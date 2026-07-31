@@ -453,6 +453,7 @@ export function cartTotals(
   lines: CartLine[],
   cartDiscount: number,
   cartDiscountType: DiscountType = "amount",
+  tax?: TaxSettings,
 ) {
   const subtotal = r2(lines.reduce((a, l) => a + l.price * l.qty, 0));
   const lineDiscount = r2(lines.reduce((a, l) => a + lineUnitDiscount(l) * l.qty, 0));
@@ -463,12 +464,31 @@ export function cartTotals(
   const discount = r2(lineDiscount + billDiscount);
   // Spread the bill-level discount proportionally so tax stays accurate.
   const ratio = base !== 0 ? (base - billDiscount) / base : 1;
-  const tax = r2(
-    lines.reduce((a, l) => a + (l.price - lineUnitDiscount(l)) * l.qty * l.taxRate * ratio, 0),
-  );
+  /** taxable value of the ticket after every discount */
+  const net = r2(subtotal - discount);
+  let taxAmount: number;
+  let total: number;
+  if (tax) {
+    const rate = tax.enabled ? (tax.rate || 0) / 100 : 0;
+    if (!tax.enabled) {
+      taxAmount = 0;
+      total = net;
+    } else if (tax.mode === "inclusive") {
+      // prices already carry the tax — pull it back out for reporting
+      taxAmount = r2(net - net / (1 + rate));
+      total = net;
+    } else {
+      taxAmount = r2(net * rate);
+      total = r2(net + taxAmount);
+    }
+  } else {
+    taxAmount = r2(
+      lines.reduce((a, l) => a + (l.price - lineUnitDiscount(l)) * l.qty * l.taxRate * ratio, 0),
+    );
+    total = r2(net + taxAmount);
+  }
   const credit = r2(
     lines.filter((l) => l.credit).reduce((a, l) => a + (l.price - lineUnitDiscount(l)) * -l.qty, 0),
   );
-  const total = r2(subtotal - discount + tax);
-  return { subtotal, discount, lineDiscount, billDiscount, tax, total, credit };
+  return { subtotal, discount, lineDiscount, billDiscount, tax: taxAmount, total, credit, net };
 }
