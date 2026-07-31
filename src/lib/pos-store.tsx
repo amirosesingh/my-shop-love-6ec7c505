@@ -34,11 +34,22 @@ type NewTransfer = {
   kind: TransferKind;
   fromStoreId: string;
   toStoreId: string;
-  productId: string;
-  qty: number;
+  items: { productId: string; qty: number }[];
   note: string;
   createdBy: string;
 };
+
+/** Apply a stock delta for every line of a transfer at one store. */
+const bumpItems = (
+  products: Product[],
+  items: { productId: string; qty: number }[],
+  storeId: string,
+  sign: 1 | -1,
+) =>
+  products.map((p) => {
+    const item = items.find((i) => i.productId === p.id);
+    return item ? bump(p, storeId, sign * item.qty) : p;
+  });
 
 type Ctx = {
   ready: boolean;
