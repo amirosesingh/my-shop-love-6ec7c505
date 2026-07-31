@@ -10,101 +10,151 @@ import {
 
 export type PosRole = "cashier" | "admin";
 
+/** An employee record the admin can edit at any time. */
+export type StaffMember = {
+  id: string;
+  name: string;
+  /** unique staff id used to sign in */
+  staffId: string;
+  password: string;
+  /** current assigned store duty */
+  storeId: string;
+};
+
 export type PosUser = {
-  username: string;
+  staffId: string;
   name: string;
   role: PosRole;
   /** null for admin = access to every store */
   storeId: string | null;
 };
 
-type Account = PosUser & { password: string };
+const ADMIN = { staffId: "admin", password: "123", name: "Store Admin" };
 
-/** Mock accounts — local demo only, no backend. */
-const ACCOUNTS: Account[] = [
-  {
-    username: "cashier1",
-    password: "123",
-    name: "Cashier One",
-    role: "cashier",
-    storeId: "s1",
-  },
-  {
-    username: "cashier2",
-    password: "123",
-    name: "Cashier Two",
-    role: "cashier",
-    storeId: "s2",
-  },
-  {
-    username: "admin",
-    password: "123",
-    name: "Store Admin",
-    role: "admin",
-    storeId: null,
-  },
+const SEED_STAFF: StaffMember[] = [
+  { id: "u1", name: "John Carter", staffId: "EMP-101", password: "123", storeId: "s1" },
+  { id: "u2", name: "Maya Lin", staffId: "EMP-102", password: "123", storeId: "s2" },
+  { id: "u3", name: "Sofia Reyes", staffId: "EMP-103", password: "123", storeId: "s3" },
 ];
 
-const KEY = "pos-session-v1";
+const STAFF_KEY = "pos-staff-v1";
+const SESSION_KEY = "pos-session-v2";
 
 type AuthCtx = {
   ready: boolean;
   user: PosUser | null;
   isAdmin: boolean;
-  login: (username: string, password: string) => { ok: boolean; error?: string };
+  staff: StaffMember[];
+  addStaff: (member: Omit<StaffMember, "id">) => void;
+  updateStaff: (member: StaffMember) => void;
+  removeStaff: (id: string) => void;
+  login: (staffId: string, password: string) => { ok: boolean; error?: string };
   logout: () => void;
 };
 
 const AuthContext = createContext<AuthCtx | null>(null);
 
+const norm = (v: string) => v.trim().toLowerCase();
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<PosUser | null>(null);
+  const [staff, setStaff] = useState<StaffMember[]>(SEED_STAFF);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     try {
-      const raw = window.localStorage.getItem(KEY);
-      if (raw) {
-        const saved = JSON.parse(raw) as PosUser;
-        const found = ACCOUNTS.find((a) => a.username === saved.username);
-        if (found) {
-          const { password: _pw, ...safe } = found;
-          setUser(safe);
-        }
-      }
+      const rawStaff = window.localStorage.getItem(STAFF_KEY);
+      if (rawStaff) setStaff(JSON.parse(rawStaff) as StaffMember[]);
+      const rawSession = window.localStorage.getItem(SESSION_KEY);
+      if (rawSession) setSessionId(rawSession);
     } catch {
       /* ignore corrupt storage */
     }
     setReady(true);
   }, []);
 
-  const login = useCallback((username: string, password: string) => {
-    const found = ACCOUNTS.find(
-      (a) => a.username === username.trim().toLowerCase() && a.password === password,
-    );
-    if (!found) return { ok: false, error: "Invalid username or password" };
-    const { password: _pw, ...safe } = found;
-    setUser(safe);
+  const persist = useCallback((next: StaffMember[]) => {
+    setStaff(next);
     try {
-      window.localStorage.setItem(KEY, JSON.stringify(safe));
+      window.localStorage.setItem(STAFF_KEY, JSON.stringify(next));
     } catch {
       /* storage full */
     }
-    return { ok: true };
   }, []);
 
+  const addStaff = useCallback(
+    (member: Omit<StaffMember, "id">) =>
+      persist([...staff, { ...member, id: crypto.randomUUID() }]),
+    [persist, staff],
+  );
+
+  const updateStaff = useCallback(
+    (member: StaffMember) => persist(staff.map((s) => (s.id === member.id ? member : s))),
+    [persist, staff],
+  );
+
+  const removeStaff = useCallback(
+    (id: string) => persist(staff.filter((s) => s.id !== id)),
+    [persist, staff],
+  );
+
+  const login = useCallback(
+    (staffId: string, password: string) => {
+      const id = norm(staffId);
+      if (id === ADMIN.staffId && password === ADMIN.password) {
+        setSessionId(ADMIN.staffId);
+        try {
+          window.localStorage.setItem(SESSION_KEY, ADMIN.staffId);
+        } catch {
+          /* ignore */
+        }
+        return { ok: true };
+      }
+      const found = staff.find((s) => norm(s.staffId) === id && s.password === password);
+      if (!found) return { ok: false, error: "Invalid staff ID or password" };
+      setSessionId(found.staffId);
+      try {
+        window.localStorage.setItem(SESSION_KEY, found.staffId);
+      } catch {
+        /* ignore */
+      }
+      return { ok: true };
+    },
+    [staff],
+  );
+
   const logout = useCallback(() => {
-    setUser(null);
+    setSessionId(null);
     try {
-      window.localStorage.removeItem(KEY);
+      window.localStorage.removeItem(SESSION_KEY);
     } catch {
       /* ignore */
     }
   }, []);
 
+  // Resolved fresh from the staff list so a duty change applies immediately.
+  const user = useMemo<PosUser | null>(() => {
+    if (!sessionId) return null;
+    if (norm(sessionId) === ADMIN.staffId)
+      return { staffId: ADMIN.staffId, name: ADMIN.name, role: "admin", storeId: null };
+    const found = staff.find((s) => norm(s.staffId) === norm(sessionId));
+    if (!found) return null;
+    return { staffId: found.staffId, name: found.name, role: "cashier", storeId: found.storeId };
+  }, [sessionId, staff]);
+
   const value = useMemo<AuthCtx>(
-    () => ({ ready, user, isAdmin: user?.role === "admin", login, logout }),
-    [ready, user, login, logout],
+    () => ({
+      ready,
+      user,
+      isAdmin: user?.role === "admin",
+      staff,
+      addStaff,
+      updateStaff,
+      removeStaff,
+      login,
+      logout,
+    }),
+    [ready, user, staff, addStaff, updateStaff, removeStaff, login, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
