@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Gift, Percent, Plus, Sparkles, Trash2, Trophy } from "lucide-react";
+import { Crown, Gift, Percent, Plus, Sparkles, Trash2, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ import {
 import { money, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
 import { isLive } from "@/lib/pos-promotions";
-import type { DiscountType, PromoType, Promotion } from "@/lib/pos-types";
+import type { DiscountType, MemberTier, PromoType, Promotion } from "@/lib/pos-types";
 
 export const Route = createFileRoute("/promotions")({
   head: () => ({
@@ -44,6 +44,7 @@ const typeLabel: Record<PromoType, string> = {
   foc: "FOC (free item)",
   birthday: "Birthday discount",
   threshold: "Threshold discount",
+  tier: "Membership tier discount",
 };
 
 const typeIcon: Record<PromoType, typeof Percent> = {
@@ -51,7 +52,10 @@ const typeIcon: Record<PromoType, typeof Percent> = {
   foc: Gift,
   birthday: Sparkles,
   threshold: Percent,
+  tier: Crown,
 };
+
+const TIERS: MemberTier[] = ["Bronze", "Silver", "Gold"];
 
 const blank = (): Promotion => ({
   id: crypto.randomUUID(),
@@ -63,6 +67,7 @@ const blank = (): Promotion => ({
   focQty: 1,
   value: 10,
   valueType: "percent",
+  tierRates: { Bronze: 5, Silver: 10, Gold: 15 },
 });
 
 function Promotions() {
@@ -86,6 +91,8 @@ function Promotions() {
         return `Spend ${money(p.minBill ?? 0)} → ${
           p.valueType === "percent" ? `${p.value ?? 0}% off` : `${money(p.value ?? 0)} off`
         }`;
+      case "tier":
+        return TIERS.map((t) => `${t}: ${p.tierRates?.[t] ?? 0}%`).join(" · ");
     }
   }
 
@@ -281,6 +288,40 @@ function Promotions() {
                 </>
               )}
 
+              {draft.type === "birthday" && (
+                <></>
+              )}
+              {draft.type === "tier" && (
+                <div className="col-span-2 space-y-2">
+                  <Label className="text-xs text-muted-foreground">
+                    Discount percent by membership tier
+                  </Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {TIERS.map((t) => (
+                      <div key={t} className="space-y-1">
+                        <Label className="text-[11px] text-muted-foreground">{t}</Label>
+                        <Input
+                          className="numeric"
+                          value={draft.tierRates?.[t] ?? 0}
+                          onChange={(e) =>
+                            setDraft({
+                              ...draft,
+                              tierRates: {
+                                ...{ Bronze: 0, Silver: 0, Gold: 0 },
+                                ...(draft.tierRates ?? {}),
+                                [t]: Number(e.target.value) || 0,
+                              },
+                            })
+                          }
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Auto-applies at the register as soon as a member is attached to the ticket.
+                  </p>
+                </div>
+              )}
               {draft.type === "birthday" && (
                 <div className="col-span-2 space-y-1">
                   <Label className="text-xs text-muted-foreground">Discount percent</Label>
