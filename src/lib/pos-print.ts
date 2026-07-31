@@ -27,6 +27,21 @@ const fmt = (n: number) => n.toFixed(2);
 const esc = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
+/** Deterministic Code39-style bar pattern rendered from any reference string. */
+export function barcodeSvg(value: string) {
+  const chars = `*${value.toUpperCase()}*`.split("");
+  let bars = "";
+  chars.forEach((ch, i) => {
+    const code = ch.charCodeAt(0) + i;
+    for (let b = 0; b < 5; b++) {
+      const wide = (code >> b) & 1;
+      bars += `<i style="width:${wide ? 3 : 1}px"></i>`;
+      bars += `<i style="width:${wide ? 1 : 2}px;background:transparent"></i>`;
+    }
+  });
+  return `<div class="barcode">${bars}</div><div class="bc-text">${esc(value)}</div>`;
+}
+
 const shell = (title: string, body: string) => `<!doctype html><html><head>
 <meta charset="utf-8"><title>${esc(title)}</title>
 <style>
@@ -110,6 +125,18 @@ function saleBody(sale: Sale, member: Member | null, kind: ReceiptKind) {
     <table>${rows}</table>
     ${totals}
     ${memberBlock}
+    <hr>
+    ${
+      kind === "gift"
+        ? `<div class="c muted">GIFT RETURN CODE</div>${barcodeSvg(`GIFT-${sale.receiptNo}`)}`
+        : kind === "kitchen"
+          ? ""
+          : `${barcodeSvg(sale.receiptNo)}${
+              sale.method === "card"
+                ? `<div class="muted" style="margin-top:8px">Cardholder signature</div><div class="muted">______________________________</div>`
+                : ""
+            }`
+    }
     <hr>
     <div class="c muted">${
       kind === "gift"
