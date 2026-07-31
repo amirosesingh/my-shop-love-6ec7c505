@@ -1,3 +1,11 @@
+export type Store = {
+  id: string;
+  code: string;
+  name: string;
+  address: string;
+  phone: string;
+};
+
 export type Product = {
   id: string;
   name: string;
@@ -6,7 +14,8 @@ export type Product = {
   category: string;
   price: number;
   cost: number;
-  stock: number;
+  /** stock per store id */
+  stockByStore: Record<string, number>;
   reorderLevel: number;
   taxRate: number;
 };
@@ -21,6 +30,7 @@ export type Member = {
   points: number;
   totalSpend: number;
   joinedAt: string;
+  homeStoreId?: string;
 };
 
 export type CartLine = {
@@ -37,6 +47,7 @@ export type PaymentMethod = "cash" | "card" | "wallet" | "points";
 export type Sale = {
   id: string;
   receiptNo: string;
+  storeId: string;
   shiftId: string;
   lines: CartLine[];
   subtotal: number;
@@ -55,6 +66,7 @@ export type Sale = {
 
 export type Shift = {
   id: string;
+  storeId: string;
   cashier: string;
   openedAt: string;
   closedAt: string | null;
@@ -63,10 +75,39 @@ export type Shift = {
   note: string;
 };
 
+export type TransferKind = "transfer" | "request";
+export type TransferStatus =
+  | "requested"
+  | "in_transit"
+  | "received"
+  | "rejected"
+  | "cancelled";
+
+export type Transfer = {
+  id: string;
+  ref: string;
+  kind: TransferKind;
+  /** store the goods leave from */
+  fromStoreId: string;
+  /** store the goods arrive at */
+  toStoreId: string;
+  productId: string;
+  qty: number;
+  status: TransferStatus;
+  note: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type PosState = {
+  stores: Store[];
+  currentStoreId: string;
   products: Product[];
   members: Member[];
   sales: Sale[];
   shifts: Shift[];
+  transfers: Transfer[];
   counter: number;
+  transferCounter: number;
 };

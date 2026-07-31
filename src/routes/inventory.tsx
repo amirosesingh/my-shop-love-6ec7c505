@@ -23,7 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { money, usePos } from "@/lib/pos-store";
+import { money, stockAt, usePos } from "@/lib/pos-store";
 import type { Product } from "@/lib/pos-types";
 
 export const Route = createFileRoute("/inventory")({
@@ -41,7 +41,7 @@ export const Route = createFileRoute("/inventory")({
   component: Inventory,
 });
 
-const blank = (): Product => ({
+const blank = (storeId: string): Product => ({
   id: crypto.randomUUID(),
   name: "",
   sku: "",
@@ -49,28 +49,33 @@ const blank = (): Product => ({
   category: "General",
   price: 0,
   cost: 0,
-  stock: 0,
+  stockByStore: { [storeId]: 0 },
   reorderLevel: 10,
   taxRate: 0.05,
 });
 
 function Inventory() {
-  const { state, upsertProduct, removeProduct, adjustStock } = usePos();
+  const { state, stores, currentStore, upsertProduct, removeProduct, adjustStock } = usePos();
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState<Product | null>(null);
 
   const rows = state.products.filter((p) =>
     `${p.name} ${p.sku} ${p.barcode} ${p.category}`.toLowerCase().includes(query.toLowerCase()),
   );
-  const lowStock = state.products.filter((p) => p.stock <= p.reorderLevel);
-  const stockValue = state.products.reduce((a, p) => a + p.cost * p.stock, 0);
+  const lowStock = state.products.filter(
+    (p) => stockAt(p, currentStore.id) <= p.reorderLevel,
+  );
+  const stockValue = state.products.reduce(
+    (a, p) => a + p.cost * stockAt(p, currentStore.id),
+    0,
+  );
 
   return (
     <AppShell>
       <div className="space-y-5 p-6">
         <header className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold">Inventory</h1>
+            <h1 className="text-2xl font-semibold">Inventory · {currentStore.name}</h1>
             <p className="text-sm text-muted-foreground">
               {state.products.length} products · stock value{" "}
               <span className="numeric">{money(stockValue)}</span> ·{" "}
@@ -89,10 +94,10 @@ function Inventory() {
             </div>
             <Dialog
               open={!!draft}
-              onOpenChange={(o) => setDraft(o ? (draft ?? blank()) : null)}
+              onOpenChange={(o) => setDraft(o ? (draft ?? blank(currentStore.id)) : null)}
             >
               <DialogTrigger asChild>
-                <Button onClick={() => setDraft(blank())}>
+                <Button onClick={() => setDraft(blank(currentStore.id))}>
                   <Plus className="size-4" /> New product
                 </Button>
               </DialogTrigger>
@@ -149,11 +154,19 @@ function Inventory() {
                         onChange={(e) => setDraft({ ...draft, cost: Number(e.target.value) || 0 })}
                       />
                     </Field>
-                    <Field label="Stock">
+                    <Field label={`Stock · ${currentStore.code}`}>
                       <Input
                         className="numeric"
-                        value={draft.stock}
-                        onChange={(e) => setDraft({ ...draft, stock: Number(e.target.value) || 0 })}
+                        value={stockAt(draft, currentStore.id)}
+                        onChange={(e) =>
+                          setDraft({
+                            ...draft,
+                            stockByStore: {
+                              ...draft.stockByStore,
+                              [currentStore.id]: Number(e.target.value) || 0,
+                            },
+                          })
+                        }
                       />
                     </Field>
                     <Field label="Reorder level">
@@ -196,7 +209,8 @@ function Inventory() {
                 <TableHead className="text-right">Cost</TableHead>
                 <TableHead className="text-right">Price</TableHead>
                 <TableHead className="text-right">Margin</TableHead>
-                <TableHead className="text-center">Stock</TableHead>
+                <TableHead className="text-center">Stock · {currentStore.code}</TableHead>
+                <TableHead className="text-center">Other stores</TableHead>
                 <TableHead />
               </TableRow>
             </TableHeader>
@@ -228,14 +242,30 @@ function Inventory() {
                       <Badge
                         variant="outline"
                         className={`numeric w-12 justify-center ${
-                          p.stock <= p.reorderLevel ? "border-warning/50 text-warning" : ""
+                          stockAt(p, currentStore.id) <= p.reorderLevel
+                            ? "border-warning/50 text-warning"
+                            : ""
                         }`}
                       >
-                        {p.stock}
+                        {stockAt(p, currentStore.id)}
                       </Badge>
                       <Button size="icon" variant="outline" className="size-7" onClick={() => adjustStock(p.id, 1)}>
                         <Plus className="size-3" />
                       </Button>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap justify-center gap-1">
+                      {stores
+                        .filter((s) => s.id !== currentStore.id)
+                        .map((s) => (
+                          <span
+                            key={s.id}
+                            className="numeric rounded border border-border px-1.5 py-0.5 text-[11px] text-muted-foreground"
+                          >
+                            {s.code} {stockAt(p, s.id)}
+                          </span>
+                        ))}
                     </div>
                   </TableCell>
                   <TableCell className="text-right">

@@ -1,4 +1,28 @@
-import type { PosState } from "./pos-types";
+import type { PosState, Store } from "./pos-types";
+
+export const seedStores: Store[] = [
+  {
+    id: "s1",
+    code: "HRB",
+    name: "Harbour Street",
+    address: "42 Harbour Street, Unit 3",
+    phone: "555-0100",
+  },
+  {
+    id: "s2",
+    code: "MKT",
+    name: "Market Square",
+    address: "8 Market Square",
+    phone: "555-0121",
+  },
+  {
+    id: "s3",
+    code: "APT",
+    name: "Airport Kiosk",
+    address: "Terminal 2, Gate B",
+    phone: "555-0188",
+  },
+];
 
 const p = (
   id: string,
@@ -15,13 +39,21 @@ const p = (
   category,
   price,
   cost,
-  stock,
+  stockByStore: {
+    s1: stock,
+    s2: Math.round(stock * 0.6),
+    s3: Math.round(stock * 0.25),
+  } as Record<string, number>,
   reorderLevel: 10,
   taxRate: 0.05,
 });
 
 export const seedState: PosState = {
+  stores: seedStores,
+  currentStoreId: "s1",
   counter: 1042,
+  transferCounter: 24,
+  transfers: [],
   products: [
     p("p1", "Espresso Beans 250g", "Coffee", 12.5, 7.2, 34),
     p("p2", "Cold Brew Can", "Coffee", 4.25, 2.1, 120),
@@ -50,6 +82,7 @@ export const seedState: PosState = {
       points: 1840,
       totalSpend: 1840.5,
       joinedAt: "2024-03-11",
+      homeStoreId: "s1",
     },
     {
       id: "m2",
@@ -61,6 +94,7 @@ export const seedState: PosState = {
       points: 620,
       totalSpend: 620.0,
       joinedAt: "2024-09-02",
+      homeStoreId: "s2",
     },
     {
       id: "m3",
@@ -72,6 +106,7 @@ export const seedState: PosState = {
       points: 145,
       totalSpend: 145.25,
       joinedAt: "2025-01-20",
+      homeStoreId: "s3",
     },
   ],
   sales: [],

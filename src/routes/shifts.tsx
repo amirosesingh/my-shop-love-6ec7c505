@@ -43,15 +43,17 @@ export const Route = createFileRoute("/shifts")({
 });
 
 function Shifts() {
-  const { state, activeShift, openShift, closeShift, refundSale } = usePos();
+  const { state, activeShift, openShift, closeShift, refundSale, currentStore } = usePos();
   const [cashier, setCashier] = useState("Alex Rivera");
   const [float, setFloat] = useState("150");
   const [counted, setCounted] = useState("");
   const [note, setNote] = useState("");
   const [closeOpen, setCloseOpen] = useState(false);
 
+  const storeSales = state.sales.filter((s) => s.storeId === currentStore.id);
+  const storeShifts = state.shifts.filter((s) => s.storeId === currentStore.id);
   const shiftSales = activeShift
-    ? state.sales.filter((s) => s.shiftId === activeShift.id && !s.refunded)
+    ? storeSales.filter((s) => s.shiftId === activeShift.id && !s.refunded)
     : [];
   const cashTaken = shiftSales.filter((s) => s.method === "cash").reduce((a, s) => a + s.total, 0);
   const expected = (activeShift?.openingFloat ?? 0) + cashTaken;
@@ -61,7 +63,9 @@ function Shifts() {
       <div className="space-y-6 p-6">
         <header className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold">Shifts &amp; receipts</h1>
+            <h1 className="text-2xl font-semibold">
+              Shifts &amp; receipts · {currentStore.name}
+            </h1>
             <p className="text-sm text-muted-foreground">
               Drawer control, X / Z reports and full sales history
             </p>
@@ -84,7 +88,7 @@ function Shifts() {
               <div className="md:col-span-4 flex flex-wrap gap-2">
                 <Button
                   variant="outline"
-                  onClick={() => printShiftReport(activeShift, state.sales, "xreport")}
+                  onClick={() => printShiftReport(activeShift, storeSales, "xreport")}
                 >
                   <Printer className="size-4" /> Print X report
                 </Button>
@@ -140,7 +144,7 @@ function Shifts() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {state.sales.map((s) => {
+              {storeSales.map((s) => {
                 const member = state.members.find((m) => m.id === s.memberId) ?? null;
                 return (
                   <TableRow key={s.id}>
@@ -192,7 +196,7 @@ function Shifts() {
                   </TableRow>
                 );
               })}
-              {!state.sales.length && (
+              {!storeSales.length && (
                 <TableRow>
                   <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
                     No sales recorded yet.
@@ -218,7 +222,7 @@ function Shifts() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {state.shifts.map((sh) => (
+              {storeShifts.map((sh) => (
                 <TableRow key={sh.id}>
                   <TableCell>{sh.cashier}</TableCell>
                   <TableCell className="text-muted-foreground">
@@ -235,14 +239,14 @@ function Shifts() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => printShiftReport(sh, state.sales, "zreport")}
+                      onClick={() => printShiftReport(sh, storeSales, "zreport")}
                     >
                       <Printer className="size-4" />
                     </Button>
                   </TableCell>
                 </TableRow>
               ))}
-              {!state.shifts.length && (
+              {!storeShifts.length && (
                 <TableRow>
                   <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
                     No shifts yet.
@@ -287,7 +291,7 @@ function Shifts() {
               onClick={() => {
                 const closed = closeShift(Number(counted || 0), note);
                 if (closed) {
-                  printShiftReport(closed, state.sales, "zreport");
+                  printShiftReport(closed, storeSales, "zreport");
                   openCashDrawer();
                   toast.success("Shift closed · Z report printed");
                 }
