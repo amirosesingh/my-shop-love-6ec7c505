@@ -535,31 +535,79 @@ function Register() {
           </ScrollArea>
 
           <div className="space-y-2 border-t border-border px-4 py-3 text-sm">
+            {exchangeRef && (
+              <div className="flex items-center justify-between rounded-md border border-accent/40 bg-accent/10 px-2 py-1.5 text-[11px]">
+                <span>Exchange against bill #{exchangeRef}</span>
+                <button
+                  className="text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    setLines((ls) => ls.filter((l) => !l.credit));
+                    setExchangeRef(null);
+                  }}
+                >
+                  remove
+                </button>
+              </div>
+            )}
             <Row label="Subtotal" value={money(totals.subtotal)} />
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Discount</span>
-              <Input
-                value={cartDiscount || ""}
-                onChange={(e) => setCartDiscount(Number(e.target.value) || 0)}
-                placeholder="0.00"
-                className="numeric h-8 w-24 text-right"
+            {totals.credit > 0 && (
+              <Row
+                label={`Store credit #${exchangeRef ?? ""}`}
+                value={`-${money(totals.credit)}`}
               />
+            )}
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Bill discount</span>
+              <div className="flex items-center gap-1">
+                <Input
+                  value={cartDiscount || ""}
+                  onChange={(e) => setCartDiscount(Number(e.target.value) || 0)}
+                  placeholder="0.00"
+                  className="numeric h-8 w-20 text-right"
+                />
+                <div className="flex overflow-hidden rounded-md border border-border">
+                  {(["amount", "percent"] as const).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setCartDiscountType(t)}
+                      className={`px-2 py-1.5 text-xs ${
+                        cartDiscountType === t
+                          ? "bg-primary/15 text-primary"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {t === "amount" ? "$" : "%"}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
+            <Row label="Discount applied" value={`-${money(totals.discount)}`} />
             <Row label="Tax" value={money(totals.tax)} />
             <Separator />
             <div className="flex items-center justify-between">
-              <span className="text-base font-semibold">Total</span>
-              <span className="numeric text-2xl font-bold text-primary">{money(totals.total)}</span>
+              <span className="text-base font-semibold">
+                {refundDue > 0 ? "Refund due" : "Balance due"}
+              </span>
+              <span
+                className={`numeric text-2xl font-bold ${refundDue > 0 ? "text-accent" : "text-primary"}`}
+              >
+                {money(refundDue > 0 ? refundDue : balanceDue)}
+              </span>
             </div>
             <Button
               className="mt-1 h-12 w-full text-base"
               disabled={!lines.length || !activeShift}
               onClick={() => {
-                setTendered(totals.total.toFixed(2));
+                setTendered(Math.max(0, totals.total).toFixed(2));
                 setPayOpen(true);
               }}
             >
-              {activeShift ? `Charge ${money(totals.total)}` : "Shift closed — selling locked"}
+              {!activeShift
+                ? "Shift closed — selling locked"
+                : refundDue > 0
+                  ? `Refund ${money(refundDue)}`
+                  : `Charge ${money(balanceDue)}`}
             </Button>
             {lastSale && (
               <div className="flex flex-wrap gap-2 pt-1">
