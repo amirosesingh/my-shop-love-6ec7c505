@@ -14,6 +14,10 @@ export type Product = {
   category: string;
   price: number;
   cost: number;
+  /** online storefront price */
+  ecomPrice?: number;
+  /** visible on the e-commerce website */
+  ecomVisible?: boolean;
   /** stock per store id */
   stockByStore: Record<string, number>;
   reorderLevel: number;
