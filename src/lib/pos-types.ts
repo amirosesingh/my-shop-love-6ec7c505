@@ -35,6 +35,8 @@ export type Member = {
   totalSpend: number;
   joinedAt: string;
   homeStoreId?: string;
+  /** date of birth, ISO yyyy-mm-dd — powers birthday promotions */
+  birthday?: string;
 };
 
 export type CartLine = {
@@ -48,6 +50,10 @@ export type CartLine = {
   discountType?: DiscountType;
   /** exchange credit line (negative qty) returned against an earlier bill */
   credit?: boolean;
+  /** free-of-charge promo line, priced at 0 */
+  foc?: boolean;
+  /** promotion that generated this line */
+  promoId?: string;
 };
 
 export type DiscountType = "amount" | "percent";
@@ -138,6 +144,31 @@ export type PosState = {
   sales: Sale[];
   shifts: Shift[];
   transfers: Transfer[];
+  promotions: Promotion[];
   counter: number;
   transferCounter: number;
+};
+
+export type PromoType = "points" | "foc" | "birthday" | "threshold";
+
+export type Promotion = {
+  id: string;
+  name: string;
+  type: PromoType;
+  active: boolean;
+  /** optional ISO yyyy-mm-dd window */
+  startDate?: string;
+  endDate?: string;
+  /** points policy */
+  pointsPerDollar?: number;
+  /** foc + threshold: minimum bill amount to trigger */
+  minBill?: number;
+  /** foc: product handed out for free */
+  focProductId?: string;
+  /** foc: how many units */
+  focQty?: number;
+  /** birthday + threshold: discount value */
+  value?: number;
+  /** how `value` is read (threshold rules only; birthday is always percent) */
+  valueType?: DiscountType;
 };
