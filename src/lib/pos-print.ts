@@ -1,4 +1,14 @@
-import type { Member, Product, Sale, Shift, Store, Transfer } from "./pos-types";
+import type {
+  Member,
+  PaperSize,
+  Product,
+  ReceiptSettings,
+  Sale,
+  Shift,
+  Store,
+  TaxSettings,
+  Transfer,
+} from "./pos-types";
 import { lineUnitDiscount } from "./pos-types";
 
 export const STORE = {
@@ -11,6 +21,44 @@ export const STORE = {
 let activeBranch: Store | null = null;
 export function setPrintStore(store: Store | null) {
   activeBranch = store;
+}
+
+/** Receipt customizer + tax configuration, pushed in by the app shell. */
+let receiptCfg: ReceiptSettings = {
+  paper: "80mm",
+  headerText: "42 Harbour Street, Unit 3\nTel 555-0100 · VAT 88-2201194",
+  footerText: "Thank you — see you again soon",
+  showLogo: true,
+  showPoints: true,
+  showBarcode: true,
+  showTax: true,
+};
+let taxCfg: TaxSettings = { enabled: true, rate: 5, mode: "exclusive" };
+
+export function setPrintSettings(receipt: ReceiptSettings, tax: TaxSettings) {
+  receiptCfg = receipt;
+  taxCfg = tax;
+}
+
+export const PAPER_LABELS: Record<PaperSize, string> = {
+  "80mm": "80mm Thermal (Standard)",
+  "58mm": "58mm Thermal (Mini)",
+  a4: "A4 Sheet",
+  letter: "Letter",
+};
+
+/** @page + body geometry for each supported slip size. */
+export function paperCss(paper: PaperSize) {
+  switch (paper) {
+    case "58mm":
+      return { page: "58mm auto", width: "50mm", font: "10px", h1: "13px" };
+    case "a4":
+      return { page: "A4", width: "180mm", font: "13px", h1: "22px" };
+    case "letter":
+      return { page: "Letter", width: "170mm", font: "13px", h1: "22px" };
+    default:
+      return { page: "80mm auto", width: "72mm", font: "12px", h1: "15px" };
+  }
 }
 
 export type ReceiptKind =
@@ -43,25 +91,33 @@ export function barcodeSvg(value: string) {
   return `<div class="barcode">${bars}</div><div class="bc-text">${esc(value)}</div>`;
 }
 
-const shell = (title: string, body: string, autoPrint = true) => `<!doctype html><html><head>
+const shell = (title: string, body: string, autoPrint = true) => {
+  const p = paperCss(receiptCfg.paper);
+  return `<!doctype html><html><head>
 <meta charset="utf-8"><title>${esc(title)}</title>
 <style>
-  @page { size: 80mm auto; margin: 4mm; }
+  @page { size: ${p.page}; margin: ${receiptCfg.paper === "58mm" ? "3mm" : receiptCfg.paper === "80mm" ? "4mm" : "12mm"}; }
   * { box-sizing: border-box; }
-  body { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12px; color: #000; margin: 0; width: 72mm; }
-  h1 { font-size: 15px; letter-spacing: 2px; text-align: center; margin: 0 0 2px; }
+  body { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: ${p.font}; color: #000; margin: 0 auto; width: ${p.width}; }
+  h1 { font-size: ${p.h1}; letter-spacing: 2px; text-align: center; margin: 0 0 2px; }
   .c { text-align: center; }
-  .muted { font-size: 10px; }
+  .muted { font-size: 0.85em; }
+  .logo { text-align: center; margin-bottom: 4px; }
+  .logo span { display: inline-block; border: 2px solid #000; border-radius: 4px; padding: 3px 8px; font-weight: 700; letter-spacing: 3px; font-size: 1.1em; }
   hr { border: none; border-top: 1px dashed #000; margin: 6px 0; }
   table { width: 100%; border-collapse: collapse; }
   td { vertical-align: top; padding: 1px 0; }
   .r { text-align: right; }
   .b { font-weight: 700; }
-  .big { font-size: 14px; }
-  .tag { border: 1px solid #000; padding: 2px 4px; display: inline-block; margin-top: 4px; font-size: 10px; letter-spacing: 1px; }
+  .big { font-size: 1.2em; }
+  .tag { border: 1px solid #000; padding: 2px 4px; display: inline-block; margin-top: 4px; font-size: 0.8em; letter-spacing: 1px; }
   .barcode { display: flex; align-items: flex-end; justify-content: center; height: 38px; gap: 1px; margin-top: 6px; }
   .barcode i { display: block; background: #000; height: 100%; }
-  .bc-text { text-align: center; font-size: 10px; letter-spacing: 3px; margin-top: 2px; }
+  .bc-text { text-align: center; font-size: 0.85em; letter-spacing: 3px; margin-top: 2px; }
+  @media print {
+    html, body { width: ${p.width}; margin: 0 auto; }
+    .no-print { display: none !important; }
+  }
 </style></head><body>${body}
 ${
   autoPrint
@@ -69,15 +125,19 @@ ${
     : ""
 }
 </body></html>`;
+};
 
 const header = (subtitle?: string) => `
+  ${receiptCfg.showLogo ? `<div class="logo"><span>N&amp;CO</span></div>` : ""}
   <h1>${STORE.name}</h1>
   <div class="c muted">${esc(
     activeBranch ? `${activeBranch.name} (${activeBranch.code})` : STORE.line1,
   )}</div>
-  <div class="c muted">${esc(
-    activeBranch ? `${activeBranch.address} · Tel ${activeBranch.phone}` : STORE.line2,
-  )}</div>
+  ${(receiptCfg.headerText || "")
+    .split("\n")
+    .filter(Boolean)
+    .map((l) => `<div class="c muted">${esc(l)}</div>`)
+    .join("")}
   ${subtitle ? `<div class="c tag">${esc(subtitle)}</div>` : ""}
   <hr>`;
 
@@ -118,7 +178,11 @@ function saleBody(sale: Sale, member: Member | null, kind: ReceiptKind) {
           ? `<tr><td>Store Credit from Bill #${esc(sale.exchangeOfReceiptNo)}</td><td class="r">-${fmt(sale.exchangeCredit ?? 0)}</td></tr>`
           : ""
       }
-      <tr><td>Tax</td><td class="r">${fmt(sign * sale.tax)}</td></tr>
+      ${
+        receiptCfg.showTax
+          ? `<tr><td>Tax${taxCfg.enabled ? ` ${taxCfg.rate}%${taxCfg.mode === "inclusive" ? " incl." : ""}` : " (off)"}</td><td class="r">${fmt(sign * sale.tax)}</td></tr>`
+          : ""
+      }
       <tr class="b big"><td>TOTAL</td><td class="r">${fmt(sign * sale.total)}</td></tr>
       <tr><td>${esc(sale.method.toUpperCase())}</td><td class="r">${fmt(sign * sale.paid)}</td></tr>
       <tr><td>Change</td><td class="r">${fmt(sale.change)}</td></tr>
@@ -126,7 +190,11 @@ function saleBody(sale: Sale, member: Member | null, kind: ReceiptKind) {
 
   const memberBlock = member
     ? `<hr><div>Member ${esc(member.code)} · ${esc(member.name)}</div>
-       <div class="muted">Tier ${member.tier} · Points earned ${sale.pointsEarned} · Balance ${member.points}</div>`
+       ${
+         receiptCfg.showPoints
+           ? `<div class="muted">Tier ${member.tier} · Points earned ${sale.pointsEarned} · Balance ${member.points}</div>`
+           : `<div class="muted">Tier ${member.tier}</div>`
+       }`
     : "";
 
   return `${header(subtitle)}
@@ -142,10 +210,12 @@ function saleBody(sale: Sale, member: Member | null, kind: ReceiptKind) {
     <hr>
     ${
       kind === "gift"
-        ? `<div class="c muted">GIFT RETURN CODE</div>${barcodeSvg(`GIFT-${sale.receiptNo}`)}`
+        ? receiptCfg.showBarcode
+          ? `<div class="c muted">GIFT RETURN CODE</div>${barcodeSvg(`GIFT-${sale.receiptNo}`)}`
+          : `<div class="c muted">GIFT RETURN CODE ${esc(sale.receiptNo)}</div>`
         : kind === "kitchen"
           ? ""
-          : `${barcodeSvg(sale.receiptNo)}${
+          : `${receiptCfg.showBarcode ? barcodeSvg(sale.receiptNo) : ""}${
               sale.method === "card"
                 ? `<div class="muted" style="margin-top:8px">Cardholder signature</div><div class="muted">______________________________</div>`
                 : ""
@@ -155,7 +225,7 @@ function saleBody(sale: Sale, member: Member | null, kind: ReceiptKind) {
     <div class="c muted">${
       kind === "gift"
         ? "Exchangeable within 30 days with this slip"
-        : "Thank you — see you again soon"
+        : esc(receiptCfg.footerText || "")
     }</div>
     <div class="c muted">${esc(sale.receiptNo)}</div>`;
 }

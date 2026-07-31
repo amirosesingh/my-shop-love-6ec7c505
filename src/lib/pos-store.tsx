@@ -7,8 +7,9 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { seedState } from "./pos-seed";
+import { defaultSettings, seedState } from "./pos-seed";
 import type {
+  AppSettings,
   CartLine,
   Member,
   PosState,
@@ -17,6 +18,7 @@ import type {
   Sale,
   Shift,
   Store,
+  TaxSettings,
   Transfer,
   TransferKind,
 } from "./pos-types";
@@ -74,6 +76,7 @@ type Ctx = {
   upsertPromotion: (promotion: Promotion) => void;
   removePromotion: (id: string) => void;
   togglePromotion: (id: string, active: boolean) => void;
+  updateSettings: (patch: Partial<AppSettings>) => void;
   createTransfer: (input: NewTransfer) => Transfer;
   approveTransfer: (id: string) => void;
   receiveTransfer: (id: string) => void;
@@ -104,6 +107,10 @@ export function PosProvider({ children }: { children: ReactNode }) {
           ...saved,
           transfers,
           promotions: saved.promotions?.length ? saved.promotions : seedState.promotions,
+          settings: {
+            tax: { ...defaultSettings.tax, ...(saved.settings?.tax ?? {}) },
+            receipt: { ...defaultSettings.receipt, ...(saved.settings?.receipt ?? {}) },
+          },
         });
       }
     } catch {
@@ -309,6 +316,16 @@ export function PosProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  const updateSettings = useCallback((patch: Partial<AppSettings>) => {
+    setState((s) => ({
+      ...s,
+      settings: {
+        tax: { ...s.settings.tax, ...(patch.tax ?? {}) },
+        receipt: { ...s.settings.receipt, ...(patch.receipt ?? {}) },
+      },
+    }));
+  }, []);
+
   const createTransfer = useCallback((input: NewTransfer) => {
     const now = new Date().toISOString();
     const transfer: Transfer = {
@@ -410,6 +427,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     upsertPromotion,
     removePromotion,
     togglePromotion,
+    updateSettings,
     createTransfer,
     approveTransfer,
     receiveTransfer,
@@ -435,6 +453,7 @@ export function cartTotals(
   lines: CartLine[],
   cartDiscount: number,
   cartDiscountType: DiscountType = "amount",
+  tax?: TaxSettings,
 ) {
   const subtotal = r2(lines.reduce((a, l) => a + l.price * l.qty, 0));
   const lineDiscount = r2(lines.reduce((a, l) => a + lineUnitDiscount(l) * l.qty, 0));
@@ -445,12 +464,31 @@ export function cartTotals(
   const discount = r2(lineDiscount + billDiscount);
   // Spread the bill-level discount proportionally so tax stays accurate.
   const ratio = base !== 0 ? (base - billDiscount) / base : 1;
-  const tax = r2(
-    lines.reduce((a, l) => a + (l.price - lineUnitDiscount(l)) * l.qty * l.taxRate * ratio, 0),
-  );
+  /** taxable value of the ticket after every discount */
+  const net = r2(subtotal - discount);
+  let taxAmount: number;
+  let total: number;
+  if (tax) {
+    const rate = tax.enabled ? (tax.rate || 0) / 100 : 0;
+    if (!tax.enabled) {
+      taxAmount = 0;
+      total = net;
+    } else if (tax.mode === "inclusive") {
+      // prices already carry the tax — pull it back out for reporting
+      taxAmount = r2(net - net / (1 + rate));
+      total = net;
+    } else {
+      taxAmount = r2(net * rate);
+      total = r2(net + taxAmount);
+    }
+  } else {
+    taxAmount = r2(
+      lines.reduce((a, l) => a + (l.price - lineUnitDiscount(l)) * l.qty * l.taxRate * ratio, 0),
+    );
+    total = r2(net + taxAmount);
+  }
   const credit = r2(
     lines.filter((l) => l.credit).reduce((a, l) => a + (l.price - lineUnitDiscount(l)) * -l.qty, 0),
   );
-  const total = r2(subtotal - discount + tax);
-  return { subtotal, discount, lineDiscount, billDiscount, tax, total, credit };
+  return { subtotal, discount, lineDiscount, billDiscount, tax: taxAmount, total, credit, net };
 }

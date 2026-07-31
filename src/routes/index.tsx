@@ -98,8 +98,9 @@ function Register() {
 
   const member = state.members.find((m) => m.id === memberId) ?? null;
 
+  const taxSettings = state.settings.tax;
   // Promotions run against the subtotal after line-level discounts.
-  const preTotals = cartTotals(lines, 0, "amount");
+  const preTotals = cartTotals(lines, 0, "amount", taxSettings);
   const promoBase = r2(preTotals.subtotal - preTotals.lineDiscount);
   const promo = evaluatePromotions({
     promotions: state.promotions,
@@ -110,7 +111,12 @@ function Register() {
   const manualBillDiscount = r2(
     cartDiscountType === "percent" ? (promoBase * (cartDiscount || 0)) / 100 : cartDiscount || 0,
   );
-  const totals = cartTotals(lines, r2(manualBillDiscount + promo.promoDiscount), "amount");
+  const totals = cartTotals(
+    lines,
+    r2(manualBillDiscount + promo.promoDiscount),
+    "amount",
+    taxSettings,
+  );
   const pointsEarned = member ? Math.max(0, Math.round(totals.total * promo.pointsRate)) : 0;
 
   // Keep the qualifying FOC freebie in sync with the open ticket.
@@ -639,7 +645,16 @@ function Register() {
                 )}
               </div>
             )}
-            <Row label="Tax" value={money(totals.tax)} />
+            <Row
+              label={
+                !taxSettings.enabled
+                  ? "Tax (disabled)"
+                  : taxSettings.mode === "inclusive"
+                    ? `Tax ${taxSettings.rate}% (included)`
+                    : `Tax ${taxSettings.rate}%`
+              }
+              value={money(totals.tax)}
+            />
             <Separator />
             <div className="flex items-center justify-between">
               <span className="text-base font-semibold">

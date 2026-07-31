@@ -1,4 +1,17 @@
-import type { PosState, Promotion, Store } from "./pos-types";
+import type { AppSettings, PosState, Promotion, Store } from "./pos-types";
+
+export const defaultSettings: AppSettings = {
+  tax: { enabled: true, rate: 5, mode: "exclusive" },
+  receipt: {
+    paper: "80mm",
+    headerText: "42 Harbour Street, Unit 3\nTel 555-0100 · VAT 88-2201194",
+    footerText: "Thank you — see you again soon",
+    showLogo: true,
+    showPoints: true,
+    showBarcode: true,
+    showTax: true,
+  },
+};
 
 export const seedPromotions: Promotion[] = [
   {
@@ -33,6 +46,13 @@ export const seedPromotions: Promotion[] = [
     minBill: 150,
     value: 10,
     valueType: "amount",
+  },
+  {
+    id: "promo-tier",
+    name: "Membership tier discount",
+    type: "tier",
+    active: true,
+    tierRates: { Bronze: 5, Silver: 10, Gold: 15 },
   },
 ];
 
@@ -91,6 +111,7 @@ export const seedState: PosState = {
   transferCounter: 24,
   transfers: [],
   promotions: seedPromotions,
+  settings: defaultSettings,
   products: [
     p("p1", "Espresso Beans 250g", "Coffee", 12.5, 7.2, 34),
     p("p2", "Cold Brew Can", "Coffee", 4.25, 2.1, 120),
