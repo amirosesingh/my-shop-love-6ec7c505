@@ -102,7 +102,8 @@ const shell = (title: string, body: string, autoPrint = true) => {
   h1 { font-size: ${p.h1}; letter-spacing: 2px; text-align: center; margin: 0 0 2px; }
   .c { text-align: center; }
   .muted { font-size: 0.85em; }
-  .logo { text-align: center; margin-bottom: 2px; font-size: 1.6em; }
+  .logo { text-align: center; margin-bottom: 4px; }
+  .logo span { display: inline-block; border: 2px solid #000; border-radius: 4px; padding: 3px 8px; font-weight: 700; letter-spacing: 3px; font-size: 1.1em; }
   hr { border: none; border-top: 1px dashed #000; margin: 6px 0; }
   table { width: 100%; border-collapse: collapse; }
   td { vertical-align: top; padding: 1px 0; }
@@ -127,7 +128,7 @@ ${
 };
 
 const header = (subtitle?: string) => `
-  ${receiptCfg.showLogo ? `<div class="logo">🧾</div>` : ""}
+  ${receiptCfg.showLogo ? `<div class="logo"><span>N&amp;CO</span></div>` : ""}
   <h1>${STORE.name}</h1>
   <div class="c muted">${esc(
     activeBranch ? `${activeBranch.name} (${activeBranch.code})` : STORE.line1,
