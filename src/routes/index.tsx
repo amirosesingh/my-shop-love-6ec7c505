@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   BadgeCheck,
   Banknote,
@@ -17,6 +17,7 @@ import {
   UserPlus,
   X,
   Repeat,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
@@ -37,6 +38,7 @@ import { cartTotals, money, stockAt, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
 import type { CartLine, DiscountType, PaymentMethod, Sale } from "@/lib/pos-types";
 import { lineUnitDiscount, r2 } from "@/lib/pos-types";
+import { evaluatePromotions, focLine } from "@/lib/pos-promotions";
 import { openCashDrawer, printSaleReceipt } from "@/lib/pos-print";
 
 export const Route = createFileRoute("/")({
@@ -95,7 +97,34 @@ function Register() {
   });
 
   const member = state.members.find((m) => m.id === memberId) ?? null;
-  const totals = cartTotals(lines, cartDiscount, cartDiscountType);
+
+  // Promotions run against the subtotal after line-level discounts.
+  const preTotals = cartTotals(lines, 0, "amount");
+  const promoBase = r2(preTotals.subtotal - preTotals.lineDiscount);
+  const promo = evaluatePromotions({
+    promotions: state.promotions,
+    products: state.products,
+    base: promoBase,
+    member,
+  });
+  const manualBillDiscount = r2(
+    cartDiscountType === "percent" ? (promoBase * (cartDiscount || 0)) / 100 : cartDiscount || 0,
+  );
+  const totals = cartTotals(lines, r2(manualBillDiscount + promo.promoDiscount), "amount");
+  const pointsEarned = member ? Math.max(0, Math.round(totals.total * promo.pointsRate)) : 0;
+
+  // Keep the qualifying FOC freebie in sync with the open ticket.
+  const focId = promo.foc ? `${promo.foc.promo.id}:${promo.foc.product.id}:${promo.foc.qty}` : "";
+  const hasFoc = lines.some((l) => l.foc);
+  useEffect(() => {
+    if (focId && !hasFoc) {
+      const [, productId, qty] = focId.split(":");
+      const rule = state.promotions.find((p) => p.id === focId.split(":")[0]);
+      const product = state.products.find((p) => p.id === productId);
+      if (rule && product) setLines((ls) => [...ls, focLine(rule, product, Number(qty))]);
+    }
+    if (!focId && hasFoc) setLines((ls) => ls.filter((l) => !l.foc));
+  }, [focId, hasFoc, state.promotions, state.products]);
   const balanceDue = totals.total >= 0 ? totals.total : 0;
   const refundDue = totals.total < 0 ? r2(-totals.total) : 0;
   const detail = state.products.find((p) => p.id === detailId) ?? null;
@@ -253,7 +282,7 @@ function Register() {
       change: r2(Math.max(0, paid - totals.total)),
       method,
       memberId,
-      pointsEarned: member ? Math.max(0, Math.round(totals.total)) : 0,
+      pointsEarned,
       cashier: activeShift.cashier,
       ...(exchangeRef
         ? { exchangeOfReceiptNo: exchangeRef, exchangeCredit: totals.credit }
@@ -475,6 +504,11 @@ function Register() {
                             credit
                           </Badge>
                         )}
+                        {l.foc && (
+                          <Badge className="ml-2 bg-success/15 text-[10px] text-success">
+                            FREE PROMO
+                          </Badge>
+                        )}
                       </div>
                       <p className="numeric text-[11px] text-muted-foreground">
                         {money(l.price)} · tax {(l.taxRate * 100).toFixed(0)}%
@@ -495,7 +529,7 @@ function Register() {
                       {money((l.price - lineUnitDiscount(l)) * l.qty)}
                     </span>
                   </div>
-                  {!l.credit && (
+                  {!l.credit && !l.foc && (
                     <div className="mt-2 flex items-center justify-end gap-1">
                       <span className="text-[11px] text-muted-foreground">Disc</span>
                       <Input
@@ -582,7 +616,29 @@ function Register() {
                 </div>
               </div>
             </div>
+            {promo.promoDiscount > 0 && (
+              <Row label="Promotion discount" value={`-${money(promo.promoDiscount)}`} />
+            )}
             <Row label="Discount applied" value={`-${money(totals.discount)}`} />
+            {promo.applied.length > 0 && (
+              <div className="rounded-md border border-success/30 bg-success/5 px-2 py-2">
+                <p className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-success">
+                  <Sparkles className="size-3" /> Active promotions applied
+                </p>
+                <ul className="mt-1 space-y-0.5">
+                  {promo.applied.map((a) => (
+                    <li key={a.id} className="text-[11px] text-muted-foreground">
+                      <span className="font-medium text-foreground">{a.name}</span> · {a.detail}
+                    </li>
+                  ))}
+                </ul>
+                {member && (
+                  <p className="numeric mt-1 text-[11px] text-muted-foreground">
+                    {member.name} earns {pointsEarned} pts on this bill
+                  </p>
+                )}
+              </div>
+            )}
             <Row label="Tax" value={money(totals.tax)} />
             <Separator />
             <div className="flex items-center justify-between">

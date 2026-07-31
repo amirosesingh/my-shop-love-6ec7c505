@@ -1,4 +1,40 @@
-import type { PosState, Store } from "./pos-types";
+import type { PosState, Promotion, Store } from "./pos-types";
+
+export const seedPromotions: Promotion[] = [
+  {
+    id: "promo-points",
+    name: "Standard point policy",
+    type: "points",
+    active: true,
+    pointsPerDollar: 1,
+  },
+  {
+    id: "promo-birthday",
+    name: "Birthday month treat",
+    type: "birthday",
+    active: true,
+    value: 20,
+    valueType: "percent",
+  },
+  {
+    id: "promo-foc",
+    name: "Free croissant over $100",
+    type: "foc",
+    active: false,
+    minBill: 100,
+    focProductId: "p5",
+    focQty: 1,
+  },
+  {
+    id: "promo-threshold",
+    name: "$10 off bills over $150",
+    type: "threshold",
+    active: false,
+    minBill: 150,
+    value: 10,
+    valueType: "amount",
+  },
+];
 
 export const seedStores: Store[] = [
   {
@@ -54,6 +90,7 @@ export const seedState: PosState = {
   counter: 1042,
   transferCounter: 24,
   transfers: [],
+  promotions: seedPromotions,
   products: [
     p("p1", "Espresso Beans 250g", "Coffee", 12.5, 7.2, 34),
     p("p2", "Cold Brew Can", "Coffee", 4.25, 2.1, 120),
@@ -83,6 +120,7 @@ export const seedState: PosState = {
       totalSpend: 1840.5,
       joinedAt: "2024-03-11",
       homeStoreId: "s1",
+      birthday: "1991-07-14",
     },
     {
       id: "m2",
@@ -95,6 +133,7 @@ export const seedState: PosState = {
       totalSpend: 620.0,
       joinedAt: "2024-09-02",
       homeStoreId: "s2",
+      birthday: "1988-03-02",
     },
     {
       id: "m3",
@@ -107,6 +146,7 @@ export const seedState: PosState = {
       totalSpend: 145.25,
       joinedAt: "2025-01-20",
       homeStoreId: "s3",
+      birthday: "1996-11-23",
     },
   ],
   sales: [],

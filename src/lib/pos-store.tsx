@@ -13,6 +13,7 @@ import type {
   Member,
   PosState,
   Product,
+  Promotion,
   Sale,
   Shift,
   Store,
@@ -70,6 +71,9 @@ type Ctx = {
   adjustStock: (id: string, delta: number, storeId?: string) => void;
   upsertMember: (member: Member) => void;
   removeMember: (id: string) => void;
+  upsertPromotion: (promotion: Promotion) => void;
+  removePromotion: (id: string) => void;
+  togglePromotion: (id: string, active: boolean) => void;
   createTransfer: (input: NewTransfer) => Transfer;
   approveTransfer: (id: string) => void;
   receiveTransfer: (id: string) => void;
@@ -95,7 +99,12 @@ export function PosProvider({ children }: { children: ReactNode }) {
             ? t
             : { ...t, items: [{ productId: legacy.productId ?? "", qty: legacy.qty ?? 0 }] };
         });
-        setState({ ...seedState, ...saved, transfers });
+        setState({
+          ...seedState,
+          ...saved,
+          transfers,
+          promotions: saved.promotions?.length ? saved.promotions : seedState.promotions,
+        });
       }
     } catch {
       /* ignore corrupt storage */
@@ -280,6 +289,26 @@ export function PosProvider({ children }: { children: ReactNode }) {
     setState((s) => ({ ...s, members: s.members.filter((m) => m.id !== id) }));
   }, []);
 
+  const upsertPromotion = useCallback((promotion: Promotion) => {
+    setState((s) => ({
+      ...s,
+      promotions: s.promotions.some((p) => p.id === promotion.id)
+        ? s.promotions.map((p) => (p.id === promotion.id ? promotion : p))
+        : [promotion, ...s.promotions],
+    }));
+  }, []);
+
+  const removePromotion = useCallback((id: string) => {
+    setState((s) => ({ ...s, promotions: s.promotions.filter((p) => p.id !== id) }));
+  }, []);
+
+  const togglePromotion = useCallback((id: string, active: boolean) => {
+    setState((s) => ({
+      ...s,
+      promotions: s.promotions.map((p) => (p.id === id ? { ...p, active } : p)),
+    }));
+  }, []);
+
   const createTransfer = useCallback((input: NewTransfer) => {
     const now = new Date().toISOString();
     const transfer: Transfer = {
@@ -378,6 +407,9 @@ export function PosProvider({ children }: { children: ReactNode }) {
     adjustStock,
     upsertMember,
     removeMember,
+    upsertPromotion,
+    removePromotion,
+    togglePromotion,
     createTransfer,
     approveTransfer,
     receiveTransfer,

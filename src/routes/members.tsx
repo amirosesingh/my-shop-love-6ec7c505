@@ -193,6 +193,14 @@ function Members() {
                   onChange={(e) => setDraft({ ...draft, points: Number(e.target.value) || 0 })}
                 />
               </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Date of birth</Label>
+                <Input
+                  type="date"
+                  value={draft.birthday ?? ""}
+                  onChange={(e) => setDraft({ ...draft, birthday: e.target.value })}
+                />
+              </div>
             </div>
           )}
           <DialogFooter>
