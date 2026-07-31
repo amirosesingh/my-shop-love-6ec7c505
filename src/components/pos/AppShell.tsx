@@ -5,6 +5,8 @@ import {
   Clock,
   LogOut,
   ReceiptText,
+  ScanBarcode,
+  ScrollText,
   ShieldCheck,
   Store,
   Users,
@@ -25,19 +27,31 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-const nav = [
+type NavItem = {
+  to: string;
+  label: string;
+  icon: typeof LayoutGrid;
+  flag?: "financials" | "products" | "ecommerce";
+};
+
+const nav: NavItem[] = [
   { to: "/", label: "Register", icon: LayoutGrid },
   { to: "/inventory", label: "Inventory", icon: Boxes },
+  { to: "/receipts", label: "Receipts", icon: ScrollText, flag: "financials" },
+  { to: "/purchasing", label: "Purchasing", icon: ScanBarcode, flag: "products" },
   { to: "/transfers", label: "Transfers", icon: ArrowLeftRight },
   { to: "/members", label: "Members", icon: Users },
-  { to: "/shifts", label: "Shifts", icon: Clock },
+  { to: "/shifts", label: "Shifts", icon: Clock, flag: "financials" },
 ];
 
-const adminNav = [{ to: "/staff", label: "Staff", icon: ShieldCheck }];
+const adminNav: NavItem[] = [
+  { to: "/stores", label: "Locations", icon: Store },
+  { to: "/staff", label: "Staff", icon: ShieldCheck },
+];
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { activeShift, stores, currentStore, setCurrentStore, state } = usePos();
-  const { ready, user, isAdmin, logout } = useAuth();
+  const { ready, user, isAdmin, logout, can } = useAuth();
 
   useEffect(() => {
     setPrintStore(currentStore ?? null);
@@ -97,7 +111,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           )}
         </div>
 
-        {(isAdmin ? [...nav, ...adminNav] : nav).map((item) => (
+        {(isAdmin ? [...nav, ...adminNav] : nav)
+          .filter((item) => !item.flag || can(item.flag))
+          .map((item) => (
           <Link
             key={item.to}
             to={item.to}
