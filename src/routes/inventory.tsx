@@ -1,12 +1,13 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { Minus, Plus, Search, Trash2 } from "lucide-react";
+import { ArrowLeftRight, Inbox, Minus, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -56,12 +57,28 @@ const blank = (storeId: string): Product => ({
 
 function Inventory() {
   const { state, stores, currentStore, upsertProduct, removeProduct, adjustStock } = usePos();
+  const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState<Product | null>(null);
+  const [selected, setSelected] = useState<string[]>([]);
 
   const rows = state.products.filter((p) =>
     `${p.name} ${p.sku} ${p.barcode} ${p.category}`.toLowerCase().includes(query.toLowerCase()),
   );
+  const allShownSelected = rows.length > 0 && rows.every((p) => selected.includes(p.id));
+
+  function toggle(id: string, on: boolean) {
+    setSelected((prev) => (on ? [...new Set([...prev, id])] : prev.filter((x) => x !== id)));
+  }
+
+  function goToTransfers(kind: "transfer" | "request") {
+    if (!selected.length) {
+      toast.error("Select at least one product first");
+      return;
+    }
+    navigate({ to: "/transfers", search: { items: selected.join(","), kind } });
+  }
+
   const lowStock = state.products.filter(
     (p) => stockAt(p, currentStore.id) <= p.reorderLevel,
   );
