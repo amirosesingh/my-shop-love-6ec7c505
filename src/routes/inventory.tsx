@@ -25,6 +25,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { money, stockAt, usePos } from "@/lib/pos-store";
+import { useAuth } from "@/lib/pos-auth";
+import { Switch } from "@/components/ui/switch";
 import type { Product } from "@/lib/pos-types";
 
 export const Route = createFileRoute("/inventory")({
@@ -50,6 +52,8 @@ const blank = (storeId: string): Product => ({
   category: "General",
   price: 0,
   cost: 0,
+  ecomPrice: 0,
+  ecomVisible: false,
   stockByStore: { [storeId]: 0 },
   reorderLevel: 10,
   taxRate: 0.05,
@@ -57,6 +61,10 @@ const blank = (storeId: string): Product => ({
 
 function Inventory() {
   const { state, stores, currentStore, upsertProduct, removeProduct, adjustStock } = usePos();
+  const { can } = useAuth();
+  const showMoney = can("financials");
+  const canEdit = can("products");
+  const canEcom = can("ecommerce");
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState<Product | null>(null);
@@ -94,8 +102,12 @@ function Inventory() {
           <div>
             <h1 className="text-2xl font-semibold">Inventory · {currentStore.name}</h1>
             <p className="text-sm text-muted-foreground">
-              {state.products.length} products · stock value{" "}
-              <span className="numeric">{money(stockValue)}</span> ·{" "}
+              {state.products.length} products ·{" "}
+              {showMoney && (
+                <>
+                  stock value <span className="numeric">{money(stockValue)}</span> ·{" "}
+                </>
+              )}
               <span className="text-warning">{lowStock.length} below reorder level</span>
             </p>
           </div>
@@ -109,6 +121,7 @@ function Inventory() {
                 className="w-56 pl-9"
               />
             </div>
+            {canEdit && (
             <Dialog
               open={!!draft}
               onOpenChange={(o) => setDraft(o ? (draft ?? blank(currentStore.id)) : null)}
@@ -164,6 +177,15 @@ function Inventory() {
                         onChange={(e) => setDraft({ ...draft, price: Number(e.target.value) || 0 })}
                       />
                     </Field>
+                    <Field label="E-com price">
+                      <Input
+                        className="numeric"
+                        value={draft.ecomPrice ?? 0}
+                        onChange={(e) =>
+                          setDraft({ ...draft, ecomPrice: Number(e.target.value) || 0 })
+                        }
+                      />
+                    </Field>
                     <Field label="Cost">
                       <Input
                         className="numeric"
@@ -214,6 +236,7 @@ function Inventory() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+            )}
           </div>
         </header>
 
@@ -252,9 +275,10 @@ function Inventory() {
                 </TableHead>
                 <TableHead>Product</TableHead>
                 <TableHead>Category</TableHead>
-                <TableHead className="text-right">Cost</TableHead>
+                {showMoney && <TableHead className="text-right">Cost</TableHead>}
                 <TableHead className="text-right">Price</TableHead>
-                <TableHead className="text-right">Margin</TableHead>
+                {showMoney && <TableHead className="text-right">Margin</TableHead>}
+                {canEcom && <TableHead className="text-center">On web</TableHead>}
                 <TableHead className="text-center">Stock · {currentStore.code}</TableHead>
                 <TableHead className="text-center">Other stores</TableHead>
                 <TableHead />
@@ -282,11 +306,29 @@ function Inventory() {
                     </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">{p.category}</TableCell>
-                  <TableCell className="numeric text-right">{money(p.cost)}</TableCell>
+                  {showMoney && (
+                    <TableCell className="numeric text-right">{money(p.cost)}</TableCell>
+                  )}
                   <TableCell className="numeric text-right">{money(p.price)}</TableCell>
-                  <TableCell className="numeric text-right text-accent">
-                    {p.price ? `${Math.round(((p.price - p.cost) / p.price) * 100)}%` : "—"}
-                  </TableCell>
+                  {showMoney && (
+                    <TableCell className="numeric text-right text-accent">
+                      {p.price ? `${Math.round(((p.price - p.cost) / p.price) * 100)}%` : "—"}
+                    </TableCell>
+                  )}
+                  {canEcom && (
+                    <TableCell className="text-center">
+                      <Switch
+                        checked={!!p.ecomVisible}
+                        onCheckedChange={(v) => {
+                          upsertProduct({ ...p, ecomVisible: v });
+                          toast.success(
+                            `${p.name} ${v ? "published to" : "hidden from"} the web store`,
+                          );
+                        }}
+                        aria-label={`E-commerce visibility for ${p.name}`}
+                      />
+                    </TableCell>
+                  )}
                   <TableCell>
                     <div className="flex items-center justify-center gap-1">
                       <Button size="icon" variant="outline" className="size-7" onClick={() => adjustStock(p.id, -1)}>
@@ -322,6 +364,7 @@ function Inventory() {
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
+                    {canEdit && (
                     <Button
                       size="icon"
                       variant="ghost"
@@ -332,6 +375,7 @@ function Inventory() {
                     >
                       <Trash2 className="size-4 text-destructive" />
                     </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
