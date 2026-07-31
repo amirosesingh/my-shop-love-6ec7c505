@@ -292,6 +292,9 @@ function Register() {
             <Button variant="outline" className="h-11" onClick={() => openCashDrawer()}>
               <Vault className="size-4" /> Open drawer
             </Button>
+            <Button variant="outline" className="h-11" onClick={() => setExchangeOpen(true)}>
+              <Repeat className="size-4" /> Exchange
+            </Button>
             {!activeShift && (
               <Button className="h-11" onClick={() => setOpenShiftOpen(true)}>
                 Open shift
@@ -380,7 +383,7 @@ function Register() {
               variant="ghost"
               size="sm"
               disabled={!lines.length}
-              onClick={() => setLines([])}
+              onClick={clearCart}
             >
               <Trash2 className="size-4" /> Clear
             </Button>
