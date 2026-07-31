@@ -282,7 +282,7 @@ function Register() {
       change: r2(Math.max(0, paid - totals.total)),
       method,
       memberId,
-      pointsEarned: member ? Math.max(0, Math.round(totals.total)) : 0,
+      pointsEarned,
       cashier: activeShift.cashier,
       ...(exchangeRef
         ? { exchangeOfReceiptNo: exchangeRef, exchangeCredit: totals.credit }
