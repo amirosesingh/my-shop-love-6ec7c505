@@ -1,4 +1,40 @@
-import type { PosState, Store } from "./pos-types";
+import type { PosState, Promotion, Store } from "./pos-types";
+
+export const seedPromotions: Promotion[] = [
+  {
+    id: "promo-points",
+    name: "Standard point policy",
+    type: "points",
+    active: true,
+    pointsPerDollar: 1,
+  },
+  {
+    id: "promo-birthday",
+    name: "Birthday month treat",
+    type: "birthday",
+    active: true,
+    value: 20,
+    valueType: "percent",
+  },
+  {
+    id: "promo-foc",
+    name: "Free croissant over $100",
+    type: "foc",
+    active: false,
+    minBill: 100,
+    focProductId: "p5",
+    focQty: 1,
+  },
+  {
+    id: "promo-threshold",
+    name: "$10 off bills over $150",
+    type: "threshold",
+    active: false,
+    minBill: 150,
+    value: 10,
+    valueType: "amount",
+  },
+];
 
 export const seedStores: Store[] = [
   {
