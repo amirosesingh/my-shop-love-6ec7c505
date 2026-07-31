@@ -44,7 +44,22 @@ export type CartLine = {
   qty: number;
   taxRate: number;
   discount: number;
+  /** how `discount` is interpreted: flat amount per unit, or percent of price */
+  discountType?: DiscountType;
+  /** exchange credit line (negative qty) returned against an earlier bill */
+  credit?: boolean;
 };
+
+export type DiscountType = "amount" | "percent";
+
+/** Round to cents without float drift. */
+export const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+/** Resolve a cart line's per-unit discount in currency. */
+export const lineUnitDiscount = (l: Pick<CartLine, "price" | "discount" | "discountType">) =>
+  l.discountType === "percent"
+    ? r2((l.price * (l.discount || 0)) / 100)
+    : r2(l.discount || 0);
 
 export type PaymentMethod = "cash" | "card" | "wallet" | "points";
 
@@ -66,6 +81,12 @@ export type Sale = {
   cashier: string;
   createdAt: string;
   refunded?: boolean;
+  /** original bill this sale exchanges against */
+  exchangeOfReceiptNo?: string;
+  /** new bill that exchanged this one */
+  exchangedToReceiptNo?: string;
+  /** credit value carried over from the original bill */
+  exchangeCredit?: number;
 };
 
 export type Shift = {
