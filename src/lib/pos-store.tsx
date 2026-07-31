@@ -280,9 +280,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       // Goods only leave the source store once they are actually in transit.
       const products =
         transfer.status === "in_transit"
-          ? s.products.map((p) =>
-              p.id === input.productId ? bump(p, input.fromStoreId, -input.qty) : p,
-            )
+          ? bumpItems(s.products, input.items, input.fromStoreId, -1)
           : s.products;
       return { ...s, transferCounter, products, transfers: [transfer, ...s.transfers] };
     });
@@ -295,9 +293,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       if (!t || t.status !== "requested") return s;
       return {
         ...s,
-        products: s.products.map((p) =>
-          p.id === t.productId ? bump(p, t.fromStoreId, -t.qty) : p,
-        ),
+        products: bumpItems(s.products, t.items, t.fromStoreId, -1),
         transfers: s.transfers.map((x) =>
           x.id === id ? { ...x, status: "in_transit", updatedAt: new Date().toISOString() } : x,
         ),
@@ -311,7 +307,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       if (!t || t.status !== "in_transit") return s;
       return {
         ...s,
-        products: s.products.map((p) => (p.id === t.productId ? bump(p, t.toStoreId, t.qty) : p)),
+        products: bumpItems(s.products, t.items, t.toStoreId, 1),
         transfers: s.transfers.map((x) =>
           x.id === id ? { ...x, status: "received", updatedAt: new Date().toISOString() } : x,
         ),
@@ -326,7 +322,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       // If stock already left the source store, put it back.
       const products =
         t.status === "in_transit"
-          ? s.products.map((p) => (p.id === t.productId ? bump(p, t.fromStoreId, t.qty) : p))
+          ? bumpItems(s.products, t.items, t.fromStoreId, 1)
           : s.products;
       return {
         ...s,
