@@ -7,8 +7,9 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { seedState } from "./pos-seed";
+import { defaultSettings, seedState } from "./pos-seed";
 import type {
+  AppSettings,
   CartLine,
   Member,
   PosState,
@@ -17,6 +18,7 @@ import type {
   Sale,
   Shift,
   Store,
+  TaxSettings,
   Transfer,
   TransferKind,
 } from "./pos-types";
@@ -74,6 +76,7 @@ type Ctx = {
   upsertPromotion: (promotion: Promotion) => void;
   removePromotion: (id: string) => void;
   togglePromotion: (id: string, active: boolean) => void;
+  updateSettings: (patch: Partial<AppSettings>) => void;
   createTransfer: (input: NewTransfer) => Transfer;
   approveTransfer: (id: string) => void;
   receiveTransfer: (id: string) => void;
@@ -104,6 +107,10 @@ export function PosProvider({ children }: { children: ReactNode }) {
           ...saved,
           transfers,
           promotions: saved.promotions?.length ? saved.promotions : seedState.promotions,
+          settings: {
+            tax: { ...defaultSettings.tax, ...(saved.settings?.tax ?? {}) },
+            receipt: { ...defaultSettings.receipt, ...(saved.settings?.receipt ?? {}) },
+          },
         });
       }
     } catch {
@@ -309,6 +316,16 @@ export function PosProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  const updateSettings = useCallback((patch: Partial<AppSettings>) => {
+    setState((s) => ({
+      ...s,
+      settings: {
+        tax: { ...s.settings.tax, ...(patch.tax ?? {}) },
+        receipt: { ...s.settings.receipt, ...(patch.receipt ?? {}) },
+      },
+    }));
+  }, []);
+
   const createTransfer = useCallback((input: NewTransfer) => {
     const now = new Date().toISOString();
     const transfer: Transfer = {
@@ -410,6 +427,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     upsertPromotion,
     removePromotion,
     togglePromotion,
+    updateSettings,
     createTransfer,
     approveTransfer,
     receiveTransfer,
