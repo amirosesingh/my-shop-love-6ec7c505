@@ -202,6 +202,15 @@ function Register() {
             )}
           </div>
 
+          {!activeShift && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              <Lock className="size-4" />
+              <span>
+                Selling is locked at {currentStore.name}. Open a shift to ring up sales.
+              </span>
+            </div>
+          )}
+
           <div className="mt-3 flex flex-wrap gap-2">
             {categories.map((c) => (
               <button
@@ -224,7 +233,8 @@ function Register() {
                 <button
                   key={p.id}
                   onClick={() => addLine(p.id)}
-                  className="group flex flex-col justify-between rounded-lg border border-border bg-card p-3 text-left transition-colors hover:border-primary/60 hover:bg-surface-2"
+                  disabled={!activeShift}
+                  className="group flex flex-col justify-between rounded-lg border border-border bg-card p-3 text-left transition-colors hover:border-primary/60 hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border disabled:hover:bg-card"
                 >
                   <span className="text-sm font-medium leading-snug">{p.name}</span>
                   <span className="mt-2 flex items-center justify-between">
@@ -233,10 +243,12 @@ function Register() {
                     </span>
                     <span
                       className={`numeric text-[11px] ${
-                        p.stock <= p.reorderLevel ? "text-warning" : "text-muted-foreground"
+                        stockAt(p, currentStore.id) <= p.reorderLevel
+                          ? "text-warning"
+                          : "text-muted-foreground"
                       }`}
                     >
-                      {p.stock} left
+                      {stockAt(p, currentStore.id)} left
                     </span>
                   </span>
                 </button>
