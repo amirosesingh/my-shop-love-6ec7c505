@@ -1,10 +1,16 @@
-import type { Member, Sale, Shift } from "./pos-types";
+import type { Member, Product, Sale, Shift, Store, Transfer } from "./pos-types";
 
 export const STORE = {
   name: "NORTHWIND & CO.",
   line1: "42 Harbour Street, Unit 3",
   line2: "Tel 555-0100 · VAT 88-2201194",
 };
+
+/** Branch currently printing; set by the app whenever the store is switched. */
+let activeBranch: Store | null = null;
+export function setPrintStore(store: Store | null) {
+  activeBranch = store;
+}
 
 export type ReceiptKind =
   | "sale"
@@ -14,7 +20,8 @@ export type ReceiptKind =
   | "kitchen"
   | "xreport"
   | "zreport"
-  | "member";
+  | "member"
+  | "transfer";
 
 const fmt = (n: number) => n.toFixed(2);
 const esc = (s: string) =>
@@ -42,8 +49,12 @@ const shell = (title: string, body: string) => `<!doctype html><html><head>
 
 const header = (subtitle?: string) => `
   <h1>${STORE.name}</h1>
-  <div class="c muted">${STORE.line1}</div>
-  <div class="c muted">${STORE.line2}</div>
+  <div class="c muted">${esc(
+    activeBranch ? `${activeBranch.name} (${activeBranch.code})` : STORE.line1,
+  )}</div>
+  <div class="c muted">${esc(
+    activeBranch ? `${activeBranch.address} · Tel ${activeBranch.phone}` : STORE.line2,
+  )}</div>
   ${subtitle ? `<div class="c tag">${esc(subtitle)}</div>` : ""}
   <hr>`;
 
