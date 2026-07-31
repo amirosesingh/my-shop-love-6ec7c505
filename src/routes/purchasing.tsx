@@ -43,7 +43,7 @@ export const Route = createFileRoute("/purchasing")({
       },
     ],
   }),
-  component: Purchasing;
+  component: Purchasing,
 });
 
 type Line = {
