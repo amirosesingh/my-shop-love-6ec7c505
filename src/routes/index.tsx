@@ -616,7 +616,29 @@ function Register() {
                 </div>
               </div>
             </div>
+            {promo.promoDiscount > 0 && (
+              <Row label="Promotion discount" value={`-${money(promo.promoDiscount)}`} />
+            )}
             <Row label="Discount applied" value={`-${money(totals.discount)}`} />
+            {promo.applied.length > 0 && (
+              <div className="rounded-md border border-success/30 bg-success/5 px-2 py-2">
+                <p className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-success">
+                  <Sparkles className="size-3" /> Active promotions applied
+                </p>
+                <ul className="mt-1 space-y-0.5">
+                  {promo.applied.map((a) => (
+                    <li key={a.id} className="text-[11px] text-muted-foreground">
+                      <span className="font-medium text-foreground">{a.name}</span> · {a.detail}
+                    </li>
+                  ))}
+                </ul>
+                {member && (
+                  <p className="numeric mt-1 text-[11px] text-muted-foreground">
+                    {member.name} earns {pointsEarned} pts on this bill
+                  </p>
+                )}
+              </div>
+            )}
             <Row label="Tax" value={money(totals.tax)} />
             <Separator />
             <div className="flex items-center justify-between">
