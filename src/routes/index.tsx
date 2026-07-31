@@ -468,14 +468,14 @@ function Register() {
                 >
                   <div className="flex items-center gap-2">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">
+                      <div className="truncate text-sm font-medium">
                         {l.name}
                         {l.credit && (
                           <Badge variant="outline" className="ml-2 text-[10px]">
                             credit
                           </Badge>
                         )}
-                      </p>
+                      </div>
                       <p className="numeric text-[11px] text-muted-foreground">
                         {money(l.price)} · tax {(l.taxRate * 100).toFixed(0)}%
                       </p>
