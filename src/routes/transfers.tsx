@@ -227,7 +227,6 @@ function Transfers() {
             </TableHeader>
             <TableBody>
               {mine.map((t) => {
-                const p = state.products.find((x) => x.id === t.productId);
                 const canApprove = t.status === "requested" && t.fromStoreId === currentStore.id;
                 const canReceive = t.status === "in_transit" && t.toStoreId === currentStore.id;
                 return (
@@ -238,8 +237,22 @@ function Transfers() {
                         {new Date(t.createdAt).toLocaleString()}
                       </div>
                     </TableCell>
-                    <TableCell>{p?.name ?? "—"}</TableCell>
-                    <TableCell className="numeric text-center">{t.qty}</TableCell>
+                    <TableCell>
+                      <div className="space-y-0.5">
+                        {t.items.map((i) => (
+                          <div key={i.productId} className="text-sm">
+                            {productOf(i.productId)?.name ?? "—"}
+                            <span className="numeric text-muted-foreground"> × {i.qty}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell className="numeric text-center">
+                      {t.items.reduce((a, i) => a + i.qty, 0)}
+                      <div className="text-[11px] text-muted-foreground">
+                        {t.items.length} line{t.items.length > 1 ? "s" : ""}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-muted-foreground">
                       {storeOf(t.fromStoreId)?.code} → {storeOf(t.toStoreId)?.code}
                     </TableCell>
