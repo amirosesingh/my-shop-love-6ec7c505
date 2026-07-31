@@ -390,6 +390,7 @@ function Inventory() {
           </Table>
         </div>
       </div>
+      {canEdit && <BulkImportDialog open={importOpen} onOpenChange={setImportOpen} />}
     </AppShell>
   );
 }
