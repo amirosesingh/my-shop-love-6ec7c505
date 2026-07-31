@@ -11,6 +11,7 @@ import {
   Store,
   Users,
   LayoutGrid,
+  Percent,
 } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
 import { usePos } from "@/lib/pos-store";
@@ -45,6 +46,7 @@ const nav: NavItem[] = [
 ];
 
 const adminNav: NavItem[] = [
+  { to: "/promotions", label: "Promotions", icon: Percent },
   { to: "/stores", label: "Locations", icon: Store },
   { to: "/staff", label: "Staff", icon: ShieldCheck },
 ];
