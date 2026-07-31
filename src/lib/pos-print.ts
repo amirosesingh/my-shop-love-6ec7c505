@@ -42,7 +42,7 @@ export function barcodeSvg(value: string) {
   return `<div class="barcode">${bars}</div><div class="bc-text">${esc(value)}</div>`;
 }
 
-const shell = (title: string, body: string) => `<!doctype html><html><head>
+const shell = (title: string, body: string, autoPrint = true) => `<!doctype html><html><head>
 <meta charset="utf-8"><title>${esc(title)}</title>
 <style>
   @page { size: 80mm auto; margin: 4mm; }
@@ -62,7 +62,11 @@ const shell = (title: string, body: string) => `<!doctype html><html><head>
   .barcode i { display: block; background: #000; height: 100%; }
   .bc-text { text-align: center; font-size: 10px; letter-spacing: 3px; margin-top: 2px; }
 </style></head><body>${body}
-<script>window.onload=function(){window.focus();window.print();setTimeout(function(){window.close()},400)}<\/script>
+${
+  autoPrint
+    ? `<script>window.onload=function(){window.focus();window.print();setTimeout(function(){window.close()},400)}<\/script>`
+    : ""
+}
 </body></html>`;
 
 const header = (subtitle?: string) => `
