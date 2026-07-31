@@ -490,7 +490,7 @@ function Register() {
                       </Button>
                     </div>
                     <span
-                      className={`numeric w-16 text-right text-sm font-semibold ${l.credit ? "text-accent" : ""}`}
+                      className={`numeric w-20 shrink-0 text-right text-sm font-semibold ${l.credit ? "text-accent" : ""}`}
                     >
                       {money((l.price - lineUnitDiscount(l)) * l.qty)}
                     </span>
