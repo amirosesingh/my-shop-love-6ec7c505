@@ -96,7 +96,7 @@ function Transfers() {
     if (!search.items) return;
     const ids = search.items.split(",").filter(Boolean);
     if (!ids.length) return;
-    setItems(ids.map((productId) => ({ productId, qty: 1 })));
+    setItems(ids.map((productId: string) => ({ productId, qty: 1 })));
     setKind(search.kind ?? "transfer");
     setOpen(true);
   }, [search.items, search.kind]);
