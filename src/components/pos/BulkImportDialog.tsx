@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
-import { FileSpreadsheet, Download, UploadCloud } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet, UploadCloud } from "lucide-react";
 import { toast } from "sonner";
+import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -25,38 +26,42 @@ export type ImportRow = {
   barcode: string;
   name: string;
   price: number;
-  ecomPrice: number;
+  cost: number;
+  category: string;
   stock: number;
+  customPoints: number;
   existing: boolean;
 };
 
-const HEADERS = ["Barcode/SKU", "Product Name", "POS Price", "E-com Price", "Starting Stock"];
+type ErrorRow = { row: number; reason: string };
+
+const HEADERS = [
+  "barcode",
+  "name",
+  "price",
+  "cost",
+  "category",
+  "stock_quantity",
+  "custom_points",
+] as const;
 
 const TEMPLATE_ROWS = [
-  ["8901234500011", "Colombian Whole Bean 1kg", "24.00", "26.50", "40"],
-  ["8901234500028", "Ceramic Pour-Over Dripper", "18.50", "21.00", "15"],
-  ["8901234500035", "Cold Brew Concentrate 500ml", "9.75", "11.00", "60"],
+  ["8901234500011", "Colombian Whole Bean 1kg", 24, 14.5, "Coffee", 40, 2],
+  ["8901234500028", "Ceramic Pour-Over Dripper", 18.5, 9.25, "Merch", 15, 1],
+  ["8901234500035", "Cold Brew Concentrate 500ml", 9.75, 4.4, "Drinks", 60, 1],
 ];
 
-const MOCK_FILE_ROWS = [
-  ...TEMPLATE_ROWS,
-  ["8901234500042", "Reusable Steel Tumbler", "14.00", "16.50", "25"],
-  ["8901234500059", "Espresso Tamper Pro", "29.00", "33.00", "12"],
-];
-
-function toCsv(rows: string[][]) {
-  return [HEADERS, ...rows].map((r) => r.join(",")).join("\n");
+function templateSheet() {
+  const ws = XLSX.utils.aoa_to_sheet([[...HEADERS], ...TEMPLATE_ROWS]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Products");
+  return wb;
 }
 
-function parseCsv(text: string): string[][] {
-  return text
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .slice(1)
-    .map((l) => l.split(",").map((c) => c.trim().replace(/^"|"$/g, "")))
-    .filter((c) => c.length >= 2 && c[0]);
-}
+const num = (v: unknown) => {
+  const n = Number(String(v ?? "").replace(/[^0-9.\-]/g, ""));
+  return Number.isFinite(n) ? n : 0;
+};
 
 export function BulkImportDialog({
   open,
@@ -68,66 +73,89 @@ export function BulkImportDialog({
   const { state, currentStore, upsertProduct } = usePos();
   const inputRef = useRef<HTMLInputElement>(null);
   const [progress, setProgress] = useState(0);
+  const [progressLabel, setProgressLabel] = useState("");
   const [parsing, setParsing] = useState(false);
   const [rows, setRows] = useState<ImportRow[] | null>(null);
+  const [errors, setErrors] = useState<ErrorRow[]>([]);
+  const [summary, setSummary] = useState<{ added: number; updated: number; errors: ErrorRow[] } | null>(
+    null,
+  );
   const [dragging, setDragging] = useState(false);
   const [fileName, setFileName] = useState("");
 
   function reset() {
     setRows(null);
+    setErrors([]);
     setProgress(0);
+    setProgressLabel("");
     setParsing(false);
     setFileName("");
   }
 
-  function downloadTemplate() {
-    const blob = new Blob([toCsv(TEMPLATE_ROWS)], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "inventory-import-template.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  function buildRows(cells: string[][]): ImportRow[] {
-    return cells.map((c) => {
-      const barcode = c[0] ?? "";
-      const existing = state.products.some(
-        (p) => p.barcode === barcode || p.sku.toLowerCase() === barcode.toLowerCase(),
-      );
-      return {
-        barcode,
-        name: c[1] ?? "Untitled item",
-        price: Number(c[2]) || 0,
-        ecomPrice: Number(c[3]) || Number(c[2]) || 0,
-        stock: Number(c[4]) || 0,
-        existing,
-      };
-    });
+  function downloadTemplate(kind: "xlsx" | "csv") {
+    const wb = templateSheet();
+    XLSX.writeFile(wb, `inventory-import-template.${kind}`, { bookType: kind });
   }
 
   async function handleFile(file: File) {
     setFileName(file.name);
     setParsing(true);
     setRows(null);
-    setProgress(8);
+    setErrors([]);
+    setSummary(null);
+    setProgress(2);
+    setProgressLabel("Reading file…");
 
-    let cells: string[][];
-    if (/\.csv$/i.test(file.name)) {
-      cells = parseCsv(await file.text());
-      if (!cells.length) cells = MOCK_FILE_ROWS;
-    } else {
-      // .xlsx binary parsing is simulated with a representative sheet payload.
-      cells = MOCK_FILE_ROWS;
+    let records: Record<string, unknown>[] = [];
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      records = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
+    } catch {
+      setParsing(false);
+      toast.error("Could not read that file — use the .xlsx or .csv template");
+      return;
     }
 
-    for (const step of [30, 55, 80, 100]) {
-      await new Promise((r) => setTimeout(r, 220));
-      setProgress(step);
+    const parsed: ImportRow[] = [];
+    const bad: ErrorRow[] = [];
+    const total = records.length || 1;
+
+    for (let i = 0; i < records.length; i++) {
+      const raw = records[i];
+      const key = (k: string) =>
+        Object.entries(raw).find(([h]) => h.trim().toLowerCase().replace(/\s+/g, "_") === k)?.[1];
+      const barcode = String(key("barcode") ?? key("sku") ?? "").trim();
+      const name = String(key("name") ?? "").trim();
+      if (!barcode || !name) {
+        bad.push({ row: i + 2, reason: !barcode ? "Missing barcode" : "Missing product name" });
+      } else {
+        const price = num(key("price"));
+        parsed.push({
+          barcode,
+          name,
+          price,
+          cost: num(key("cost")) || Number((price * 0.6).toFixed(2)),
+          category: String(key("category") ?? "Imported").trim() || "Imported",
+          stock: num(key("stock_quantity")),
+          customPoints: num(key("custom_points")),
+          existing: state.products.some(
+            (p) => p.barcode === barcode || p.sku.toLowerCase() === barcode.toLowerCase(),
+          ),
+        });
+      }
+      const pct = Math.round(((i + 1) / total) * 100);
+      setProgress(pct);
+      setProgressLabel(`Importing row ${i + 1} of ${records.length}… ${pct}% complete`);
+      // yield to the browser so the progress bar paints live
+      if (i % 5 === 0) await new Promise((r) => setTimeout(r, 12));
     }
+
     setParsing(false);
-    setRows(buildRows(cells));
+    setErrors(bad);
+    setRows(parsed);
+    if (!parsed.length) toast.error("No valid product rows found in that file");
   }
 
   function confirm() {
@@ -145,6 +173,7 @@ export function BulkImportDialog({
             ...hit.stockByStore,
             [currentStore.id]: stockAt(hit, currentStore.id) + r.stock,
           },
+          customPoints: r.customPoints || hit.customPoints,
         });
         updated += 1;
       } else {
@@ -153,144 +182,226 @@ export function BulkImportDialog({
           name: r.name,
           sku: r.barcode,
           barcode: r.barcode,
-          category: "Imported",
+          category: r.category,
           price: r.price,
-          cost: Number((r.price * 0.6).toFixed(2)),
-          ecomPrice: r.ecomPrice,
+          cost: r.cost,
+          ecomPrice: r.price,
           ecomVisible: false,
           stockByStore: Object.fromEntries(
             state.stores.map((s) => [s.id, s.id === currentStore.id ? r.stock : 0]),
           ),
           reorderLevel: 10,
           taxRate: 0.05,
+          customPoints: r.customPoints,
         };
         upsertProduct(product);
         added += 1;
       }
     }
+    setSummary({ added, updated, errors });
     toast.success(`Imported ${rows.length} rows · ${added} new, ${updated} restocked`);
-    reset();
-    onOpenChange(false);
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        if (!o) reset();
-        onOpenChange(o);
-      }}
-    >
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Bulk import via Excel / CSV</DialogTitle>
-          <DialogDescription>
-            Rows are added to {currentStore.name}. Matching barcodes top up existing stock.
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog
+        open={open && !summary}
+        onOpenChange={(o) => {
+          if (!o) reset();
+          onOpenChange(o);
+        }}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Bulk import from Excel / CSV</DialogTitle>
+            <DialogDescription>
+              Rows are added to {currentStore.name}. Matching barcodes top up existing stock.
+            </DialogDescription>
+          </DialogHeader>
 
-        {!rows && (
-          <>
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragging(true);
-              }}
-              onDragLeave={() => setDragging(false)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragging(false);
-                const f = e.dataTransfer.files?.[0];
-                if (f) void handleFile(f);
-              }}
-              onClick={() => inputRef.current?.click()}
-              className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-10 text-center transition-colors ${
-                dragging ? "border-success bg-success/10" : "border-border bg-surface-2"
-              }`}
-            >
-              <UploadCloud className="size-8 text-muted-foreground" />
-              <p className="text-sm font-medium">
-                Drag &amp; Drop your Store Inventory spreadsheet (.xlsx, .csv) here
-              </p>
-              <p className="text-xs text-muted-foreground">or click to browse your files</p>
-              <input
-                ref={inputRef}
-                type="file"
-                accept=".csv,.xlsx,.xls"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) void handleFile(f);
-                  e.target.value = "";
+          {!rows && !parsing && (
+            <>
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragging(true);
                 }}
-              />
+                onDragLeave={() => setDragging(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragging(false);
+                  const f = e.dataTransfer.files?.[0];
+                  if (f) void handleFile(f);
+                }}
+                onClick={() => inputRef.current?.click()}
+                className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-10 text-center transition-colors ${
+                  dragging ? "border-success bg-success/10" : "border-border bg-surface-2"
+                }`}
+              >
+                <UploadCloud className="size-8 text-muted-foreground" />
+                <p className="text-sm font-medium">
+                  Drag &amp; Drop your Store Inventory spreadsheet (.xlsx, .csv) here
+                </p>
+                <p className="text-xs text-muted-foreground">or click to browse your files</p>
+                <input
+                  ref={inputRef}
+                  type="file"
+                  accept=".csv,.xlsx,.xls"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void handleFile(f);
+                    e.target.value = "";
+                  }}
+                />
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={() => downloadTemplate("xlsx")}
+                  className="text-xs text-primary underline-offset-4 hover:underline"
+                >
+                  📥 Download Excel template (.xlsx)
+                </button>
+                <button
+                  onClick={() => downloadTemplate("csv")}
+                  className="text-xs text-primary underline-offset-4 hover:underline"
+                >
+                  📥 Download CSV template
+                </button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Expected headers: {HEADERS.join(" · ")}
+              </p>
+            </>
+          )}
+
+          {parsing && (
+            <div className="space-y-2">
+              <p className="flex items-center gap-2 text-sm text-success">
+                <FileSpreadsheet className="size-4" /> {progressLabel || "Parsing spreadsheet data…"}
+              </p>
+              <Progress value={progress} className="h-2 [&>div]:bg-success" />
             </div>
+          )}
 
-            <button
-              onClick={downloadTemplate}
-              className="self-start text-xs text-primary underline-offset-4 hover:underline"
-            >
-              📥 Download Example Spreadsheet Template
-            </button>
-            <p className="text-[11px] text-muted-foreground">
-              Expected headers: {HEADERS.join(" · ")}
-            </p>
-          </>
-        )}
-
-        {parsing && (
-          <div className="space-y-2">
-            <p className="flex items-center gap-2 text-sm text-success">
-              <FileSpreadsheet className="size-4" /> Parsing spreadsheet data…
-            </p>
-            <Progress value={progress} className="h-2 [&>div]:bg-success" />
-          </div>
-        )}
-
-        {rows && (
-          <div className="space-y-3">
-            <p className="text-xs text-muted-foreground">
-              {fileName} · {rows.length} rows found
-            </p>
-            <div className="max-h-72 overflow-y-auto rounded-lg border border-border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Barcode / SKU</TableHead>
-                    <TableHead>Product name</TableHead>
-                    <TableHead className="text-right">POS</TableHead>
-                    <TableHead className="text-right">E-com</TableHead>
-                    <TableHead className="text-right">Stock</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((r) => (
-                    <TableRow key={r.barcode}>
-                      <TableCell className="numeric">{r.barcode}</TableCell>
-                      <TableCell className="font-medium">{r.name}</TableCell>
-                      <TableCell className="numeric text-right">{money(r.price)}</TableCell>
-                      <TableCell className="numeric text-right">{money(r.ecomPrice)}</TableCell>
-                      <TableCell className="numeric text-right">+{r.stock}</TableCell>
-                      <TableCell className="text-right text-xs text-muted-foreground">
-                        {r.existing ? "restock" : "new item"}
-                      </TableCell>
-                    </TableRow>
+          {rows && (
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                {fileName} · {rows.length} valid rows
+                {errors.length ? ` · ${errors.length} rows with errors` : ""}
+              </p>
+              {errors.length > 0 && (
+                <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                  {errors.slice(0, 4).map((e) => (
+                    <p key={e.row}>
+                      Row {e.row}: {e.reason}
+                    </p>
                   ))}
-                </TableBody>
-              </Table>
+                  {errors.length > 4 && <p>+{errors.length - 4} more…</p>}
+                </div>
+              )}
+              <div className="max-h-72 overflow-y-auto rounded-lg border border-border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Barcode / SKU</TableHead>
+                      <TableHead>Product name</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead className="text-right">Price</TableHead>
+                      <TableHead className="text-right">Cost</TableHead>
+                      <TableHead className="text-right">Stock</TableHead>
+                      <TableHead className="text-right">Pts</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rows.map((r, i) => (
+                      <TableRow key={`${r.barcode}-${i}`}>
+                        <TableCell className="numeric">{r.barcode}</TableCell>
+                        <TableCell className="font-medium">{r.name}</TableCell>
+                        <TableCell className="text-muted-foreground">{r.category}</TableCell>
+                        <TableCell className="numeric text-right">{money(r.price)}</TableCell>
+                        <TableCell className="numeric text-right">{money(r.cost)}</TableCell>
+                        <TableCell className="numeric text-right">+{r.stock}</TableCell>
+                        <TableCell className="numeric text-right">{r.customPoints}</TableCell>
+                        <TableCell className="text-right text-xs text-muted-foreground">
+                          {r.existing ? "restock" : "new item"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="flex justify-between gap-2">
+                <Button variant="outline" onClick={reset}>
+                  Choose another file
+                </Button>
+                <Button
+                  className="bg-success text-background hover:bg-success/90"
+                  disabled={!rows.length}
+                  onClick={confirm}
+                >
+                  <Download className="size-4" /> Confirm Bulk Add {rows.length} Items
+                </Button>
+              </div>
             </div>
-            <div className="flex justify-between gap-2">
-              <Button variant="outline" onClick={reset}>
-                Choose another file
-              </Button>
-              <Button className="bg-success text-background hover:bg-success/90" onClick={confirm}>
-                <Download className="size-4" /> Confirm Bulk Add {rows.length} Items
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Import summary */}
+      <Dialog
+        open={!!summary}
+        onOpenChange={(o) => {
+          if (!o) {
+            setSummary(null);
+            reset();
+            onOpenChange(false);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Import summary</DialogTitle>
+          </DialogHeader>
+          {summary && (
+            <div className="space-y-3 text-sm">
+              <p className="flex items-center gap-2 text-success">
+                <CheckCircle2 className="size-4" />
+                {summary.added + summary.updated} records inserted successfully
+              </p>
+              <ul className="space-y-1 text-muted-foreground">
+                <li className="numeric">New products created: {summary.added}</li>
+                <li className="numeric">Existing products restocked: {summary.updated}</li>
+                <li className="numeric">Error rows skipped: {summary.errors.length}</li>
+              </ul>
+              {summary.errors.length > 0 && (
+                <div className="max-h-40 space-y-1 overflow-y-auto rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                  <p className="flex items-center gap-1 font-semibold">
+                    <AlertTriangle className="size-3.5" /> Rows not imported
+                  </p>
+                  {summary.errors.map((e) => (
+                    <p key={e.row}>
+                      Row {e.row}: {e.reason}
+                    </p>
+                  ))}
+                </div>
+              )}
+              <Button
+                className="w-full"
+                onClick={() => {
+                  setSummary(null);
+                  reset();
+                  onOpenChange(false);
+                }}
+              >
+                Done
               </Button>
             </div>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

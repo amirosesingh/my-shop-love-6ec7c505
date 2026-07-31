@@ -125,7 +125,7 @@ function Inventory() {
             </div>
             {canEdit && (
               <Button variant="outline" onClick={() => setImportOpen(true)}>
-                📥 Bulk Import via Excel/CSV
+                📥 Bulk Import from Excel
               </Button>
             )}
             {canEdit && (
