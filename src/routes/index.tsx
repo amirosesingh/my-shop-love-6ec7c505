@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { cartTotals, money, stockAt, usePos } from "@/lib/pos-store";
+import { useAuth } from "@/lib/pos-auth";
 import type { CartLine, PaymentMethod, Sale } from "@/lib/pos-types";
 import { openCashDrawer, printSaleReceipt } from "@/lib/pos-print";
 
