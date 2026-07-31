@@ -1,9 +1,21 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowLeftRight, Boxes, Clock, ReceiptText, Store, Users, LayoutGrid } from "lucide-react";
+import {
+  ArrowLeftRight,
+  Boxes,
+  Clock,
+  LogOut,
+  ReceiptText,
+  Store,
+  Users,
+  LayoutGrid,
+} from "lucide-react";
 import { useEffect, type ReactNode } from "react";
 import { usePos } from "@/lib/pos-store";
+import { useAuth } from "@/lib/pos-auth";
+import { LoginScreen } from "@/components/pos/LoginScreen";
 import { setPrintStore } from "@/lib/pos-print";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -22,10 +34,21 @@ const nav = [
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { activeShift, stores, currentStore, setCurrentStore, state } = usePos();
+  const { ready, user, isAdmin, logout } = useAuth();
 
   useEffect(() => {
     setPrintStore(currentStore ?? null);
   }, [currentStore]);
+
+  // Cashiers are pinned to their assigned branch — no manual switching.
+  useEffect(() => {
+    if (user && !isAdmin && user.storeId && currentStore.id !== user.storeId) {
+      setCurrentStore(user.storeId);
+    }
+  }, [user, isAdmin, currentStore.id, setCurrentStore]);
+
+  if (!ready) return null;
+  if (!user) return <LoginScreen />;
 
   const inbound = state.transfers.filter(
     (t) =>
@@ -47,19 +70,28 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
 
         <div className="mb-3 hidden px-1 md:block">
-          <Select value={currentStore.id} onValueChange={setCurrentStore}>
-            <SelectTrigger className="h-9 w-full text-xs">
+          {isAdmin ? (
+            <Select value={currentStore.id} onValueChange={setCurrentStore}>
+              <SelectTrigger className="h-9 w-full text-xs">
+                <Store className="size-3.5 text-muted-foreground" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {stores.map((s) => (
+                  <SelectItem key={s.id} value={s.id} className="text-xs">
+                    {s.code} · {s.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <div className="flex items-center gap-2 rounded-md border border-border bg-surface-2 px-2 py-2 text-xs">
               <Store className="size-3.5 text-muted-foreground" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {stores.map((s) => (
-                <SelectItem key={s.id} value={s.id} className="text-xs">
-                  {s.code} · {s.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+              <span className="truncate">
+                {currentStore.code} · {currentStore.name}
+              </span>
+            </div>
+          )}
         </div>
 
         {nav.map((item) => (
@@ -80,7 +112,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Link>
         ))}
 
-        <div className="mt-auto hidden px-2 md:block">
+        <div className="mt-auto hidden space-y-2 px-2 md:block">
           <Badge
             variant="outline"
             className={
@@ -91,6 +123,18 @@ export function AppShell({ children }: { children: ReactNode }) {
           >
             {activeShift ? `Shift open · ${activeShift.cashier}` : "Shift closed"}
           </Badge>
+          <div className="rounded-md border border-border px-2 py-2">
+            <p className="truncate text-xs font-medium">{user.name}</p>
+            <p className="text-[11px] capitalize text-muted-foreground">{user.role}</p>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mt-1 h-7 w-full justify-start px-1 text-xs"
+              onClick={logout}
+            >
+              <LogOut className="size-3.5" /> Sign out
+            </Button>
+          </div>
         </div>
       </aside>
 
