@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 
 export function LoginScreen() {
   const { login } = useAuth();
-  const [username, setUsername] = useState("");
+  const [staffId, setStaffId] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
@@ -16,7 +16,7 @@ export function LoginScreen() {
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          const res = login(username, password);
+          const res = login(staffId, password);
           if (!res.ok) setError(res.error ?? "Sign in failed");
         }}
         className="w-full max-w-sm space-y-4 rounded-lg border border-border bg-card p-6"
@@ -32,13 +32,14 @@ export function LoginScreen() {
         </div>
 
         <div className="space-y-1">
-          <Label htmlFor="username">Username</Label>
+          <Label htmlFor="username">Staff ID</Label>
           <Input
             id="username"
             autoFocus
-            value={username}
+            placeholder="EMP-101"
+            value={staffId}
             onChange={(e) => {
-              setUsername(e.target.value);
+              setStaffId(e.target.value);
               setError("");
             }}
           />
@@ -63,8 +64,8 @@ export function LoginScreen() {
         </Button>
 
         <p className="text-[11px] leading-relaxed text-muted-foreground">
-          Demo accounts · cashier1 / 123 (Store 1) · cashier2 / 123 (Store 2) · admin / 123
-          (all stores)
+          Staff sign in with the ID issued by your manager · password 123 for demo staff. Admin
+          account: admin / 123.
         </p>
       </form>
     </div>

@@ -5,6 +5,7 @@ import {
   Clock,
   LogOut,
   ReceiptText,
+  ShieldCheck,
   Store,
   Users,
   LayoutGrid,
@@ -31,6 +32,8 @@ const nav = [
   { to: "/members", label: "Members", icon: Users },
   { to: "/shifts", label: "Shifts", icon: Clock },
 ];
+
+const adminNav = [{ to: "/staff", label: "Staff", icon: ShieldCheck }];
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { activeShift, stores, currentStore, setCurrentStore, state } = usePos();
@@ -94,7 +97,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           )}
         </div>
 
-        {nav.map((item) => (
+        {(isAdmin ? [...nav, ...adminNav] : nav).map((item) => (
           <Link
             key={item.to}
             to={item.to}

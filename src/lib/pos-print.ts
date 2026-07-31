@@ -206,12 +206,18 @@ export function printMemberStatement(member: Member, sales: Sale[]) {
 
 function transferBody(
   transfer: Transfer,
-  product: Product,
+  products: Product[],
   from: Store,
   to: Store,
 ) {
   const label =
     transfer.kind === "request" ? "STOCK REQUEST NOTE" : "STOCK TRANSFER NOTE";
+  const lines = transfer.items.map((item) => ({
+    item,
+    product: products.find((p) => p.id === item.productId) ?? null,
+  }));
+  const units = transfer.items.reduce((a, i) => a + i.qty, 0);
+  const value = lines.reduce((a, l) => a + (l.product?.cost ?? 0) * l.item.qty, 0);
   return `${header(label)}
     <table>
       <tr><td>Reference</td><td class="r b">${esc(transfer.ref)}</td></tr>
@@ -224,10 +230,17 @@ function transferBody(
       <tr><td>To</td><td class="r">${esc(to.name)} (${esc(to.code)})</td></tr>
     </table><hr>
     <table>
-      <tr><td>${esc(product.name)}<div class="muted">${esc(product.sku)}</div></td>
-          <td class="r b big">${transfer.qty}</td></tr>
-      <tr><td>Unit cost</td><td class="r">${fmt(product.cost)}</td></tr>
-      <tr class="b"><td>Value</td><td class="r">${fmt(product.cost * transfer.qty)}</td></tr>
+      ${lines
+        .map(
+          (l) => `<tr><td>${esc(l.product?.name ?? "Unknown item")}
+            <div class="muted">${esc(l.product?.sku ?? "")} · ${fmt(l.product?.cost ?? 0)} ea</div></td>
+          <td class="r b big">${l.item.qty}</td></tr>`,
+        )
+        .join("")}
+    </table><hr>
+    <table>
+      <tr><td>Lines / units</td><td class="r">${lines.length} / ${units}</td></tr>
+      <tr class="b"><td>Value</td><td class="r">${fmt(value)}</td></tr>
     </table>
     ${transfer.note ? `<hr><div class="muted">Note: ${esc(transfer.note)}</div>` : ""}
     <hr>
@@ -238,11 +251,11 @@ function transferBody(
 
 export function printTransferNote(
   transfer: Transfer,
-  product: Product,
+  products: Product[],
   from: Store,
   to: Store,
 ) {
-  printHtml(transfer.ref, transferBody(transfer, product, from, to));
+  printHtml(transfer.ref, transferBody(transfer, products, from, to));
 }
 
 /**

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { ArrowLeftRight, Check, Printer, Send, Truck, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowLeftRight, Check, Plus, Printer, Send, Trash2, Truck, X } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/table";
 import { stockAt, usePos } from "@/lib/pos-store";
 import { printTransferNote } from "@/lib/pos-print";
-import type { Transfer, TransferKind } from "@/lib/pos-types";
+import type { Transfer, TransferItem, TransferKind } from "@/lib/pos-types";
 
 export const Route = createFileRoute("/transfers")({
   head: () => ({
@@ -51,7 +51,13 @@ export const Route = createFileRoute("/transfers")({
     ],
   }),
   component: Transfers,
+  validateSearch: (search: Record<string, unknown>): TransferSearch => ({
+    items: typeof search.items === "string" ? search.items : undefined,
+    kind: search.kind === "request" ? "request" : search.kind === "transfer" ? "transfer" : undefined,
+  }),
 });
+
+type TransferSearch = { items?: string; kind?: TransferKind };
 
 const statusStyle: Record<string, string> = {
   requested: "border-warning/50 text-warning",
@@ -72,17 +78,37 @@ function Transfers() {
     receiveTransfer,
     rejectTransfer,
   } = usePos();
+  const search = Route.useSearch();
 
   const others = stores.filter((s) => s.id !== currentStore.id);
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<TransferKind>("transfer");
-  const [productId, setProductId] = useState(state.products[0]?.id ?? "");
+  const [items, setItems] = useState<TransferItem[]>([]);
+  const [pickId, setPickId] = useState(state.products[0]?.id ?? "");
   const [otherStoreId, setOtherStoreId] = useState(others[0]?.id ?? "");
-  const [qty, setQty] = useState("1");
   const [note, setNote] = useState("");
 
-  const product = state.products.find((p) => p.id === productId) ?? null;
   const storeOf = (id: string) => stores.find((s) => s.id === id);
+  const productOf = (id: string) => state.products.find((p) => p.id === id) ?? null;
+
+  // Prefilled multi-item basket handed over from the inventory page.
+  useEffect(() => {
+    if (!search.items) return;
+    const ids = search.items.split(",").filter(Boolean);
+    if (!ids.length) return;
+    setItems(ids.map((productId: string) => ({ productId, qty: 1 })));
+    setKind(search.kind ?? "transfer");
+    setOpen(true);
+  }, [search.items, search.kind]);
+
+  function addItem(productId: string) {
+    if (!productId) return;
+    setItems((prev) =>
+      prev.some((i) => i.productId === productId)
+        ? prev.map((i) => (i.productId === productId ? { ...i, qty: i.qty + 1 } : i))
+        : [...prev, { productId, qty: 1 }],
+    );
+  }
 
   const mine = useMemo(
     () =>
@@ -97,39 +123,50 @@ function Transfers() {
   );
 
   function print(t: Transfer) {
-    const p = state.products.find((x) => x.id === t.productId);
     const from = storeOf(t.fromStoreId);
     const to = storeOf(t.toStoreId);
-    if (p && from && to) printTransferNote(t, p, from, to);
+    if (from && to) printTransferNote(t, state.products, from, to);
   }
 
   function submit() {
-    const n = Math.floor(Number(qty) || 0);
-    if (!product || !otherStoreId || n <= 0) {
-      toast.error("Pick a product, a store and a quantity");
+    const clean = items
+      .map((i) => ({ productId: i.productId, qty: Math.floor(Number(i.qty) || 0) }))
+      .filter((i) => i.qty > 0);
+    if (!clean.length || !otherStoreId) {
+      toast.error("Add at least one product with a quantity, and pick a store");
       return;
     }
     const fromStoreId = kind === "transfer" ? currentStore.id : otherStoreId;
     const toStoreId = kind === "transfer" ? otherStoreId : currentStore.id;
-    if (kind === "transfer" && stockAt(product, currentStore.id) < n) {
-      toast.error(`Only ${stockAt(product, currentStore.id)} on hand at ${currentStore.name}`);
-      return;
+    if (kind === "transfer") {
+      const short = clean.find((i) => {
+        const p = productOf(i.productId);
+        return !p || stockAt(p, currentStore.id) < i.qty;
+      });
+      if (short) {
+        const p = productOf(short.productId);
+        toast.error(
+          `Only ${p ? stockAt(p, currentStore.id) : 0} × ${p?.name ?? "item"} on hand at ${currentStore.name}`,
+        );
+        return;
+      }
     }
     const t = createTransfer({
       kind,
       fromStoreId,
       toStoreId,
-      productId: product.id,
-      qty: n,
+      items: clean,
       note,
       createdBy: activeShift?.cashier ?? "Manager",
     });
     print({ ...t });
     setOpen(false);
     setNote("");
-    setQty("1");
+    setItems([]);
     toast.success(
-      kind === "transfer" ? `${t.ref} dispatched` : `${t.ref} requested from ${storeOf(otherStoreId)?.name}`,
+      kind === "transfer"
+        ? `${t.ref} dispatched · ${clean.length} item${clean.length > 1 ? "s" : ""}`
+        : `${t.ref} requested from ${storeOf(otherStoreId)?.name}`,
     );
   }
 
@@ -190,7 +227,6 @@ function Transfers() {
             </TableHeader>
             <TableBody>
               {mine.map((t) => {
-                const p = state.products.find((x) => x.id === t.productId);
                 const canApprove = t.status === "requested" && t.fromStoreId === currentStore.id;
                 const canReceive = t.status === "in_transit" && t.toStoreId === currentStore.id;
                 return (
@@ -201,8 +237,22 @@ function Transfers() {
                         {new Date(t.createdAt).toLocaleString()}
                       </div>
                     </TableCell>
-                    <TableCell>{p?.name ?? "—"}</TableCell>
-                    <TableCell className="numeric text-center">{t.qty}</TableCell>
+                    <TableCell>
+                      <div className="space-y-0.5">
+                        {t.items.map((i) => (
+                          <div key={i.productId} className="text-sm">
+                            {productOf(i.productId)?.name ?? "—"}
+                            <span className="numeric text-muted-foreground"> × {i.qty}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell className="numeric text-center">
+                      {t.items.reduce((a, i) => a + i.qty, 0)}
+                      <div className="text-[11px] text-muted-foreground">
+                        {t.items.length} line{t.items.length > 1 ? "s" : ""}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-muted-foreground">
                       {storeOf(t.fromStoreId)?.code} → {storeOf(t.toStoreId)?.code}
                     </TableCell>
@@ -279,20 +329,72 @@ function Transfers() {
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label>Product</Label>
-              <Select value={productId} onValueChange={setProductId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select product" />
-                </SelectTrigger>
-                <SelectContent>
-                  {state.products.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Add products</Label>
+              <div className="flex gap-2">
+                <Select value={pickId} onValueChange={setPickId}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Select product" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {state.products.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name} — {stockAt(p, currentStore.id)} at {currentStore.code}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" onClick={() => addItem(pickId)}>
+                  <Plus className="size-4" /> Add
+                </Button>
+              </div>
             </div>
+
+            <div className="max-h-56 space-y-2 overflow-y-auto rounded-md border border-border p-2">
+              {items.map((i) => {
+                const p = productOf(i.productId);
+                return (
+                  <div key={i.productId} className="flex items-center gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm">{p?.name ?? "Unknown item"}</p>
+                      <p className="numeric text-[11px] text-muted-foreground">
+                        {currentStore.code} on hand: {p ? stockAt(p, currentStore.id) : 0}
+                        {otherStoreId && p
+                          ? ` · ${storeOf(otherStoreId)?.code} on hand: ${stockAt(p, otherStoreId)}`
+                          : ""}
+                      </p>
+                    </div>
+                    <Input
+                      className="numeric h-9 w-20"
+                      value={String(i.qty)}
+                      onChange={(e) =>
+                        setItems((prev) =>
+                          prev.map((x) =>
+                            x.productId === i.productId
+                              ? { ...x, qty: Math.max(0, Math.floor(Number(e.target.value) || 0)) }
+                              : x,
+                          ),
+                        )
+                      }
+                    />
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() =>
+                        setItems((prev) => prev.filter((x) => x.productId !== i.productId))
+                      }
+                    >
+                      <Trash2 className="size-4 text-destructive" />
+                    </Button>
+                  </div>
+                );
+              })}
+              {!items.length && (
+                <p className="py-4 text-center text-sm text-muted-foreground">
+                  No items yet — add one or more products to this note.
+                </p>
+              )}
+            </div>
+
             <div className="space-y-1">
               <Label>{kind === "transfer" ? "Destination store" : "Supplying store"}</Label>
               <Select value={otherStoreId} onValueChange={setOtherStoreId}>
@@ -303,20 +405,10 @@ function Transfers() {
                   {others.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
                       {s.code} · {s.name}
-                      {product ? ` — ${stockAt(product, s.id)} on hand` : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Quantity</Label>
-              <Input className="numeric" value={qty} onChange={(e) => setQty(e.target.value)} />
-              {product && (
-                <p className="numeric text-[11px] text-muted-foreground">
-                  {currentStore.code} on hand: {stockAt(product, currentStore.id)}
-                </p>
-              )}
             </div>
             <div className="space-y-1">
               <Label>Note</Label>

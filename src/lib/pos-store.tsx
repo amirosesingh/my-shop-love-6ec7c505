@@ -34,11 +34,22 @@ type NewTransfer = {
   kind: TransferKind;
   fromStoreId: string;
   toStoreId: string;
-  productId: string;
-  qty: number;
+  items: { productId: string; qty: number }[];
   note: string;
   createdBy: string;
 };
+
+/** Apply a stock delta for every line of a transfer at one store. */
+const bumpItems = (
+  products: Product[],
+  items: { productId: string; qty: number }[],
+  storeId: string,
+  sign: 1 | -1,
+) =>
+  products.map((p) => {
+    const item = items.find((i) => i.productId === p.id);
+    return item ? bump(p, storeId, sign * item.qty) : p;
+  });
 
 type Ctx = {
   ready: boolean;
@@ -74,7 +85,17 @@ export function PosProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(KEY);
-      if (raw) setState({ ...seedState, ...(JSON.parse(raw) as PosState) });
+      if (raw) {
+        const saved = JSON.parse(raw) as PosState;
+        // Migrate single-product transfers saved before multi-item support.
+        const transfers = (saved.transfers ?? []).map((t) => {
+          const legacy = t as Transfer & { productId?: string; qty?: number };
+          return t.items
+            ? t
+            : { ...t, items: [{ productId: legacy.productId ?? "", qty: legacy.qty ?? 0 }] };
+        });
+        setState({ ...seedState, ...saved, transfers });
+      }
     } catch {
       /* ignore corrupt storage */
     }
@@ -269,9 +290,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       // Goods only leave the source store once they are actually in transit.
       const products =
         transfer.status === "in_transit"
-          ? s.products.map((p) =>
-              p.id === input.productId ? bump(p, input.fromStoreId, -input.qty) : p,
-            )
+          ? bumpItems(s.products, input.items, input.fromStoreId, -1)
           : s.products;
       return { ...s, transferCounter, products, transfers: [transfer, ...s.transfers] };
     });
@@ -284,9 +303,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       if (!t || t.status !== "requested") return s;
       return {
         ...s,
-        products: s.products.map((p) =>
-          p.id === t.productId ? bump(p, t.fromStoreId, -t.qty) : p,
-        ),
+        products: bumpItems(s.products, t.items, t.fromStoreId, -1),
         transfers: s.transfers.map((x) =>
           x.id === id ? { ...x, status: "in_transit", updatedAt: new Date().toISOString() } : x,
         ),
@@ -300,7 +317,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       if (!t || t.status !== "in_transit") return s;
       return {
         ...s,
-        products: s.products.map((p) => (p.id === t.productId ? bump(p, t.toStoreId, t.qty) : p)),
+        products: bumpItems(s.products, t.items, t.toStoreId, 1),
         transfers: s.transfers.map((x) =>
           x.id === id ? { ...x, status: "received", updatedAt: new Date().toISOString() } : x,
         ),
@@ -315,7 +332,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       // If stock already left the source store, put it back.
       const products =
         t.status === "in_transit"
-          ? s.products.map((p) => (p.id === t.productId ? bump(p, t.fromStoreId, t.qty) : p))
+          ? bumpItems(s.products, t.items, t.fromStoreId, 1)
           : s.products;
       return {
         ...s,

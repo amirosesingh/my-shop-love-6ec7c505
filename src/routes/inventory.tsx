@@ -1,12 +1,13 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { Minus, Plus, Search, Trash2 } from "lucide-react";
+import { ArrowLeftRight, Inbox, Minus, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -56,12 +57,28 @@ const blank = (storeId: string): Product => ({
 
 function Inventory() {
   const { state, stores, currentStore, upsertProduct, removeProduct, adjustStock } = usePos();
+  const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState<Product | null>(null);
+  const [selected, setSelected] = useState<string[]>([]);
 
   const rows = state.products.filter((p) =>
     `${p.name} ${p.sku} ${p.barcode} ${p.category}`.toLowerCase().includes(query.toLowerCase()),
   );
+  const allShownSelected = rows.length > 0 && rows.every((p) => selected.includes(p.id));
+
+  function toggle(id: string, on: boolean) {
+    setSelected((prev) => (on ? [...new Set([...prev, id])] : prev.filter((x) => x !== id)));
+  }
+
+  function goToTransfers(kind: "transfer" | "request") {
+    if (!selected.length) {
+      toast.error("Select at least one product first");
+      return;
+    }
+    navigate({ to: "/transfers", search: { items: selected.join(","), kind } });
+  }
+
   const lowStock = state.products.filter(
     (p) => stockAt(p, currentStore.id) <= p.reorderLevel,
   );
@@ -200,10 +217,39 @@ function Inventory() {
           </div>
         </header>
 
+        {selected.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/40 bg-primary/5 px-4 py-3">
+            <p className="text-sm">
+              <span className="numeric font-semibold">{selected.length}</span> product
+              {selected.length > 1 ? "s" : ""} selected
+            </p>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setSelected([])}>
+                Clear
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => goToTransfers("request")}>
+                <Inbox className="size-4" /> Request selected
+              </Button>
+              <Button size="sm" onClick={() => goToTransfers("transfer")}>
+                <ArrowLeftRight className="size-4" /> Transfer selected
+              </Button>
+            </div>
+          </div>
+        )}
+
         <div className="rounded-lg border border-border bg-card">
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10">
+                  <Checkbox
+                    checked={allShownSelected}
+                    onCheckedChange={(v) =>
+                      setSelected(v ? rows.map((p) => p.id) : [])
+                    }
+                    aria-label="Select all products"
+                  />
+                </TableHead>
                 <TableHead>Product</TableHead>
                 <TableHead>Category</TableHead>
                 <TableHead className="text-right">Cost</TableHead>
@@ -217,6 +263,13 @@ function Inventory() {
             <TableBody>
               {rows.map((p) => (
                 <TableRow key={p.id}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selected.includes(p.id)}
+                      onCheckedChange={(v) => toggle(p.id, !!v)}
+                      aria-label={`Select ${p.name}`}
+                    />
+                  </TableCell>
                   <TableCell>
                     <button
                       className="text-left font-medium hover:text-primary"

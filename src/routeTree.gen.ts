@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as InventoryRouteImport } from './routes/inventory'
 import { Route as MembersRouteImport } from './routes/members'
 import { Route as ShiftsRouteImport } from './routes/shifts'
+import { Route as StaffRouteImport } from './routes/staff'
 import { Route as TransfersRouteImport } from './routes/transfers'
 
 const IndexRoute = IndexRouteImport.update({
@@ -35,6 +36,11 @@ const ShiftsRoute = ShiftsRouteImport.update({
   path: '/shifts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StaffRoute = StaffRouteImport.update({
+  id: '/staff',
+  path: '/staff',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TransfersRoute = TransfersRouteImport.update({
   id: '/transfers',
   path: '/transfers',
@@ -46,6 +52,7 @@ export interface FileRoutesByFullPath {
   '/inventory': typeof InventoryRoute
   '/members': typeof MembersRoute
   '/shifts': typeof ShiftsRoute
+  '/staff': typeof StaffRoute
   '/transfers': typeof TransfersRoute
 }
 export interface FileRoutesByTo {
@@ -53,6 +60,7 @@ export interface FileRoutesByTo {
   '/inventory': typeof InventoryRoute
   '/members': typeof MembersRoute
   '/shifts': typeof ShiftsRoute
+  '/staff': typeof StaffRoute
   '/transfers': typeof TransfersRoute
 }
 export interface FileRoutesById {
@@ -61,14 +69,23 @@ export interface FileRoutesById {
   '/inventory': typeof InventoryRoute
   '/members': typeof MembersRoute
   '/shifts': typeof ShiftsRoute
+  '/staff': typeof StaffRoute
   '/transfers': typeof TransfersRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/inventory' | '/members' | '/shifts' | '/transfers'
+  fullPaths:
+    '/' | '/inventory' | '/members' | '/shifts' | '/staff' | '/transfers'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/inventory' | '/members' | '/shifts' | '/transfers'
-  id: '__root__' | '/' | '/inventory' | '/members' | '/shifts' | '/transfers'
+  to: '/' | '/inventory' | '/members' | '/shifts' | '/staff' | '/transfers'
+  id:
+    | '__root__'
+    | '/'
+    | '/inventory'
+    | '/members'
+    | '/shifts'
+    | '/staff'
+    | '/transfers'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -76,6 +93,7 @@ export interface RootRouteChildren {
   InventoryRoute: typeof InventoryRoute
   MembersRoute: typeof MembersRoute
   ShiftsRoute: typeof ShiftsRoute
+  StaffRoute: typeof StaffRoute
   TransfersRoute: typeof TransfersRoute
 }
 
@@ -109,6 +127,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShiftsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/staff': {
+      id: '/staff'
+      path: '/staff'
+      fullPath: '/staff'
+      preLoaderRoute: typeof StaffRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/transfers': {
       id: '/transfers'
       path: '/transfers'
@@ -124,6 +149,7 @@ const rootRouteChildren: RootRouteChildren = {
   InventoryRoute: InventoryRoute,
   MembersRoute: MembersRoute,
   ShiftsRoute: ShiftsRoute,
+  StaffRoute: StaffRoute,
   TransfersRoute: TransfersRoute,
 }
 export const routeTree = rootRouteImport
