@@ -83,6 +83,11 @@ export type TransferStatus =
   | "rejected"
   | "cancelled";
 
+export type TransferItem = {
+  productId: string;
+  qty: number;
+};
+
 export type Transfer = {
   id: string;
   ref: string;
@@ -91,8 +96,8 @@ export type Transfer = {
   fromStoreId: string;
   /** store the goods arrive at */
   toStoreId: string;
-  productId: string;
-  qty: number;
+  /** one or more products moved together on the same note */
+  items: TransferItem[];
   status: TransferStatus;
   note: string;
   createdBy: string;
