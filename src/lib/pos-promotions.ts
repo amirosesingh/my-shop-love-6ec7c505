@@ -82,9 +82,24 @@ export function evaluatePromotions({
   }
 
   const thresholds = live
+  const tierRule = live.find((p) => p.type === "tier");
+  if (tierRule && member && base > 0) {
+    const pct = tierRule.tierRates?.[member.tier] ?? 0;
+    const off = r2((base * pct) / 100);
+    if (off > 0) {
+      promoDiscount += off;
+      applied.push({
+        id: tierRule.id,
+        name: tierRule.name,
+        detail: `${pct}% ${member.tier} member discount`,
+      });
+    }
+  }
+
+  const thresholdList = live
     .filter((p) => p.type === "threshold" && base >= (p.minBill ?? 0))
     .sort((a, b) => (b.minBill ?? 0) - (a.minBill ?? 0));
-  const threshold = thresholds[0];
+  const threshold = thresholdList[0];
   if (threshold && base > 0) {
     const off =
       threshold.valueType === "percent"
