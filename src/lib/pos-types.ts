@@ -147,9 +147,42 @@ export type PosState = {
   promotions: Promotion[];
   counter: number;
   transferCounter: number;
+  settings: AppSettings;
 };
 
-export type PromoType = "points" | "foc" | "birthday" | "threshold";
+export type PromoType = "points" | "foc" | "birthday" | "threshold" | "tier";
+
+export type MemberTier = Member["tier"];
+
+export type TaxMode = "inclusive" | "exclusive";
+
+export type TaxSettings = {
+  /** master switch for tax calculation */
+  enabled: boolean;
+  /** percent, e.g. 5 for 5% */
+  rate: number;
+  /** "Prices Include Tax" vs "Tax Added at Checkout" */
+  mode: TaxMode;
+};
+
+export type PaperSize = "80mm" | "58mm" | "a4" | "letter";
+
+export type ReceiptSettings = {
+  paper: PaperSize;
+  /** store header address / phone block */
+  headerText: string;
+  /** bottom thank-you note */
+  footerText: string;
+  showLogo: boolean;
+  showPoints: boolean;
+  showBarcode: boolean;
+  showTax: boolean;
+};
+
+export type AppSettings = {
+  tax: TaxSettings;
+  receipt: ReceiptSettings;
+};
 
 export type Promotion = {
   id: string;
@@ -171,4 +204,6 @@ export type Promotion = {
   value?: number;
   /** how `value` is read (threshold rules only; birthday is always percent) */
   valueType?: DiscountType;
+  /** tier rule: percentage discount per membership tier */
+  tierRates?: Record<MemberTier, number>;
 };
