@@ -28,7 +28,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
-import { cartTotals, money, usePos } from "@/lib/pos-store";
+import { cartTotals, money, stockAt, usePos } from "@/lib/pos-store";
 import type { CartLine, PaymentMethod, Sale } from "@/lib/pos-types";
 import { openCashDrawer, printSaleReceipt } from "@/lib/pos-print";
 
@@ -49,7 +49,7 @@ export const Route = createFileRoute("/")({
 });
 
 function Register() {
-  const { state, activeShift, recordSale, openShift } = usePos();
+  const { state, activeShift, recordSale, openShift, currentStore } = usePos();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
   const [lines, setLines] = useState<CartLine[]>([]);
@@ -82,10 +82,16 @@ function Register() {
   const totals = cartTotals(lines, cartDiscount);
 
   function addLine(productId: string) {
+    if (!activeShift) {
+      toast.error("Open a shift before ringing up a sale");
+      setOpenShiftOpen(true);
+      return;
+    }
     const product = state.products.find((p) => p.id === productId);
     if (!product) return;
-    if (product.stock <= 0) {
-      toast.error(`${product.name} is out of stock`);
+    const onHand = stockAt(product, currentStore.id);
+    if (onHand <= 0) {
+      toast.error(`${product.name} is out of stock at ${currentStore.name}`);
       return;
     }
     setLines((ls) => {
@@ -116,6 +122,11 @@ function Register() {
 
   function scanSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!activeShift) {
+      toast.error("Open a shift before ringing up a sale");
+      setOpenShiftOpen(true);
+      return;
+    }
     const hit = state.products.find(
       (p) => p.barcode === query.trim() || p.sku.toLowerCase() === query.trim().toLowerCase(),
     );
@@ -140,6 +151,7 @@ function Register() {
       return;
     }
     const sale = recordSale({
+      storeId: currentStore.id,
       shiftId: activeShift.id,
       lines,
       subtotal: totals.subtotal,
