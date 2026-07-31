@@ -16,6 +16,7 @@ import {
   Info,
   UserPlus,
   X,
+  Repeat,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
@@ -34,7 +35,8 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { cartTotals, money, stockAt, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
-import type { CartLine, PaymentMethod, Sale } from "@/lib/pos-types";
+import type { CartLine, DiscountType, PaymentMethod, Sale } from "@/lib/pos-types";
+import { lineUnitDiscount, r2 } from "@/lib/pos-types";
 import { openCashDrawer, printSaleReceipt } from "@/lib/pos-print";
 
 export const Route = createFileRoute("/")({
@@ -60,6 +62,12 @@ function Register() {
   const [category, setCategory] = useState("All");
   const [lines, setLines] = useState<CartLine[]>([]);
   const [cartDiscount, setCartDiscount] = useState(0);
+  const [cartDiscountType, setCartDiscountType] = useState<DiscountType>("amount");
+  const [exchangeOpen, setExchangeOpen] = useState(false);
+  const [billQuery, setBillQuery] = useState("");
+  const [billHit, setBillHit] = useState<Sale | null>(null);
+  const [picks, setPicks] = useState<Record<number, number>>({});
+  const [exchangeRef, setExchangeRef] = useState<string | null>(null);
   const [memberId, setMemberId] = useState<string | null>(null);
   const [payOpen, setPayOpen] = useState(false);
   const [openShiftOpen, setOpenShiftOpen] = useState(false);
@@ -87,7 +95,9 @@ function Register() {
   });
 
   const member = state.members.find((m) => m.id === memberId) ?? null;
-  const totals = cartTotals(lines, cartDiscount);
+  const totals = cartTotals(lines, cartDiscount, cartDiscountType);
+  const balanceDue = totals.total >= 0 ? totals.total : 0;
+  const refundDue = totals.total < 0 ? r2(-totals.total) : 0;
   const detail = state.products.find((p) => p.id === detailId) ?? null;
 
   const memberMatches = memberQuery.trim()
@@ -117,9 +127,11 @@ function Register() {
       return;
     }
     setLines((ls) => {
-      const found = ls.find((l) => l.productId === productId);
+      const found = ls.find((l) => l.productId === productId && !l.credit);
       if (found)
-        return ls.map((l) => (l.productId === productId ? { ...l, qty: l.qty + 1 } : l));
+        return ls.map((l) =>
+          l.productId === productId && !l.credit ? { ...l, qty: l.qty + 1 } : l,
+        );
       return [
         ...ls,
         {
@@ -129,17 +141,73 @@ function Register() {
           qty: 1,
           taxRate: product.taxRate,
           discount: 0,
+          discountType: "amount",
         },
       ];
     });
   }
 
-  function setQty(productId: string, delta: number) {
+  function setQty(index: number, delta: number) {
     setLines((ls) =>
       ls
-        .map((l) => (l.productId === productId ? { ...l, qty: l.qty + delta } : l))
-        .filter((l) => l.qty > 0),
+        .map((l, i) => (i === index ? { ...l, qty: l.credit ? l.qty - delta : l.qty + delta } : l))
+        .filter((l) => (l.credit ? l.qty < 0 : l.qty > 0)),
     );
+  }
+
+  function patchLine(index: number, patch: Partial<CartLine>) {
+    setLines((ls) => ls.map((l, i) => (i === index ? { ...l, ...patch } : l)));
+  }
+
+  function clearCart() {
+    setLines([]);
+    setCartDiscount(0);
+    setExchangeRef(null);
+  }
+
+  function lookupBill() {
+    const ref = billQuery.trim().toLowerCase();
+    const hit =
+      state.sales.find((s) => s.receiptNo.toLowerCase() === ref) ??
+      state.sales.find((s) => s.receiptNo.toLowerCase().includes(ref) && !!ref) ??
+      null;
+    setBillHit(hit);
+    setPicks({});
+    if (!hit) toast.error(`No bill found for “${billQuery}”`);
+  }
+
+  function addExchangeCredits() {
+    if (!billHit) return;
+    if (!activeShift) {
+      toast.error("Open a shift before processing an exchange");
+      return;
+    }
+    const credits: CartLine[] = Object.entries(picks)
+      .filter(([, qty]) => qty > 0)
+      .map(([idx, qty]) => {
+        const src = billHit.lines[Number(idx)];
+        return {
+          productId: src.productId,
+          name: src.name,
+          price: r2(src.price - lineUnitDiscount(src)),
+          qty: -qty,
+          taxRate: src.taxRate,
+          discount: 0,
+          discountType: "amount" as DiscountType,
+          credit: true,
+        };
+      });
+    if (!credits.length) {
+      toast.error("Select at least one item to exchange");
+      return;
+    }
+    setLines((ls) => [...credits, ...ls]);
+    setExchangeRef(billHit.receiptNo);
+    setExchangeOpen(false);
+    setBillQuery("");
+    setBillHit(null);
+    setPicks({});
+    toast.success(`Credits from ${billHit.receiptNo} added to the ticket`);
   }
 
   function scanSubmit(e: React.FormEvent) {
@@ -163,12 +231,13 @@ function Register() {
       toast.error("Open a shift before taking payment");
       return;
     }
-    const paid = method === "cash" ? Number(tendered || 0) : totals.total;
-    if (method === "cash" && paid < totals.total) {
+    const isRefund = totals.total < 0;
+    const paid = isRefund ? totals.total : method === "cash" ? Number(tendered || 0) : totals.total;
+    if (!isRefund && method === "cash" && paid < totals.total) {
       toast.error("Tendered amount is less than the total");
       return;
     }
-    if (method === "points" && (member?.points ?? 0) < totals.total * 100) {
+    if (!isRefund && method === "points" && (member?.points ?? 0) < totals.total * 100) {
       toast.error("Not enough points on this member");
       return;
     }
@@ -181,21 +250,27 @@ function Register() {
       tax: totals.tax,
       total: totals.total,
       paid,
-      change: Number(Math.max(0, paid - totals.total).toFixed(2)),
+      change: r2(Math.max(0, paid - totals.total)),
       method,
       memberId,
-      pointsEarned: member ? Math.round(totals.total) : 0,
+      pointsEarned: member ? Math.max(0, Math.round(totals.total)) : 0,
       cashier: activeShift.cashier,
+      ...(exchangeRef
+        ? { exchangeOfReceiptNo: exchangeRef, exchangeCredit: totals.credit }
+        : {}),
     });
     if (method === "cash") openCashDrawer();
     printSaleReceipt(sale, member, "sale");
     setLastSale(sale);
-    setLines([]);
-    setCartDiscount(0);
+    clearCart();
     setMemberId(null);
     setTendered("");
     setPayOpen(false);
-    toast.success(`Sale ${sale.receiptNo} completed`);
+    toast.success(
+      exchangeRef
+        ? `Exchange ${sale.receiptNo} completed against ${exchangeRef}`
+        : `Sale ${sale.receiptNo} completed`,
+    );
   }
 
   return (
@@ -216,6 +291,9 @@ function Register() {
             </form>
             <Button variant="outline" className="h-11" onClick={() => openCashDrawer()}>
               <Vault className="size-4" /> Open drawer
+            </Button>
+            <Button variant="outline" className="h-11" onClick={() => setExchangeOpen(true)}>
+              <Repeat className="size-4" /> Exchange
             </Button>
             {!activeShift && (
               <Button className="h-11" onClick={() => setOpenShiftOpen(true)}>
@@ -305,7 +383,7 @@ function Register() {
               variant="ghost"
               size="sm"
               disabled={!lines.length}
-              onClick={() => setLines([])}
+              onClick={clearCart}
             >
               <Trash2 className="size-4" /> Clear
             </Button>
@@ -383,26 +461,69 @@ function Register() {
 
           <ScrollArea className="min-h-0 flex-1">
             <div className="divide-y divide-border">
-              {lines.map((l) => (
-                <div key={l.productId} className="flex items-center gap-2 px-4 py-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{l.name}</p>
-                    <p className="numeric text-[11px] text-muted-foreground">
-                      {money(l.price)} · tax {(l.taxRate * 100).toFixed(0)}%
-                    </p>
+              {lines.map((l, i) => (
+                <div
+                  key={`${l.credit ? "C" : "S"}-${l.productId}-${i}`}
+                  className={`px-4 py-3 ${l.credit ? "bg-accent/5" : ""}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium">
+                        {l.name}
+                        {l.credit && (
+                          <Badge variant="outline" className="ml-2 text-[10px]">
+                            credit
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="numeric text-[11px] text-muted-foreground">
+                        {money(l.price)} · tax {(l.taxRate * 100).toFixed(0)}%
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button size="icon" variant="outline" className="size-7" onClick={() => setQty(i, -1)}>
+                        <Minus className="size-3" />
+                      </Button>
+                      <span className="numeric w-6 text-center text-sm">{l.qty}</span>
+                      <Button size="icon" variant="outline" className="size-7" onClick={() => setQty(i, 1)}>
+                        <Plus className="size-3" />
+                      </Button>
+                    </div>
+                    <span
+                      className={`numeric w-20 shrink-0 text-right text-sm font-semibold ${l.credit ? "text-accent" : ""}`}
+                    >
+                      {money((l.price - lineUnitDiscount(l)) * l.qty)}
+                    </span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Button size="icon" variant="outline" className="size-7" onClick={() => setQty(l.productId, -1)}>
-                      <Minus className="size-3" />
-                    </Button>
-                    <span className="numeric w-6 text-center text-sm">{l.qty}</span>
-                    <Button size="icon" variant="outline" className="size-7" onClick={() => setQty(l.productId, 1)}>
-                      <Plus className="size-3" />
-                    </Button>
-                  </div>
-                  <span className="numeric w-16 text-right text-sm font-semibold">
-                    {money(l.price * l.qty)}
-                  </span>
+                  {!l.credit && (
+                    <div className="mt-2 flex items-center justify-end gap-1">
+                      <span className="text-[11px] text-muted-foreground">Disc</span>
+                      <Input
+                        value={l.discount || ""}
+                        onChange={(e) => patchLine(i, { discount: Number(e.target.value) || 0 })}
+                        placeholder="0"
+                        className="numeric h-7 w-16 text-right text-xs"
+                      />
+                      <div className="flex overflow-hidden rounded-md border border-border">
+                        {(["amount", "percent"] as const).map((t) => (
+                          <button
+                            key={t}
+                            onClick={() => patchLine(i, { discountType: t })}
+                            className={`px-2 py-1 text-[11px] ${
+                              (l.discountType ?? "amount") === t
+                                ? "bg-primary/15 text-primary"
+                                : "text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            {t === "amount" ? "$" : "%"}
+                          </button>
+                        ))}
+                      </div>
+                      <span className="numeric w-14 text-right text-[11px] text-muted-foreground">
+                        -{money(lineUnitDiscount(l) * l.qty)}
+                      </span>
+                    </div>
+                  )}
                 </div>
               ))}
               {!lines.length && (
@@ -414,31 +535,79 @@ function Register() {
           </ScrollArea>
 
           <div className="space-y-2 border-t border-border px-4 py-3 text-sm">
+            {exchangeRef && (
+              <div className="flex items-center justify-between rounded-md border border-accent/40 bg-accent/10 px-2 py-1.5 text-[11px]">
+                <span>Exchange against bill #{exchangeRef}</span>
+                <button
+                  className="text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    setLines((ls) => ls.filter((l) => !l.credit));
+                    setExchangeRef(null);
+                  }}
+                >
+                  remove
+                </button>
+              </div>
+            )}
             <Row label="Subtotal" value={money(totals.subtotal)} />
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Discount</span>
-              <Input
-                value={cartDiscount || ""}
-                onChange={(e) => setCartDiscount(Number(e.target.value) || 0)}
-                placeholder="0.00"
-                className="numeric h-8 w-24 text-right"
+            {totals.credit > 0 && (
+              <Row
+                label={`Store credit #${exchangeRef ?? ""}`}
+                value={`-${money(totals.credit)}`}
               />
+            )}
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Bill discount</span>
+              <div className="flex items-center gap-1">
+                <Input
+                  value={cartDiscount || ""}
+                  onChange={(e) => setCartDiscount(Number(e.target.value) || 0)}
+                  placeholder="0.00"
+                  className="numeric h-8 w-20 text-right"
+                />
+                <div className="flex overflow-hidden rounded-md border border-border">
+                  {(["amount", "percent"] as const).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setCartDiscountType(t)}
+                      className={`px-2 py-1.5 text-xs ${
+                        cartDiscountType === t
+                          ? "bg-primary/15 text-primary"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {t === "amount" ? "$" : "%"}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
+            <Row label="Discount applied" value={`-${money(totals.discount)}`} />
             <Row label="Tax" value={money(totals.tax)} />
             <Separator />
             <div className="flex items-center justify-between">
-              <span className="text-base font-semibold">Total</span>
-              <span className="numeric text-2xl font-bold text-primary">{money(totals.total)}</span>
+              <span className="text-base font-semibold">
+                {refundDue > 0 ? "Refund due" : "Balance due"}
+              </span>
+              <span
+                className={`numeric text-2xl font-bold ${refundDue > 0 ? "text-accent" : "text-primary"}`}
+              >
+                {money(refundDue > 0 ? refundDue : balanceDue)}
+              </span>
             </div>
             <Button
               className="mt-1 h-12 w-full text-base"
               disabled={!lines.length || !activeShift}
               onClick={() => {
-                setTendered(totals.total.toFixed(2));
+                setTendered(Math.max(0, totals.total).toFixed(2));
                 setPayOpen(true);
               }}
             >
-              {activeShift ? `Charge ${money(totals.total)}` : "Shift closed — selling locked"}
+              {!activeShift
+                ? "Shift closed — selling locked"
+                : refundDue > 0
+                  ? `Refund ${money(refundDue)}`
+                  : `Charge ${money(balanceDue)}`}
             </Button>
             {lastSale && (
               <div className="flex flex-wrap gap-2 pt-1">
@@ -532,8 +701,18 @@ function Register() {
       <Dialog open={payOpen} onOpenChange={setPayOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Take payment · {money(totals.total)}</DialogTitle>
+            <DialogTitle>
+              {refundDue > 0
+                ? `Refund customer · ${money(refundDue)}`
+                : `Take payment · ${money(balanceDue)}`}
+            </DialogTitle>
           </DialogHeader>
+          {exchangeRef && (
+            <p className="rounded-md border border-accent/40 bg-accent/10 px-3 py-2 text-xs">
+              Store credit of {money(totals.credit)} from bill #{exchangeRef} applied to this
+              ticket.
+            </p>
+          )}
           <div className="grid grid-cols-4 gap-2">
             {(
               [
@@ -558,7 +737,12 @@ function Register() {
             ))}
           </div>
 
-          {method === "cash" && (
+          {method === "cash" && refundDue > 0 && (
+            <p className="numeric text-sm text-muted-foreground">
+              Pay {money(refundDue)} back to the customer as cash or store credit.
+            </p>
+          )}
+          {method === "cash" && refundDue === 0 && (
             <div className="space-y-2">
               <Label>Cash tendered</Label>
               <Input
@@ -567,7 +751,7 @@ function Register() {
                 className="numeric h-12 text-xl"
               />
               <div className="flex gap-2">
-                {[totals.total, 20, 50, 100].map((v, i) => (
+                {[balanceDue, 20, 50, 100].map((v, i) => (
                   <Button
                     key={i}
                     variant="outline"
@@ -579,7 +763,7 @@ function Register() {
                 ))}
               </div>
               <p className="numeric text-sm text-muted-foreground">
-                Change due {money(Math.max(0, Number(tendered || 0) - totals.total))}
+                Change due {money(Math.max(0, Number(tendered || 0) - balanceDue))}
               </p>
             </div>
           )}
@@ -596,6 +780,108 @@ function Register() {
               Cancel
             </Button>
             <Button onClick={completeSale}>Complete &amp; print</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Exchange lookup */}
+      <Dialog
+        open={exchangeOpen}
+        onOpenChange={(o) => {
+          setExchangeOpen(o);
+          if (!o) {
+            setBillHit(null);
+            setPicks({});
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Exchange item</DialogTitle>
+          </DialogHeader>
+          <form
+            className="flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              lookupBill();
+            }}
+          >
+            <Input
+              autoFocus
+              value={billQuery}
+              onChange={(e) => setBillQuery(e.target.value)}
+              placeholder="Scan or type original bill number…"
+              className="numeric h-11"
+            />
+            <Button type="submit" className="h-11">
+              <Search className="size-4" /> Find
+            </Button>
+          </form>
+
+          {billHit && (
+            <div className="space-y-3">
+              <p className="numeric text-xs text-muted-foreground">
+                {billHit.receiptNo} · {new Date(billHit.createdAt).toLocaleString()} ·{" "}
+                {money(billHit.total)} · {billHit.cashier}
+                {billHit.exchangedToReceiptNo
+                  ? ` · already exchanged to ${billHit.exchangedToReceiptNo}`
+                  : ""}
+              </p>
+              <Separator />
+              <div className="max-h-64 space-y-1 overflow-y-auto">
+                {billHit.lines.map((l, idx) => {
+                  const picked = picks[idx] ?? 0;
+                  const unit = r2(l.price - lineUnitDiscount(l));
+                  return (
+                    <div
+                      key={`${l.productId}-${idx}`}
+                      className="flex items-center gap-2 rounded-md border border-border px-3 py-2"
+                    >
+                      <input
+                        type="checkbox"
+                        aria-label={`Exchange ${l.name}`}
+                        checked={picked > 0}
+                        onChange={(e) =>
+                          setPicks((p) => ({ ...p, [idx]: e.target.checked ? l.qty : 0 }))
+                        }
+                        className="size-4 accent-[hsl(var(--primary))]"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{l.name}</p>
+                        <p className="numeric text-[11px] text-muted-foreground">
+                          sold {l.qty} × {money(unit)}
+                        </p>
+                      </div>
+                      <Input
+                        value={picked || ""}
+                        onChange={(e) => {
+                          const v = Math.max(0, Math.min(l.qty, Number(e.target.value) || 0));
+                          setPicks((p) => ({ ...p, [idx]: v }));
+                        }}
+                        placeholder="0"
+                        className="numeric h-8 w-16 text-right"
+                      />
+                      <span className="numeric w-20 text-right text-sm font-semibold text-accent">
+                        -{money(unit * picked)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Returned items are credited even when their stock at {currentStore.name} is 0 —
+                the stock is added back on completion.
+              </p>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExchangeOpen(false)}>
+              Cancel
+            </Button>
+            <Button disabled={!billHit} onClick={addExchangeCredits}>
+              Add credit to cart
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

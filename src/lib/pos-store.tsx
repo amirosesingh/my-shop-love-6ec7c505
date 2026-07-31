@@ -19,6 +19,7 @@ import type {
   Transfer,
   TransferKind,
 } from "./pos-types";
+import { lineUnitDiscount, r2, type DiscountType } from "./pos-types";
 
 const KEY = "pos-state-v2";
 
@@ -216,7 +217,14 @@ export function PosProvider({ children }: { children: ReactNode }) {
             }
           : m,
       );
-      return { ...s, counter, products, members, sales: [sale, ...s.sales] };
+      const tagged = input.exchangeOfReceiptNo
+        ? s.sales.map((x) =>
+            x.receiptNo === input.exchangeOfReceiptNo
+              ? { ...x, exchangedToReceiptNo: sale.receiptNo }
+              : x,
+          )
+        : s.sales;
+      return { ...s, counter, products, members, sales: [sale, ...tagged] };
     });
     return sale;
   }, []);
@@ -391,12 +399,26 @@ export const money = (n: number) =>
     Number.isFinite(n) ? n : 0,
   );
 
-export function cartTotals(lines: CartLine[], cartDiscount: number) {
-  const subtotal = lines.reduce((a, l) => a + l.price * l.qty, 0);
-  const lineDiscount = lines.reduce((a, l) => a + l.discount * l.qty, 0);
-  const taxable = lines.reduce((a, l) => a + (l.price - l.discount) * l.qty * l.taxRate, 0);
-  const discount = lineDiscount + cartDiscount;
-  const tax = Number(taxable.toFixed(2));
-  const total = Number(Math.max(0, subtotal - discount + tax).toFixed(2));
-  return { subtotal: Number(subtotal.toFixed(2)), discount: Number(discount.toFixed(2)), tax, total };
+export function cartTotals(
+  lines: CartLine[],
+  cartDiscount: number,
+  cartDiscountType: DiscountType = "amount",
+) {
+  const subtotal = r2(lines.reduce((a, l) => a + l.price * l.qty, 0));
+  const lineDiscount = r2(lines.reduce((a, l) => a + lineUnitDiscount(l) * l.qty, 0));
+  const base = r2(subtotal - lineDiscount);
+  const billDiscount = r2(
+    cartDiscountType === "percent" ? (base * (cartDiscount || 0)) / 100 : cartDiscount || 0,
+  );
+  const discount = r2(lineDiscount + billDiscount);
+  // Spread the bill-level discount proportionally so tax stays accurate.
+  const ratio = base !== 0 ? (base - billDiscount) / base : 1;
+  const tax = r2(
+    lines.reduce((a, l) => a + (l.price - lineUnitDiscount(l)) * l.qty * l.taxRate * ratio, 0),
+  );
+  const credit = r2(
+    lines.filter((l) => l.credit).reduce((a, l) => a + (l.price - lineUnitDiscount(l)) * -l.qty, 0),
+  );
+  const total = r2(subtotal - discount + tax);
+  return { subtotal, discount, lineDiscount, billDiscount, tax, total, credit };
 }

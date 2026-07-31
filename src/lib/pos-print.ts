@@ -1,4 +1,5 @@
 import type { Member, Product, Sale, Shift, Store, Transfer } from "./pos-types";
+import { lineUnitDiscount } from "./pos-types";
 
 export const STORE = {
   name: "NORTHWIND & CO.",
@@ -95,10 +96,14 @@ function saleBody(sale: Sale, member: Member | null, kind: ReceiptKind) {
   const sign = kind === "refund" ? -1 : 1;
   const rows = sale.lines
     .map(
-      (l) => `<tr><td>${esc(l.name)}<div class="muted">${l.qty} x ${fmt(l.price)}${
-        l.discount ? ` - ${fmt(l.discount)} disc` : ""
+      (l) => `<tr><td>${esc(l.name)}${l.credit ? ' <span class="tag">CREDIT</span>' : ""}<div class="muted">${l.qty} x ${fmt(l.price)}${
+        l.discount
+          ? ` - ${l.discountType === "percent" ? `${l.discount}%` : fmt(l.discount)} disc`
+          : ""
       }</div></td>${
-        hidePrices ? "" : `<td class="r">${fmt(sign * (l.price - l.discount) * l.qty)}</td>`
+        hidePrices
+          ? ""
+          : `<td class="r">${fmt(sign * (l.price - lineUnitDiscount(l)) * l.qty)}</td>`
       }</tr>`,
     )
     .join("");
@@ -108,6 +113,11 @@ function saleBody(sale: Sale, member: Member | null, kind: ReceiptKind) {
     : `<hr><table>
       <tr><td>Subtotal</td><td class="r">${fmt(sign * sale.subtotal)}</td></tr>
       <tr><td>Discount</td><td class="r">-${fmt(sale.discount)}</td></tr>
+      ${
+        sale.exchangeOfReceiptNo
+          ? `<tr><td>Store Credit from Bill #${esc(sale.exchangeOfReceiptNo)}</td><td class="r">-${fmt(sale.exchangeCredit ?? 0)}</td></tr>`
+          : ""
+      }
       <tr><td>Tax</td><td class="r">${fmt(sign * sale.tax)}</td></tr>
       <tr class="b big"><td>TOTAL</td><td class="r">${fmt(sign * sale.total)}</td></tr>
       <tr><td>${esc(sale.method.toUpperCase())}</td><td class="r">${fmt(sign * sale.paid)}</td></tr>
