@@ -288,9 +288,6 @@ function Promotions() {
                 </>
               )}
 
-              {draft.type === "birthday" && (
-                <></>
-              )}
               {draft.type === "tier" && (
                 <div className="col-span-2 space-y-2">
                   <Label className="text-xs text-muted-foreground">
