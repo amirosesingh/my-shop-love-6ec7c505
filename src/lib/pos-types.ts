@@ -22,6 +22,8 @@ export type Product = {
   stockByStore: Record<string, number>;
   reorderLevel: number;
   taxRate: number;
+  /** bonus loyalty points awarded for this item (bulk import field) */
+  customPoints?: number;
 };
 
 export type Member = {
