@@ -204,6 +204,47 @@ export function printMemberStatement(member: Member, sales: Sale[]) {
   printHtml(`${member.code} statement`, memberBody(member, sales));
 }
 
+function transferBody(
+  transfer: Transfer,
+  product: Product,
+  from: Store,
+  to: Store,
+) {
+  const label =
+    transfer.kind === "request" ? "STOCK REQUEST NOTE" : "STOCK TRANSFER NOTE";
+  return `${header(label)}
+    <table>
+      <tr><td>Reference</td><td class="r b">${esc(transfer.ref)}</td></tr>
+      <tr><td>Date</td><td class="r">${new Date(transfer.createdAt).toLocaleString()}</td></tr>
+      <tr><td>Status</td><td class="r">${esc(transfer.status.replace("_", " ").toUpperCase())}</td></tr>
+      <tr><td>Raised by</td><td class="r">${esc(transfer.createdBy)}</td></tr>
+    </table><hr>
+    <table>
+      <tr><td>From</td><td class="r">${esc(from.name)} (${esc(from.code)})</td></tr>
+      <tr><td>To</td><td class="r">${esc(to.name)} (${esc(to.code)})</td></tr>
+    </table><hr>
+    <table>
+      <tr><td>${esc(product.name)}<div class="muted">${esc(product.sku)}</div></td>
+          <td class="r b big">${transfer.qty}</td></tr>
+      <tr><td>Unit cost</td><td class="r">${fmt(product.cost)}</td></tr>
+      <tr class="b"><td>Value</td><td class="r">${fmt(product.cost * transfer.qty)}</td></tr>
+    </table>
+    ${transfer.note ? `<hr><div class="muted">Note: ${esc(transfer.note)}</div>` : ""}
+    <hr>
+    <div class="muted">Dispatched by ______________________</div>
+    <div class="muted">Received by  ______________________</div>
+    <div class="c muted">${esc(transfer.ref)}</div>`;
+}
+
+export function printTransferNote(
+  transfer: Transfer,
+  product: Product,
+  from: Store,
+  to: Store,
+) {
+  printHtml(transfer.ref, transferBody(transfer, product, from, to));
+}
+
 /**
  * Cash drawer kick. Browsers cannot open a USB drawer directly, so we send the
  * standard ESC/POS pulse sequence (ESC p 0 25 250) through the receipt printer,
