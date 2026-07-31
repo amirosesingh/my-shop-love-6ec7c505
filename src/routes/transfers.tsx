@@ -329,20 +329,72 @@ function Transfers() {
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label>Product</Label>
-              <Select value={productId} onValueChange={setProductId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select product" />
-                </SelectTrigger>
-                <SelectContent>
-                  {state.products.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Add products</Label>
+              <div className="flex gap-2">
+                <Select value={pickId} onValueChange={setPickId}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Select product" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {state.products.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name} — {stockAt(p, currentStore.id)} at {currentStore.code}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" onClick={() => addItem(pickId)}>
+                  <Plus className="size-4" /> Add
+                </Button>
+              </div>
             </div>
+
+            <div className="max-h-56 space-y-2 overflow-y-auto rounded-md border border-border p-2">
+              {items.map((i) => {
+                const p = productOf(i.productId);
+                return (
+                  <div key={i.productId} className="flex items-center gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm">{p?.name ?? "Unknown item"}</p>
+                      <p className="numeric text-[11px] text-muted-foreground">
+                        {currentStore.code} on hand: {p ? stockAt(p, currentStore.id) : 0}
+                        {otherStoreId && p
+                          ? ` · ${storeOf(otherStoreId)?.code} on hand: ${stockAt(p, otherStoreId)}`
+                          : ""}
+                      </p>
+                    </div>
+                    <Input
+                      className="numeric h-9 w-20"
+                      value={String(i.qty)}
+                      onChange={(e) =>
+                        setItems((prev) =>
+                          prev.map((x) =>
+                            x.productId === i.productId
+                              ? { ...x, qty: Math.max(0, Math.floor(Number(e.target.value) || 0)) }
+                              : x,
+                          ),
+                        )
+                      }
+                    />
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() =>
+                        setItems((prev) => prev.filter((x) => x.productId !== i.productId))
+                      }
+                    >
+                      <Trash2 className="size-4 text-destructive" />
+                    </Button>
+                  </div>
+                );
+              })}
+              {!items.length && (
+                <p className="py-4 text-center text-sm text-muted-foreground">
+                  No items yet — add one or more products to this note.
+                </p>
+              )}
+            </div>
+
             <div className="space-y-1">
               <Label>{kind === "transfer" ? "Destination store" : "Supplying store"}</Label>
               <Select value={otherStoreId} onValueChange={setOtherStoreId}>
@@ -353,20 +405,10 @@ function Transfers() {
                   {others.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
                       {s.code} · {s.name}
-                      {product ? ` — ${stockAt(product, s.id)} on hand` : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Quantity</Label>
-              <Input className="numeric" value={qty} onChange={(e) => setQty(e.target.value)} />
-              {product && (
-                <p className="numeric text-[11px] text-muted-foreground">
-                  {currentStore.code} on hand: {stockAt(product, currentStore.id)}
-                </p>
-              )}
             </div>
             <div className="space-y-1">
               <Label>Note</Label>
