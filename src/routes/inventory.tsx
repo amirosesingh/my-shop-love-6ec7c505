@@ -217,10 +217,39 @@ function Inventory() {
           </div>
         </header>
 
+        {selected.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/40 bg-primary/5 px-4 py-3">
+            <p className="text-sm">
+              <span className="numeric font-semibold">{selected.length}</span> product
+              {selected.length > 1 ? "s" : ""} selected
+            </p>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setSelected([])}>
+                Clear
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => goToTransfers("request")}>
+                <Inbox className="size-4" /> Request selected
+              </Button>
+              <Button size="sm" onClick={() => goToTransfers("transfer")}>
+                <ArrowLeftRight className="size-4" /> Transfer selected
+              </Button>
+            </div>
+          </div>
+        )}
+
         <div className="rounded-lg border border-border bg-card">
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10">
+                  <Checkbox
+                    checked={allShownSelected}
+                    onCheckedChange={(v) =>
+                      setSelected(v ? rows.map((p) => p.id) : [])
+                    }
+                    aria-label="Select all products"
+                  />
+                </TableHead>
                 <TableHead>Product</TableHead>
                 <TableHead>Category</TableHead>
                 <TableHead className="text-right">Cost</TableHead>
@@ -234,6 +263,13 @@ function Inventory() {
             <TableBody>
               {rows.map((p) => (
                 <TableRow key={p.id}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selected.includes(p.id)}
+                      onCheckedChange={(v) => toggle(p.id, !!v)}
+                      aria-label={`Select ${p.name}`}
+                    />
+                  </TableCell>
                   <TableCell>
                     <button
                       className="text-left font-medium hover:text-primary"
