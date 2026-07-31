@@ -461,26 +461,69 @@ function Register() {
 
           <ScrollArea className="min-h-0 flex-1">
             <div className="divide-y divide-border">
-              {lines.map((l) => (
-                <div key={l.productId} className="flex items-center gap-2 px-4 py-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{l.name}</p>
-                    <p className="numeric text-[11px] text-muted-foreground">
-                      {money(l.price)} · tax {(l.taxRate * 100).toFixed(0)}%
-                    </p>
+              {lines.map((l, i) => (
+                <div
+                  key={`${l.credit ? "C" : "S"}-${l.productId}-${i}`}
+                  className={`px-4 py-3 ${l.credit ? "bg-accent/5" : ""}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">
+                        {l.name}
+                        {l.credit && (
+                          <Badge variant="outline" className="ml-2 text-[10px]">
+                            credit
+                          </Badge>
+                        )}
+                      </p>
+                      <p className="numeric text-[11px] text-muted-foreground">
+                        {money(l.price)} · tax {(l.taxRate * 100).toFixed(0)}%
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button size="icon" variant="outline" className="size-7" onClick={() => setQty(i, -1)}>
+                        <Minus className="size-3" />
+                      </Button>
+                      <span className="numeric w-6 text-center text-sm">{l.qty}</span>
+                      <Button size="icon" variant="outline" className="size-7" onClick={() => setQty(i, 1)}>
+                        <Plus className="size-3" />
+                      </Button>
+                    </div>
+                    <span
+                      className={`numeric w-16 text-right text-sm font-semibold ${l.credit ? "text-accent" : ""}`}
+                    >
+                      {money((l.price - lineUnitDiscount(l)) * l.qty)}
+                    </span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Button size="icon" variant="outline" className="size-7" onClick={() => setQty(l.productId, -1)}>
-                      <Minus className="size-3" />
-                    </Button>
-                    <span className="numeric w-6 text-center text-sm">{l.qty}</span>
-                    <Button size="icon" variant="outline" className="size-7" onClick={() => setQty(l.productId, 1)}>
-                      <Plus className="size-3" />
-                    </Button>
-                  </div>
-                  <span className="numeric w-16 text-right text-sm font-semibold">
-                    {money(l.price * l.qty)}
-                  </span>
+                  {!l.credit && (
+                    <div className="mt-2 flex items-center justify-end gap-1">
+                      <span className="text-[11px] text-muted-foreground">Disc</span>
+                      <Input
+                        value={l.discount || ""}
+                        onChange={(e) => patchLine(i, { discount: Number(e.target.value) || 0 })}
+                        placeholder="0"
+                        className="numeric h-7 w-16 text-right text-xs"
+                      />
+                      <div className="flex overflow-hidden rounded-md border border-border">
+                        {(["amount", "percent"] as const).map((t) => (
+                          <button
+                            key={t}
+                            onClick={() => patchLine(i, { discountType: t })}
+                            className={`px-2 py-1 text-[11px] ${
+                              (l.discountType ?? "amount") === t
+                                ? "bg-primary/15 text-primary"
+                                : "text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            {t === "amount" ? "$" : "%"}
+                          </button>
+                        ))}
+                      </div>
+                      <span className="numeric w-14 text-right text-[11px] text-muted-foreground">
+                        -{money(lineUnitDiscount(l) * l.qty)}
+                      </span>
+                    </div>
+                  )}
                 </div>
               ))}
               {!lines.length && (
