@@ -504,6 +504,11 @@ function Register() {
                             credit
                           </Badge>
                         )}
+                        {l.foc && (
+                          <Badge className="ml-2 bg-success/15 text-[10px] text-success">
+                            FREE PROMO
+                          </Badge>
+                        )}
                       </div>
                       <p className="numeric text-[11px] text-muted-foreground">
                         {money(l.price)} · tax {(l.taxRate * 100).toFixed(0)}%
@@ -524,7 +529,7 @@ function Register() {
                       {money((l.price - lineUnitDiscount(l)) * l.qty)}
                     </span>
                   </div>
-                  {!l.credit && (
+                  {!l.credit && !l.foc && (
                     <div className="mt-2 flex items-center justify-end gap-1">
                       <span className="text-[11px] text-muted-foreground">Disc</span>
                       <Input
