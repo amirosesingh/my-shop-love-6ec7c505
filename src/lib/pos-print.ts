@@ -238,6 +238,15 @@ export function printMemberStatement(member: Member, sales: Sale[]) {
   printHtml(`${member.code} statement`, memberBody(member, sales));
 }
 
+/** Full HTML document for on-screen preview (no auto-print). */
+export function saleReceiptPreview(sale: Sale, member: Member | null, kind: ReceiptKind) {
+  return shell(sale.receiptNo, saleBody(sale, member, kind), false);
+}
+
+export function shiftReportPreview(shift: Shift, sales: Sale[]) {
+  return shell("Z report", shiftBody(shift, sales, "zreport"), false);
+}
+
 function transferBody(
   transfer: Transfer,
   products: Product[],
