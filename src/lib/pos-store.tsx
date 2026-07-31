@@ -99,7 +99,12 @@ export function PosProvider({ children }: { children: ReactNode }) {
             ? t
             : { ...t, items: [{ productId: legacy.productId ?? "", qty: legacy.qty ?? 0 }] };
         });
-        setState({ ...seedState, ...saved, transfers });
+        setState({
+          ...seedState,
+          ...saved,
+          transfers,
+          promotions: saved.promotions?.length ? saved.promotions : seedState.promotions,
+        });
       }
     } catch {
       /* ignore corrupt storage */
