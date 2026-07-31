@@ -24,6 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { money, usePos } from "@/lib/pos-store";
+import { useAuth } from "@/lib/pos-auth";
 import { openCashDrawer, printSaleReceipt, printShiftReport } from "@/lib/pos-print";
 
 export const Route = createFileRoute("/shifts")({
@@ -43,8 +44,9 @@ export const Route = createFileRoute("/shifts")({
 });
 
 function Shifts() {
-  const { state, activeShift, openShift, closeShift, refundSale, currentStore } = usePos();
-  const [cashier, setCashier] = useState("Alex Rivera");
+  const { state, activeShift, openShift, closeShift, refundSale, currentStore, stores } = usePos();
+  const { user, isAdmin } = useAuth();
+  const [cashier, setCashier] = useState(user?.name ?? "Cashier");
   const [float, setFloat] = useState("150");
   const [counted, setCounted] = useState("");
   const [note, setNote] = useState("");
@@ -57,6 +59,9 @@ function Shifts() {
     : [];
   const cashTaken = shiftSales.filter((s) => s.method === "cash").reduce((a, s) => a + s.total, 0);
   const expected = (activeShift?.openingFloat ?? 0) + cashTaken;
+
+  const storeIndex = stores.findIndex((s) => s.id === currentStore.id);
+  const storeLabel = `Store ${storeIndex + 1}`;
 
   return (
     <AppShell>
@@ -74,6 +79,37 @@ function Shifts() {
             <Vault className="size-4" /> Open drawer
           </Button>
         </header>
+
+        {!isAdmin && (
+          <div className="rounded-md border border-primary/40 bg-primary/10 px-4 py-3 text-sm font-medium text-primary">
+            Viewing data for {storeLabel} Only
+          </div>
+        )}
+
+        {isAdmin && (
+          <section className="rounded-lg border border-border bg-card p-5">
+            <h2 className="mb-3 text-sm font-semibold">Aggregated multi-store statistics</h2>
+            <div className="grid gap-4 md:grid-cols-4">
+              {stores.map((st, i) => {
+                const sales = state.sales.filter((s) => s.storeId === st.id && !s.refunded);
+                return (
+                  <Metric
+                    key={st.id}
+                    label={`Store ${i + 1} · ${st.name} (${sales.length} sales)`}
+                    value={money(sales.reduce((a, s) => a + s.total, 0))}
+                  />
+                );
+              })}
+              <Metric
+                label="Company-wide revenue"
+                value={money(
+                  state.sales.filter((s) => !s.refunded).reduce((a, s) => a + s.total, 0),
+                )}
+                highlight
+              />
+            </div>
+          </section>
+        )}
 
         <section className="rounded-lg border border-border bg-card p-5">
           {activeShift ? (

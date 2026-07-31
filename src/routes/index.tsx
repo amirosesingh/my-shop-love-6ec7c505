@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { cartTotals, money, stockAt, usePos } from "@/lib/pos-store";
+import { useAuth } from "@/lib/pos-auth";
 import type { CartLine, PaymentMethod, Sale } from "@/lib/pos-types";
 import { openCashDrawer, printSaleReceipt } from "@/lib/pos-print";
 
@@ -51,6 +52,7 @@ export const Route = createFileRoute("/")({
 
 function Register() {
   const { state, activeShift, recordSale, openShift, currentStore } = usePos();
+  const { user } = useAuth();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
   const [lines, setLines] = useState<CartLine[]>([]);
@@ -59,7 +61,7 @@ function Register() {
   const [payOpen, setPayOpen] = useState(false);
   const [openShiftOpen, setOpenShiftOpen] = useState(false);
   const [float, setFloat] = useState("150");
-  const [cashier, setCashier] = useState("Alex Rivera");
+  const [cashier, setCashier] = useState(user?.name ?? "Cashier");
   const [tendered, setTendered] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("cash");
   const [lastSale, setLastSale] = useState<Sale | null>(null);
