@@ -43,6 +43,9 @@ const shell = (title: string, body: string) => `<!doctype html><html><head>
   .b { font-weight: 700; }
   .big { font-size: 14px; }
   .tag { border: 1px solid #000; padding: 2px 4px; display: inline-block; margin-top: 4px; font-size: 10px; letter-spacing: 1px; }
+  .barcode { display: flex; align-items: flex-end; justify-content: center; height: 38px; gap: 1px; margin-top: 6px; }
+  .barcode i { display: block; background: #000; height: 100%; }
+  .bc-text { text-align: center; font-size: 10px; letter-spacing: 3px; margin-top: 2px; }
 </style></head><body>${body}
 <script>window.onload=function(){window.focus();window.print();setTimeout(function(){window.close()},400)}<\/script>
 </body></html>`;
