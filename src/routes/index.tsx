@@ -12,6 +12,7 @@ import {
   Wallet,
   Gift,
   Vault,
+  Lock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
@@ -353,13 +354,13 @@ function Register() {
             </div>
             <Button
               className="mt-1 h-12 w-full text-base"
-              disabled={!lines.length}
+              disabled={!lines.length || !activeShift}
               onClick={() => {
                 setTendered(totals.total.toFixed(2));
                 setPayOpen(true);
               }}
             >
-              Charge {money(totals.total)}
+              {activeShift ? `Charge ${money(totals.total)}` : "Shift closed — selling locked"}
             </Button>
             {lastSale && (
               <div className="flex flex-wrap gap-2 pt-1">
