@@ -16,6 +16,7 @@ import {
   Info,
   UserPlus,
   X,
+  Repeat,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
@@ -34,7 +35,8 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { cartTotals, money, stockAt, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
-import type { CartLine, PaymentMethod, Sale } from "@/lib/pos-types";
+import type { CartLine, DiscountType, PaymentMethod, Sale } from "@/lib/pos-types";
+import { lineUnitDiscount, r2 } from "@/lib/pos-types";
 import { openCashDrawer, printSaleReceipt } from "@/lib/pos-print";
 
 export const Route = createFileRoute("/")({
@@ -60,6 +62,12 @@ function Register() {
   const [category, setCategory] = useState("All");
   const [lines, setLines] = useState<CartLine[]>([]);
   const [cartDiscount, setCartDiscount] = useState(0);
+  const [cartDiscountType, setCartDiscountType] = useState<DiscountType>("amount");
+  const [exchangeOpen, setExchangeOpen] = useState(false);
+  const [billQuery, setBillQuery] = useState("");
+  const [billHit, setBillHit] = useState<Sale | null>(null);
+  const [picks, setPicks] = useState<Record<number, number>>({});
+  const [exchangeRef, setExchangeRef] = useState<string | null>(null);
   const [memberId, setMemberId] = useState<string | null>(null);
   const [payOpen, setPayOpen] = useState(false);
   const [openShiftOpen, setOpenShiftOpen] = useState(false);
@@ -87,7 +95,9 @@ function Register() {
   });
 
   const member = state.members.find((m) => m.id === memberId) ?? null;
-  const totals = cartTotals(lines, cartDiscount);
+  const totals = cartTotals(lines, cartDiscount, cartDiscountType);
+  const balanceDue = totals.total >= 0 ? totals.total : 0;
+  const refundDue = totals.total < 0 ? r2(-totals.total) : 0;
   const detail = state.products.find((p) => p.id === detailId) ?? null;
 
   const memberMatches = memberQuery.trim()
@@ -117,9 +127,11 @@ function Register() {
       return;
     }
     setLines((ls) => {
-      const found = ls.find((l) => l.productId === productId);
+      const found = ls.find((l) => l.productId === productId && !l.credit);
       if (found)
-        return ls.map((l) => (l.productId === productId ? { ...l, qty: l.qty + 1 } : l));
+        return ls.map((l) =>
+          l.productId === productId && !l.credit ? { ...l, qty: l.qty + 1 } : l,
+        );
       return [
         ...ls,
         {
@@ -129,17 +141,73 @@ function Register() {
           qty: 1,
           taxRate: product.taxRate,
           discount: 0,
+          discountType: "amount",
         },
       ];
     });
   }
 
-  function setQty(productId: string, delta: number) {
+  function setQty(index: number, delta: number) {
     setLines((ls) =>
       ls
-        .map((l) => (l.productId === productId ? { ...l, qty: l.qty + delta } : l))
-        .filter((l) => l.qty > 0),
+        .map((l, i) => (i === index ? { ...l, qty: l.credit ? l.qty - delta : l.qty + delta } : l))
+        .filter((l) => (l.credit ? l.qty < 0 : l.qty > 0)),
     );
+  }
+
+  function patchLine(index: number, patch: Partial<CartLine>) {
+    setLines((ls) => ls.map((l, i) => (i === index ? { ...l, ...patch } : l)));
+  }
+
+  function clearCart() {
+    setLines([]);
+    setCartDiscount(0);
+    setExchangeRef(null);
+  }
+
+  function lookupBill() {
+    const ref = billQuery.trim().toLowerCase();
+    const hit =
+      state.sales.find((s) => s.receiptNo.toLowerCase() === ref) ??
+      state.sales.find((s) => s.receiptNo.toLowerCase().includes(ref) && !!ref) ??
+      null;
+    setBillHit(hit);
+    setPicks({});
+    if (!hit) toast.error(`No bill found for “${billQuery}”`);
+  }
+
+  function addExchangeCredits() {
+    if (!billHit) return;
+    if (!activeShift) {
+      toast.error("Open a shift before processing an exchange");
+      return;
+    }
+    const credits: CartLine[] = Object.entries(picks)
+      .filter(([, qty]) => qty > 0)
+      .map(([idx, qty]) => {
+        const src = billHit.lines[Number(idx)];
+        return {
+          productId: src.productId,
+          name: src.name,
+          price: r2(src.price - lineUnitDiscount(src)),
+          qty: -qty,
+          taxRate: src.taxRate,
+          discount: 0,
+          discountType: "amount" as DiscountType,
+          credit: true,
+        };
+      });
+    if (!credits.length) {
+      toast.error("Select at least one item to exchange");
+      return;
+    }
+    setLines((ls) => [...credits, ...ls]);
+    setExchangeRef(billHit.receiptNo);
+    setExchangeOpen(false);
+    setBillQuery("");
+    setBillHit(null);
+    setPicks({});
+    toast.success(`Credits from ${billHit.receiptNo} added to the ticket`);
   }
 
   function scanSubmit(e: React.FormEvent) {
@@ -163,12 +231,13 @@ function Register() {
       toast.error("Open a shift before taking payment");
       return;
     }
-    const paid = method === "cash" ? Number(tendered || 0) : totals.total;
-    if (method === "cash" && paid < totals.total) {
+    const isRefund = totals.total < 0;
+    const paid = isRefund ? totals.total : method === "cash" ? Number(tendered || 0) : totals.total;
+    if (!isRefund && method === "cash" && paid < totals.total) {
       toast.error("Tendered amount is less than the total");
       return;
     }
-    if (method === "points" && (member?.points ?? 0) < totals.total * 100) {
+    if (!isRefund && method === "points" && (member?.points ?? 0) < totals.total * 100) {
       toast.error("Not enough points on this member");
       return;
     }
@@ -181,21 +250,27 @@ function Register() {
       tax: totals.tax,
       total: totals.total,
       paid,
-      change: Number(Math.max(0, paid - totals.total).toFixed(2)),
+      change: r2(Math.max(0, paid - totals.total)),
       method,
       memberId,
-      pointsEarned: member ? Math.round(totals.total) : 0,
+      pointsEarned: member ? Math.max(0, Math.round(totals.total)) : 0,
       cashier: activeShift.cashier,
+      ...(exchangeRef
+        ? { exchangeOfReceiptNo: exchangeRef, exchangeCredit: totals.credit }
+        : {}),
     });
     if (method === "cash") openCashDrawer();
     printSaleReceipt(sale, member, "sale");
     setLastSale(sale);
-    setLines([]);
-    setCartDiscount(0);
+    clearCart();
     setMemberId(null);
     setTendered("");
     setPayOpen(false);
-    toast.success(`Sale ${sale.receiptNo} completed`);
+    toast.success(
+      exchangeRef
+        ? `Exchange ${sale.receiptNo} completed against ${exchangeRef}`
+        : `Sale ${sale.receiptNo} completed`,
+    );
   }
 
   return (
