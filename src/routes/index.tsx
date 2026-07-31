@@ -475,6 +475,59 @@ function Register() {
         </aside>
       </div>
 
+      {/* Cross-store stock */}
+      <Dialog open={!!detail} onOpenChange={(o) => !o && setDetailId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{detail?.name}</DialogTitle>
+          </DialogHeader>
+          {detail && (
+            <div className="space-y-3">
+              <p className="numeric text-xs text-muted-foreground">
+                {detail.sku} · {detail.barcode} · {money(detail.price)}
+              </p>
+              <Separator />
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Stock across all locations
+              </p>
+              <div className="space-y-1">
+                {state.stores.map((s) => {
+                  const qty = stockAt(detail, s.id);
+                  return (
+                    <div
+                      key={s.id}
+                      className={`flex items-center justify-between rounded-md border px-3 py-2 text-sm ${
+                        s.id === currentStore.id ? "border-primary/50 bg-primary/10" : "border-border"
+                      }`}
+                    >
+                      <span>
+                        {s.name}{" "}
+                        <span className="text-[11px] text-muted-foreground">({s.code})</span>
+                      </span>
+                      <span
+                        className={`numeric font-semibold ${
+                          qty <= 0
+                            ? "text-destructive"
+                            : qty <= detail.reorderLevel
+                              ? "text-warning"
+                              : "text-foreground"
+                        }`}
+                      >
+                        {qty}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Stock counts are shared company-wide. Financial metrics stay locked to{" "}
+                {currentStore.name}.
+              </p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Payment */}
       <Dialog open={payOpen} onOpenChange={setPayOpen}>
         <DialogContent>
