@@ -51,6 +51,10 @@ export const Route = createFileRoute("/transfers")({
     ],
   }),
   component: Transfers,
+  validateSearch: (search: Record<string, unknown>): TransferSearch => ({
+    items: typeof search.items === "string" ? search.items : undefined,
+    kind: search.kind === "request" ? "request" : search.kind === "transfer" ? "transfer" : undefined,
+  }),
 });
 
 type TransferSearch = { items?: string; kind?: TransferKind };
