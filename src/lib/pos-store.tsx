@@ -8,13 +8,46 @@ import {
   type ReactNode,
 } from "react";
 import { seedState } from "./pos-seed";
-import type { CartLine, Member, PosState, Product, Sale, Shift } from "./pos-types";
+import type {
+  CartLine,
+  Member,
+  PosState,
+  Product,
+  Sale,
+  Shift,
+  Store,
+  Transfer,
+  TransferKind,
+} from "./pos-types";
 
-const KEY = "pos-state-v1";
+const KEY = "pos-state-v2";
+
+export const stockAt = (product: Product, storeId: string) =>
+  product.stockByStore?.[storeId] ?? 0;
+
+const bump = (p: Product, storeId: string, delta: number): Product => ({
+  ...p,
+  stockByStore: { ...p.stockByStore, [storeId]: stockAt(p, storeId) + delta },
+});
+
+type NewTransfer = {
+  kind: TransferKind;
+  fromStoreId: string;
+  toStoreId: string;
+  productId: string;
+  qty: number;
+  note: string;
+  createdBy: string;
+};
 
 type Ctx = {
   ready: boolean;
   state: PosState;
+  stores: Store[];
+  currentStore: Store;
+  setCurrentStore: (id: string) => void;
+  upsertStore: (store: Store) => void;
+  removeStore: (id: string) => void;
   openShift: (cashier: string, openingFloat: number) => void;
   closeShift: (countedCash: number, note: string) => Shift | null;
   activeShift: Shift | null;
@@ -22,9 +55,13 @@ type Ctx = {
   refundSale: (saleId: string) => void;
   upsertProduct: (product: Product) => void;
   removeProduct: (id: string) => void;
-  adjustStock: (id: string, delta: number) => void;
+  adjustStock: (id: string, delta: number, storeId?: string) => void;
   upsertMember: (member: Member) => void;
   removeMember: (id: string) => void;
+  createTransfer: (input: NewTransfer) => Transfer;
+  approveTransfer: (id: string) => void;
+  receiveTransfer: (id: string) => void;
+  rejectTransfer: (id: string) => void;
   reset: () => void;
 };
 
@@ -53,28 +90,68 @@ export function PosProvider({ children }: { children: ReactNode }) {
     }
   }, [state, ready]);
 
-  const activeShift = useMemo(
-    () => state.shifts.find((s) => !s.closedAt) ?? null,
-    [state.shifts],
+  const currentStore = useMemo(
+    () => state.stores.find((s) => s.id === state.currentStoreId) ?? state.stores[0],
+    [state.stores, state.currentStoreId],
   );
 
-  const openShift = useCallback((cashier: string, openingFloat: number) => {
+  const activeShift = useMemo(
+    () => state.shifts.find((s) => !s.closedAt && s.storeId === currentStore.id) ?? null,
+    [state.shifts, currentStore.id],
+  );
+
+  const setCurrentStore = useCallback(
+    (id: string) => setState((s) => ({ ...s, currentStoreId: id })),
+    [],
+  );
+
+  const upsertStore = useCallback((store: Store) => {
     setState((s) => ({
       ...s,
-      shifts: [
-        {
-          id: crypto.randomUUID(),
-          cashier,
-          openedAt: new Date().toISOString(),
-          closedAt: null,
-          openingFloat,
-          countedCash: null,
-          note: "",
-        },
-        ...s.shifts,
-      ],
+      stores: s.stores.some((x) => x.id === store.id)
+        ? s.stores.map((x) => (x.id === store.id ? store : x))
+        : [...s.stores, store],
+      products: s.products.map((p) =>
+        p.stockByStore[store.id] === undefined
+          ? { ...p, stockByStore: { ...p.stockByStore, [store.id]: 0 } }
+          : p,
+      ),
     }));
   }, []);
+
+  const removeStore = useCallback((id: string) => {
+    setState((s) => {
+      if (s.stores.length <= 1) return s;
+      const stores = s.stores.filter((x) => x.id !== id);
+      return {
+        ...s,
+        stores,
+        currentStoreId: s.currentStoreId === id ? stores[0].id : s.currentStoreId,
+      };
+    });
+  }, []);
+
+  const openShift = useCallback(
+    (cashier: string, openingFloat: number) => {
+      setState((s) => ({
+        ...s,
+        shifts: [
+          {
+            id: crypto.randomUUID(),
+            storeId: s.currentStoreId,
+            cashier,
+            openedAt: new Date().toISOString(),
+            closedAt: null,
+            openingFloat,
+            countedCash: null,
+            note: "",
+          },
+          ...s.shifts,
+        ],
+      }));
+    },
+    [],
+  );
 
   const closeShift = useCallback(
     (countedCash: number, note: string) => {
@@ -103,10 +180,11 @@ export function PosProvider({ children }: { children: ReactNode }) {
     };
     setState((s) => {
       const counter = s.counter + 1;
-      sale.receiptNo = `R-${String(counter).padStart(6, "0")}`;
+      const store = s.stores.find((x) => x.id === input.storeId);
+      sale.receiptNo = `${store?.code ?? "R"}-${String(counter).padStart(6, "0")}`;
       const products = s.products.map((p) => {
         const line = input.lines.find((l) => l.productId === p.id);
-        return line ? { ...p, stock: p.stock - line.qty } : p;
+        return line ? bump(p, input.storeId, -line.qty) : p;
       });
       const members = s.members.map((m) =>
         m.id === input.memberId
@@ -128,7 +206,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       if (!sale || sale.refunded) return s;
       const products = s.products.map((p) => {
         const line = sale.lines.find((l) => l.productId === p.id);
-        return line ? { ...p, stock: p.stock + line.qty } : p;
+        return line ? bump(p, sale.storeId, line.qty) : p;
       });
       return {
         ...s,
@@ -151,10 +229,12 @@ export function PosProvider({ children }: { children: ReactNode }) {
     setState((s) => ({ ...s, products: s.products.filter((p) => p.id !== id) }));
   }, []);
 
-  const adjustStock = useCallback((id: string, delta: number) => {
+  const adjustStock = useCallback((id: string, delta: number, storeId?: string) => {
     setState((s) => ({
       ...s,
-      products: s.products.map((p) => (p.id === id ? { ...p, stock: p.stock + delta } : p)),
+      products: s.products.map((p) =>
+        p.id === id ? bump(p, storeId ?? s.currentStoreId, delta) : p,
+      ),
     }));
   }, []);
 
@@ -171,11 +251,98 @@ export function PosProvider({ children }: { children: ReactNode }) {
     setState((s) => ({ ...s, members: s.members.filter((m) => m.id !== id) }));
   }, []);
 
+  const createTransfer = useCallback((input: NewTransfer) => {
+    const now = new Date().toISOString();
+    const transfer: Transfer = {
+      ...input,
+      id: crypto.randomUUID(),
+      ref: "",
+      status: input.kind === "transfer" ? "in_transit" : "requested",
+      createdAt: now,
+      updatedAt: now,
+    };
+    setState((s) => {
+      const transferCounter = s.transferCounter + 1;
+      transfer.ref = `${input.kind === "transfer" ? "TRF" : "REQ"}-${String(
+        transferCounter,
+      ).padStart(5, "0")}`;
+      // Goods only leave the source store once they are actually in transit.
+      const products =
+        transfer.status === "in_transit"
+          ? s.products.map((p) =>
+              p.id === input.productId ? bump(p, input.fromStoreId, -input.qty) : p,
+            )
+          : s.products;
+      return { ...s, transferCounter, products, transfers: [transfer, ...s.transfers] };
+    });
+    return transfer;
+  }, []);
+
+  const approveTransfer = useCallback((id: string) => {
+    setState((s) => {
+      const t = s.transfers.find((x) => x.id === id);
+      if (!t || t.status !== "requested") return s;
+      return {
+        ...s,
+        products: s.products.map((p) =>
+          p.id === t.productId ? bump(p, t.fromStoreId, -t.qty) : p,
+        ),
+        transfers: s.transfers.map((x) =>
+          x.id === id ? { ...x, status: "in_transit", updatedAt: new Date().toISOString() } : x,
+        ),
+      };
+    });
+  }, []);
+
+  const receiveTransfer = useCallback((id: string) => {
+    setState((s) => {
+      const t = s.transfers.find((x) => x.id === id);
+      if (!t || t.status !== "in_transit") return s;
+      return {
+        ...s,
+        products: s.products.map((p) => (p.id === t.productId ? bump(p, t.toStoreId, t.qty) : p)),
+        transfers: s.transfers.map((x) =>
+          x.id === id ? { ...x, status: "received", updatedAt: new Date().toISOString() } : x,
+        ),
+      };
+    });
+  }, []);
+
+  const rejectTransfer = useCallback((id: string) => {
+    setState((s) => {
+      const t = s.transfers.find((x) => x.id === id);
+      if (!t || (t.status !== "requested" && t.status !== "in_transit")) return s;
+      // If stock already left the source store, put it back.
+      const products =
+        t.status === "in_transit"
+          ? s.products.map((p) => (p.id === t.productId ? bump(p, t.fromStoreId, t.qty) : p))
+          : s.products;
+      return {
+        ...s,
+        products,
+        transfers: s.transfers.map((x) =>
+          x.id === id
+            ? {
+                ...x,
+                status: t.status === "in_transit" ? "cancelled" : "rejected",
+                updatedAt: new Date().toISOString(),
+              }
+            : x,
+        ),
+      };
+    });
+  }, []);
+
   const reset = useCallback(() => setState(seedState), []);
 
   const value: Ctx = {
     ready,
     state,
+    stores: state.stores,
+    currentStore,
+    setCurrentStore,
+    upsertStore,
+    removeStore,
     activeShift,
     openShift,
     closeShift,
@@ -186,6 +353,10 @@ export function PosProvider({ children }: { children: ReactNode }) {
     adjustStock,
     upsertMember,
     removeMember,
+    createTransfer,
+    approveTransfer,
+    receiveTransfer,
+    rejectTransfer,
     reset,
   };
 
