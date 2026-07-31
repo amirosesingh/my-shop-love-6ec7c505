@@ -27,6 +27,7 @@ import {
 import { money, stockAt, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
 import { Switch } from "@/components/ui/switch";
+import { BulkImportDialog } from "@/components/pos/BulkImportDialog";
 import type { Product } from "@/lib/pos-types";
 
 export const Route = createFileRoute("/inventory")({
@@ -69,6 +70,7 @@ function Inventory() {
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState<Product | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
+  const [importOpen, setImportOpen] = useState(false);
 
   const rows = state.products.filter((p) =>
     `${p.name} ${p.sku} ${p.barcode} ${p.category}`.toLowerCase().includes(query.toLowerCase()),
@@ -121,6 +123,11 @@ function Inventory() {
                 className="w-56 pl-9"
               />
             </div>
+            {canEdit && (
+              <Button variant="outline" onClick={() => setImportOpen(true)}>
+                📥 Bulk Import via Excel/CSV
+              </Button>
+            )}
             {canEdit && (
             <Dialog
               open={!!draft}
@@ -383,6 +390,7 @@ function Inventory() {
           </Table>
         </div>
       </div>
+      {canEdit && <BulkImportDialog open={importOpen} onOpenChange={setImportOpen} />}
     </AppShell>
   );
 }
