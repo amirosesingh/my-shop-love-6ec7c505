@@ -19,6 +19,7 @@ import type {
   Transfer,
   TransferKind,
 } from "./pos-types";
+import { lineUnitDiscount, r2, type DiscountType } from "./pos-types";
 
 const KEY = "pos-state-v2";
 
