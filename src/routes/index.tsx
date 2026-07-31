@@ -784,6 +784,108 @@ function Register() {
         </DialogContent>
       </Dialog>
 
+      {/* Exchange lookup */}
+      <Dialog
+        open={exchangeOpen}
+        onOpenChange={(o) => {
+          setExchangeOpen(o);
+          if (!o) {
+            setBillHit(null);
+            setPicks({});
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Exchange item</DialogTitle>
+          </DialogHeader>
+          <form
+            className="flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              lookupBill();
+            }}
+          >
+            <Input
+              autoFocus
+              value={billQuery}
+              onChange={(e) => setBillQuery(e.target.value)}
+              placeholder="Scan or type original bill number…"
+              className="numeric h-11"
+            />
+            <Button type="submit" className="h-11">
+              <Search className="size-4" /> Find
+            </Button>
+          </form>
+
+          {billHit && (
+            <div className="space-y-3">
+              <p className="numeric text-xs text-muted-foreground">
+                {billHit.receiptNo} · {new Date(billHit.createdAt).toLocaleString()} ·{" "}
+                {money(billHit.total)} · {billHit.cashier}
+                {billHit.exchangedToReceiptNo
+                  ? ` · already exchanged to ${billHit.exchangedToReceiptNo}`
+                  : ""}
+              </p>
+              <Separator />
+              <div className="max-h-64 space-y-1 overflow-y-auto">
+                {billHit.lines.map((l, idx) => {
+                  const picked = picks[idx] ?? 0;
+                  const unit = r2(l.price - lineUnitDiscount(l));
+                  return (
+                    <div
+                      key={`${l.productId}-${idx}`}
+                      className="flex items-center gap-2 rounded-md border border-border px-3 py-2"
+                    >
+                      <input
+                        type="checkbox"
+                        aria-label={`Exchange ${l.name}`}
+                        checked={picked > 0}
+                        onChange={(e) =>
+                          setPicks((p) => ({ ...p, [idx]: e.target.checked ? l.qty : 0 }))
+                        }
+                        className="size-4 accent-[hsl(var(--primary))]"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{l.name}</p>
+                        <p className="numeric text-[11px] text-muted-foreground">
+                          sold {l.qty} × {money(unit)}
+                        </p>
+                      </div>
+                      <Input
+                        value={picked || ""}
+                        onChange={(e) => {
+                          const v = Math.max(0, Math.min(l.qty, Number(e.target.value) || 0));
+                          setPicks((p) => ({ ...p, [idx]: v }));
+                        }}
+                        placeholder="0"
+                        className="numeric h-8 w-16 text-right"
+                      />
+                      <span className="numeric w-20 text-right text-sm font-semibold text-accent">
+                        -{money(unit * picked)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Returned items are credited even when their stock at {currentStore.name} is 0 —
+                the stock is added back on completion.
+              </p>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExchangeOpen(false)}>
+              Cancel
+            </Button>
+            <Button disabled={!billHit} onClick={addExchangeCredits}>
+              Add credit to cart
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Open shift */}
       <Dialog open={openShiftOpen} onOpenChange={setOpenShiftOpen}>
         <DialogContent>
