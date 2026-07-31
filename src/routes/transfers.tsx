@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { ArrowLeftRight, Check, Printer, Send, Truck, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowLeftRight, Check, Plus, Printer, Send, Trash2, Truck, X } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/table";
 import { stockAt, usePos } from "@/lib/pos-store";
 import { printTransferNote } from "@/lib/pos-print";
-import type { Transfer, TransferKind } from "@/lib/pos-types";
+import type { Transfer, TransferItem, TransferKind } from "@/lib/pos-types";
 
 export const Route = createFileRoute("/transfers")({
   head: () => ({
@@ -52,6 +52,8 @@ export const Route = createFileRoute("/transfers")({
   }),
   component: Transfers,
 });
+
+type TransferSearch = { items?: string; kind?: TransferKind };
 
 const statusStyle: Record<string, string> = {
   requested: "border-warning/50 text-warning",
