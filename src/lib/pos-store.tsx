@@ -85,7 +85,17 @@ export function PosProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(KEY);
-      if (raw) setState({ ...seedState, ...(JSON.parse(raw) as PosState) });
+      if (raw) {
+        const saved = JSON.parse(raw) as PosState;
+        // Migrate single-product transfers saved before multi-item support.
+        const transfers = (saved.transfers ?? []).map((t) => {
+          const legacy = t as Transfer & { productId?: string; qty?: number };
+          return t.items
+            ? t
+            : { ...t, items: [{ productId: legacy.productId ?? "", qty: legacy.qty ?? 0 }] };
+        });
+        setState({ ...seedState, ...saved, transfers });
+      }
     } catch {
       /* ignore corrupt storage */
     }
