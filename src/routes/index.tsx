@@ -13,6 +13,9 @@ import {
   Gift,
   Vault,
   Lock,
+  Info,
+  UserPlus,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
@@ -65,6 +68,8 @@ function Register() {
   const [tendered, setTendered] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("cash");
   const [lastSale, setLastSale] = useState<Sale | null>(null);
+  const [memberQuery, setMemberQuery] = useState("");
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   const categories = useMemo(
     () => ["All", ...Array.from(new Set(state.products.map((p) => p.category)))],
@@ -83,6 +88,20 @@ function Register() {
 
   const member = state.members.find((m) => m.id === memberId) ?? null;
   const totals = cartTotals(lines, cartDiscount);
+  const detail = state.products.find((p) => p.id === detailId) ?? null;
+
+  const memberMatches = memberQuery.trim()
+    ? state.members
+        .filter((m) => {
+          const q = memberQuery.trim().toLowerCase();
+          return (
+            m.name.toLowerCase().includes(q) ||
+            m.phone.replace(/\s/g, "").includes(q.replace(/\s/g, "")) ||
+            m.code.toLowerCase().includes(q)
+          );
+        })
+        .slice(0, 5)
+    : [];
 
   function addLine(productId: string) {
     if (!activeShift) {
@@ -233,13 +252,13 @@ function Register() {
           <ScrollArea className="mt-4 min-h-0 flex-1 pr-2">
             <div className="grid grid-cols-2 gap-3 pb-6 sm:grid-cols-3 xl:grid-cols-4">
               {filtered.map((p) => (
+                <div key={p.id} className="relative">
                 <button
-                  key={p.id}
                   onClick={() => addLine(p.id)}
                   disabled={!activeShift}
-                  className="group flex flex-col justify-between rounded-lg border border-border bg-card p-3 text-left transition-colors hover:border-primary/60 hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border disabled:hover:bg-card"
+                  className="group flex h-full w-full flex-col justify-between rounded-lg border border-border bg-card p-3 text-left transition-colors hover:border-primary/60 hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border disabled:hover:bg-card"
                 >
-                  <span className="text-sm font-medium leading-snug">{p.name}</span>
+                  <span className="pr-6 text-sm font-medium leading-snug">{p.name}</span>
                   <span className="mt-2 flex items-center justify-between">
                     <span className="numeric text-base font-semibold text-primary">
                       {money(p.price)}
@@ -255,6 +274,14 @@ function Register() {
                     </span>
                   </span>
                 </button>
+                <button
+                  aria-label={`Stock across stores for ${p.name}`}
+                  onClick={() => setDetailId(p.id)}
+                  className="absolute right-2 top-2 rounded p-1 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+                >
+                  <Info className="size-3.5" />
+                </button>
+                </div>
               ))}
               {filtered.length === 0 && (
                 <p className="col-span-full py-10 text-center text-sm text-muted-foreground">
@@ -286,23 +313,72 @@ function Register() {
 
           <div className="border-b border-border px-4 py-3">
             <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">
-              Member
+              Search loyalty member
             </Label>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {state.members.map((m) => (
-                <button
-                  key={m.id}
-                  onClick={() => setMemberId(memberId === m.id ? null : m.id)}
-                  className={`rounded-md border px-2 py-1 text-xs transition-colors ${
-                    memberId === m.id
-                      ? "border-accent bg-accent/15 text-accent"
-                      : "border-border text-muted-foreground hover:text-foreground"
-                  }`}
+            {member ? (
+              <div className="mt-2 flex items-center gap-2 rounded-md border border-accent/50 bg-accent/10 px-3 py-2">
+                <BadgeCheck className="size-4 text-accent" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{member.name}</p>
+                  <p className="numeric text-[11px] text-muted-foreground">
+                    {member.code} · {member.tier} · {member.points} pts · {member.phone}
+                  </p>
+                </div>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="size-7"
+                  aria-label="Detach member"
+                  onClick={() => setMemberId(null)}
                 >
-                  {m.name.split(" ")[0]} · {m.points}p
-                </button>
-              ))}
-            </div>
+                  <X className="size-3.5" />
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div className="relative mt-2">
+                  <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={memberQuery}
+                    onChange={(e) => setMemberQuery(e.target.value)}
+                    placeholder="Phone number or name…"
+                    className="h-9 pl-8 text-sm"
+                  />
+                </div>
+                <div className="mt-2 space-y-1">
+                  {memberMatches.map((m) => (
+                    <div
+                      key={m.id}
+                      className="flex items-center gap-2 rounded-md border border-border px-2 py-1.5"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs font-medium">{m.name}</p>
+                        <p className="numeric text-[11px] text-muted-foreground">
+                          {m.phone} · {m.points} pts · {m.tier}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-[11px]"
+                        onClick={() => {
+                          setMemberId(m.id);
+                          setMemberQuery("");
+                          toast.success(`${m.name} attached to receipt`);
+                        }}
+                      >
+                        <UserPlus className="size-3" /> Attach
+                      </Button>
+                    </div>
+                  ))}
+                  {memberQuery.trim() && !memberMatches.length && (
+                    <p className="py-1 text-[11px] text-muted-foreground">
+                      No member matches “{memberQuery}”.
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           <ScrollArea className="min-h-0 flex-1">
@@ -398,6 +474,59 @@ function Register() {
           </div>
         </aside>
       </div>
+
+      {/* Cross-store stock */}
+      <Dialog open={!!detail} onOpenChange={(o) => !o && setDetailId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{detail?.name}</DialogTitle>
+          </DialogHeader>
+          {detail && (
+            <div className="space-y-3">
+              <p className="numeric text-xs text-muted-foreground">
+                {detail.sku} · {detail.barcode} · {money(detail.price)}
+              </p>
+              <Separator />
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Stock across all locations
+              </p>
+              <div className="space-y-1">
+                {state.stores.map((s) => {
+                  const qty = stockAt(detail, s.id);
+                  return (
+                    <div
+                      key={s.id}
+                      className={`flex items-center justify-between rounded-md border px-3 py-2 text-sm ${
+                        s.id === currentStore.id ? "border-primary/50 bg-primary/10" : "border-border"
+                      }`}
+                    >
+                      <span>
+                        {s.name}{" "}
+                        <span className="text-[11px] text-muted-foreground">({s.code})</span>
+                      </span>
+                      <span
+                        className={`numeric font-semibold ${
+                          qty <= 0
+                            ? "text-destructive"
+                            : qty <= detail.reorderLevel
+                              ? "text-warning"
+                              : "text-foreground"
+                        }`}
+                      >
+                        {qty}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Stock counts are shared company-wide. Financial metrics stay locked to{" "}
+                {currentStore.name}.
+              </p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Payment */}
       <Dialog open={payOpen} onOpenChange={setPayOpen}>

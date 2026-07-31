@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -23,7 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { usePos } from "@/lib/pos-store";
-import { useAuth } from "@/lib/pos-auth";
+import { DEFAULT_PERMISSIONS, PERMISSION_LABELS, useAuth } from "@/lib/pos-auth";
 
 export const Route = createFileRoute("/staff")({
   head: () => ({
@@ -93,6 +94,7 @@ function StaffConfiguration() {
                 <TableHead>Staff ID</TableHead>
                 <TableHead>Password</TableHead>
                 <TableHead>Assigned store duty</TableHead>
+                <TableHead>Modify System Roles</TableHead>
                 <TableHead className="text-right">Remove</TableHead>
               </TableRow>
             </TableHeader>
@@ -140,6 +142,28 @@ function StaffConfiguration() {
                       </SelectContent>
                     </Select>
                   </TableCell>
+                  <TableCell>
+                    <div className="space-y-1.5">
+                      {PERMISSION_LABELS.map((p) => (
+                        <label
+                          key={p.key}
+                          className="flex items-center gap-2 text-xs text-muted-foreground"
+                        >
+                          <Switch
+                            checked={!!s.permissions?.[p.key]}
+                            onCheckedChange={(v) => {
+                              updateStaff({
+                                ...s,
+                                permissions: { ...DEFAULT_PERMISSIONS, ...s.permissions, [p.key]: v },
+                              });
+                              toast.success(`${p.label}: ${v ? "enabled" : "disabled"} for ${s.name}`);
+                            }}
+                          />
+                          <span>{p.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </TableCell>
                   <TableCell className="text-right">
                     <Button
                       size="sm"
@@ -156,7 +180,7 @@ function StaffConfiguration() {
               ))}
               {!staff.length && (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
                     No employees yet.
                   </TableCell>
                 </TableRow>
@@ -219,6 +243,7 @@ function StaffConfiguration() {
                   staffId: staffId.trim(),
                   password,
                   storeId,
+                  permissions: { ...DEFAULT_PERMISSIONS },
                 });
                 setName("");
                 setStaffId("");

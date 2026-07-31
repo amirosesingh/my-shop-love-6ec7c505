@@ -10,6 +10,34 @@ import {
 
 export type PosRole = "cashier" | "admin";
 
+/** Feature flags the admin can toggle per employee. */
+export type StaffPermissions = {
+  /** Can Access Financial History Reports */
+  financials: boolean;
+  /** Can Create New Products / Access PO Engine */
+  products: boolean;
+  /** Can Toggle E-commerce Website Visibility */
+  ecommerce: boolean;
+};
+
+export const FULL_PERMISSIONS: StaffPermissions = {
+  financials: true,
+  products: true,
+  ecommerce: true,
+};
+
+export const DEFAULT_PERMISSIONS: StaffPermissions = {
+  financials: false,
+  products: false,
+  ecommerce: false,
+};
+
+export const PERMISSION_LABELS: { key: keyof StaffPermissions; label: string }[] = [
+  { key: "financials", label: "Can Access Financial History Reports" },
+  { key: "products", label: "Can Create New Products / Access PO Engine" },
+  { key: "ecommerce", label: "Can Toggle E-commerce Website Visibility" },
+];
+
 /** An employee record the admin can edit at any time. */
 export type StaffMember = {
   id: string;
@@ -19,6 +47,7 @@ export type StaffMember = {
   password: string;
   /** current assigned store duty */
   storeId: string;
+  permissions: StaffPermissions;
 };
 
 export type PosUser = {
@@ -27,14 +56,36 @@ export type PosUser = {
   role: PosRole;
   /** null for admin = access to every store */
   storeId: string | null;
+  permissions: StaffPermissions;
 };
 
 const ADMIN = { staffId: "admin", password: "123", name: "Store Admin" };
 
 const SEED_STAFF: StaffMember[] = [
-  { id: "u1", name: "John Carter", staffId: "EMP-101", password: "123", storeId: "s1" },
-  { id: "u2", name: "Maya Lin", staffId: "EMP-102", password: "123", storeId: "s2" },
-  { id: "u3", name: "Sofia Reyes", staffId: "EMP-103", password: "123", storeId: "s3" },
+  {
+    id: "u1",
+    name: "John Carter",
+    staffId: "EMP-101",
+    password: "123",
+    storeId: "s1",
+    permissions: { financials: true, products: true, ecommerce: false },
+  },
+  {
+    id: "u2",
+    name: "Maya Lin",
+    staffId: "EMP-102",
+    password: "123",
+    storeId: "s2",
+    permissions: { financials: true, products: false, ecommerce: false },
+  },
+  {
+    id: "u3",
+    name: "Sofia Reyes",
+    staffId: "EMP-103",
+    password: "123",
+    storeId: "s3",
+    permissions: { ...DEFAULT_PERMISSIONS },
+  },
 ];
 
 const STAFF_KEY = "pos-staff-v1";
@@ -44,6 +95,8 @@ type AuthCtx = {
   ready: boolean;
   user: PosUser | null;
   isAdmin: boolean;
+  /** permission check that always passes for the admin */
+  can: (flag: keyof StaffPermissions) => boolean;
   staff: StaffMember[];
   addStaff: (member: Omit<StaffMember, "id">) => void;
   updateStaff: (member: StaffMember) => void;
@@ -64,7 +117,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       const rawStaff = window.localStorage.getItem(STAFF_KEY);
-      if (rawStaff) setStaff(JSON.parse(rawStaff) as StaffMember[]);
+      if (rawStaff)
+        setStaff(
+          (JSON.parse(rawStaff) as StaffMember[]).map((s) => ({
+            ...s,
+            permissions: { ...DEFAULT_PERMISSIONS, ...(s.permissions ?? {}) },
+          })),
+        );
       const rawSession = window.localStorage.getItem(SESSION_KEY);
       if (rawSession) setSessionId(rawSession);
     } catch {
@@ -136,10 +195,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const user = useMemo<PosUser | null>(() => {
     if (!sessionId) return null;
     if (norm(sessionId) === ADMIN.staffId)
-      return { staffId: ADMIN.staffId, name: ADMIN.name, role: "admin", storeId: null };
+      return {
+        staffId: ADMIN.staffId,
+        name: ADMIN.name,
+        role: "admin",
+        storeId: null,
+        permissions: FULL_PERMISSIONS,
+      };
     const found = staff.find((s) => norm(s.staffId) === norm(sessionId));
     if (!found) return null;
-    return { staffId: found.staffId, name: found.name, role: "cashier", storeId: found.storeId };
+    return {
+      staffId: found.staffId,
+      name: found.name,
+      role: "cashier",
+      storeId: found.storeId,
+      permissions: { ...DEFAULT_PERMISSIONS, ...found.permissions },
+    };
   }, [sessionId, staff]);
 
   const value = useMemo<AuthCtx>(
@@ -147,6 +218,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ready,
       user,
       isAdmin: user?.role === "admin",
+      can: (flag) => user?.role === "admin" || !!user?.permissions?.[flag],
       staff,
       addStaff,
       updateStaff,

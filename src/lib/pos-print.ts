@@ -27,7 +27,22 @@ const fmt = (n: number) => n.toFixed(2);
 const esc = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-const shell = (title: string, body: string) => `<!doctype html><html><head>
+/** Deterministic Code39-style bar pattern rendered from any reference string. */
+export function barcodeSvg(value: string) {
+  const chars = `*${value.toUpperCase()}*`.split("");
+  let bars = "";
+  chars.forEach((ch, i) => {
+    const code = ch.charCodeAt(0) + i;
+    for (let b = 0; b < 5; b++) {
+      const wide = (code >> b) & 1;
+      bars += `<i style="width:${wide ? 3 : 1}px"></i>`;
+      bars += `<i style="width:${wide ? 1 : 2}px;background:transparent"></i>`;
+    }
+  });
+  return `<div class="barcode">${bars}</div><div class="bc-text">${esc(value)}</div>`;
+}
+
+const shell = (title: string, body: string, autoPrint = true) => `<!doctype html><html><head>
 <meta charset="utf-8"><title>${esc(title)}</title>
 <style>
   @page { size: 80mm auto; margin: 4mm; }
@@ -43,8 +58,15 @@ const shell = (title: string, body: string) => `<!doctype html><html><head>
   .b { font-weight: 700; }
   .big { font-size: 14px; }
   .tag { border: 1px solid #000; padding: 2px 4px; display: inline-block; margin-top: 4px; font-size: 10px; letter-spacing: 1px; }
+  .barcode { display: flex; align-items: flex-end; justify-content: center; height: 38px; gap: 1px; margin-top: 6px; }
+  .barcode i { display: block; background: #000; height: 100%; }
+  .bc-text { text-align: center; font-size: 10px; letter-spacing: 3px; margin-top: 2px; }
 </style></head><body>${body}
-<script>window.onload=function(){window.focus();window.print();setTimeout(function(){window.close()},400)}<\/script>
+${
+  autoPrint
+    ? `<script>window.onload=function(){window.focus();window.print();setTimeout(function(){window.close()},400)}<\/script>`
+    : ""
+}
 </body></html>`;
 
 const header = (subtitle?: string) => `
@@ -107,6 +129,18 @@ function saleBody(sale: Sale, member: Member | null, kind: ReceiptKind) {
     <table>${rows}</table>
     ${totals}
     ${memberBlock}
+    <hr>
+    ${
+      kind === "gift"
+        ? `<div class="c muted">GIFT RETURN CODE</div>${barcodeSvg(`GIFT-${sale.receiptNo}`)}`
+        : kind === "kitchen"
+          ? ""
+          : `${barcodeSvg(sale.receiptNo)}${
+              sale.method === "card"
+                ? `<div class="muted" style="margin-top:8px">Cardholder signature</div><div class="muted">______________________________</div>`
+                : ""
+            }`
+    }
     <hr>
     <div class="c muted">${
       kind === "gift"
@@ -202,6 +236,15 @@ export function printShiftReport(shift: Shift, sales: Sale[], kind: "xreport" | 
 
 export function printMemberStatement(member: Member, sales: Sale[]) {
   printHtml(`${member.code} statement`, memberBody(member, sales));
+}
+
+/** Full HTML document for on-screen preview (no auto-print). */
+export function saleReceiptPreview(sale: Sale, member: Member | null, kind: ReceiptKind) {
+  return shell(sale.receiptNo, saleBody(sale, member, kind), false);
+}
+
+export function shiftReportPreview(shift: Shift, sales: Sale[]) {
+  return shell("Z report", shiftBody(shift, sales, "zreport"), false);
 }
 
 function transferBody(
