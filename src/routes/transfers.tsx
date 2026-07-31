@@ -78,17 +78,37 @@ function Transfers() {
     receiveTransfer,
     rejectTransfer,
   } = usePos();
+  const search = Route.useSearch();
 
   const others = stores.filter((s) => s.id !== currentStore.id);
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<TransferKind>("transfer");
-  const [productId, setProductId] = useState(state.products[0]?.id ?? "");
+  const [items, setItems] = useState<TransferItem[]>([]);
+  const [pickId, setPickId] = useState(state.products[0]?.id ?? "");
   const [otherStoreId, setOtherStoreId] = useState(others[0]?.id ?? "");
-  const [qty, setQty] = useState("1");
   const [note, setNote] = useState("");
 
-  const product = state.products.find((p) => p.id === productId) ?? null;
   const storeOf = (id: string) => stores.find((s) => s.id === id);
+  const productOf = (id: string) => state.products.find((p) => p.id === id) ?? null;
+
+  // Prefilled multi-item basket handed over from the inventory page.
+  useEffect(() => {
+    if (!search.items) return;
+    const ids = search.items.split(",").filter(Boolean);
+    if (!ids.length) return;
+    setItems(ids.map((productId) => ({ productId, qty: 1 })));
+    setKind(search.kind ?? "transfer");
+    setOpen(true);
+  }, [search.items, search.kind]);
+
+  function addItem(productId: string) {
+    if (!productId) return;
+    setItems((prev) =>
+      prev.some((i) => i.productId === productId)
+        ? prev.map((i) => (i.productId === productId ? { ...i, qty: i.qty + 1 } : i))
+        : [...prev, { productId, qty: 1 }],
+    );
+  }
 
   const mine = useMemo(
     () =>
@@ -103,39 +123,50 @@ function Transfers() {
   );
 
   function print(t: Transfer) {
-    const p = state.products.find((x) => x.id === t.productId);
     const from = storeOf(t.fromStoreId);
     const to = storeOf(t.toStoreId);
-    if (p && from && to) printTransferNote(t, p, from, to);
+    if (from && to) printTransferNote(t, state.products, from, to);
   }
 
   function submit() {
-    const n = Math.floor(Number(qty) || 0);
-    if (!product || !otherStoreId || n <= 0) {
-      toast.error("Pick a product, a store and a quantity");
+    const clean = items
+      .map((i) => ({ productId: i.productId, qty: Math.floor(Number(i.qty) || 0) }))
+      .filter((i) => i.qty > 0);
+    if (!clean.length || !otherStoreId) {
+      toast.error("Add at least one product with a quantity, and pick a store");
       return;
     }
     const fromStoreId = kind === "transfer" ? currentStore.id : otherStoreId;
     const toStoreId = kind === "transfer" ? otherStoreId : currentStore.id;
-    if (kind === "transfer" && stockAt(product, currentStore.id) < n) {
-      toast.error(`Only ${stockAt(product, currentStore.id)} on hand at ${currentStore.name}`);
-      return;
+    if (kind === "transfer") {
+      const short = clean.find((i) => {
+        const p = productOf(i.productId);
+        return !p || stockAt(p, currentStore.id) < i.qty;
+      });
+      if (short) {
+        const p = productOf(short.productId);
+        toast.error(
+          `Only ${p ? stockAt(p, currentStore.id) : 0} × ${p?.name ?? "item"} on hand at ${currentStore.name}`,
+        );
+        return;
+      }
     }
     const t = createTransfer({
       kind,
       fromStoreId,
       toStoreId,
-      productId: product.id,
-      qty: n,
+      items: clean,
       note,
       createdBy: activeShift?.cashier ?? "Manager",
     });
     print({ ...t });
     setOpen(false);
     setNote("");
-    setQty("1");
+    setItems([]);
     toast.success(
-      kind === "transfer" ? `${t.ref} dispatched` : `${t.ref} requested from ${storeOf(otherStoreId)?.name}`,
+      kind === "transfer"
+        ? `${t.ref} dispatched · ${clean.length} item${clean.length > 1 ? "s" : ""}`
+        : `${t.ref} requested from ${storeOf(otherStoreId)?.name}`,
     );
   }
 
