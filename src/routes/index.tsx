@@ -701,8 +701,18 @@ function Register() {
       <Dialog open={payOpen} onOpenChange={setPayOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Take payment · {money(totals.total)}</DialogTitle>
+            <DialogTitle>
+              {refundDue > 0
+                ? `Refund customer · ${money(refundDue)}`
+                : `Take payment · ${money(balanceDue)}`}
+            </DialogTitle>
           </DialogHeader>
+          {exchangeRef && (
+            <p className="rounded-md border border-accent/40 bg-accent/10 px-3 py-2 text-xs">
+              Store credit of {money(totals.credit)} from bill #{exchangeRef} applied to this
+              ticket.
+            </p>
+          )}
           <div className="grid grid-cols-4 gap-2">
             {(
               [
@@ -727,7 +737,12 @@ function Register() {
             ))}
           </div>
 
-          {method === "cash" && (
+          {method === "cash" && refundDue > 0 && (
+            <p className="numeric text-sm text-muted-foreground">
+              Pay {money(refundDue)} back to the customer as cash or store credit.
+            </p>
+          )}
+          {method === "cash" && refundDue === 0 && (
             <div className="space-y-2">
               <Label>Cash tendered</Label>
               <Input
@@ -736,7 +751,7 @@ function Register() {
                 className="numeric h-12 text-xl"
               />
               <div className="flex gap-2">
-                {[totals.total, 20, 50, 100].map((v, i) => (
+                {[balanceDue, 20, 50, 100].map((v, i) => (
                   <Button
                     key={i}
                     variant="outline"
@@ -748,7 +763,7 @@ function Register() {
                 ))}
               </div>
               <p className="numeric text-sm text-muted-foreground">
-                Change due {money(Math.max(0, Number(tendered || 0) - totals.total))}
+                Change due {money(Math.max(0, Number(tendered || 0) - balanceDue))}
               </p>
             </div>
           )}
