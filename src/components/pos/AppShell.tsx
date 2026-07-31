@@ -12,12 +12,13 @@ import {
   Users,
   LayoutGrid,
   Percent,
+  Settings as SettingsIcon,
 } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
 import { usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
 import { LoginScreen } from "@/components/pos/LoginScreen";
-import { setPrintStore } from "@/lib/pos-print";
+import { setPrintStore, setPrintSettings } from "@/lib/pos-print";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,6 +50,7 @@ const adminNav: NavItem[] = [
   { to: "/promotions", label: "Promotions", icon: Percent },
   { to: "/stores", label: "Locations", icon: Store },
   { to: "/staff", label: "Staff", icon: ShieldCheck },
+  { to: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -58,6 +60,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     setPrintStore(currentStore ?? null);
   }, [currentStore]);
+
+  useEffect(() => {
+    setPrintSettings(state.settings.receipt, state.settings.tax);
+  }, [state.settings]);
 
   // Cashiers are pinned to their assigned branch — no manual switching.
   useEffect(() => {
