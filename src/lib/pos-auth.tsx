@@ -518,6 +518,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       isAdmin: user?.role === "admin",
       isSupervisor: user?.metaRole === "supervisor" || user?.role === "admin",
+      // Admins and "All stores" supervisors (no single branch assigned).
+      canSwitchStores: user?.role === "admin" && !user.storeId,
       isCashier: user?.metaRole === "cashier" || (!!user && user.role !== "admin"),
       authUserId: userId,
       terminalUser,
