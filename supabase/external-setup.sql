@@ -280,7 +280,15 @@ alter table public.app_users
   add column if not exists auth_user_id uuid,
   add column if not exists store_id varchar(64),
   add column if not exists last_login_at timestamptz,
-  add column if not exists permissions jsonb not null default '{}'::jsonb;
+  add column if not exists permissions jsonb not null default '{}'::jsonb,
+  add column if not exists is_active boolean not null default true,
+  add column if not exists full_name varchar(160),
+  add column if not exists email varchar(255),
+  add column if not exists role app_role not null default 'staff',
+  add column if not exists pin_hash text not null default '',
+  add column if not exists auth_secret text not null default '',
+  add column if not exists created_at timestamptz not null default now(),
+  add column if not exists updated_at timestamptz not null default now();
 
 create unique index if not exists app_users_user_id_key
   on public.app_users (lower(user_id));
