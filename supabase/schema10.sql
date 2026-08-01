@@ -6,7 +6,8 @@
 
 -- ---------------------------------------------------------------- stores ---
 CREATE TABLE IF NOT EXISTS public.stores (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  -- text, not uuid: existing terminals already use short branch codes as ids
+  id text PRIMARY KEY,
   code text NOT NULL,
   name text NOT NULL,
   address text,
@@ -40,7 +41,7 @@ CREATE TRIGGER update_stores_updated_at BEFORE UPDATE ON public.stores
 -- ------------------------------------------------------- terminal tokens ---
 CREATE TABLE IF NOT EXISTS public.terminal_tokens (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  location_id uuid REFERENCES public.stores(id) ON DELETE SET NULL,
+  location_id text REFERENCES public.stores(id) ON DELETE SET NULL,
   location_name text,
   device_name text NOT NULL,
   status text NOT NULL DEFAULT 'active',
