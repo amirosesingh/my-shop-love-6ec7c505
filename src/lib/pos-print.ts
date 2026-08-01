@@ -25,6 +25,7 @@ export const STORE = {
 let activeBranch: Store | null = null;
 export function setPrintStore(store: Store | null) {
   activeBranch = store;
+  receiptCfg = resolveReceiptCfg(globalReceiptCfg, store);
 }
 
 /** Receipt customizer + tax configuration, pushed in by the app shell. */
