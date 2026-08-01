@@ -2240,6 +2240,10 @@ function Register() {
           <DialogFooter>
             <Button
               onClick={() => {
+                if (!can("can_open_shift")) {
+                  toast.error("You are not allowed to open a shift");
+                  return;
+                }
                 openShift(cashier || "Cashier", Number(float) || 0);
                 openCashDrawer();
                 setOpenShiftOpen(false);
