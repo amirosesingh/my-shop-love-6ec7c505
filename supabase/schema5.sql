@@ -2,7 +2,16 @@
 -- schema5.sql — cashiers live in their own table (no auth account)
 -- Idempotent: safe to run multiple times.
 -- ============================================================================
-create extension if not exists pgcrypto with schema extensions;
+create schema if not exists extensions;
+do $$
+begin
+  create extension if not exists pgcrypto with schema extensions;
+exception when others then
+  begin
+    create extension if not exists pgcrypto;
+  exception when others then null;
+  end;
+end $$;
 
 -- ---------------------------------------------------------------------------
 -- Supervisor guard (re-created here so this script can run standalone)

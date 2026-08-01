@@ -5,8 +5,16 @@
 -- the legacy `user_code` name is migrated away automatically.
 -- ============================================================================
 
-create extension if not exists pgcrypto with schema extensions;
-create extension if not exists pgcrypto with schema extensions;
+create schema if not exists extensions;
+do $$
+begin
+  create extension if not exists pgcrypto with schema extensions;
+exception when others then
+  begin
+    create extension if not exists pgcrypto;
+  exception when others then null;
+  end;
+end $$;
 
 do $$ begin
   create type public.app_role as enum ('admin','manager','staff');

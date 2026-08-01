@@ -10,6 +10,17 @@
 -- auth account, and re-creates the RPCs to use it. Safe to re-run.
 -- ---------------------------------------------------------------------------
 
+create schema if not exists extensions;
+do $$
+begin
+  create extension if not exists pgcrypto with schema extensions;
+exception when others then
+  begin
+    create extension if not exists pgcrypto;
+  exception when others then null;
+  end;
+end $$;
+
 -- 1. Link app_users rows to auth accounts by email (idempotent)
 update public.app_users a
    set auth_user_id = u.id

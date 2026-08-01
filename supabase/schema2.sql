@@ -7,7 +7,16 @@
 -- reloads the PostgREST schema cache.
 -- ============================================================================
 
-create extension if not exists pgcrypto with schema extensions;
+create schema if not exists extensions;
+do $$
+begin
+  create extension if not exists pgcrypto with schema extensions;
+exception when others then
+  begin
+    create extension if not exists pgcrypto;
+  exception when others then null;
+  end;
+end $$;
 
 -- ---------------------------------------------------------------------------
 -- 0. Prerequisites: role enum + role tables the functions depend on
