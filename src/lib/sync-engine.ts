@@ -1,5 +1,6 @@
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { logSync } from "./sync-log";
+import { isTerminalRevoked } from "./use-revocation-check";
 import {
   failOp,
   isOnline,
@@ -93,7 +94,9 @@ let draining = false;
  * depend on each other (sale then sale_items) never land out of order.
  */
 export async function drainOutbox(): Promise<{ pushed: number; failed: number }> {
-  if (draining || !isOnline() || !isOnlineSyncEnabled()) return { pushed: 0, failed: 0 };
+  // A revoked terminal keeps selling locally but is cut off from the cloud.
+  if (draining || !isOnline() || !isOnlineSyncEnabled() || isTerminalRevoked())
+    return { pushed: 0, failed: 0 };
   draining = true;
   let pushed = 0;
   let failed = 0;
