@@ -28,6 +28,7 @@ export const PERMISSION_GROUPS = [
       "can_edit_product_price",
       "can_add_new_product",
       "can_receive_purchase_order",
+      "can_adjust_stock",
     ],
   },
   {
@@ -56,6 +57,7 @@ export type PermissionKey =
   | "can_edit_product_price"
   | "can_add_new_product"
   | "can_receive_purchase_order"
+  | "can_adjust_stock"
   | "can_add_member"
   | "can_edit_member_points"
   | "can_apply_member_discount"
@@ -77,6 +79,7 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   can_edit_product_price: "Edit product pricing",
   can_add_new_product: "Add new products",
   can_receive_purchase_order: "Receive purchase orders",
+  can_adjust_stock: "Adjust / recount stock",
   can_add_member: "Add members",
   can_edit_member_points: "Edit member points",
   can_apply_member_discount: "Apply member discount",
@@ -118,6 +121,7 @@ export const WAREHOUSE_PERMISSIONS: StaffPermissions = build([
   "can_view_inventory",
   "can_add_new_product",
   "can_receive_purchase_order",
+  "can_adjust_stock",
 ]);
 
 // --------------------------------------------------------------------------

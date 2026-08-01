@@ -112,6 +112,7 @@ const rowToPromotion = (r: Row): Promotion => ({
   value: num(r.discount_percent) || num(r.discount_amount),
   valueType: num(r.discount_percent) ? "percent" : "amount",
   tierRates: (r.tier_rates ?? undefined) as Record<MemberTier, number> | undefined,
+  partner: r.partner ?? undefined,
 });
 
 const promotionToRow = (p: Promotion): Row => ({
@@ -127,6 +128,7 @@ const promotionToRow = (p: Promotion): Row => ({
   discount_percent: p.valueType === "percent" ? (p.value ?? 0) : 0,
   discount_amount: p.valueType === "amount" ? (p.value ?? 0) : 0,
   tier_rates: p.tierRates ?? null,
+  partner: p.partner?.trim() ? p.partner.trim() : null,
 });
 
 const rowToSettings = (r: Row | null): AppSettings =>
