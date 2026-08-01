@@ -38,7 +38,8 @@ export const Route = createFileRoute("/settings/")({
       : {},
   // Older links used /settings?section=tax — send them to the real page.
   beforeLoad: ({ search }) => {
-    const target = "section" in search ? LEGACY[search.section] : undefined;
+    const section = (search as { section?: string }).section;
+    const target = section ? LEGACY[section] : undefined;
     if (target) throw redirect({ to: target });
   },
   head: () => ({
