@@ -105,8 +105,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
       {!mini && (
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold leading-tight">Northwind</p>
-          <p className="text-[11px] text-muted-foreground">POS Terminal 01</p>
+          <p className="truncate text-sm font-semibold leading-tight">{companyName}</p>
+          <p className="text-[11px] text-muted-foreground">{branding.terminal}</p>
         </div>
       )}
     </div>
@@ -229,7 +229,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Sheet>
           <div className="flex min-w-0 items-center gap-2">
             <ReceiptText className="size-4 shrink-0 text-primary" />
-            <span className="truncate text-sm font-semibold">Northwind POS</span>
+            <span className="truncate text-sm font-semibold">{companyName}</span>
           </div>
           <Badge
             variant="outline"
