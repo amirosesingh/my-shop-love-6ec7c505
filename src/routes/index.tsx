@@ -1011,6 +1011,11 @@ function Register() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <MemberHistoryDialog
+        member={state.members.find((m) => m.id === historyMemberId) ?? null}
+        onOpenChange={(o) => !o && setHistoryMemberId(null)}
+      />
     </AppShell>
   );
 }
