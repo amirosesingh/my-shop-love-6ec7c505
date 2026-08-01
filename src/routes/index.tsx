@@ -303,6 +303,99 @@ function Register() {
     }
   }
 
+  const displayBase = {
+    companyName: state.settings.receipt.companyName || currentStore.name,
+    storeName: `${currentStore.name} (${currentStore.code})`,
+    cashier: activeShift?.cashier ?? cashier,
+    payment: state.settings.payment,
+  };
+
+  const cartSnapshot = (): DisplaySnapshot => ({
+    at: Date.now(),
+    ...displayBase,
+    mode: lines.length ? "cart" : "idle",
+    memberName: member?.name ?? null,
+    memberPoints: member?.points ?? null,
+    lines: lines.map((l) => toDisplayLine(l, r2((l.price - lineUnitDiscount(l)) * l.qty))),
+    subtotal: totals.subtotal,
+    discount: totals.discount,
+    tax: totals.tax,
+    total: totals.total,
+    paid: 0,
+    change: 0,
+    balance: 0,
+    reference: "",
+    dueDate: "",
+    promos: promo.applied.map((a) => `${a.name} · ${a.detail}`),
+  });
+
+  // Mirror the live ticket onto the customer-facing second screen.
+  const displayKey = JSON.stringify({
+    l: lines.map((l) => [l.productId, l.qty, l.discount, l.discountType, l.foc, l.credit]),
+    t: totals.total,
+    d: totals.discount,
+    x: totals.tax,
+    m: member?.id ?? null,
+    s: currentStore.id,
+  });
+  useEffect(() => {
+    publishDisplay(cartSnapshot());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayKey, state.settings.payment]);
+
+  async function bookAndPayLater() {
+    if (!activeShift) {
+      toast.error("Open a shift before taking a booking");
+      return;
+    }
+    if (!(await requirePermission("can_process_sale"))) return;
+    const paidNow = r2(Math.max(0, Number(deposit || 0)));
+    if (paidNow > totals.total) {
+      toast.error("Deposit cannot exceed the booking total");
+      return;
+    }
+    if (!dueDate) {
+      toast.error("Choose a collect-by date");
+      return;
+    }
+    const booking = createBooking({
+      storeId: currentStore.id,
+      shiftId: activeShift.id,
+      lines,
+      subtotal: totals.subtotal,
+      discount: totals.discount,
+      tax: totals.tax,
+      total: totals.total,
+      deposit: paidNow,
+      depositMethod,
+      dueDate,
+      memberId,
+      customerName: bookName.trim() || member?.name || "Walk-in",
+      customerPhone: bookPhone.trim() || member?.phone || "",
+      note: bookNote.trim(),
+      cashier: activeShift.cashier,
+    });
+    if (paidNow > 0 && depositMethod === "cash") openCashDrawer();
+    printBookingSlip(booking, member, state.settings.payment);
+    publishDisplay({
+      ...cartSnapshot(),
+      mode: "booking",
+      paid: booking.paid,
+      balance: r2(booking.total - booking.paid),
+      reference: booking.ref,
+      dueDate: booking.dueDate,
+    });
+    resetCart();
+    setMemberId(null);
+    setBookOpen(false);
+    setDeposit("");
+    setBookName("");
+    setBookPhone("");
+    setBookNote("");
+    setDueDate(isoDaysFromNow(14));
+    toast.success(`Booking ${booking.ref} reserved until ${new Date(booking.dueDate).toDateString()}`);
+  }
+
   async function completeSale() {
     if (!activeShift) {
       toast.error("Open a shift before taking payment");
