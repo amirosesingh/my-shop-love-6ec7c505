@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { Crown, Gift, Percent, Plus, Sparkles, Trash2, Trophy } from "lucide-react";
 import { toast } from "sonner";
+import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { AppShell } from "@/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -223,17 +224,15 @@ function Promotions() {
               </div>
               <div className="col-span-2 space-y-1">
                 <Label className="text-xs text-muted-foreground">Promo type</Label>
-                <select
+                <ThemedSelect
+                  ariaLabel="Promo type"
                   value={draft.type}
-                  onChange={(e) => setDraft({ ...draft, type: e.target.value as PromoType })}
-                  className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
-                >
-                  {(Object.keys(typeLabel) as PromoType[]).map((t) => (
-                    <option key={t} value={t}>
-                      {typeLabel[t]}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(v) => setDraft({ ...draft, type: v as PromoType })}
+                  options={(Object.keys(typeLabel) as PromoType[]).map((t) => ({
+                    value: t,
+                    label: typeLabel[t],
+                  }))}
+                />
               </div>
 
               {draft.type === "points" && (
@@ -272,18 +271,16 @@ function Promotions() {
                   </div>
                   <div className="col-span-2 space-y-1">
                     <Label className="text-xs text-muted-foreground">Free product</Label>
-                    <select
+                    <ThemedSelect
+                      ariaLabel="Free product"
+                      placeholder="Select a product…"
                       value={draft.focProductId ?? ""}
-                      onChange={(e) => setDraft({ ...draft, focProductId: e.target.value })}
-                      className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
-                    >
-                      <option value="">Select a product…</option>
-                      {state.products.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} · {money(p.price)}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(v) => setDraft({ ...draft, focProductId: v })}
+                      options={state.products.map((p) => ({
+                        value: p.id,
+                        label: `${p.name} · ${money(p.price)}`,
+                      }))}
+                    />
                   </div>
                 </>
               )}

@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { History, Plus, Printer, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { AppShell } from "@/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -182,15 +183,16 @@ function Members() {
               </div>
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Tier</Label>
-                <select
+                <ThemedSelect
+                  ariaLabel="Tier"
                   value={draft.tier}
-                  onChange={(e) => setDraft({ ...draft, tier: e.target.value as Member["tier"] })}
-                  className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
-                >
-                  <option>Bronze</option>
-                  <option>Silver</option>
-                  <option>Gold</option>
-                </select>
+                  onChange={(v) => setDraft({ ...draft, tier: v as Member["tier"] })}
+                  options={[
+                    { value: "Bronze", label: "Bronze" },
+                    { value: "Silver", label: "Silver" },
+                    { value: "Gold", label: "Gold" },
+                  ]}
+                />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Points</Label>
