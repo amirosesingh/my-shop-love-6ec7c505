@@ -6,7 +6,13 @@ export const PERMISSION_GROUPS = [
   {
     id: "drawer",
     label: "Cash Drawer",
-    keys: ["can_open_drawer", "can_close_drawer", "can_view_drawer_balance"],
+    keys: [
+      "can_open_drawer",
+      "can_close_drawer",
+      "can_view_drawer_balance",
+      "can_open_shift",
+      "can_close_shift",
+    ],
   },
   {
     id: "approvals",
@@ -31,6 +37,9 @@ export const PERMISSION_GROUPS = [
       "can_hold_cart",
       "can_process_refund",
       "can_process_exchange",
+      "can_reprint_bill",
+      "can_send_whatsapp_bill",
+      "can_manage_bookings",
     ],
   },
   {
@@ -42,17 +51,42 @@ export const PERMISSION_GROUPS = [
       "can_add_new_product",
       "can_receive_purchase_order",
       "can_adjust_stock",
+      "can_create_transfer",
+      "can_receive_transfer",
+      "can_manage_locations",
     ],
   },
   {
     id: "members",
     label: "Members & Loyalty",
-    keys: ["can_add_member", "can_edit_member_points", "can_apply_member_discount"],
+    keys: [
+      "can_add_member",
+      "can_edit_member_points",
+      "can_apply_member_discount",
+      "can_redeem_points",
+      "can_view_member_history",
+    ],
   },
   {
     id: "reports",
-    label: "Reports & Settings",
-    keys: ["can_view_sales_reports", "can_access_pos_settings", "can_manage_staff"],
+    label: "Reports & Analytics",
+    keys: [
+      "can_view_sales_reports",
+      "can_view_dashboard",
+      "can_view_audit_trail",
+      "can_export_reports",
+    ],
+  },
+  {
+    id: "system",
+    label: "System & Administration",
+    keys: [
+      "can_access_pos_settings",
+      "can_manage_staff",
+      "can_manage_promotions",
+      "can_manage_terminals",
+      "can_manage_sync_backup",
+    ],
   },
 ] as const;
 
@@ -60,6 +94,8 @@ export type PermissionKey =
   | "can_open_drawer"
   | "can_close_drawer"
   | "can_view_drawer_balance"
+  | "can_open_shift"
+  | "can_close_shift"
   | "can_delete_line"
   | "can_reduce_qty"
   | "can_discount_bill"
@@ -73,22 +109,38 @@ export type PermissionKey =
   | "can_hold_cart"
   | "can_process_refund"
   | "can_process_exchange"
+  | "can_reprint_bill"
+  | "can_send_whatsapp_bill"
+  | "can_manage_bookings"
   | "can_view_inventory"
   | "can_edit_product_price"
   | "can_add_new_product"
   | "can_receive_purchase_order"
   | "can_adjust_stock"
+  | "can_create_transfer"
+  | "can_receive_transfer"
+  | "can_manage_locations"
   | "can_add_member"
   | "can_edit_member_points"
   | "can_apply_member_discount"
+  | "can_redeem_points"
+  | "can_view_member_history"
   | "can_view_sales_reports"
+  | "can_view_dashboard"
+  | "can_view_audit_trail"
+  | "can_export_reports"
   | "can_access_pos_settings"
-  | "can_manage_staff";
+  | "can_manage_staff"
+  | "can_manage_promotions"
+  | "can_manage_terminals"
+  | "can_manage_sync_backup";
 
 export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   can_open_drawer: "Open cash drawer",
   can_close_drawer: "Close / count drawer",
   can_view_drawer_balance: "View drawer balance",
+  can_open_shift: "Open a shift",
+  can_close_shift: "Close a shift / run Z-report",
   can_delete_line: "Delete a line from the cart",
   can_reduce_qty: "Reduce an item quantity",
   can_discount_bill: "Apply a bill-level discount",
@@ -102,17 +154,31 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   can_hold_cart: "Hold / park a cart",
   can_process_refund: "Process refunds",
   can_process_exchange: "Process exchanges",
+  can_reprint_bill: "Reprint / re-issue a bill",
+  can_send_whatsapp_bill: "Send a bill by WhatsApp",
+  can_manage_bookings: "Take and collect bookings (pay later)",
   can_view_inventory: "View inventory",
   can_edit_product_price: "Edit product pricing",
   can_add_new_product: "Add new products",
   can_receive_purchase_order: "Receive purchase orders",
   can_adjust_stock: "Adjust / recount stock",
+  can_create_transfer: "Create stock transfer requests",
+  can_receive_transfer: "Approve / receive transfers",
+  can_manage_locations: "Manage locations & warehouses",
   can_add_member: "Add members",
   can_edit_member_points: "Edit member points",
   can_apply_member_discount: "Apply member discount",
+  can_redeem_points: "Redeem loyalty points at the till",
+  can_view_member_history: "View member purchase history",
   can_view_sales_reports: "View sales reports",
+  can_view_dashboard: "View the live dashboard",
+  can_view_audit_trail: "View register activity / audit trail",
+  can_export_reports: "Export or download report data",
   can_access_pos_settings: "Access POS settings",
   can_manage_staff: "Manage staff & permissions",
+  can_manage_promotions: "Edit promotions & coupon rules",
+  can_manage_terminals: "Manage terminal activation tokens",
+  can_manage_sync_backup: "Run sync, backup & restore",
 };
 
 export const PERMISSION_KEYS = Object.keys(PERMISSION_LABELS) as PermissionKey[];
@@ -132,11 +198,16 @@ export const NO_PERMISSIONS: StaffPermissions = build([]);
 export const CASHIER_PERMISSIONS: StaffPermissions = build([
   "can_open_drawer",
   "can_close_drawer",
+  "can_open_shift",
+  "can_close_shift",
   "can_process_sale",
   "can_hold_cart",
+  "can_reprint_bill",
+  "can_manage_bookings",
   "can_view_inventory",
   "can_add_member",
   "can_apply_member_discount",
+  "can_view_member_history",
 ]);
 
 /** Kept for existing screens that still ask for the older coarse flags. */
@@ -149,6 +220,9 @@ export const WAREHOUSE_PERMISSIONS: StaffPermissions = build([
   "can_add_new_product",
   "can_receive_purchase_order",
   "can_adjust_stock",
+  "can_create_transfer",
+  "can_receive_transfer",
+  "can_manage_locations",
 ]);
 
 // --------------------------------------------------------------------------
