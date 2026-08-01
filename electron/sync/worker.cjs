@@ -7,7 +7,7 @@
  * tables are never pulled, so a cloud read can't overwrite an offline sale.
  */
 const { createClient } = require("@supabase/supabase-js");
-const repo = require("../db/repo");
+const repo = require("../db/repo.cjs");
 
 const BATCH = 200;
 const INTERVAL_MS = 30_000;
