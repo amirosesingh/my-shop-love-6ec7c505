@@ -52,6 +52,7 @@ import {
 import { availableAt, cartTotals, money, stockAt, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
 import { useUserPermissions } from "@/lib/pos-permissions";
+import { useUiScale } from "@/lib/use-ui-scale";
 import type { CartLine, DiscountType, PaymentMethod, Sale } from "@/lib/pos-types";
 import { lineUnitDiscount, r2 } from "@/lib/pos-types";
 import { buildBookingMessage, buildSaleMessage, sendBillOnWhatsApp } from "@/lib/whatsapp";
