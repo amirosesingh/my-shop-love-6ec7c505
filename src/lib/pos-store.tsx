@@ -139,8 +139,11 @@ export function PosProvider({ children }: { children: ReactNode }) {
             tax: { ...defaultSettings.tax, ...cloud.settings.tax },
             receipt: { ...defaultSettings.receipt, ...cloud.settings.receipt },
           },
-          // Keep the bill counter ahead of anything already stored in cloud.
-          counter: Math.max(s.counter, cloud.sales.length),
+          // Keep the bill counter ahead of every receipt already in the cloud.
+          counter: cloud.sales.reduce(
+            (max, sale) => Math.max(max, Number(sale.receiptNo.split("-").pop()) || 0),
+            s.counter,
+          ),
         }));
       } catch (e) {
         dbError("Loading data", e);
