@@ -1,3 +1,4 @@
+-- SUPERSEDED: run supabase/schema_final.sql instead. Kept for history only.
 -- ============================================================================
 -- Northwind POS — master database schema
 -- Run this whole file in the Supabase SQL editor. It is idempotent: safe to

@@ -1,3 +1,4 @@
+-- SUPERSEDED: run supabase/schema_final.sql instead. Kept for history only.
 -- ============================================================================
 -- schema2.sql — RPC repair script
 -- Fixes: "Could not find the function public.list_app_users without parameters
