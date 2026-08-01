@@ -1,16 +1,44 @@
 import { useState } from "react";
-import { Loader2, Lock, ReceiptText } from "lucide-react";
+import { Delete, Loader2, Lock, ReceiptText } from "lucide-react";
 import { useAuth } from "@/lib/pos-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
+
+const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
 export function TerminalLogin() {
-  const { login } = useAuth();
+  const { login, cashierLogin, pinLogin } = useAuth();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("");
+  const [pin, setPin] = useState("");
+
+  const submitPin = async (value = pin) => {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    let res = await cashierLogin(username, value);
+    // Legacy hashed-PIN terminal accounts / offline bootstrap admin.
+    if (!res.ok) res = await pinLogin(username, value);
+    if (!res.ok) {
+      setError(res.error ?? "Invalid username or PIN");
+      setPin("");
+    }
+    setBusy(false);
+  };
+
+  const press = (digit: string) => {
+    if (pin.length >= 6) return;
+    const next = pin + digit;
+    setPin(next);
+    setError("");
+    if (next.length === 6) void submitPin(next);
+  };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
