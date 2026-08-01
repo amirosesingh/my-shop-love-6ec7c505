@@ -256,6 +256,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const cashierLogin = useCallback(async (userId: string, pin: string) => {
+    const code = userId.trim();
+    if (!code) return { ok: false, error: "Enter your User ID" };
+    if (!/^\d{4}$/.test(pin)) return { ok: false, error: "Enter your 4-digit PIN" };
+    const { error } = await supabase.auth.signInWithPassword({
+      email: cashierEmail(code),
+      password: cashierSecret(code, pin),
+    });
+    return error ? { ok: false, error: "Invalid User ID or PIN" } : { ok: true };
+  }, []);
+
   const pinLogin = useCallback(async (userCode: string, pin: string) => {
     const code = userCode.trim();
     if (!code) return { ok: false, error: "Enter your User ID" };
@@ -375,23 +386,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         name: terminalUser.name,
         email: terminalUser.email,
         role: isLocalAdmin ? "admin" : "cashier",
+        metaRole: isLocalAdmin ? "admin" : "cashier",
         roles: [terminalUser.role],
         storeId: isLocalAdmin ? null : terminalUser.storeId,
         permissions: isLocalAdmin ? FULL_PERMISSIONS : { ...DEFAULT_PERMISSIONS },
       };
     }
     const email = account.email ?? "";
-    const isAdmin = roles.includes("admin") || terminalUser?.role === "admin";
+    const meta = account.user_metadata ?? {};
+    const metaRole = (meta["role"] as MetaRole | undefined) ?? null;
+    const isAdmin =
+      metaRole === "admin" ||
+      metaRole === "supervisor" ||
+      roles.includes("admin") ||
+      terminalUser?.role === "admin";
     const found = email ? staff.find((s) => s.email && norm(s.email) === norm(email)) : undefined;
     const fallbackName =
-      (account.user_metadata?.["full_name"] as string | undefined) || email.split("@")[0] || "User";
+      (meta["full_name"] as string | undefined) || email.split("@")[0] || "User";
     return {
-      staffId: terminalUser?.userCode ?? found?.staffId ?? email,
+      staffId:
+        (meta["user_id"] as string | undefined) ?? terminalUser?.userCode ?? found?.staffId ?? email,
       name: terminalUser?.name ?? found?.name ?? fallbackName,
       email,
       role: isAdmin ? "admin" : "cashier",
+      metaRole,
       roles,
-      storeId: isAdmin ? null : (terminalUser?.storeId ?? found?.storeId ?? null),
+      storeId: isAdmin
+        ? null
+        : ((meta["store_id"] as string | null | undefined) ??
+          terminalUser?.storeId ??
+          found?.storeId ??
+          null),
       permissions: isAdmin
         ? FULL_PERMISSIONS
         : { ...DEFAULT_PERMISSIONS, ...(found?.permissions ?? {}) },
@@ -403,6 +428,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ready,
       user,
       isAdmin: user?.role === "admin",
+      isSupervisor: user?.metaRole === "supervisor" || user?.role === "admin",
+      isCashier: user?.metaRole === "cashier" || (!!user && user.role !== "admin"),
       authUserId: userId,
       terminalUser,
       can: (flag) => user?.role === "admin" || !!user?.permissions?.[flag],
@@ -411,6 +438,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updateStaff,
       removeStaff,
       login,
+      cashierLogin,
       pinLogin,
       signUp,
       logout,
@@ -426,6 +454,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updateStaff,
       removeStaff,
       login,
+      cashierLogin,
       pinLogin,
       signUp,
       logout,
