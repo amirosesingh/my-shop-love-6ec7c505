@@ -163,3 +163,38 @@
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
+
+/* ── Dynamic register scaling ─────────────────────────────────────────────
+   `--pos-scale` is set from the viewport by useUiScale(). Everything inside
+   .pos-scaled keys its type and control sizes off it so the three-panel
+   register stays touch-friendly on any Windows resolution.                */
+:root {
+  --pos-scale: 1;
+}
+
+.pos-scaled {
+  font-size: calc(0.875rem * var(--pos-scale));
+  line-height: 1.45;
+}
+
+.pos-scaled button,
+.pos-scaled [role="button"],
+.pos-scaled input,
+.pos-scaled select {
+  min-height: calc(2.5rem * var(--pos-scale));
+}
+
+.pos-scaled button.size-7,
+.pos-scaled button.size-8,
+.pos-scaled .pos-icon-btn {
+  min-height: calc(1.75rem * var(--pos-scale));
+  min-width: calc(1.75rem * var(--pos-scale));
+}
+
+@media (pointer: coarse) {
+  .pos-scaled button,
+  .pos-scaled [role="button"],
+  .pos-scaled input {
+    min-height: max(44px, calc(2.5rem * var(--pos-scale)));
+  }
+}
