@@ -1,5 +1,5 @@
--- Run this in the SQL editor of your Supabase project (qhrufhtbeguxydenzfey).
--- Creates the full POS schema with open (public terminal) access policies.
+-- Master schema for the POS backend. Run this in your Supabase SQL editor.
+-- Includes the full POS schema, app_users identity table and auth sync trigger.
 
 create extension if not exists pgcrypto;
 
