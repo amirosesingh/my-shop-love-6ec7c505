@@ -1859,11 +1859,23 @@ function Register() {
             </div>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="items-center gap-2">
+            {refundDue === 0 && tenders.length > 0 && validateTenders(balanceDue, tenders).error && (
+              <span className="mr-auto text-[11px] font-medium text-destructive">
+                {validateTenders(balanceDue, tenders).error}
+              </span>
+            )}
             <Button variant="outline" onClick={() => setPayOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={completeSale}>Complete &amp; print</Button>
+            <Button
+              onClick={completeSale}
+              disabled={
+                refundDue === 0 && tenders.length > 0 && !!validateTenders(balanceDue, tenders).error
+              }
+            >
+              Complete &amp; print
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
