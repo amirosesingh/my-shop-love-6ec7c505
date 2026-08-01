@@ -189,9 +189,14 @@ function Register() {
     }
     const product = state.products.find((p) => p.id === productId);
     if (!product) return;
-    const onHand = stockAt(product, currentStore.id);
+    const onHand = availableAt(product, currentStore.id, state.bookings);
     if (onHand <= 0) {
-      toast.error(`${product.name} is out of stock at ${currentStore.name}`);
+      const reserved = stockAt(product, currentStore.id) > 0;
+      toast.error(
+        reserved
+          ? `${product.name} is fully reserved by open bookings at ${currentStore.name}`
+          : `${product.name} is out of stock at ${currentStore.name}`,
+      );
       return;
     }
     setLines((ls) => {
