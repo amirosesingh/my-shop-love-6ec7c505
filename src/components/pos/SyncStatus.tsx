@@ -40,14 +40,23 @@ export function SyncStatus({ className = "" }: { className?: string }) {
         ? `${pending} pending`
         : "Synced";
 
-  const tone = !online || !syncOn ? "text-warning" : conflicts ? "text-destructive" : pending ? "text-accent" : "text-success";
+  const tone =
+    !online || !syncOn
+      ? "text-warning"
+      : conflicts
+        ? "text-destructive"
+        : pending
+          ? "text-accent"
+          : "text-success";
 
   return (
     <button
       type="button"
       onClick={() => void drainOutbox().then(bump)}
       title={
-        conflicts ? `${conflicts} operation(s) need attention in Settings → Sync` : "Push queued changes now"
+        conflicts
+          ? `${conflicts} operation(s) need attention in Settings → Sync`
+          : "Push queued changes now"
       }
       className={`flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs ${className}`}
     >

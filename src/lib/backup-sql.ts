@@ -12,9 +12,7 @@ const lit = (v: unknown): string => {
 function insertBlock(table: string, rows: Record<string, unknown>[]): string {
   if (!rows.length) return `-- ${table}: no rows\n`;
   const cols = Object.keys(rows[0]);
-  const values = rows
-    .map((r) => `  (${cols.map((c) => lit(r[c])).join(", ")})`)
-    .join(",\n");
+  const values = rows.map((r) => `  (${cols.map((c) => lit(r[c])).join(", ")})`).join(",\n");
   return `INSERT INTO public.${table} (${cols.join(", ")}) VALUES\n${values}\nON CONFLICT DO NOTHING;\n`;
 }
 

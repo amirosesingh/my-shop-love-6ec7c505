@@ -131,8 +131,22 @@ function Settings() {
 
   const sample: Sale = useMemo(() => {
     const lines = [
-      { productId: "x1", name: "Espresso Beans 250g", price: 12.5, qty: 2, taxRate: 0.05, discount: 0 },
-      { productId: "x2", name: "Butter Croissant", price: 3.75, qty: 1, taxRate: 0.05, discount: 0 },
+      {
+        productId: "x1",
+        name: "Espresso Beans 250g",
+        price: 12.5,
+        qty: 2,
+        taxRate: 0.05,
+        discount: 0,
+      },
+      {
+        productId: "x2",
+        name: "Butter Croissant",
+        price: 3.75,
+        qty: 1,
+        taxRate: 0.05,
+        discount: 0,
+      },
     ];
     const subtotal = 28.75;
     const rate = tax.enabled ? tax.rate / 100 : 0;
@@ -141,7 +155,10 @@ function Settings() {
         ? Number((subtotal - subtotal / (1 + rate)).toFixed(2))
         : Number((subtotal * rate).toFixed(2))
       : 0;
-    const total = tax.enabled && tax.mode === "exclusive" ? Number((subtotal + taxAmount).toFixed(2)) : subtotal;
+    const total =
+      tax.enabled && tax.mode === "exclusive"
+        ? Number((subtotal + taxAmount).toFixed(2))
+        : subtotal;
     return {
       id: "preview",
       receiptNo: `${currentStore.code}-000001`,
@@ -205,7 +222,8 @@ function Settings() {
         <header>
           <h1 className="text-2xl font-semibold">Settings</h1>
           <p className="text-sm text-muted-foreground">
-            Tax rules apply to every register instantly. Receipt styling applies to all printed slips.
+            Tax rules apply to every register instantly. Receipt styling applies to all printed
+            slips.
           </p>
         </header>
 
@@ -230,7 +248,9 @@ function Settings() {
               <Input
                 className="numeric"
                 value={tax.rate}
-                onChange={(e) => updateSettings({ tax: { ...tax, rate: Number(e.target.value) || 0 } })}
+                onChange={(e) =>
+                  updateSettings({ tax: { ...tax, rate: Number(e.target.value) || 0 } })
+                }
               />
             </div>
             <div className="space-y-1">
@@ -377,7 +397,9 @@ function Settings() {
                             />
                           </div>
                           <div className="space-y-1">
-                            <Label className="text-[11px] text-muted-foreground">Spacing (px)</Label>
+                            <Label className="text-[11px] text-muted-foreground">
+                              Spacing (px)
+                            </Label>
                             <Input
                               type="number"
                               min={0}
@@ -432,7 +454,10 @@ function Settings() {
                             "customLines",
                             effective.customLines.map((l) =>
                               l.id === line.id
-                                ? { ...l, placement: e.target.value as ReceiptCustomLine["placement"] }
+                                ? {
+                                    ...l,
+                                    placement: e.target.value as ReceiptCustomLine["placement"],
+                                  }
                                 : l,
                             ),
                           )
@@ -563,7 +588,9 @@ function Settings() {
                         <Switch
                           aria-label={t.label}
                           checked={!!receipt[t.key]}
-                          onCheckedChange={(v) => setGlobal({ [t.key]: v } as Partial<ReceiptSettings>)}
+                          onCheckedChange={(v) =>
+                            setGlobal({ [t.key]: v } as Partial<ReceiptSettings>)
+                          }
                         />
                       </div>
                     ))}
@@ -580,14 +607,18 @@ function Settings() {
                       <Label className="text-xs text-muted-foreground">Bank name</Label>
                       <Input
                         value={payment.bankName}
-                        onChange={(e) => updateSettings({ payment: { ...payment, bankName: e.target.value } })}
+                        onChange={(e) =>
+                          updateSettings({ payment: { ...payment, bankName: e.target.value } })
+                        }
                       />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Account name</Label>
                       <Input
                         value={payment.accountName}
-                        onChange={(e) => updateSettings({ payment: { ...payment, accountName: e.target.value } })}
+                        onChange={(e) =>
+                          updateSettings({ payment: { ...payment, accountName: e.target.value } })
+                        }
                       />
                     </div>
                     <div className="space-y-1">
@@ -595,7 +626,9 @@ function Settings() {
                       <Input
                         className="numeric"
                         value={payment.accountNumber}
-                        onChange={(e) => updateSettings({ payment: { ...payment, accountNumber: e.target.value } })}
+                        onChange={(e) =>
+                          updateSettings({ payment: { ...payment, accountNumber: e.target.value } })
+                        }
                       />
                     </div>
                     <div className="space-y-1">
@@ -606,7 +639,9 @@ function Settings() {
                         className="numeric"
                         placeholder="+15550100"
                         value={payment.whatsapp}
-                        onChange={(e) => updateSettings({ payment: { ...payment, whatsapp: e.target.value } })}
+                        onChange={(e) =>
+                          updateSettings({ payment: { ...payment, whatsapp: e.target.value } })
+                        }
                       />
                     </div>
                   </div>
@@ -614,7 +649,9 @@ function Settings() {
                     <Label className="text-xs text-muted-foreground">Instruction note</Label>
                     <Input
                       value={payment.note}
-                      onChange={(e) => updateSettings({ payment: { ...payment, note: e.target.value } })}
+                      onChange={(e) =>
+                        updateSettings({ payment: { ...payment, note: e.target.value } })
+                      }
                     />
                   </div>
                   <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
@@ -710,9 +747,7 @@ function Settings() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">
-                        Default country code
-                      </Label>
+                      <Label className="text-xs text-muted-foreground">Default country code</Label>
                       <Input
                         className="numeric"
                         placeholder="+1"

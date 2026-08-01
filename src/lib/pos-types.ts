@@ -67,9 +67,7 @@ export const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
 /** Resolve a cart line's per-unit discount in currency. */
 export const lineUnitDiscount = (l: Pick<CartLine, "price" | "discount" | "discountType">) =>
-  l.discountType === "percent"
-    ? r2((l.price * (l.discount || 0)) / 100)
-    : r2(l.discount || 0);
+  l.discountType === "percent" ? r2((l.price * (l.discount || 0)) / 100) : r2(l.discount || 0);
 
 export type PaymentMethod = "cash" | "card" | "wallet" | "points" | "bank_transfer";
 
@@ -123,12 +121,7 @@ export type Shift = {
 };
 
 export type TransferKind = "transfer" | "request";
-export type TransferStatus =
-  | "requested"
-  | "in_transit"
-  | "received"
-  | "rejected"
-  | "cancelled";
+export type TransferStatus = "requested" | "in_transit" | "received" | "rejected" | "cancelled";
 
 export type TransferItem = {
   productId: string;

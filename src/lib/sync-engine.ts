@@ -68,7 +68,10 @@ async function runOne(entry: QueuedOp): Promise<boolean> {
   let res = await execute(entry.op);
   // PGRST204 = column missing from the schema cache. Retry without the
   // optional branding columns so the core row still saves.
-  if (res.error?.code === "PGRST204" && (entry.op.kind === "upsert" || entry.op.kind === "insert")) {
+  if (
+    res.error?.code === "PGRST204" &&
+    (entry.op.kind === "upsert" || entry.op.kind === "insert")
+  ) {
     const rows = strip(entry.op.table, entry.op.rows);
     res = await execute({ ...entry.op, rows } as SyncOp);
   }

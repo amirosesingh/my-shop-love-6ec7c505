@@ -106,7 +106,11 @@ export function SecureCredentials() {
               value={drafts[f.key] ?? ""}
               onChange={(e) => setDrafts((d) => ({ ...d, [f.key]: e.target.value }))}
             />
-            <Button size="sm" disabled={busy || !(drafts[f.key] ?? "").trim()} onClick={() => void save(f.key)}>
+            <Button
+              size="sm"
+              disabled={busy || !(drafts[f.key] ?? "").trim()}
+              onClick={() => void save(f.key)}
+            >
               Save
             </Button>
             {hints[f.key] && (

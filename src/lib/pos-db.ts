@@ -271,8 +271,7 @@ let tierIdByName: Record<string, string> = {};
 let tierNameById: Record<string, MemberTier> = {};
 
 const tierId = (name: MemberTier) => tierIdByName[name] ?? null;
-const tierName = (id: string | null): MemberTier =>
-  (id && tierNameById[id]) || "Bronze";
+const tierName = (id: string | null): MemberTier => (id && tierNameById[id]) || "Bronze";
 
 /* ------------------------------ bootstrap ------------------------------ */
 
@@ -328,8 +327,7 @@ export async function loadCloudState(): Promise<CloudSlice> {
     supabase.from("pos_settings").select("*").eq("id", 1).maybeSingle(),
   ]);
 
-  const err =
-    products.error || members.error || sales.error || promotions.error || settings.error;
+  const err = products.error || members.error || sales.error || promotions.error || settings.error;
   if (err) throw err;
 
   return {

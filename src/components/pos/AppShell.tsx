@@ -252,12 +252,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </p>
           </div>
           <SyncStatus className="ml-auto" />
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 text-xs"
-            onClick={() => void lock()}
-          >
+          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => void lock()}>
             <Lock className="size-3.5" /> Lock / Switch user
           </Button>
         </header>
