@@ -35,11 +35,44 @@ type LooseClient = {
   from: (table: string) => {
     select: (cols: string) => any;
     insert: (rows: unknown) => PromiseLike<{ error: { message: string } | null }>;
+    upsert: (
+      rows: unknown,
+      options?: { onConflict?: string },
+    ) => PromiseLike<{ error: { message: string } | null }>;
     update: (values: unknown) => any;
   };
 };
 
 const table = () => (supabaseExternal as unknown as LooseClient).from("terminal_tokens");
+const storesTable = () => (supabaseExternal as unknown as LooseClient).from("stores");
+
+export type TokenLocation = {
+  id: string;
+  code: string;
+  name: string;
+  address?: string;
+  phone?: string;
+};
+
+/**
+ * The token row references the central stores table. Locations may still live
+ * only in local state (older installs, or a queued sync that never drained),
+ * so mirror them up before anything depends on the reference.
+ */
+export async function ensureLocations(locations: TokenLocation[]): Promise<void> {
+  if (!locations.length) return;
+  const { error } = await storesTable().upsert(
+    locations.map((l) => ({
+      id: l.id,
+      code: l.code,
+      name: l.name,
+      address: l.address || null,
+      phone: l.phone || null,
+    })),
+    { onConflict: "id" },
+  );
+  if (error) throw error;
+}
 
 const rowToToken = (r: Record<string, any>): TerminalToken => ({
   id: r.id,
@@ -63,14 +96,16 @@ export async function listTerminalTokens(): Promise<TerminalToken[]> {
 
 /** Create the token row and return the base64 activation code for the till. */
 export async function issueTerminalToken(input: {
-  locationId: string;
+  location: TokenLocation;
   locationName: string;
   deviceName: string;
 }): Promise<{ token: TerminalToken; code: string }> {
+  // Self-healing: guarantee the referenced location row exists.
+  await ensureLocations([input.location]);
   const id = crypto.randomUUID();
   const row = {
     id,
-    location_id: input.locationId,
+    location_id: input.location.id,
     location_name: input.locationName,
     device_name: input.deviceName,
     status: "active" as const,
@@ -81,7 +116,7 @@ export async function issueTerminalToken(input: {
 
   const payload: ActivationPayload = {
     token_id: id,
-    location_id: input.locationId,
+    location_id: input.location.id,
     location_name: input.locationName,
     supabase_url: POS_SUPABASE_URL,
     supabase_key: POS_SUPABASE_KEY,
