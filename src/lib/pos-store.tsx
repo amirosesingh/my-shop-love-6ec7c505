@@ -25,6 +25,7 @@ import type {
 } from "./pos-types";
 import { lineUnitDiscount, r2, type DiscountType } from "./pos-types";
 import { logger } from "./audit-log";
+import { db, dbError, loadCloudState } from "./pos-db";
 
 const KEY = "pos-state-v2";
 
@@ -96,6 +97,9 @@ export function PosProvider({ children }: { children: ReactNode }) {
   stateRef.current = state;
 
   useEffect(() => {
+    let cancelled = false;
+    // Local-only slices (stores, shifts, transfers, counters) stay on the
+    // terminal; catalogue, members, bills, promos and settings come from cloud.
     try {
       const raw = window.localStorage.getItem(KEY);
       if (raw) {
@@ -107,21 +111,47 @@ export function PosProvider({ children }: { children: ReactNode }) {
             ? t
             : { ...t, items: [{ productId: legacy.productId ?? "", qty: legacy.qty ?? 0 }] };
         });
-        setState({
-          ...seedState,
-          ...saved,
+        setState((s) => ({
+          ...s,
+          stores: saved.stores?.length ? saved.stores : s.stores,
+          currentStoreId: saved.currentStoreId ?? s.currentStoreId,
+          shifts: saved.shifts ?? [],
           transfers,
-          promotions: saved.promotions?.length ? saved.promotions : seedState.promotions,
-          settings: {
-            tax: { ...defaultSettings.tax, ...(saved.settings?.tax ?? {}) },
-            receipt: { ...defaultSettings.receipt, ...(saved.settings?.receipt ?? {}) },
-          },
-        });
+          counter: saved.counter ?? 0,
+          transferCounter: saved.transferCounter ?? 0,
+        }));
       }
     } catch {
       /* ignore corrupt storage */
     }
-    setReady(true);
+
+    void (async () => {
+      try {
+        const cloud = await loadCloudState();
+        if (cancelled) return;
+        setState((s) => ({
+          ...s,
+          products: cloud.products,
+          members: cloud.members,
+          sales: cloud.sales,
+          promotions: cloud.promotions.length ? cloud.promotions : s.promotions,
+          settings: {
+            tax: { ...defaultSettings.tax, ...cloud.settings.tax },
+            receipt: { ...defaultSettings.receipt, ...cloud.settings.receipt },
+          },
+          // Keep the bill counter ahead of anything already stored in cloud.
+          counter: Math.max(s.counter, cloud.sales.length),
+        }));
+      } catch (e) {
+        dbError("Loading data", e);
+      } finally {
+        if (!cancelled) setReady(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
