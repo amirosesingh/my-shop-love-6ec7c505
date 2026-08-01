@@ -1476,9 +1476,49 @@ function Register() {
               onChange={(e) => setCouponCode(e.target.value)}
               placeholder="e.g. WEEKEND10"
             />
+            <Label>Apply to</Label>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                className="flex-1"
+                variant={couponScope === "bill" ? "default" : "outline"}
+                onClick={() => setCouponScope("bill")}
+              >
+                Whole bill
+              </Button>
+              <Button
+                size="sm"
+                className="flex-1"
+                variant={couponScope === "item" ? "default" : "outline"}
+                onClick={() => setCouponScope("item")}
+              >
+                Single item
+              </Button>
+            </div>
+            {couponScope === "item" && (
+              <div className="max-h-40 space-y-1 overflow-auto rounded-md border border-border p-2">
+                {lines.filter((l) => !l.credit && !l.foc).length === 0 && (
+                  <p className="text-[11px] text-muted-foreground">No eligible items in the cart.</p>
+                )}
+                {lines
+                  .filter((l) => !l.credit && !l.foc)
+                  .map((l) => (
+                    <button
+                      key={l.productId}
+                      onClick={() => setCouponLine(l.productId)}
+                      className={`flex w-full items-center justify-between rounded px-2 py-1 text-left text-xs ${
+                        couponLine === l.productId ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                      }`}
+                    >
+                      <span className="truncate">{l.name}</span>
+                      <span className="numeric">×{l.qty}</span>
+                    </button>
+                  ))}
+              </div>
+            )}
             <p className="text-[11px] text-muted-foreground">
-              Codes match an active threshold promotion by name. The value is applied as a bill
-              discount.
+              Codes match an active promotion by name. Every application, its scope and the item it
+              touched are written to the audit trail with a timestamp.
             </p>
           </div>
           <DialogFooter>
