@@ -12,12 +12,27 @@ export const timeOf = (iso: string) =>
 /** Turn a raw audit record into one plain-English sentence. */
 export function describeLog(l: AuditLog): string {
   const d = l.details ?? {};
-  const who = l.staffName || l.staffId || "Someone";
+  const role = (l.role ?? (d["role"] as string) ?? "").replace(/_/g, " ");
+  const who = `${l.staffName || l.staffId || "Someone"}${role ? ` (${role})` : ""}`;
   const mod = (l.module || "the app").replace(/-/g, " ");
 
   switch (l.action) {
     case "Bill created":
       return `${who} completed a ${str(d["paymentMethod"], "cash")} sale of ${money(d["total"])} on Bill #${str(d["receiptNo"], "—")}`;
+    case "Bank transfer payment recorded":
+      return `${who} took a bank transfer of ${money(d["total"])} for Bill #${str(d["receiptNo"], "—")} (reference ${str(d["transferRef"], "—")})`;
+    case "Bill sent on WhatsApp":
+      return `${who} sent the bill for ${str(d["reference"], "—")} to ${str(d["customer"], "the customer")} on WhatsApp (${str(d["to"], "no number")})`;
+    case "WhatsApp send failed":
+      return `${who} tried to send ${str(d["reference"], "a bill")} on WhatsApp but it failed — ${str(d["error"], "unknown error")}`;
+    case "Booking created":
+      return `${who} booked ${money(d["total"])} of goods for later collection with a ${money(d["deposit"])} deposit`;
+    case "Booking part payment":
+      return `${who} received a part payment of ${money(d["amount"])} against a booking`;
+    case "Booking collected":
+      return `${who} handed over a booking after settling ${money(d["amount"] ?? d["total"])}`;
+    case "Booking cancelled":
+      return `${who} cancelled a booking and returned the reserved stock`;
     case "Exchange bill created":
       return `${who} processed an exchange for Bill #${str(d["exchangeOfReceiptNo"], "—")} ➔ issued new Bill #${str(d["receiptNo"], "—")} (${money(d["total"])} net)`;
     case "Sale refunded":
