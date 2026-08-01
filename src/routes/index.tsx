@@ -1493,7 +1493,10 @@ function Register() {
               variant="outline"
               className="h-12 w-full justify-start gap-3"
               onClick={async () => {
-                if (await requirePermission("can_open_drawer")) openCashDrawer();
+                if (!(await requirePermission("can_open_drawer"))) return;
+                setNoSaleNote("");
+                setNoSaleReason("change_float");
+                setNoSaleOpen(true);
               }}
             >
               <Vault className="size-4" /> Open cash drawer
