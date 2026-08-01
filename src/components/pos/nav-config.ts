@@ -77,6 +77,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { to: "/staff", label: "Staff Profiles", icon: UserCog, adminOnly: true, keywords: "employees duty store assignment" },
       { to: "/staff", label: "User Roles & Permissions", icon: ShieldCheck, adminOnly: true, hash: "permissions", keywords: "flags toggles access matrix" },
+      { to: "/roles", label: "Backend Access Roles", icon: ShieldCheck, adminOnly: true, keywords: "supabase admin manager staff database roles accounts" },
       { to: "/audit", label: "Audit Logs & Activity", icon: ScanEye, adminOnly: true, keywords: "telemetry trail compliance logs sync" },
     ],
   },
