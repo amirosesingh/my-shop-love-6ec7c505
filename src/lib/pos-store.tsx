@@ -129,8 +129,10 @@ export function PosProvider({ children }: { children: ReactNode }) {
           currentStoreId: saved.currentStoreId ?? s.currentStoreId,
           shifts: saved.shifts ?? [],
           transfers,
+          bookings: saved.bookings ?? [],
           counter: saved.counter ?? 0,
           transferCounter: saved.transferCounter ?? 0,
+          bookingCounter: saved.bookingCounter ?? 0,
         }));
       }
     } catch {
@@ -150,6 +152,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
           settings: {
             tax: { ...defaultSettings.tax, ...cloud.settings.tax },
             receipt: { ...defaultSettings.receipt, ...cloud.settings.receipt },
+            payment: { ...defaultSettings.payment, ...cloud.settings.payment },
           },
           // Keep the bill counter ahead of every receipt already in the cloud.
           counter: cloud.sales.reduce(
