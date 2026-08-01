@@ -118,6 +118,9 @@ const NEW_USER = {
   store_id: "",
 };
 
+/** "" / "none" in the create form both mean "All stores" (null in the DB). */
+const formStoreId = (v: string) => (v && v !== "none" ? v : null);
+
 function StaffManagement() {
   const { isAdmin } = useAuth();
   const { stores } = usePos();
