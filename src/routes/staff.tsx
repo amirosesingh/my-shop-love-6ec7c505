@@ -590,8 +590,20 @@ function StaffManagement() {
             </div>
             <Separator />
             <ul className="max-h-[70vh] overflow-y-auto">
-              {filtered.map((r) => (
-                <li key={r.user_id}>
+              {(
+                [
+                  ["Supervisors & admins", filtered.filter((r) => r.kind === "account")],
+                  ["Cashiers", filtered.filter((r) => r.kind === "cashier")],
+                ] as const
+              ).flatMap(([label, group]) => [
+                <li
+                  key={`h-${label}`}
+                  className="bg-muted/40 px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+                >
+                  {label} · {group.length}
+                </li>,
+                ...group.map((r) => (
+                <li key={`${r.kind}-${r.user_id}`}>
                   <button
                     type="button"
                     onClick={() => setSelectedId(r.user_id)}
@@ -615,7 +627,8 @@ function StaffManagement() {
                     </span>
                   </button>
                 </li>
-              ))}
+                )),
+              ])}
               {!loading && !filtered.length && (
                 <li className="p-6 text-center text-sm text-muted-foreground">
                   No staff accounts yet.
