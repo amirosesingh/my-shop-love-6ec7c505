@@ -257,16 +257,34 @@ export function PosProvider({ children }: { children: ReactNode }) {
   );
 
   const recordSale = useCallback((input: Omit<Sale, "id" | "receiptNo" | "createdAt">) => {
+    const snapshot = stateRef.current;
+    const counter = snapshot.counter + 1;
+    const store = snapshot.stores.find((x) => x.id === input.storeId);
     const sale: Sale = {
       ...input,
       id: crypto.randomUUID(),
-      receiptNo: "",
+      receiptNo: `${store?.code ?? "R"}-${String(counter).padStart(6, "0")}`,
       createdAt: new Date().toISOString(),
     };
+
+    const touchedProducts = snapshot.products
+      .filter((p) => input.lines.some((l) => l.productId === p.id))
+      .map((p) => {
+        const line = input.lines.find((l) => l.productId === p.id)!;
+        return bump(p, input.storeId, -line.qty);
+      });
+    const member = snapshot.members.find((m) => m.id === input.memberId) ?? null;
+    const updatedMember = member
+      ? {
+          ...member,
+          points:
+            member.points + input.pointsEarned - (input.method === "points" ? input.paid : 0),
+          totalSpend: Number((member.totalSpend + input.total).toFixed(2)),
+        }
+      : null;
+    void db.recordSale(sale, touchedProducts, updatedMember);
+
     setState((s) => {
-      const counter = s.counter + 1;
-      const store = s.stores.find((x) => x.id === input.storeId);
-      sale.receiptNo = `${store?.code ?? "R"}-${String(counter).padStart(6, "0")}`;
       const products = s.products.map((p) => {
         const line = input.lines.find((l) => l.productId === p.id);
         return line ? bump(p, input.storeId, -line.qty) : p;
@@ -287,7 +305,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
               : x,
           )
         : s.sales;
-      return { ...s, counter, products, members, sales: [sale, ...tagged] };
+      return { ...s, counter: Math.max(counter, s.counter + 1), products, members, sales: [sale, ...tagged] };
     });
     logger.log(
       "sale_event",
@@ -324,6 +342,16 @@ export function PosProvider({ children }: { children: ReactNode }) {
       saleId,
       receiptNo: stateRef.current.sales.find((x) => x.id === saleId)?.receiptNo ?? null,
     });
+    {
+      const snap = stateRef.current;
+      const sale = snap.sales.find((x) => x.id === saleId);
+      if (sale && !sale.refunded) {
+        const restocked = snap.products
+          .filter((p) => sale.lines.some((l) => l.productId === p.id))
+          .map((p) => bump(p, sale.storeId, sale.lines.find((l) => l.productId === p.id)!.qty));
+        void db.refundSale(saleId, restocked);
+      }
+    }
     setState((s) => {
       const sale = s.sales.find((x) => x.id === saleId);
       if (!sale || sale.refunded) return s;
@@ -355,6 +383,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
         ecomPrice: product.ecomPrice,
       },
     });
+    void db.upsertProduct(product);
     setState((s) => ({
       ...s,
       products: s.products.some((p) => p.id === product.id)
@@ -364,6 +393,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const removeProduct = useCallback((id: string) => {
+    void db.deleteProduct(id);
     setState((s) => ({ ...s, products: s.products.filter((p) => p.id !== id) }));
   }, []);
 
@@ -378,6 +408,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       previousStock: before ? stockAt(before, target) : null,
       updatedStock: before ? stockAt(before, target) + delta : null,
     });
+    if (before) void db.upsertProduct(bump(before, target, delta));
     setState((s) => ({
       ...s,
       products: s.products.map((p) =>
@@ -396,6 +427,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       updated: { points: member.points, tier: member.tier, phone: member.phone },
       pointsDelta: prev ? member.points - prev.points : member.points,
     });
+    void db.upsertMember(member);
     setState((s) => ({
       ...s,
       members: s.members.some((m) => m.id === member.id)
@@ -405,10 +437,12 @@ export function PosProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const removeMember = useCallback((id: string) => {
+    void db.deleteMember(id);
     setState((s) => ({ ...s, members: s.members.filter((m) => m.id !== id) }));
   }, []);
 
   const upsertPromotion = useCallback((promotion: Promotion) => {
+    void db.upsertPromotion(promotion);
     setState((s) => ({
       ...s,
       promotions: s.promotions.some((p) => p.id === promotion.id)
@@ -418,10 +452,15 @@ export function PosProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const removePromotion = useCallback((id: string) => {
+    void db.deletePromotion(id);
     setState((s) => ({ ...s, promotions: s.promotions.filter((p) => p.id !== id) }));
   }, []);
 
   const togglePromotion = useCallback((id: string, active: boolean) => {
+    {
+      const p = stateRef.current.promotions.find((x) => x.id === id);
+      if (p) void db.upsertPromotion({ ...p, active });
+    }
     setState((s) => ({
       ...s,
       promotions: s.promotions.map((p) => (p.id === id ? { ...p, active } : p)),
@@ -433,6 +472,13 @@ export function PosProvider({ children }: { children: ReactNode }) {
       previous: stateRef.current.settings,
       updated: patch,
     });
+    {
+      const prev = stateRef.current.settings;
+      void db.saveSettings({
+        tax: { ...prev.tax, ...(patch.tax ?? {}) },
+        receipt: { ...prev.receipt, ...(patch.receipt ?? {}) },
+      });
+    }
     setState((s) => ({
       ...s,
       settings: {
