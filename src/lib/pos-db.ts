@@ -156,6 +156,18 @@ const rowToSettings = (r: Row | null): AppSettings =>
       }
     : defaultSettings;
 
+/** Columns added by supabase/schema6.sql; dropped when the DB predates it. */
+const BRANDING_COLUMNS = [
+  "company_name",
+  "tax_number",
+  "reg_number",
+  "phone",
+  "website",
+  "fonts",
+  "custom_lines",
+  "qr",
+] as const;
+
 const settingsToRow = (s: AppSettings): Row => ({
   id: 1,
   tax_percentage: s.tax.rate,
@@ -370,9 +382,29 @@ export const db = {
     run("Deleting promotion", () => supabase.from("promotions").delete().eq("id", id)),
 
   saveSettings: (s: AppSettings) =>
-    run("Saving settings", () =>
-      supabase.from("pos_settings").upsert(settingsToRow(s) as never, { onConflict: "id" }),
-    ),
+    run("Saving settings", async () => {
+      const row = settingsToRow(s);
+      const res = await supabase
+        .from("pos_settings")
+        .upsert(row as never, { onConflict: "id" });
+      // Older databases lack the receipt-branding columns; keep the core
+      // settings saving and tell the operator to run supabase/schema6.sql.
+      if (res.error?.code === "PGRST204") {
+        const legacy = { ...row };
+        for (const k of BRANDING_COLUMNS) delete legacy[k];
+        const retry = await supabase
+          .from("pos_settings")
+          .upsert(legacy as never, { onConflict: "id" });
+        if (retry.error) return retry;
+        return {
+          error: {
+            message:
+              "Receipt branding could not be saved: your database is missing the branding columns. Run supabase/schema6.sql in your SQL editor.",
+          },
+        } as typeof res;
+      }
+      return res;
+    }),
 
   /** Persist a completed bill, its lines, the stock movement and member points. */
   async recordSale(sale: Sale, products: Product[], member: Member | null) {

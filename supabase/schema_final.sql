@@ -198,6 +198,14 @@ create table if not exists public.pos_settings (
   paper_size text not null default '80mm',
   header_text text,
   footer_text text,
+  company_name text,
+  tax_number text,
+  reg_number text,
+  phone text,
+  website text,
+  fonts jsonb not null default '{}'::jsonb,
+  custom_lines jsonb not null default '[]'::jsonb,
+  qr jsonb not null default '{}'::jsonb,
   show_logo boolean not null default true,
   show_points boolean not null default true,
   show_barcode boolean not null default true,
@@ -953,4 +961,15 @@ begin
   raise notice 'schema_final.sql OK - all POS functions installed.';
 end $$;
 
+notify pgrst, 'reload schema';
+
+-- Idempotent upgrade for databases created before schema6.sql
+alter table public.pos_settings add column if not exists company_name text;
+alter table public.pos_settings add column if not exists tax_number   text;
+alter table public.pos_settings add column if not exists reg_number   text;
+alter table public.pos_settings add column if not exists phone        text;
+alter table public.pos_settings add column if not exists website      text;
+alter table public.pos_settings add column if not exists fonts        jsonb not null default '{}'::jsonb;
+alter table public.pos_settings add column if not exists custom_lines jsonb not null default '[]'::jsonb;
+alter table public.pos_settings add column if not exists qr           jsonb not null default '{}'::jsonb;
 notify pgrst, 'reload schema';
