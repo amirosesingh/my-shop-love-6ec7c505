@@ -543,7 +543,27 @@ function Register() {
       ...(exchangeRef
         ? { exchangeOfReceiptNo: exchangeRef, exchangeCredit: totals.credit }
         : {}),
+      ...(coupon
+        ? {
+            couponCode: coupon.code,
+            couponPromoId: coupon.promoId,
+            couponScope: coupon.scope,
+            couponDiscount: coupon.discount,
+          }
+        : {}),
     });
+    if (coupon) {
+      logger.log("promotion", "Coupon redeemed on a bill", "register", {
+        receiptNo: sale.receiptNo,
+        coupon: coupon.code,
+        promotionId: coupon.promoId,
+        scope: coupon.scope,
+        product: coupon.productName ?? null,
+        discountValue: coupon.discount,
+        billTotal: sale.total,
+        storeId: sale.storeId,
+      });
+    }
     if (method === "cash") openCashDrawer();
     if (method === "bank_transfer") {
       logger.log("sale", "Bank transfer payment recorded", "register", {
