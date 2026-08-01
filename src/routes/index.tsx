@@ -1211,14 +1211,13 @@ function Register() {
                 {coupon && (
                   <div className="flex items-center justify-between rounded-md border border-primary/40 bg-primary/10 px-2 py-1.5 text-[11px]">
                     <span>
-                      Coupon <span className="font-semibold">{coupon.code}</span> applied
+                      Coupon <span className="font-semibold">{coupon.code}</span> ·{" "}
+                      {coupon.scope === "item" ? coupon.productName : "whole bill"} ·{" "}
+                      <span className="numeric">-{money(coupon.discount)}</span>
                     </span>
                     <button
                       className="text-muted-foreground hover:text-foreground"
-                      onClick={() => {
-                        setCoupon(null);
-                        setCartDiscount(0);
-                      }}
+                      onClick={removeCoupon}
                     >
                       remove
                     </button>
