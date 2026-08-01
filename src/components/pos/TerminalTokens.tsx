@@ -40,6 +40,7 @@ import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { usePos } from "@/lib/pos-store";
 import { logger } from "@/lib/audit-log";
 import {
+  ensureLocations,
   issueTerminalToken,
   listTerminalTokens,
   restoreTerminalToken,
