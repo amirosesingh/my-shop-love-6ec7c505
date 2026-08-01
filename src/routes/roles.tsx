@@ -200,7 +200,9 @@ function RolesPage() {
                     <p className="font-medium">{p.full_name || p.email || "Unnamed"}</p>
                     <p className="text-xs text-muted-foreground">{p.email}</p>
                   </TableCell>
-                  <TableCell className="numeric text-xs text-muted-foreground">{p.id}</TableCell>
+                  <TableCell className="numeric text-xs text-muted-foreground">
+                    {p.user_code || p.id}
+                  </TableCell>
                   {APP_ROLES.map((r) => (
                     <TableCell key={r}>
                       <Switch
