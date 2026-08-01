@@ -30,6 +30,18 @@ describe("route guards", () => {
     }
   });
 
+  /** Sidebar-only hiding is not a guard: a signed-in cashier can still type
+   *  the URL. Every screen must have an entry in the AppShell route map. */
+  it("every screen has a permission entry in the route guard map", () => {
+    const OPEN_ROUTES = new Set(["index.tsx", "display.tsx"]);
+    const missing = routeFiles
+      .filter((f) => !OPEN_ROUTES.has(f))
+      .map((f) => `/${f.replace(/\.tsx$/, "").split(".")[0]}`)
+      .filter((path, i, all) => all.indexOf(path) === i)
+      .filter((path) => !APP_SHELL.includes(`"${path}"`));
+    expect(missing).toEqual([]);
+  });
+
   it("every report screen requires the sales-reports permission in the sidebar", () => {
     const reportLines = NAV.split("\n").filter((l) => l.includes('to: "/reports'));
     expect(reportLines.length).toBeGreaterThan(0);

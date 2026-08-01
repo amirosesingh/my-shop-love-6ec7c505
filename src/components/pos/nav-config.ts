@@ -65,9 +65,9 @@ export const navGroups: NavGroup[] = [
     icon: Wallet,
     items: [
       { to: "/", label: "Register POS", icon: LayoutGrid, keywords: "checkout cart sale" },
-      { to: "/dashboard", label: "Live Dashboard", icon: Activity, flag: "can_view_sales_reports", keywords: "revenue profit margin peak hours charts kpi review flags" },
-      { to: "/shifts", label: "Shift Management", icon: Clock, flag: "can_view_sales_reports", keywords: "open close drawer z-report" },
-      { to: "/bookings", label: "Bookings / Pay Later", icon: CalendarClock, keywords: "layaway reserve deposit balance due collect" },
+      { to: "/dashboard", label: "Live Dashboard", icon: Activity, flag: "can_view_dashboard", keywords: "revenue profit margin peak hours charts kpi review flags" },
+      { to: "/shifts", label: "Shift Management", icon: Clock, flag: "can_close_shift", keywords: "open close drawer z-report" },
+      { to: "/bookings", label: "Bookings / Pay Later", icon: CalendarClock, flag: "can_manage_bookings", keywords: "layaway reserve deposit balance due collect" },
       { to: "/display", label: "Customer Display", icon: MonitorPlay, keywords: "second screen customer facing transfer qr" },
       { to: "/receipts", label: "Bill Search & History", icon: ScrollText, flag: "can_view_sales_reports", keywords: "invoice receipt reprint" },
     ],
@@ -79,8 +79,8 @@ export const navGroups: NavGroup[] = [
     items: [
       { to: "/inventory", label: "Inventory Catalog", icon: Boxes, flag: "can_view_inventory", keywords: "stock products import" },
       { to: "/purchasing", label: "Purchasing", icon: ScanBarcode, flag: "can_receive_purchase_order", keywords: "po invoice receiving barcode" },
-      { to: "/transfers", label: "Stock Transfers", icon: ArrowLeftRight, keywords: "request move branch" },
-      { to: "/stores", label: "Locations / Warehouses", icon: Truck, adminOnly: true, flag: "can_view_inventory", keywords: "branch store warehouse" },
+      { to: "/transfers", label: "Stock Transfers", icon: ArrowLeftRight, flag: "can_create_transfer", keywords: "request move branch" },
+      { to: "/stores", label: "Locations / Warehouses", icon: Truck, adminOnly: true, flag: "can_manage_locations", keywords: "branch store warehouse" },
     ],
   },
   {
@@ -88,8 +88,8 @@ export const navGroups: NavGroup[] = [
     label: "Customers & Marketing",
     icon: Users,
     items: [
-      { to: "/members", label: "Member Directory", icon: Users, keywords: "loyalty customer history" },
-      { to: "/promotions", label: "Promotions & Discounts", icon: Percent, adminOnly: true, flag: "can_access_pos_settings", keywords: "foc birthday tier threshold" },
+      { to: "/members", label: "Member Directory", icon: Users, flag: "can_add_member", keywords: "loyalty customer history" },
+      { to: "/promotions", label: "Promotions & Discounts", icon: Percent, adminOnly: true, flag: "can_manage_promotions", keywords: "foc birthday tier threshold" },
     ],
   },
   {
@@ -98,7 +98,7 @@ export const navGroups: NavGroup[] = [
     icon: ShieldCheck,
     items: [
       { to: "/staff", label: "Staff Management", icon: UserCog, adminOnly: true, flag: "can_manage_staff", keywords: "employees users roles permissions cashier supervisor pin account matrix duty store" },
-      { to: "/audit", label: "Audit Logs & Activity", icon: ScanEye, adminOnly: true, flag: "can_view_sales_reports", keywords: "telemetry trail compliance logs sync" },
+      { to: "/audit", label: "Audit Logs & Activity", icon: ScanEye, adminOnly: true, flag: "can_view_audit_trail", keywords: "telemetry trail compliance logs sync" },
     ],
   },
   {
@@ -129,9 +129,9 @@ export const navGroups: NavGroup[] = [
       { to: "/settings/elements", label: "Receipt Elements", icon: Printer, adminOnly: true, flag: "can_access_pos_settings", keywords: "logo points barcode tax toggles" },
       { to: "/settings/payment", label: "Bank Transfer Details", icon: Landmark, adminOnly: true, flag: "can_access_pos_settings", keywords: "bank account iban qr payment transfer" },
       { to: "/settings/whatsapp", label: "WhatsApp Bills", icon: MessageCircle, adminOnly: true, flag: "can_access_pos_settings", keywords: "whatsapp send bill api token" },
-      { to: "/settings/sync", label: "Sync & Backup", icon: RefreshCw, adminOnly: true, flag: "can_access_pos_settings", keywords: "offline outbox backup sql local database branch pending" },
-      { to: "/settings/terminals", label: "Terminal Activation", icon: MonitorSmartphone, adminOnly: true, flag: "can_access_pos_settings", keywords: "device register token activation revoke license qr windows till location warehouse" },
-      { to: "/promotions", label: "Point Rules", icon: Sparkles, adminOnly: true, flag: "can_access_pos_settings", hash: "points", keywords: "loyalty points per dollar policy" },
+      { to: "/settings/sync", label: "Sync & Backup", icon: RefreshCw, adminOnly: true, flag: "can_manage_sync_backup", keywords: "offline outbox backup sql local database branch pending" },
+      { to: "/settings/terminals", label: "Terminal Activation", icon: MonitorSmartphone, adminOnly: true, flag: "can_manage_terminals", keywords: "device register token activation revoke license qr windows till location warehouse" },
+      { to: "/promotions", label: "Point Rules", icon: Sparkles, adminOnly: true, flag: "can_manage_promotions", hash: "points", keywords: "loyalty points per dollar policy" },
     ],
   },
 ];

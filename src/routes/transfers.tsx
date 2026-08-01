@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowLeftRight, Check, Plus, Printer, Send, Trash2, Truck, X } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
+import { useAuth } from "@/lib/pos-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -78,6 +79,7 @@ function Transfers() {
     receiveTransfer,
     rejectTransfer,
   } = usePos();
+  const { can } = useAuth();
   const search = Route.useSearch();
 
   const others = stores.filter((s) => s.id !== currentStore.id);
@@ -227,8 +229,14 @@ function Transfers() {
             </TableHeader>
             <TableBody>
               {mine.map((t) => {
-                const canApprove = t.status === "requested" && t.fromStoreId === currentStore.id;
-                const canReceive = t.status === "in_transit" && t.toStoreId === currentStore.id;
+                const canApprove =
+                  t.status === "requested" &&
+                  t.fromStoreId === currentStore.id &&
+                  can("can_receive_transfer");
+                const canReceive =
+                  t.status === "in_transit" &&
+                  t.toStoreId === currentStore.id &&
+                  can("can_receive_transfer");
                 return (
                   <TableRow key={t.id}>
                     <TableCell className="numeric">

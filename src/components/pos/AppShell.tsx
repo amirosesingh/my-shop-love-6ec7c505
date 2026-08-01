@@ -29,14 +29,28 @@ import { cn } from "@/lib/utils";
 import { useUiScale } from "@/lib/use-ui-scale";
 import { useBranding, isDesktop } from "@/lib/branding";
 
-/** Screens reserved for supervisor / admin accounts, and the permission
- *  toggle that also unlocks them for any other account (e.g. warehouse). */
-const ADMIN_PATHS: Record<string, PermissionFlag> = {
+/** Permission required to open each screen. Keys are path prefixes, so child
+ *  pages (/settings/tax, /reports/sales …) inherit the parent gate unless they
+ *  declare their own. `/` (register) and `/display` are intentionally open to
+ *  every signed-in account. Keep this in sync with nav-config.ts. */
+const ROUTE_PERMISSIONS: Record<string, PermissionFlag> = {
+  "/settings/terminals": "can_manage_terminals",
+  "/settings/sync": "can_manage_sync_backup",
   "/settings": "can_access_pos_settings",
   "/staff": "can_manage_staff",
-  "/stores": "can_view_inventory",
-  "/promotions": "can_access_pos_settings",
-  "/audit": "can_view_sales_reports",
+  "/stores": "can_manage_locations",
+  "/promotions": "can_manage_promotions",
+  "/audit": "can_view_audit_trail",
+  "/dashboard": "can_view_dashboard",
+  "/reports/activity": "can_view_audit_trail",
+  "/reports": "can_view_sales_reports",
+  "/receipts": "can_view_sales_reports",
+  "/shifts": "can_close_shift",
+  "/inventory": "can_view_inventory",
+  "/purchasing": "can_receive_purchase_order",
+  "/transfers": "can_create_transfer",
+  "/bookings": "can_manage_bookings",
+  "/members": "can_add_member",
 };
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -59,12 +73,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Cashier accounts are limited to the register; management screens are
   // reserved for supervisors and admins.
   useEffect(() => {
-    // Settings has child pages (/settings/tax …) that inherit the same gate.
+    // Longest prefix wins so a child page can tighten its parent's gate.
     const key =
-      Object.keys(ADMIN_PATHS).find(
-        (p) => location.pathname === p || location.pathname.startsWith(`${p}/`),
-      ) ?? "";
-    const required = ADMIN_PATHS[key];
+      Object.keys(ROUTE_PERMISSIONS)
+        .filter((p) => location.pathname === p || location.pathname.startsWith(`${p}/`))
+        .sort((a, b) => b.length - a.length)[0] ?? "";
+    const required = ROUTE_PERMISSIONS[key];
     if (user && !isAdmin && required && !can(required)) {
       void navigate({ to: "/", replace: true });
     }

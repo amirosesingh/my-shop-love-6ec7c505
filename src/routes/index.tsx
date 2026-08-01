@@ -1341,19 +1341,21 @@ function Register() {
 
             {lastSale && (
               <div className="flex flex-wrap items-center gap-2 border-t border-border pt-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    printSaleReceipt(
-                      lastSale,
-                      state.members.find((m) => m.id === lastSale.memberId) ?? null,
-                      "duplicate",
-                    )
-                  }
-                >
-                  <Printer className="size-4" /> Reprint
-                </Button>
+                {can("can_reprint_bill") && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      printSaleReceipt(
+                        lastSale,
+                        state.members.find((m) => m.id === lastSale.memberId) ?? null,
+                        "duplicate",
+                      )
+                    }
+                  >
+                    <Printer className="size-4" /> Reprint
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
@@ -1368,7 +1370,7 @@ function Register() {
                 >
                   Kitchen
                 </Button>
-                {wa.enabled && (
+                {wa.enabled && can("can_send_whatsapp_bill") && (
                   <div className="flex flex-wrap items-center gap-2">
                     <Input
                       value={waNumber}
@@ -2238,6 +2240,10 @@ function Register() {
           <DialogFooter>
             <Button
               onClick={() => {
+                if (!can("can_open_shift")) {
+                  toast.error("You are not allowed to open a shift");
+                  return;
+                }
                 openShift(cashier || "Cashier", Number(float) || 0);
                 openCashDrawer();
                 setOpenShiftOpen(false);

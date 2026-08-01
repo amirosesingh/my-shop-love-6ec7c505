@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/pos-auth";
 
 /** Shared date-range state helpers for every report page. */
 export const isoDay = (d: Date) => d.toISOString().slice(0, 10);
@@ -67,6 +68,9 @@ export function ReportHeader({
   onExport?: () => void;
   children?: ReactNode;
 }) {
+  // Exporting report data is its own permission — hide the button when off.
+  const { can } = useAuth();
+  const canExport = can("can_export_reports");
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -77,7 +81,7 @@ export function ReportHeader({
           <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
           <p className="text-sm text-muted-foreground">{subtitle}</p>
         </div>
-        {onExport && (
+        {onExport && canExport && (
           <Button variant="outline" onClick={onExport}>
             Export CSV
           </Button>
