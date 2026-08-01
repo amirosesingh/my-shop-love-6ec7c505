@@ -1,6 +1,8 @@
 import { toast } from "sonner";
 import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
 import { defaultSettings, seedState } from "./pos-seed";
+import { drainOutbox } from "./sync-engine";
+import { enqueue, type SyncOp } from "./sync-outbox";
 import type {
   AppSettings,
   Member,
