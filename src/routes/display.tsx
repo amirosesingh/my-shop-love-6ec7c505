@@ -1,0 +1,204 @@
+import { useEffect, useState } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+
+import {
+  readDisplaySnapshot,
+  subscribeDisplay,
+  type DisplaySnapshot,
+} from "@/lib/customer-display";
+import { qrSvg } from "@/lib/pos-print";
+import { whatsappLink } from "@/lib/pos-types";
+
+export const Route = createFileRoute("/display")({
+  head: () => ({
+    meta: [
+      { title: "Customer Display — Live Order Screen" },
+      {
+        name: "description",
+        content:
+          "Second-screen customer display showing the live basket, discounts, totals and bank transfer details.",
+      },
+      { property: "og:title", content: "Customer Display — Live Order Screen" },
+      {
+        property: "og:description",
+        content: "Live basket, totals and payment instructions for the customer-facing screen.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+      { name: "robots", content: "noindex" },
+    ],
+  }),
+  component: CustomerDisplay,
+});
+
+const money = (n: number) =>
+  n.toLocaleString(undefined, { style: "currency", currency: "USD" });
+
+function CustomerDisplay() {
+  const [snap, setSnap] = useState<DisplaySnapshot | null>(null);
+
+  useEffect(() => {
+    setSnap(readDisplaySnapshot());
+    return subscribeDisplay(setSnap);
+  }, []);
+
+  const pay = snap?.payment ?? null;
+  const wa = pay?.whatsapp ? whatsappLink(pay.whatsapp) : "";
+  const showTransfer =
+    !!pay && (!!pay.accountNumber || !!pay.whatsapp || !!pay.accountName);
+
+  return (
+    <main className="flex min-h-screen flex-col bg-background text-foreground">
+      <header className="flex items-baseline justify-between border-b border-border px-8 py-5">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {snap?.companyName || "Welcome"}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {snap?.storeName ?? "Please wait for the cashier"}
+          </p>
+        </div>
+        {snap?.memberName && (
+          <div className="text-right">
+            <p className="text-sm font-semibold">{snap.memberName}</p>
+            <p className="numeric text-xs text-muted-foreground">
+              {snap.memberPoints ?? 0} points
+            </p>
+          </div>
+        )}
+      </header>
+
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 p-8 lg:grid-cols-[1.4fr_1fr]">
+        <section className="flex min-h-0 flex-col">
+          {!snap || snap.mode === "idle" || snap.lines.length === 0 ? (
+            <div className="flex flex-1 flex-col items-center justify-center text-center">
+              <p className="text-4xl font-bold tracking-tight">Welcome</p>
+              <p className="mt-2 text-muted-foreground">
+                Your items will appear here as they are scanned.
+              </p>
+            </div>
+          ) : (
+            <ul className="min-h-0 flex-1 space-y-2 overflow-auto pr-2">
+              {snap.lines.map((l, i) => (
+                <li
+                  key={`${l.name}-${i}`}
+                  className="flex items-start justify-between rounded-lg border border-border px-4 py-3"
+                >
+                  <div>
+                    <p className="text-lg font-medium">
+                      {l.name}
+                      {l.foc && (
+                        <span className="ml-2 rounded bg-success/15 px-2 py-0.5 text-xs text-success">
+                          FREE
+                        </span>
+                      )}
+                      {l.credit && (
+                        <span className="ml-2 rounded bg-accent/15 px-2 py-0.5 text-xs text-accent">
+                          RETURN
+                        </span>
+                      )}
+                    </p>
+                    <p className="numeric text-sm text-muted-foreground">
+                      {l.qty} × {money(l.price)}
+                      {l.discount ? ` · less ${money(l.discount)}` : ""}
+                    </p>
+                  </div>
+                  <span className="numeric text-lg font-semibold">{money(l.lineTotal)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <aside className="flex flex-col gap-4">
+          <div className="rounded-xl border border-border p-5">
+            <Row label="Subtotal" value={money(snap?.subtotal ?? 0)} />
+            <Row label="Discount" value={`-${money(snap?.discount ?? 0)}`} />
+            <Row label="Tax" value={money(snap?.tax ?? 0)} />
+            {snap?.promos?.length ? (
+              <ul className="mt-2 space-y-0.5 border-t border-border pt-2">
+                {snap.promos.map((p) => (
+                  <li key={p} className="text-xs text-success">
+                    {p}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <div className="mt-3 flex items-end justify-between border-t border-border pt-3">
+              <span className="text-sm uppercase tracking-wide text-muted-foreground">
+                {snap?.mode === "booking" ? "Booking total" : "Total"}
+              </span>
+              <span className="numeric text-4xl font-bold text-primary">
+                {money(snap?.total ?? 0)}
+              </span>
+            </div>
+            {snap?.mode === "paid" && (
+              <div className="mt-3 space-y-1 border-t border-border pt-3">
+                <Row label="Paid" value={money(snap.paid)} />
+                <Row label="Change" value={money(snap.change)} />
+                <p className="numeric text-xs text-muted-foreground">
+                  Receipt {snap.reference}
+                </p>
+              </div>
+            )}
+            {snap?.mode === "booking" && (
+              <div className="mt-3 space-y-1 border-t border-border pt-3">
+                <Row label="Deposit paid" value={money(snap.paid)} />
+                <Row label="Balance due" value={money(snap.balance)} />
+                <p className="text-xs text-muted-foreground">
+                  Booking {snap.reference} · collect by{" "}
+                  {snap.dueDate ? new Date(snap.dueDate).toDateString() : "—"}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {showTransfer && (
+            <div className="rounded-xl border border-border p-5">
+              <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Pay by bank transfer
+              </p>
+              <div className="mt-3 space-y-1 text-sm">
+                {pay?.bankName && <Row label="Bank" value={pay.bankName} />}
+                {pay?.accountName && <Row label="Account name" value={pay.accountName} />}
+                {pay?.accountNumber && (
+                  <Row label="Account no." value={pay.accountNumber} strong />
+                )}
+                {pay?.whatsapp && <Row label="WhatsApp" value={pay.whatsapp} />}
+              </div>
+              {pay?.note && <p className="mt-2 text-xs text-muted-foreground">{pay.note}</p>}
+              {wa && (
+                <div className="mt-3 flex items-center gap-3">
+                  <div
+                    className="rounded bg-white p-2"
+                    dangerouslySetInnerHTML={{ __html: qrSvg(wa, 110) }}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Scan to send your transfer slip on WhatsApp.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </aside>
+      </div>
+    </main>
+  );
+}
+
+function Row({
+  label,
+  value,
+  strong,
+}: {
+  label: string;
+  value: string;
+  strong?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between py-0.5">
+      <span className="text-sm text-muted-foreground">{label}</span>
+      <span className={`numeric text-sm ${strong ? "font-bold" : ""}`}>{value}</span>
+    </div>
+  );
+}
