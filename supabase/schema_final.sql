@@ -502,8 +502,8 @@ begin
   if not (public.has_role(auth.uid(),'admin') or public.has_role(auth.uid(),'manager')) then
     raise exception 'Only supervisors can manage terminal users';
   end if;
-  if p_pin !~ '^[0-9]{4}$' then
-    raise exception 'PIN must be exactly 4 digits';
+  if p_pin !~ '^[0-9]{4,6}$' then
+    raise exception 'PIN must be 4 to 6 digits';
   end if;
   insert into public.app_users (user_id, full_name, role, store_id, email, pin_hash, auth_secret)
   values (trim(p_user_id), trim(p_full_name), p_role, nullif(trim(coalesce(p_store_id,'')),''),
