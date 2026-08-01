@@ -54,7 +54,9 @@ import { useAuth } from "@/lib/pos-auth";
 import { useUserPermissions } from "@/lib/pos-permissions";
 import { useUiScale } from "@/lib/use-ui-scale";
 import type { CartLine, DiscountType, PaymentMethod, Sale } from "@/lib/pos-types";
-import { lineUnitDiscount, r2 } from "@/lib/pos-types";
+import type { Payment } from "@/lib/pos-types";
+import { lineUnitDiscount, paymentsLabel, paymentsTotal, PAYMENT_LABELS, r2 } from "@/lib/pos-types";
+import { NO_SALE_REASONS, recordNoSale, type NoSaleReason } from "@/lib/drawer-events";
 import { buildBookingMessage, buildSaleMessage, sendBillOnWhatsApp } from "@/lib/whatsapp";
 import { logger } from "@/lib/audit-log";
 import { evaluatePromotions, focLine } from "@/lib/pos-promotions";
@@ -162,6 +164,13 @@ function Register() {
   } | null>(null);
   const [splitOpen, setSplitOpen] = useState(false);
   const [splitWays, setSplitWays] = useState(2);
+  /* Split tenders + card machine capture */
+  const [tenders, setTenders] = useState<Payment[]>([]);
+  const [bankName, setBankName] = useState("");
+  /* No-sale drawer open */
+  const [noSaleOpen, setNoSaleOpen] = useState(false);
+  const [noSaleReason, setNoSaleReason] = useState<NoSaleReason>("change_float");
+  const [noSaleNote, setNoSaleNote] = useState("");
 
   const categories = useMemo(
     () => ["All", ...Array.from(new Set(state.products.map((p) => p.category)))],
