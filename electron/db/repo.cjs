@@ -222,7 +222,6 @@ async function mergeFromCloud(table, rows) {
 
 async function stats() {
   const out = [];
-  const out = [];
   for (const table of TABLES) {
     const res = await getPool().request().query(`
       SELECT
