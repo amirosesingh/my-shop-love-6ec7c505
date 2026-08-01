@@ -360,6 +360,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setTerminalUser(null);
     try {
       window.sessionStorage.removeItem(TERMINAL_KEY);
+      window.sessionStorage.removeItem(TERMINAL_TOKEN_KEY);
     } catch {
       /* ignore */
     }
