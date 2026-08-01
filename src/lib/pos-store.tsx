@@ -510,10 +510,27 @@ export function PosProvider({ children }: { children: ReactNode }) {
           : s.products;
       return { ...s, transferCounter, products, transfers: [transfer, ...s.transfers] };
     });
+    if (transfer.status === "in_transit") {
+      void db.upsertProducts(
+        bumpItems(stateRef.current.products, input.items, input.fromStoreId, -1).filter((p) =>
+          input.items.some((i) => i.productId === p.id),
+        ),
+      );
+    }
     return transfer;
   }, []);
 
   const approveTransfer = useCallback((id: string) => {
+    {
+      const s = stateRef.current;
+      const t = s.transfers.find((x) => x.id === id);
+      if (t && t.status === "requested")
+        void db.upsertProducts(
+          bumpItems(s.products, t.items, t.fromStoreId, -1).filter((p) =>
+            t.items.some((i) => i.productId === p.id),
+          ),
+        );
+    }
     setState((s) => {
       const t = s.transfers.find((x) => x.id === id);
       if (!t || t.status !== "requested") return s;
@@ -528,6 +545,16 @@ export function PosProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const receiveTransfer = useCallback((id: string) => {
+    {
+      const s = stateRef.current;
+      const t = s.transfers.find((x) => x.id === id);
+      if (t && t.status === "in_transit")
+        void db.upsertProducts(
+          bumpItems(s.products, t.items, t.toStoreId, 1).filter((p) =>
+            t.items.some((i) => i.productId === p.id),
+          ),
+        );
+    }
     setState((s) => {
       const t = s.transfers.find((x) => x.id === id);
       if (!t || t.status !== "in_transit") return s;
@@ -542,6 +569,16 @@ export function PosProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const rejectTransfer = useCallback((id: string) => {
+    {
+      const s = stateRef.current;
+      const t = s.transfers.find((x) => x.id === id);
+      if (t && t.status === "in_transit")
+        void db.upsertProducts(
+          bumpItems(s.products, t.items, t.fromStoreId, 1).filter((p) =>
+            t.items.some((i) => i.productId === p.id),
+          ),
+        );
+    }
     setState((s) => {
       const t = s.transfers.find((x) => x.id === id);
       if (!t || (t.status !== "requested" && t.status !== "in_transit")) return s;
