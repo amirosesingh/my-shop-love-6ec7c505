@@ -40,6 +40,7 @@ import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { usePos } from "@/lib/pos-store";
 import { logger } from "@/lib/audit-log";
 import {
+  ensureLocations,
   issueTerminalToken,
   listTerminalTokens,
   restoreTerminalToken,
@@ -92,6 +93,23 @@ export function TerminalTokens() {
     if (!locationId && stores.length) setLocationId(stores[0].id);
   }, [stores, locationId]);
 
+  // Mirror local locations into the central directory so the dropdown and the
+  // database agree before any token references one of them.
+  useEffect(() => {
+    if (!stores.length) return;
+    void ensureLocations(
+      stores.map((s) => ({
+        id: s.id,
+        code: s.code,
+        name: s.name,
+        address: s.address,
+        phone: s.phone,
+      })),
+    ).catch(() => {
+      /* non-fatal: issuing a token re-attempts this for the chosen location */
+    });
+  }, [stores]);
+
   const qr = useMemo(() => (code ? qrDataUrl(code) : ""), [code]);
   const locationName = useMemo(() => {
     const s = stores.find((x) => x.id === locationId);
@@ -101,10 +119,18 @@ export function TerminalTokens() {
   const generate = async () => {
     if (!locationId) return toast.error("Choose a location first");
     if (!deviceName.trim()) return toast.error("Enter a terminal / device name");
+    const store = stores.find((x) => x.id === locationId);
+    if (!store) return toast.error("That location is no longer available");
     setIssuing(true);
     try {
       const { code: issued } = await issueTerminalToken({
-        locationId,
+        location: {
+          id: store.id,
+          code: store.code,
+          name: store.name,
+          address: store.address,
+          phone: store.phone,
+        },
         locationName,
         deviceName: deviceName.trim(),
       });
@@ -117,8 +143,11 @@ export function TerminalTokens() {
       toast.success("Activation token generated");
       await refresh();
     } catch (e) {
+      const message = (e as { message?: string })?.message ?? "Unknown error";
       toast.error("Could not generate the token", {
-        description: (e as { message?: string })?.message,
+        description: /foreign key|location_id/i.test(message)
+          ? `${message} — the selected location could not be saved to the central directory. Check that you are signed in with a staff account.`
+          : message,
       });
     } finally {
       setIssuing(false);
@@ -195,7 +224,11 @@ export function TerminalTokens() {
               onChange={(e) => setDeviceName(e.target.value)}
             />
           </div>
-          <Button className="h-9" disabled={issuing} onClick={() => void generate()}>
+          <Button
+            className="h-9"
+            disabled={issuing || !locationId || !deviceName.trim()}
+            onClick={() => void generate()}
+          >
             {issuing ? <Loader2 className="size-4 animate-spin" /> : <KeyRound className="size-4" />}
             Generate activation token
           </Button>
