@@ -28,12 +28,14 @@ New "Adjust stock" action per product row and a bulk "Stock check" mode on `/inv
 
 ## 3. Security review and automated checks
 
-Review and tighten first:
+Review and tighten fit:
+
 - Re-run the database linter and security scan; fix anything real that turns up.
 - Audit route-level and action-level permission gating for the newer features (reports pages, coupons, stock adjustment, bookings, settings pages) so each has an explicit permission flag rather than relying on being unlisted.
 - Confirm every table's policies still match intent after the recent feature growth, and that no new table is reachable without a staff check.
 
 Then automate, so regressions are caught before release:
+
 - A permissions snapshot test: the full role → permission matrix is serialised into a checked-in snapshot. Any change to who can do what fails CI until the snapshot is deliberately updated.
 - Route-guard tests asserting each protected route declares a permission flag and that a cashier-level role is denied admin-only routes.
 - A GitHub Actions workflow on push/PR running install, lint, typecheck, the permission tests, and a dependency vulnerability scan (high/critical fails the build).
