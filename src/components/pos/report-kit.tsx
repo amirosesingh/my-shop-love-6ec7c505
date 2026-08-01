@@ -67,6 +67,9 @@ export function ReportHeader({
   onExport?: () => void;
   children?: ReactNode;
 }) {
+  // Exporting report data is its own permission — hide the button when off.
+  const { can } = useAuth();
+  const canExport = can("can_export_reports");
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
