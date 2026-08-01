@@ -146,6 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [ready, setReady] = useState(false);
+  const [terminalUser, setTerminalUser] = useState<TerminalUser | null>(null);
 
   useEffect(() => {
     try {
@@ -158,6 +159,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             permissions: { ...DEFAULT_PERMISSIONS, ...(s.permissions ?? {}) },
           })),
         );
+    } catch {
+      /* ignore corrupt storage */
+    }
+    try {
+      const rawTerminal = window.sessionStorage.getItem(TERMINAL_KEY);
+      if (rawTerminal) setTerminalUser(JSON.parse(rawTerminal) as TerminalUser);
     } catch {
       /* ignore corrupt storage */
     }
@@ -232,6 +239,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const pinLogin = useCallback(async (userCode: string, pin: string) => {
+    const code = userCode.trim();
+    if (!code) return { ok: false, error: "Enter your User ID" };
+    if (!/^\d{4}$/.test(pin)) return { ok: false, error: "Enter your 4-digit PIN" };
+
+    // The PIN is compared against the bcrypt digest inside the database;
+    // it is never stored, logged or persisted on this device.
+    const { data, error } = await supabase.rpc("verify_terminal_pin" as never, {
+      p_user_code: code,
+      p_pin: pin,
+    } as never);
+    if (error) return { ok: false, error: error.message };
+
+    const row = (Array.isArray(data) ? data[0] : data) as
+      | {
+          user_code: string;
+          full_name: string;
+          role: AppRole;
+          store_id: string | null;
+          email: string;
+          auth_secret: string;
+        }
+      | undefined;
+    if (!row) return { ok: false, error: "Invalid User ID or PIN" };
+
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: row.email,
+      password: row.auth_secret,
+    });
+    if (signInError) return { ok: false, error: signInError.message };
+
+    const next: TerminalUser = {
+      userCode: row.user_code,
+      name: row.full_name,
+      role: row.role,
+      storeId: row.store_id,
+      email: row.email,
+    };
+    setTerminalUser(next);
+    try {
+      window.sessionStorage.setItem(TERMINAL_KEY, JSON.stringify(next));
+    } catch {
+      /* session storage unavailable */
+    }
+    return { ok: true };
+  }, []);
+
   const signUp = useCallback(async (email: string, password: string, fullName: string) => {
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
@@ -249,6 +303,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
     setSession(null);
     setRoles([]);
+    setTerminalUser(null);
+    try {
+      window.sessionStorage.removeItem(TERMINAL_KEY);
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   // Resolved fresh from the staff list so a duty change applies immediately.
@@ -256,22 +316,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const account = session?.user;
     if (!account) return null;
     const email = account.email ?? "";
-    const isAdmin = roles.includes("admin");
+    const isAdmin = roles.includes("admin") || terminalUser?.role === "admin";
     const found = email ? staff.find((s) => s.email && norm(s.email) === norm(email)) : undefined;
     const fallbackName =
       (account.user_metadata?.["full_name"] as string | undefined) || email.split("@")[0] || "User";
     return {
-      staffId: found?.staffId ?? email,
-      name: found?.name ?? fallbackName,
+      staffId: terminalUser?.userCode ?? found?.staffId ?? email,
+      name: terminalUser?.name ?? found?.name ?? fallbackName,
       email,
       role: isAdmin ? "admin" : "cashier",
       roles,
-      storeId: isAdmin ? null : (found?.storeId ?? null),
+      storeId: isAdmin ? null : (terminalUser?.storeId ?? found?.storeId ?? null),
       permissions: isAdmin
         ? FULL_PERMISSIONS
         : { ...DEFAULT_PERMISSIONS, ...(found?.permissions ?? {}) },
     };
-  }, [session, roles, staff]);
+  }, [session, roles, staff, terminalUser]);
 
   const value = useMemo<AuthCtx>(
     () => ({
@@ -279,16 +339,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       isAdmin: user?.role === "admin",
       authUserId: userId,
+      terminalUser,
       can: (flag) => user?.role === "admin" || !!user?.permissions?.[flag],
       staff,
       addStaff,
       updateStaff,
       removeStaff,
       login,
+      pinLogin,
       signUp,
       logout,
+      lock: logout,
     }),
-    [ready, user, userId, staff, addStaff, updateStaff, removeStaff, login, signUp, logout],
+    [
+      ready,
+      user,
+      userId,
+      terminalUser,
+      staff,
+      addStaff,
+      updateStaff,
+      removeStaff,
+      login,
+      pinLogin,
+      signUp,
+      logout,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
