@@ -353,95 +353,68 @@ export async function loadCloudState(): Promise<CloudSlice> {
 
 /* ------------------------------- writers ------------------------------- */
 
-const run = async (
-  context: string,
-  fn: () => PromiseLike<{ error?: unknown } | void>,
-) => {
-  try {
-    const res = await fn();
-    if (res && (res as { error?: unknown }).error) dbError(context, (res as { error: unknown }).error);
-  } catch (e) {
-    dbError(context, e);
-  }
+/**
+ * Writes never hit the network directly: they are appended to the offline
+ * outbox and pushed by the sync engine. The till therefore keeps working with
+ * no connection, and nothing is lost when it comes back.
+ */
+const queue = (context: string, op: SyncOp) => {
+  enqueue(context, op);
+  void drainOutbox();
 };
 
 export const db = {
   upsertProduct: (p: Product) =>
-    run("Saving product", () =>
-      supabase.from("products").upsert(productToRow(p) as never, { onConflict: "id" }),
-    ),
-  upsertProducts: (list: Product[]) =>
-    run("Saving products", () =>
-      supabase
-        .from("products")
-        .upsert(list.map(productToRow) as never, { onConflict: "id" }),
-    ),
+    queue("Saving product", { kind: "upsert", table: "products", rows: [productToRow(p)] }),
+  upsertProducts: (list: Product[]) => {
+    if (!list.length) return;
+    queue("Saving products", { kind: "upsert", table: "products", rows: list.map(productToRow) });
+  },
   deleteProduct: (id: string) =>
-    run("Deleting product", () => supabase.from("products").delete().eq("id", id)),
+    queue("Deleting product", { kind: "delete", table: "products", match: { id } }),
 
   upsertMember: (m: Member) =>
-    run("Saving member", () =>
-      supabase.from("members").upsert(memberToRow(m, tierId) as never, { onConflict: "id" }),
-    ),
+    queue("Saving member", { kind: "upsert", table: "members", rows: [memberToRow(m, tierId)] }),
   deleteMember: (id: string) =>
-    run("Deleting member", () => supabase.from("members").delete().eq("id", id)),
+    queue("Deleting member", { kind: "delete", table: "members", match: { id } }),
 
   upsertPromotion: (p: Promotion) =>
-    run("Saving promotion", () =>
-      supabase.from("promotions").upsert(promotionToRow(p) as never, { onConflict: "id" }),
-    ),
+    queue("Saving promotion", { kind: "upsert", table: "promotions", rows: [promotionToRow(p)] }),
   deletePromotion: (id: string) =>
-    run("Deleting promotion", () => supabase.from("promotions").delete().eq("id", id)),
+    queue("Deleting promotion", { kind: "delete", table: "promotions", match: { id } }),
 
   saveSettings: (s: AppSettings) =>
-    run("Saving settings", async () => {
-      const row = settingsToRow(s);
-      const res = await supabase
-        .from("pos_settings")
-        .upsert(row as never, { onConflict: "id" });
-      // Older databases lack the receipt-branding columns; keep the core
-      // settings saving and tell the operator to run supabase/schema_final.sql.
-      if (res.error?.code === "PGRST204") {
-        const legacy = { ...row };
-        for (const k of BRANDING_COLUMNS) delete legacy[k];
-        const retry = await supabase
-          .from("pos_settings")
-          .upsert(legacy as never, { onConflict: "id" });
-        if (retry.error) return retry;
-        return {
-          error: {
-            message:
-              "Receipt branding could not be saved: your database is missing the branding columns. Run supabase/schema_final.sql in your SQL editor.",
-          },
-        } as typeof res;
-      }
-      return res;
+    queue("Saving settings", {
+      kind: "upsert",
+      table: "pos_settings",
+      rows: [settingsToRow(s)],
     }),
 
   /** Persist a completed bill, its lines, the stock movement and member points. */
-  async recordSale(sale: Sale, products: Product[], member: Member | null) {
-    await run("Saving sale", async () => {
-      const res = await supabase.from("sales").insert(saleToRow(sale) as never);
-      if (res.error) return res;
-      return supabase.from("sale_items").insert(saleItemRows(sale) as never);
-    });
-    if (products.length) await db.upsertProducts(products);
-    if (member) await db.upsertMember(member);
+  recordSale(sale: Sale, products: Product[], member: Member | null) {
+    // Order matters — the queue drains sequentially and stops on failure.
+    queue("Saving sale", { kind: "insert", table: "sales", rows: [saleToRow(sale)] });
+    queue("Saving sale items", { kind: "insert", table: "sale_items", rows: saleItemRows(sale) });
+    if (products.length) db.upsertProducts(products);
+    if (member) db.upsertMember(member);
     if (sale.exchangeOfReceiptNo) {
-      await run("Linking exchange bill", () =>
-        supabase
-          .from("sales")
-          .update({ exchanged_to_bill_number: sale.receiptNo } as never)
-          .eq("bill_number", sale.exchangeOfReceiptNo!),
-      );
+      queue("Linking exchange bill", {
+        kind: "update",
+        table: "sales",
+        values: { exchanged_to_bill_number: sale.receiptNo },
+        match: { bill_number: sale.exchangeOfReceiptNo },
+      });
     }
   },
 
-  async refundSale(saleId: string, products: Product[]) {
-    await run("Refunding sale", () =>
-      supabase.from("sales").update({ is_refunded: true } as never).eq("id", saleId),
-    );
-    if (products.length) await db.upsertProducts(products);
+  refundSale(saleId: string, products: Product[]) {
+    queue("Refunding sale", {
+      kind: "update",
+      table: "sales",
+      values: { is_refunded: true },
+      match: { id: saleId },
+    });
+    if (products.length) db.upsertProducts(products);
   },
 
   /** Batch-push pending audit rows; returns the ids that landed in the cloud. */
