@@ -65,6 +65,25 @@ type NewTransfer = {
   createdBy: string;
 };
 
+export type NewBooking = {
+  storeId: string;
+  shiftId: string;
+  lines: CartLine[];
+  subtotal: number;
+  discount: number;
+  tax: number;
+  total: number;
+  /** deposit collected at the counter right now */
+  deposit: number;
+  depositMethod: PaymentMethod;
+  dueDate: string;
+  memberId: string | null;
+  customerName: string;
+  customerPhone: string;
+  note: string;
+  cashier: string;
+};
+
 /** Apply a stock delta for every line of a transfer at one store. */
 const bumpItems = (
   products: Product[],
