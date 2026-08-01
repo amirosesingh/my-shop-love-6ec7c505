@@ -304,6 +304,7 @@ export type ReceiptOverride = Partial<
 export type AppSettings = {
   tax: TaxSettings;
   receipt: ReceiptSettings;
+  payment: PaymentDetails;
 };
 
 export type Promotion = {
