@@ -93,6 +93,45 @@ const fmt = (n: number) => n.toFixed(2);
 const esc = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
+const FONT_STACKS: Record<string, string> = {
+  mono: `"IBM Plex Mono", ui-monospace, monospace`,
+  sans: `"Helvetica Neue", Arial, sans-serif`,
+  serif: `Georgia, "Times New Roman", serif`,
+};
+
+const fontCss = (f: FontStyleSettings) =>
+  `font-family: ${FONT_STACKS[f.family] ?? FONT_STACKS.mono}; font-size: ${f.size}px; font-weight: ${
+    f.bold ? 700 : 400
+  }; letter-spacing: ${f.spacing}px;`;
+
+/** Real QR code rendered as inline SVG — no network calls. */
+export function qrSvg(value: string, size: number) {
+  if (!value.trim()) return "";
+  const qr = qrcode(0, "M");
+  qr.addData(value);
+  qr.make();
+  const count = qr.getModuleCount();
+  let rects = "";
+  for (let r = 0; r < count; r++) {
+    for (let c = 0; c < count; c++) {
+      if (qr.isDark(r, c)) rects += `<rect x="${c}" y="${r}" width="1" height="1" fill="#000"/>`;
+    }
+  }
+  return `<div class="c" style="margin-top:6px"><svg width="${size}" height="${size}" viewBox="0 0 ${count} ${count}" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg"><rect width="${count}" height="${count}" fill="#fff"/>${rects}</svg></div>`;
+}
+
+const customLines = (placement: "header" | "footer") =>
+  (receiptCfg.customLines ?? [])
+    .filter((l) => l.placement === placement && l.text.trim())
+    .map((l) => `<div class="c muted">${esc(l.text)}</div>`)
+    .join("");
+
+/** QR block if it belongs at the given placement. */
+const qrBlock = (placement: "header" | "footer") =>
+  receiptCfg.qr?.enabled && receiptCfg.qr.placement === placement
+    ? qrSvg(receiptCfg.qr.value, receiptCfg.qr.size || 96)
+    : "";
+
 /** Deterministic Code39-style bar pattern rendered from any reference string. */
 export function barcodeSvg(value: string) {
   const chars = `*${value.toUpperCase()}*`.split("");
@@ -110,13 +149,16 @@ export function barcodeSvg(value: string) {
 
 const shell = (title: string, body: string, autoPrint = true) => {
   const p = paperCss(receiptCfg.paper);
+  const f = receiptCfg.fonts ?? defaultReceiptSettings.fonts;
   return `<!doctype html><html><head>
 <meta charset="utf-8"><title>${esc(title)}</title>
 <style>
   @page { size: ${p.page}; margin: ${receiptCfg.paper === "58mm" ? "3mm" : receiptCfg.paper === "80mm" ? "4mm" : "12mm"}; }
   * { box-sizing: border-box; }
-  body { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: ${p.font}; color: #000; margin: 0 auto; width: ${p.width}; }
-  h1 { font-size: ${p.h1}; letter-spacing: 2px; text-align: center; margin: 0 0 2px; }
+  body { ${fontCss(f.body)} color: #000; margin: 0 auto; width: ${p.width}; }
+  .rcpt-head { ${fontCss(f.header)} }
+  .rcpt-foot { ${fontCss(f.footer)} }
+  h1 { ${fontCss(f.header)} font-size: ${Math.round(f.header.size * 1.25)}px; text-align: center; margin: 0 0 2px; }
   .c { text-align: center; }
   .muted { font-size: 0.85em; }
   .logo { text-align: center; margin-bottom: 4px; }
