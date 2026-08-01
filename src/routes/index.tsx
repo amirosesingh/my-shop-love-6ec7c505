@@ -55,6 +55,7 @@ import { useUserPermissions } from "@/lib/pos-permissions";
 import { useUiScale } from "@/lib/use-ui-scale";
 import type { CartLine, DiscountType, PaymentMethod, Sale } from "@/lib/pos-types";
 import type { Payment } from "@/lib/pos-types";
+import { TenderSplit, rememberBanks } from "@/components/pos/TenderSplit";
 import { lineUnitDiscount, paymentsLabel, paymentsTotal, PAYMENT_LABELS, r2 } from "@/lib/pos-types";
 import { NO_SALE_REASONS, recordNoSale, type NoSaleReason } from "@/lib/drawer-events";
 import { buildBookingMessage, buildSaleMessage, sendBillOnWhatsApp } from "@/lib/whatsapp";
