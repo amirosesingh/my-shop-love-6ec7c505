@@ -283,10 +283,20 @@ function Register() {
     setLines([]);
     setCartDiscount(0);
     setExchangeRef(null);
+    setCoupon(null);
   }
 
   async function clearCart() {
     if (lines.length && !(await requirePermission("can_void_item"))) return;
+    if (lines.length) {
+      logger.log("refund", "Cart voided", "register", {
+        lines: lines.length,
+        value: totals.total,
+        coupon: coupon?.code ?? null,
+        storeId: currentStore.id,
+        items: lines.map((l) => ({ name: l.name, qty: l.qty, price: l.price })),
+      });
+    }
     resetCart();
   }
 
