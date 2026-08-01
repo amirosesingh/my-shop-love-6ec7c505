@@ -23,6 +23,7 @@ import { Route as StaffRouteImport } from './routes/staff'
 import { Route as StoresRouteImport } from './routes/stores'
 import { Route as TransfersRouteImport } from './routes/transfers'
 import { Route as ReportsIndexRouteImport } from './routes/reports.index'
+import { Route as ReportsCouponsRouteImport } from './routes/reports.coupons'
 import { Route as ReportsSalesRouteImport } from './routes/reports.sales'
 import { Route as SettingsIndexRouteImport } from './routes/settings.index'
 import { Route as SettingsDisplayRouteImport } from './routes/settings.display'
@@ -106,6 +107,11 @@ const ReportsIndexRoute = ReportsIndexRouteImport.update({
   path: '/reports/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReportsCouponsRoute = ReportsCouponsRouteImport.update({
+  id: '/reports/coupons',
+  path: '/reports/coupons',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReportsSalesRoute = ReportsSalesRouteImport.update({
   id: '/reports/sales',
   path: '/reports/sales',
@@ -181,6 +187,7 @@ export interface FileRoutesByFullPath {
   '/staff': typeof StaffRoute
   '/stores': typeof StoresRoute
   '/transfers': typeof TransfersRoute
+  '/reports/coupons': typeof ReportsCouponsRoute
   '/reports/sales': typeof ReportsSalesRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
@@ -209,6 +216,7 @@ export interface FileRoutesByTo {
   '/staff': typeof StaffRoute
   '/stores': typeof StoresRoute
   '/transfers': typeof TransfersRoute
+  '/reports/coupons': typeof ReportsCouponsRoute
   '/reports/sales': typeof ReportsSalesRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
@@ -238,6 +246,7 @@ export interface FileRoutesById {
   '/staff': typeof StaffRoute
   '/stores': typeof StoresRoute
   '/transfers': typeof TransfersRoute
+  '/reports/coupons': typeof ReportsCouponsRoute
   '/reports/sales': typeof ReportsSalesRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
@@ -268,6 +277,7 @@ export interface FileRouteTypes {
     | '/staff'
     | '/stores'
     | '/transfers'
+    | '/reports/coupons'
     | '/reports/sales'
     | '/settings/display'
     | '/settings/elements'
@@ -296,6 +306,7 @@ export interface FileRouteTypes {
     | '/staff'
     | '/stores'
     | '/transfers'
+    | '/reports/coupons'
     | '/reports/sales'
     | '/settings/display'
     | '/settings/elements'
@@ -324,6 +335,7 @@ export interface FileRouteTypes {
     | '/staff'
     | '/stores'
     | '/transfers'
+    | '/reports/coupons'
     | '/reports/sales'
     | '/settings/display'
     | '/settings/elements'
@@ -353,6 +365,7 @@ export interface RootRouteChildren {
   StaffRoute: typeof StaffRoute
   StoresRoute: typeof StoresRoute
   TransfersRoute: typeof TransfersRoute
+  ReportsCouponsRoute: typeof ReportsCouponsRoute
   ReportsSalesRoute: typeof ReportsSalesRoute
   SettingsDisplayRoute: typeof SettingsDisplayRoute
   SettingsElementsRoute: typeof SettingsElementsRoute
@@ -468,6 +481,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReportsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reports/coupons': {
+      id: '/reports/coupons'
+      path: '/reports/coupons'
+      fullPath: '/reports/coupons'
+      preLoaderRoute: typeof ReportsCouponsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reports/sales': {
       id: '/reports/sales'
       path: '/reports/sales'
@@ -569,6 +589,7 @@ const rootRouteChildren: RootRouteChildren = {
   StaffRoute: StaffRoute,
   StoresRoute: StoresRoute,
   TransfersRoute: TransfersRoute,
+  ReportsCouponsRoute: ReportsCouponsRoute,
   ReportsSalesRoute: ReportsSalesRoute,
   SettingsDisplayRoute: SettingsDisplayRoute,
   SettingsElementsRoute: SettingsElementsRoute,
