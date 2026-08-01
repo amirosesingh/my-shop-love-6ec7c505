@@ -2,6 +2,8 @@ import type {
   Member,
   PaperSize,
   Product,
+  FontStyleSettings,
+  ReceiptOverride,
   ReceiptSettings,
   Sale,
   Shift,
@@ -10,6 +12,8 @@ import type {
   Transfer,
 } from "./pos-types";
 import { lineUnitDiscount } from "./pos-types";
+import { defaultReceiptSettings } from "./pos-seed";
+import qrcode from "qrcode-generator";
 
 export const STORE = {
   name: "NORTHWIND & CO.",
@@ -21,21 +25,34 @@ export const STORE = {
 let activeBranch: Store | null = null;
 export function setPrintStore(store: Store | null) {
   activeBranch = store;
+  receiptCfg = resolveReceiptCfg(globalReceiptCfg, store);
 }
 
 /** Receipt customizer + tax configuration, pushed in by the app shell. */
-let receiptCfg: ReceiptSettings = {
-  paper: "80mm",
-  headerText: "42 Harbour Street, Unit 3\nTel 555-0100 · VAT 88-2201194",
-  footerText: "Thank you — see you again soon",
-  showLogo: true,
-  showPoints: true,
-  showBarcode: true,
-  showTax: true,
-};
+let globalReceiptCfg: ReceiptSettings = defaultReceiptSettings;
+let receiptCfg: ReceiptSettings = defaultReceiptSettings;
 let taxCfg: TaxSettings = { enabled: true, rate: 5, mode: "exclusive" };
 
+/** Merge the global receipt profile with any branch-level overrides. */
+export function resolveReceiptCfg(
+  receipt: ReceiptSettings,
+  store?: Store | null,
+): ReceiptSettings {
+  const o: ReceiptOverride = store?.receiptOverrides ?? {};
+  const clean = Object.fromEntries(
+    Object.entries(o).filter(([, v]) => v !== undefined && v !== null && v !== ""),
+  ) as ReceiptOverride;
+  return { ...receipt, ...clean };
+}
+
 export function setPrintSettings(receipt: ReceiptSettings, tax: TaxSettings) {
+  globalReceiptCfg = receipt;
+  receiptCfg = resolveReceiptCfg(receipt, activeBranch);
+  taxCfg = tax;
+}
+
+/** Preview helper: render with an explicit, already-resolved profile. */
+export function setPreviewReceiptCfg(receipt: ReceiptSettings, tax: TaxSettings) {
   receiptCfg = receipt;
   taxCfg = tax;
 }
@@ -76,6 +93,45 @@ const fmt = (n: number) => n.toFixed(2);
 const esc = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
+const FONT_STACKS: Record<string, string> = {
+  mono: `"IBM Plex Mono", ui-monospace, monospace`,
+  sans: `"Helvetica Neue", Arial, sans-serif`,
+  serif: `Georgia, "Times New Roman", serif`,
+};
+
+const fontCss = (f: FontStyleSettings) =>
+  `font-family: ${FONT_STACKS[f.family] ?? FONT_STACKS.mono}; font-size: ${f.size}px; font-weight: ${
+    f.bold ? 700 : 400
+  }; letter-spacing: ${f.spacing}px;`;
+
+/** Real QR code rendered as inline SVG — no network calls. */
+export function qrSvg(value: string, size: number) {
+  if (!value.trim()) return "";
+  const qr = qrcode(0, "M");
+  qr.addData(value);
+  qr.make();
+  const count = qr.getModuleCount();
+  let rects = "";
+  for (let r = 0; r < count; r++) {
+    for (let c = 0; c < count; c++) {
+      if (qr.isDark(r, c)) rects += `<rect x="${c}" y="${r}" width="1" height="1" fill="#000"/>`;
+    }
+  }
+  return `<div class="c" style="margin-top:6px"><svg width="${size}" height="${size}" viewBox="0 0 ${count} ${count}" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg"><rect width="${count}" height="${count}" fill="#fff"/>${rects}</svg></div>`;
+}
+
+const customLines = (placement: "header" | "footer") =>
+  (receiptCfg.customLines ?? [])
+    .filter((l) => l.placement === placement && l.text.trim())
+    .map((l) => `<div class="c muted">${esc(l.text)}</div>`)
+    .join("");
+
+/** QR block if it belongs at the given placement. */
+const qrBlock = (placement: "header" | "footer") =>
+  receiptCfg.qr?.enabled && receiptCfg.qr.placement === placement
+    ? qrSvg(receiptCfg.qr.value, receiptCfg.qr.size || 96)
+    : "";
+
 /** Deterministic Code39-style bar pattern rendered from any reference string. */
 export function barcodeSvg(value: string) {
   const chars = `*${value.toUpperCase()}*`.split("");
@@ -93,13 +149,16 @@ export function barcodeSvg(value: string) {
 
 const shell = (title: string, body: string, autoPrint = true) => {
   const p = paperCss(receiptCfg.paper);
+  const f = receiptCfg.fonts ?? defaultReceiptSettings.fonts;
   return `<!doctype html><html><head>
 <meta charset="utf-8"><title>${esc(title)}</title>
 <style>
   @page { size: ${p.page}; margin: ${receiptCfg.paper === "58mm" ? "3mm" : receiptCfg.paper === "80mm" ? "4mm" : "12mm"}; }
   * { box-sizing: border-box; }
-  body { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: ${p.font}; color: #000; margin: 0 auto; width: ${p.width}; }
-  h1 { font-size: ${p.h1}; letter-spacing: 2px; text-align: center; margin: 0 0 2px; }
+  body { ${fontCss(f.body)} color: #000; margin: 0 auto; width: ${p.width}; }
+  .rcpt-head { ${fontCss(f.header)} }
+  .rcpt-foot { ${fontCss(f.footer)} }
+  h1 { ${fontCss(f.header)} font-size: ${Math.round(f.header.size * 1.25)}px; text-align: center; margin: 0 0 2px; }
   .c { text-align: center; }
   .muted { font-size: 0.85em; }
   .logo { text-align: center; margin-bottom: 4px; }
@@ -127,9 +186,24 @@ ${
 </body></html>`;
 };
 
-const header = (subtitle?: string) => `
-  ${receiptCfg.showLogo ? `<div class="logo"><span>N&amp;CO</span></div>` : ""}
-  <h1>${STORE.name}</h1>
+const header = (subtitle?: string) => {
+  const initials = (receiptCfg.companyName || STORE.name)
+    .split(/\s+/)
+    .map((w) => w.replace(/[^A-Za-z0-9&]/g, "")[0] ?? "")
+    .join("")
+    .slice(0, 4)
+    .toUpperCase();
+  const info = [
+    receiptCfg.phone ? `Tel ${receiptCfg.phone}` : "",
+    receiptCfg.taxNumber ? `VAT / Tax No. ${receiptCfg.taxNumber}` : "",
+    receiptCfg.regNumber ? `Reg. No. ${receiptCfg.regNumber}` : "",
+    receiptCfg.website || "",
+  ].filter(Boolean);
+  return `
+  <div class="rcpt-head">
+  ${receiptCfg.showLogo ? `<div class="logo"><span>${esc(initials || "POS")}</span></div>` : ""}
+  <h1>${esc(receiptCfg.companyName || STORE.name)}</h1>
+  </div>
   <div class="c muted">${esc(
     activeBranch ? `${activeBranch.name} (${activeBranch.code})` : STORE.line1,
   )}</div>
@@ -138,8 +212,12 @@ const header = (subtitle?: string) => `
     .filter(Boolean)
     .map((l) => `<div class="c muted">${esc(l)}</div>`)
     .join("")}
+  ${info.map((l) => `<div class="c muted">${esc(l)}</div>`).join("")}
+  ${customLines("header")}
+  ${qrBlock("header")}
   ${subtitle ? `<div class="c tag">${esc(subtitle)}</div>` : ""}
   <hr>`;
+};
 
 function saleBody(sale: Sale, member: Member | null, kind: ReceiptKind) {
   const hidePrices = kind === "gift" || kind === "kitchen";
@@ -222,11 +300,13 @@ function saleBody(sale: Sale, member: Member | null, kind: ReceiptKind) {
             }`
     }
     <hr>
-    <div class="c muted">${
+    <div class="c muted rcpt-foot">${
       kind === "gift"
         ? "Exchangeable within 30 days with this slip"
         : esc(receiptCfg.footerText || "")
     }</div>
+    ${customLines("footer")}
+    ${qrBlock("footer")}
     <div class="c muted">${esc(sale.receiptNo)}</div>`;
 }
 

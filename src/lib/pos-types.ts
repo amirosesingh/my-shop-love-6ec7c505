@@ -4,6 +4,8 @@ export type Store = {
   name: string;
   address: string;
   phone: string;
+  /** optional branch-level receipt branding overrides */
+  receiptOverrides?: ReceiptOverride;
 };
 
 export type Product = {
@@ -169,8 +171,41 @@ export type TaxSettings = {
 
 export type PaperSize = "80mm" | "58mm" | "a4" | "letter";
 
+export type FontFamilyKey = "mono" | "sans" | "serif";
+
+export type FontStyleSettings = {
+  family: FontFamilyKey;
+  /** px */
+  size: number;
+  bold: boolean;
+  /** px letter spacing */
+  spacing: number;
+};
+
+export type ReceiptLinePlacement = "header" | "footer";
+
+export type ReceiptCustomLine = {
+  id: string;
+  text: string;
+  placement: ReceiptLinePlacement;
+};
+
+export type ReceiptQrSettings = {
+  enabled: boolean;
+  value: string;
+  /** px */
+  size: number;
+  placement: ReceiptLinePlacement;
+};
+
 export type ReceiptSettings = {
   paper: PaperSize;
+  /** business identity printed at the top of every slip */
+  companyName: string;
+  taxNumber: string;
+  regNumber: string;
+  phone: string;
+  website: string;
   /** store header address / phone block */
   headerText: string;
   /** bottom thank-you note */
@@ -179,7 +214,30 @@ export type ReceiptSettings = {
   showPoints: boolean;
   showBarcode: boolean;
   showTax: boolean;
+  fonts: {
+    header: FontStyleSettings;
+    body: FontStyleSettings;
+    footer: FontStyleSettings;
+  };
+  customLines: ReceiptCustomLine[];
+  qr: ReceiptQrSettings;
 };
+
+/** Fields a single branch may override on top of the global receipt profile. */
+export type ReceiptOverride = Partial<
+  Pick<
+    ReceiptSettings,
+    | "companyName"
+    | "taxNumber"
+    | "regNumber"
+    | "phone"
+    | "website"
+    | "headerText"
+    | "footerText"
+    | "customLines"
+    | "qr"
+  >
+>;
 
 export type AppSettings = {
   tax: TaxSettings;
