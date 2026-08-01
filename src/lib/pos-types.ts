@@ -97,6 +97,8 @@ export type Sale = {
   exchangedToReceiptNo?: string;
   /** credit value carried over from the original bill */
   exchangeCredit?: number;
+  /** booking (pay-later ticket) this bill settles */
+  bookingRef?: string;
 };
 
 export type Shift = {
