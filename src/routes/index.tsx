@@ -697,7 +697,7 @@ function Register() {
             </div>
             <Button
               className="mt-1 h-12 w-full text-base"
-              disabled={!lines.length || !activeShift}
+              disabled={!lines.length || !activeShift || (refundDue > 0 && !canRefund)}
               onClick={() => {
                 setTendered(Math.max(0, totals.total).toFixed(2));
                 setPayOpen(true);
@@ -706,7 +706,9 @@ function Register() {
               {!activeShift
                 ? "Shift closed — selling locked"
                 : refundDue > 0
-                  ? `Refund ${money(refundDue)}`
+                  ? canRefund
+                    ? `Refund ${money(refundDue)}`
+                    : "Refunds locked for this user"
                   : `Charge ${money(balanceDue)}`}
             </Button>
             {lastSale && (
