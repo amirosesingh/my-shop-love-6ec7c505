@@ -227,8 +227,14 @@ function Transfers() {
             </TableHeader>
             <TableBody>
               {mine.map((t) => {
-                const canApprove = t.status === "requested" && t.fromStoreId === currentStore.id;
-                const canReceive = t.status === "in_transit" && t.toStoreId === currentStore.id;
+                const canApprove =
+                  t.status === "requested" &&
+                  t.fromStoreId === currentStore.id &&
+                  can("can_receive_transfer");
+                const canReceive =
+                  t.status === "in_transit" &&
+                  t.toStoreId === currentStore.id &&
+                  can("can_receive_transfer");
                 return (
                   <TableRow key={t.id}>
                     <TableCell className="numeric">
