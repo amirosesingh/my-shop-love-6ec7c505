@@ -309,7 +309,10 @@ export async function loadCloudState(): Promise<CloudSlice> {
 
 /* ------------------------------- writers ------------------------------- */
 
-const run = async (context: string, fn: () => Promise<{ error: unknown } | void>) => {
+const run = async (
+  context: string,
+  fn: () => PromiseLike<{ error?: unknown } | void>,
+) => {
   try {
     const res = await fn();
     if (res && (res as { error?: unknown }).error) dbError(context, (res as { error: unknown }).error);
