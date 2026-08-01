@@ -1,20 +1,38 @@
-# Fix cashier PIN hashing resolution
+# One consolidated database script (with working PIN hashing)
 
-## Confirmed state
+## Where hashing actually happens
 
-- `pgcrypto` is installed in the `extensions` schema.
-- The database exposes `extensions.gen_salt(text)`, `extensions.gen_salt(text, integer)`, and `extensions.crypt(text, text)`.
-- A direct live call to `extensions.gen_salt('bf'::text)` and `extensions.crypt(...)` succeeds.
-- The current `schema5.sql` already qualifies its visible hashing calls, so the reported unqualified `gen_salt(unknown)` error is coming from a stale or separately selected SQL statement, or from an older stored definition.
+Hashing is never done in the React app. It happens inside the database functions, using the `pgcrypto` extension:
 
-## Changes
+- Saving a cashier: `upsert_cashier` stores `extensions.crypt(pin, extensions.gen_salt('bf'))`
+- Logging in: `verify_cashier_pin` re-hashes the typed PIN using the stored hash as salt and compares
+- Same pattern for terminal users in `upsert_terminal_user` / `verify_terminal_pin`
 
-1. Replace the exception-swallowing extension setup in `schema5.sql` with an explicit, idempotent preflight that verifies `pgcrypto` exists in `extensions` and raises a useful error if it does not.
-2. Add explicit `::text` casts to every bcrypt algorithm, PIN, and salt argument so PostgreSQL never has to resolve an `unknown` literal.
-3. Set the search path on every PL/pgSQL block/function involved in cashier hashing and migration, while retaining explicit `extensions.crypt(...)` and `extensions.gen_salt(...)` calls.
-4. Recreate the cashier RPCs idempotently so any older stored function bodies are replaced, then reload the API schema cache.
-5. Validate the final script against the live database with direct hash generation and verification checks, and confirm the stored RPC definitions contain no unqualified hashing calls.
+So if those functions are missing from the live database, nothing is doing the hashing — that is exactly the "function is missing" symptom.
 
-## Result
+## What is missing today
 
-`schema5.sql` will be fully re-runnable and cashier creation/login will consistently resolve the hashing functions from the `extensions` schema.
+The app calls 12 database functions, but they are spread across five scripts written at different times that partly overwrite each other:
+
+- `schema.sql` / `schema2.sql` / `schema3.sql`: `list_app_users`, `current_app_user`, `verify_terminal_pin`, `set_app_user_permissions`, `set_app_user_profile`, `upsert_terminal_user`, `delete_terminal_user` — three competing versions
+- `schema5.sql`: `list_cashiers`, `upsert_cashier`, `set_cashier_permissions`, `delete_cashier`, `verify_cashier_pin`
+- `schema4.sql`: only the auth sync trigger
+
+Running them in the wrong order leaves some functions old and some absent.
+
+## Plan
+
+1. Create a single `supabase/schema_final.sql` that fully replaces schemas 1-5:
+   - Preflight that installs `pgcrypto` into the `extensions` schema and raises a clear error if it cannot, instead of silently swallowing it.
+   - All POS tables plus `app_users`, `cashiers`, `user_roles`, idempotent and additive so existing data survives.
+   - All 12 functions the frontend calls, each recreated as `security definer` with `set search_path = public, extensions`, and every hashing call written as `extensions.crypt(...)` / `extensions.gen_salt(...)` with explicit `::text` casts.
+   - Grants on the tables and `execute` grants on the functions.
+   - A self-check block at the end that raises an error listing any of the 12 functions that did not get created, then reloads the API schema cache.
+2. Add a header comment marking this as the only script to run; older schema files stay in the repo for history but are superseded.
+3. No frontend changes needed — the RPC names and arguments already match.
+
+## Technical notes
+
+- Functions guaranteed: `list_app_users`, `current_app_user`, `verify_terminal_pin`, `set_app_user_permissions`, `set_app_user_profile`, `upsert_terminal_user`, `delete_terminal_user`, `list_cashiers`, `upsert_cashier`, `set_cashier_permissions`, `delete_cashier`, `verify_cashier_pin`.
+- Old overloads are dropped by signature before recreation, so stale versions containing unqualified `gen_salt` cannot survive.
+- Confirmed in the connected database that `pgcrypto` lives in the `extensions` schema, which is why unqualified `gen_salt(...)` fails and qualified calls are required.
