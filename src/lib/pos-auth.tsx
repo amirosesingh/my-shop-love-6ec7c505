@@ -15,6 +15,7 @@ import {
   CASHIER_PERMISSIONS,
   FULL_PERMISSIONS,
   NO_PERMISSIONS,
+  WAREHOUSE_PERMISSIONS,
   PERMISSION_GROUPS,
   PERMISSION_KEYS,
   PERMISSION_LABELS,
@@ -32,6 +33,7 @@ export {
   CASHIER_PERMISSIONS,
   FULL_PERMISSIONS,
   NO_PERMISSIONS,
+  WAREHOUSE_PERMISSIONS,
   PERMISSION_GROUPS,
   PERMISSION_KEYS,
   PERMISSION_LABELS,
@@ -150,6 +152,8 @@ type AuthCtx = {
   canSwitchStores: boolean;
   /** cashier accounts are limited to the POS terminal */
   isCashier: boolean;
+  /** warehouse account — stock/receiving user driven purely by its toggles */
+  isWarehouse: boolean;
   /** raw Supabase user id of the signed-in account */
   authUserId: string | null;
   /** cashier currently signed in at the terminal (User ID + PIN) */
