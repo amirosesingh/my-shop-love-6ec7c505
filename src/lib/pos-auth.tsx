@@ -10,6 +10,35 @@ import {
 import type { Session } from "@supabase/supabase-js";
 import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
 import { cashierEmail, cashierSecret, type MetaRole } from "@/lib/pos-users";
+import {
+  CASHIER_PERMISSIONS,
+  FULL_PERMISSIONS,
+  NO_PERMISSIONS,
+  PERMISSION_GROUPS,
+  PERMISSION_KEYS,
+  PERMISSION_LABELS,
+  fromDbRole,
+  normalizePermissions,
+  resolvePermission,
+  toDbRole,
+  type PermissionFlag,
+  type PermissionKey,
+  type StaffPermissions,
+  type StaffRole,
+} from "@/lib/permissions";
+
+export {
+  CASHIER_PERMISSIONS,
+  FULL_PERMISSIONS,
+  NO_PERMISSIONS,
+  PERMISSION_GROUPS,
+  PERMISSION_KEYS,
+  PERMISSION_LABELS,
+  fromDbRole,
+  normalizePermissions,
+  toDbRole,
+};
+export type { PermissionFlag, PermissionKey, StaffPermissions, StaffRole };
 
 export type PosRole = "cashier" | "admin";
 
@@ -17,48 +46,7 @@ export type PosRole = "cashier" | "admin";
 export type AppRole = "admin" | "manager" | "staff";
 export const APP_ROLES: AppRole[] = ["admin", "manager", "staff"];
 
-/** Feature flags the admin can toggle per employee. */
-export type StaffPermissions = {
-  /** Can Access Financial History Reports */
-  financials: boolean;
-  /** Can Create New Products / Access PO Engine */
-  products: boolean;
-  /** Can Toggle E-commerce Website Visibility */
-  ecommerce: boolean;
-  /** Can apply line / bill discounts at the register */
-  can_give_discount: boolean;
-  /** Can complete refunds and exchanges that pay money back */
-  can_refund: boolean;
-  /** Can pop the cash drawer outside of a sale */
-  can_open_drawer_manual: boolean;
-};
-
-export const FULL_PERMISSIONS: StaffPermissions = {
-  financials: true,
-  products: true,
-  ecommerce: true,
-  can_give_discount: true,
-  can_refund: true,
-  can_open_drawer_manual: true,
-};
-
-export const DEFAULT_PERMISSIONS: StaffPermissions = {
-  financials: false,
-  products: false,
-  ecommerce: false,
-  can_give_discount: false,
-  can_refund: false,
-  can_open_drawer_manual: false,
-};
-
-export const PERMISSION_LABELS: { key: keyof StaffPermissions; label: string }[] = [
-  { key: "financials", label: "Can Access Financial History Reports" },
-  { key: "products", label: "Can Create New Products / Access PO Engine" },
-  { key: "ecommerce", label: "Can Toggle E-commerce Website Visibility" },
-  { key: "can_give_discount", label: "Can Give Discounts" },
-  { key: "can_refund", label: "Can Process Refunds / Exchanges" },
-  { key: "can_open_drawer_manual", label: "Can Open Cash Drawer Manually" },
-];
+export const DEFAULT_PERMISSIONS = CASHIER_PERMISSIONS;
 
 /** An employee record the admin can edit at any time. */
 export type StaffMember = {
