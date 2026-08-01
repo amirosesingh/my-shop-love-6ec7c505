@@ -146,6 +146,8 @@ type AuthCtx = {
   isAdmin: boolean;
   /** supervisor or admin — may reach settings, reports, inventory, user management */
   isSupervisor: boolean;
+  /** admin, or a supervisor assigned to "All stores" — may switch branches */
+  canSwitchStores: boolean;
   /** cashier accounts are limited to the POS terminal */
   isCashier: boolean;
   /** raw Supabase user id of the signed-in account */
@@ -442,15 +444,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!account) {
       if (!terminalUser) return null;
       // Local bootstrap / offline terminal session.
-      const isLocalAdmin = terminalUser.role === "admin";
+      const isLocalAdmin = terminalUser.role === "admin" || terminalUser.role === "manager";
       return {
         staffId: terminalUser.userCode,
         name: terminalUser.name,
         email: terminalUser.email,
         role: isLocalAdmin ? "admin" : "cashier",
-        metaRole: isLocalAdmin ? "admin" : "cashier",
+        metaRole:
+          terminalUser.role === "admin"
+            ? "admin"
+            : terminalUser.role === "manager"
+              ? "supervisor"
+              : "cashier",
         roles: [terminalUser.role],
-        storeId: isLocalAdmin ? null : terminalUser.storeId,
+        storeId: terminalUser.role === "admin" ? null : terminalUser.storeId,
         permissions: isLocalAdmin
           ? FULL_PERMISSIONS
           : normalizePermissions(terminalUser.permissions ?? {}, "cashier"),
@@ -459,12 +466,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const email = account.email ?? "";
     const meta = account.user_metadata ?? {};
     const metaRole = (meta["role"] as MetaRole | undefined) ?? null;
-    const isAdmin =
+    const isTrueAdmin =
       metaRole === "admin" ||
-      metaRole === "supervisor" ||
       roles.includes("admin") ||
       appUser?.role === "admin" ||
       terminalUser?.role === "admin";
+    // Supervisors reach the same management screens as admins, but their
+    // store scope is their own assignment (null = all stores).
+    const isElevated =
+      isTrueAdmin ||
+      metaRole === "supervisor" ||
+      roles.includes("manager") ||
+      appUser?.role === "manager" ||
+      terminalUser?.role === "manager";
+    const isAdmin = isElevated;
     const found = email ? staff.find((s) => s.email && norm(s.email) === norm(email)) : undefined;
     const fallbackName =
       (meta["full_name"] as string | undefined) || email.split("@")[0] || "User";
@@ -480,9 +495,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role: isAdmin ? "admin" : "cashier",
       metaRole,
       roles,
-      storeId: isAdmin
+      storeId: isTrueAdmin
         ? null
-        : (appUser?.store_id ??
+        : isElevated
+          ? (appUser?.store_id ?? (meta["store_id"] as string | null | undefined) ?? null)
+          : (appUser?.store_id ??
           (meta["store_id"] as string | null | undefined) ??
           terminalUser?.storeId ??
           found?.storeId ??
@@ -506,6 +523,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       isAdmin: user?.role === "admin",
       isSupervisor: user?.metaRole === "supervisor" || user?.role === "admin",
+      // Admins and "All stores" supervisors (no single branch assigned).
+      canSwitchStores: user?.role === "admin" && !user.storeId,
       isCashier: user?.metaRole === "cashier" || (!!user && user.role !== "admin"),
       authUserId: userId,
       terminalUser,
