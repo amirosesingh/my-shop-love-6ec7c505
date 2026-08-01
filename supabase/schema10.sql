@@ -4,6 +4,19 @@
 -- Run this once against the POS database.
 -- ===========================================================================
 
+-- --------------------------------------------------- shared trigger helper ---
+-- Defined here so this script is self-contained on the POS database.
+CREATE OR REPLACE FUNCTION public.update_updated_at_column()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$;
+
 -- ---------------------------------------------------------------- stores ---
 CREATE TABLE IF NOT EXISTS public.stores (
   -- text, not uuid: existing terminals already use short branch codes as ids
