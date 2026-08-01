@@ -995,6 +995,161 @@ function StaffManagement() {
           )}
         </div>
       </div>
+
+      <ChangeRoleDialog
+        request={roleChange}
+        onCancel={() => setRoleChange(null)}
+        onConfirm={async (creds, mode) => {
+          if (!roleChange) return;
+          const ok = await convertRole(roleChange.row, roleChange.target, creds, mode);
+          if (ok) setRoleChange(null);
+        }}
+      />
     </AppShell>
+  );
+}
+
+type RoleCreds = { username: string; pin: string; email: string; password: string };
+const EMPTY_CREDS: RoleCreds = { username: "", pin: "", email: "", password: "" };
+
+function ChangeRoleDialog({
+  request,
+  onCancel,
+  onConfirm,
+}: {
+  request: { row: StaffRow; target: StaffRole } | null;
+  onCancel: () => void;
+  onConfirm: (creds: RoleCreds, mode: "defaults" | "keep") => Promise<void>;
+}) {
+  const [creds, setCreds] = useState<RoleCreds>(EMPTY_CREDS);
+  const [mode, setMode] = useState<"defaults" | "keep">("defaults");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (request) {
+      setCreds({ ...EMPTY_CREDS, email: request.row.email });
+      setMode("defaults");
+    }
+  }, [request]);
+
+  if (!request) return null;
+  const { row, target } = request;
+  const toCashier = target === "cashier";
+  const crossing = toCashier || row.kind === "cashier";
+
+  const submit = async () => {
+    setBusy(true);
+    try {
+      await onConfirm(creds, mode);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && !busy && onCancel()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="capitalize">Change role to {target}</DialogTitle>
+          <DialogDescription>
+            {crossing
+              ? `${row.full_name || row.user_id} needs a new login for this role. Their current login stops working once the change is saved.`
+              : `Update the role for ${row.full_name || row.user_id}.`}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {crossing && toCashier && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label>Username</Label>
+                <Input
+                  className="numeric"
+                  placeholder="cashier101"
+                  value={creds.username}
+                  onChange={(e) => setCreds((c) => ({ ...c, username: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>6-digit PIN</Label>
+                <Input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={6}
+                  autoComplete="new-password"
+                  value={creds.pin}
+                  onChange={(e) =>
+                    setCreds((c) => ({ ...c, pin: e.target.value.replace(/\D/g, "").slice(0, 6) }))
+                  }
+                />
+              </div>
+            </div>
+          )}
+          {crossing && !toCashier && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  autoComplete="off"
+                  value={creds.email}
+                  onChange={(e) => setCreds((c) => ({ ...c, email: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Password</Label>
+                <Input
+                  type="password"
+                  autoComplete="new-password"
+                  value={creds.password}
+                  onChange={(e) => setCreds((c) => ({ ...c, password: e.target.value }))}
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-2 rounded-md border border-border p-3">
+            <p className="text-xs font-semibold">Feature permissions</p>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="radio"
+                className="mt-1"
+                checked={mode === "defaults"}
+                onChange={() => setMode("defaults")}
+              />
+              <span>
+                Use the new role&apos;s defaults
+                <span className="block text-[11px] text-muted-foreground">
+                  Applies the standard preset for a {target}; still editable afterwards.
+                </span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="radio"
+                className="mt-1"
+                checked={mode === "keep"}
+                onChange={() => setMode("keep")}
+              />
+              <span>
+                Keep current toggles
+                <span className="block text-[11px] text-muted-foreground">
+                  Every switch stays exactly as it is today.
+                </span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onCancel} disabled={busy}>
+            Cancel
+          </Button>
+          <Button onClick={() => void submit()} disabled={busy}>
+            {busy && <Loader2 className="size-4 animate-spin" />} Change role
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
