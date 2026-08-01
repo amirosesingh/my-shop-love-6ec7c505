@@ -352,6 +352,27 @@ function StaffManagement() {
   };
 
   const resetPassword = async (row: StaffRow) => {
+    if (row.kind === "cashier") {
+      if (!/^\d{6}$/.test(passwordReset)) {
+        toast.error("PIN must be exactly 6 digits");
+        return;
+      }
+      try {
+        await upsertCashier({
+          id: row.id,
+          username: row.user_id,
+          fullName: row.full_name,
+          pin: passwordReset,
+          storeId: row.store_id,
+          isActive: row.is_active,
+        });
+        setPasswordReset("");
+        toast.success("PIN updated");
+      } catch (e) {
+        toast.error("Could not update PIN", { description: cashierErrText(e) });
+      }
+      return;
+    }
     if (passwordReset.length < 6) {
       toast.error("Password must be at least 6 characters");
       return;
@@ -374,6 +395,18 @@ function StaffManagement() {
   };
 
   const removeUser = async (row: StaffRow) => {
+    if (row.kind === "cashier") {
+      try {
+        await deleteCashier(row.id);
+      } catch (e) {
+        toast.error("Delete failed", { description: cashierErrText(e) });
+        return;
+      }
+      setSelectedId(null);
+      toast.success(`${row.full_name || row.user_id} removed`);
+      void load();
+      return;
+    }
     const { error } = await sb.rpc("delete_terminal_user", { p_user_id: row.user_id });
     if (error) {
       toast.error("Delete failed", { description: error.message });
