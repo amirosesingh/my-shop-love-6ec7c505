@@ -182,6 +182,11 @@ export function PosProvider({ children }: { children: ReactNode }) {
     }
 
     void (async () => {
+      // Anonymous visitors get nothing: no products, members or sales.
+      if (!signedIn) {
+        if (authReady && !cancelled) setReady(true);
+        return;
+      }
       try {
         const cloud = await loadCloudState();
         if (cancelled) return;
