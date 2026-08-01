@@ -186,9 +186,24 @@ ${
 </body></html>`;
 };
 
-const header = (subtitle?: string) => `
-  ${receiptCfg.showLogo ? `<div class="logo"><span>N&amp;CO</span></div>` : ""}
-  <h1>${STORE.name}</h1>
+const header = (subtitle?: string) => {
+  const initials = (receiptCfg.companyName || STORE.name)
+    .split(/\s+/)
+    .map((w) => w.replace(/[^A-Za-z0-9&]/g, "")[0] ?? "")
+    .join("")
+    .slice(0, 4)
+    .toUpperCase();
+  const info = [
+    receiptCfg.phone ? `Tel ${receiptCfg.phone}` : "",
+    receiptCfg.taxNumber ? `VAT / Tax No. ${receiptCfg.taxNumber}` : "",
+    receiptCfg.regNumber ? `Reg. No. ${receiptCfg.regNumber}` : "",
+    receiptCfg.website || "",
+  ].filter(Boolean);
+  return `
+  <div class="rcpt-head">
+  ${receiptCfg.showLogo ? `<div class="logo"><span>${esc(initials || "POS")}</span></div>` : ""}
+  <h1>${esc(receiptCfg.companyName || STORE.name)}</h1>
+  </div>
   <div class="c muted">${esc(
     activeBranch ? `${activeBranch.name} (${activeBranch.code})` : STORE.line1,
   )}</div>
@@ -197,8 +212,12 @@ const header = (subtitle?: string) => `
     .filter(Boolean)
     .map((l) => `<div class="c muted">${esc(l)}</div>`)
     .join("")}
+  ${info.map((l) => `<div class="c muted">${esc(l)}</div>`).join("")}
+  ${customLines("header")}
+  ${qrBlock("header")}
   ${subtitle ? `<div class="c tag">${esc(subtitle)}</div>` : ""}
   <hr>`;
+};
 
 function saleBody(sale: Sale, member: Member | null, kind: ReceiptKind) {
   const hidePrices = kind === "gift" || kind === "kitchen";
@@ -281,11 +300,13 @@ function saleBody(sale: Sale, member: Member | null, kind: ReceiptKind) {
             }`
     }
     <hr>
-    <div class="c muted">${
+    <div class="c muted rcpt-foot">${
       kind === "gift"
         ? "Exchangeable within 30 days with this slip"
         : esc(receiptCfg.footerText || "")
     }</div>
+    ${customLines("footer")}
+    ${qrBlock("footer")}
     <div class="c muted">${esc(sale.receiptNo)}</div>`;
 }
 
