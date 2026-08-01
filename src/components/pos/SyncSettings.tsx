@@ -75,26 +75,17 @@ export function SyncSettings() {
         <Button
           variant="outline"
           size="sm"
-          onClick={async () => {
-            const { pushed, failed } = await drainOutbox();
-            bump();
-            if (failed) toast.error("Some changes could not be pushed");
-            else toast.success(pushed ? `${pushed} change(s) synced` : "Nothing to sync");
-          }}
-        >
-          Sync now
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
           onClick={() => {
             downloadSqlBackup(state);
+            logSync("backup", "all tables", true, "SQL backup downloaded");
             toast.success("SQL backup downloaded");
           }}
         >
           Download SQL backup
         </Button>
       </div>
+
+      <SyncLogViewer />
 
       {quarantined.length > 0 && (
         <div className="space-y-2 rounded-md border border-destructive/40 bg-destructive/5 p-3">
