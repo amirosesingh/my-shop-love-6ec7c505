@@ -410,6 +410,15 @@ export const db = {
   deleteProduct: (id: string) =>
     queue("Deleting product", { kind: "delete", table: "products", match: { id } }),
 
+  upsertStore: (s: Store) =>
+    queue("Saving location", { kind: "upsert", table: "stores", rows: [storeToRow(s)] }),
+  upsertStores: (list: Store[]) => {
+    if (!list.length) return;
+    queue("Saving locations", { kind: "upsert", table: "stores", rows: list.map(storeToRow) });
+  },
+  deleteStore: (id: string) =>
+    queue("Deleting location", { kind: "delete", table: "stores", match: { id } }),
+
   upsertMember: (m: Member) =>
     queue("Saving member", { kind: "upsert", table: "members", rows: [memberToRow(m, tierId)] }),
   deleteMember: (id: string) =>
