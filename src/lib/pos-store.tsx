@@ -417,6 +417,12 @@ export function PosProvider({ children }: { children: ReactNode }) {
 
   const upsertProduct = useCallback((product: Product) => {
     const prev = stateRef.current.products.find((p) => p.id === product.id);
+    void prev;
+    return upsertProductImpl(product);
+  }, []);
+
+  const upsertProductImpl = useCallback((product: Product) => {
+    const prev = stateRef.current.products.find((p) => p.id === product.id);
     logger.log("inventory_edit", prev ? "Product updated" : "Product created", "inventory", {
       productId: product.id,
       name: product.name,
