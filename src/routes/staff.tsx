@@ -474,7 +474,15 @@ function StaffManagement() {
                     <Label>Role</Label>
                     <Select
                       value={form.role}
-                      onValueChange={(v) => setForm({ ...form, role: v as StaffRole })}
+                      onValueChange={(v) =>
+                        setForm({
+                          ...form,
+                          role: v as StaffRole,
+                          // "All stores" is not valid for cashiers.
+                          store_id:
+                            v === "cashier" && form.store_id === "none" ? "" : form.store_id,
+                        })
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue />
