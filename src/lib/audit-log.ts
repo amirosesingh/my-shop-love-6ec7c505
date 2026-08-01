@@ -1,28 +1,82 @@
 import { useSyncExternalStore } from "react";
 import { db } from "./pos-db";
 
+/** Action types — what the person actually did, never a button name. */
 export type AuditCategory =
-  | "ui_click"
-  | "navigation"
-  | "modal"
-  | "search"
-  | "sale_event"
-  | "inventory_edit"
-  | "member_event"
+  | "sale"
+  | "refund"
+  | "booking"
+  | "cash"
+  | "inventory"
+  | "purchasing"
+  | "member"
+  | "promotion"
+  | "staff"
   | "settings"
+  | "messaging"
+  | "session"
+  | "navigation"
+  | "interaction"
+  | "lookup"
+  | "report"
   | "sync";
 
 export const AUDIT_CATEGORIES: { value: AuditCategory; label: string }[] = [
-  { value: "ui_click", label: "UI Click" },
-  { value: "navigation", label: "Navigation" },
-  { value: "modal", label: "Modal" },
-  { value: "search", label: "Search" },
-  { value: "sale_event", label: "Sale Event" },
-  { value: "inventory_edit", label: "Inventory Edit" },
-  { value: "member_event", label: "Member & Points" },
-  { value: "settings", label: "Settings" },
-  { value: "sync", label: "Sync Status" },
+  { value: "sale", label: "Sale & payment" },
+  { value: "refund", label: "Refund & exchange" },
+  { value: "booking", label: "Booking & pay later" },
+  { value: "cash", label: "Cash drawer & shift" },
+  { value: "inventory", label: "Inventory & stock" },
+  { value: "purchasing", label: "Purchasing & receiving" },
+  { value: "member", label: "Member & loyalty" },
+  { value: "promotion", label: "Promotions & pricing" },
+  { value: "staff", label: "Staff & permissions" },
+  { value: "settings", label: "Settings & configuration" },
+  { value: "messaging", label: "Customer messaging" },
+  { value: "session", label: "Sign-in & session" },
+  { value: "navigation", label: "Moving around the app" },
+  { value: "interaction", label: "Screen interaction" },
+  { value: "lookup", label: "Search & lookup" },
+  { value: "report", label: "Reports & exports" },
+  { value: "sync", label: "Data sync" },
 ];
+
+export const AUDIT_CATEGORY_LABELS: Record<string, string> = Object.fromEntries(
+  AUDIT_CATEGORIES.map((c) => [c.value, c.label]),
+);
+
+/** Legacy category names still stored in older local logs. */
+const LEGACY: Record<string, AuditCategory> = {
+  ui_click: "interaction",
+  modal: "interaction",
+  search: "lookup",
+  sale_event: "sale",
+  inventory_edit: "inventory",
+  member_event: "member",
+};
+
+/**
+ * Resolves the action type from the action itself, so the trail reads as
+ * "what happened" rather than "which control was pressed".
+ */
+export function resolveCategory(raw: string, action: string): AuditCategory {
+  const a = action.toLowerCase();
+  if (/refund|exchange|void|return/.test(a)) return "refund";
+  if (/booking|pay later|deposit|part payment|collect/.test(a)) return "booking";
+  if (/shift|drawer|float|cash count/.test(a)) return "cash";
+  if (/whatsapp|message sent|sms/.test(a)) return "messaging";
+  if (/sign in|signed in|sign out|login|logout|locked|unlock|override/.test(a)) return "session";
+  if (/receiving|purchase order|supplier|barcode scanned/.test(a)) return "purchasing";
+  if (/promotion|discount policy|tier/.test(a)) return "promotion";
+  if (/staff|permission|role|cashier account/.test(a)) return "staff";
+  if (/export|report/.test(a)) return "report";
+  if (/bill|sale|payment|receipt printed/.test(a)) return "sale";
+  if (/stock|product|inventory|price/.test(a)) return "inventory";
+  if (/member|points|loyalty/.test(a)) return "member";
+  if (/setting/.test(a)) return "settings";
+  if (LEGACY[raw]) return LEGACY[raw]!;
+  return (AUDIT_CATEGORY_LABELS[raw] ? (raw as AuditCategory) : "interaction");
+}
 
 export type AuditLog = {
   id: string;
@@ -32,6 +86,8 @@ export type AuditLog = {
   module: string;
   staffId: string;
   staffName: string;
+  /** role the person held when the action happened */
+  role: string;
   storeId: string | null;
   route: string;
   details: Record<string, unknown>;
@@ -49,6 +105,7 @@ const listeners = new Set<() => void>();
 let actor = {
   staffId: "anonymous",
   staffName: "Unknown",
+  role: "unknown",
   storeId: null as string | null,
   authUserId: null as string | null,
 };
@@ -86,7 +143,7 @@ function emit() {
 /** Global logging utility — every write lands locally first, offline-safe. */
 export const logger = {
   log(
-    category: AuditCategory,
+    category: string,
     actionName: string,
     module: string,
     details: Record<string, unknown> = {},
@@ -96,14 +153,15 @@ export const logger = {
     const entry: AuditLog = {
       id: crypto.randomUUID(),
       at: new Date().toISOString(),
-      category,
+      category: resolveCategory(category, actionName),
       action: actionName,
       module,
       staffId: actor.staffId,
       staffName: actor.staffName,
+      role: actor.role,
       storeId: actor.storeId,
       route: window.location.pathname,
-      details: { ...details, authUserId: actor.authUserId },
+      details: { ...details, role: actor.role, authUserId: actor.authUserId },
       synced_to_cloud: false,
       syncedAt: null,
     };
