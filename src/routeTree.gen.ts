@@ -27,9 +27,12 @@ import { Route as SettingsDisplayRouteImport } from './routes/settings.display'
 import { Route as SettingsElementsRouteImport } from './routes/settings.elements'
 import { Route as SettingsIdentityRouteImport } from './routes/settings.identity'
 import { Route as SettingsLinesRouteImport } from './routes/settings.lines'
+import { Route as SettingsPaymentRouteImport } from './routes/settings.payment'
 import { Route as SettingsQrRouteImport } from './routes/settings.qr'
+import { Route as SettingsSyncRouteImport } from './routes/settings.sync'
 import { Route as SettingsTaxRouteImport } from './routes/settings.tax'
 import { Route as SettingsTypeRouteImport } from './routes/settings.type'
+import { Route as SettingsWhatsappRouteImport } from './routes/settings.whatsapp'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -121,9 +124,19 @@ const SettingsLinesRoute = SettingsLinesRouteImport.update({
   path: '/lines',
   getParentRoute: () => SettingsRoute,
 } as any)
+const SettingsPaymentRoute = SettingsPaymentRouteImport.update({
+  id: '/payment',
+  path: '/payment',
+  getParentRoute: () => SettingsRoute,
+} as any)
 const SettingsQrRoute = SettingsQrRouteImport.update({
   id: '/qr',
   path: '/qr',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsSyncRoute = SettingsSyncRouteImport.update({
+  id: '/sync',
+  path: '/sync',
   getParentRoute: () => SettingsRoute,
 } as any)
 const SettingsTaxRoute = SettingsTaxRouteImport.update({
@@ -134,6 +147,11 @@ const SettingsTaxRoute = SettingsTaxRouteImport.update({
 const SettingsTypeRoute = SettingsTypeRouteImport.update({
   id: '/type',
   path: '/type',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsWhatsappRoute = SettingsWhatsappRouteImport.update({
+  id: '/whatsapp',
+  path: '/whatsapp',
   getParentRoute: () => SettingsRoute,
 } as any)
 
@@ -156,9 +174,12 @@ export interface FileRoutesByFullPath {
   '/settings/elements': typeof SettingsElementsRoute
   '/settings/identity': typeof SettingsIdentityRoute
   '/settings/lines': typeof SettingsLinesRoute
+  '/settings/payment': typeof SettingsPaymentRoute
   '/settings/qr': typeof SettingsQrRoute
+  '/settings/sync': typeof SettingsSyncRoute
   '/settings/tax': typeof SettingsTaxRoute
   '/settings/type': typeof SettingsTypeRoute
+  '/settings/whatsapp': typeof SettingsWhatsappRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -179,9 +200,12 @@ export interface FileRoutesByTo {
   '/settings/elements': typeof SettingsElementsRoute
   '/settings/identity': typeof SettingsIdentityRoute
   '/settings/lines': typeof SettingsLinesRoute
+  '/settings/payment': typeof SettingsPaymentRoute
   '/settings/qr': typeof SettingsQrRoute
+  '/settings/sync': typeof SettingsSyncRoute
   '/settings/tax': typeof SettingsTaxRoute
   '/settings/type': typeof SettingsTypeRoute
+  '/settings/whatsapp': typeof SettingsWhatsappRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -203,9 +227,12 @@ export interface FileRoutesById {
   '/settings/elements': typeof SettingsElementsRoute
   '/settings/identity': typeof SettingsIdentityRoute
   '/settings/lines': typeof SettingsLinesRoute
+  '/settings/payment': typeof SettingsPaymentRoute
   '/settings/qr': typeof SettingsQrRoute
+  '/settings/sync': typeof SettingsSyncRoute
   '/settings/tax': typeof SettingsTaxRoute
   '/settings/type': typeof SettingsTypeRoute
+  '/settings/whatsapp': typeof SettingsWhatsappRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -228,9 +255,12 @@ export interface FileRouteTypes {
     | '/settings/elements'
     | '/settings/identity'
     | '/settings/lines'
+    | '/settings/payment'
     | '/settings/qr'
+    | '/settings/sync'
     | '/settings/tax'
     | '/settings/type'
+    | '/settings/whatsapp'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -251,9 +281,12 @@ export interface FileRouteTypes {
     | '/settings/elements'
     | '/settings/identity'
     | '/settings/lines'
+    | '/settings/payment'
     | '/settings/qr'
+    | '/settings/sync'
     | '/settings/tax'
     | '/settings/type'
+    | '/settings/whatsapp'
   id:
     | '__root__'
     | '/'
@@ -274,9 +307,12 @@ export interface FileRouteTypes {
     | '/settings/elements'
     | '/settings/identity'
     | '/settings/lines'
+    | '/settings/payment'
     | '/settings/qr'
+    | '/settings/sync'
     | '/settings/tax'
     | '/settings/type'
+    | '/settings/whatsapp'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -424,11 +460,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsLinesRouteImport
       parentRoute: typeof SettingsRoute
     }
+    '/settings/payment': {
+      id: '/settings/payment'
+      path: '/payment'
+      fullPath: '/settings/payment'
+      preLoaderRoute: typeof SettingsPaymentRouteImport
+      parentRoute: typeof SettingsRoute
+    }
     '/settings/qr': {
       id: '/settings/qr'
       path: '/qr'
       fullPath: '/settings/qr'
       preLoaderRoute: typeof SettingsQrRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/sync': {
+      id: '/settings/sync'
+      path: '/sync'
+      fullPath: '/settings/sync'
+      preLoaderRoute: typeof SettingsSyncRouteImport
       parentRoute: typeof SettingsRoute
     }
     '/settings/tax': {
@@ -445,6 +495,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsTypeRouteImport
       parentRoute: typeof SettingsRoute
     }
+    '/settings/whatsapp': {
+      id: '/settings/whatsapp'
+      path: '/whatsapp'
+      fullPath: '/settings/whatsapp'
+      preLoaderRoute: typeof SettingsWhatsappRouteImport
+      parentRoute: typeof SettingsRoute
+    }
   }
 }
 
@@ -453,9 +510,12 @@ interface SettingsRouteChildren {
   SettingsElementsRoute: typeof SettingsElementsRoute
   SettingsIdentityRoute: typeof SettingsIdentityRoute
   SettingsLinesRoute: typeof SettingsLinesRoute
+  SettingsPaymentRoute: typeof SettingsPaymentRoute
   SettingsQrRoute: typeof SettingsQrRoute
+  SettingsSyncRoute: typeof SettingsSyncRoute
   SettingsTaxRoute: typeof SettingsTaxRoute
   SettingsTypeRoute: typeof SettingsTypeRoute
+  SettingsWhatsappRoute: typeof SettingsWhatsappRoute
 }
 
 const SettingsRouteChildren: SettingsRouteChildren = {
@@ -463,9 +523,12 @@ const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsElementsRoute: SettingsElementsRoute,
   SettingsIdentityRoute: SettingsIdentityRoute,
   SettingsLinesRoute: SettingsLinesRoute,
+  SettingsPaymentRoute: SettingsPaymentRoute,
   SettingsQrRoute: SettingsQrRoute,
+  SettingsSyncRoute: SettingsSyncRoute,
   SettingsTaxRoute: SettingsTaxRoute,
   SettingsTypeRoute: SettingsTypeRoute,
+  SettingsWhatsappRoute: SettingsWhatsappRoute,
 }
 
 const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
