@@ -55,7 +55,15 @@ import { useUserPermissions } from "@/lib/pos-permissions";
 import { useUiScale } from "@/lib/use-ui-scale";
 import type { CartLine, DiscountType, PaymentMethod, Sale } from "@/lib/pos-types";
 import type { Payment } from "@/lib/pos-types";
-import { lineUnitDiscount, paymentsLabel, paymentsTotal, PAYMENT_LABELS, r2 } from "@/lib/pos-types";
+import { TenderSplit, rememberBanks } from "@/components/pos/TenderSplit";
+import {
+  lineUnitDiscount,
+  paymentsLabel,
+  paymentsTotal,
+  PAYMENT_LABELS,
+  r2,
+  validateTenders,
+} from "@/lib/pos-types";
 import { NO_SALE_REASONS, recordNoSale, type NoSaleReason } from "@/lib/drawer-events";
 import { buildBookingMessage, buildSaleMessage, sendBillOnWhatsApp } from "@/lib/whatsapp";
 import { logger } from "@/lib/audit-log";
@@ -541,15 +549,14 @@ function Register() {
     if (!(await requirePermission("can_process_sale"))) return;
     if (isRefund && !(await requirePermission("can_process_refund"))) return;
     const splitting = tenders.length > 0;
-    const splitPaid = paymentsTotal(tenders);
-    if (!isRefund && splitting && splitPaid < r2(totals.total)) {
+    const split = validateTenders(totals.total, tenders);
+    const splitPaid = split.paid;
+    if (!isRefund && splitting && split.error) {
       toast.error(
-        `Split tenders cover ${money(splitPaid)} of ${money(totals.total)} — add another tender`,
+        split.balance > 0
+          ? `Split tenders cover ${money(splitPaid)} of ${money(totals.total)} — ${split.error}`
+          : split.error,
       );
-      return;
-    }
-    if (!isRefund && splitting && tenders.some((t) => t.method === "card" && !t.bankName?.trim())) {
-      toast.error("Enter the bank / card machine used for every card tender");
       return;
     }
     const paid = isRefund
@@ -590,6 +597,7 @@ function Register() {
         ];
     // The headline method stays the largest tender so reports keep working.
     const headline = payments.reduce((a, p) => (p.amount > a.amount ? p : a), payments[0]!).method;
+    rememberBanks(payments.map((p) => p.bankName ?? ""));
     const sale = recordSale({
       storeId: currentStore.id,
       shiftId: activeShift.id,
@@ -1820,102 +1828,12 @@ function Register() {
           )}
 
           {refundDue === 0 && (
-            <div className="space-y-2 rounded-md border border-border p-3">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Split across tenders
-                </p>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={async () => {
-                    if (!(await requirePermission("can_edit_tenders"))) return;
-                    const remaining = r2(balanceDue - paymentsTotal(tenders));
-                    setTenders((ts) => [
-                      ...ts,
-                      {
-                        id: crypto.randomUUID(),
-                        method: "cash",
-                        amount: Math.max(0, remaining),
-                      },
-                    ]);
-                  }}
-                >
-                  <Plus className="size-3" /> Add tender
-                </Button>
-              </div>
-              {tenders.map((t, i) => (
-                <div key={t.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    <select
-                      value={t.method}
-                      onChange={(e) =>
-                        setTenders((ts) =>
-                          ts.map((x, xi) =>
-                            xi === i ? { ...x, method: e.target.value as PaymentMethod } : x,
-                          ),
-                        )
-                      }
-                      className="h-9 rounded-md border border-border bg-background px-2 text-xs"
-                    >
-                      {(Object.keys(PAYMENT_LABELS) as PaymentMethod[]).map((m) => (
-                        <option key={m} value={m}>
-                          {PAYMENT_LABELS[m]}
-                        </option>
-                      ))}
-                    </select>
-                    {t.method === "card" ? (
-                      <Input
-                        value={t.bankName ?? ""}
-                        onChange={(e) =>
-                          setTenders((ts) =>
-                            ts.map((x, xi) => (xi === i ? { ...x, bankName: e.target.value } : x)),
-                          )
-                        }
-                        placeholder="Bank / machine"
-                        className="h-9 text-xs"
-                      />
-                    ) : (
-                      <Input
-                        value={t.ref ?? ""}
-                        onChange={(e) =>
-                          setTenders((ts) =>
-                            ts.map((x, xi) => (xi === i ? { ...x, ref: e.target.value } : x)),
-                          )
-                        }
-                        placeholder="Reference"
-                        className="h-9 text-xs"
-                      />
-                    )}
-                  </div>
-                  <Input
-                    value={t.amount || ""}
-                    onChange={(e) =>
-                      setTenders((ts) =>
-                        ts.map((x, xi) =>
-                          xi === i ? { ...x, amount: Number(e.target.value) || 0 } : x,
-                        ),
-                      )
-                    }
-                    className="numeric h-9 w-24 text-right"
-                  />
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="size-8"
-                    onClick={() => setTenders((ts) => ts.filter((_, xi) => xi !== i))}
-                  >
-                    <X className="size-3" />
-                  </Button>
-                </div>
-              ))}
-              {tenders.length > 0 && (
-                <p className="numeric text-[11px] text-muted-foreground">
-                  Tendered {money(paymentsTotal(tenders))} of {money(balanceDue)} ·{" "}
-                  {paymentsLabel(tenders)}
-                </p>
-              )}
-            </div>
+            <TenderSplit
+              total={balanceDue}
+              tenders={tenders}
+              onChange={setTenders}
+              onBeforeAdd={() => requirePermission("can_edit_tenders")}
+            />
           )}
           {method === "bank_transfer" && (
             <div className="space-y-2 rounded-md border border-border p-3">
@@ -1941,11 +1859,23 @@ function Register() {
             </div>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="items-center gap-2">
+            {refundDue === 0 && tenders.length > 0 && validateTenders(balanceDue, tenders).error && (
+              <span className="mr-auto text-[11px] font-medium text-destructive">
+                {validateTenders(balanceDue, tenders).error}
+              </span>
+            )}
             <Button variant="outline" onClick={() => setPayOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={completeSale}>Complete &amp; print</Button>
+            <Button
+              onClick={completeSale}
+              disabled={
+                refundDue === 0 && tenders.length > 0 && !!validateTenders(balanceDue, tenders).error
+              }
+            >
+              Complete &amp; print
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

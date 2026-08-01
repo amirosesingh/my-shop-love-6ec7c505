@@ -2,7 +2,7 @@ import { Loader2, Lock, LogOut, Menu, MapPin, ReceiptText, Store } from "lucide-
 import { useEffect, useState, type ReactNode } from "react";
 import { usePos } from "@/lib/pos-store";
 import { useAuth, type PermissionFlag } from "@/lib/pos-auth";
-import { useLocation, useNavigate } from "@tanstack/react-router";
+import { Link, useLocation } from "@tanstack/react-router";
 import { TerminalLogin } from "@/components/pos/TerminalLogin";
 import {
   TerminalActivation,
@@ -53,6 +53,20 @@ const ROUTE_PERMISSIONS: Record<string, PermissionFlag> = {
   "/members": "can_add_member",
 };
 
+/** The only screens any signed-in account may open. Everything else must have
+ *  an entry above — unknown paths are denied, never silently allowed. */
+const PUBLIC_ROUTES = new Set(["/", "/display"]);
+
+/** Longest matching prefix wins so a child page can tighten its parent gate. */
+function requiredPermission(pathname: string): PermissionFlag | null | "unknown" {
+  if (PUBLIC_ROUTES.has(pathname)) return null;
+  const key =
+    Object.keys(ROUTE_PERMISSIONS)
+      .filter((p) => pathname === p || pathname.startsWith(`${p}/`))
+      .sort((a, b) => b.length - a.length)[0] ?? "";
+  return ROUTE_PERMISSIONS[key] ?? "unknown";
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const { activeShift, stores, currentStore, setCurrentStore, state, ready: dataReady } = usePos();
   const { ready, user, isAdmin, canSwitchStores, logout, lock, can } = useAuth();
@@ -62,27 +76,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Windows tills must be registered to a location before they can be used.
   const terminal = useRevocationCheck();
   const location = useLocation();
-  const navigate = useNavigate();
 
   // Terminal-wide font / control scaling preference.
   useUiScale();
 
   // Background outbox drain: keeps offline sales flowing once the link returns.
   useEffect(() => startSyncEngine(), []);
-
-  // Cashier accounts are limited to the register; management screens are
-  // reserved for supervisors and admins.
-  useEffect(() => {
-    // Longest prefix wins so a child page can tighten its parent's gate.
-    const key =
-      Object.keys(ROUTE_PERMISSIONS)
-        .filter((p) => location.pathname === p || location.pathname.startsWith(`${p}/`))
-        .sort((a, b) => b.length - a.length)[0] ?? "";
-    const required = ROUTE_PERMISSIONS[key];
-    if (user && !isAdmin && required && !can(required)) {
-      void navigate({ to: "/", replace: true });
-    }
-  }, [user, isAdmin, can, location.pathname, navigate]);
 
   useEffect(() => {
     setPrintStore(currentStore ?? null);
@@ -309,7 +308,28 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Button>
         </header>
 
-        <main className="min-w-0 flex-1">{children}</main>
+        <main className="min-w-0 flex-1">
+          {(() => {
+            // Decided before the page body renders: no flash of protected data.
+            const required = requiredPermission(location.pathname);
+            const allowed =
+              required === null ? true : required === "unknown" ? isAdmin : can(required);
+            if (allowed) return children;
+            return (
+              <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 p-8 text-center">
+                <Lock className="size-8 text-muted-foreground" />
+                <h1 className="text-lg font-semibold">Access restricted</h1>
+                <p className="max-w-sm text-sm text-muted-foreground">
+                  Your account does not have permission to open this screen. Ask an administrator to
+                  enable it in Staff Management.
+                </p>
+                <Button asChild variant="outline" size="sm">
+                  <Link to="/">Back to the register</Link>
+                </Button>
+              </div>
+            );
+          })()}
+        </main>
       </div>
     </div>
   );
