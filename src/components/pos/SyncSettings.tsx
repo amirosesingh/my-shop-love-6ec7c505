@@ -7,6 +7,7 @@ import { downloadSqlBackup } from "@/lib/backup-sql";
 import { drainOutbox } from "@/lib/sync-engine";
 import { LocalDatabaseSettings } from "@/components/pos/LocalDatabaseSettings";
 import { SyncLogViewer } from "@/components/SyncLogViewer";
+import { logSync } from "@/lib/sync-log";
 import { localDb } from "@/lib/local-db";
 import {
   discardQuarantined,
