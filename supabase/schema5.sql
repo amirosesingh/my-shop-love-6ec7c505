@@ -1,3 +1,4 @@
+-- SUPERSEDED: run supabase/schema_final.sql instead. Kept for history only.
 -- ============================================================================
 -- schema5.sql — cashiers live in their own table (no auth account)
 -- Idempotent: safe to run multiple times.

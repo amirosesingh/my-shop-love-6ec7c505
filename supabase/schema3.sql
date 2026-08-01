@@ -1,3 +1,4 @@
+-- SUPERSEDED: run supabase/schema_final.sql instead. Kept for history only.
 -- ---------------------------------------------------------------------------
 -- FIX: "Only supervisors can manage terminal users" / empty staff list
 --

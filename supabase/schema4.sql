@@ -1,3 +1,4 @@
+-- SUPERSEDED: run supabase/schema_final.sql instead. Kept for history only.
 -- ---------------------------------------------------------------------------
 -- FIX: Authentication signup fails with "Database error saving new user"
 --
