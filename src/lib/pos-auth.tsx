@@ -258,7 +258,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     void supabase.rpc("current_app_user" as never).then(({ data }) => {
       if (cancelled) return;
-      const row = (Array.isArray(data) ? data[0] : data) as AppUserProfile | undefined;
+      const row = (Array.isArray(data) ? data[0] : data) as unknown as
+        | AppUserProfile
+        | undefined;
       setAppUser(row ?? null);
     });
     return () => {
