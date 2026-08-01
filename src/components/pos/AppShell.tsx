@@ -22,8 +22,6 @@ import { cn } from "@/lib/utils";
 /** Screens reserved for supervisor / admin accounts. */
 const ADMIN_PATHS = [
   "/settings",
-  "/roles",
-  "/users",
   "/staff",
   "/stores",
   "/promotions",

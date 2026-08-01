@@ -1,13 +1,33 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { ShieldAlert, Trash2, UserPlus } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  KeyRound,
+  Loader2,
+  RefreshCw,
+  Search,
+  ShieldAlert,
+  Trash2,
+  UserPlus,
+} from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -15,47 +35,255 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { usePos } from "@/lib/pos-store";
-import { DEFAULT_PERMISSIONS, PERMISSION_LABELS, useAuth } from "@/lib/pos-auth";
+import { useAuth } from "@/lib/pos-auth";
+import {
+  PERMISSION_GROUPS,
+  PERMISSION_LABELS,
+  STAFF_ROLES,
+  fromDbRole,
+  normalizePermissions,
+  rolePermissions,
+  toDbRole,
+  type PermissionKey,
+  type StaffRole,
+} from "@/lib/permissions";
+import { cashierEmail, cashierSecret, createSupervisorAccount } from "@/lib/pos-users";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/staff")({
   head: () => ({
     meta: [
-      { title: "Staff Configuration — Northwind POS" },
+      { title: "Staff Management — Northwind POS" },
       {
         name: "description",
         content:
-          "Admin panel to manage employees, staff IDs, passwords and the store branch each cashier is currently assigned to.",
+          "One screen to create cashiers, supervisors and admins, edit their profile and switch every feature permission on or off.",
       },
-      { property: "og:title", content: "Staff Configuration — Northwind POS" },
+      { property: "og:title", content: "Staff Management — Northwind POS" },
       {
         property: "og:description",
-        content: "Assign and reassign cashier store duty from one admin dashboard.",
+        content: "Unified staff profiles and the granular POS permission matrix.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: StaffConfiguration,
+  component: StaffManagement,
 });
 
-function StaffConfiguration() {
-  const { stores } = usePos();
-  const { isAdmin, staff, addStaff, updateStaff, removeStaff } = useAuth();
-  const [name, setName] = useState("");
-  const [staffId, setStaffId] = useState("");
-  const [password, setPassword] = useState("");
-  const [storeId, setStoreId] = useState(stores[0]?.id ?? "");
+const sb = supabaseExternal as unknown as SupabaseClient;
 
-  const storeLabel = (id: string) => {
-    const i = stores.findIndex((s) => s.id === id);
-    return i < 0 ? "Unassigned" : `Store ${i + 1} · ${stores[i].name}`;
+type StaffRow = {
+  user_id: string;
+  full_name: string;
+  email: string;
+  role: StaffRole;
+  store_id: string | null;
+  is_active: boolean;
+  last_login_at: string | null;
+  permissions: Record<string, boolean>;
+};
+
+const NEW_USER = {
+  kind: "cashier" as "cashier" | "manager",
+  user_id: "",
+  full_name: "",
+  pin: "",
+  email: "",
+  password: "",
+  role: "cashier" as StaffRole,
+  store_id: "",
+};
+
+function StaffManagement() {
+  const { isAdmin } = useAuth();
+  const { stores } = usePos();
+  const [rows, setRows] = useState<StaffRow[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState(NEW_USER);
+  const [creating, setCreating] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [pinReset, setPinReset] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await sb.rpc("list_app_users");
+    if (error) toast.error("Could not load staff", { description: error.message });
+    const mapped = ((data ?? []) as Record<string, unknown>[]).map((r) => {
+      const role = fromDbRole(r["role"] as string | null);
+      return {
+        user_id: String(r["user_id"] ?? ""),
+        full_name: String(r["full_name"] ?? ""),
+        email: String(r["email"] ?? ""),
+        role,
+        store_id: (r["store_id"] as string | null) ?? null,
+        is_active: r["is_active"] !== false,
+        last_login_at: (r["last_login_at"] as string | null) ?? null,
+        permissions: normalizePermissions(
+          r["permissions"] as Record<string, unknown> | null,
+          role,
+        ),
+      } satisfies StaffRow;
+    });
+    setRows(mapped);
+    setSelectedId((prev) => prev ?? mapped[0]?.user_id ?? null);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (isAdmin) void load();
+  }, [isAdmin, load]);
+
+  const filtered = useMemo(
+    () =>
+      rows.filter((r) =>
+        `${r.user_id} ${r.full_name} ${r.email} ${r.role}`
+          .toLowerCase()
+          .includes(query.trim().toLowerCase()),
+      ),
+    [rows, query],
+  );
+
+  const selected = rows.find((r) => r.user_id === selectedId) ?? null;
+
+  const patchRow = (userId: string, patch: Partial<StaffRow>) =>
+    setRows((prev) => prev.map((r) => (r.user_id === userId ? { ...r, ...patch } : r)));
+
+  const saveProfile = async (row: StaffRow) => {
+    setSaving(true);
+    const { error } = await sb.rpc("set_app_user_profile", {
+      p_user_id: row.user_id,
+      p_full_name: row.full_name,
+      p_role: toDbRole(row.role),
+      p_store_id: row.store_id,
+      p_is_active: row.is_active,
+    });
+    setSaving(false);
+    if (error) {
+      toast.error("Could not save profile", { description: error.message });
+      return;
+    }
+    toast.success("Profile saved");
+  };
+
+  const togglePermission = async (row: StaffRow, key: PermissionKey, value: boolean) => {
+    patchRow(row.user_id, { permissions: { ...row.permissions, [key]: value } });
+    const { error } = await sb.rpc("set_app_user_permissions", {
+      p_user_id: row.user_id,
+      p_permissions: { [key]: value },
+    });
+    if (error) {
+      toast.error("Could not update permission", { description: error.message });
+      void load();
+    }
+  };
+
+  const setGroup = async (row: StaffRow, keys: readonly string[], value: boolean) => {
+    const patch = Object.fromEntries(keys.map((k) => [k, value]));
+    patchRow(row.user_id, { permissions: { ...row.permissions, ...patch } });
+    const { error } = await sb.rpc("set_app_user_permissions", {
+      p_user_id: row.user_id,
+      p_permissions: patch,
+    });
+    if (error) {
+      toast.error("Could not update permissions", { description: error.message });
+      void load();
+    }
+  };
+
+  const createUser = async () => {
+    setCreating(true);
+    try {
+      if (form.kind === "cashier") {
+        if (!/^[a-z0-9-]+$/i.test(form.user_id.trim())) {
+          toast.error("Enter a User ID (letters, numbers or dashes)");
+          return;
+        }
+        if (!/^\d{4}$/.test(form.pin)) {
+          toast.error("PIN must be exactly 4 digits");
+          return;
+        }
+        const email = cashierEmail(form.user_id);
+        const secret = cashierSecret(form.user_id, form.pin);
+        const { error } = await sb.rpc("upsert_terminal_user", {
+          p_user_id: form.user_id.trim(),
+          p_full_name: form.full_name.trim() || form.user_id.trim(),
+          p_role: "staff",
+          p_store_id: form.store_id || null,
+          p_email: email,
+          p_pin: form.pin,
+          p_password: secret,
+        });
+        if (error) {
+          toast.error("Could not create cashier", { description: error.message });
+          return;
+        }
+        toast.success(`Cashier ${form.user_id.trim()} created`);
+      } else {
+        if (!form.email.includes("@")) {
+          toast.error("Enter a valid email address");
+          return;
+        }
+        if (form.password.length < 6) {
+          toast.error("Password must be at least 6 characters");
+          return;
+        }
+        const res = await createSupervisorAccount({
+          email: form.email,
+          fullName: form.full_name || form.email,
+          password: form.password,
+          role: form.role === "admin" ? "admin" : "supervisor",
+        });
+        if (!res.ok) {
+          toast.error("Could not create account", { description: res.error });
+          return;
+        }
+        toast.success(`${form.role} account created`);
+      }
+      setForm(NEW_USER);
+      setDialogOpen(false);
+      void load();
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const resetPin = async (row: StaffRow) => {
+    if (!/^\d{4}$/.test(pinReset)) {
+      toast.error("PIN must be exactly 4 digits");
+      return;
+    }
+    const { error } = await sb.rpc("upsert_terminal_user", {
+      p_user_id: row.user_id,
+      p_full_name: row.full_name,
+      p_role: toDbRole(row.role),
+      p_store_id: row.store_id,
+      p_email: row.email || cashierEmail(row.user_id),
+      p_pin: pinReset,
+      p_password: cashierSecret(row.user_id, pinReset),
+    });
+    setPinReset("");
+    if (error) {
+      toast.error("Could not reset PIN", { description: error.message });
+      return;
+    }
+    toast.success("PIN updated");
+  };
+
+  const removeUser = async (row: StaffRow) => {
+    const { error } = await sb.rpc("delete_terminal_user", { p_user_id: row.user_id });
+    if (error) {
+      toast.error("Delete failed", { description: error.message });
+      return;
+    }
+    setSelectedId(null);
+    toast.success(`${row.full_name || row.user_id} removed`);
+    void load();
   };
 
   if (!isAdmin) {
@@ -64,9 +292,9 @@ function StaffConfiguration() {
         <div className="flex min-h-screen items-center justify-center p-6">
           <div className="max-w-sm rounded-lg border border-destructive/40 bg-destructive/10 p-6 text-center">
             <ShieldAlert className="mx-auto size-6 text-destructive" />
-            <p className="mt-2 font-semibold">Admin only</p>
+            <p className="mt-2 font-semibold">Supervisors only</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Staff configuration is restricted to the admin account.
+              Staff management is restricted to supervisor and admin accounts.
             </p>
           </div>
         </div>
@@ -77,188 +305,399 @@ function StaffConfiguration() {
   return (
     <AppShell>
       <div className="space-y-6 p-6">
-        <header>
-          <h1 className="text-2xl font-semibold">Staff configuration</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage employees and reassign store duty — changes apply on their next screen load.
-          </p>
+        <header className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold">Staff management</h1>
+            <p className="text-sm text-muted-foreground">
+              Profiles, roles and every feature permission in one place.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => void load()} disabled={loading}>
+              {loading ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <RefreshCw className="size-4" />
+              )}
+              Refresh
+            </Button>
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <UserPlus className="size-4" /> New staff
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Create staff account</DialogTitle>
+                  <DialogDescription>
+                    Cashiers sign in with a User ID and 4-digit PIN. Supervisors and admins sign in
+                    with email and password.
+                  </DialogDescription>
+                </DialogHeader>
+                <Tabs
+                  value={form.kind}
+                  onValueChange={(v) =>
+                    setForm({
+                      ...form,
+                      kind: v as "cashier" | "manager",
+                      role: v === "cashier" ? "cashier" : "supervisor",
+                    })
+                  }
+                >
+                  <TabsList className="w-full">
+                    <TabsTrigger value="cashier" className="flex-1">
+                      Cashier (PIN)
+                    </TabsTrigger>
+                    <TabsTrigger value="manager" className="flex-1">
+                      Supervisor / Admin
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="cashier" className="space-y-3 pt-3">
+                    <div className="space-y-1">
+                      <Label htmlFor="nu-id">User ID</Label>
+                      <Input
+                        id="nu-id"
+                        placeholder="101"
+                        value={form.user_id}
+                        onChange={(e) => setForm({ ...form, user_id: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="nu-name">Full name</Label>
+                      <Input
+                        id="nu-name"
+                        value={form.full_name}
+                        onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="nu-pin">4-digit PIN</Label>
+                      <Input
+                        id="nu-pin"
+                        type="password"
+                        inputMode="numeric"
+                        maxLength={4}
+                        autoComplete="off"
+                        value={form.pin}
+                        onChange={(e) =>
+                          setForm({ ...form, pin: e.target.value.replace(/\D/g, "").slice(0, 4) })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Assigned store</Label>
+                      <Select
+                        value={form.store_id}
+                        onValueChange={(v) => setForm({ ...form, store_id: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select store" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {stores.map((s) => (
+                            <SelectItem key={s.id} value={s.id}>
+                              {s.code} · {s.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="manager" className="space-y-3 pt-3">
+                    <div className="space-y-1">
+                      <Label htmlFor="nu-mname">Full name</Label>
+                      <Input
+                        id="nu-mname"
+                        value={form.full_name}
+                        onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="nu-email">Email</Label>
+                      <Input
+                        id="nu-email"
+                        type="email"
+                        value={form.email}
+                        onChange={(e) => setForm({ ...form, email: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="nu-pass">Password</Label>
+                      <Input
+                        id="nu-pass"
+                        type="password"
+                        autoComplete="new-password"
+                        value={form.password}
+                        onChange={(e) => setForm({ ...form, password: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Role</Label>
+                      <Select
+                        value={form.role}
+                        onValueChange={(v) => setForm({ ...form, role: v as StaffRole })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="supervisor">Supervisor</SelectItem>
+                          <SelectItem value="admin">Admin</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </TabsContent>
+                </Tabs>
+                <DialogFooter>
+                  <Button onClick={() => void createUser()} disabled={creating}>
+                    {creating && <Loader2 className="size-4 animate-spin" />} Create account
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
         </header>
 
-        <section className="rounded-lg border border-border bg-card">
-          <h2 className="px-5 py-3 text-sm font-semibold">Active employees</h2>
-          <Separator />
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Employee name</TableHead>
-                <TableHead>Staff ID</TableHead>
-                <TableHead>Login email</TableHead>
-                <TableHead>Assigned store duty</TableHead>
-                <TableHead>Modify System Roles</TableHead>
-                <TableHead className="text-right">Remove</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {staff.map((s) => (
-                <TableRow key={s.id}>
-                  <TableCell>
-                    <Input
-                      className="h-9"
-                      value={s.name}
-                      onChange={(e) => updateStaff({ ...s, name: e.target.value })}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      className="numeric h-9 w-32"
-                      value={s.staffId}
-                      onChange={(e) => updateStaff({ ...s, staffId: e.target.value })}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      className="h-9 w-52"
-                      type="email"
-                      placeholder="cashier@store.com"
-                      value={s.email ?? ""}
-                      onChange={(e) => updateStaff({ ...s, email: e.target.value })}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Select
-                      value={s.storeId}
-                      onValueChange={(v) => {
-                        updateStaff({ ...s, storeId: v });
-                        toast.success(`${s.name} assigned to ${storeLabel(v)}`);
-                      }}
-                    >
-                      <SelectTrigger className="h-9 w-56">
-                        <SelectValue placeholder="Assigned store duty" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {stores.map((st, i) => (
-                          <SelectItem key={st.id} value={st.id}>
-                            Store {i + 1} · {st.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1.5">
-                      {PERMISSION_LABELS.map((p) => (
-                        <label
-                          key={p.key}
-                          className="flex items-center gap-2 text-xs text-muted-foreground"
-                        >
-                          <Switch
-                            checked={!!s.permissions?.[p.key]}
-                            onCheckedChange={(v) => {
-                              updateStaff({
-                                ...s,
-                                permissions: { ...DEFAULT_PERMISSIONS, ...s.permissions, [p.key]: v },
-                              });
-                              toast.success(`${p.label}: ${v ? "enabled" : "disabled"} for ${s.name}`);
-                            }}
-                          />
-                          <span>{p.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        removeStaff(s.id);
-                        toast.success(`${s.name} removed`);
-                      }}
-                    >
-                      <Trash2 className="size-4 text-destructive" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
+        <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
+          {/* Master list */}
+          <section className="rounded-lg border border-border bg-card">
+            <div className="flex items-center gap-2 p-3">
+              <Search className="size-4 text-muted-foreground" />
+              <Input
+                className="h-8"
+                placeholder="Search staff"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </div>
+            <Separator />
+            <ul className="max-h-[70vh] overflow-y-auto">
+              {filtered.map((r) => (
+                <li key={r.user_id}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedId(r.user_id)}
+                    className={cn(
+                      "flex w-full flex-col items-start gap-0.5 border-b border-border px-4 py-3 text-left transition-colors hover:bg-accent",
+                      selectedId === r.user_id && "bg-accent",
+                    )}
+                  >
+                    <span className="flex w-full items-center gap-2">
+                      <span className="truncate text-sm font-medium">
+                        {r.full_name || r.user_id}
+                      </span>
+                      {!r.is_active && (
+                        <Badge variant="outline" className="ml-auto text-[10px]">
+                          Inactive
+                        </Badge>
+                      )}
+                    </span>
+                    <span className="numeric text-[11px] capitalize text-muted-foreground">
+                      {r.user_id} · {r.role}
+                    </span>
+                  </button>
+                </li>
               ))}
-              {!staff.length && (
-                <TableRow>
-                  <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
-                    No employees yet.
-                  </TableCell>
-                </TableRow>
+              {!loading && !filtered.length && (
+                <li className="p-6 text-center text-sm text-muted-foreground">
+                  No staff accounts yet.
+                </li>
               )}
-            </TableBody>
-          </Table>
-        </section>
+            </ul>
+          </section>
 
-        <section className="rounded-lg border border-border bg-card p-5">
-          <h2 className="mb-3 text-sm font-semibold">Add employee</h2>
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Employee name</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Staff ID</Label>
-              <Input
-                className="numeric w-36"
-                placeholder="EMP-104"
-                value={staffId}
-                onChange={(e) => setStaffId(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Login email</Label>
-              <Input
-                className="w-56"
-                type="email"
-                placeholder="cashier@store.com"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Assigned store duty</Label>
-              <Select value={storeId} onValueChange={setStoreId}>
-                <SelectTrigger className="w-56">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {stores.map((st, i) => (
-                    <SelectItem key={st.id} value={st.id}>
-                      Store {i + 1} · {st.name}
-                    </SelectItem>
+          {/* Detail */}
+          {selected ? (
+            <section className="rounded-lg border border-border bg-card">
+              <div className="flex flex-wrap items-center gap-3 px-5 py-3">
+                <div className="min-w-0">
+                  <h2 className="truncate text-sm font-semibold">
+                    {selected.full_name || selected.user_id}
+                  </h2>
+                  <p className="text-[11px] text-muted-foreground">
+                    {selected.email || "No email"} · last login{" "}
+                    {selected.last_login_at
+                      ? new Date(selected.last_login_at).toLocaleString()
+                      : "never"}
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="ml-auto"
+                  onClick={() => void removeUser(selected)}
+                >
+                  <Trash2 className="size-4 text-destructive" /> Remove
+                </Button>
+              </div>
+              <Separator />
+
+              <Tabs defaultValue="profile" className="p-5">
+                <TabsList>
+                  <TabsTrigger value="profile">Profile details</TabsTrigger>
+                  <TabsTrigger value="permissions">Permission matrix</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="profile" className="space-y-4 pt-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <Label>Full name</Label>
+                      <Input
+                        value={selected.full_name}
+                        onChange={(e) =>
+                          patchRow(selected.user_id, { full_name: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>User ID</Label>
+                      <Input className="numeric" value={selected.user_id} readOnly />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Email</Label>
+                      <Input value={selected.email} readOnly />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Role</Label>
+                      <Select
+                        value={selected.role}
+                        onValueChange={(v) => {
+                          const role = v as StaffRole;
+                          patchRow(selected.user_id, {
+                            role,
+                            permissions: rolePermissions(role),
+                          });
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {STAFF_ROLES.map((r) => (
+                            <SelectItem key={r} value={r} className="capitalize">
+                              {r}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Assigned store</Label>
+                      <Select
+                        value={selected.store_id ?? "none"}
+                        onValueChange={(v) =>
+                          patchRow(selected.user_id, { store_id: v === "none" ? null : v })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">All stores</SelectItem>
+                          {stores.map((s) => (
+                            <SelectItem key={s.id} value={s.id}>
+                              {s.code} · {s.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-end gap-3">
+                      <label className="flex items-center gap-2 text-sm">
+                        <Switch
+                          checked={selected.is_active}
+                          onCheckedChange={(v) =>
+                            patchRow(selected.user_id, { is_active: v })
+                          }
+                        />
+                        Active
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-end gap-3 rounded-md border border-border p-3">
+                    <div className="space-y-1">
+                      <Label className="flex items-center gap-1 text-xs">
+                        <KeyRound className="size-3.5" /> Reset 4-digit PIN
+                      </Label>
+                      <Input
+                        className="w-32"
+                        type="password"
+                        inputMode="numeric"
+                        maxLength={4}
+                        autoComplete="off"
+                        value={pinReset}
+                        onChange={(e) =>
+                          setPinReset(e.target.value.replace(/\D/g, "").slice(0, 4))
+                        }
+                      />
+                    </div>
+                    <Button variant="outline" onClick={() => void resetPin(selected)}>
+                      Update PIN
+                    </Button>
+                    <p className="text-[11px] text-muted-foreground">
+                      PINs are hashed in the database and can never be read back.
+                    </p>
+                  </div>
+
+                  <Button onClick={() => void saveProfile(selected)} disabled={saving}>
+                    {saving && <Loader2 className="size-4 animate-spin" />} Save profile
+                  </Button>
+                </TabsContent>
+
+                <TabsContent value="permissions" className="space-y-5 pt-4">
+                  {PERMISSION_GROUPS.map((group) => (
+                    <div key={group.id} className="rounded-md border border-border">
+                      <div className="flex items-center gap-2 px-4 py-2">
+                        <h3 className="text-sm font-semibold">{group.label}</h3>
+                        <div className="ml-auto flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 text-[11px]"
+                            onClick={() => void setGroup(selected, group.keys, true)}
+                          >
+                            All on
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 text-[11px]"
+                            onClick={() => void setGroup(selected, group.keys, false)}
+                          >
+                            All off
+                          </Button>
+                        </div>
+                      </div>
+                      <Separator />
+                      <div className="grid gap-3 p-4 sm:grid-cols-2">
+                        {group.keys.map((key) => (
+                          <label
+                            key={key}
+                            className="flex items-center justify-between gap-3 text-sm"
+                          >
+                            <span>{PERMISSION_LABELS[key as PermissionKey]}</span>
+                            <Switch
+                              checked={!!selected.permissions[key]}
+                              onCheckedChange={(v) =>
+                                void togglePermission(selected, key as PermissionKey, v)
+                              }
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    </div>
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button
-              onClick={() => {
-                if (!name.trim() || !staffId.trim() || !password.trim()) {
-                  toast.error("Name, staff ID and login email are required");
-                  return;
-                }
-                if (staff.some((s) => s.staffId.toLowerCase() === staffId.trim().toLowerCase())) {
-                  toast.error("That staff ID is already in use");
-                  return;
-                }
-                addStaff({
-                  name: name.trim(),
-                  staffId: staffId.trim(),
-                  email: password.trim().toLowerCase(),
-                  storeId,
-                  permissions: { ...DEFAULT_PERMISSIONS },
-                });
-                setName("");
-                setStaffId("");
-                setPassword("");
-                toast.success("Employee added");
-              }}
-            >
-              <UserPlus className="size-4" /> Add employee
-            </Button>
-          </div>
-        </section>
+                </TabsContent>
+              </Tabs>
+            </section>
+          ) : (
+            <section className="flex items-center justify-center rounded-lg border border-border bg-card p-10 text-sm text-muted-foreground">
+              Select a staff member to view their profile and permissions.
+            </section>
+          )}
+        </div>
       </div>
     </AppShell>
   );

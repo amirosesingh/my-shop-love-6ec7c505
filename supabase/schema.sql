@@ -244,12 +244,13 @@ create table if not exists public.app_users (
   store_id varchar(64),
   is_active boolean not null default true,
   permissions jsonb not null default jsonb_build_object(
-    'financials', false,
-    'products', false,
-    'ecommerce', false,
-    'can_give_discount', false,
-    'can_refund', false,
-    'can_open_drawer_manual', false
+    'can_open_drawer', true, 'can_close_drawer', true, 'can_view_drawer_balance', false,
+    'can_process_sale', true, 'can_give_discount', false, 'can_void_item', false,
+    'can_hold_cart', true, 'can_process_refund', false, 'can_process_exchange', false,
+    'can_view_inventory', true, 'can_edit_product_price', false, 'can_add_new_product', false,
+    'can_receive_purchase_order', false, 'can_add_member', true, 'can_edit_member_points', false,
+    'can_apply_member_discount', true, 'can_view_sales_reports', false,
+    'can_access_pos_settings', false, 'can_manage_staff', false
   ),
   pin_hash text not null default '',       -- bcrypt digest, never returned to clients
   auth_secret text not null default '',    -- backend sign-in secret, released only on a correct PIN
@@ -289,6 +290,44 @@ alter table public.app_users
   add column if not exists auth_secret text not null default '',
   add column if not exists created_at timestamptz not null default now(),
   add column if not exists updated_at timestamptz not null default now();
+
+-- Merge legacy coarse permission flags into the granular matrix (idempotent).
+update public.app_users a
+   set permissions = (
+     case when a.role in ('admin','manager') then
+       jsonb_build_object(
+         'can_open_drawer', true, 'can_close_drawer', true, 'can_view_drawer_balance', true,
+         'can_process_sale', true, 'can_give_discount', true, 'can_void_item', true,
+         'can_hold_cart', true, 'can_process_refund', true, 'can_process_exchange', true,
+         'can_view_inventory', true, 'can_edit_product_price', true, 'can_add_new_product', true,
+         'can_receive_purchase_order', true, 'can_add_member', true, 'can_edit_member_points', true,
+         'can_apply_member_discount', true, 'can_view_sales_reports', true,
+         'can_access_pos_settings', true, 'can_manage_staff', true)
+     else
+       jsonb_build_object(
+         'can_open_drawer', coalesce((a.permissions ->> 'can_open_drawer_manual')::boolean, true),
+         'can_close_drawer', true,
+         'can_view_drawer_balance', coalesce((a.permissions ->> 'financials')::boolean, false),
+         'can_process_sale', true,
+         'can_give_discount', coalesce((a.permissions ->> 'can_give_discount')::boolean, false),
+         'can_void_item', false,
+         'can_hold_cart', true,
+         'can_process_refund', coalesce((a.permissions ->> 'can_refund')::boolean, false),
+         'can_process_exchange', coalesce((a.permissions ->> 'can_refund')::boolean, false),
+         'can_view_inventory', true,
+         'can_edit_product_price', coalesce((a.permissions ->> 'ecommerce')::boolean, false),
+         'can_add_new_product', coalesce((a.permissions ->> 'products')::boolean, false),
+         'can_receive_purchase_order', coalesce((a.permissions ->> 'products')::boolean, false),
+         'can_add_member', true,
+         'can_edit_member_points', false,
+         'can_apply_member_discount', true,
+         'can_view_sales_reports', coalesce((a.permissions ->> 'financials')::boolean, false),
+         'can_access_pos_settings', false,
+         'can_manage_staff', false)
+     end
+   ) || (coalesce(a.permissions, '{}'::jsonb) - array['financials','products','ecommerce','can_refund','can_open_drawer_manual'])
+ where a.permissions ?| array['financials','products','ecommerce','can_refund','can_open_drawer_manual']
+    or not (a.permissions ? 'can_process_sale');
 
 create unique index if not exists app_users_user_id_key
   on public.app_users (lower(user_id));
@@ -452,12 +491,24 @@ declare
                      end;
   v_store text := nullif(trim(coalesce(new.raw_user_meta_data ->> 'store_id', '')), '');
   v_perms jsonb := case when v_role in ('admin','manager')
-    then jsonb_build_object('financials', true, 'products', true, 'ecommerce', true,
-                            'can_give_discount', true, 'can_refund', true,
-                            'can_open_drawer_manual', true)
-    else jsonb_build_object('financials', false, 'products', false, 'ecommerce', false,
-                            'can_give_discount', false, 'can_refund', false,
-                            'can_open_drawer_manual', false)
+    then jsonb_build_object(
+      'can_open_drawer', true, 'can_close_drawer', true, 'can_view_drawer_balance', true,
+      'can_process_sale', true, 'can_give_discount', true, 'can_void_item', true,
+      'can_hold_cart', true, 'can_process_refund', true, 'can_process_exchange', true,
+      'can_view_inventory', true, 'can_edit_product_price', true, 'can_add_new_product', true,
+      'can_receive_purchase_order', true, 'can_add_member', true, 'can_edit_member_points', true,
+      'can_apply_member_discount', true, 'can_view_sales_reports', true,
+      'can_access_pos_settings', true, 'can_manage_staff', true
+    )
+    else jsonb_build_object(
+      'can_open_drawer', true, 'can_close_drawer', true, 'can_view_drawer_balance', false,
+      'can_process_sale', true, 'can_give_discount', false, 'can_void_item', false,
+      'can_hold_cart', true, 'can_process_refund', false, 'can_process_exchange', false,
+      'can_view_inventory', true, 'can_edit_product_price', false, 'can_add_new_product', false,
+      'can_receive_purchase_order', false, 'can_add_member', true, 'can_edit_member_points', false,
+      'can_apply_member_discount', true, 'can_view_sales_reports', false,
+      'can_access_pos_settings', false, 'can_manage_staff', false
+    )
   end;
 begin
   insert into public.app_users
@@ -477,6 +528,29 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert or update of email, raw_user_meta_data on auth.users
   for each row execute function public.sync_auth_user_to_public();
+
+
+-- Supervisors edit a staff profile (name, role, store, active flag).
+drop function if exists public.set_app_user_profile(text, text, app_role, text, boolean);
+create or replace function public.set_app_user_profile(
+  p_user_id text, p_full_name text, p_role app_role, p_store_id text, p_is_active boolean)
+returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not (public.has_role(auth.uid(),'admin') or public.has_role(auth.uid(),'manager')) then
+    raise exception 'Only supervisors can edit staff profiles';
+  end if;
+  update public.app_users a
+     set full_name  = coalesce(nullif(trim(p_full_name), ''), a.full_name),
+         role       = coalesce(p_role, a.role),
+         store_id   = nullif(trim(coalesce(p_store_id, '')), ''),
+         is_active  = coalesce(p_is_active, a.is_active),
+         updated_at = now()
+   where lower(a.user_id) = lower(trim(p_user_id));
+end $$;
+
+revoke all on function public.set_app_user_profile(text, text, app_role, text, boolean) from public;
+grant execute on function public.set_app_user_profile(text, text, app_role, text, boolean) to authenticated, service_role;
 
 -- ============================================================================
 -- Default seed data
@@ -499,19 +573,34 @@ insert into public.app_users (user_id, full_name, email, role, store_id, permiss
                               pin_hash, auth_secret)
 values
   ('admin', 'Administrator', 'admin@store.internal', 'admin', null,
-   jsonb_build_object('financials', true, 'products', true, 'ecommerce', true,
-                      'can_give_discount', true, 'can_refund', true,
-                      'can_open_drawer_manual', true),
+   jsonb_build_object(
+     'can_open_drawer', true, 'can_close_drawer', true, 'can_view_drawer_balance', true,
+     'can_process_sale', true, 'can_give_discount', true, 'can_void_item', true,
+     'can_hold_cart', true, 'can_process_refund', true, 'can_process_exchange', true,
+     'can_view_inventory', true, 'can_edit_product_price', true, 'can_add_new_product', true,
+     'can_receive_purchase_order', true, 'can_add_member', true, 'can_edit_member_points', true,
+     'can_apply_member_discount', true, 'can_view_sales_reports', true,
+     'can_access_pos_settings', true, 'can_manage_staff', true),
    extensions.crypt('1234', extensions.gen_salt('bf', 10)), 'pos-admin-1234'),
   ('supervisor', 'Store Supervisor', 'supervisor@store.internal', 'manager', null,
-   jsonb_build_object('financials', true, 'products', true, 'ecommerce', true,
-                      'can_give_discount', true, 'can_refund', true,
-                      'can_open_drawer_manual', true),
+   jsonb_build_object(
+     'can_open_drawer', true, 'can_close_drawer', true, 'can_view_drawer_balance', true,
+     'can_process_sale', true, 'can_give_discount', true, 'can_void_item', true,
+     'can_hold_cart', true, 'can_process_refund', true, 'can_process_exchange', true,
+     'can_view_inventory', true, 'can_edit_product_price', true, 'can_add_new_product', true,
+     'can_receive_purchase_order', true, 'can_add_member', true, 'can_edit_member_points', true,
+     'can_apply_member_discount', true, 'can_view_sales_reports', true,
+     'can_access_pos_settings', true, 'can_manage_staff', true),
    extensions.crypt('2345', extensions.gen_salt('bf', 10)), 'pos-supervisor-2345'),
   ('101', 'Cashier 101', '101@store.internal', 'staff', 's1',
-   jsonb_build_object('financials', false, 'products', false, 'ecommerce', false,
-                      'can_give_discount', false, 'can_refund', false,
-                      'can_open_drawer_manual', false),
+   jsonb_build_object(
+     'can_open_drawer', true, 'can_close_drawer', true, 'can_view_drawer_balance', false,
+     'can_process_sale', true, 'can_give_discount', false, 'can_void_item', false,
+     'can_hold_cart', true, 'can_process_refund', false, 'can_process_exchange', false,
+     'can_view_inventory', true, 'can_edit_product_price', false, 'can_add_new_product', false,
+     'can_receive_purchase_order', false, 'can_add_member', true, 'can_edit_member_points', false,
+     'can_apply_member_discount', true, 'can_view_sales_reports', false,
+     'can_access_pos_settings', false, 'can_manage_staff', false),
    extensions.crypt('1111', extensions.gen_salt('bf', 10)), 'pos-101-1111')
 on conflict (user_id) do nothing;
 

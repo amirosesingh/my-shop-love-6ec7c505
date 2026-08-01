@@ -16,13 +16,11 @@ import { Route as MembersRouteImport } from './routes/members'
 import { Route as PromotionsRouteImport } from './routes/promotions'
 import { Route as PurchasingRouteImport } from './routes/purchasing'
 import { Route as ReceiptsRouteImport } from './routes/receipts'
-import { Route as RolesRouteImport } from './routes/roles'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ShiftsRouteImport } from './routes/shifts'
 import { Route as StaffRouteImport } from './routes/staff'
 import { Route as StoresRouteImport } from './routes/stores'
 import { Route as TransfersRouteImport } from './routes/transfers'
-import { Route as UsersRouteImport } from './routes/users'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -59,11 +57,6 @@ const ReceiptsRoute = ReceiptsRouteImport.update({
   path: '/receipts',
   getParentRoute: () => rootRouteImport,
 } as any)
-const RolesRoute = RolesRouteImport.update({
-  id: '/roles',
-  path: '/roles',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -89,11 +82,6 @@ const TransfersRoute = TransfersRouteImport.update({
   path: '/transfers',
   getParentRoute: () => rootRouteImport,
 } as any)
-const UsersRoute = UsersRouteImport.update({
-  id: '/users',
-  path: '/users',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -103,13 +91,11 @@ export interface FileRoutesByFullPath {
   '/promotions': typeof PromotionsRoute
   '/purchasing': typeof PurchasingRoute
   '/receipts': typeof ReceiptsRoute
-  '/roles': typeof RolesRoute
   '/settings': typeof SettingsRoute
   '/shifts': typeof ShiftsRoute
   '/staff': typeof StaffRoute
   '/stores': typeof StoresRoute
   '/transfers': typeof TransfersRoute
-  '/users': typeof UsersRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -119,13 +105,11 @@ export interface FileRoutesByTo {
   '/promotions': typeof PromotionsRoute
   '/purchasing': typeof PurchasingRoute
   '/receipts': typeof ReceiptsRoute
-  '/roles': typeof RolesRoute
   '/settings': typeof SettingsRoute
   '/shifts': typeof ShiftsRoute
   '/staff': typeof StaffRoute
   '/stores': typeof StoresRoute
   '/transfers': typeof TransfersRoute
-  '/users': typeof UsersRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -136,13 +120,11 @@ export interface FileRoutesById {
   '/promotions': typeof PromotionsRoute
   '/purchasing': typeof PurchasingRoute
   '/receipts': typeof ReceiptsRoute
-  '/roles': typeof RolesRoute
   '/settings': typeof SettingsRoute
   '/shifts': typeof ShiftsRoute
   '/staff': typeof StaffRoute
   '/stores': typeof StoresRoute
   '/transfers': typeof TransfersRoute
-  '/users': typeof UsersRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -154,13 +136,11 @@ export interface FileRouteTypes {
     | '/promotions'
     | '/purchasing'
     | '/receipts'
-    | '/roles'
     | '/settings'
     | '/shifts'
     | '/staff'
     | '/stores'
     | '/transfers'
-    | '/users'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -170,13 +150,11 @@ export interface FileRouteTypes {
     | '/promotions'
     | '/purchasing'
     | '/receipts'
-    | '/roles'
     | '/settings'
     | '/shifts'
     | '/staff'
     | '/stores'
     | '/transfers'
-    | '/users'
   id:
     | '__root__'
     | '/'
@@ -186,13 +164,11 @@ export interface FileRouteTypes {
     | '/promotions'
     | '/purchasing'
     | '/receipts'
-    | '/roles'
     | '/settings'
     | '/shifts'
     | '/staff'
     | '/stores'
     | '/transfers'
-    | '/users'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -203,13 +179,11 @@ export interface RootRouteChildren {
   PromotionsRoute: typeof PromotionsRoute
   PurchasingRoute: typeof PurchasingRoute
   ReceiptsRoute: typeof ReceiptsRoute
-  RolesRoute: typeof RolesRoute
   SettingsRoute: typeof SettingsRoute
   ShiftsRoute: typeof ShiftsRoute
   StaffRoute: typeof StaffRoute
   StoresRoute: typeof StoresRoute
   TransfersRoute: typeof TransfersRoute
-  UsersRoute: typeof UsersRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -263,13 +237,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReceiptsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/roles': {
-      id: '/roles'
-      path: '/roles'
-      fullPath: '/roles'
-      preLoaderRoute: typeof RolesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/settings': {
       id: '/settings'
       path: '/settings'
@@ -305,13 +272,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TransfersRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/users': {
-      id: '/users'
-      path: '/users'
-      fullPath: '/users'
-      preLoaderRoute: typeof UsersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
@@ -323,13 +283,11 @@ const rootRouteChildren: RootRouteChildren = {
   PromotionsRoute: PromotionsRoute,
   PurchasingRoute: PurchasingRoute,
   ReceiptsRoute: ReceiptsRoute,
-  RolesRoute: RolesRoute,
   SettingsRoute: SettingsRoute,
   ShiftsRoute: ShiftsRoute,
   StaffRoute: StaffRoute,
   StoresRoute: StoresRoute,
   TransfersRoute: TransfersRoute,
-  UsersRoute: UsersRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

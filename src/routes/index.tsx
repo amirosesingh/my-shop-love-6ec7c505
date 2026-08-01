@@ -37,6 +37,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { cartTotals, money, stockAt, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
+import { useUserPermissions } from "@/lib/pos-permissions";
 import type { CartLine, DiscountType, PaymentMethod, Sale } from "@/lib/pos-types";
 import { lineUnitDiscount, r2 } from "@/lib/pos-types";
 import { evaluatePromotions, focLine } from "@/lib/pos-promotions";
@@ -62,9 +63,9 @@ export const Route = createFileRoute("/")({
 function Register() {
   const { state, activeShift, recordSale, openShift, currentStore } = usePos();
   const { user, can } = useAuth();
+  const { requirePermission } = useUserPermissions();
   const canDiscount = can("can_give_discount");
-  const canRefund = can("can_refund");
-  const canOpenDrawer = can("can_open_drawer_manual");
+  const canRefund = can("can_process_refund");
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
   const [lines, setLines] = useState<CartLine[]>([]);
@@ -267,16 +268,14 @@ function Register() {
     }
   }
 
-  function completeSale() {
+  async function completeSale() {
     if (!activeShift) {
       toast.error("Open a shift before taking payment");
       return;
     }
     const isRefund = totals.total < 0;
-    if (isRefund && !canRefund) {
-      toast.error("Your account is not allowed to process refunds");
-      return;
-    }
+    if (!(await requirePermission("can_process_sale"))) return;
+    if (isRefund && !(await requirePermission("can_process_refund"))) return;
     const paid = isRefund ? totals.total : method === "cash" ? Number(tendered || 0) : totals.total;
     if (!isRefund && method === "cash" && paid < totals.total) {
       toast.error("Tendered amount is less than the total");
@@ -334,12 +333,22 @@ function Register() {
                 className="h-11 pl-9 numeric"
               />
             </form>
-            {canOpenDrawer && (
-              <Button variant="outline" className="h-11" onClick={() => openCashDrawer()}>
-                <Vault className="size-4" /> Open drawer
-              </Button>
-            )}
-            <Button variant="outline" className="h-11" onClick={() => setExchangeOpen(true)}>
+            <Button
+              variant="outline"
+              className="h-11"
+              onClick={async () => {
+                if (await requirePermission("can_open_drawer")) openCashDrawer();
+              }}
+            >
+              <Vault className="size-4" /> Open drawer
+            </Button>
+            <Button
+              variant="outline"
+              className="h-11"
+              onClick={async () => {
+                if (await requirePermission("can_process_exchange")) setExchangeOpen(true);
+              }}
+            >
               <Repeat className="size-4" /> Exchange
             </Button>
             {!activeShift && (

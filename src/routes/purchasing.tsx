@@ -98,7 +98,7 @@ function Purchasing() {
     scanRef.current?.focus();
   }, []);
 
-  if (!can("products")) {
+  if (!can("can_receive_purchase_order")) {
     return (
       <AppShell>
         <div className="flex min-h-screen items-center justify-center p-6">

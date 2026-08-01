@@ -10,6 +10,35 @@ import {
 import type { Session } from "@supabase/supabase-js";
 import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
 import { cashierEmail, cashierSecret, type MetaRole } from "@/lib/pos-users";
+import {
+  CASHIER_PERMISSIONS,
+  FULL_PERMISSIONS,
+  NO_PERMISSIONS,
+  PERMISSION_GROUPS,
+  PERMISSION_KEYS,
+  PERMISSION_LABELS,
+  fromDbRole,
+  normalizePermissions,
+  resolvePermission,
+  toDbRole,
+  type PermissionFlag,
+  type PermissionKey,
+  type StaffPermissions,
+  type StaffRole,
+} from "@/lib/permissions";
+
+export {
+  CASHIER_PERMISSIONS,
+  FULL_PERMISSIONS,
+  NO_PERMISSIONS,
+  PERMISSION_GROUPS,
+  PERMISSION_KEYS,
+  PERMISSION_LABELS,
+  fromDbRole,
+  normalizePermissions,
+  toDbRole,
+};
+export type { PermissionFlag, PermissionKey, StaffPermissions, StaffRole };
 
 export type PosRole = "cashier" | "admin";
 
@@ -17,48 +46,7 @@ export type PosRole = "cashier" | "admin";
 export type AppRole = "admin" | "manager" | "staff";
 export const APP_ROLES: AppRole[] = ["admin", "manager", "staff"];
 
-/** Feature flags the admin can toggle per employee. */
-export type StaffPermissions = {
-  /** Can Access Financial History Reports */
-  financials: boolean;
-  /** Can Create New Products / Access PO Engine */
-  products: boolean;
-  /** Can Toggle E-commerce Website Visibility */
-  ecommerce: boolean;
-  /** Can apply line / bill discounts at the register */
-  can_give_discount: boolean;
-  /** Can complete refunds and exchanges that pay money back */
-  can_refund: boolean;
-  /** Can pop the cash drawer outside of a sale */
-  can_open_drawer_manual: boolean;
-};
-
-export const FULL_PERMISSIONS: StaffPermissions = {
-  financials: true,
-  products: true,
-  ecommerce: true,
-  can_give_discount: true,
-  can_refund: true,
-  can_open_drawer_manual: true,
-};
-
-export const DEFAULT_PERMISSIONS: StaffPermissions = {
-  financials: false,
-  products: false,
-  ecommerce: false,
-  can_give_discount: false,
-  can_refund: false,
-  can_open_drawer_manual: false,
-};
-
-export const PERMISSION_LABELS: { key: keyof StaffPermissions; label: string }[] = [
-  { key: "financials", label: "Can Access Financial History Reports" },
-  { key: "products", label: "Can Create New Products / Access PO Engine" },
-  { key: "ecommerce", label: "Can Toggle E-commerce Website Visibility" },
-  { key: "can_give_discount", label: "Can Give Discounts" },
-  { key: "can_refund", label: "Can Process Refunds / Exchanges" },
-  { key: "can_open_drawer_manual", label: "Can Open Cash Drawer Manually" },
-];
+export const DEFAULT_PERMISSIONS = CASHIER_PERMISSIONS;
 
 /** An employee record the admin can edit at any time. */
 export type StaffMember = {
@@ -96,7 +84,7 @@ const SEED_STAFF: StaffMember[] = [
     staffId: "EMP-101",
     email: "",
     storeId: "s1",
-    permissions: { ...DEFAULT_PERMISSIONS, financials: true, products: true },
+    permissions: { ...DEFAULT_PERMISSIONS, can_view_sales_reports: true, can_add_new_product: true },
   },
   {
     id: "u2",
@@ -104,7 +92,7 @@ const SEED_STAFF: StaffMember[] = [
     staffId: "EMP-102",
     email: "",
     storeId: "s2",
-    permissions: { ...DEFAULT_PERMISSIONS, financials: true },
+    permissions: { ...DEFAULT_PERMISSIONS, can_view_sales_reports: true },
   },
   {
     id: "u3",
@@ -162,7 +150,7 @@ type AuthCtx = {
   /** public.app_users record backing the signed-in account */
   appUser: AppUserProfile | null;
   /** permission check that always passes for the admin */
-  can: (flag: keyof StaffPermissions) => boolean;
+  can: (flag: PermissionFlag) => boolean;
   staff: StaffMember[];
   addStaff: (member: Omit<StaffMember, "id">) => void;
   updateStaff: (member: StaffMember) => void;
@@ -472,13 +460,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           found?.storeId ??
           null),
       permissions: isAdmin
-        ? FULL_PERMISSIONS
-        : {
-            ...DEFAULT_PERMISSIONS,
-            ...(found?.permissions ?? {}),
-            // public.app_users is the source of truth when the account has a row.
-            ...(appUser?.permissions ?? {}),
-          },
+        ? { ...FULL_PERMISSIONS }
+        : // public.app_users is the source of truth when the account has a row.
+          normalizePermissions(
+            {
+              ...(found?.permissions ?? {}),
+              ...(appUser?.permissions ?? {}),
+            },
+            fromDbRole(appUser?.role ?? null),
+          ),
     };
   }, [session, roles, staff, terminalUser, appUser]);
 
@@ -492,7 +482,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       authUserId: userId,
       terminalUser,
       appUser,
-      can: (flag) => user?.role === "admin" || !!user?.permissions?.[flag],
+      can: (flag) =>
+        user?.role === "admin" || !!user?.permissions?.[resolvePermission(flag)],
       staff,
       addStaff,
       updateStaff,

@@ -13,6 +13,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { PosProvider } from "../lib/pos-store";
 import { AuthProvider } from "../lib/pos-auth";
+import { PermissionsProvider } from "../lib/pos-permissions";
 import { Toaster } from "../components/ui/sonner";
 import { AuditTracker } from "../components/pos/AuditTracker";
 
@@ -136,12 +137,14 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <PermissionsProvider>
         <PosProvider>
           {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
           <AuditTracker />
           <Outlet />
           <Toaster position="top-center" />
         </PosProvider>
+        </PermissionsProvider>
       </AuthProvider>
     </QueryClientProvider>
   );
