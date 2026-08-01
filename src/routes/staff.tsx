@@ -49,7 +49,12 @@ import {
   type PermissionKey,
   type StaffRole,
 } from "@/lib/permissions";
-import { cashierEmail, cashierSecret, createSupervisorAccount } from "@/lib/pos-users";
+import {
+  cashierEmail,
+  cashierSecret,
+  createCashierAccount,
+  createSupervisorAccount,
+} from "@/lib/pos-users";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/staff")({
@@ -210,6 +215,18 @@ function StaffManagement() {
         }
         const email = cashierEmail(form.user_id);
         const secret = cashierSecret(form.user_id, form.pin);
+        // The Supabase Auth account is the source of truth for the login.
+        const auth = await createCashierAccount({
+          userId: form.user_id,
+          fullName: form.full_name || form.user_id,
+          pin: form.pin,
+          storeId: form.store_id || null,
+        });
+        if (!auth.ok && !/already/i.test(auth.error ?? "")) {
+          toast.error("Could not create cashier login", { description: auth.error });
+          return;
+        }
+        // Mirror the profile + hashed PIN into app_users for terminal sign-in.
         const { error } = await sb.rpc("upsert_terminal_user", {
           p_user_id: form.user_id.trim(),
           p_full_name: form.full_name.trim() || form.user_id.trim(),
