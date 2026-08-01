@@ -22,6 +22,7 @@ import type {
   Sale,
   Shift,
   Store,
+  StockAdjustmentReason,
   TaxSettings,
   Transfer,
   TransferKind,
