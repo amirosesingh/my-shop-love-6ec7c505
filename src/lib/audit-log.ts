@@ -104,6 +104,7 @@ export const logger = {
     };
     logs = [entry, ...logs].slice(0, MAX);
     emit();
+    scheduleFlush();
     return entry;
   },
   all() {
@@ -124,6 +125,16 @@ export const logger = {
 
 let syncTimer: ReturnType<typeof setInterval> | null = null;
 const BATCH = 50;
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Debounced push so fresh activity reaches the cloud within seconds. */
+function scheduleFlush() {
+  if (typeof window === "undefined" || flushTimer) return;
+  flushTimer = setTimeout(() => {
+    flushTimer = null;
+    void flushBatch();
+  }, 3000);
+}
 
 export type SyncState = { online: boolean; pending: number; lastSyncAt: string | null };
 
