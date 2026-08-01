@@ -2,7 +2,7 @@ import { toast } from "sonner";
 import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
 import { defaultSettings, seedState } from "./pos-seed";
 import { drainOutbox } from "./sync-engine";
-import { localDb } from "./local-db";
+import { electronDb, localDb, readBranch } from "./local-db";
 import { enqueue, type SyncOp } from "./sync-outbox";
 import type {
   AppSettings,
@@ -391,6 +391,24 @@ export const db = {
 
   /** Persist a completed bill, its lines, the stock movement and member points. */
   recordSale(sale: Sale, products: Product[], member: Member | null) {
+    // Desktop shell: one transactional, fully offline call into local SQL Server.
+    const bridge = electronDb();
+    if (bridge) {
+      void bridge
+        .createSale({
+          sale: saleToRow(sale),
+          items: saleItemRows(sale),
+          products: products.map(productToRow),
+          member: member ? memberToRow(member, tierId) : null,
+          branchId: readBranch().branchId ?? sale.storeId ?? null,
+          exchangeOfBillNumber: sale.exchangeOfReceiptNo ?? null,
+        })
+        .then((res) => {
+          if (!res.ok) dbError("Saving sale", new Error(res.error ?? "Local sale write failed"));
+        })
+        .catch((err) => dbError("Saving sale", err));
+      return;
+    }
     // Order matters — the queue drains sequentially and stops on failure.
     queue("Saving sale", { kind: "insert", table: "sales", rows: [saleToRow(sale)] });
     queue("Saving sale items", { kind: "insert", table: "sale_items", rows: saleItemRows(sale) });
