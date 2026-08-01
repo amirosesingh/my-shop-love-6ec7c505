@@ -512,14 +512,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ? { ...FULL_PERMISSIONS }
         : // public.app_users is the source of truth when the account has a row.
           normalizePermissions(
-            {
+            Object.keys({
               ...(found?.permissions ?? {}),
               ...(appUser?.permissions ?? {}),
-            },
+            }).length
+              ? { ...(found?.permissions ?? {}), ...(appUser?.permissions ?? {}) }
+              : null,
             fromDbRole(appUser?.role ?? null),
           ),
     };
   }, [session, roles, staff, terminalUser, appUser]);
+
+  const isWarehouse =
+    !!session?.user &&
+    !terminalUser?.cashierId &&
+    user?.role !== "admin" &&
+    (appUser?.role === "staff" ||
+      (session.user.user_metadata?.["role"] as string | undefined) === "warehouse");
 
   const value = useMemo<AuthCtx>(
     () => ({
@@ -527,9 +536,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       isAdmin: user?.role === "admin",
       isSupervisor: user?.metaRole === "supervisor" || user?.role === "admin",
-      // Admins and "All stores" supervisors (no single branch assigned).
-      canSwitchStores: user?.role === "admin" && !user.storeId,
-      isCashier: user?.metaRole === "cashier" || (!!user && user.role !== "admin"),
+      // Admins, "All stores" supervisors and all-store warehouse accounts.
+      canSwitchStores: !!user && !user.storeId && (user.role === "admin" || isWarehouse),
+      isCashier:
+        !isWarehouse && (user?.metaRole === "cashier" || (!!user && user.role !== "admin")),
+      isWarehouse,
       authUserId: userId,
       terminalUser,
       appUser,
@@ -552,6 +563,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       userId,
       terminalUser,
       appUser,
+      isWarehouse,
       staff,
       addStaff,
       updateStaff,
