@@ -11,8 +11,11 @@ import {
 import { defaultSettings, seedState } from "./pos-seed";
 import type {
   AppSettings,
+  Booking,
+  BookingPayment,
   CartLine,
   Member,
+  PaymentMethod,
   PosState,
   Product,
   Promotion,
@@ -23,7 +26,7 @@ import type {
   Transfer,
   TransferKind,
 } from "./pos-types";
-import { lineUnitDiscount, r2, type DiscountType } from "./pos-types";
+import { bookingBalance, lineUnitDiscount, r2, type DiscountType } from "./pos-types";
 import { logger } from "./audit-log";
 import { db, dbError, loadCloudState } from "./pos-db";
 
@@ -31,6 +34,15 @@ const KEY = "pos-state-v2";
 
 export const stockAt = (product: Product, storeId: string) =>
   product.stockByStore?.[storeId] ?? 0;
+
+/** Units held back at a store by still-open bookings. */
+export const reservedAt = (bookings: Booking[], productId: string, storeId: string) =>
+  bookings
+    .filter((b) => b.status === "active" && b.storeId === storeId)
+    .reduce(
+      (a, b) => a + b.lines.filter((l) => l.productId === productId && !l.credit).reduce((x, l) => x + l.qty, 0),
+      0,
+    );
 
 const bump = (p: Product, storeId: string, delta: number): Product => ({
   ...p,
