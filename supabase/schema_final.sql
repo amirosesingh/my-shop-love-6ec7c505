@@ -962,3 +962,14 @@ begin
 end $$;
 
 notify pgrst, 'reload schema';
+
+-- Idempotent upgrade for databases created before schema6.sql
+alter table public.pos_settings add column if not exists company_name text;
+alter table public.pos_settings add column if not exists tax_number   text;
+alter table public.pos_settings add column if not exists reg_number   text;
+alter table public.pos_settings add column if not exists phone        text;
+alter table public.pos_settings add column if not exists website      text;
+alter table public.pos_settings add column if not exists fonts        jsonb not null default '{}'::jsonb;
+alter table public.pos_settings add column if not exists custom_lines jsonb not null default '[]'::jsonb;
+alter table public.pos_settings add column if not exists qr           jsonb not null default '{}'::jsonb;
+notify pgrst, 'reload schema';
