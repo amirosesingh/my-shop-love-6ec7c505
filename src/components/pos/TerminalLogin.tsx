@@ -6,11 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { useBranding } from "@/lib/branding";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
 export function TerminalLogin() {
   const { login, cashierLogin } = useAuth();
+  const brand = useBranding();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [email, setEmail] = useState("");
@@ -46,7 +48,7 @@ export function TerminalLogin() {
             <ReceiptText className="size-5" />
           </div>
           <div>
-            <p className="font-semibold leading-tight">Northwind POS</p>
+            <p className="font-semibold leading-tight">{brand.company}</p>
             <p className="text-xs text-muted-foreground">Terminal sign in</p>
           </div>
           <Lock className="ml-auto size-4 text-muted-foreground" />

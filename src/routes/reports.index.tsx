@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { BarChart3, TicketPercent, Activity, PackageSearch } from "lucide-react";
+import { BarChart3, TicketPercent, Activity, PackageSearch, Scale } from "lucide-react";
 import { AppShell } from "@/components/pos/AppShell";
 
 export const Route = createFileRoute("/reports/")({
@@ -47,6 +47,12 @@ const cards = [
     label: "Catalog Change History",
     icon: PackageSearch,
     text: "Products added, prices changed and stock edited, with who and when.",
+  },
+  {
+    to: "/reports/stock",
+    label: "Stock Adjustments & Calibration",
+    icon: Scale,
+    text: "Stock checks, damages and losses with the variance, cost impact and reason.",
   },
 ] as const;
 

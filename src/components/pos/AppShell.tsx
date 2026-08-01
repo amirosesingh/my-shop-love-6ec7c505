@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useUiScale } from "@/lib/use-ui-scale";
+import { useBranding } from "@/lib/branding";
 
 /** Screens reserved for supervisor / admin accounts, and the permission
  *  toggle that also unlocks them for any other account (e.g. warehouse). */
@@ -38,6 +39,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { ready, user, isAdmin, canSwitchStores, logout, lock, can } = useAuth();
   const [collapsed, setCollapsed] = useSidebarCollapsed();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const branding = useBranding();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -92,6 +94,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       (t.fromStoreId === currentStore.id && t.status === "requested"),
   ).length;
 
+  // Receipt identity wins; the locally captured install name is the fallback.
+  const companyName =
+    state.settings.receipt.companyName?.trim() || branding.company;
+
   const canSee = (item: NavItem) => {
     if (item.flag && !can(item.flag)) return false;
     if (item.adminOnly && !isAdmin && !item.flag) return false;
@@ -105,8 +111,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
       {!mini && (
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold leading-tight">Northwind</p>
-          <p className="text-[11px] text-muted-foreground">POS Terminal 01</p>
+          <p className="truncate text-sm font-semibold leading-tight">{companyName}</p>
+          <p className="text-[11px] text-muted-foreground">{branding.terminal}</p>
         </div>
       )}
     </div>
@@ -229,7 +235,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Sheet>
           <div className="flex min-w-0 items-center gap-2">
             <ReceiptText className="size-4 shrink-0 text-primary" />
-            <span className="truncate text-sm font-semibold">Northwind POS</span>
+            <span className="truncate text-sm font-semibold">{companyName}</span>
           </div>
           <Badge
             variant="outline"

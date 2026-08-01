@@ -22,6 +22,7 @@ import type {
   Sale,
   Shift,
   Store,
+  StockAdjustmentReason,
   TaxSettings,
   Transfer,
   TransferKind,
@@ -116,6 +117,12 @@ type Ctx = {
   upsertProduct: (product: Product) => void;
   removeProduct: (id: string) => void;
   adjustStock: (id: string, delta: number, storeId?: string) => void;
+  applyStockCount: (
+    entries: { productId: string; counted: number }[],
+    reason: StockAdjustmentReason,
+    note?: string,
+    storeId?: string,
+  ) => void;
   upsertMember: (member: Member) => void;
   removeMember: (id: string) => void;
   upsertPromotion: (promotion: Promotion) => void;
@@ -628,6 +635,68 @@ export function PosProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  /**
+   * Commits a physical stock count / adjustment: absolute counted quantities
+   * replace the system figure and every variance is written to the trail with
+   * a reason, so calibration differences can be audited later.
+   */
+  const applyStockCount = useCallback(
+    (
+      entries: { productId: string; counted: number }[],
+      reason: StockAdjustmentReason,
+      note = "",
+      storeId?: string,
+    ) => {
+      const target = storeId ?? stateRef.current.currentStoreId;
+      const changes = entries
+        .map((e) => {
+          const product = stateRef.current.products.find((p) => p.id === e.productId);
+          if (!product) return null;
+          const before = stockAt(product, target);
+          const counted = Math.max(0, Math.round(e.counted));
+          if (counted === before) return null;
+          return { product, before, counted, delta: counted - before };
+        })
+        .filter(Boolean) as {
+        product: Product;
+        before: number;
+        counted: number;
+        delta: number;
+      }[];
+      if (!changes.length) return;
+
+      for (const c of changes) {
+        logger.log("inventory", "Stock adjusted", "inventory", {
+          productId: c.product.id,
+          name: c.product.name,
+          sku: c.product.sku,
+          storeId: target,
+          reason,
+          note,
+          previousStock: c.before,
+          updatedStock: c.counted,
+          delta: c.delta,
+          costImpact: r2(c.delta * (c.product.cost ?? 0)),
+        });
+        void db.upsertProduct({
+          ...c.product,
+          stockByStore: { ...c.product.stockByStore, [target]: c.counted },
+        });
+      }
+
+      const byId = new Map(changes.map((c) => [c.product.id, c.counted]));
+      setState((s) => ({
+        ...s,
+        products: s.products.map((p) =>
+          byId.has(p.id)
+            ? { ...p, stockByStore: { ...p.stockByStore, [target]: byId.get(p.id)! } }
+            : p,
+        ),
+      }));
+    },
+    [],
+  );
+
   const upsertMember = useCallback((member: Member) => {
     const prev = stateRef.current.members.find((m) => m.id === member.id);
     logger.log("member_event", prev ? "Member profile edited" : "Member created", "members", {
@@ -840,6 +909,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     upsertProduct,
     removeProduct,
     adjustStock,
+    applyStockCount,
     upsertMember,
     removeMember,
     upsertPromotion,

@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowLeftRight, Inbox, Minus, Plus, Search, Trash2 } from "lucide-react";
+import { ArrowLeftRight, ClipboardCheck, Inbox, Minus, Plus, Scale, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ import { useAuth } from "@/lib/pos-auth";
 import { TablePagination, usePagination } from "@/components/pos/TablePagination";
 import { Switch } from "@/components/ui/switch";
 import { BulkImportDialog } from "@/components/pos/BulkImportDialog";
+import { StockAdjustDialog, StockCountDialog } from "@/components/pos/StockAdjust";
 import type { Product } from "@/lib/pos-types";
 
 export const Route = createFileRoute("/inventory")({
@@ -67,12 +68,15 @@ function Inventory() {
   const showMoney = can("can_view_sales_reports");
   const canEdit = can("can_add_new_product");
   const canPrice = can("can_edit_product_price");
+  const canAdjust = can("can_adjust_stock");
   const canEcom = canPrice;
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState<Product | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [importOpen, setImportOpen] = useState(false);
+  const [adjustTarget, setAdjustTarget] = useState<Product | null>(null);
+  const [countOpen, setCountOpen] = useState(false);
 
   const rows = state.products.filter((p) =>
     `${p.name} ${p.sku} ${p.barcode} ${p.category}`.toLowerCase().includes(query.toLowerCase()),
@@ -131,6 +135,11 @@ function Inventory() {
             {canEdit && (
               <Button variant="outline" onClick={() => setImportOpen(true)}>
                 📥 Bulk Import from Excel
+              </Button>
+            )}
+            {canAdjust && (
+              <Button variant="outline" onClick={() => setCountOpen(true)}>
+                <ClipboardCheck className="size-4" /> Stock check
               </Button>
             )}
             {canEdit && (
@@ -362,6 +371,18 @@ function Inventory() {
                       <Button size="icon" variant="outline" className="size-7" onClick={() => adjustStock(p.id, 1)}>
                         <Plus className="size-3" />
                       </Button>
+                      {canAdjust && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="size-7"
+                          title="Adjust / recount stock"
+                          aria-label={`Adjust stock for ${p.name}`}
+                          onClick={() => setAdjustTarget(p)}
+                        >
+                          <Scale className="size-3.5" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>
@@ -410,6 +431,21 @@ function Inventory() {
         </div>
       </div>
       {canEdit && <BulkImportDialog open={importOpen} onOpenChange={setImportOpen} />}
+      {canAdjust && (
+        <>
+          <StockAdjustDialog
+            product={adjustTarget}
+            storeId={currentStore.id}
+            onClose={() => setAdjustTarget(null)}
+          />
+          <StockCountDialog
+            open={countOpen}
+            products={rows}
+            storeId={currentStore.id}
+            onClose={() => setCountOpen(false)}
+          />
+        </>
+      )}
     </AppShell>
   );
 }

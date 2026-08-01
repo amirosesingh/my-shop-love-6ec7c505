@@ -216,6 +216,29 @@ export type Booking = {
 export const bookingBalance = (b: Pick<Booking, "total" | "paid">) =>
   r2(Math.max(0, b.total - b.paid));
 
+/* -------------------------- stock adjustments -------------------------- */
+
+export type StockAdjustmentReason =
+  | "stock_count"
+  | "damage"
+  | "theft"
+  | "expiry"
+  | "correction"
+  | "received_off_po";
+
+export const STOCK_ADJUSTMENT_REASONS: { value: StockAdjustmentReason; label: string }[] = [
+  { value: "stock_count", label: "Stock count / calibration" },
+  { value: "damage", label: "Damage" },
+  { value: "theft", label: "Theft / loss" },
+  { value: "expiry", label: "Expiry" },
+  { value: "correction", label: "Data correction" },
+  { value: "received_off_po", label: "Received without a PO" },
+];
+
+export const STOCK_REASON_LABELS: Record<string, string> = Object.fromEntries(
+  STOCK_ADJUSTMENT_REASONS.map((r) => [r.value, r.label]),
+);
+
 /** Bank-transfer / e-wallet details shown to the customer. */
 export type PaymentDetails = {
   accountName: string;
@@ -382,6 +405,8 @@ export type Promotion = {
   name: string;
   type: PromoType;
   active: boolean;
+  /** collaborator / partner the coupon codes of this rule belong to */
+  partner?: string;
   /** optional ISO yyyy-mm-dd window */
   startDate?: string;
   endDate?: string;

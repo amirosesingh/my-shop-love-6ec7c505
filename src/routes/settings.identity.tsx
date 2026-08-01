@@ -3,6 +3,8 @@ import { SettingsFrame, useSettingsCtx } from "@/components/pos/settings/Setting
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useEffect, useState } from "react";
+import { readBranding, useBranding, writeBranding } from "@/lib/branding";
 import type { ReceiptOverride, ReceiptSettings } from "@/lib/pos-types";
 
 const IDENTITY_FIELDS: { key: keyof ReceiptOverride; label: string; placeholder: string }[] = [
@@ -38,8 +40,30 @@ export const Route = createFileRoute("/settings/identity")({
 
 function IdentityForm() {
   const { effective, setField } = useSettingsCtx();
+  const brand = useBranding();
+  const [terminal, setTerminal] = useState("");
+
+  useEffect(() => setTerminal(brand.terminal), [brand.terminal]);
+
+  // Keep the locally stored install name aligned with the receipt company name.
+  useEffect(() => {
+    const name = (effective.companyName ?? "").trim();
+    if (name && name !== readBranding().company) writeBranding({ company: name });
+  }, [effective.companyName]);
+
   return (
     <div className="space-y-3">
+      <div className="space-y-1">
+        <Label className="text-xs text-muted-foreground">
+          Terminal name (this machine only)
+        </Label>
+        <Input
+          value={terminal}
+          onChange={(e) => setTerminal(e.target.value)}
+          onBlur={() => writeBranding({ terminal: terminal.trim() || "POS Terminal 01" })}
+          placeholder="POS Terminal 01"
+        />
+      </div>
       <div className="grid gap-3 sm:grid-cols-2">
         {IDENTITY_FIELDS.map((f) => (
           <div key={f.key} className="space-y-1">

@@ -109,6 +109,7 @@ export const navGroups: NavGroup[] = [
       { to: "/reports/coupons", label: "Coupon Usage", icon: TicketPercent, flag: "can_view_sales_reports", keywords: "coupon promotion discount bill item applied" },
       { to: "/reports/activity", label: "Register Activity", icon: Activity, flag: "can_view_sales_reports", keywords: "hold resume void split drawer timeline" },
       { to: "/reports/catalog", label: "Catalog Changes", icon: PackageSearch, flag: "can_view_sales_reports", keywords: "product price stock history timestamp" },
+      { to: "/reports/stock", label: "Stock Adjustments", icon: PackageSearch, flag: "can_view_sales_reports", keywords: "stock check calibration variance damage loss shrinkage adjust" },
     ],
   },
   {

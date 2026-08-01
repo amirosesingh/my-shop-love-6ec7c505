@@ -27,6 +27,7 @@ import { Route as ReportsActivityRouteImport } from './routes/reports.activity'
 import { Route as ReportsCatalogRouteImport } from './routes/reports.catalog'
 import { Route as ReportsCouponsRouteImport } from './routes/reports.coupons'
 import { Route as ReportsSalesRouteImport } from './routes/reports.sales'
+import { Route as ReportsStockRouteImport } from './routes/reports.stock'
 import { Route as SettingsIndexRouteImport } from './routes/settings.index'
 import { Route as SettingsDisplayRouteImport } from './routes/settings.display'
 import { Route as SettingsElementsRouteImport } from './routes/settings.elements'
@@ -129,6 +130,11 @@ const ReportsSalesRoute = ReportsSalesRouteImport.update({
   path: '/reports/sales',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReportsStockRoute = ReportsStockRouteImport.update({
+  id: '/reports/stock',
+  path: '/reports/stock',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsIndexRoute = SettingsIndexRouteImport.update({
   id: '/settings/',
   path: '/settings/',
@@ -203,6 +209,7 @@ export interface FileRoutesByFullPath {
   '/reports/catalog': typeof ReportsCatalogRoute
   '/reports/coupons': typeof ReportsCouponsRoute
   '/reports/sales': typeof ReportsSalesRoute
+  '/reports/stock': typeof ReportsStockRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
   '/settings/identity': typeof SettingsIdentityRoute
@@ -234,6 +241,7 @@ export interface FileRoutesByTo {
   '/reports/catalog': typeof ReportsCatalogRoute
   '/reports/coupons': typeof ReportsCouponsRoute
   '/reports/sales': typeof ReportsSalesRoute
+  '/reports/stock': typeof ReportsStockRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
   '/settings/identity': typeof SettingsIdentityRoute
@@ -266,6 +274,7 @@ export interface FileRoutesById {
   '/reports/catalog': typeof ReportsCatalogRoute
   '/reports/coupons': typeof ReportsCouponsRoute
   '/reports/sales': typeof ReportsSalesRoute
+  '/reports/stock': typeof ReportsStockRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
   '/settings/identity': typeof SettingsIdentityRoute
@@ -299,6 +308,7 @@ export interface FileRouteTypes {
     | '/reports/catalog'
     | '/reports/coupons'
     | '/reports/sales'
+    | '/reports/stock'
     | '/settings/display'
     | '/settings/elements'
     | '/settings/identity'
@@ -330,6 +340,7 @@ export interface FileRouteTypes {
     | '/reports/catalog'
     | '/reports/coupons'
     | '/reports/sales'
+    | '/reports/stock'
     | '/settings/display'
     | '/settings/elements'
     | '/settings/identity'
@@ -361,6 +372,7 @@ export interface FileRouteTypes {
     | '/reports/catalog'
     | '/reports/coupons'
     | '/reports/sales'
+    | '/reports/stock'
     | '/settings/display'
     | '/settings/elements'
     | '/settings/identity'
@@ -393,6 +405,7 @@ export interface RootRouteChildren {
   ReportsCatalogRoute: typeof ReportsCatalogRoute
   ReportsCouponsRoute: typeof ReportsCouponsRoute
   ReportsSalesRoute: typeof ReportsSalesRoute
+  ReportsStockRoute: typeof ReportsStockRoute
   SettingsDisplayRoute: typeof SettingsDisplayRoute
   SettingsElementsRoute: typeof SettingsElementsRoute
   SettingsIdentityRoute: typeof SettingsIdentityRoute
@@ -535,6 +548,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReportsSalesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reports/stock': {
+      id: '/reports/stock'
+      path: '/reports/stock'
+      fullPath: '/reports/stock'
+      preLoaderRoute: typeof ReportsStockRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/': {
       id: '/settings/'
       path: '/settings'
@@ -633,6 +653,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReportsCatalogRoute: ReportsCatalogRoute,
   ReportsCouponsRoute: ReportsCouponsRoute,
   ReportsSalesRoute: ReportsSalesRoute,
+  ReportsStockRoute: ReportsStockRoute,
   SettingsDisplayRoute: SettingsDisplayRoute,
   SettingsElementsRoute: SettingsElementsRoute,
   SettingsIdentityRoute: SettingsIdentityRoute,
@@ -649,13 +670,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
