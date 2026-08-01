@@ -430,7 +430,7 @@ begin
   select * into u from public.app_users a
    where lower(a.user_id) = lower(trim(p_user_id)) and a.is_active;
   if not found then return; end if;
-  if u.pin_hash = '' or u.pin_hash <> extensions.crypt(p_pin, u.pin_hash) then return; end if;
+  if u.pin_hash = '' or u.pin_hash <> extensions.crypt(p_pin::text, u.pin_hash::text) then return; end if;
   update public.app_users set last_login_at = now() where id = u.id;
   return query select u.user_id::text, u.full_name::text, u.role, u.store_id::text,
                       u.email::text, u.auth_secret;
@@ -507,7 +507,7 @@ begin
   end if;
   insert into public.app_users (user_id, full_name, role, store_id, email, pin_hash, auth_secret)
   values (trim(p_user_id), trim(p_full_name), p_role, nullif(trim(coalesce(p_store_id,'')),''),
-          lower(trim(p_email)), extensions.crypt(p_pin, extensions.gen_salt('bf', 10)), p_password)
+          lower(trim(p_email)), extensions.crypt(p_pin::text, extensions.gen_salt('bf'::text, 10)), p_password)
   on conflict (user_id) do update
     set full_name   = excluded.full_name,
         role        = excluded.role,
@@ -657,7 +657,7 @@ values
      'can_receive_purchase_order', true, 'can_add_member', true, 'can_edit_member_points', true,
      'can_apply_member_discount', true, 'can_view_sales_reports', true,
      'can_access_pos_settings', true, 'can_manage_staff', true),
-   extensions.crypt('1234', extensions.gen_salt('bf', 10)), 'pos-admin-1234'),
+   extensions.crypt('1234'::text, extensions.gen_salt('bf'::text, 10)), 'pos-admin-1234'),
   ('supervisor', 'Store Supervisor', 'supervisor@store.internal', 'manager', null,
    jsonb_build_object(
      'can_open_drawer', true, 'can_close_drawer', true, 'can_view_drawer_balance', true,
@@ -667,7 +667,7 @@ values
      'can_receive_purchase_order', true, 'can_add_member', true, 'can_edit_member_points', true,
      'can_apply_member_discount', true, 'can_view_sales_reports', true,
      'can_access_pos_settings', true, 'can_manage_staff', true),
-   extensions.crypt('2345', extensions.gen_salt('bf', 10)), 'pos-supervisor-2345'),
+   extensions.crypt('2345'::text, extensions.gen_salt('bf'::text, 10)), 'pos-supervisor-2345'),
   ('101', 'Cashier 101', '101@store.internal', 'staff', 's1',
    jsonb_build_object(
      'can_open_drawer', true, 'can_close_drawer', true, 'can_view_drawer_balance', false,
@@ -677,7 +677,7 @@ values
      'can_receive_purchase_order', false, 'can_add_member', true, 'can_edit_member_points', false,
      'can_apply_member_discount', true, 'can_view_sales_reports', false,
      'can_access_pos_settings', false, 'can_manage_staff', false),
-   extensions.crypt('1111', extensions.gen_salt('bf', 10)), 'pos-101-1111')
+   extensions.crypt('1111'::text, extensions.gen_salt('bf'::text, 10)), 'pos-101-1111')
 on conflict (user_id) do nothing;
 
 -- Bootstrap: grant the admin role to an existing Supabase Auth account.
@@ -730,6 +730,14 @@ create trigger cashiers_touch_updated_at
 -- ---------------------------------------------------------------------------
 -- RPCs
 -- ---------------------------------------------------------------------------
+-- Drop any older stored versions first, so stale bodies containing
+-- unqualified gen_salt(...) cannot survive a re-run.
+drop function if exists public.list_cashiers();
+drop function if exists public.upsert_cashier(uuid, text, text, text, text, boolean);
+drop function if exists public.set_cashier_permissions(uuid, jsonb);
+drop function if exists public.delete_cashier(uuid);
+drop function if exists public.verify_cashier_pin(text, text);
+
 create or replace function public.list_cashiers()
 returns table (
   id uuid,
@@ -784,7 +792,7 @@ begin
     end if;
     insert into public.cashiers (username, full_name, pin_hash, store_id, is_active)
     values (lower(trim(p_username)), coalesce(p_full_name, ''),
-            extensions.crypt(p_pin, extensions.gen_salt('bf')), p_store_id, coalesce(p_is_active, true))
+            extensions.crypt(p_pin::text, extensions.gen_salt('bf'::text, 10)), p_store_id, coalesce(p_is_active, true))
     returning id into v_id;
   else
     update public.cashiers set
@@ -793,7 +801,7 @@ begin
       store_id = p_store_id,
       is_active = coalesce(p_is_active, is_active),
       pin_hash = case when p_pin is null or p_pin = '' then pin_hash
-                      else extensions.crypt(p_pin, extensions.gen_salt('bf')) end
+                      else extensions.crypt(p_pin::text, extensions.gen_salt('bf'::text, 10)) end
     where id = p_id
     returning id into v_id;
   end if;
@@ -853,7 +861,7 @@ begin
    where lower(c.username) = lower(trim(p_username)) and c.is_active
    limit 1;
   if v_row.id is null then return; end if;
-  if v_row.pin_hash <> extensions.crypt(p_pin, v_row.pin_hash) then return; end if;
+  if v_row.pin_hash <> extensions.crypt(p_pin::text, v_row.pin_hash::text) then return; end if;
 
   update public.cashiers set last_login_at = now() where public.cashiers.id = v_row.id;
 
@@ -902,7 +910,7 @@ begin
       r.full_name,
       -- keep the existing digest when present, otherwise a locked PIN that
       -- must be reset by a supervisor
-      coalesce(nullif(r.pin_hash, ''), extensions.crypt(gen_random_uuid()::text, extensions.gen_salt('bf'))),
+      coalesce(nullif(r.pin_hash, ''), extensions.crypt(gen_random_uuid()::text, extensions.gen_salt('bf'::text, 10))),
       r.store_id,
       r.permissions,
       r.is_active
