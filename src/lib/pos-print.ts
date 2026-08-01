@@ -1,5 +1,8 @@
 import type {
   Member,
+  Booking,
+  BookingPayment,
+  PaymentDetails,
   PaperSize,
   Product,
   FontStyleSettings,
@@ -11,7 +14,7 @@ import type {
   TaxSettings,
   Transfer,
 } from "./pos-types";
-import { lineUnitDiscount } from "./pos-types";
+import { bookingBalance, lineUnitDiscount, whatsappLink } from "./pos-types";
 import { defaultReceiptSettings } from "./pos-seed";
 import qrcode from "qrcode-generator";
 
@@ -396,6 +399,109 @@ export function printShiftReport(shift: Shift, sales: Sale[], kind: "xreport" | 
 
 export function printMemberStatement(member: Member, sales: Sale[]) {
   printHtml(`${member.code} statement`, memberBody(member, sales));
+}
+
+/* ------------------------------ bookings ------------------------------ */
+
+function transferBlock(pay: PaymentDetails | null) {
+  if (!pay) return "";
+  const rows = [
+    pay.bankName ? `<tr><td>Bank</td><td class="r">${esc(pay.bankName)}</td></tr>` : "",
+    pay.accountName ? `<tr><td>Account name</td><td class="r">${esc(pay.accountName)}</td></tr>` : "",
+    pay.accountNumber ? `<tr><td>Account no.</td><td class="r b">${esc(pay.accountNumber)}</td></tr>` : "",
+    pay.whatsapp ? `<tr><td>WhatsApp</td><td class="r">${esc(pay.whatsapp)}</td></tr>` : "",
+  ].filter(Boolean);
+  if (!rows.length) return "";
+  const link = whatsappLink(pay.whatsapp);
+  return `<hr><div class="c tag">PAY BY TRANSFER</div>
+    <table>${rows.join("")}</table>
+    ${pay.note ? `<div class="c muted">${esc(pay.note)}</div>` : ""}
+    ${link ? `<div class="c" style="margin-top:6px">${qrSvg(link, 90)}<div class="muted">Scan to chat on WhatsApp</div></div>` : ""}`;
+}
+
+function bookingBody(booking: Booking, member: Member | null, pay: PaymentDetails | null) {
+  const rows = booking.lines
+    .map(
+      (l) =>
+        `<tr><td>${esc(l.name)}<div class="muted">${l.qty} x ${fmt(l.price)}</div></td><td class="r">${fmt((l.price - lineUnitDiscount(l)) * l.qty)}</td></tr>`,
+    )
+    .join("");
+  const balance = bookingBalance(booking);
+  const paidRows = booking.payments
+    .map(
+      (p) =>
+        `<tr><td>${new Date(p.at).toLocaleDateString()} · ${esc(p.method.toUpperCase())}</td><td class="r">${fmt(p.amount)}</td></tr>`,
+    )
+    .join("");
+  return `${header("BOOKING / PAY LATER SLIP")}
+    <table>
+      <tr><td>Booking</td><td class="r b">${esc(booking.ref)}</td></tr>
+      <tr><td>Date</td><td class="r">${new Date(booking.createdAt).toLocaleString()}</td></tr>
+      <tr><td>Cashier</td><td class="r">${esc(booking.cashier)}</td></tr>
+      ${booking.customerName ? `<tr><td>Customer</td><td class="r">${esc(booking.customerName)}</td></tr>` : ""}
+      ${booking.customerPhone ? `<tr><td>Phone</td><td class="r">${esc(booking.customerPhone)}</td></tr>` : ""}
+    </table>
+    <hr><table>${rows}</table>
+    <hr><table>
+      <tr><td>Subtotal</td><td class="r">${fmt(booking.subtotal)}</td></tr>
+      <tr><td>Discount</td><td class="r">-${fmt(booking.discount)}</td></tr>
+      ${receiptCfg.showTax ? `<tr><td>Tax</td><td class="r">${fmt(booking.tax)}</td></tr>` : ""}
+      <tr class="b"><td>TOTAL</td><td class="r">${fmt(booking.total)}</td></tr>
+    </table>
+    <hr><div class="muted">Payments received</div>
+    <table>${paidRows || `<tr><td class="muted">None</td><td class="r">${fmt(0)}</td></tr>`}
+      <tr><td>Paid to date</td><td class="r">${fmt(booking.paid)}</td></tr>
+      <tr class="b big"><td>BALANCE DUE</td><td class="r">${fmt(balance)}</td></tr>
+    </table>
+    <hr>
+    <div class="c b">Collect &amp; settle by ${esc(new Date(booking.dueDate).toDateString())}</div>
+    <div class="c muted">Goods are reserved until this date. Bring this slip to collect.</div>
+    ${booking.note ? `<div class="c muted">${esc(booking.note)}</div>` : ""}
+    ${transferBlock(pay)}
+    ${member ? `<hr><div>Member ${esc(member.code)} · ${esc(member.name)}</div>` : ""}
+    <hr>${receiptCfg.showBarcode ? barcodeSvg(booking.ref) : ""}
+    <div class="c muted rcpt-foot">${esc(receiptCfg.footerText || "")}</div>
+    ${customLines("footer")}
+    <div class="c muted">${esc(booking.ref)}</div>`;
+}
+
+function bookingPaymentBody(booking: Booking, payment: BookingPayment) {
+  return `${header("PART PAYMENT RECEIPT")}
+    <table>
+      <tr><td>Booking</td><td class="r b">${esc(booking.ref)}</td></tr>
+      <tr><td>Date</td><td class="r">${new Date(payment.at).toLocaleString()}</td></tr>
+      <tr><td>Cashier</td><td class="r">${esc(payment.cashier)}</td></tr>
+      ${booking.customerName ? `<tr><td>Customer</td><td class="r">${esc(booking.customerName)}</td></tr>` : ""}
+    </table>
+    <hr><table>
+      <tr class="b big"><td>PAID NOW (${esc(payment.method.toUpperCase())})</td><td class="r">${fmt(payment.amount)}</td></tr>
+      <tr><td>Booking total</td><td class="r">${fmt(booking.total)}</td></tr>
+      <tr><td>Paid to date</td><td class="r">${fmt(booking.paid)}</td></tr>
+      <tr class="b"><td>BALANCE DUE</td><td class="r">${fmt(bookingBalance(booking))}</td></tr>
+    </table>
+    <hr><div class="c">Collect &amp; settle by ${esc(new Date(booking.dueDate).toDateString())}</div>
+    <hr><div class="c muted rcpt-foot">${esc(receiptCfg.footerText || "")}</div>
+    <div class="c muted">${esc(booking.ref)}</div>`;
+}
+
+export function printBookingSlip(
+  booking: Booking,
+  member: Member | null,
+  pay: PaymentDetails | null,
+) {
+  printHtml(`${booking.ref} booking`, bookingBody(booking, member, pay));
+}
+
+export function printBookingPayment(booking: Booking, payment: BookingPayment) {
+  printHtml(`${booking.ref} payment`, bookingPaymentBody(booking, payment));
+}
+
+export function bookingSlipPreview(
+  booking: Booking,
+  member: Member | null,
+  pay: PaymentDetails | null,
+) {
+  return shell(booking.ref, bookingBody(booking, member, pay), false);
 }
 
 /** Full HTML document for on-screen preview (no auto-print). */
