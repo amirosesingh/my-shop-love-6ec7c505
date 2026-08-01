@@ -431,6 +431,21 @@ function Inventory() {
         </div>
       </div>
       {canEdit && <BulkImportDialog open={importOpen} onOpenChange={setImportOpen} />}
+      {canAdjust && (
+        <>
+          <StockAdjustDialog
+            product={adjustTarget}
+            storeId={currentStore.id}
+            onClose={() => setAdjustTarget(null)}
+          />
+          <StockCountDialog
+            open={countOpen}
+            products={rows}
+            storeId={currentStore.id}
+            onClose={() => setCountOpen(false)}
+          />
+        </>
+      )}
     </AppShell>
   );
 }
