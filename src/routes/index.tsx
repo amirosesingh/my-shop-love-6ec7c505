@@ -445,7 +445,7 @@ function Register() {
                   variant="ghost"
                   className="size-7"
                   aria-label="Purchase history"
-                  onClick={() => setMemberId(memberId) || setHistoryMemberId(memberId)}
+                  onClick={() => setHistoryMemberId(memberId)}
                 >
                   <History className="size-3.5" />
                 </Button>
