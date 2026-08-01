@@ -19,6 +19,17 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
+/** Screens reserved for supervisor / admin accounts. */
+const ADMIN_PATHS = [
+  "/settings",
+  "/roles",
+  "/users",
+  "/staff",
+  "/stores",
+  "/promotions",
+  "/audit",
+];
+
 export function AppShell({ children }: { children: ReactNode }) {
   const { activeShift, stores, currentStore, setCurrentStore, state, ready: dataReady } = usePos();
   const { ready, user, isAdmin, logout, lock, can } = useAuth();
