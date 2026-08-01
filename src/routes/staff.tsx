@@ -295,7 +295,7 @@ function StaffManagement() {
             username,
             fullName: form.full_name.trim() || username,
             pin: form.pin,
-            storeId: form.store_id || null,
+            storeId: formStoreId(form.store_id),
             isActive: true,
           });
         } catch (e) {
