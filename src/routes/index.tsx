@@ -92,6 +92,7 @@ export const Route = createFileRoute("/")({
 
 function Register() {
   const { state, activeShift, recordSale, createBooking, openShift, currentStore } = usePos();
+  useUiScale();
   const { user, can } = useAuth();
   const { requirePermission } = useUserPermissions();
   const canDiscount = can("can_give_discount");
