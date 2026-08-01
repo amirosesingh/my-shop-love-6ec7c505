@@ -16,6 +16,7 @@ import {
   Truck,
   Users,
   UserCog,
+  UserPlus,
   Wallet,
 } from "lucide-react";
 
@@ -76,6 +77,7 @@ export const navGroups: NavGroup[] = [
     icon: ShieldCheck,
     items: [
       { to: "/staff", label: "Staff Profiles", icon: UserCog, adminOnly: true, keywords: "employees duty store assignment" },
+      { to: "/users", label: "User Management", icon: UserPlus, adminOnly: true, keywords: "create cashier supervisor pin account auth" },
       { to: "/staff", label: "User Roles & Permissions", icon: ShieldCheck, adminOnly: true, hash: "permissions", keywords: "flags toggles access matrix" },
       { to: "/roles", label: "Backend Access Roles", icon: ShieldCheck, adminOnly: true, keywords: "supabase admin manager staff database roles accounts" },
       { to: "/audit", label: "Audit Logs & Activity", icon: ScanEye, adminOnly: true, keywords: "telemetry trail compliance logs sync" },
