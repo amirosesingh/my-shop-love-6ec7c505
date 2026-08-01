@@ -1354,6 +1354,7 @@ function Register() {
                 >
                   <Printer className="size-4" /> Reprint
                 </Button>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
@@ -1368,7 +1369,7 @@ function Register() {
                 >
                   Kitchen
                 </Button>
-                {wa.enabled && (
+                {wa.enabled && can("can_send_whatsapp_bill") && (
                   <div className="flex flex-wrap items-center gap-2">
                     <Input
                       value={waNumber}
