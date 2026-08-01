@@ -21,6 +21,8 @@ import {
   History,
   CalendarClock,
   MonitorPlay,
+  Landmark,
+  MessageCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
@@ -42,6 +44,8 @@ import { useAuth } from "@/lib/pos-auth";
 import { useUserPermissions } from "@/lib/pos-permissions";
 import type { CartLine, DiscountType, PaymentMethod, Sale } from "@/lib/pos-types";
 import { lineUnitDiscount, r2 } from "@/lib/pos-types";
+import { buildBookingMessage, buildSaleMessage, sendBillOnWhatsApp } from "@/lib/whatsapp";
+import { logger } from "@/lib/audit-log";
 import { evaluatePromotions, focLine } from "@/lib/pos-promotions";
 import { openCashDrawer, printBookingSlip, printSaleReceipt } from "@/lib/pos-print";
 import {
@@ -102,6 +106,9 @@ function Register() {
   const [cashier, setCashier] = useState(user?.name ?? "Cashier");
   const [tendered, setTendered] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("cash");
+  const [transferRef, setTransferRef] = useState("");
+  const [waNumber, setWaNumber] = useState("");
+  const [waSending, setWaSending] = useState(false);
   const [lastSale, setLastSale] = useState<Sale | null>(null);
   const [memberQuery, setMemberQuery] = useState("");
   const [historyMemberId, setHistoryMemberId] = useState<string | null>(null);
@@ -332,6 +339,8 @@ function Register() {
     reference: "",
     dueDate: "",
     promos: promo.applied.map((a) => `${a.name} · ${a.detail}`),
+    method: null,
+    transferRef: "",
   });
 
   // Mirror the live ticket onto the customer-facing second screen.
@@ -347,6 +356,38 @@ function Register() {
     publishDisplay(cartSnapshot());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayKey, state.settings.payment]);
+
+  /** Show bank-transfer instructions on the customer screen while the
+   *  cashier has that tender selected. */
+  useEffect(() => {
+    if (!payOpen) return;
+    publishDisplay({
+      ...cartSnapshot(),
+      mode: method === "bank_transfer" ? "transfer" : "cart",
+      method,
+      transferRef,
+      balance: totals.total,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [payOpen, method, transferRef, displayKey]);
+
+  const wa = state.settings.whatsapp;
+
+  /** Sends the finished bill to the customer's WhatsApp. */
+  async function sendSaleOnWhatsApp(sale: Sale, to: string) {
+    setWaSending(true);
+    const buyer = state.members.find((m) => m.id === sale.memberId) ?? null;
+    const res = await sendBillOnWhatsApp({
+      cfg: wa,
+      to,
+      body: buildSaleMessage(sale, displayBase.companyName, wa),
+      reference: sale.receiptNo,
+      member: buyer,
+    });
+    setWaSending(false);
+    if (res.ok) toast.success(`Bill ${sale.receiptNo} sent on WhatsApp`);
+    else toast.error("WhatsApp send failed", { description: res.error });
+  }
 
   async function bookAndPayLater() {
     if (!activeShift) {
@@ -382,6 +423,15 @@ function Register() {
     });
     if (paidNow > 0 && depositMethod === "cash") openCashDrawer();
     printBookingSlip(booking, member, state.settings.payment);
+    if (wa.enabled && wa.autoSendOnBooking) {
+      void sendBillOnWhatsApp({
+        cfg: wa,
+        to: bookPhone.trim() || member?.phone || "",
+        body: buildBookingMessage(booking, displayBase.companyName, wa),
+        reference: booking.ref,
+        member,
+      });
+    }
     publishDisplay({
       ...cartSnapshot(),
       mode: "booking",
@@ -389,6 +439,7 @@ function Register() {
       balance: r2(booking.total - booking.paid),
       reference: booking.ref,
       dueDate: booking.dueDate,
+      method: depositMethod,
     });
     resetCart();
     setMemberId(null);
@@ -414,6 +465,10 @@ function Register() {
       toast.error("Tendered amount is less than the total");
       return;
     }
+    if (!isRefund && method === "bank_transfer" && !transferRef.trim()) {
+      toast.error("Enter the transfer reference shown on the customer's slip");
+      return;
+    }
     if (!isRefund && method === "points" && (member?.points ?? 0) < totals.total * 100) {
       toast.error("Not enough points on this member");
       return;
@@ -432,23 +487,40 @@ function Register() {
       memberId,
       pointsEarned,
       cashier: activeShift.cashier,
+      ...(method === "bank_transfer" ? { transferRef: transferRef.trim() } : {}),
       ...(exchangeRef
         ? { exchangeOfReceiptNo: exchangeRef, exchangeCredit: totals.credit }
         : {}),
     });
     if (method === "cash") openCashDrawer();
+    if (method === "bank_transfer") {
+      logger.log("sale", "Bank transfer payment recorded", "register", {
+        receiptNo: sale.receiptNo,
+        total: sale.total,
+        transferRef: sale.transferRef,
+        bank: state.settings.payment.bankName,
+      });
+    }
     printSaleReceipt(sale, member, "sale");
     setLastSale(sale);
+    const customerNumber = member?.phone ?? "";
+    setWaNumber(customerNumber);
+    if (wa.enabled && wa.autoSendOnSale && customerNumber) {
+      void sendSaleOnWhatsApp(sale, customerNumber);
+    }
     publishDisplay({
       ...cartSnapshot(),
       mode: "paid",
       paid: sale.paid,
       change: sale.change,
       reference: sale.receiptNo,
+      method: sale.method,
+      transferRef: sale.transferRef ?? "",
     });
     resetCart();
     setMemberId(null);
     setTendered("");
+    setTransferRef("");
     setPayOpen(false);
     toast.success(
       exchangeRef
@@ -926,6 +998,25 @@ function Register() {
                 >
                   Kitchen
                 </Button>
+                {wa.enabled && (
+                  <div className="flex w-full flex-wrap items-center gap-2">
+                    <Input
+                      value={waNumber}
+                      onChange={(e) => setWaNumber(e.target.value)}
+                      placeholder="WhatsApp number"
+                      className="numeric h-9 w-44"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={waSending || !waNumber.trim()}
+                      onClick={() => void sendSaleOnWhatsApp(lastSale, waNumber)}
+                    >
+                      <MessageCircle className="size-4" />
+                      {waSending ? "Sending…" : "Send bill"}
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1001,13 +1092,14 @@ function Register() {
               ticket.
             </p>
           )}
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-5 gap-2">
             {(
               [
                 { m: "cash", icon: Banknote, label: "Cash" },
                 { m: "card", icon: CreditCard, label: "Card" },
                 { m: "wallet", icon: Wallet, label: "Wallet" },
                 { m: "points", icon: BadgeCheck, label: "Points" },
+                { m: "bank_transfer", icon: Landmark, label: "Transfer" },
               ] as const
             ).map((opt) => (
               <button
@@ -1061,6 +1153,29 @@ function Register() {
                 ? `${member.name} has ${member.points} points (100 pts = $1).`
                 : "Attach a member to pay with points."}
             </p>
+          )}
+          {method === "bank_transfer" && (
+            <div className="space-y-2 rounded-md border border-border p-3">
+              <p className="text-xs text-muted-foreground">
+                The customer screen is now showing your bank details and WhatsApp QR code so the
+                shopper can transfer {money(balanceDue)}.
+              </p>
+              <div className="numeric space-y-0.5 text-sm">
+                {state.settings.payment.bankName && <p>{state.settings.payment.bankName}</p>}
+                {state.settings.payment.accountName && (
+                  <p>{state.settings.payment.accountName}</p>
+                )}
+                {state.settings.payment.accountNumber && (
+                  <p className="font-bold">{state.settings.payment.accountNumber}</p>
+                )}
+              </div>
+              <Label>Transfer reference / slip number</Label>
+              <Input
+                value={transferRef}
+                onChange={(e) => setTransferRef(e.target.value)}
+                placeholder="e.g. TRX-889210"
+              />
+            </div>
           )}
 
           <DialogFooter>

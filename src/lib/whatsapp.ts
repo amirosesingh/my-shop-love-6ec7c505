@@ -1,0 +1,114 @@
+import { logger } from "./audit-log";
+import { sendWhatsAppBill } from "./whatsapp.functions";
+import {
+  PAYMENT_LABELS,
+  bookingBalance,
+  lineUnitDiscount,
+  r2,
+  type Booking,
+  type Member,
+  type Sale,
+  type WhatsAppSettings,
+} from "./pos-types";
+
+const cash = (n: number) =>
+  n.toLocaleString(undefined, { style: "currency", currency: "USD" });
+
+/** Strip formatting and apply the default dialling code to local numbers. */
+export function normalizeWhatsAppNumber(raw: string, countryCode: string) {
+  const digits = (raw || "").replace(/\D/g, "");
+  if (!digits) return "";
+  const cc = (countryCode || "").replace(/\D/g, "");
+  if (raw.trim().startsWith("+") || (cc && digits.startsWith(cc))) return digits;
+  return `${cc}${digits.replace(/^0+/, "")}`;
+}
+
+const itemLines = (sale: Sale) =>
+  sale.lines
+    .map((l) => {
+      const each = r2(l.price - lineUnitDiscount(l));
+      return `• ${l.name} ×${l.qty} — ${cash(r2(each * l.qty))}${l.foc ? " (free)" : ""}`;
+    })
+    .join("\n");
+
+export function buildSaleMessage(
+  sale: Sale,
+  company: string,
+  cfg: WhatsAppSettings,
+): string {
+  const parts = [cfg.greeting, "", `*${company}*`, `Bill ${sale.receiptNo}`];
+  if (cfg.format === "itemized") parts.push("", itemLines(sale));
+  parts.push(
+    "",
+    `Subtotal: ${cash(sale.subtotal)}`,
+    ...(sale.discount ? [`Discount: -${cash(sale.discount)}`] : []),
+    ...(sale.tax ? [`Tax: ${cash(sale.tax)}`] : []),
+    `*Total: ${cash(sale.total)}*`,
+    `Paid by ${PAYMENT_LABELS[sale.method]}${sale.change ? ` · change ${cash(sale.change)}` : ""}`,
+    ...(sale.transferRef ? [`Transfer ref: ${sale.transferRef}`] : []),
+    ...(sale.pointsEarned ? [`Points earned: ${sale.pointsEarned}`] : []),
+    "",
+    cfg.signoff,
+  );
+  return parts.filter((p) => p !== undefined).join("\n");
+}
+
+export function buildBookingMessage(
+  booking: Booking,
+  company: string,
+  cfg: WhatsAppSettings,
+): string {
+  return [
+    cfg.greeting,
+    "",
+    `*${company}*`,
+    `Booking ${booking.ref}`,
+    ...(cfg.format === "itemized"
+      ? ["", booking.lines.map((l) => `• ${l.name} ×${l.qty}`).join("\n")]
+      : []),
+    "",
+    `Booking total: ${cash(booking.total)}`,
+    `Deposit paid: ${cash(booking.paid)}`,
+    `*Balance due: ${cash(bookingBalance(booking))}*`,
+    `Collect by: ${new Date(booking.dueDate).toDateString()}`,
+    "",
+    cfg.signoff,
+  ].join("\n");
+}
+
+type SendArgs = {
+  cfg: WhatsAppSettings;
+  /** raw customer number (member profile or typed at the till) */
+  to: string;
+  body: string;
+  /** what the message is about, for the activity trail */
+  reference: string;
+  member?: Member | null;
+};
+
+/** Sends the bill and writes a human-readable entry to the activity trail. */
+export async function sendBillOnWhatsApp({ cfg, to, body, reference, member }: SendArgs) {
+  if (!cfg.enabled) return { ok: false, error: "WhatsApp billing is switched off in Settings" };
+  if (!cfg.phoneNumberId)
+    return { ok: false, error: "Add your WhatsApp phone number ID in Settings" };
+  const number = normalizeWhatsAppNumber(to, cfg.countryCode);
+  if (!number) return { ok: false, error: "This customer has no WhatsApp number on file" };
+
+  const res = await sendWhatsAppBill({
+    data: { phoneNumberId: cfg.phoneNumberId, to: number, body },
+  }).catch((e: unknown) => ({ ok: false as const, error: String(e) }));
+
+  logger.log(
+    "messaging",
+    res.ok ? "Bill sent on WhatsApp" : "WhatsApp send failed",
+    "messaging",
+    {
+      reference,
+      to: number,
+      customer: member?.name ?? null,
+      format: cfg.format,
+      error: res.ok ? null : ("error" in res ? res.error : "unknown"),
+    },
+  );
+  return res.ok ? { ok: true } : { ok: false, error: ("error" in res && res.error) || "Send failed" };
+}
