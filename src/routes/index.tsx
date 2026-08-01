@@ -21,6 +21,8 @@ import {
   History,
   CalendarClock,
   MonitorPlay,
+  Landmark,
+  MessageCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
@@ -42,6 +44,8 @@ import { useAuth } from "@/lib/pos-auth";
 import { useUserPermissions } from "@/lib/pos-permissions";
 import type { CartLine, DiscountType, PaymentMethod, Sale } from "@/lib/pos-types";
 import { lineUnitDiscount, r2 } from "@/lib/pos-types";
+import { buildBookingMessage, buildSaleMessage, sendBillOnWhatsApp } from "@/lib/whatsapp";
+import { logger } from "@/lib/audit-log";
 import { evaluatePromotions, focLine } from "@/lib/pos-promotions";
 import { openCashDrawer, printBookingSlip, printSaleReceipt } from "@/lib/pos-print";
 import {
@@ -102,6 +106,9 @@ function Register() {
   const [cashier, setCashier] = useState(user?.name ?? "Cashier");
   const [tendered, setTendered] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("cash");
+  const [transferRef, setTransferRef] = useState("");
+  const [waNumber, setWaNumber] = useState("");
+  const [waSending, setWaSending] = useState(false);
   const [lastSale, setLastSale] = useState<Sale | null>(null);
   const [memberQuery, setMemberQuery] = useState("");
   const [historyMemberId, setHistoryMemberId] = useState<string | null>(null);
@@ -332,6 +339,8 @@ function Register() {
     reference: "",
     dueDate: "",
     promos: promo.applied.map((a) => `${a.name} · ${a.detail}`),
+    method: null,
+    transferRef: "",
   });
 
   // Mirror the live ticket onto the customer-facing second screen.
