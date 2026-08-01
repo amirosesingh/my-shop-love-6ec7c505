@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Plus, Printer, Search, Trash2 } from "lucide-react";
+import { History, Plus, Printer, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import {
 import { money, usePos } from "@/lib/pos-store";
 import type { Member } from "@/lib/pos-types";
 import { printMemberStatement } from "@/lib/pos-print";
+import { MemberHistoryDialog } from "@/components/pos/MemberHistoryDialog";
 
 export const Route = createFileRoute("/members")({
   head: () => ({
@@ -50,6 +51,7 @@ function Members() {
   const { state, upsertMember, removeMember } = usePos();
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState<Member | null>(null);
+  const [historyMember, setHistoryMember] = useState<Member | null>(null);
 
   const rows = state.members.filter((m) =>
     `${m.name} ${m.code} ${m.phone} ${m.email}`.toLowerCase().includes(query.toLowerCase()),
@@ -121,6 +123,9 @@ function Members() {
                   {m.phone} · {m.email}
                 </p>
                 <div className="mt-3 flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setHistoryMember(m)}>
+                    <History className="size-4" /> History
+                  </Button>
                   <Button
                     size="sm"
                     variant="outline"
@@ -144,6 +149,8 @@ function Members() {
           })}
         </div>
       </div>
+
+      <MemberHistoryDialog member={historyMember} onOpenChange={(o) => !o && setHistoryMember(null)} />
 
       <Dialog open={!!draft} onOpenChange={(o) => !o && setDraft(null)}>
         <DialogContent>
