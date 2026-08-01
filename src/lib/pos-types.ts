@@ -71,7 +71,15 @@ export const lineUnitDiscount = (l: Pick<CartLine, "price" | "discount" | "disco
     ? r2((l.price * (l.discount || 0)) / 100)
     : r2(l.discount || 0);
 
-export type PaymentMethod = "cash" | "card" | "wallet" | "points";
+export type PaymentMethod = "cash" | "card" | "wallet" | "points" | "bank_transfer";
+
+export const PAYMENT_LABELS: Record<PaymentMethod, string> = {
+  cash: "Cash",
+  card: "Card",
+  wallet: "Wallet",
+  points: "Points",
+  bank_transfer: "Bank transfer",
+};
 
 export type Sale = {
   id: string;
@@ -99,6 +107,8 @@ export type Sale = {
   exchangeCredit?: number;
   /** booking (pay-later ticket) this bill settles */
   bookingRef?: string;
+  /** bank-transfer slip / reference number captured at the till */
+  transferRef?: string;
 };
 
 export type Shift = {
@@ -218,6 +228,23 @@ export const whatsappLink = (number: string) => {
   return digits ? `https://wa.me/${digits}` : "";
 };
 
+/** WhatsApp bill delivery (Meta WhatsApp Cloud API). */
+export type WhatsAppSettings = {
+  enabled: boolean;
+  /** Meta Cloud API phone number id (from the WhatsApp app dashboard) */
+  phoneNumberId: string;
+  /** short totals only, or every line of the bill */
+  format: "summary" | "itemized";
+  autoSendOnSale: boolean;
+  autoSendOnBooking: boolean;
+  /** default country dialling code applied to local member numbers */
+  countryCode: string;
+  /** intro line above the bill body */
+  greeting: string;
+  /** sign-off under the bill body */
+  signoff: string;
+};
+
 export type PromoType = "points" | "foc" | "birthday" | "threshold" | "tier";
 
 export type MemberTier = Member["tier"];
@@ -307,6 +334,7 @@ export type AppSettings = {
   tax: TaxSettings;
   receipt: ReceiptSettings;
   payment: PaymentDetails;
+  whatsapp: WhatsAppSettings;
 };
 
 export type Promotion = {

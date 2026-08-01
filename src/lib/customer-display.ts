@@ -1,4 +1,4 @@
-import type { CartLine, PaymentDetails } from "./pos-types";
+import type { CartLine, PaymentDetails, PaymentMethod } from "./pos-types";
 
 export const DISPLAY_CHANNEL = "pos-customer-display";
 export const DISPLAY_STORAGE_KEY = "pos.display.snapshot";
@@ -15,7 +15,7 @@ export type DisplayLine = {
 
 export type DisplaySnapshot = {
   at: number;
-  mode: "idle" | "cart" | "paid" | "booking";
+  mode: "idle" | "cart" | "paid" | "booking" | "transfer";
   companyName: string;
   storeName: string;
   cashier: string;
@@ -34,6 +34,10 @@ export type DisplaySnapshot = {
   dueDate: string;
   promos: string[];
   payment: PaymentDetails | null;
+  /** tender the cashier has selected, drives the transfer instructions */
+  method: PaymentMethod | null;
+  /** bank-transfer slip reference typed by the cashier */
+  transferRef: string;
 };
 
 export const toDisplayLine = (l: CartLine, lineTotal: number): DisplayLine => ({

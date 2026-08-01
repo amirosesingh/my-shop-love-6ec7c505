@@ -5,6 +5,7 @@ import type {
   Promotion,
   ReceiptSettings,
   Store,
+  WhatsAppSettings,
 } from "./pos-types";
 
 export const defaultPaymentDetails: PaymentDetails = {
@@ -38,10 +39,22 @@ export const defaultReceiptSettings: ReceiptSettings = {
   qr: { enabled: false, value: "", size: 96, placement: "footer" },
 };
 
+export const defaultWhatsApp: WhatsAppSettings = {
+  enabled: false,
+  phoneNumberId: "",
+  format: "summary",
+  autoSendOnSale: false,
+  autoSendOnBooking: false,
+  countryCode: "+1",
+  greeting: "Thanks for shopping with us!",
+  signoff: "Keep this message as your digital receipt.",
+};
+
 export const defaultSettings: AppSettings = {
   tax: { enabled: true, rate: 5, mode: "exclusive" },
   receipt: defaultReceiptSettings,
   payment: defaultPaymentDetails,
+  whatsapp: defaultWhatsApp,
 };
 
 export const seedPromotions: Promotion[] = [
