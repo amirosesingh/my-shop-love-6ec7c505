@@ -130,6 +130,17 @@ export type TerminalUser = {
   local?: boolean;
 };
 
+/** Row loaded from public.app_users for the signed-in account. */
+export type AppUserProfile = {
+  user_code: string;
+  full_name: string;
+  role: AppRole;
+  store_id: string | null;
+  email: string;
+  permissions: Partial<StaffPermissions> | null;
+  is_active: boolean;
+};
+
 /** Offline bootstrap admin so the terminal is never locked out before the
  *  backend auth tables (app_users / user_roles) have been provisioned. */
 const BOOTSTRAP_ADMIN_CODE = "admin";
@@ -148,6 +159,8 @@ type AuthCtx = {
   authUserId: string | null;
   /** cashier currently signed in at the terminal (User ID + PIN) */
   terminalUser: TerminalUser | null;
+  /** public.app_users record backing the signed-in account */
+  appUser: AppUserProfile | null;
   /** permission check that always passes for the admin */
   can: (flag: keyof StaffPermissions) => boolean;
   staff: StaffMember[];
