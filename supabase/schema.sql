@@ -535,19 +535,34 @@ insert into public.app_users (user_id, full_name, email, role, store_id, permiss
                               pin_hash, auth_secret)
 values
   ('admin', 'Administrator', 'admin@store.internal', 'admin', null,
-   jsonb_build_object('financials', true, 'products', true, 'ecommerce', true,
-                      'can_give_discount', true, 'can_refund', true,
-                      'can_open_drawer_manual', true),
+   jsonb_build_object(
+     'can_open_drawer', true, 'can_close_drawer', true, 'can_view_drawer_balance', true,
+     'can_process_sale', true, 'can_give_discount', true, 'can_void_item', true,
+     'can_hold_cart', true, 'can_process_refund', true, 'can_process_exchange', true,
+     'can_view_inventory', true, 'can_edit_product_price', true, 'can_add_new_product', true,
+     'can_receive_purchase_order', true, 'can_add_member', true, 'can_edit_member_points', true,
+     'can_apply_member_discount', true, 'can_view_sales_reports', true,
+     'can_access_pos_settings', true, 'can_manage_staff', true),
    extensions.crypt('1234', extensions.gen_salt('bf', 10)), 'pos-admin-1234'),
   ('supervisor', 'Store Supervisor', 'supervisor@store.internal', 'manager', null,
-   jsonb_build_object('financials', true, 'products', true, 'ecommerce', true,
-                      'can_give_discount', true, 'can_refund', true,
-                      'can_open_drawer_manual', true),
+   jsonb_build_object(
+     'can_open_drawer', true, 'can_close_drawer', true, 'can_view_drawer_balance', true,
+     'can_process_sale', true, 'can_give_discount', true, 'can_void_item', true,
+     'can_hold_cart', true, 'can_process_refund', true, 'can_process_exchange', true,
+     'can_view_inventory', true, 'can_edit_product_price', true, 'can_add_new_product', true,
+     'can_receive_purchase_order', true, 'can_add_member', true, 'can_edit_member_points', true,
+     'can_apply_member_discount', true, 'can_view_sales_reports', true,
+     'can_access_pos_settings', true, 'can_manage_staff', true),
    extensions.crypt('2345', extensions.gen_salt('bf', 10)), 'pos-supervisor-2345'),
   ('101', 'Cashier 101', '101@store.internal', 'staff', 's1',
-   jsonb_build_object('financials', false, 'products', false, 'ecommerce', false,
-                      'can_give_discount', false, 'can_refund', false,
-                      'can_open_drawer_manual', false),
+   jsonb_build_object(
+     'can_open_drawer', true, 'can_close_drawer', true, 'can_view_drawer_balance', false,
+     'can_process_sale', true, 'can_give_discount', false, 'can_void_item', false,
+     'can_hold_cart', true, 'can_process_refund', false, 'can_process_exchange', false,
+     'can_view_inventory', true, 'can_edit_product_price', false, 'can_add_new_product', false,
+     'can_receive_purchase_order', false, 'can_add_member', true, 'can_edit_member_points', false,
+     'can_apply_member_discount', true, 'can_view_sales_reports', false,
+     'can_access_pos_settings', false, 'can_manage_staff', false),
    extensions.crypt('1111', extensions.gen_salt('bf', 10)), 'pos-101-1111')
 on conflict (user_id) do nothing;
 
