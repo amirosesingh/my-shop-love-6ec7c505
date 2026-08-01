@@ -534,6 +534,41 @@ export const db = {
   },
 
   /** Purchase order / receiving invoice. */
+  /** No-sale cash-drawer open, queued so it survives an offline till. */
+  recordDrawerEvent(row: {
+    id: string;
+    storeId: string | null;
+    terminalId: string | null;
+    shiftId: string | null;
+    staffId: string | null;
+    staffName: string | null;
+    role: string | null;
+    reason: string;
+    note: string | null;
+    approvedBy: string | null;
+    at: string;
+  }) {
+    queue("Logging drawer open", {
+      kind: "insert",
+      table: "drawer_events",
+      rows: [
+        {
+          id: row.id,
+          store_id: row.storeId,
+          terminal_id: row.terminalId,
+          shift_id: row.shiftId,
+          staff_id: row.staffId,
+          staff_name: row.staffName,
+          role: row.role,
+          reason: row.reason,
+          note: row.note,
+          approved_by: row.approvedBy,
+          created_at: row.at,
+        },
+      ],
+    });
+  },
+
   async recordPurchaseOrder(
     po: {
       poNumber: string;
