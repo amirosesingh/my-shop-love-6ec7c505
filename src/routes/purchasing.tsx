@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { FilePlus2, PackagePlus, Plus, ShieldAlert, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { FilePlus2, PackagePlus, ScanBarcode, ShieldAlert, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
@@ -8,13 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -23,23 +23,24 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { stockAt, usePos } from "@/lib/pos-store";
+import { money, stockAt, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
+import { logger } from "@/lib/audit-log";
 import type { Product } from "@/lib/pos-types";
 
 export const Route = createFileRoute("/purchasing")({
   head: () => ({
     meta: [
-      { title: "Purchase Orders & Receiving — Northwind POS" },
+      { title: "Receiving Orders & Stock Entry — Northwind POS" },
       {
         name: "description",
         content:
-          "Post batch supplier invoices with multiple product receipt lines and track every shipment received into the branch.",
+          "Scan supplier invoices line by line, edit cost and quantity received, create missing items inline and post stock into the branch.",
       },
-      { property: "og:title", content: "Purchase Orders & Receiving — Northwind POS" },
+      { property: "og:title", content: "Receiving Orders & Stock Entry — Northwind POS" },
       {
         property: "og:description",
-        content: "Batch invoice intake, barcode receipt lines and received-shipment history.",
+        content: "Barcode-driven receiving invoices with inline product creation and audit trail.",
       },
     ],
   }),
@@ -48,30 +49,53 @@ export const Route = createFileRoute("/purchasing")({
 
 type Line = {
   id: string;
-  code: string;
-  qty: string;
-  error?: boolean;
+  productId: string;
+  barcode: string;
+  name: string;
+  cost: number;
+  price: number;
+  qty: number;
 };
 
 type InvoiceLog = {
   id: string;
   invoiceNo: string;
+  supplier: string;
+  invoiceDate: string;
   uniqueItems: number;
   totalUnits: number;
+  totalCost: number;
   at: string;
   operator: string;
   storeCode: string;
 };
 
-const newLine = (): Line => ({ id: crypto.randomUUID(), code: "", qty: "1" });
+const today = () => new Date().toISOString().slice(0, 10);
 
 function Purchasing() {
   const { state, currentStore, upsertProduct, adjustStock } = usePos();
   const { can, user } = useAuth();
   const [invoiceNo, setInvoiceNo] = useState("");
-  const [lines, setLines] = useState<Line[]>([newLine()]);
+  const [supplier, setSupplier] = useState("");
+  const [invoiceDate, setInvoiceDate] = useState(today());
+  const [scan, setScan] = useState("");
+  const [lines, setLines] = useState<Line[]>([]);
   const [history, setHistory] = useState<InvoiceLog[]>([]);
-  const [draft, setDraft] = useState<{ product: Product; lineId: string } | null>(null);
+  const [draft, setDraft] = useState<Product | null>(null);
+  const [draftQty, setDraftQty] = useState("1");
+  const scanRef = useRef<HTMLInputElement>(null);
+
+  const totals = useMemo(
+    () => ({
+      units: lines.reduce((a, l) => a + l.qty, 0),
+      cost: Number(lines.reduce((a, l) => a + l.cost * l.qty, 0).toFixed(2)),
+    }),
+    [lines],
+  );
+
+  useEffect(() => {
+    scanRef.current?.focus();
+  }, []);
 
   if (!can("products")) {
     return (
@@ -91,189 +115,267 @@ function Purchasing() {
 
   const findProduct = (code: string) =>
     state.products.find(
-      (p) =>
-        p.barcode === code.trim() || p.sku.toLowerCase() === code.trim().toLowerCase(),
+      (p) => p.barcode === code.trim() || p.sku.toLowerCase() === code.trim().toLowerCase(),
     );
 
   const patch = (id: string, next: Partial<Line>) =>
     setLines((ls) => ls.map((l) => (l.id === id ? { ...l, ...next } : l)));
 
-  function postInvoice() {
-    const ref = invoiceNo.trim();
-    if (!ref) return toast.error("Master Invoice / PO Number is required");
+  const addLine = (p: Product, qty = 1) =>
+    setLines((ls) => {
+      const existing = ls.find((l) => l.productId === p.id);
+      if (existing)
+        return ls.map((l) => (l.id === existing.id ? { ...l, qty: l.qty + qty } : l));
+      return [
+        ...ls,
+        {
+          id: crypto.randomUUID(),
+          productId: p.id,
+          barcode: p.barcode,
+          name: p.name,
+          cost: p.cost,
+          price: p.price,
+          qty,
+        },
+      ];
+    });
 
-    const filled = lines.filter((l) => l.code.trim());
-    if (!filled.length) return toast.error("Add at least one product receipt line");
-
-    const missing: string[] = [];
-    setLines((ls) =>
-      ls.map((l) => {
-        if (!l.code.trim()) return { ...l, error: false };
-        const hit = findProduct(l.code);
-        if (!hit) missing.push(l.id);
-        return { ...l, error: !hit };
-      }),
-    );
-
-    const unresolved = filled.filter((l) => !findProduct(l.code));
-    if (unresolved.length) {
-      toast.error(
-        `${unresolved.length} line${unresolved.length > 1 ? "s" : ""} not found in the catalog.`,
-      );
+  function submitScan() {
+    const code = scan.trim();
+    if (!code) return;
+    const hit = findProduct(code);
+    setScan("");
+    if (hit) {
+      addLine(hit);
+      logger.log("inventory_edit", "Receiving line scanned", "purchasing", {
+        barcode: code,
+        productId: hit.id,
+        name: hit.name,
+        matched: true,
+      });
+      toast.success(`${hit.name} added to invoice`);
       return;
     }
-
-    let totalUnits = 0;
-    for (const l of filled) {
-      const hit = findProduct(l.code)!;
-      const units = Math.max(1, Number(l.qty) || 1);
-      totalUnits += units;
-      adjustStock(hit.id, units, currentStore.id);
-    }
-
-    setHistory((h) => [
-      {
-        id: crypto.randomUUID(),
-        invoiceNo: ref,
-        uniqueItems: filled.length,
-        totalUnits,
-        at: new Date().toISOString(),
-        operator: user?.name ?? "—",
-        storeCode: currentStore.code,
-      },
-      ...h,
-    ]);
-    toast.success(`Invoice ${ref} posted · ${totalUnits} units received`);
-    setInvoiceNo("");
-    setLines([newLine()]);
-  }
-
-  function openDraft(line: Line) {
-    const code = line.code.trim();
+    logger.log("inventory_edit", "Unknown barcode scanned", "purchasing", {
+      barcode: code,
+      matched: false,
+    });
+    setDraftQty("1");
     setDraft({
-      lineId: line.id,
-      product: {
-        id: crypto.randomUUID(),
-        name: "",
-        sku: code,
-        barcode: code,
-        category: "General",
-        price: 0,
-        cost: 0,
-        ecomPrice: 0,
-        ecomVisible: false,
-        stockByStore: Object.fromEntries(state.stores.map((s) => [s.id, 0])),
-        reorderLevel: 10,
-        taxRate: 0.05,
-      },
+      id: crypto.randomUUID(),
+      name: "",
+      sku: code,
+      barcode: code,
+      category: "General",
+      price: 0,
+      cost: 0,
+      ecomPrice: 0,
+      ecomVisible: false,
+      stockByStore: Object.fromEntries(state.stores.map((s) => [s.id, 0])),
+      reorderLevel: 10,
+      taxRate: 0.05,
     });
   }
 
   function saveDraft() {
     if (!draft) return;
-    const p = draft.product;
-    if (!p.name.trim()) return toast.error("Title is required");
-    if (!p.price) return toast.error("POS price is required");
-    if (!p.ecomPrice) return toast.error("E-com price is required");
-    upsertProduct(p);
-    patch(draft.lineId, { error: false });
-    toast.success(`“${p.name}” created — re-post the invoice to receive it.`);
+    if (!draft.name.trim()) return toast.error("Item name is required");
+    if (!draft.price) return toast.error("Selling price is required");
+    const qty = Math.max(1, Number(draftQty) || 1);
+    upsertProduct({ ...draft, ecomPrice: draft.ecomPrice || draft.price });
+    addLine(draft, qty);
+    toast.success(`“${draft.name}” created and added to the invoice`);
     setDraft(null);
+    scanRef.current?.focus();
+  }
+
+  function finalize() {
+    const ref = invoiceNo.trim();
+    if (!ref) return toast.error("Invoice number is required");
+    if (!supplier.trim()) return toast.error("Supplier name is required");
+    if (!lines.length) return toast.error("Scan at least one item into the invoice");
+
+    const movements = lines.map((l) => {
+      const before = state.products.find((p) => p.id === l.productId);
+      const previousStock = before ? stockAt(before, currentStore.id) : 0;
+      adjustStock(l.productId, l.qty, currentStore.id);
+      // Cost changes captured on the line are written back to the catalog.
+      if (before && before.cost !== l.cost) upsertProduct({ ...before, cost: l.cost });
+      return {
+        productId: l.productId,
+        barcode: l.barcode,
+        name: l.name,
+        qty: l.qty,
+        unitCost: l.cost,
+        lineCost: Number((l.cost * l.qty).toFixed(2)),
+        previousStock,
+        updatedStock: previousStock + l.qty,
+        storeId: currentStore.id,
+      };
+    });
+
+    const record: InvoiceLog = {
+      id: crypto.randomUUID(),
+      invoiceNo: ref,
+      supplier: supplier.trim(),
+      invoiceDate,
+      uniqueItems: lines.length,
+      totalUnits: totals.units,
+      totalCost: totals.cost,
+      at: new Date().toISOString(),
+      operator: user?.name ?? "—",
+      storeCode: currentStore.code,
+    };
+    setHistory((h) => [record, ...h]);
+
+    logger.log("inventory_edit", "Receiving order finalized", "purchasing", {
+      ...record,
+      stockMovements: movements,
+    });
+
+    toast.success(`Invoice ${ref} received · ${totals.units} units · ${money(totals.cost)}`);
+    setInvoiceNo("");
+    setSupplier("");
+    setInvoiceDate(today());
+    setLines([]);
+    scanRef.current?.focus();
   }
 
   return (
     <AppShell>
       <div className="space-y-5 p-6">
         <header>
-          <h1 className="text-2xl font-semibold">Purchase order &amp; receiving</h1>
+          <h1 className="text-2xl font-semibold">Receiving order &amp; stock entry</h1>
           <p className="text-sm text-muted-foreground">
-            Batch invoice intake for {currentStore.name} · operator {user?.name}
+            Receiving into {currentStore.name} · operator {user?.name}
           </p>
         </header>
 
         <section className="space-y-4 rounded-lg border border-border bg-card p-5">
-          <div className="max-w-md space-y-1">
-            <Label className="text-xs text-muted-foreground">Master Invoice / PO Number *</Label>
-            <Input
-              value={invoiceNo}
-              onChange={(e) => setInvoiceNo(e.target.value)}
-              placeholder="e.g. INV-2026-0417"
-              className="numeric h-11 text-base"
-            />
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Invoice number *</Label>
+              <Input
+                value={invoiceNo}
+                onChange={(e) => setInvoiceNo(e.target.value)}
+                placeholder="e.g. INV-2026-0417"
+                className="numeric h-11"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Supplier name *</Label>
+              <Input
+                value={supplier}
+                onChange={(e) => setSupplier(e.target.value)}
+                placeholder="e.g. Harbour Foods Ltd"
+                className="h-11"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Invoice date</Label>
+              <Input
+                type="date"
+                value={invoiceDate}
+                onChange={(e) => setInvoiceDate(e.target.value)}
+                className="numeric h-11"
+              />
+            </div>
           </div>
 
           <Separator />
 
-          <div className="space-y-2">
-            <p className="text-sm font-semibold">Product receipt lines</p>
-            {lines.map((l, i) => {
-              const hit = l.code.trim() ? findProduct(l.code) : undefined;
-              return (
-                <div key={l.id} className="space-y-1">
-                  <div className="flex flex-wrap items-end gap-2">
-                    <div className="min-w-56 flex-1 space-y-1">
-                      {i === 0 && (
-                        <Label className="text-[11px] text-muted-foreground">Barcode / SKU</Label>
-                      )}
-                      <Input
-                        value={l.code}
-                        onChange={(e) => patch(l.id, { code: e.target.value, error: false })}
-                        placeholder="Scan or type a barcode"
-                        className={`numeric h-11 ${
-                          l.error ? "border-2 border-destructive" : ""
-                        }`}
-                      />
-                    </div>
-                    <div className="w-32 space-y-1">
-                      {i === 0 && (
-                        <Label className="text-[11px] text-muted-foreground">Qty received</Label>
-                      )}
-                      <Input
-                        value={l.qty}
-                        onChange={(e) => patch(l.id, { qty: e.target.value })}
-                        className="numeric h-11"
-                      />
-                    </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Scan or search barcode</Label>
+            <div className="flex gap-2">
+              <Input
+                ref={scanRef}
+                value={scan}
+                onChange={(e) => setScan(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && submitScan()}
+                placeholder="Scan a barcode and press Enter"
+                className="numeric h-11 max-w-md"
+              />
+              <Button className="h-11" onClick={submitScan}>
+                <ScanBarcode className="size-4" /> Add to invoice
+              </Button>
+            </div>
+          </div>
+
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Barcode</TableHead>
+                <TableHead>Product</TableHead>
+                <TableHead className="w-32 text-right">Cost price</TableHead>
+                <TableHead className="text-right">Selling price</TableHead>
+                <TableHead className="w-28 text-right">Qty received</TableHead>
+                <TableHead className="text-right">Subtotal cost</TableHead>
+                <TableHead />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {lines.map((l) => (
+                <TableRow key={l.id}>
+                  <TableCell className="numeric">{l.barcode}</TableCell>
+                  <TableCell className="font-medium">{l.name}</TableCell>
+                  <TableCell className="text-right">
+                    <Input
+                      className="numeric h-9 text-right"
+                      value={l.cost}
+                      onChange={(e) => patch(l.id, { cost: Number(e.target.value) || 0 })}
+                    />
+                  </TableCell>
+                  <TableCell className="numeric text-right text-muted-foreground">
+                    {money(l.price)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Input
+                      className="numeric h-9 text-right"
+                      value={l.qty}
+                      onChange={(e) =>
+                        patch(l.id, { qty: Math.max(0, Number(e.target.value) || 0) })
+                      }
+                    />
+                  </TableCell>
+                  <TableCell className="numeric text-right font-medium">
+                    {money(l.cost * l.qty)}
+                  </TableCell>
+                  <TableCell className="text-right">
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-11"
-                      onClick={() =>
-                        setLines((ls) =>
-                          ls.length > 1 ? ls.filter((x) => x.id !== l.id) : [newLine()],
-                        )
-                      }
                       aria-label="Remove line"
+                      onClick={() => setLines((ls) => ls.filter((x) => x.id !== l.id))}
                     >
                       <Trash2 className="size-4 text-destructive" />
                     </Button>
-                  </div>
-                  {l.error ? (
-                    <button
-                      onClick={() => openDraft(l)}
-                      className="text-xs font-medium text-warning underline-offset-4 hover:underline"
-                    >
-                      Create missing item record
-                    </button>
-                  ) : hit ? (
-                    <p className="text-[11px] text-muted-foreground">
-                      {hit.name} · in stock {stockAt(hit, currentStore.id)}
-                    </p>
-                  ) : null}
-                </div>
-              );
-            })}
-
-            <Button variant="outline" size="sm" onClick={() => setLines((ls) => [...ls, newLine()])}>
-              <Plus className="size-4" /> Add new row
-            </Button>
-          </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {!lines.length && (
+                <TableRow>
+                  <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                    Scan a barcode to start this receiving invoice.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
 
           <Separator />
 
-          <Button className="h-11 w-full sm:w-auto" onClick={postInvoice}>
-            <PackagePlus className="size-4" /> Post invoice to inventory
-          </Button>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="text-sm text-muted-foreground">
+              <span className="numeric font-semibold text-foreground">{lines.length}</span> unique
+              items ·{" "}
+              <span className="numeric font-semibold text-foreground">{totals.units}</span> units ·
+              total cost{" "}
+              <span className="numeric font-semibold text-foreground">{money(totals.cost)}</span>
+            </div>
+            <Button className="h-11" onClick={finalize}>
+              <PackagePlus className="size-4" /> Finalize &amp; receive stock
+            </Button>
+          </div>
         </section>
 
         <section className="rounded-lg border border-border bg-card">
@@ -283,9 +385,11 @@ function Purchasing() {
             <TableHeader>
               <TableRow>
                 <TableHead>Invoice no.</TableHead>
+                <TableHead>Supplier</TableHead>
+                <TableHead>Invoice date</TableHead>
                 <TableHead className="text-right">Unique items</TableHead>
                 <TableHead className="text-right">Total units</TableHead>
-                <TableHead>Timestamp</TableHead>
+                <TableHead className="text-right">Total cost</TableHead>
                 <TableHead>Operator</TableHead>
                 <TableHead className="text-right">Branch</TableHead>
               </TableRow>
@@ -294,11 +398,11 @@ function Purchasing() {
               {history.map((h) => (
                 <TableRow key={h.id}>
                   <TableCell className="numeric font-medium">{h.invoiceNo}</TableCell>
+                  <TableCell>{h.supplier}</TableCell>
+                  <TableCell className="numeric text-muted-foreground">{h.invoiceDate}</TableCell>
                   <TableCell className="numeric text-right">{h.uniqueItems}</TableCell>
                   <TableCell className="numeric text-right">{h.totalUnits}</TableCell>
-                  <TableCell className="numeric text-muted-foreground">
-                    {new Date(h.at).toLocaleString()}
-                  </TableCell>
+                  <TableCell className="numeric text-right">{money(h.totalCost)}</TableCell>
                   <TableCell>{h.operator}</TableCell>
                   <TableCell className="numeric text-right text-muted-foreground">
                     {h.storeCode}
@@ -307,8 +411,8 @@ function Purchasing() {
               ))}
               {!history.length && (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
-                    No invoices posted yet.
+                  <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                    No invoices received yet.
                   </TableCell>
                 </TableRow>
               )}
@@ -317,113 +421,84 @@ function Purchasing() {
         </section>
       </div>
 
-      <Sheet open={!!draft} onOpenChange={(o) => !o && setDraft(null)}>
-        <SheetContent className="w-full overflow-y-auto sm:max-w-md">
-          <SheetHeader>
-            <SheetTitle>
+      <Dialog open={!!draft} onOpenChange={(o) => !o && setDraft(null)}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
               <span className="flex items-center gap-2">
-                <FilePlus2 className="size-4" /> Create new product record
+                <FilePlus2 className="size-4" /> Add new item to inventory
               </span>
-            </SheetTitle>
-            <SheetDescription>
-              Barcode {draft?.product.barcode} was not found. Complete the record, then post the
-              invoice again.
-            </SheetDescription>
-          </SheetHeader>
+            </DialogTitle>
+            <DialogDescription>
+              Barcode {draft?.barcode} is not in the catalog. Saving creates the product and adds it
+              to this invoice in one step.
+            </DialogDescription>
+          </DialogHeader>
           {draft && (
-            <div className="grid gap-3 p-4">
+            <div className="grid gap-3">
               <Field label="Barcode / SKU">
                 <Input
                   className="numeric"
-                  value={draft.product.barcode}
+                  value={draft.barcode}
                   onChange={(e) =>
-                    setDraft({
-                      ...draft,
-                      product: {
-                        ...draft.product,
-                        barcode: e.target.value,
-                        sku: e.target.value,
-                      },
-                    })
+                    setDraft({ ...draft, barcode: e.target.value, sku: e.target.value })
                   }
                 />
               </Field>
-              <Field label="Title *">
+              <Field label="Item name *">
                 <Input
-                  value={draft.product.name}
-                  onChange={(e) =>
-                    setDraft({ ...draft, product: { ...draft.product, name: e.target.value } })
-                  }
+                  value={draft.name}
+                  onChange={(e) => setDraft({ ...draft, name: e.target.value })}
                 />
               </Field>
               <Field label="Category">
                 <Input
-                  value={draft.product.category}
-                  onChange={(e) =>
-                    setDraft({ ...draft, product: { ...draft.product, category: e.target.value } })
-                  }
+                  value={draft.category}
+                  onChange={(e) => setDraft({ ...draft, category: e.target.value })}
                 />
               </Field>
               <div className="grid grid-cols-2 gap-3">
-                <Field label="POS price *">
+                <Field label="Cost price">
                   <Input
                     className="numeric"
-                    value={draft.product.price}
-                    onChange={(e) =>
-                      setDraft({
-                        ...draft,
-                        product: { ...draft.product, price: Number(e.target.value) || 0 },
-                      })
-                    }
+                    value={draft.cost}
+                    onChange={(e) => setDraft({ ...draft, cost: Number(e.target.value) || 0 })}
                   />
                 </Field>
-                <Field label="E-com price *">
+                <Field label="Selling price *">
                   <Input
                     className="numeric"
-                    value={draft.product.ecomPrice ?? 0}
-                    onChange={(e) =>
-                      setDraft({
-                        ...draft,
-                        product: { ...draft.product, ecomPrice: Number(e.target.value) || 0 },
-                      })
-                    }
+                    value={draft.price}
+                    onChange={(e) => setDraft({ ...draft, price: Number(e.target.value) || 0 })}
                   />
                 </Field>
-                <Field label="Cost">
+                <Field label="Initial quantity received">
                   <Input
                     className="numeric"
-                    value={draft.product.cost}
-                    onChange={(e) =>
-                      setDraft({
-                        ...draft,
-                        product: { ...draft.product, cost: Number(e.target.value) || 0 },
-                      })
-                    }
+                    value={draftQty}
+                    onChange={(e) => setDraftQty(e.target.value)}
                   />
                 </Field>
                 <Field label="Reorder level">
                   <Input
                     className="numeric"
-                    value={draft.product.reorderLevel}
+                    value={draft.reorderLevel}
                     onChange={(e) =>
-                      setDraft({
-                        ...draft,
-                        product: { ...draft.product, reorderLevel: Number(e.target.value) || 0 },
-                      })
+                      setDraft({ ...draft, reorderLevel: Number(e.target.value) || 0 })
                     }
                   />
                 </Field>
               </div>
             </div>
           )}
-          <SheetFooter>
+          <DialogFooter>
             <Button variant="outline" onClick={() => setDraft(null)}>
               Cancel
             </Button>
-            <Button onClick={saveDraft}>Save product record</Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
+            <Button onClick={saveDraft}>Save &amp; add to invoice</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
 }

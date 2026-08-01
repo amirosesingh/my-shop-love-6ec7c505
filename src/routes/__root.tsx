@@ -14,6 +14,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { PosProvider } from "../lib/pos-store";
 import { AuthProvider } from "../lib/pos-auth";
 import { Toaster } from "../components/ui/sonner";
+import { AuditTracker } from "../components/pos/AuditTracker";
 
 function NotFoundComponent() {
   return (
@@ -137,6 +138,7 @@ function RootComponent() {
       <AuthProvider>
         <PosProvider>
           {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+          <AuditTracker />
           <Outlet />
           <Toaster position="top-center" />
         </PosProvider>

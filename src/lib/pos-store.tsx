@@ -5,6 +5,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useRef,
   type ReactNode,
 } from "react";
 import { defaultSettings, seedState } from "./pos-seed";
@@ -23,6 +24,7 @@ import type {
   TransferKind,
 } from "./pos-types";
 import { lineUnitDiscount, r2, type DiscountType } from "./pos-types";
+import { logger } from "./audit-log";
 
 const KEY = "pos-state-v2";
 
@@ -89,6 +91,9 @@ const PosContext = createContext<Ctx | null>(null);
 export function PosProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<PosState>(seedState);
   const [ready, setReady] = useState(false);
+  // Latest snapshot for audit logging without re-creating every callback.
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   useEffect(() => {
     try {
@@ -171,6 +176,11 @@ export function PosProvider({ children }: { children: ReactNode }) {
 
   const openShift = useCallback(
     (cashier: string, openingFloat: number) => {
+      logger.log("sale_event", "Shift opened", "shifts", {
+        cashier,
+        openingFloat,
+        storeId: stateRef.current.currentStoreId,
+      });
       setState((s) => ({
         ...s,
         shifts: [
@@ -204,6 +214,13 @@ export function PosProvider({ children }: { children: ReactNode }) {
         ...s,
         shifts: s.shifts.map((x) => (x.id === closed.id ? closed : x)),
       }));
+      logger.log("sale_event", "Shift closed", "shifts", {
+        shiftId: closed.id,
+        storeId: closed.storeId,
+        openingFloat: closed.openingFloat,
+        countedCash: countedCash,
+        note,
+      });
       return closed;
     },
     [activeShift],
@@ -242,10 +259,41 @@ export function PosProvider({ children }: { children: ReactNode }) {
         : s.sales;
       return { ...s, counter, products, members, sales: [sale, ...tagged] };
     });
+    logger.log(
+      "sale_event",
+      sale.exchangeOfReceiptNo ? "Exchange bill created" : "Bill created",
+      "register",
+      {
+        receiptNo: sale.receiptNo,
+        storeId: sale.storeId,
+        paymentMethod: sale.method,
+        subtotal: sale.subtotal,
+        discount: sale.discount,
+        tax: sale.tax,
+        total: sale.total,
+        paid: sale.paid,
+        memberId: sale.memberId ?? null,
+        pointsEarned: sale.pointsEarned,
+        exchangeOfReceiptNo: sale.exchangeOfReceiptNo ?? null,
+        cart: sale.lines.map((l) => ({
+          productId: l.productId,
+          name: l.name,
+          qty: l.qty,
+          price: l.price,
+          discount: l.discount,
+          discountType: l.discountType,
+          credit: !!l.credit,
+        })),
+      },
+    );
     return sale;
   }, []);
 
   const refundSale = useCallback((saleId: string) => {
+    logger.log("sale_event", "Sale refunded", "receipts", {
+      saleId,
+      receiptNo: stateRef.current.sales.find((x) => x.id === saleId)?.receiptNo ?? null,
+    });
     setState((s) => {
       const sale = s.sales.find((x) => x.id === saleId);
       if (!sale || sale.refunded) return s;
@@ -262,6 +310,21 @@ export function PosProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const upsertProduct = useCallback((product: Product) => {
+    const prev = stateRef.current.products.find((p) => p.id === product.id);
+    logger.log("inventory_edit", prev ? "Product updated" : "Product created", "inventory", {
+      productId: product.id,
+      name: product.name,
+      barcode: product.barcode,
+      previous: prev
+        ? { name: prev.name, price: prev.price, cost: prev.cost, ecomPrice: prev.ecomPrice }
+        : null,
+      updated: {
+        name: product.name,
+        price: product.price,
+        cost: product.cost,
+        ecomPrice: product.ecomPrice,
+      },
+    });
     setState((s) => ({
       ...s,
       products: s.products.some((p) => p.id === product.id)
@@ -275,6 +338,16 @@ export function PosProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const adjustStock = useCallback((id: string, delta: number, storeId?: string) => {
+    const target = storeId ?? stateRef.current.currentStoreId;
+    const before = stateRef.current.products.find((p) => p.id === id);
+    logger.log("inventory_edit", "Stock adjusted", "inventory", {
+      productId: id,
+      name: before?.name ?? null,
+      storeId: target,
+      delta,
+      previousStock: before ? stockAt(before, target) : null,
+      updatedStock: before ? stockAt(before, target) + delta : null,
+    });
     setState((s) => ({
       ...s,
       products: s.products.map((p) =>
@@ -284,6 +357,15 @@ export function PosProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const upsertMember = useCallback((member: Member) => {
+    const prev = stateRef.current.members.find((m) => m.id === member.id);
+    logger.log("member_event", prev ? "Member profile edited" : "Member created", "members", {
+      memberId: member.id,
+      name: member.name,
+      phone: member.phone,
+      previous: prev ? { points: prev.points, tier: prev.tier, phone: prev.phone } : null,
+      updated: { points: member.points, tier: member.tier, phone: member.phone },
+      pointsDelta: prev ? member.points - prev.points : member.points,
+    });
     setState((s) => ({
       ...s,
       members: s.members.some((m) => m.id === member.id)
@@ -317,6 +399,10 @@ export function PosProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const updateSettings = useCallback((patch: Partial<AppSettings>) => {
+    logger.log("settings", "Settings updated", "settings", {
+      previous: stateRef.current.settings,
+      updated: patch,
+    });
     setState((s) => ({
       ...s,
       settings: {
