@@ -138,7 +138,13 @@ function Register() {
   const [bookPhone, setBookPhone] = useState("");
   const [bookNote, setBookNote] = useState("");
   /* Operation deck state */
-  type HeldOrder = { id: string; label: string; total: number; lines: CartLine[] };
+  type HeldOrder = {
+    id: string;
+    label: string;
+    total: number;
+    lines: CartLine[];
+    heldAt: string;
+  };
   const [held, setHeld] = useState<HeldOrder[]>([]);
   const [receiptPreview, setReceiptPreview] = useState(false);
   const [couponOpen, setCouponOpen] = useState(false);
