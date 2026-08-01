@@ -134,7 +134,7 @@ function AuditPage() {
       if (category !== "all" && l.category !== category) return false;
       if (
         text &&
-        !`${l.action} ${l.module} ${l.staffName} ${l.staffId} ${l.route} ${JSON.stringify(
+        !`${describeLog(l)} ${l.action} ${l.module} ${l.staffName} ${l.staffId} ${l.route} ${JSON.stringify(
           l.details,
         )}`
           .toLowerCase()
@@ -144,6 +144,8 @@ function AuditPage() {
       return true;
     });
   }, [logs, range, from, to, who, category, q]);
+
+  const pager = usePagination(rows, 25);
 
   if (!isAdmin) {
     return (
