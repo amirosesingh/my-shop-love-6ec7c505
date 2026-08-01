@@ -1,0 +1,201 @@
+/**
+ * Windows terminal activation tokens.
+ *
+ * An administrator issues one token per till from Settings → Terminal
+ * Activation. The till redeems the code once, then keeps checking the token
+ * status so management can disconnect a machine remotely.
+ */
+import { supabaseExternal } from "@/integrations/supabase/external-client";
+import { decryptActivation, encryptActivation, type ActivationPayload } from "./terminal-crypto";
+
+export const POS_SUPABASE_URL =
+  (import.meta.env["VITE_SUPABASE_EXTERNAL_URL"] as string | undefined) ??
+  "https://qhrufhtbeguxydenzfey.supabase.co";
+
+export const POS_SUPABASE_KEY =
+  (import.meta.env["VITE_SUPABASE_EXTERNAL_PUBLISHABLE_KEY"] as string | undefined) ??
+  "sb_publishable_QwVvttLzDle_xTwP3L7Dyg_A6XM-cC-";
+
+export type TokenStatus = "active" | "revoked";
+
+export type TerminalToken = {
+  id: string;
+  locationId: string | null;
+  locationName: string;
+  deviceName: string;
+  status: TokenStatus;
+  createdAt: string;
+  activatedAt: string | null;
+  revokedAt: string | null;
+  lastSeenAt: string | null;
+};
+
+/** The table is not in the generated types, so queries go through a loose view. */
+type LooseClient = {
+  from: (table: string) => {
+    select: (cols: string) => any;
+    insert: (rows: unknown) => PromiseLike<{ error: { message: string } | null }>;
+    update: (values: unknown) => any;
+  };
+};
+
+const table = () => (supabaseExternal as unknown as LooseClient).from("terminal_tokens");
+
+const rowToToken = (r: Record<string, any>): TerminalToken => ({
+  id: r.id,
+  locationId: r.location_id ?? null,
+  locationName: r.location_name ?? "",
+  deviceName: r.device_name ?? "",
+  status: r.status === "revoked" ? "revoked" : "active",
+  createdAt: r.created_at,
+  activatedAt: r.activated_at ?? null,
+  revokedAt: r.revoked_at ?? null,
+  lastSeenAt: r.last_seen_at ?? null,
+});
+
+/* ----------------------------- admin surface ---------------------------- */
+
+export async function listTerminalTokens(): Promise<TerminalToken[]> {
+  const { data, error } = await table().select("*").order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(rowToToken);
+}
+
+/** Create the token row and return the base64 activation code for the till. */
+export async function issueTerminalToken(input: {
+  locationId: string;
+  locationName: string;
+  deviceName: string;
+}): Promise<{ token: TerminalToken; code: string }> {
+  const id = crypto.randomUUID();
+  const row = {
+    id,
+    location_id: input.locationId,
+    location_name: input.locationName,
+    device_name: input.deviceName,
+    status: "active" as const,
+    created_at: new Date().toISOString(),
+  };
+  const { error } = await table().insert([row]);
+  if (error) throw error;
+
+  const payload: ActivationPayload = {
+    token_id: id,
+    location_id: input.locationId,
+    location_name: input.locationName,
+    supabase_url: POS_SUPABASE_URL,
+    supabase_key: POS_SUPABASE_KEY,
+  };
+  return { token: rowToToken(row), code: await encryptActivation(payload) };
+}
+
+export async function revokeTerminalToken(id: string): Promise<void> {
+  const { error } = await table()
+    .update({ status: "revoked", revoked_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function restoreTerminalToken(id: string): Promise<void> {
+  const { error } = await table().update({ status: "active", revoked_at: null }).eq("id", id);
+  if (error) throw error;
+}
+
+/* --------------------------- terminal surface --------------------------- */
+
+export type TerminalConfig = {
+  tokenId: string;
+  locationId: string;
+  locationName: string;
+  supabaseUrl: string;
+  supabaseKey: string;
+  activatedAt: string;
+};
+
+const CONFIG_KEY = "pos.terminal.config";
+const EVENT = "pos:terminal-config-changed";
+
+export function readTerminalConfig(): TerminalConfig | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(CONFIG_KEY);
+    return raw ? (JSON.parse(raw) as TerminalConfig) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeTerminalConfig(config: TerminalConfig) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+  window.dispatchEvent(new CustomEvent(EVENT));
+}
+
+/** Called when a token is revoked — the till loses its credentials entirely. */
+export function clearTerminalConfig() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(CONFIG_KEY);
+  window.dispatchEvent(new CustomEvent(EVENT));
+}
+
+export function subscribeTerminalConfig(cb: () => void) {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener(EVENT, cb);
+  return () => window.removeEventListener(EVENT, cb);
+}
+
+export const TERMINAL_CONFIG_EVENT = EVENT;
+
+/** Look the token up by id. `null` means the network answered "no such token". */
+export async function fetchTokenStatus(
+  tokenId: string,
+): Promise<{ status: TokenStatus; locationName: string } | null> {
+  const { data, error } = await table()
+    .select("id, status, location_name")
+    .eq("id", tokenId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return {
+    status: data.status === "revoked" ? "revoked" : "active",
+    locationName: data.location_name ?? "",
+  };
+}
+
+export async function stampHeartbeat(tokenId: string): Promise<void> {
+  await table().update({ last_seen_at: new Date().toISOString() }).eq("id", tokenId);
+}
+
+export class ActivationError extends Error {}
+
+/** Decrypt, verify against the server and register this machine. */
+export async function activateTerminal(code: string): Promise<TerminalConfig> {
+  let payload: ActivationPayload;
+  try {
+    payload = await decryptActivation(code);
+  } catch {
+    throw new ActivationError("This activation code is not valid.");
+  }
+
+  const remote = await fetchTokenStatus(payload.token_id).catch(() => {
+    throw new ActivationError("Cannot reach the server to verify this code. Check the connection.");
+  });
+  if (!remote) throw new ActivationError("This activation code is not recognised.");
+  if (remote.status === "revoked") {
+    throw new ActivationError("This activation code has been revoked by management.");
+  }
+
+  const config: TerminalConfig = {
+    tokenId: payload.token_id,
+    locationId: payload.location_id,
+    locationName: remote.locationName || payload.location_name,
+    supabaseUrl: payload.supabase_url,
+    supabaseKey: payload.supabase_key,
+    activatedAt: new Date().toISOString(),
+  };
+  writeTerminalConfig(config);
+  await table()
+    .update({ activated_at: config.activatedAt, last_seen_at: config.activatedAt })
+    .eq("id", config.tokenId);
+  return config;
+}
