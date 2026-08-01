@@ -1,9 +1,14 @@
-import { Loader2, Lock, LogOut, Menu, ReceiptText, Store } from "lucide-react";
+import { Loader2, Lock, LogOut, Menu, MapPin, ReceiptText, Store } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { usePos } from "@/lib/pos-store";
 import { useAuth, type PermissionFlag } from "@/lib/pos-auth";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { TerminalLogin } from "@/components/pos/TerminalLogin";
+import {
+  TerminalActivation,
+  TerminalRevokedScreen,
+} from "@/components/pos/TerminalActivation";
+import { clearRevocation, useRevocationCheck } from "@/lib/use-revocation-check";
 import { SidebarNav, useSidebarCollapsed } from "@/components/pos/SidebarNav";
 import { SyncStatus } from "@/components/pos/SyncStatus";
 import { ThemeToggle } from "@/components/pos/ThemeToggle";
@@ -22,7 +27,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useUiScale } from "@/lib/use-ui-scale";
-import { useBranding } from "@/lib/branding";
+import { useBranding, isDesktop } from "@/lib/branding";
 
 /** Screens reserved for supervisor / admin accounts, and the permission
  *  toggle that also unlocks them for any other account (e.g. warehouse). */
@@ -40,6 +45,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useSidebarCollapsed();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const branding = useBranding();
+  // Windows tills must be registered to a location before they can be used.
+  const terminal = useRevocationCheck();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -79,6 +86,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [user, canSwitchStores, currentStore.id, setCurrentStore]);
 
   if (!ready) return null;
+  if (isDesktop()) {
+    if (terminal.revoked) return <TerminalRevokedScreen onReactivate={clearRevocation} />;
+    if (!terminal.config) return <TerminalActivation onActivated={() => clearRevocation()} />;
+  }
   if (!user) return <TerminalLogin />;
   if (!dataReady)
     return (
@@ -269,6 +280,15 @@ export function AppShell({ children }: { children: ReactNode }) {
             </p>
           </div>
           <SyncStatus className="ml-auto" />
+          {terminal.config && (
+            <Badge
+              variant="outline"
+              className="shrink-0 gap-1 border-primary/40 bg-primary/10 text-[11px] text-primary"
+            >
+              <MapPin className="size-3" />
+              {terminal.config.locationName || currentStore.name}
+            </Badge>
+          )}
           <ThemeToggle />
           <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => void lock()}>
             <Lock className="size-3.5" /> Lock / Switch user
