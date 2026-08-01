@@ -10,6 +10,17 @@
 -- auth account, and re-creates the RPCs to use it. Safe to re-run.
 -- ---------------------------------------------------------------------------
 
+create schema if not exists extensions;
+do $$
+begin
+  create extension if not exists pgcrypto with schema extensions;
+exception when others then
+  begin
+    create extension if not exists pgcrypto;
+  exception when others then null;
+  end;
+end $$;
+
 -- 1. Link app_users rows to auth accounts by email (idempotent)
 update public.app_users a
    set auth_user_id = u.id
@@ -28,7 +39,7 @@ on conflict (user_id, role) do nothing;
 -- 3. Unified supervisor check
 create or replace function public.is_app_supervisor()
 returns boolean
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = public, extensions as $$
   select
     exists (
       select 1 from public.user_roles r
@@ -51,7 +62,7 @@ create or replace function public.list_app_users()
 returns table (id uuid, auth_user_id uuid, user_id text, full_name text, email text,
                role public.app_role, store_id text, is_active boolean, permissions jsonb,
                last_login_at timestamptz, created_at timestamptz)
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = public, extensions as $$
   select a.id, a.auth_user_id, a.user_id::text, a.full_name::text, a.email::text,
          a.role, a.store_id::text, a.is_active, a.permissions, a.last_login_at, a.created_at
   from public.app_users a
@@ -63,7 +74,7 @@ grant execute on function public.list_app_users() to anon, authenticated, servic
 
 drop function if exists public.set_app_user_permissions(text, jsonb);
 create or replace function public.set_app_user_permissions(p_user_id text, p_permissions jsonb)
-returns void language plpgsql security definer set search_path = public as $$
+returns void language plpgsql security definer set search_path = public, extensions as $$
 begin
   if not public.is_app_supervisor() then
     raise exception 'Only supervisors can change permissions';
@@ -79,7 +90,7 @@ grant execute on function public.set_app_user_permissions(text, jsonb) to authen
 drop function if exists public.set_app_user_profile(text, text, app_role, text, boolean);
 create or replace function public.set_app_user_profile(
   p_user_id text, p_full_name text, p_role public.app_role, p_store_id text, p_is_active boolean)
-returns void language plpgsql security definer set search_path = public as $$
+returns void language plpgsql security definer set search_path = public, extensions as $$
 begin
   if not public.is_app_supervisor() then
     raise exception 'Only supervisors can edit staff profiles';
@@ -115,7 +126,7 @@ begin
   insert into public.app_users (user_id, full_name, role, store_id, email, pin_hash, auth_secret, auth_user_id)
   values (trim(p_user_id), trim(p_full_name), p_role, nullif(trim(coalesce(p_store_id,'')),''),
           lower(trim(p_email)),
-          case when coalesce(p_pin,'') = '' then '' else crypt(p_pin, gen_salt('bf', 10)) end,
+          case when coalesce(p_pin,'') = '' then '' else extensions.crypt(p_pin, extensions.gen_salt('bf', 10)) end,
           coalesce(p_password,''), v_auth)
   on conflict (user_id) do update
     set full_name    = excluded.full_name,
@@ -138,7 +149,7 @@ grant execute on function public.upsert_terminal_user(text, text, app_role, text
 
 drop function if exists public.set_terminal_active(text, boolean);
 create or replace function public.set_terminal_active(p_user_id text, p_active boolean)
-returns void language plpgsql security definer set search_path = public as $$
+returns void language plpgsql security definer set search_path = public, extensions as $$
 begin
   if not public.is_app_supervisor() then
     raise exception 'Only supervisors can manage terminal users';
@@ -151,7 +162,7 @@ grant execute on function public.set_terminal_active(text, boolean) to authentic
 
 drop function if exists public.delete_terminal_user(text);
 create or replace function public.delete_terminal_user(p_user_id text)
-returns void language plpgsql security definer set search_path = public as $$
+returns void language plpgsql security definer set search_path = public, extensions as $$
 begin
   if not public.is_app_supervisor() then
     raise exception 'Only supervisors can manage terminal users';
