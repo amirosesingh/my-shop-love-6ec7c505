@@ -4,9 +4,11 @@ import { useAuth } from "@/lib/pos-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useBranding } from "@/lib/branding";
 
 export function LoginScreen() {
   const { login, signUp } = useAuth();
+  const brand = useBranding();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
