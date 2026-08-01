@@ -560,6 +560,9 @@ function StaffManagement() {
                         <SelectValue placeholder="Select store" />
                       </SelectTrigger>
                       <SelectContent>
+                        {form.role !== "cashier" && (
+                          <SelectItem value="none">All stores</SelectItem>
+                        )}
                         {stores.map((s) => (
                           <SelectItem key={s.id} value={s.id}>
                             {s.code} · {s.name}
