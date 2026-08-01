@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePos } from "@/lib/pos-store";
+import { defaultPaymentDetails } from "@/lib/pos-seed";
 import { useAuth } from "@/lib/pos-auth";
 import {
   PAPER_LABELS,
@@ -81,6 +82,7 @@ function Settings() {
   const { isAdmin, can } = useAuth();
   const canSettings = isAdmin || can("can_access_pos_settings");
   const { tax, receipt } = state.settings;
+  const payment = state.settings.payment ?? defaultPaymentDetails;
 
   const [branchId, setBranchId] = useState(currentStore.id);
   const branch = stores.find((s) => s.id === branchId) ?? currentStore;
@@ -288,6 +290,7 @@ function Settings() {
                   <TabsTrigger value="lines">Extra lines</TabsTrigger>
                   <TabsTrigger value="qr">QR code</TabsTrigger>
                   <TabsTrigger value="elements">Elements</TabsTrigger>
+                  <TabsTrigger value="payment">Bank transfer</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="identity" className="space-y-3 pt-4">
@@ -553,6 +556,65 @@ function Settings() {
                         />
                       </div>
                     ))}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="payment" className="space-y-3 pt-4">
+                  <p className="text-xs text-muted-foreground">
+                    Shown on the customer-facing display and printed on booking slips so shoppers
+                    can settle a balance by bank transfer.
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Bank name</Label>
+                      <Input
+                        value={payment.bankName}
+                        onChange={(e) => updateSettings({ payment: { ...payment, bankName: e.target.value } })}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Account name</Label>
+                      <Input
+                        value={payment.accountName}
+                        onChange={(e) => updateSettings({ payment: { ...payment, accountName: e.target.value } })}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Account number</Label>
+                      <Input
+                        className="numeric"
+                        value={payment.accountNumber}
+                        onChange={(e) => updateSettings({ payment: { ...payment, accountNumber: e.target.value } })}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">
+                        WhatsApp number (QR code)
+                      </Label>
+                      <Input
+                        className="numeric"
+                        placeholder="+15550100"
+                        value={payment.whatsapp}
+                        onChange={(e) => updateSettings({ payment: { ...payment, whatsapp: e.target.value } })}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Instruction note</Label>
+                    <Input
+                      value={payment.note}
+                      onChange={(e) => updateSettings({ payment: { ...payment, note: e.target.value } })}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+                    <span className="text-sm">Print transfer details on booking slips</span>
+                    <Switch
+                      aria-label="Print transfer details on booking slips"
+                      checked={payment.showOnBookingSlip}
+                      onCheckedChange={(v) =>
+                        updateSettings({ payment: { ...payment, showOnBookingSlip: v } })
+                      }
+                    />
                   </div>
                 </TabsContent>
               </Tabs>

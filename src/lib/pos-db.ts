@@ -153,6 +153,10 @@ const rowToSettings = (r: Row | null): AppSettings =>
           customLines: Array.isArray(r.custom_lines) ? r.custom_lines : [],
           qr: { ...defaultSettings.receipt.qr, ...((r.qr ?? {}) as object) },
         },
+        payment: {
+          ...defaultSettings.payment,
+          ...((r.payment_details ?? {}) as object),
+        },
       }
     : defaultSettings;
 
@@ -166,6 +170,7 @@ const BRANDING_COLUMNS = [
   "fonts",
   "custom_lines",
   "qr",
+  "payment_details",
 ] as const;
 
 const settingsToRow = (s: AppSettings): Row => ({
@@ -182,6 +187,7 @@ const settingsToRow = (s: AppSettings): Row => ({
   fonts: s.receipt.fonts,
   custom_lines: s.receipt.customLines,
   qr: s.receipt.qr,
+  payment_details: s.payment,
   header_text: s.receipt.headerText,
   footer_text: s.receipt.footerText,
   show_logo: s.receipt.showLogo,

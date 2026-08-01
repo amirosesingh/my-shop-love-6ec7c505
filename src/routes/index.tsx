@@ -19,6 +19,8 @@ import {
   Repeat,
   Sparkles,
   History,
+  CalendarClock,
+  MonitorPlay,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
@@ -35,14 +37,23 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
-import { cartTotals, money, stockAt, usePos } from "@/lib/pos-store";
+import { availableAt, cartTotals, money, stockAt, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
 import { useUserPermissions } from "@/lib/pos-permissions";
 import type { CartLine, DiscountType, PaymentMethod, Sale } from "@/lib/pos-types";
 import { lineUnitDiscount, r2 } from "@/lib/pos-types";
 import { evaluatePromotions, focLine } from "@/lib/pos-promotions";
-import { openCashDrawer, printSaleReceipt } from "@/lib/pos-print";
+import { openCashDrawer, printBookingSlip, printSaleReceipt } from "@/lib/pos-print";
+import {
+  openCustomerDisplay,
+  publishDisplay,
+  toDisplayLine,
+  type DisplaySnapshot,
+} from "@/lib/customer-display";
 import { MemberHistoryDialog } from "@/components/pos/MemberHistoryDialog";
+
+const isoDaysFromNow = (days: number) =>
+  new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -61,7 +72,7 @@ export const Route = createFileRoute("/")({
 });
 
 function Register() {
-  const { state, activeShift, recordSale, openShift, currentStore } = usePos();
+  const { state, activeShift, recordSale, createBooking, openShift, currentStore } = usePos();
   const { user, can } = useAuth();
   const { requirePermission } = useUserPermissions();
   const canDiscount = can("can_give_discount");
@@ -95,6 +106,13 @@ function Register() {
   const [memberQuery, setMemberQuery] = useState("");
   const [historyMemberId, setHistoryMemberId] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [bookOpen, setBookOpen] = useState(false);
+  const [deposit, setDeposit] = useState("");
+  const [depositMethod, setDepositMethod] = useState<PaymentMethod>("cash");
+  const [dueDate, setDueDate] = useState(isoDaysFromNow(14));
+  const [bookName, setBookName] = useState("");
+  const [bookPhone, setBookPhone] = useState("");
+  const [bookNote, setBookNote] = useState("");
 
   const categories = useMemo(
     () => ["All", ...Array.from(new Set(state.products.map((p) => p.category)))],
@@ -171,9 +189,14 @@ function Register() {
     }
     const product = state.products.find((p) => p.id === productId);
     if (!product) return;
-    const onHand = stockAt(product, currentStore.id);
+    const onHand = availableAt(product, currentStore.id, state.bookings);
     if (onHand <= 0) {
-      toast.error(`${product.name} is out of stock at ${currentStore.name}`);
+      const reserved = stockAt(product, currentStore.id) > 0;
+      toast.error(
+        reserved
+          ? `${product.name} is fully reserved by open bookings at ${currentStore.name}`
+          : `${product.name} is out of stock at ${currentStore.name}`,
+      );
       return;
     }
     setLines((ls) => {
@@ -285,6 +308,99 @@ function Register() {
     }
   }
 
+  const displayBase = {
+    companyName: state.settings.receipt.companyName || currentStore.name,
+    storeName: `${currentStore.name} (${currentStore.code})`,
+    cashier: activeShift?.cashier ?? cashier,
+    payment: state.settings.payment,
+  };
+
+  const cartSnapshot = (): DisplaySnapshot => ({
+    at: Date.now(),
+    ...displayBase,
+    mode: lines.length ? "cart" : "idle",
+    memberName: member?.name ?? null,
+    memberPoints: member?.points ?? null,
+    lines: lines.map((l) => toDisplayLine(l, r2((l.price - lineUnitDiscount(l)) * l.qty))),
+    subtotal: totals.subtotal,
+    discount: totals.discount,
+    tax: totals.tax,
+    total: totals.total,
+    paid: 0,
+    change: 0,
+    balance: 0,
+    reference: "",
+    dueDate: "",
+    promos: promo.applied.map((a) => `${a.name} · ${a.detail}`),
+  });
+
+  // Mirror the live ticket onto the customer-facing second screen.
+  const displayKey = JSON.stringify({
+    l: lines.map((l) => [l.productId, l.qty, l.discount, l.discountType, l.foc, l.credit]),
+    t: totals.total,
+    d: totals.discount,
+    x: totals.tax,
+    m: member?.id ?? null,
+    s: currentStore.id,
+  });
+  useEffect(() => {
+    publishDisplay(cartSnapshot());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayKey, state.settings.payment]);
+
+  async function bookAndPayLater() {
+    if (!activeShift) {
+      toast.error("Open a shift before taking a booking");
+      return;
+    }
+    if (!(await requirePermission("can_process_sale"))) return;
+    const paidNow = r2(Math.max(0, Number(deposit || 0)));
+    if (paidNow > totals.total) {
+      toast.error("Deposit cannot exceed the booking total");
+      return;
+    }
+    if (!dueDate) {
+      toast.error("Choose a collect-by date");
+      return;
+    }
+    const booking = createBooking({
+      storeId: currentStore.id,
+      shiftId: activeShift.id,
+      lines,
+      subtotal: totals.subtotal,
+      discount: totals.discount,
+      tax: totals.tax,
+      total: totals.total,
+      deposit: paidNow,
+      depositMethod,
+      dueDate,
+      memberId,
+      customerName: bookName.trim() || member?.name || "Walk-in",
+      customerPhone: bookPhone.trim() || member?.phone || "",
+      note: bookNote.trim(),
+      cashier: activeShift.cashier,
+    });
+    if (paidNow > 0 && depositMethod === "cash") openCashDrawer();
+    printBookingSlip(booking, member, state.settings.payment);
+    publishDisplay({
+      ...cartSnapshot(),
+      mode: "booking",
+      paid: booking.paid,
+      balance: r2(booking.total - booking.paid),
+      reference: booking.ref,
+      dueDate: booking.dueDate,
+    });
+    resetCart();
+    setMemberId(null);
+    setBookOpen(false);
+    setDeposit("");
+    setBookName("");
+    setBookPhone("");
+    setBookNote("");
+    setDueDate(isoDaysFromNow(14));
+    toast.success(`Booking ${booking.ref} reserved until ${new Date(booking.dueDate).toDateString()}`);
+  }
+
   async function completeSale() {
     if (!activeShift) {
       toast.error("Open a shift before taking payment");
@@ -323,6 +439,13 @@ function Register() {
     if (method === "cash") openCashDrawer();
     printSaleReceipt(sale, member, "sale");
     setLastSale(sale);
+    publishDisplay({
+      ...cartSnapshot(),
+      mode: "paid",
+      paid: sale.paid,
+      change: sale.change,
+      reference: sale.receiptNo,
+    });
     resetCart();
     setMemberId(null);
     setTendered("");
@@ -358,6 +481,9 @@ function Register() {
               }}
             >
               <Vault className="size-4" /> Open drawer
+            </Button>
+            <Button variant="outline" className="h-11" onClick={openCustomerDisplay}>
+              <MonitorPlay className="size-4" /> Customer screen
             </Button>
             <Button
               variant="outline"
@@ -758,6 +884,19 @@ function Register() {
                     : "Refunds locked for this user"
                   : `Charge ${money(balanceDue)}`}
             </Button>
+            <Button
+              variant="outline"
+              className="h-11 w-full"
+              disabled={!lines.length || !activeShift || refundDue > 0}
+              onClick={() => {
+                setDeposit("");
+                setBookName(member?.name ?? "");
+                setBookPhone(member?.phone ?? "");
+                setBookOpen(true);
+              }}
+            >
+              <CalendarClock className="size-4" /> Book &amp; pay later
+            </Button>
             {lastSale && (
               <div className="flex flex-wrap gap-2 pt-1">
                 <Button
@@ -1031,6 +1170,116 @@ function Register() {
             <Button disabled={!billHit} onClick={addExchangeCredits}>
               Add credit to cart
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Book & pay later */}
+      <Dialog open={bookOpen} onOpenChange={setBookOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Book &amp; pay later</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="rounded-md border border-border px-3 py-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Booking total</span>
+                <span className="numeric font-semibold">{money(totals.total)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Balance after deposit</span>
+                <span className="numeric font-semibold text-primary">
+                  {money(r2(Math.max(0, totals.total - Number(deposit || 0))))}
+                </span>
+              </div>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                {lines.reduce((a, l) => a + l.qty, 0)} unit(s) are reserved at{" "}
+                {currentStore.name} until the collect-by date.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>Deposit taken now</Label>
+                <Input
+                  value={deposit}
+                  onChange={(e) => setDeposit(e.target.value)}
+                  placeholder="0.00"
+                  className="numeric"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Deposit method</Label>
+                <div className="flex overflow-hidden rounded-md border border-border">
+                  {(["cash", "card", "wallet"] as const).map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => setDepositMethod(m)}
+                      className={`flex-1 px-2 py-2 text-xs capitalize ${
+                        depositMethod === m
+                          ? "bg-primary/15 text-primary"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>Collect &amp; settle by</Label>
+                <Input
+                  type="date"
+                  value={dueDate}
+                  min={isoDaysFromNow(0)}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  className="numeric"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Quick window</Label>
+                <div className="flex gap-1">
+                  {[7, 14, 30, 60].map((d) => (
+                    <button
+                      key={d}
+                      onClick={() => setDueDate(isoDaysFromNow(d))}
+                      className="flex-1 rounded-md border border-border py-2 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      {d}d
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>Customer name</Label>
+                <Input value={bookName} onChange={(e) => setBookName(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label>Phone</Label>
+                <Input
+                  value={bookPhone}
+                  onChange={(e) => setBookPhone(e.target.value)}
+                  className="numeric"
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Note</Label>
+              <Input
+                value={bookNote}
+                onChange={(e) => setBookNote(e.target.value)}
+                placeholder="Colour, size, collection instructions…"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBookOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => void bookAndPayLater()}>Reserve &amp; print slip</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

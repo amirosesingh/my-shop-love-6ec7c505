@@ -11,8 +11,11 @@ import {
 import { defaultSettings, seedState } from "./pos-seed";
 import type {
   AppSettings,
+  Booking,
+  BookingPayment,
   CartLine,
   Member,
+  PaymentMethod,
   PosState,
   Product,
   Promotion,
@@ -23,7 +26,7 @@ import type {
   Transfer,
   TransferKind,
 } from "./pos-types";
-import { lineUnitDiscount, r2, type DiscountType } from "./pos-types";
+import { bookingBalance, lineUnitDiscount, r2, type DiscountType } from "./pos-types";
 import { logger } from "./audit-log";
 import { db, dbError, loadCloudState } from "./pos-db";
 
@@ -31,6 +34,22 @@ const KEY = "pos-state-v2";
 
 export const stockAt = (product: Product, storeId: string) =>
   product.stockByStore?.[storeId] ?? 0;
+
+/** Units held back at a store by still-open bookings. */
+export const reservedAt = (bookings: Booking[], productId: string, storeId: string) =>
+  bookings
+    .filter((b) => b.status === "active" && b.storeId === storeId)
+    .reduce(
+      (a, b) => a + b.lines.filter((l) => l.productId === productId && !l.credit).reduce((x, l) => x + l.qty, 0),
+      0,
+    );
+
+/** Stock a cashier may actually sell right now: on hand minus booked units. */
+export const availableAt = (
+  product: Product,
+  storeId: string,
+  bookings: Booking[] = [],
+) => stockAt(product, storeId) - reservedAt(bookings, product.id, storeId);
 
 const bump = (p: Product, storeId: string, delta: number): Product => ({
   ...p,
@@ -44,6 +63,25 @@ type NewTransfer = {
   items: { productId: string; qty: number }[];
   note: string;
   createdBy: string;
+};
+
+export type NewBooking = {
+  storeId: string;
+  shiftId: string;
+  lines: CartLine[];
+  subtotal: number;
+  discount: number;
+  tax: number;
+  total: number;
+  /** deposit collected at the counter right now */
+  deposit: number;
+  depositMethod: PaymentMethod;
+  dueDate: string;
+  memberId: string | null;
+  customerName: string;
+  customerPhone: string;
+  note: string;
+  cashier: string;
 };
 
 /** Apply a stock delta for every line of a transfer at one store. */
@@ -71,6 +109,10 @@ type Ctx = {
   activeShift: Shift | null;
   recordSale: (sale: Omit<Sale, "id" | "receiptNo" | "createdAt">) => Sale;
   refundSale: (saleId: string) => void;
+  createBooking: (input: NewBooking) => Booking;
+  addBookingPayment: (id: string, amount: number, method: PaymentMethod, cashier: string) => Booking | null;
+  collectBooking: (id: string, amount: number, method: PaymentMethod) => { booking: Booking; sale: Sale } | null;
+  cancelBooking: (id: string, reason: string) => void;
   upsertProduct: (product: Product) => void;
   removeProduct: (id: string) => void;
   adjustStock: (id: string, delta: number, storeId?: string) => void;
@@ -117,8 +159,10 @@ export function PosProvider({ children }: { children: ReactNode }) {
           currentStoreId: saved.currentStoreId ?? s.currentStoreId,
           shifts: saved.shifts ?? [],
           transfers,
+          bookings: saved.bookings ?? [],
           counter: saved.counter ?? 0,
           transferCounter: saved.transferCounter ?? 0,
+          bookingCounter: saved.bookingCounter ?? 0,
         }));
       }
     } catch {
@@ -138,6 +182,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
           settings: {
             tax: { ...defaultSettings.tax, ...cloud.settings.tax },
             receipt: { ...defaultSettings.receipt, ...cloud.settings.receipt },
+            payment: { ...defaultSettings.payment, ...cloud.settings.payment },
           },
           // Keep the bill counter ahead of every receipt already in the cloud.
           counter: cloud.sales.reduce(
@@ -340,6 +385,168 @@ export function PosProvider({ children }: { children: ReactNode }) {
     return sale;
   }, []);
 
+  const createBooking = useCallback((input: NewBooking) => {
+    const snapshot = stateRef.current;
+    const counter = snapshot.bookingCounter + 1;
+    const store = snapshot.stores.find((x) => x.id === input.storeId);
+    const now = new Date().toISOString();
+    const payments: BookingPayment[] = input.deposit
+      ? [
+          {
+            id: crypto.randomUUID(),
+            amount: r2(input.deposit),
+            method: input.depositMethod,
+            at: now,
+            cashier: input.cashier,
+          },
+        ]
+      : [];
+    const booking: Booking = {
+      id: crypto.randomUUID(),
+      ref: `BK-${store?.code ?? "R"}-${String(counter).padStart(5, "0")}`,
+      storeId: input.storeId,
+      shiftId: input.shiftId,
+      lines: input.lines,
+      subtotal: input.subtotal,
+      discount: input.discount,
+      tax: input.tax,
+      total: input.total,
+      paid: r2(input.deposit),
+      payments,
+      dueDate: input.dueDate,
+      memberId: input.memberId,
+      customerName: input.customerName,
+      customerPhone: input.customerPhone,
+      note: input.note,
+      cashier: input.cashier,
+      createdAt: now,
+      status: "active",
+    };
+    setState((s) => ({
+      ...s,
+      bookingCounter: Math.max(counter, s.bookingCounter + 1),
+      bookings: [booking, ...s.bookings],
+    }));
+    logger.log("sale_event", "Booking created", "bookings", {
+      ref: booking.ref,
+      storeId: booking.storeId,
+      total: booking.total,
+      deposit: booking.paid,
+      balance: bookingBalance(booking),
+      dueDate: booking.dueDate,
+      customer: booking.customerName,
+      items: booking.lines.map((l) => ({ name: l.name, qty: l.qty })),
+    });
+    return booking;
+  }, []);
+
+  const addBookingPayment = useCallback(
+    (id: string, amount: number, method: PaymentMethod, cashier: string) => {
+      const current = stateRef.current.bookings.find((b) => b.id === id);
+      if (!current || current.status !== "active" || amount <= 0) return null;
+      const payment: BookingPayment = {
+        id: crypto.randomUUID(),
+        amount: r2(amount),
+        method,
+        at: new Date().toISOString(),
+        cashier,
+      };
+      const updated: Booking = {
+        ...current,
+        paid: r2(current.paid + payment.amount),
+        payments: [...current.payments, payment],
+      };
+      setState((s) => ({
+        ...s,
+        bookings: s.bookings.map((b) => (b.id === id ? updated : b)),
+      }));
+      logger.log("sale_event", "Booking part payment", "bookings", {
+        ref: updated.ref,
+        amount: payment.amount,
+        method,
+        paid: updated.paid,
+        balance: bookingBalance(updated),
+      });
+      return updated;
+    },
+    [],
+  );
+
+  const cancelBooking = useCallback((id: string, reason: string) => {
+    const current = stateRef.current.bookings.find((b) => b.id === id);
+    if (!current || current.status !== "active") return;
+    setState((s) => ({
+      ...s,
+      bookings: s.bookings.map((b) =>
+        b.id === id
+          ? {
+              ...b,
+              status: "cancelled",
+              closedAt: new Date().toISOString(),
+              note: reason ? `${b.note ? `${b.note} · ` : ""}Cancelled: ${reason}` : b.note,
+            }
+          : b,
+      ),
+    }));
+    logger.log("sale_event", "Booking cancelled", "bookings", {
+      ref: current.ref,
+      reason,
+      refundable: current.paid,
+    });
+  }, []);
+
+  const collectBooking = useCallback(
+    (id: string, amount: number, method: PaymentMethod) => {
+      const current = stateRef.current.bookings.find((b) => b.id === id);
+      if (!current || current.status !== "active") return null;
+      const balance = bookingBalance(current);
+      const settled = r2(Math.min(Math.max(amount, 0), balance));
+      const sale = recordSale({
+        storeId: current.storeId,
+        shiftId: activeShift?.id ?? current.shiftId,
+        lines: current.lines,
+        subtotal: current.subtotal,
+        discount: current.discount,
+        tax: current.tax,
+        total: current.total,
+        paid: current.total,
+        change: r2(Math.max(0, amount - balance)),
+        method,
+        memberId: current.memberId,
+        pointsEarned: 0,
+        cashier: current.cashier,
+        bookingRef: current.ref,
+      });
+      const finalPayment: BookingPayment = {
+        id: crypto.randomUUID(),
+        amount: settled,
+        method,
+        at: new Date().toISOString(),
+        cashier: current.cashier,
+      };
+      const updated: Booking = {
+        ...current,
+        paid: r2(current.paid + settled),
+        payments: settled ? [...current.payments, finalPayment] : current.payments,
+        status: "collected",
+        closedAt: new Date().toISOString(),
+        saleReceiptNo: sale.receiptNo,
+      };
+      setState((s) => ({
+        ...s,
+        bookings: s.bookings.map((b) => (b.id === id ? updated : b)),
+      }));
+      logger.log("sale_event", "Booking collected", "bookings", {
+        ref: updated.ref,
+        receiptNo: sale.receiptNo,
+        settled,
+        total: updated.total,
+      });
+      return { booking: updated, sale };
+    },
+    [activeShift, recordSale],
+  );
+
   const refundSale = useCallback((saleId: string) => {
     logger.log("sale_event", "Sale refunded", "receipts", {
       saleId,
@@ -480,6 +687,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       void db.saveSettings({
         tax: { ...prev.tax, ...(patch.tax ?? {}) },
         receipt: { ...prev.receipt, ...(patch.receipt ?? {}) },
+        payment: { ...prev.payment, ...(patch.payment ?? {}) },
       });
     }
     setState((s) => ({
@@ -487,6 +695,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       settings: {
         tax: { ...s.settings.tax, ...(patch.tax ?? {}) },
         receipt: { ...s.settings.receipt, ...(patch.receipt ?? {}) },
+        payment: { ...s.settings.payment, ...(patch.payment ?? {}) },
       },
     }));
   }, []);
@@ -621,6 +830,10 @@ export function PosProvider({ children }: { children: ReactNode }) {
     closeShift,
     recordSale,
     refundSale,
+    createBooking,
+    addBookingPayment,
+    collectBooking,
+    cancelBooking,
     upsertProduct,
     removeProduct,
     adjustStock,

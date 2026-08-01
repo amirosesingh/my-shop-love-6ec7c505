@@ -1,8 +1,10 @@
 import {
   ArrowLeftRight,
   Boxes,
+  CalendarClock,
   Clock,
   LayoutGrid,
+  MonitorPlay,
   Percent,
   Printer,
   ReceiptText,
@@ -49,6 +51,8 @@ export const navGroups: NavGroup[] = [
     items: [
       { to: "/", label: "Register POS", icon: LayoutGrid, keywords: "checkout cart sale" },
       { to: "/shifts", label: "Shift Management", icon: Clock, flag: "can_view_sales_reports", keywords: "open close drawer z-report" },
+      { to: "/bookings", label: "Bookings / Pay Later", icon: CalendarClock, keywords: "layaway reserve deposit balance due collect" },
+      { to: "/display", label: "Customer Display", icon: MonitorPlay, keywords: "second screen customer facing transfer qr" },
       { to: "/receipts", label: "Bill Search & History", icon: ScrollText, flag: "can_view_sales_reports", keywords: "invoice receipt reprint" },
     ],
   },

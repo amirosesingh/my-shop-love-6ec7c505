@@ -1,4 +1,20 @@
-import type { AppSettings, PosState, Promotion, ReceiptSettings, Store } from "./pos-types";
+import type {
+  AppSettings,
+  PaymentDetails,
+  PosState,
+  Promotion,
+  ReceiptSettings,
+  Store,
+} from "./pos-types";
+
+export const defaultPaymentDetails: PaymentDetails = {
+  accountName: "",
+  bankName: "",
+  accountNumber: "",
+  whatsapp: "",
+  note: "Send the transfer slip on WhatsApp to confirm your booking.",
+  showOnBookingSlip: true,
+};
 
 export const defaultReceiptSettings: ReceiptSettings = {
   paper: "80mm",
@@ -25,6 +41,7 @@ export const defaultReceiptSettings: ReceiptSettings = {
 export const defaultSettings: AppSettings = {
   tax: { enabled: true, rate: 5, mode: "exclusive" },
   receipt: defaultReceiptSettings,
+  payment: defaultPaymentDetails,
 };
 
 export const seedPromotions: Promotion[] = [
@@ -123,7 +140,9 @@ export const seedState: PosState = {
   currentStoreId: "s1",
   counter: 1042,
   transferCounter: 24,
+  bookingCounter: 0,
   transfers: [],
+  bookings: [],
   promotions: seedPromotions,
   settings: defaultSettings,
   products: [
