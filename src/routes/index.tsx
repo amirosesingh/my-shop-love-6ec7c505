@@ -597,6 +597,7 @@ function Register() {
         ];
     // The headline method stays the largest tender so reports keep working.
     const headline = payments.reduce((a, p) => (p.amount > a.amount ? p : a), payments[0]!).method;
+    rememberBanks(payments.map((p) => p.bankName ?? ""));
     const sale = recordSale({
       storeId: currentStore.id,
       shiftId: activeShift.id,
