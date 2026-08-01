@@ -149,9 +149,71 @@ export type PosState = {
   shifts: Shift[];
   transfers: Transfer[];
   promotions: Promotion[];
+  bookings: Booking[];
   counter: number;
   transferCounter: number;
+  bookingCounter: number;
   settings: AppSettings;
+};
+
+/* ----------------------------- bookings ----------------------------- */
+
+export type BookingStatus = "active" | "collected" | "cancelled";
+
+export type BookingPayment = {
+  id: string;
+  amount: number;
+  method: PaymentMethod;
+  at: string;
+  cashier: string;
+};
+
+/** A "book now, pay later" ticket. Stock is reserved the moment it is created. */
+export type Booking = {
+  id: string;
+  ref: string;
+  storeId: string;
+  shiftId: string;
+  lines: CartLine[];
+  subtotal: number;
+  discount: number;
+  tax: number;
+  total: number;
+  /** everything paid so far (initial deposit + part payments) */
+  paid: number;
+  payments: BookingPayment[];
+  /** ISO yyyy-mm-dd the customer must settle & collect by */
+  dueDate: string;
+  memberId: string | null;
+  customerName: string;
+  customerPhone: string;
+  note: string;
+  cashier: string;
+  createdAt: string;
+  status: BookingStatus;
+  closedAt?: string;
+  /** receipt number of the bill raised when the goods were collected */
+  saleReceiptNo?: string;
+};
+
+export const bookingBalance = (b: Pick<Booking, "total" | "paid">) =>
+  r2(Math.max(0, b.total - b.paid));
+
+/** Bank-transfer / e-wallet details shown to the customer. */
+export type PaymentDetails = {
+  accountName: string;
+  bankName: string;
+  accountNumber: string;
+  /** international format, powers the WhatsApp QR code */
+  whatsapp: string;
+  note: string;
+  /** also print the transfer block on booking slips */
+  showOnBookingSlip: boolean;
+};
+
+export const whatsappLink = (number: string) => {
+  const digits = (number || "").replace(/[^\d]/g, "");
+  return digits ? `https://wa.me/${digits}` : "";
 };
 
 export type PromoType = "points" | "foc" | "birthday" | "threshold" | "tier";
