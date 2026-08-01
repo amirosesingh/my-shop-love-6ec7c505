@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Eye, Percent, Plus, Printer, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { AppShell } from "@/components/pos/AppShell";
 import { SyncSettings } from "@/components/pos/SyncSettings";
 import { SecureCredentials } from "@/components/pos/SecureCredentials";
@@ -300,17 +301,13 @@ function Settings() {
               <div className="flex flex-wrap items-center gap-3 rounded-md border border-border px-3 py-2">
                 <div className="space-y-1">
                   <Label className="text-[11px] text-muted-foreground">Editing branch</Label>
-                  <select
+                  <ThemedSelect
+                    ariaLabel="Editing branch"
+                    className="h-8 w-56"
                     value={branchId}
-                    onChange={(e) => setBranchId(e.target.value)}
-                    className="h-8 rounded-md border border-input bg-transparent px-2 text-sm"
-                  >
-                    {stores.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({s.code})
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setBranchId}
+                    options={stores.map((s) => ({ value: s.id, label: `${s.name} (${s.code})` }))}
+                  />
                 </div>
                 <div className="ml-auto flex items-center gap-2">
                   <span className="text-xs text-muted-foreground">
@@ -440,19 +437,12 @@ function Settings() {
                         <div className="mt-2 grid gap-3 sm:grid-cols-4">
                           <div className="space-y-1">
                             <Label className="text-[11px] text-muted-foreground">Family</Label>
-                            <select
+                            <ThemedSelect
+                              ariaLabel="Font family"
                               value={f.family}
-                              onChange={(e) =>
-                                setFont(scope.key, { family: e.target.value as FontFamilyKey })
-                              }
-                              className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm"
-                            >
-                              {FAMILIES.map((o) => (
-                                <option key={o.key} value={o.key}>
-                                  {o.label}
-                                </option>
-                              ))}
-                            </select>
+                              onChange={(v) => setFont(scope.key, { family: v as FontFamilyKey })}
+                              options={FAMILIES.map((o) => ({ value: o.key, label: o.label }))}
+                            />
                           </div>
                           <div className="space-y-1">
                             <Label className="text-[11px] text-muted-foreground">Size (px)</Label>
@@ -521,26 +511,25 @@ function Settings() {
                           )
                         }
                       />
-                      <select
+                      <ThemedSelect
+                        ariaLabel="Line placement"
+                        className="w-40 shrink-0"
                         value={line.placement}
-                        onChange={(e) =>
+                        onChange={(v) =>
                           setField(
                             "customLines",
                             effective.customLines.map((l) =>
                               l.id === line.id
-                                ? {
-                                    ...l,
-                                    placement: e.target.value as ReceiptCustomLine["placement"],
-                                  }
+                                ? { ...l, placement: v as ReceiptCustomLine["placement"] }
                                 : l,
                             ),
                           )
                         }
-                        className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
-                      >
-                        <option value="header">Below header</option>
-                        <option value="footer">Above footer</option>
-                      </select>
+                        options={[
+                          { value: "header", label: "Below header" },
+                          { value: "footer", label: "Above footer" },
+                        ]}
+                      />
                       <Button
                         variant="ghost"
                         size="icon"
@@ -623,19 +612,20 @@ function Settings() {
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Placement</Label>
-                      <select
+                      <ThemedSelect
+                        ariaLabel="QR placement"
                         value={effective.qr.placement}
-                        onChange={(e) =>
+                        onChange={(v) =>
                           setField("qr", {
                             ...effective.qr,
-                            placement: e.target.value as ReceiptCustomLine["placement"],
+                            placement: v as ReceiptCustomLine["placement"],
                           })
                         }
-                        className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm"
-                      >
-                        <option value="header">Top of receipt</option>
-                        <option value="footer">Bottom of receipt</option>
-                      </select>
+                        options={[
+                          { value: "header", label: "Top of receipt" },
+                          { value: "footer", label: "Bottom of receipt" },
+                        ]}
+                      />
                     </div>
                   </div>
                   </AccordionContent>
@@ -646,17 +636,15 @@ function Settings() {
   <AccordionContent className="space-y-3 pt-4">
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Paper size</Label>
-                    <select
+                    <ThemedSelect
+                      ariaLabel="Paper size"
                       value={receipt.paper}
-                      onChange={(e) => setGlobal({ paper: e.target.value as PaperSize })}
-                      className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
-                    >
-                      {(Object.keys(PAPER_LABELS) as PaperSize[]).map((p) => (
-                        <option key={p} value={p}>
-                          {PAPER_LABELS[p]}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(v) => setGlobal({ paper: v as PaperSize })}
+                      options={(Object.keys(PAPER_LABELS) as PaperSize[]).map((p) => ({
+                        value: p,
+                        label: PAPER_LABELS[p],
+                      }))}
+                    />
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {TOGGLES.map((t) => (
