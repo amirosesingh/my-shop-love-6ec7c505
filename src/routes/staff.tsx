@@ -319,7 +319,7 @@ function StaffManagement() {
         fullName: form.full_name || email,
         password: form.password,
         role: form.role === "admin" ? "admin" : "supervisor",
-        storeId: form.store_id || null,
+        storeId: formStoreId(form.store_id),
       });
       if (!auth.ok && !/already/i.test(auth.error ?? "")) {
         toast.error("Could not create account", { description: auth.error });
@@ -330,7 +330,7 @@ function StaffManagement() {
         p_user_id: staffUserId(email),
         p_full_name: form.full_name.trim() || email,
         p_role: toDbRole(form.role),
-        p_store_id: form.store_id || null,
+        p_store_id: formStoreId(form.store_id),
         p_email: email,
         // Legacy PIN column is still NOT NULL in the database; it is unused now.
         p_pin: String(Math.floor(1000 + Math.random() * 9000)),
