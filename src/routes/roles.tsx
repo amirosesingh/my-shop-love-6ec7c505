@@ -41,22 +41,31 @@ export const Route = createFileRoute("/roles")({
   component: RolesPage,
 });
 
-// `profiles` lives in the POS database but not in the generated types.
+// `app_users` / `user_roles` live in the POS database but not in the generated types.
 const sb = supabaseExternal as unknown as SupabaseClient;
 
-type ProfileRow = { id: string; email: string | null; full_name: string | null };
+type AppUserRow = {
+  id: string;
+  email: string | null;
+  full_name: string | null;
+  user_code: string | null;
+  role: AppRole | null;
+};
 
 function RolesPage() {
   const { isAdmin, authUserId } = useAuth();
-  const [profiles, setProfiles] = useState<ProfileRow[]>([]);
+  const [accounts, setAccounts] = useState<AppUserRow[]>([]);
   const [roles, setRoles] = useState<Record<string, AppRole[]>>({});
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [{ data: profileRows, error: pErr }, { data: roleRows, error: rErr }] = await Promise.all([
-      sb.from("profiles").select("id, email, full_name").order("email"),
+    // Read accounts from public.app_users. The table itself exposes pin_hash /
+    // auth_secret, so it is queried through the security-definer listing which
+    // returns only the safe columns.
+    const [{ data: userRows, error: pErr }, { data: roleRows, error: rErr }] = await Promise.all([
+      sb.rpc("list_app_users"),
       sb.from("user_roles").select("user_id, role"),
     ]);
     if (pErr || rErr) {
@@ -64,7 +73,24 @@ function RolesPage() {
         description: (pErr ?? rErr)?.message,
       });
     }
-    setProfiles((profileRows ?? []) as ProfileRow[]);
+    const rows = (userRows ?? []) as {
+      auth_user_id: string | null;
+      user_code: string | null;
+      full_name: string | null;
+      email: string | null;
+      role: AppRole | null;
+    }[];
+    setAccounts(
+      rows
+        .filter((r) => !!r.auth_user_id)
+        .map((r) => ({
+          id: r.auth_user_id as string,
+          email: r.email,
+          full_name: r.full_name,
+          user_code: r.user_code,
+          role: r.role,
+        })),
+    );
     const map: Record<string, AppRole[]> = {};
     for (const r of (roleRows ?? []) as { user_id: string; role: AppRole }[]) {
       (map[r.user_id] ??= []).push(r.role);
@@ -115,8 +141,10 @@ function RolesPage() {
     );
   }
 
-  const filtered = profiles.filter((p) =>
-    `${p.email ?? ""} ${p.full_name ?? ""}`.toLowerCase().includes(query.trim().toLowerCase()),
+  const filtered = accounts.filter((p) =>
+    `${p.email ?? ""} ${p.full_name ?? ""} ${p.user_code ?? ""}`
+      .toLowerCase()
+      .includes(query.trim().toLowerCase()),
   );
 
   return (
@@ -172,7 +200,9 @@ function RolesPage() {
                     <p className="font-medium">{p.full_name || p.email || "Unnamed"}</p>
                     <p className="text-xs text-muted-foreground">{p.email}</p>
                   </TableCell>
-                  <TableCell className="numeric text-xs text-muted-foreground">{p.id}</TableCell>
+                  <TableCell className="numeric text-xs text-muted-foreground">
+                    {p.user_code || p.id}
+                  </TableCell>
                   {APP_ROLES.map((r) => (
                     <TableCell key={r}>
                       <Switch
