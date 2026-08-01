@@ -189,7 +189,11 @@ function Register() {
     });
   }
 
-  function setQty(index: number, delta: number) {
+  async function setQty(index: number, delta: number) {
+    const line = lines[index];
+    const removes = line && !line.credit && line.qty + delta <= 0;
+    // Removing a line from the ticket is a void and needs the permission.
+    if (removes && !(await requirePermission("can_void_item"))) return;
     setLines((ls) =>
       ls
         .map((l, i) => (i === index ? { ...l, qty: l.credit ? l.qty - delta : l.qty + delta } : l))
@@ -201,7 +205,8 @@ function Register() {
     setLines((ls) => ls.map((l, i) => (i === index ? { ...l, ...patch } : l)));
   }
 
-  function clearCart() {
+  async function clearCart() {
+    if (lines.length && !(await requirePermission("can_void_item"))) return;
     setLines([]);
     setCartDiscount(0);
     setExchangeRef(null);
