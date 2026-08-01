@@ -2,6 +2,7 @@ import { Loader2, Lock, LogOut, Menu, ReceiptText, Store } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
+import { useLocation, useNavigate } from "@tanstack/react-router";
 import { TerminalLogin } from "@/components/pos/TerminalLogin";
 import { SidebarNav, useSidebarCollapsed } from "@/components/pos/SidebarNav";
 import type { NavItem } from "@/components/pos/nav-config";
@@ -23,6 +24,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { ready, user, isAdmin, logout, lock, can } = useAuth();
   const [collapsed, setCollapsed] = useSidebarCollapsed();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Cashier accounts are limited to the register; management screens are
+  // reserved for supervisors and admins.
+  useEffect(() => {
+    if (user && !isAdmin && ADMIN_PATHS.includes(location.pathname)) {
+      void navigate({ to: "/", replace: true });
+    }
+  }, [user, isAdmin, location.pathname, navigate]);
 
   useEffect(() => {
     setPrintStore(currentStore ?? null);
