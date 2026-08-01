@@ -6,22 +6,23 @@ The cashier setup script hashes 6-digit PINs using the `pgcrypto` extension (`cr
 
 ## The fix
 
-Create `supabase/schema6.sql` — a corrected, re-runnable version of the cashier setup that:
+Fix the hashing calls in place, across every SQL script that uses them, so they work with `pgcrypto` in the `extensions` schema:
 
-- Installs `pgcrypto` into the `extensions` schema, tolerating it already existing.
-- Changes every affected function's search path to `public, extensions` so the hashing functions resolve.
-- Calls hashing schema-qualified (`extensions.crypt`, `extensions.gen_salt`) as a belt-and-braces measure.
-- Re-creates the same objects so nothing is lost: the `cashiers` table, management functions (list / upsert / set permissions / delete / reset PIN), PIN verification, and the migration that moves existing cashiers out of the shared staff table.
-- Ends with a schema-cache reload so the app sees the updated functions immediately.
+- `supabase/schema5.sql` (cashiers), `supabase/schema3.sql`, `supabase/schema2.sql`, `supabase/schema.sql`, `supabase/external-setup.sql`.
+- Ensure `pgcrypto` is installed into the `extensions` schema, tolerating it already existing elsewhere.
+- Every function that hashes or verifies gets `set search_path = public, extensions`.
+- Every hashing call is schema-qualified: `extensions.crypt(...)`, `extensions.gen_salt('bf')`.
+- All scripts stay idempotent and fully re-runnable (`create ... if not exists`, `create or replace function`, guarded `DO` blocks).
+- Each script ends with a schema-cache reload so the app picks up the updated functions immediately.
 
 ## Technical details
 
-- Affected routines: `upsert_cashier`, `reset_cashier_pin`, `verify_cashier_pin`, plus the migration `DO` block (around lines 138, 147, 207 and 256 of `schema5.sql`).
+- Affected routines include `upsert_cashier`, `reset_cashier_pin`, `verify_cashier_pin`, and the cashier migration `DO` block in `schema5.sql`, plus the equivalent PIN/hash routines in the older scripts.
 - Each becomes `security definer ... set search_path = public, extensions`.
 - Verification compares `pin_hash = extensions.crypt(p_pin, pin_hash)`.
-- The migration block re-checks whether a cashier row already exists before inserting, so applying `schema6.sql` after a partially applied `schema5.sql` is safe.
+- Migration blocks re-check existing rows before inserting, so re-running after a partial apply is safe.
 - No frontend changes needed — `src/lib/pos-cashiers.ts` and `src/lib/pos-auth.tsx` call the same function names with the same signatures.
 
 ## After approval
 
-Apply `supabase/schema6.sql` in your database SQL editor, then create a cashier and sign in with the PIN to confirm hashing works.
+Apply the updated `supabase/schema5.sql` in your database SQL editor, then create a cashier and sign in with the PIN to confirm hashing works.
