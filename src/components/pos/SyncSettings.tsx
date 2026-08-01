@@ -6,6 +6,7 @@ import { usePos } from "@/lib/pos-store";
 import { downloadSqlBackup } from "@/lib/backup-sql";
 import { drainOutbox } from "@/lib/sync-engine";
 import { LocalDatabaseSettings } from "@/components/pos/LocalDatabaseSettings";
+import { SyncLogViewer } from "@/components/SyncLogViewer";
 import { localDb } from "@/lib/local-db";
 import {
   discardQuarantined,

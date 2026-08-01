@@ -1,4 +1,5 @@
 import { supabaseExternal } from "@/integrations/supabase/external-client";
+import { logSync } from "./sync-log";
 import {
   failOp,
   isOnline,
@@ -77,9 +78,11 @@ async function runOne(entry: QueuedOp): Promise<boolean> {
   }
   if (res.error) {
     failOp(entry.id, res.error.message);
+    logSync("push", entry.op.table, false, `${entry.context}: ${res.error.message}`);
     return false;
   }
   resolveOp(entry.id);
+  logSync("push", entry.op.table, true, entry.context);
   return true;
 }
 
