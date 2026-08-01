@@ -24,6 +24,7 @@ import { Route as StoresRouteImport } from './routes/stores'
 import { Route as TransfersRouteImport } from './routes/transfers'
 import { Route as ReportsIndexRouteImport } from './routes/reports.index'
 import { Route as ReportsActivityRouteImport } from './routes/reports.activity'
+import { Route as ReportsCatalogRouteImport } from './routes/reports.catalog'
 import { Route as ReportsCouponsRouteImport } from './routes/reports.coupons'
 import { Route as ReportsSalesRouteImport } from './routes/reports.sales'
 import { Route as SettingsIndexRouteImport } from './routes/settings.index'
@@ -113,6 +114,11 @@ const ReportsActivityRoute = ReportsActivityRouteImport.update({
   path: '/reports/activity',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReportsCatalogRoute = ReportsCatalogRouteImport.update({
+  id: '/reports/catalog',
+  path: '/reports/catalog',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReportsCouponsRoute = ReportsCouponsRouteImport.update({
   id: '/reports/coupons',
   path: '/reports/coupons',
@@ -194,6 +200,7 @@ export interface FileRoutesByFullPath {
   '/stores': typeof StoresRoute
   '/transfers': typeof TransfersRoute
   '/reports/activity': typeof ReportsActivityRoute
+  '/reports/catalog': typeof ReportsCatalogRoute
   '/reports/coupons': typeof ReportsCouponsRoute
   '/reports/sales': typeof ReportsSalesRoute
   '/settings/display': typeof SettingsDisplayRoute
@@ -224,6 +231,7 @@ export interface FileRoutesByTo {
   '/stores': typeof StoresRoute
   '/transfers': typeof TransfersRoute
   '/reports/activity': typeof ReportsActivityRoute
+  '/reports/catalog': typeof ReportsCatalogRoute
   '/reports/coupons': typeof ReportsCouponsRoute
   '/reports/sales': typeof ReportsSalesRoute
   '/settings/display': typeof SettingsDisplayRoute
@@ -255,6 +263,7 @@ export interface FileRoutesById {
   '/stores': typeof StoresRoute
   '/transfers': typeof TransfersRoute
   '/reports/activity': typeof ReportsActivityRoute
+  '/reports/catalog': typeof ReportsCatalogRoute
   '/reports/coupons': typeof ReportsCouponsRoute
   '/reports/sales': typeof ReportsSalesRoute
   '/settings/display': typeof SettingsDisplayRoute
@@ -287,6 +296,7 @@ export interface FileRouteTypes {
     | '/stores'
     | '/transfers'
     | '/reports/activity'
+    | '/reports/catalog'
     | '/reports/coupons'
     | '/reports/sales'
     | '/settings/display'
@@ -317,6 +327,7 @@ export interface FileRouteTypes {
     | '/stores'
     | '/transfers'
     | '/reports/activity'
+    | '/reports/catalog'
     | '/reports/coupons'
     | '/reports/sales'
     | '/settings/display'
@@ -347,6 +358,7 @@ export interface FileRouteTypes {
     | '/stores'
     | '/transfers'
     | '/reports/activity'
+    | '/reports/catalog'
     | '/reports/coupons'
     | '/reports/sales'
     | '/settings/display'
@@ -378,6 +390,7 @@ export interface RootRouteChildren {
   StoresRoute: typeof StoresRoute
   TransfersRoute: typeof TransfersRoute
   ReportsActivityRoute: typeof ReportsActivityRoute
+  ReportsCatalogRoute: typeof ReportsCatalogRoute
   ReportsCouponsRoute: typeof ReportsCouponsRoute
   ReportsSalesRoute: typeof ReportsSalesRoute
   SettingsDisplayRoute: typeof SettingsDisplayRoute
@@ -501,6 +514,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReportsActivityRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reports/catalog': {
+      id: '/reports/catalog'
+      path: '/reports/catalog'
+      fullPath: '/reports/catalog'
+      preLoaderRoute: typeof ReportsCatalogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reports/coupons': {
       id: '/reports/coupons'
       path: '/reports/coupons'
@@ -610,6 +630,7 @@ const rootRouteChildren: RootRouteChildren = {
   StoresRoute: StoresRoute,
   TransfersRoute: TransfersRoute,
   ReportsActivityRoute: ReportsActivityRoute,
+  ReportsCatalogRoute: ReportsCatalogRoute,
   ReportsCouponsRoute: ReportsCouponsRoute,
   ReportsSalesRoute: ReportsSalesRoute,
   SettingsDisplayRoute: SettingsDisplayRoute,

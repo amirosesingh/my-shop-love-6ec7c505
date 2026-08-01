@@ -27,6 +27,10 @@ import {
   Users,
   UserCog,
   Wallet,
+  BarChart3,
+  Activity,
+  TicketPercent,
+  PackageSearch,
 } from "lucide-react";
 
 import type { PermissionFlag } from "@/lib/permissions";
