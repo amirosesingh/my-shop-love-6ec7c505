@@ -614,7 +614,7 @@ function StaffManagement() {
             <ul className="max-h-[70vh] overflow-y-auto">
               {(
                 [
-                  ["Supervisors & admins", filtered.filter((r) => r.kind === "account")],
+                  ["Supervisors, warehouse & admins", filtered.filter((r) => r.kind === "account")],
                   ["Cashiers", filtered.filter((r) => r.kind === "cashier")],
                 ] as const
               ).flatMap(([label, group]) => [
