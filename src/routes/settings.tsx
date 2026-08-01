@@ -153,7 +153,7 @@ function Settings() {
 
   const previewHtml = useMemo(() => {
     setPreviewReceiptCfg(effective, tax);
-    return saleReceiptPreview(
+    const html = saleReceiptPreview(
       sample,
       {
         id: "m1",
@@ -168,7 +168,10 @@ function Settings() {
       },
       "sale",
     );
-  }, [effective, tax, sample]);
+    // restore the live printer profile after rendering the preview
+    setPrintSettings(receipt, tax);
+    return html;
+  }, [effective, receipt, tax, sample]);
 
   const geometry = paperCss(effective.paper);
 
