@@ -207,6 +207,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
             receipt: { ...defaultSettings.receipt, ...cloud.settings.receipt },
             payment: { ...defaultSettings.payment, ...cloud.settings.payment },
             whatsapp: { ...defaultSettings.whatsapp, ...cloud.settings.whatsapp },
+            review: { ...defaultSettings.review, ...cloud.settings.review },
           },
           // Keep the bill counter ahead of every receipt already in the cloud.
           counter: cloud.sales.reduce(
