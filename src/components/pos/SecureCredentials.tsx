@@ -55,7 +55,7 @@ export function SecureCredentials() {
       return;
     }
     setError("");
-    setHints(Object.fromEntries(res.items.map((i) => [i.key, i.hint])));
+    setHints(Object.fromEntries(res.items.map((i) => [i.key, i.hint ?? "set"])));
   };
 
   useEffect(() => {
