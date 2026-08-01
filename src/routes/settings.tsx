@@ -288,6 +288,7 @@ function Settings() {
                   <TabsTrigger value="lines">Extra lines</TabsTrigger>
                   <TabsTrigger value="qr">QR code</TabsTrigger>
                   <TabsTrigger value="elements">Elements</TabsTrigger>
+                  <TabsTrigger value="payment">Bank transfer</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="identity" className="space-y-3 pt-4">
@@ -556,6 +557,8 @@ function Settings() {
                   </div>
                 </TabsContent>
               </Tabs>
+
+                <TabsContent value="payment" className="space-y-3 pt-4" />
 
               <Button
                 variant="outline"
