@@ -2,6 +2,8 @@ import type {
   Member,
   PaperSize,
   Product,
+  FontStyleSettings,
+  ReceiptOverride,
   ReceiptSettings,
   Sale,
   Shift,
@@ -10,6 +12,8 @@ import type {
   Transfer,
 } from "./pos-types";
 import { lineUnitDiscount } from "./pos-types";
+import { defaultReceiptSettings } from "./pos-seed";
+import qrcode from "qrcode-generator";
 
 export const STORE = {
   name: "NORTHWIND & CO.",
@@ -24,18 +28,30 @@ export function setPrintStore(store: Store | null) {
 }
 
 /** Receipt customizer + tax configuration, pushed in by the app shell. */
-let receiptCfg: ReceiptSettings = {
-  paper: "80mm",
-  headerText: "42 Harbour Street, Unit 3\nTel 555-0100 · VAT 88-2201194",
-  footerText: "Thank you — see you again soon",
-  showLogo: true,
-  showPoints: true,
-  showBarcode: true,
-  showTax: true,
-};
+let globalReceiptCfg: ReceiptSettings = defaultReceiptSettings;
+let receiptCfg: ReceiptSettings = defaultReceiptSettings;
 let taxCfg: TaxSettings = { enabled: true, rate: 5, mode: "exclusive" };
 
+/** Merge the global receipt profile with any branch-level overrides. */
+export function resolveReceiptCfg(
+  receipt: ReceiptSettings,
+  store?: Store | null,
+): ReceiptSettings {
+  const o: ReceiptOverride = store?.receiptOverrides ?? {};
+  const clean = Object.fromEntries(
+    Object.entries(o).filter(([, v]) => v !== undefined && v !== null && v !== ""),
+  ) as ReceiptOverride;
+  return { ...receipt, ...clean };
+}
+
 export function setPrintSettings(receipt: ReceiptSettings, tax: TaxSettings) {
+  globalReceiptCfg = receipt;
+  receiptCfg = resolveReceiptCfg(receipt, activeBranch);
+  taxCfg = tax;
+}
+
+/** Preview helper: render with an explicit, already-resolved profile. */
+export function setPreviewReceiptCfg(receipt: ReceiptSettings, tax: TaxSettings) {
   receiptCfg = receipt;
   taxCfg = tax;
 }
