@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useUiScale } from "@/lib/use-ui-scale";
+import { useBranding } from "@/lib/branding";
 
 /** Screens reserved for supervisor / admin accounts, and the permission
  *  toggle that also unlocks them for any other account (e.g. warehouse). */
@@ -38,6 +39,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { ready, user, isAdmin, canSwitchStores, logout, lock, can } = useAuth();
   const [collapsed, setCollapsed] = useSidebarCollapsed();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const branding = useBranding();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -91,6 +93,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       (t.toStoreId === currentStore.id && t.status === "in_transit") ||
       (t.fromStoreId === currentStore.id && t.status === "requested"),
   ).length;
+
+  // Receipt identity wins; the locally captured install name is the fallback.
+  const companyName =
+    state.settings.receipt.companyName?.trim() || branding.company;
 
   const canSee = (item: NavItem) => {
     if (item.flag && !can(item.flag)) return false;

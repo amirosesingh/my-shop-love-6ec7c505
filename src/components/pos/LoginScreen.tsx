@@ -44,7 +44,7 @@ export function LoginScreen() {
             <ReceiptText className="size-5" />
           </div>
           <div>
-            <p className="font-semibold leading-tight">Northwind POS</p>
+            <p className="font-semibold leading-tight">{brand.company}</p>
             <p className="text-xs text-muted-foreground">
               {mode === "signin" ? "Staff sign in" : "Create a staff account"}
             </p>

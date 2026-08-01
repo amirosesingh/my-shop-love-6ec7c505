@@ -46,7 +46,7 @@ export function TerminalLogin() {
             <ReceiptText className="size-5" />
           </div>
           <div>
-            <p className="font-semibold leading-tight">Northwind POS</p>
+            <p className="font-semibold leading-tight">{brand.company}</p>
             <p className="text-xs text-muted-foreground">Terminal sign in</p>
           </div>
           <Lock className="ml-auto size-4 text-muted-foreground" />
