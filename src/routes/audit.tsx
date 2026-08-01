@@ -399,6 +399,9 @@ function AuditPage() {
           </DialogHeader>
           {detail && (
             <div className="space-y-4">
+              <p className="rounded-md border border-border bg-muted/40 p-3 text-sm">
+                {describeLog(detail)}
+              </p>
               <dl className="grid grid-cols-2 gap-2 text-sm">
                 <Row label="Staff" value={`${detail.staffName} (${detail.staffId})`} />
                 <Row label="Category" value={detail.category} />
