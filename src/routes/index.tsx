@@ -143,7 +143,17 @@ function Register() {
   const [receiptPreview, setReceiptPreview] = useState(false);
   const [couponOpen, setCouponOpen] = useState(false);
   const [couponCode, setCouponCode] = useState("");
-  const [coupon, setCoupon] = useState<{ code: string } | null>(null);
+  const [couponScope, setCouponScope] = useState<"bill" | "item">("bill");
+  const [couponLine, setCouponLine] = useState<string>("");
+  const [coupon, setCoupon] = useState<{
+    code: string;
+    promoId: string;
+    scope: "bill" | "item";
+    discount: number;
+    productId?: string;
+    productName?: string;
+    appliedAt: string;
+  } | null>(null);
   const [splitOpen, setSplitOpen] = useState(false);
   const [splitWays, setSplitWays] = useState(2);
 
