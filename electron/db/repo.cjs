@@ -2,7 +2,7 @@
  * Table helpers: turn the app's serialisable sync operations into parameterised
  * T-SQL, and expose the queries the sync worker needs.
  */
-const { sql, getPool } = require("./pool");
+const { sql, getPool } = require("./pool.cjs");
 
 const SETTINGS_ID = "00000000-0000-0000-0000-000000000001";
 

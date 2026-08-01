@@ -1,9 +1,9 @@
 const path = require("node:path");
 const { app, BrowserWindow, ipcMain, screen, dialog } = require("electron");
 
-const pool = require("./db/pool");
-const repo = require("./db/repo");
-const worker = require("./sync/worker");
+const pool = require("./db/pool.cjs");
+const repo = require("./db/repo.cjs");
+const worker = require("./sync/worker.cjs");
 
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
 const indexFile = path.join(__dirname, "..", "dist", "index.html");
