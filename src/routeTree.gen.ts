@@ -22,6 +22,11 @@ import { Route as ShiftsRouteImport } from './routes/shifts'
 import { Route as StaffRouteImport } from './routes/staff'
 import { Route as StoresRouteImport } from './routes/stores'
 import { Route as TransfersRouteImport } from './routes/transfers'
+import { Route as ReportsIndexRouteImport } from './routes/reports.index'
+import { Route as ReportsActivityRouteImport } from './routes/reports.activity'
+import { Route as ReportsCatalogRouteImport } from './routes/reports.catalog'
+import { Route as ReportsCouponsRouteImport } from './routes/reports.coupons'
+import { Route as ReportsSalesRouteImport } from './routes/reports.sales'
 import { Route as SettingsIndexRouteImport } from './routes/settings.index'
 import { Route as SettingsDisplayRouteImport } from './routes/settings.display'
 import { Route as SettingsElementsRouteImport } from './routes/settings.elements'
@@ -99,6 +104,31 @@ const TransfersRoute = TransfersRouteImport.update({
   path: '/transfers',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReportsIndexRoute = ReportsIndexRouteImport.update({
+  id: '/reports/',
+  path: '/reports/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsActivityRoute = ReportsActivityRouteImport.update({
+  id: '/reports/activity',
+  path: '/reports/activity',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsCatalogRoute = ReportsCatalogRouteImport.update({
+  id: '/reports/catalog',
+  path: '/reports/catalog',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsCouponsRoute = ReportsCouponsRouteImport.update({
+  id: '/reports/coupons',
+  path: '/reports/coupons',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsSalesRoute = ReportsSalesRouteImport.update({
+  id: '/reports/sales',
+  path: '/reports/sales',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsIndexRoute = SettingsIndexRouteImport.update({
   id: '/settings/',
   path: '/settings/',
@@ -169,6 +199,10 @@ export interface FileRoutesByFullPath {
   '/staff': typeof StaffRoute
   '/stores': typeof StoresRoute
   '/transfers': typeof TransfersRoute
+  '/reports/activity': typeof ReportsActivityRoute
+  '/reports/catalog': typeof ReportsCatalogRoute
+  '/reports/coupons': typeof ReportsCouponsRoute
+  '/reports/sales': typeof ReportsSalesRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
   '/settings/identity': typeof SettingsIdentityRoute
@@ -179,6 +213,7 @@ export interface FileRoutesByFullPath {
   '/settings/tax': typeof SettingsTaxRoute
   '/settings/type': typeof SettingsTypeRoute
   '/settings/whatsapp': typeof SettingsWhatsappRoute
+  '/reports/': typeof ReportsIndexRoute
   '/settings/': typeof SettingsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -195,6 +230,10 @@ export interface FileRoutesByTo {
   '/staff': typeof StaffRoute
   '/stores': typeof StoresRoute
   '/transfers': typeof TransfersRoute
+  '/reports/activity': typeof ReportsActivityRoute
+  '/reports/catalog': typeof ReportsCatalogRoute
+  '/reports/coupons': typeof ReportsCouponsRoute
+  '/reports/sales': typeof ReportsSalesRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
   '/settings/identity': typeof SettingsIdentityRoute
@@ -205,6 +244,7 @@ export interface FileRoutesByTo {
   '/settings/tax': typeof SettingsTaxRoute
   '/settings/type': typeof SettingsTypeRoute
   '/settings/whatsapp': typeof SettingsWhatsappRoute
+  '/reports': typeof ReportsIndexRoute
   '/settings': typeof SettingsIndexRoute
 }
 export interface FileRoutesById {
@@ -222,6 +262,10 @@ export interface FileRoutesById {
   '/staff': typeof StaffRoute
   '/stores': typeof StoresRoute
   '/transfers': typeof TransfersRoute
+  '/reports/activity': typeof ReportsActivityRoute
+  '/reports/catalog': typeof ReportsCatalogRoute
+  '/reports/coupons': typeof ReportsCouponsRoute
+  '/reports/sales': typeof ReportsSalesRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
   '/settings/identity': typeof SettingsIdentityRoute
@@ -232,6 +276,7 @@ export interface FileRoutesById {
   '/settings/tax': typeof SettingsTaxRoute
   '/settings/type': typeof SettingsTypeRoute
   '/settings/whatsapp': typeof SettingsWhatsappRoute
+  '/reports/': typeof ReportsIndexRoute
   '/settings/': typeof SettingsIndexRoute
 }
 export interface FileRouteTypes {
@@ -250,6 +295,10 @@ export interface FileRouteTypes {
     | '/staff'
     | '/stores'
     | '/transfers'
+    | '/reports/activity'
+    | '/reports/catalog'
+    | '/reports/coupons'
+    | '/reports/sales'
     | '/settings/display'
     | '/settings/elements'
     | '/settings/identity'
@@ -260,6 +309,7 @@ export interface FileRouteTypes {
     | '/settings/tax'
     | '/settings/type'
     | '/settings/whatsapp'
+    | '/reports/'
     | '/settings/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -276,6 +326,10 @@ export interface FileRouteTypes {
     | '/staff'
     | '/stores'
     | '/transfers'
+    | '/reports/activity'
+    | '/reports/catalog'
+    | '/reports/coupons'
+    | '/reports/sales'
     | '/settings/display'
     | '/settings/elements'
     | '/settings/identity'
@@ -286,6 +340,7 @@ export interface FileRouteTypes {
     | '/settings/tax'
     | '/settings/type'
     | '/settings/whatsapp'
+    | '/reports'
     | '/settings'
   id:
     | '__root__'
@@ -302,6 +357,10 @@ export interface FileRouteTypes {
     | '/staff'
     | '/stores'
     | '/transfers'
+    | '/reports/activity'
+    | '/reports/catalog'
+    | '/reports/coupons'
+    | '/reports/sales'
     | '/settings/display'
     | '/settings/elements'
     | '/settings/identity'
@@ -312,6 +371,7 @@ export interface FileRouteTypes {
     | '/settings/tax'
     | '/settings/type'
     | '/settings/whatsapp'
+    | '/reports/'
     | '/settings/'
   fileRoutesById: FileRoutesById
 }
@@ -329,6 +389,10 @@ export interface RootRouteChildren {
   StaffRoute: typeof StaffRoute
   StoresRoute: typeof StoresRoute
   TransfersRoute: typeof TransfersRoute
+  ReportsActivityRoute: typeof ReportsActivityRoute
+  ReportsCatalogRoute: typeof ReportsCatalogRoute
+  ReportsCouponsRoute: typeof ReportsCouponsRoute
+  ReportsSalesRoute: typeof ReportsSalesRoute
   SettingsDisplayRoute: typeof SettingsDisplayRoute
   SettingsElementsRoute: typeof SettingsElementsRoute
   SettingsIdentityRoute: typeof SettingsIdentityRoute
@@ -339,6 +403,7 @@ export interface RootRouteChildren {
   SettingsTaxRoute: typeof SettingsTaxRoute
   SettingsTypeRoute: typeof SettingsTypeRoute
   SettingsWhatsappRoute: typeof SettingsWhatsappRoute
+  ReportsIndexRoute: typeof ReportsIndexRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
 }
 
@@ -435,6 +500,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TransfersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reports/': {
+      id: '/reports/'
+      path: '/reports'
+      fullPath: '/reports/'
+      preLoaderRoute: typeof ReportsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports/activity': {
+      id: '/reports/activity'
+      path: '/reports/activity'
+      fullPath: '/reports/activity'
+      preLoaderRoute: typeof ReportsActivityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports/catalog': {
+      id: '/reports/catalog'
+      path: '/reports/catalog'
+      fullPath: '/reports/catalog'
+      preLoaderRoute: typeof ReportsCatalogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports/coupons': {
+      id: '/reports/coupons'
+      path: '/reports/coupons'
+      fullPath: '/reports/coupons'
+      preLoaderRoute: typeof ReportsCouponsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports/sales': {
+      id: '/reports/sales'
+      path: '/reports/sales'
+      fullPath: '/reports/sales'
+      preLoaderRoute: typeof ReportsSalesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/': {
       id: '/settings/'
       path: '/settings'
@@ -529,6 +629,10 @@ const rootRouteChildren: RootRouteChildren = {
   StaffRoute: StaffRoute,
   StoresRoute: StoresRoute,
   TransfersRoute: TransfersRoute,
+  ReportsActivityRoute: ReportsActivityRoute,
+  ReportsCatalogRoute: ReportsCatalogRoute,
+  ReportsCouponsRoute: ReportsCouponsRoute,
+  ReportsSalesRoute: ReportsSalesRoute,
   SettingsDisplayRoute: SettingsDisplayRoute,
   SettingsElementsRoute: SettingsElementsRoute,
   SettingsIdentityRoute: SettingsIdentityRoute,
@@ -539,18 +643,9 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsTaxRoute: SettingsTaxRoute,
   SettingsTypeRoute: SettingsTypeRoute,
   SettingsWhatsappRoute: SettingsWhatsappRoute,
+  ReportsIndexRoute: ReportsIndexRoute,
   SettingsIndexRoute: SettingsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

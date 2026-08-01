@@ -27,6 +27,10 @@ import {
   Users,
   UserCog,
   Wallet,
+  BarChart3,
+  Activity,
+  TicketPercent,
+  PackageSearch,
 } from "lucide-react";
 
 import type { PermissionFlag } from "@/lib/permissions";
@@ -93,6 +97,18 @@ export const navGroups: NavGroup[] = [
     items: [
       { to: "/staff", label: "Staff Management", icon: UserCog, adminOnly: true, flag: "can_manage_staff", keywords: "employees users roles permissions cashier supervisor pin account matrix duty store" },
       { to: "/audit", label: "Audit Logs & Activity", icon: ScanEye, adminOnly: true, flag: "can_view_sales_reports", keywords: "telemetry trail compliance logs sync" },
+    ],
+  },
+  {
+    id: "reports",
+    label: "Reports & Analytics",
+    icon: BarChart3,
+    items: [
+      { to: "/reports", label: "Reports Centre", icon: BarChart3, flag: "can_view_sales_reports", keywords: "analytics hub summary" },
+      { to: "/reports/sales", label: "Sales Summary", icon: BarChart3, flag: "can_view_sales_reports", keywords: "revenue tender discount tax cashier" },
+      { to: "/reports/coupons", label: "Coupon Usage", icon: TicketPercent, flag: "can_view_sales_reports", keywords: "coupon promotion discount bill item applied" },
+      { to: "/reports/activity", label: "Register Activity", icon: Activity, flag: "can_view_sales_reports", keywords: "hold resume void split drawer timeline" },
+      { to: "/reports/catalog", label: "Catalog Changes", icon: PackageSearch, flag: "can_view_sales_reports", keywords: "product price stock history timestamp" },
     ],
   },
   {

@@ -138,12 +138,28 @@ function Register() {
   const [bookPhone, setBookPhone] = useState("");
   const [bookNote, setBookNote] = useState("");
   /* Operation deck state */
-  type HeldOrder = { id: string; label: string; total: number; lines: CartLine[] };
+  type HeldOrder = {
+    id: string;
+    label: string;
+    total: number;
+    lines: CartLine[];
+    heldAt: string;
+  };
   const [held, setHeld] = useState<HeldOrder[]>([]);
   const [receiptPreview, setReceiptPreview] = useState(false);
   const [couponOpen, setCouponOpen] = useState(false);
   const [couponCode, setCouponCode] = useState("");
-  const [coupon, setCoupon] = useState<{ code: string } | null>(null);
+  const [couponScope, setCouponScope] = useState<"bill" | "item">("bill");
+  const [couponLine, setCouponLine] = useState<string>("");
+  const [coupon, setCoupon] = useState<{
+    code: string;
+    promoId: string;
+    scope: "bill" | "item";
+    discount: number;
+    productId?: string;
+    productName?: string;
+    appliedAt: string;
+  } | null>(null);
   const [splitOpen, setSplitOpen] = useState(false);
   const [splitWays, setSplitWays] = useState(2);
 
@@ -273,10 +289,20 @@ function Register() {
     setLines([]);
     setCartDiscount(0);
     setExchangeRef(null);
+    setCoupon(null);
   }
 
   async function clearCart() {
     if (lines.length && !(await requirePermission("can_void_item"))) return;
+    if (lines.length) {
+      logger.log("refund", "Cart voided", "register", {
+        lines: lines.length,
+        value: totals.total,
+        coupon: coupon?.code ?? null,
+        storeId: currentStore.id,
+        items: lines.map((l) => ({ name: l.name, qty: l.qty, price: l.price })),
+      });
+    }
     resetCart();
   }
 
@@ -517,7 +543,27 @@ function Register() {
       ...(exchangeRef
         ? { exchangeOfReceiptNo: exchangeRef, exchangeCredit: totals.credit }
         : {}),
+      ...(coupon
+        ? {
+            couponCode: coupon.code,
+            couponPromoId: coupon.promoId,
+            couponScope: coupon.scope,
+            couponDiscount: coupon.discount,
+          }
+        : {}),
     });
+    if (coupon) {
+      logger.log("promotion", "Coupon redeemed on a bill", "register", {
+        receiptNo: sale.receiptNo,
+        coupon: coupon.code,
+        promotionId: coupon.promoId,
+        scope: coupon.scope,
+        product: coupon.productName ?? null,
+        discountValue: coupon.discount,
+        billTotal: sale.total,
+        storeId: sale.storeId,
+      });
+    }
     if (method === "cash") openCashDrawer();
     if (method === "bank_transfer") {
       logger.log("sale", "Bank transfer payment recorded", "register", {
@@ -567,15 +613,25 @@ function Register() {
   function holdOrder() {
     if (!lines.length) return;
     const snapshot = lines;
+    const id = `H${Date.now()}`;
     setHeld((hs) => [
       ...hs,
       {
-        id: `H${Date.now()}`,
+        id,
         label: `${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · ${snapshot.length} item(s)`,
         total: totals.total,
         lines: snapshot,
+        heldAt: new Date().toISOString(),
       },
     ]);
+    logger.log("sale", "Order put on hold", "register", {
+      holdRef: id,
+      lines: snapshot.length,
+      value: totals.total,
+      storeId: currentStore.id,
+      memberId,
+      items: snapshot.map((l) => ({ name: l.name, qty: l.qty, price: l.price })),
+    });
     resetCart();
     toast.success("Order held — resume it from the operation deck");
   }
@@ -589,6 +645,14 @@ function Register() {
     }
     setLines(order.lines);
     setHeld((hs) => hs.filter((h) => h.id !== id));
+    logger.log("sale", "Held order resumed", "register", {
+      holdRef: order.id,
+      lines: order.lines.length,
+      value: order.total,
+      heldAt: order.heldAt,
+      heldForSeconds: Math.round((Date.now() - new Date(order.heldAt).getTime()) / 1000),
+      storeId: currentStore.id,
+    });
     toast.success("Held order resumed");
   }
 
@@ -602,13 +666,97 @@ function Register() {
       toast.error(`No active promotion matches “${code}”`);
       return;
     }
+    const targetIndex = lines.findIndex((l) => l.productId === couponLine);
+    if (couponScope === "item" && targetIndex < 0) {
+      toast.error("Pick the item the coupon applies to");
+      return;
+    }
     if (!(await unlockDiscounts())) return;
-    setCartDiscountType(rule.valueType ?? "amount");
-    setCartDiscount(rule.value ?? 0);
-    setCoupon({ code: rule.name });
+    const at = new Date().toISOString();
+    if (couponScope === "item") {
+      const line = lines[targetIndex]!;
+      const unit =
+        rule.valueType === "percent"
+          ? r2((line.price * (rule.value ?? 0)) / 100)
+          : r2(rule.value ?? 0);
+      const value = r2(unit * line.qty);
+      patchLine(targetIndex, {
+        discount: rule.value ?? 0,
+        discountType: rule.valueType ?? "amount",
+        couponCode: rule.name,
+        couponDiscount: value,
+      });
+      setCoupon({
+        code: rule.name,
+        promoId: rule.id,
+        scope: "item",
+        discount: value,
+        productId: line.productId,
+        productName: line.name,
+        appliedAt: at,
+      });
+      logger.log("promotion", "Coupon applied to an item", "register", {
+        coupon: rule.name,
+        promotionId: rule.id,
+        scope: "item",
+        product: line.name,
+        productId: line.productId,
+        qty: line.qty,
+        discountValue: value,
+        storeId: currentStore.id,
+        memberId,
+        appliedAt: at,
+      });
+    } else {
+      setCartDiscountType(rule.valueType ?? "amount");
+      setCartDiscount(rule.value ?? 0);
+      const value =
+        rule.valueType === "percent"
+          ? r2((promoBase * (rule.value ?? 0)) / 100)
+          : r2(rule.value ?? 0);
+      setCoupon({
+        code: rule.name,
+        promoId: rule.id,
+        scope: "bill",
+        discount: value,
+        appliedAt: at,
+      });
+      logger.log("promotion", "Coupon applied to the bill", "register", {
+        coupon: rule.name,
+        promotionId: rule.id,
+        scope: "bill",
+        discountValue: value,
+        billBase: promoBase,
+        storeId: currentStore.id,
+        memberId,
+        appliedAt: at,
+      });
+    }
     setCouponCode("");
     setCouponOpen(false);
     toast.success(`Coupon ${rule.name} applied`);
+  }
+
+  /** Take the coupon off the ticket and record who removed it. */
+  function removeCoupon() {
+    if (!coupon) return;
+    if (coupon.scope === "item") {
+      const i = lines.findIndex((l) => l.couponCode === coupon.code);
+      if (i >= 0)
+        patchLine(i, { discount: 0, couponCode: undefined, couponDiscount: undefined });
+    } else {
+      setCartDiscount(0);
+    }
+    logger.log("promotion", "Coupon removed", "register", {
+      coupon: coupon.code,
+      promotionId: coupon.promoId,
+      scope: coupon.scope,
+      product: coupon.productName ?? null,
+      discountValue: coupon.discount,
+      appliedAt: coupon.appliedAt,
+      storeId: currentStore.id,
+    });
+    setCoupon(null);
   }
 
   const splitShares = useMemo(() => {
@@ -1063,14 +1211,13 @@ function Register() {
                 {coupon && (
                   <div className="flex items-center justify-between rounded-md border border-primary/40 bg-primary/10 px-2 py-1.5 text-[11px]">
                     <span>
-                      Coupon <span className="font-semibold">{coupon.code}</span> applied
+                      Coupon <span className="font-semibold">{coupon.code}</span> ·{" "}
+                      {coupon.scope === "item" ? coupon.productName : "whole bill"} ·{" "}
+                      <span className="numeric">-{money(coupon.discount)}</span>
                     </span>
                     <button
                       className="text-muted-foreground hover:text-foreground"
-                      onClick={() => {
-                        setCoupon(null);
-                        setCartDiscount(0);
-                      }}
+                      onClick={removeCoupon}
                     >
                       remove
                     </button>
@@ -1328,9 +1475,49 @@ function Register() {
               onChange={(e) => setCouponCode(e.target.value)}
               placeholder="e.g. WEEKEND10"
             />
+            <Label>Apply to</Label>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                className="flex-1"
+                variant={couponScope === "bill" ? "default" : "outline"}
+                onClick={() => setCouponScope("bill")}
+              >
+                Whole bill
+              </Button>
+              <Button
+                size="sm"
+                className="flex-1"
+                variant={couponScope === "item" ? "default" : "outline"}
+                onClick={() => setCouponScope("item")}
+              >
+                Single item
+              </Button>
+            </div>
+            {couponScope === "item" && (
+              <div className="max-h-40 space-y-1 overflow-auto rounded-md border border-border p-2">
+                {lines.filter((l) => !l.credit && !l.foc).length === 0 && (
+                  <p className="text-[11px] text-muted-foreground">No eligible items in the cart.</p>
+                )}
+                {lines
+                  .filter((l) => !l.credit && !l.foc)
+                  .map((l) => (
+                    <button
+                      key={l.productId}
+                      onClick={() => setCouponLine(l.productId)}
+                      className={`flex w-full items-center justify-between rounded px-2 py-1 text-left text-xs ${
+                        couponLine === l.productId ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                      }`}
+                    >
+                      <span className="truncate">{l.name}</span>
+                      <span className="numeric">×{l.qty}</span>
+                    </button>
+                  ))}
+              </div>
+            )}
             <p className="text-[11px] text-muted-foreground">
-              Codes match an active threshold promotion by name. The value is applied as a bill
-              discount.
+              Codes match an active promotion by name. Every application, its scope and the item it
+              touched are written to the audit trail with a timestamp.
             </p>
           </div>
           <DialogFooter>
@@ -1393,6 +1580,13 @@ function Register() {
             <Button
               onClick={() => {
                 setSplitOpen(false);
+                logger.log("sale", "Bill split across guests", "register", {
+                  ways: splitWays,
+                  billTotal: balanceDue,
+                  shares: splitShares,
+                  storeId: currentStore.id,
+                  memberId,
+                });
                 openPayment("cash");
               }}
             >

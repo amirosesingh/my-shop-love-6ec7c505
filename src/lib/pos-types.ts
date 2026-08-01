@@ -58,6 +58,10 @@ export type CartLine = {
   foc?: boolean;
   /** promotion that generated this line */
   promoId?: string;
+  /** coupon code applied directly to this line */
+  couponCode?: string;
+  /** currency value the coupon took off this line */
+  couponDiscount?: number;
 };
 
 export type DiscountType = "amount" | "percent";
@@ -107,6 +111,14 @@ export type Sale = {
   bookingRef?: string;
   /** bank-transfer slip / reference number captured at the till */
   transferRef?: string;
+  /** coupon code used on this bill */
+  couponCode?: string;
+  /** promotion the coupon matched */
+  couponPromoId?: string;
+  /** whether the coupon hit the whole bill or one line */
+  couponScope?: "bill" | "item";
+  /** currency value the coupon took off */
+  couponDiscount?: number;
 };
 
 export type Shift = {

@@ -205,6 +205,7 @@ export type Database = {
           stock_by_store: Json
           stock_quantity: number
           tax_rate: number
+          updated_at: string
         }
         Insert: {
           barcode: string
@@ -223,6 +224,7 @@ export type Database = {
           stock_by_store?: Json
           stock_quantity?: number
           tax_rate?: number
+          updated_at?: string
         }
         Update: {
           barcode?: string
@@ -241,6 +243,7 @@ export type Database = {
           stock_by_store?: Json
           stock_quantity?: number
           tax_rate?: number
+          updated_at?: string
         }
         Relationships: []
       }
@@ -386,6 +389,8 @@ export type Database = {
       }
       sale_items: {
         Row: {
+          coupon_code: string | null
+          coupon_discount: number
           created_at: string
           discount_amount: number
           discount_percent: number
@@ -401,6 +406,8 @@ export type Database = {
           unit_price: number
         }
         Insert: {
+          coupon_code?: string | null
+          coupon_discount?: number
           created_at?: string
           discount_amount?: number
           discount_percent?: number
@@ -416,6 +423,8 @@ export type Database = {
           unit_price?: number
         }
         Update: {
+          coupon_code?: string | null
+          coupon_discount?: number
           created_at?: string
           discount_amount?: number
           discount_percent?: number
@@ -452,6 +461,10 @@ export type Database = {
           bill_number: string
           cashier_name: string | null
           change_amount: number
+          coupon_code: string | null
+          coupon_discount: number
+          coupon_promo_id: string | null
+          coupon_scope: string | null
           created_at: string
           discount_amount: number
           exchange_credit: number
@@ -475,6 +488,10 @@ export type Database = {
           bill_number: string
           cashier_name?: string | null
           change_amount?: number
+          coupon_code?: string | null
+          coupon_discount?: number
+          coupon_promo_id?: string | null
+          coupon_scope?: string | null
           created_at?: string
           discount_amount?: number
           exchange_credit?: number
@@ -498,6 +515,10 @@ export type Database = {
           bill_number?: string
           cashier_name?: string | null
           change_amount?: number
+          coupon_code?: string | null
+          coupon_discount?: number
+          coupon_promo_id?: string | null
+          coupon_scope?: string | null
           created_at?: string
           discount_amount?: number
           exchange_credit?: number

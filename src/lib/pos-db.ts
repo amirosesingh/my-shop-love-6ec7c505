@@ -210,6 +210,8 @@ const rowToSale = (r: Row): Sale => ({
     credit: !!l.is_return,
     foc: !!l.is_foc,
     promoId: l.promo_id ?? undefined,
+    couponCode: l.coupon_code ?? undefined,
+    couponDiscount: num(l.coupon_discount) || undefined,
   })),
   subtotal: num(r.subtotal_amount),
   discount: num(r.discount_amount),
@@ -226,6 +228,10 @@ const rowToSale = (r: Row): Sale => ({
   exchangeOfReceiptNo: r.original_bill_number ?? undefined,
   exchangedToReceiptNo: r.exchanged_to_bill_number ?? undefined,
   exchangeCredit: num(r.exchange_credit) || undefined,
+  couponCode: r.coupon_code ?? undefined,
+  couponPromoId: r.coupon_promo_id ?? undefined,
+  couponScope: (r.coupon_scope ?? undefined) as Sale["couponScope"],
+  couponDiscount: num(r.coupon_discount) || undefined,
 });
 
 const saleToRow = (s: Sale): Row => ({
@@ -248,6 +254,10 @@ const saleToRow = (s: Sale): Row => ({
   paid_amount: s.paid,
   change_amount: s.change,
   is_refunded: !!s.refunded,
+  coupon_code: s.couponCode ?? null,
+  coupon_promo_id: s.couponPromoId ?? null,
+  coupon_scope: s.couponScope ?? null,
+  coupon_discount: s.couponDiscount ?? 0,
   created_at: s.createdAt,
 });
 
@@ -264,6 +274,8 @@ const saleItemRows = (s: Sale) =>
     is_return: !!l.credit,
     is_foc: !!l.foc,
     promo_id: l.promoId ?? null,
+    coupon_code: l.couponCode ?? null,
+    coupon_discount: l.couponDiscount ?? 0,
   }));
 
 /* --------------------------- tier name cache --------------------------- */
