@@ -1,7 +1,7 @@
 import { Loader2, Lock, LogOut, Menu, ReceiptText, Store } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { usePos } from "@/lib/pos-store";
-import { useAuth } from "@/lib/pos-auth";
+import { useAuth, type PermissionFlag } from "@/lib/pos-auth";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { TerminalLogin } from "@/components/pos/TerminalLogin";
 import { SidebarNav, useSidebarCollapsed } from "@/components/pos/SidebarNav";
@@ -19,14 +19,15 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
-/** Screens reserved for supervisor / admin accounts. */
-const ADMIN_PATHS = [
-  "/settings",
-  "/staff",
-  "/stores",
-  "/promotions",
-  "/audit",
-];
+/** Screens reserved for supervisor / admin accounts, and the permission
+ *  toggle that also unlocks them for any other account (e.g. warehouse). */
+const ADMIN_PATHS: Record<string, PermissionFlag> = {
+  "/settings": "can_access_pos_settings",
+  "/staff": "can_manage_staff",
+  "/stores": "can_view_inventory",
+  "/promotions": "can_access_pos_settings",
+  "/audit": "can_view_sales_reports",
+};
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { activeShift, stores, currentStore, setCurrentStore, state, ready: dataReady } = usePos();
@@ -39,10 +40,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Cashier accounts are limited to the register; management screens are
   // reserved for supervisors and admins.
   useEffect(() => {
-    if (user && !isAdmin && ADMIN_PATHS.includes(location.pathname)) {
+    const required = ADMIN_PATHS[location.pathname];
+    if (user && !isAdmin && required && !can(required)) {
       void navigate({ to: "/", replace: true });
     }
-  }, [user, isAdmin, location.pathname, navigate]);
+  }, [user, isAdmin, can, location.pathname, navigate]);
 
   useEffect(() => {
     setPrintStore(currentStore ?? null);
@@ -76,8 +78,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   ).length;
 
   const canSee = (item: NavItem) => {
-    if (item.adminOnly && !isAdmin) return false;
     if (item.flag && !can(item.flag)) return false;
+    if (item.adminOnly && !isAdmin && !item.flag) return false;
     return true;
   };
 

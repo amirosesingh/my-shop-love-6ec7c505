@@ -2,7 +2,7 @@
 // live in Supabase Authentication; the role is stored in user_metadata.role.
 import { createClient } from "@supabase/supabase-js";
 
-export type MetaRole = "cashier" | "supervisor" | "admin";
+export type MetaRole = "cashier" | "warehouse" | "supervisor" | "admin";
 
 /** Internal email domain used to turn a numeric cashier User ID into a login. */
 export const CASHIER_EMAIL_DOMAIN = "store.internal";

@@ -321,7 +321,8 @@ function StaffManagement() {
         email,
         fullName: form.full_name || email,
         password: form.password,
-        role: form.role === "admin" ? "admin" : "supervisor",
+        role:
+          form.role === "admin" ? "admin" : form.role === "warehouse" ? "warehouse" : "supervisor",
         storeId: formStoreId(form.store_id),
       });
       if (!auth.ok && !/already/i.test(auth.error ?? "")) {
@@ -343,6 +344,12 @@ function StaffManagement() {
         toast.error("Could not save staff profile", { description: errText(error) });
         return;
       }
+      // Seed the role's default toggle matrix; every switch stays editable.
+      const seeded = rolePermissions(form.role);
+      await sb.rpc("set_app_user_permissions", {
+        p_user_id: staffUserId(email),
+        p_permissions: seeded as unknown as Record<string, boolean>,
+      });
       toast.success(`${form.role} account created`);
       setForm(NEW_USER);
       setDialogOpen(false);
@@ -465,8 +472,9 @@ function StaffManagement() {
                 <DialogHeader>
                   <DialogTitle>Create staff account</DialogTitle>
                   <DialogDescription>
-                    Cashiers sign in with a username and 6-digit PIN. Supervisors and admins sign
-                    in with email and password.
+                    Cashiers sign in with a username and 6-digit PIN. Warehouse, supervisor and
+                    admin accounts sign in with email and password. Every feature stays a toggle
+                    you can switch on or off afterwards.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-3">
@@ -606,7 +614,7 @@ function StaffManagement() {
             <ul className="max-h-[70vh] overflow-y-auto">
               {(
                 [
-                  ["Supervisors & admins", filtered.filter((r) => r.kind === "account")],
+                  ["Supervisors, warehouse & admins", filtered.filter((r) => r.kind === "account")],
                   ["Cashiers", filtered.filter((r) => r.kind === "cashier")],
                 ] as const
               ).flatMap(([label, group]) => [
