@@ -434,6 +434,13 @@ function Register() {
     if (method === "cash") openCashDrawer();
     printSaleReceipt(sale, member, "sale");
     setLastSale(sale);
+    publishDisplay({
+      ...cartSnapshot(),
+      mode: "paid",
+      paid: sale.paid,
+      change: sale.change,
+      reference: sale.receiptNo,
+    });
     resetCart();
     setMemberId(null);
     setTendered("");
