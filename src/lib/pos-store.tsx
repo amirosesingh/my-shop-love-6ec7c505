@@ -495,6 +495,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       void db.saveSettings({
         tax: { ...prev.tax, ...(patch.tax ?? {}) },
         receipt: { ...prev.receipt, ...(patch.receipt ?? {}) },
+        payment: { ...prev.payment, ...(patch.payment ?? {}) },
       });
     }
     setState((s) => ({
@@ -502,6 +503,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       settings: {
         tax: { ...s.settings.tax, ...(patch.tax ?? {}) },
         receipt: { ...s.settings.receipt, ...(patch.receipt ?? {}) },
+        payment: { ...s.settings.payment, ...(patch.payment ?? {}) },
       },
     }));
   }, []);
