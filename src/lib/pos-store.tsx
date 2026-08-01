@@ -495,6 +495,58 @@ export function PosProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const collectBooking = useCallback(
+    (id: string, amount: number, method: PaymentMethod) => {
+      const current = stateRef.current.bookings.find((b) => b.id === id);
+      if (!current || current.status !== "active") return null;
+      const balance = bookingBalance(current);
+      const settled = r2(Math.min(Math.max(amount, 0), balance));
+      const sale = recordSale({
+        storeId: current.storeId,
+        shiftId: activeShift?.id ?? current.shiftId,
+        lines: current.lines,
+        subtotal: current.subtotal,
+        discount: current.discount,
+        tax: current.tax,
+        total: current.total,
+        paid: current.total,
+        change: r2(Math.max(0, amount - balance)),
+        method,
+        memberId: current.memberId,
+        pointsEarned: 0,
+        cashier: current.cashier,
+        bookingRef: current.ref,
+      });
+      const finalPayment: BookingPayment = {
+        id: crypto.randomUUID(),
+        amount: settled,
+        method,
+        at: new Date().toISOString(),
+        cashier: current.cashier,
+      };
+      const updated: Booking = {
+        ...current,
+        paid: r2(current.paid + settled),
+        payments: settled ? [...current.payments, finalPayment] : current.payments,
+        status: "collected",
+        closedAt: new Date().toISOString(),
+        saleReceiptNo: sale.receiptNo,
+      };
+      setState((s) => ({
+        ...s,
+        bookings: s.bookings.map((b) => (b.id === id ? updated : b)),
+      }));
+      logger.log("sale_event", "Booking collected", "bookings", {
+        ref: updated.ref,
+        receiptNo: sale.receiptNo,
+        settled,
+        total: updated.total,
+      });
+      return { booking: updated, sale };
+    },
+    [activeShift, recordSale],
+  );
+
   const refundSale = useCallback((saleId: string) => {
     logger.log("sale_event", "Sale refunded", "receipts", {
       saleId,
