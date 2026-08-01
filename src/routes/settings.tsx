@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Percent, Plus, Printer, Trash2 } from "lucide-react";
+import { Eye, Percent, Plus, Printer, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
 import { SyncSettings } from "@/components/pos/SyncSettings";
@@ -10,7 +10,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { DisplayScalingSettings } from "@/components/pos/DisplayScalingSettings";
 import { usePos } from "@/lib/pos-store";
 import { defaultPaymentDetails, defaultWhatsApp } from "@/lib/pos-seed";
 import { useAuth } from "@/lib/pos-auth";
@@ -219,13 +226,38 @@ function Settings() {
   return (
     <AppShell>
       <div className="space-y-5 p-6">
-        <header>
-          <h1 className="text-2xl font-semibold">Settings</h1>
-          <p className="text-sm text-muted-foreground">
-            Tax rules apply to every register instantly. Receipt styling applies to all printed
-            slips.
-          </p>
+        <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold">Settings</h1>
+            <p className="text-sm text-muted-foreground">
+              Tax rules apply to every register instantly. Receipt styling applies to all printed
+              slips.
+            </p>
+          </div>
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="outline" className="shrink-0">
+                <Eye className="size-4" /> Preview receipt
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-full sm:max-w-[520px]">
+              <SheetHeader>
+                <SheetTitle>Live receipt preview · {PAPER_LABELS[receipt.paper]}</SheetTitle>
+              </SheetHeader>
+              <div className="overflow-auto px-4 pb-6">
+                <div className="mx-auto overflow-hidden rounded-md bg-white p-2" style={{ maxWidth: geometry.width }}>
+                  <iframe
+                    title="Receipt preview"
+                    srcDoc={previewHtml}
+                    className="h-[70vh] w-full border-0 bg-white"
+                  />
+                </div>
+              </div>
+            </SheetContent>
+          </Sheet>
         </header>
+
+        <DisplayScalingSettings />
 
         <section className="rounded-lg border border-border bg-card p-5">
           <h2 className="flex items-center gap-2 text-lg font-semibold">
@@ -279,7 +311,7 @@ function Settings() {
           </div>
         </section>
 
-        <section className="grid gap-5 lg:grid-cols-[1fr_340px]">
+        <section className="space-y-5">
           <div className="rounded-lg border border-border bg-card p-5">
             <h2 className="flex items-center gap-2 text-lg font-semibold">
               <Printer className="size-4 text-primary" /> Receipt &amp; slip customizer
@@ -312,19 +344,11 @@ function Settings() {
                 </div>
               </div>
 
-              <Tabs defaultValue="identity">
-                <TabsList className="flex flex-wrap">
-                  <TabsTrigger value="identity">Identity</TabsTrigger>
-                  <TabsTrigger value="type">Typography</TabsTrigger>
-                  <TabsTrigger value="lines">Extra lines</TabsTrigger>
-                  <TabsTrigger value="qr">QR code</TabsTrigger>
-                  <TabsTrigger value="elements">Elements</TabsTrigger>
-                  <TabsTrigger value="payment">Bank transfer</TabsTrigger>
-                  <TabsTrigger value="whatsapp">WhatsApp bills</TabsTrigger>
-                  <TabsTrigger value="sync">Sync &amp; backup</TabsTrigger>
-                </TabsList>
+              <Accordion type="single" collapsible className="w-full">
 
-                <TabsContent value="identity" className="space-y-3 pt-4">
+                <AccordionItem value="identity">
+  <AccordionTrigger className="text-sm font-medium">Business identity</AccordionTrigger>
+  <AccordionContent className="space-y-3 pt-4">
                   <div className="grid gap-3 sm:grid-cols-2">
                     {IDENTITY_FIELDS.map((f) => (
                       <div key={f.key} className="space-y-1">
@@ -355,9 +379,12 @@ function Settings() {
                       onChange={(e) => setField("footerText", e.target.value)}
                     />
                   </div>
-                </TabsContent>
+                  </AccordionContent>
+</AccordionItem>
 
-                <TabsContent value="type" className="space-y-3 pt-4">
+                <AccordionItem value="type">
+  <AccordionTrigger className="text-sm font-medium">Receipt typography</AccordionTrigger>
+  <AccordionContent className="space-y-3 pt-4">
                   <p className="text-[11px] text-muted-foreground">
                     Typography is shared by every branch.
                   </p>
@@ -424,9 +451,12 @@ function Settings() {
                       </div>
                     );
                   })}
-                </TabsContent>
+                  </AccordionContent>
+</AccordionItem>
 
-                <TabsContent value="lines" className="space-y-3 pt-4">
+                <AccordionItem value="lines">
+  <AccordionTrigger className="text-sm font-medium">Extra lines</AccordionTrigger>
+  <AccordionContent className="space-y-3 pt-4">
                   {(effective.customLines ?? []).length === 0 && (
                     <p className="text-xs text-muted-foreground">
                       No custom lines yet — add policy notes, promotions or opening hours.
@@ -511,9 +541,12 @@ function Settings() {
                   >
                     <Plus className="mr-1 size-4" /> Add line
                   </Button>
-                </TabsContent>
+                  </AccordionContent>
+</AccordionItem>
 
-                <TabsContent value="qr" className="space-y-3 pt-4">
+                <AccordionItem value="qr">
+  <AccordionTrigger className="text-sm font-medium">QR code</AccordionTrigger>
+  <AccordionContent className="space-y-3 pt-4">
                   <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
                     <span className="text-sm">Print QR code</span>
                     <Switch
@@ -561,9 +594,12 @@ function Settings() {
                       </select>
                     </div>
                   </div>
-                </TabsContent>
+                  </AccordionContent>
+</AccordionItem>
 
-                <TabsContent value="elements" className="space-y-3 pt-4">
+                <AccordionItem value="elements">
+  <AccordionTrigger className="text-sm font-medium">Receipt elements</AccordionTrigger>
+  <AccordionContent className="space-y-3 pt-4">
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Paper size</Label>
                     <select
@@ -595,9 +631,12 @@ function Settings() {
                       </div>
                     ))}
                   </div>
-                </TabsContent>
+                  </AccordionContent>
+</AccordionItem>
 
-                <TabsContent value="payment" className="space-y-3 pt-4">
+                <AccordionItem value="payment">
+  <AccordionTrigger className="text-sm font-medium">Bank transfer details</AccordionTrigger>
+  <AccordionContent className="space-y-3 pt-4">
                   <p className="text-xs text-muted-foreground">
                     Shown on the customer-facing display and printed on booking slips so shoppers
                     can settle a balance by bank transfer.
@@ -719,9 +758,12 @@ function Settings() {
                       </p>
                     </div>
                   </div>
-                </TabsContent>
+                  </AccordionContent>
+</AccordionItem>
 
-                <TabsContent value="whatsapp" className="space-y-3 pt-4">
+                <AccordionItem value="whatsapp">
+  <AccordionTrigger className="text-sm font-medium">WhatsApp bills</AccordionTrigger>
+  <AccordionContent className="space-y-3 pt-4">
                   <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
                     <div>
                       <p className="text-sm">Send bills on WhatsApp</p>
@@ -810,12 +852,16 @@ function Settings() {
                     />
                   </div>
                   <SecureCredentials />
-                </TabsContent>
+                  </AccordionContent>
+</AccordionItem>
 
-                <TabsContent value="sync" className="pt-4">
+                <AccordionItem value="sync">
+  <AccordionTrigger className="text-sm font-medium">Sync &amp; backup</AccordionTrigger>
+  <AccordionContent className="pt-4">
                   <SyncSettings />
-                </TabsContent>
-              </Tabs>
+                  </AccordionContent>
+</AccordionItem>
+              </Accordion>
 
               <Button
                 variant="outline"
@@ -829,19 +875,6 @@ function Settings() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-border bg-card p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Live receipt preview · {PAPER_LABELS[receipt.paper]}
-            </p>
-            <div className="mt-3 overflow-hidden rounded-md bg-white p-2">
-              <iframe
-                title="Receipt preview"
-                srcDoc={previewHtml}
-                className="h-[520px] w-full border-0 bg-white"
-                style={{ maxWidth: geometry.width }}
-              />
-            </div>
-          </div>
         </section>
       </div>
     </AppShell>

@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { useUiScale } from "@/lib/use-ui-scale";
 
 /** Screens reserved for supervisor / admin accounts, and the permission
  *  toggle that also unlocks them for any other account (e.g. warehouse). */
@@ -38,6 +39,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Terminal-wide font / control scaling preference.
+  useUiScale();
 
   // Background outbox drain: keeps offline sales flowing once the link returns.
   useEffect(() => startSyncEngine(), []);
@@ -167,7 +171,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     );
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
+    <div className="pos-scaled flex min-h-screen bg-background text-foreground">
       {/* Desktop / tablet sidebar */}
       <aside
         className={cn(
