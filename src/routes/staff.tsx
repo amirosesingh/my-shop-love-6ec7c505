@@ -758,18 +758,27 @@ function StaffManagement() {
                   <div className="flex flex-wrap items-end gap-3 rounded-md border border-border p-3">
                     <div className="space-y-1">
                       <Label className="flex items-center gap-1 text-xs">
-                        <KeyRound className="size-3.5" /> Set new password
+                        <KeyRound className="size-3.5" />{" "}
+                        {selected.kind === "cashier" ? "Set new 6-digit PIN" : "Set new password"}
                       </Label>
                       <Input
                         className="w-48"
                         type="password"
+                        inputMode={selected.kind === "cashier" ? "numeric" : undefined}
+                        maxLength={selected.kind === "cashier" ? 6 : undefined}
                         autoComplete="new-password"
                         value={passwordReset}
-                        onChange={(e) => setPasswordReset(e.target.value)}
+                        onChange={(e) =>
+                          setPasswordReset(
+                            selected.kind === "cashier"
+                              ? e.target.value.replace(/\D/g, "").slice(0, 6)
+                              : e.target.value,
+                          )
+                        }
                       />
                     </div>
                     <Button variant="outline" onClick={() => void resetPassword(selected)}>
-                      Update password
+                      {selected.kind === "cashier" ? "Update PIN" : "Update password"}
                     </Button>
                     <p className="text-[11px] text-muted-foreground">
                       Credentials are stored securely and can never be read back.
