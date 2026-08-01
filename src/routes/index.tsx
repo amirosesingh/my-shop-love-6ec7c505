@@ -37,6 +37,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { cartTotals, money, stockAt, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
+import { useUserPermissions } from "@/lib/pos-permissions";
 import type { CartLine, DiscountType, PaymentMethod, Sale } from "@/lib/pos-types";
 import { lineUnitDiscount, r2 } from "@/lib/pos-types";
 import { evaluatePromotions, focLine } from "@/lib/pos-promotions";
