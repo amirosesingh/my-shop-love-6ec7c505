@@ -32,12 +32,13 @@ const LEGACY: Record<string, string> = Object.fromEntries(
 );
 
 export const Route = createFileRoute("/settings/")({
-  validateSearch: (search: Record<string, unknown>) => ({
-    section: typeof search["section"] === "string" ? search["section"] : "",
-  }),
+  validateSearch: (search: Record<string, unknown>) =>
+    typeof search["section"] === "string" && search["section"]
+      ? { section: search["section"] }
+      : {},
   // Older links used /settings?section=tax — send them to the real page.
   beforeLoad: ({ search }) => {
-    const target = search.section ? LEGACY[search.section] : undefined;
+    const target = "section" in search ? LEGACY[search.section] : undefined;
     if (target) throw redirect({ to: target });
   },
   head: () => ({
