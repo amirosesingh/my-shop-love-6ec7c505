@@ -57,7 +57,7 @@ export const navGroups: NavGroup[] = [
     label: "Inventory & Supply",
     icon: Boxes,
     items: [
-      { to: "/inventory", label: "Inventory Catalog", icon: Boxes, keywords: "stock products import" },
+      { to: "/inventory", label: "Inventory Catalog", icon: Boxes, flag: "can_view_inventory", keywords: "stock products import" },
       { to: "/purchasing", label: "Purchasing", icon: ScanBarcode, flag: "can_receive_purchase_order", keywords: "po invoice receiving barcode" },
       { to: "/transfers", label: "Stock Transfers", icon: ArrowLeftRight, keywords: "request move branch" },
       { to: "/stores", label: "Locations / Warehouses", icon: Truck, adminOnly: true, keywords: "branch store warehouse" },
@@ -77,7 +77,7 @@ export const navGroups: NavGroup[] = [
     label: "Staff & Admin",
     icon: ShieldCheck,
     items: [
-      { to: "/staff", label: "Staff Management", icon: UserCog, adminOnly: true, keywords: "employees users roles permissions cashier supervisor pin account matrix duty store" },
+      { to: "/staff", label: "Staff Management", icon: UserCog, adminOnly: true, flag: "can_manage_staff", keywords: "employees users roles permissions cashier supervisor pin account matrix duty store" },
       { to: "/audit", label: "Audit Logs & Activity", icon: ScanEye, adminOnly: true, keywords: "telemetry trail compliance logs sync" },
     ],
   },
@@ -86,7 +86,7 @@ export const navGroups: NavGroup[] = [
     label: "System & Settings",
     icon: SettingsIcon,
     items: [
-      { to: "/settings", label: "Tax & Pricing", icon: ReceiptText, adminOnly: true, keywords: "vat rate inclusive" },
+      { to: "/settings", label: "Tax & Pricing", icon: ReceiptText, adminOnly: true, flag: "can_access_pos_settings", keywords: "vat rate inclusive" },
       { to: "/settings", label: "Receipt / Print Customizer", icon: Printer, adminOnly: true, hash: "receipt", keywords: "80mm 58mm a4 header footer" },
       { to: "/promotions", label: "Point Rules", icon: Sparkles, adminOnly: true, hash: "points", keywords: "loyalty points per dollar policy" },
     ],
