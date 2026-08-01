@@ -46,7 +46,12 @@ let logs: AuditLog[] = [];
 let loaded = false;
 const listeners = new Set<() => void>();
 
-let actor = { staffId: "anonymous", staffName: "Unknown", storeId: null as string | null };
+let actor = {
+  staffId: "anonymous",
+  staffName: "Unknown",
+  storeId: null as string | null,
+  authUserId: null as string | null,
+};
 
 /** Tell the logger which employee is currently on the terminal. */
 export const setAuditActor = (next: Partial<typeof actor>) => {
@@ -98,7 +103,7 @@ export const logger = {
       staffName: actor.staffName,
       storeId: actor.storeId,
       route: window.location.pathname,
-      details,
+      details: { ...details, authUserId: actor.authUserId },
       synced_to_cloud: false,
       syncedAt: null,
     };
