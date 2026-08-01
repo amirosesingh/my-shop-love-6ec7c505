@@ -385,12 +385,121 @@ export function PosProvider({ children }: { children: ReactNode }) {
     return sale;
   }, []);
 
+  const createBooking = useCallback((input: NewBooking) => {
+    const snapshot = stateRef.current;
+    const counter = snapshot.bookingCounter + 1;
+    const store = snapshot.stores.find((x) => x.id === input.storeId);
+    const now = new Date().toISOString();
+    const payments: BookingPayment[] = input.deposit
+      ? [
+          {
+            id: crypto.randomUUID(),
+            amount: r2(input.deposit),
+            method: input.depositMethod,
+            at: now,
+            cashier: input.cashier,
+          },
+        ]
+      : [];
+    const booking: Booking = {
+      id: crypto.randomUUID(),
+      ref: `BK-${store?.code ?? "R"}-${String(counter).padStart(5, "0")}`,
+      storeId: input.storeId,
+      shiftId: input.shiftId,
+      lines: input.lines,
+      subtotal: input.subtotal,
+      discount: input.discount,
+      tax: input.tax,
+      total: input.total,
+      paid: r2(input.deposit),
+      payments,
+      dueDate: input.dueDate,
+      memberId: input.memberId,
+      customerName: input.customerName,
+      customerPhone: input.customerPhone,
+      note: input.note,
+      cashier: input.cashier,
+      createdAt: now,
+      status: "active",
+    };
+    setState((s) => ({
+      ...s,
+      bookingCounter: Math.max(counter, s.bookingCounter + 1),
+      bookings: [booking, ...s.bookings],
+    }));
+    logger.log("sale_event", "Booking created", "bookings", {
+      ref: booking.ref,
+      storeId: booking.storeId,
+      total: booking.total,
+      deposit: booking.paid,
+      balance: bookingBalance(booking),
+      dueDate: booking.dueDate,
+      customer: booking.customerName,
+      items: booking.lines.map((l) => ({ name: l.name, qty: l.qty })),
+    });
+    return booking;
+  }, []);
+
+  const addBookingPayment = useCallback(
+    (id: string, amount: number, method: PaymentMethod, cashier: string) => {
+      const current = stateRef.current.bookings.find((b) => b.id === id);
+      if (!current || current.status !== "active" || amount <= 0) return null;
+      const payment: BookingPayment = {
+        id: crypto.randomUUID(),
+        amount: r2(amount),
+        method,
+        at: new Date().toISOString(),
+        cashier,
+      };
+      const updated: Booking = {
+        ...current,
+        paid: r2(current.paid + payment.amount),
+        payments: [...current.payments, payment],
+      };
+      setState((s) => ({
+        ...s,
+        bookings: s.bookings.map((b) => (b.id === id ? updated : b)),
+      }));
+      logger.log("sale_event", "Booking part payment", "bookings", {
+        ref: updated.ref,
+        amount: payment.amount,
+        method,
+        paid: updated.paid,
+        balance: bookingBalance(updated),
+      });
+      return updated;
+    },
+    [],
+  );
+
+  const cancelBooking = useCallback((id: string, reason: string) => {
+    const current = stateRef.current.bookings.find((b) => b.id === id);
+    if (!current || current.status !== "active") return;
+    setState((s) => ({
+      ...s,
+      bookings: s.bookings.map((b) =>
+        b.id === id
+          ? {
+              ...b,
+              status: "cancelled",
+              closedAt: new Date().toISOString(),
+              note: reason ? `${b.note ? `${b.note} · ` : ""}Cancelled: ${reason}` : b.note,
+            }
+          : b,
+      ),
+    }));
+    logger.log("sale_event", "Booking cancelled", "bookings", {
+      ref: current.ref,
+      reason,
+      refundable: current.paid,
+    });
+  }, []);
+
   const refundSale = useCallback((saleId: string) => {
     logger.log("sale_event", "Sale refunded", "receipts", {
       saleId,
       receiptNo: stateRef.current.sales.find((x) => x.id === saleId)?.receiptNo ?? null,
     });
-
     {
       const snap = stateRef.current;
       const sale = snap.sales.find((x) => x.id === saleId);
