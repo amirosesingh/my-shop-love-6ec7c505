@@ -281,8 +281,27 @@ function Register() {
   async function setQty(index: number, delta: number) {
     const line = lines[index];
     const removes = line && !line.credit && line.qty + delta <= 0;
-    // Removing a line from the ticket is a void and needs the permission.
-    if (removes && !(await requirePermission("can_void_item"))) return;
+    // Removing a line, or reducing a quantity, needs manager approval unless
+    // the cashier holds the right themselves.
+    if (removes) {
+      if (!(await requirePermission("can_delete_line"))) return;
+      logger.log("refund", "Line deleted from the cart", "register", {
+        product: line?.name,
+        productId: line?.productId,
+        qty: line?.qty,
+        price: line?.price,
+        storeId: currentStore.id,
+      });
+    } else if (delta < 0 && line && !line.credit) {
+      if (!(await requirePermission("can_reduce_qty"))) return;
+      logger.log("sale", "Item quantity reduced", "register", {
+        product: line.name,
+        productId: line.productId,
+        from: line.qty,
+        to: line.qty - 1,
+        storeId: currentStore.id,
+      });
+    }
     setLines((ls) =>
       ls
         .map((l, i) => (i === index ? { ...l, qty: l.credit ? l.qty - delta : l.qty + delta } : l))
@@ -302,7 +321,7 @@ function Register() {
   }
 
   async function clearCart() {
-    if (lines.length && !(await requirePermission("can_void_item"))) return;
+    if (lines.length && !(await requirePermission("can_void_cart"))) return;
     if (lines.length) {
       logger.log("refund", "Cart voided", "register", {
         lines: lines.length,
