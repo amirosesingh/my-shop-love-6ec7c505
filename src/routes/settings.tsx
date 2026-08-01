@@ -81,6 +81,7 @@ function Settings() {
   const { isAdmin, can } = useAuth();
   const canSettings = isAdmin || can("can_access_pos_settings");
   const { tax, receipt } = state.settings;
+  const payment = state.settings.payment ?? defaultPaymentDetails;
 
   const [branchId, setBranchId] = useState(currentStore.id);
   const branch = stores.find((s) => s.id === branchId) ?? currentStore;
