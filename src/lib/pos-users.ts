@@ -90,3 +90,24 @@ export function createSupervisorAccount(opts: {
     full_name: opts.fullName.trim(),
   });
 }
+
+/** Every account (cashier, supervisor, admin) signs in with email + password. */
+export function createStaffAccount(opts: {
+  email: string;
+  fullName: string;
+  password: string;
+  role: MetaRole;
+  storeId?: string | null;
+}) {
+  return createAccount(opts.email.trim(), opts.password, {
+    role: opts.role,
+    full_name: opts.fullName.trim(),
+    store_id: opts.storeId ?? null,
+  });
+}
+
+/** Stable app_users key derived from the login email. */
+export const staffUserId = (email: string) =>
+  (email.trim().toLowerCase().split("@")[0] ?? "")
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "user";

@@ -1,44 +1,16 @@
 import { useState } from "react";
-import { Delete, Loader2, Lock, ReceiptText } from "lucide-react";
+import { Loader2, Lock, ReceiptText } from "lucide-react";
 import { useAuth } from "@/lib/pos-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { cn } from "@/lib/utils";
-
-const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
 export function TerminalLogin() {
-  const { cashierLogin, pinLogin, login } = useAuth();
-  const [userId, setUserId] = useState("");
-  const [pin, setPin] = useState("");
+  const { login } = useAuth();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
-  const submit = async (value = pin) => {
-    if (busy) return;
-    setBusy(true);
-    setError("");
-    let res = await cashierLogin(userId, value);
-    // Legacy hashed-PIN terminal accounts / offline bootstrap admin.
-    if (!res.ok) res = await pinLogin(userId, value);
-    if (!res.ok) {
-      setError(res.error ?? "Invalid User ID or PIN");
-      setPin("");
-    }
-    setBusy(false);
-  };
-
-  const press = (digit: string) => {
-    if (pin.length >= 4) return;
-    const next = pin + digit;
-    setPin(next);
-    setError("");
-    if (next.length === 4) void submit(next);
-  };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -54,114 +26,7 @@ export function TerminalLogin() {
           <Lock className="ml-auto size-4 text-muted-foreground" />
         </div>
 
-        <Tabs
-          defaultValue="cashier"
-          onValueChange={() => {
-            setError("");
-            setPin("");
-          }}
-        >
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="cashier">Cashier PIN</TabsTrigger>
-            <TabsTrigger value="admin">Supervisor / Admin</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="cashier" className="space-y-5 pt-4">
-        <div className="space-y-1">
-          <Label htmlFor="userId">User ID</Label>
-          <Input
-            id="userId"
-            autoFocus
-            autoComplete="off"
-            inputMode="numeric"
-            placeholder="101"
-            value={userId}
-            onChange={(e) => {
-              setUserId(e.target.value);
-              setError("");
-            }}
-            className="h-11 text-center text-base tracking-wide"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label>PIN</Label>
-          <div
-            className="flex items-center justify-center gap-3 rounded-md border border-border bg-surface-2 py-3"
-            aria-label="PIN entry"
-            role="status"
-          >
-            {[0, 1, 2, 3].map((i) => (
-              <span
-                key={i}
-                className={cn(
-                  "size-3.5 rounded-full border border-border",
-                  i < pin.length ? "bg-primary" : "bg-transparent",
-                )}
-              />
-            ))}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2">
-          {KEYS.map((k) => (
-            <Button
-              key={k}
-              type="button"
-              variant="outline"
-              className="h-14 text-lg"
-              disabled={busy}
-              onClick={() => press(k)}
-            >
-              {k}
-            </Button>
-          ))}
-          <Button
-            type="button"
-            variant="ghost"
-            className="h-14 text-xs"
-            disabled={busy}
-            onClick={() => {
-              setPin("");
-              setError("");
-            }}
-          >
-            Clear
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="h-14 text-lg"
-            disabled={busy}
-            onClick={() => press("0")}
-          >
-            0
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            className="h-14"
-            aria-label="Delete last digit"
-            disabled={busy}
-            onClick={() => setPin(pin.slice(0, -1))}
-          >
-            <Delete className="size-5" />
-          </Button>
-        </div>
-
-        {error && <p className="text-center text-sm text-destructive">{error}</p>}
-
-        <Button className="w-full" disabled={busy || pin.length !== 4} onClick={() => void submit()}>
-          {busy && <Loader2 className="size-4 animate-spin" />}
-          Sign in
-        </Button>
-            <p className="text-[11px] leading-relaxed text-muted-foreground">
-              PINs are verified by the backend — they are never stored on this terminal.
-            </p>
-          </TabsContent>
-
-          <TabsContent value="admin" className="pt-4">
-            <form
+        <form
               className="space-y-4"
               onSubmit={async (e) => {
                 e.preventDefault();
@@ -177,8 +42,9 @@ export function TerminalLogin() {
                 <Input
                   id="email"
                   type="email"
+                  autoFocus
                   autoComplete="email"
-                  placeholder="supervisor@store.com"
+                  placeholder="you@store.com"
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);
@@ -205,12 +71,10 @@ export function TerminalLogin() {
                 Sign in
               </Button>
               <p className="text-[11px] leading-relaxed text-muted-foreground">
-                Supervisor and admin accounts unlock settings, reports, inventory and user
-                management.
+                Cashiers, supervisors and admins all sign in with their email and password.
+                Permissions are applied automatically from the staff profile.
               </p>
-            </form>
-          </TabsContent>
-        </Tabs>
+        </form>
       </div>
     </div>
   );

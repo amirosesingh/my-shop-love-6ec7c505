@@ -50,10 +50,8 @@ import {
   type StaffRole,
 } from "@/lib/permissions";
 import {
-  cashierEmail,
-  cashierSecret,
-  createCashierAccount,
-  createSupervisorAccount,
+  createStaffAccount,
+  staffUserId,
 } from "@/lib/pos-users";
 import { cn } from "@/lib/utils";
 
@@ -92,10 +90,7 @@ type StaffRow = {
 };
 
 const NEW_USER = {
-  kind: "cashier" as "cashier" | "manager",
-  user_id: "",
   full_name: "",
-  pin: "",
   email: "",
   password: "",
   role: "cashier" as StaffRole,
@@ -113,7 +108,7 @@ function StaffManagement() {
   const [form, setForm] = useState(NEW_USER);
   const [creating, setCreating] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [pinReset, setPinReset] = useState("");
+  const [passwordReset, setPasswordReset] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -204,64 +199,42 @@ function StaffManagement() {
   const createUser = async () => {
     setCreating(true);
     try {
-      if (form.kind === "cashier") {
-        if (!/^[a-z0-9-]+$/i.test(form.user_id.trim())) {
-          toast.error("Enter a User ID (letters, numbers or dashes)");
-          return;
-        }
-        if (!/^\d{4}$/.test(form.pin)) {
-          toast.error("PIN must be exactly 4 digits");
-          return;
-        }
-        const email = cashierEmail(form.user_id);
-        const secret = cashierSecret(form.user_id, form.pin);
-        // The Supabase Auth account is the source of truth for the login.
-        const auth = await createCashierAccount({
-          userId: form.user_id,
-          fullName: form.full_name || form.user_id,
-          pin: form.pin,
-          storeId: form.store_id || null,
-        });
-        if (!auth.ok && !/already/i.test(auth.error ?? "")) {
-          toast.error("Could not create cashier login", { description: auth.error });
-          return;
-        }
-        // Mirror the profile + hashed PIN into app_users for terminal sign-in.
-        const { error } = await sb.rpc("upsert_terminal_user", {
-          p_user_id: form.user_id.trim(),
-          p_full_name: form.full_name.trim() || form.user_id.trim(),
-          p_role: "staff",
-          p_store_id: form.store_id || null,
-          p_email: email,
-          p_pin: form.pin,
-          p_password: secret,
-        });
-        if (error) {
-          toast.error("Could not create cashier", { description: error.message });
-          return;
-        }
-        toast.success(`Cashier ${form.user_id.trim()} created`);
-      } else {
-        if (!form.email.includes("@")) {
-          toast.error("Enter a valid email address");
-          return;
-        }
-        if (form.password.length < 6) {
-          toast.error("Password must be at least 6 characters");
-          return;
-        }
-        const res = await createSupervisorAccount({
-          email: form.email,
-          fullName: form.full_name || form.email,
-          password: form.password,
-          role: form.role === "admin" ? "admin" : "supervisor",
-        });
-        if (!res.ok) {
-          toast.error("Could not create account", { description: res.error });
-          return;
-        }
-        toast.success(`${form.role} account created`);
+      const email = form.email.trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        toast.error("Enter a valid email address");
+        return;
       }
+      if (form.password.length < 6) {
+        toast.error("Password must be at least 6 characters");
+        return;
+      }
+      const auth = await createStaffAccount({
+        email,
+        fullName: form.full_name || email,
+        password: form.password,
+        role: form.role === "admin" ? "admin" : form.role === "cashier" ? "cashier" : "supervisor",
+        storeId: form.store_id || null,
+      });
+      if (!auth.ok && !/already/i.test(auth.error ?? "")) {
+        toast.error("Could not create account", { description: auth.error });
+        return;
+      }
+      // Mirror the profile into app_users so roles/permissions resolve on login.
+      const { error } = await sb.rpc("upsert_terminal_user", {
+        p_user_id: staffUserId(email),
+        p_full_name: form.full_name.trim() || email,
+        p_role: toDbRole(form.role),
+        p_store_id: form.store_id || null,
+        p_email: email,
+        // Legacy PIN column is still NOT NULL in the database; it is unused now.
+        p_pin: String(Math.floor(1000 + Math.random() * 9000)),
+        p_password: form.password,
+      });
+      if (error) {
+        toast.error("Could not save staff profile", { description: error.message });
+        return;
+      }
+      toast.success(`${form.role} account created`);
       setForm(NEW_USER);
       setDialogOpen(false);
       void load();
@@ -270,9 +243,9 @@ function StaffManagement() {
     }
   };
 
-  const resetPin = async (row: StaffRow) => {
-    if (!/^\d{4}$/.test(pinReset)) {
-      toast.error("PIN must be exactly 4 digits");
+  const resetPassword = async (row: StaffRow) => {
+    if (passwordReset.length < 6) {
+      toast.error("Password must be at least 6 characters");
       return;
     }
     const { error } = await sb.rpc("upsert_terminal_user", {
@@ -280,16 +253,16 @@ function StaffManagement() {
       p_full_name: row.full_name,
       p_role: toDbRole(row.role),
       p_store_id: row.store_id,
-      p_email: row.email || cashierEmail(row.user_id),
-      p_pin: pinReset,
-      p_password: cashierSecret(row.user_id, pinReset),
+      p_email: row.email,
+      p_pin: String(Math.floor(1000 + Math.random() * 9000)),
+      p_password: passwordReset,
     });
-    setPinReset("");
+    setPasswordReset("");
     if (error) {
-      toast.error("Could not reset PIN", { description: error.message });
+      toast.error("Could not update password", { description: error.message });
       return;
     }
-    toast.success("PIN updated");
+    toast.success("Password updated for the next sign-in sync");
   };
 
   const removeUser = async (row: StaffRow) => {
@@ -348,124 +321,77 @@ function StaffManagement() {
                 <DialogHeader>
                   <DialogTitle>Create staff account</DialogTitle>
                   <DialogDescription>
-                    Cashiers sign in with a User ID and 4-digit PIN. Supervisors and admins sign in
-                    with email and password.
+                    Every account — cashier, supervisor or admin — signs in with an email address
+                    and password.
                   </DialogDescription>
                 </DialogHeader>
-                <Tabs
-                  value={form.kind}
-                  onValueChange={(v) =>
-                    setForm({
-                      ...form,
-                      kind: v as "cashier" | "manager",
-                      role: v === "cashier" ? "cashier" : "supervisor",
-                    })
-                  }
-                >
-                  <TabsList className="w-full">
-                    <TabsTrigger value="cashier" className="flex-1">
-                      Cashier (PIN)
-                    </TabsTrigger>
-                    <TabsTrigger value="manager" className="flex-1">
-                      Supervisor / Admin
-                    </TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="cashier" className="space-y-3 pt-3">
-                    <div className="space-y-1">
-                      <Label htmlFor="nu-id">User ID</Label>
-                      <Input
-                        id="nu-id"
-                        placeholder="101"
-                        value={form.user_id}
-                        onChange={(e) => setForm({ ...form, user_id: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="nu-name">Full name</Label>
-                      <Input
-                        id="nu-name"
-                        value={form.full_name}
-                        onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="nu-pin">4-digit PIN</Label>
-                      <Input
-                        id="nu-pin"
-                        type="password"
-                        inputMode="numeric"
-                        maxLength={4}
-                        autoComplete="off"
-                        value={form.pin}
-                        onChange={(e) =>
-                          setForm({ ...form, pin: e.target.value.replace(/\D/g, "").slice(0, 4) })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label>Assigned store</Label>
-                      <Select
-                        value={form.store_id}
-                        onValueChange={(v) => setForm({ ...form, store_id: v })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select store" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {stores.map((s) => (
-                            <SelectItem key={s.id} value={s.id}>
-                              {s.code} · {s.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </TabsContent>
-                  <TabsContent value="manager" className="space-y-3 pt-3">
-                    <div className="space-y-1">
-                      <Label htmlFor="nu-mname">Full name</Label>
-                      <Input
-                        id="nu-mname"
-                        value={form.full_name}
-                        onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="nu-email">Email</Label>
-                      <Input
-                        id="nu-email"
-                        type="email"
-                        value={form.email}
-                        onChange={(e) => setForm({ ...form, email: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="nu-pass">Password</Label>
-                      <Input
-                        id="nu-pass"
-                        type="password"
-                        autoComplete="new-password"
-                        value={form.password}
-                        onChange={(e) => setForm({ ...form, password: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label>Role</Label>
-                      <Select
-                        value={form.role}
-                        onValueChange={(v) => setForm({ ...form, role: v as StaffRole })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="supervisor">Supervisor</SelectItem>
-                          <SelectItem value="admin">Admin</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </TabsContent>
-                </Tabs>
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="nu-name">Full name</Label>
+                    <Input
+                      id="nu-name"
+                      value={form.full_name}
+                      onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="nu-email">Email</Label>
+                    <Input
+                      id="nu-email"
+                      type="email"
+                      autoComplete="off"
+                      placeholder="cashier@store.com"
+                      value={form.email}
+                      onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="nu-pass">Password</Label>
+                    <Input
+                      id="nu-pass"
+                      type="password"
+                      autoComplete="new-password"
+                      value={form.password}
+                      onChange={(e) => setForm({ ...form, password: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Role</Label>
+                    <Select
+                      value={form.role}
+                      onValueChange={(v) => setForm({ ...form, role: v as StaffRole })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STAFF_ROLES.map((r) => (
+                          <SelectItem key={r} value={r} className="capitalize">
+                            {r}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Assigned store</Label>
+                    <Select
+                      value={form.store_id}
+                      onValueChange={(v) => setForm({ ...form, store_id: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select store" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {stores.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.code} · {s.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
                 <DialogFooter>
                   <Button onClick={() => void createUser()} disabled={creating}>
                     {creating && <Loader2 className="size-4 animate-spin" />} Create account
@@ -636,25 +562,21 @@ function StaffManagement() {
                   <div className="flex flex-wrap items-end gap-3 rounded-md border border-border p-3">
                     <div className="space-y-1">
                       <Label className="flex items-center gap-1 text-xs">
-                        <KeyRound className="size-3.5" /> Reset 4-digit PIN
+                        <KeyRound className="size-3.5" /> Set new password
                       </Label>
                       <Input
-                        className="w-32"
+                        className="w-48"
                         type="password"
-                        inputMode="numeric"
-                        maxLength={4}
-                        autoComplete="off"
-                        value={pinReset}
-                        onChange={(e) =>
-                          setPinReset(e.target.value.replace(/\D/g, "").slice(0, 4))
-                        }
+                        autoComplete="new-password"
+                        value={passwordReset}
+                        onChange={(e) => setPasswordReset(e.target.value)}
                       />
                     </div>
-                    <Button variant="outline" onClick={() => void resetPin(selected)}>
-                      Update PIN
+                    <Button variant="outline" onClick={() => void resetPassword(selected)}>
+                      Update password
                     </Button>
                     <p className="text-[11px] text-muted-foreground">
-                      PINs are hashed in the database and can never be read back.
+                      Credentials are stored securely and can never be read back.
                     </p>
                   </div>
 
