@@ -444,15 +444,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!account) {
       if (!terminalUser) return null;
       // Local bootstrap / offline terminal session.
-      const isLocalAdmin = terminalUser.role === "admin";
+      const isLocalAdmin = terminalUser.role === "admin" || terminalUser.role === "manager";
       return {
         staffId: terminalUser.userCode,
         name: terminalUser.name,
         email: terminalUser.email,
         role: isLocalAdmin ? "admin" : "cashier",
-        metaRole: isLocalAdmin ? "admin" : "cashier",
+        metaRole:
+          terminalUser.role === "admin"
+            ? "admin"
+            : terminalUser.role === "manager"
+              ? "supervisor"
+              : "cashier",
         roles: [terminalUser.role],
-        storeId: isLocalAdmin ? null : terminalUser.storeId,
+        storeId: terminalUser.role === "admin" ? null : terminalUser.storeId,
         permissions: isLocalAdmin
           ? FULL_PERMISSIONS
           : normalizePermissions(terminalUser.permissions ?? {}, "cashier"),
