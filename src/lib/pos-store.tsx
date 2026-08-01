@@ -5,6 +5,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useRef,
   type ReactNode,
 } from "react";
 import { defaultSettings, seedState } from "./pos-seed";
@@ -23,6 +24,7 @@ import type {
   TransferKind,
 } from "./pos-types";
 import { lineUnitDiscount, r2, type DiscountType } from "./pos-types";
+import { logger } from "./audit-log";
 
 const KEY = "pos-state-v2";
 
@@ -89,6 +91,9 @@ const PosContext = createContext<Ctx | null>(null);
 export function PosProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<PosState>(seedState);
   const [ready, setReady] = useState(false);
+  // Latest snapshot for audit logging without re-creating every callback.
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   useEffect(() => {
     try {
