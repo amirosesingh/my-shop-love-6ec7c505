@@ -133,6 +133,9 @@ function StaffManagement() {
   const [creating, setCreating] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [passwordReset, setPasswordReset] = useState("");
+  const [roleChange, setRoleChange] = useState<{ row: StaffRow; target: StaffRole } | null>(
+    null,
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
