@@ -347,7 +347,7 @@ export async function loadCloudState(): Promise<CloudSlice> {
   if (first.error) throw first.error;
   if (!first.data?.length) await seedCloud();
 
-  const [products, members, sales, promotions, settings] = await Promise.all([
+  const [products, members, sales, promotions, settings, stores] = await Promise.all([
     supabase.from("products").select("*").order("name"),
     supabase.from("members").select("*").order("created_at"),
     supabase
@@ -357,6 +357,12 @@ export async function loadCloudState(): Promise<CloudSlice> {
       .limit(500),
     supabase.from("promotions").select("*").order("created_at"),
     supabase.from("pos_settings").select("*").eq("id", 1).maybeSingle(),
+    // The stores table only exists once schema10.sql has been applied; a
+    // missing table must not stop the till from loading.
+    (supabase.from("stores" as never).select("*") as unknown as Promise<{
+      data: Row[] | null;
+      error: unknown;
+    }>).catch(() => ({ data: null, error: null })),
   ]);
 
   const err = products.error || members.error || sales.error || promotions.error || settings.error;
@@ -368,6 +374,7 @@ export async function loadCloudState(): Promise<CloudSlice> {
     sales: (sales.data ?? []).map(rowToSale),
     promotions: (promotions.data ?? []).map(rowToPromotion),
     settings: rowToSettings(settings.data as Row | null),
+    stores: ((stores.data as Row[] | null) ?? []).map(rowToStore),
   };
 }
 
