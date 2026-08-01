@@ -51,6 +51,8 @@ import {
 } from "@/lib/permissions";
 import {
   createStaffAccount,
+  createCashierAccount,
+  cashierEmail,
   staffUserId,
 } from "@/lib/pos-users";
 import { cn } from "@/lib/utils";
@@ -90,6 +92,8 @@ type StaffRow = {
 };
 
 const NEW_USER = {
+  user_id: "",
+  pin: "",
   full_name: "",
   email: "",
   password: "",
@@ -199,6 +203,46 @@ function StaffManagement() {
   const createUser = async () => {
     setCreating(true);
     try {
+      if (form.role === "cashier") {
+        const username = form.user_id.trim().toLowerCase();
+        if (!/^[a-z0-9._-]{3,}$/.test(username)) {
+          toast.error("Enter a username (3+ characters, letters/numbers)");
+          return;
+        }
+        if (!/^\d{6}$/.test(form.pin)) {
+          toast.error("PIN must be exactly 6 digits");
+          return;
+        }
+        const auth = await createCashierAccount({
+          userId: username,
+          fullName: form.full_name || username,
+          pin: form.pin,
+          storeId: form.store_id || null,
+        });
+        if (!auth.ok && !/already/i.test(auth.error ?? "")) {
+          toast.error("Could not create account", { description: auth.error });
+          return;
+        }
+        const { error: cashierError } = await sb.rpc("upsert_terminal_user", {
+          p_user_id: username,
+          p_full_name: form.full_name.trim() || username,
+          p_role: toDbRole("cashier"),
+          p_store_id: form.store_id || null,
+          p_email: cashierEmail(username),
+          // Legacy 4-digit column; the real PIN lives in the auth secret.
+          p_pin: String(Math.floor(1000 + Math.random() * 9000)),
+          p_password: "",
+        });
+        if (cashierError) {
+          toast.error("Could not save staff profile", { description: cashierError.message });
+          return;
+        }
+        toast.success(`Cashier ${username} created`);
+        setForm(NEW_USER);
+        setDialogOpen(false);
+        void load();
+        return;
+      }
       const email = form.email.trim().toLowerCase();
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         toast.error("Enter a valid email address");
@@ -212,7 +256,7 @@ function StaffManagement() {
         email,
         fullName: form.full_name || email,
         password: form.password,
-        role: form.role === "admin" ? "admin" : form.role === "cashier" ? "cashier" : "supervisor",
+        role: form.role === "admin" ? "admin" : "supervisor",
         storeId: form.store_id || null,
       });
       if (!auth.ok && !/already/i.test(auth.error ?? "")) {
