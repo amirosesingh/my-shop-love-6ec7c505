@@ -30,6 +30,7 @@ import type {
 import { bookingBalance, lineUnitDiscount, r2, type DiscountType } from "./pos-types";
 import { logger } from "./audit-log";
 import { db, dbError, loadCloudState } from "./pos-db";
+import { useAuth } from "./pos-auth";
 
 const KEY = "pos-state-v2";
 
