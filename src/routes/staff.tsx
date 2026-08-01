@@ -80,6 +80,14 @@ export const Route = createFileRoute("/staff")({
 
 const sb = supabaseExternal as unknown as SupabaseClient;
 
+/** Never surface an empty object as an error message. */
+const errText = (e: unknown): string => {
+  if (!e) return "Unknown error";
+  if (typeof e === "string") return e;
+  const o = e as { message?: string; details?: string; hint?: string; code?: string };
+  return o.message || o.details || o.hint || o.code || "Unexpected error";
+};
+
 type StaffRow = {
   user_id: string;
   full_name: string;
@@ -234,7 +242,7 @@ function StaffManagement() {
           p_password: "",
         });
         if (cashierError) {
-          toast.error("Could not save staff profile", { description: cashierError.message });
+          toast.error("Could not save staff profile", { description: errText(cashierError) });
           return;
         }
         toast.success(`Cashier ${username} created`);
@@ -275,13 +283,15 @@ function StaffManagement() {
         p_password: form.password,
       });
       if (error) {
-        toast.error("Could not save staff profile", { description: error.message });
+        toast.error("Could not save staff profile", { description: errText(error) });
         return;
       }
       toast.success(`${form.role} account created`);
       setForm(NEW_USER);
       setDialogOpen(false);
       void load();
+    } catch (e) {
+      toast.error("Could not add staff member", { description: errText(e) });
     } finally {
       setCreating(false);
     }
