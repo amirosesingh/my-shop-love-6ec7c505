@@ -291,6 +291,28 @@ alter table public.app_users
   add column if not exists created_at timestamptz not null default now(),
   add column if not exists updated_at timestamptz not null default now();
 
+-- Older installs stored `role` as varchar; convert it to the app_role enum so
+-- the security-definer functions can return it (idempotent).
+do $$ begin
+  if exists (select 1 from information_schema.columns
+              where table_schema = 'public' and table_name = 'app_users'
+                and column_name = 'role' and udt_name <> 'app_role') then
+    update public.app_users
+       set role = case lower(coalesce(role::text, ''))
+                    when 'admin' then 'admin'
+                    when 'manager' then 'manager'
+                    when 'supervisor' then 'manager'
+                    when 'staff' then 'staff'
+                    else 'staff'
+                  end;
+    alter table public.app_users alter column role drop default;
+    alter table public.app_users
+      alter column role type public.app_role using role::text::public.app_role;
+    alter table public.app_users alter column role set default 'staff'::public.app_role;
+    alter table public.app_users alter column role set not null;
+  end if;
+end $$;
+
 -- Merge legacy coarse permission flags into the granular matrix (idempotent).
 update public.app_users a
    set permissions = (
