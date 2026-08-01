@@ -291,6 +291,44 @@ alter table public.app_users
   add column if not exists created_at timestamptz not null default now(),
   add column if not exists updated_at timestamptz not null default now();
 
+-- Merge legacy coarse permission flags into the granular matrix (idempotent).
+update public.app_users a
+   set permissions = (
+     case when a.role in ('admin','manager') then
+       jsonb_build_object(
+         'can_open_drawer', true, 'can_close_drawer', true, 'can_view_drawer_balance', true,
+         'can_process_sale', true, 'can_give_discount', true, 'can_void_item', true,
+         'can_hold_cart', true, 'can_process_refund', true, 'can_process_exchange', true,
+         'can_view_inventory', true, 'can_edit_product_price', true, 'can_add_new_product', true,
+         'can_receive_purchase_order', true, 'can_add_member', true, 'can_edit_member_points', true,
+         'can_apply_member_discount', true, 'can_view_sales_reports', true,
+         'can_access_pos_settings', true, 'can_manage_staff', true)
+     else
+       jsonb_build_object(
+         'can_open_drawer', coalesce((a.permissions ->> 'can_open_drawer_manual')::boolean, true),
+         'can_close_drawer', true,
+         'can_view_drawer_balance', coalesce((a.permissions ->> 'financials')::boolean, false),
+         'can_process_sale', true,
+         'can_give_discount', coalesce((a.permissions ->> 'can_give_discount')::boolean, false),
+         'can_void_item', false,
+         'can_hold_cart', true,
+         'can_process_refund', coalesce((a.permissions ->> 'can_refund')::boolean, false),
+         'can_process_exchange', coalesce((a.permissions ->> 'can_refund')::boolean, false),
+         'can_view_inventory', true,
+         'can_edit_product_price', coalesce((a.permissions ->> 'ecommerce')::boolean, false),
+         'can_add_new_product', coalesce((a.permissions ->> 'products')::boolean, false),
+         'can_receive_purchase_order', coalesce((a.permissions ->> 'products')::boolean, false),
+         'can_add_member', true,
+         'can_edit_member_points', false,
+         'can_apply_member_discount', true,
+         'can_view_sales_reports', coalesce((a.permissions ->> 'financials')::boolean, false),
+         'can_access_pos_settings', false,
+         'can_manage_staff', false)
+     end
+   ) || (coalesce(a.permissions, '{}'::jsonb) - array['financials','products','ecommerce','can_refund','can_open_drawer_manual'])
+ where a.permissions ?| array['financials','products','ecommerce','can_refund','can_open_drawer_manual']
+    or not (a.permissions ? 'can_process_sale');
+
 create unique index if not exists app_users_user_id_key
   on public.app_users (lower(user_id));
 create unique index if not exists app_users_auth_user_id_key
