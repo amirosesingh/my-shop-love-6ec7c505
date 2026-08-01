@@ -9,6 +9,19 @@ export const PERMISSION_GROUPS = [
     keys: ["can_open_drawer", "can_close_drawer", "can_view_drawer_balance"],
   },
   {
+    id: "approvals",
+    label: "Sales Approvals (off = manager PIN required)",
+    keys: [
+      "can_delete_line",
+      "can_reduce_qty",
+      "can_discount_bill",
+      "can_override_price",
+      "can_void_cart",
+      "can_no_sale_open",
+      "can_edit_tenders",
+    ],
+  },
+  {
     id: "sales",
     label: "Sales & Checkout",
     keys: [
@@ -47,6 +60,13 @@ export type PermissionKey =
   | "can_open_drawer"
   | "can_close_drawer"
   | "can_view_drawer_balance"
+  | "can_delete_line"
+  | "can_reduce_qty"
+  | "can_discount_bill"
+  | "can_override_price"
+  | "can_void_cart"
+  | "can_no_sale_open"
+  | "can_edit_tenders"
   | "can_process_sale"
   | "can_give_discount"
   | "can_void_item"
@@ -69,6 +89,13 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   can_open_drawer: "Open cash drawer",
   can_close_drawer: "Close / count drawer",
   can_view_drawer_balance: "View drawer balance",
+  can_delete_line: "Delete a line from the cart",
+  can_reduce_qty: "Reduce an item quantity",
+  can_discount_bill: "Apply a bill-level discount",
+  can_override_price: "Override a price at the till",
+  can_void_cart: "Void the whole cart",
+  can_no_sale_open: "Open the drawer without a sale",
+  can_edit_tenders: "Edit split-payment tenders",
   can_process_sale: "Process a sale",
   can_give_discount: "Give discounts",
   can_void_item: "Void a line item",
