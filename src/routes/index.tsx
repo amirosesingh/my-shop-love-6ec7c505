@@ -1948,6 +1948,61 @@ function Register() {
         </DialogContent>
       </Dialog>
 
+      {/* No-sale drawer open */}
+      <Dialog open={noSaleOpen} onOpenChange={setNoSaleOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Open drawer without a sale</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground">
+            This open is logged against {user?.name ?? "this user"} with a timestamp.
+          </p>
+          <div className="space-y-2">
+            <Label>Reason</Label>
+            <select
+              value={noSaleReason}
+              onChange={(e) => setNoSaleReason(e.target.value as NoSaleReason)}
+              className="h-10 w-full rounded-md border border-border bg-background px-2 text-sm"
+            >
+              {NO_SALE_REASONS.map((r) => (
+                <option key={r.value} value={r.value}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+            <Label>Note (optional)</Label>
+            <Input value={noSaleNote} onChange={(e) => setNoSaleNote(e.target.value)} />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNoSaleOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                const approved = await requirePermission("can_no_sale_open");
+                if (!approved) return;
+                recordNoSale({
+                  storeId: currentStore.id,
+                  terminalId: null,
+                  shiftId: activeShift?.id ?? null,
+                  staffId: user?.id ?? "unknown",
+                  staffName: user?.name ?? "Unknown",
+                  role: user?.role ?? "unknown",
+                  reason: noSaleReason,
+                  note: noSaleNote.trim(),
+                  approvedBy: can("can_no_sale_open") ? null : "supervisor override",
+                });
+                openCashDrawer();
+                setNoSaleOpen(false);
+                toast.success("Drawer opened and logged");
+              }}
+            >
+              Open &amp; log
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Exchange lookup */}
       <Dialog
         open={exchangeOpen}
