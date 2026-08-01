@@ -77,7 +77,7 @@ export function ReportHeader({
           <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
           <p className="text-sm text-muted-foreground">{subtitle}</p>
         </div>
-        {onExport && (
+        {onExport && canExport && (
           <Button variant="outline" onClick={onExport}>
             Export CSV
           </Button>
