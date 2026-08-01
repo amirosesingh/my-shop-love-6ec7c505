@@ -531,58 +531,41 @@ function Register() {
 
   return (
     <AppShell>
-      <div className="flex h-screen flex-col lg:flex-row">
-        {/* Catalog */}
-        <section className="flex min-h-0 flex-1 flex-col p-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <form onSubmit={scanSubmit} className="relative min-w-56 flex-1">
+      <div className="flex h-screen min-w-0 flex-col overflow-hidden lg:flex-row">
+        {/* ── LEFT: product catalog (fixed min width, never shrinks) ───── */}
+        <section className="flex min-h-0 w-full shrink-0 flex-col gap-3 border-b border-border p-4 lg:w-[clamp(340px,32vw,520px)] lg:min-w-[340px] lg:border-b-0 lg:border-r">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+            <form onSubmit={scanSubmit} className="relative min-w-0">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 autoFocus
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Scan barcode or search products…"
-                className="h-11 pl-9 numeric"
+                className="numeric h-11 pl-9"
               />
             </form>
-            <Button
-              variant="outline"
-              className="h-11"
-              onClick={async () => {
-                if (await requirePermission("can_open_drawer")) openCashDrawer();
-              }}
-            >
-              <Vault className="size-4" /> Open drawer
-            </Button>
-            <Button variant="outline" className="h-11" onClick={openCustomerDisplay}>
-              <MonitorPlay className="size-4" /> Customer screen
-            </Button>
-            <Button
-              variant="outline"
-              className="h-11"
-              onClick={async () => {
-                if (await requirePermission("can_process_exchange")) setExchangeOpen(true);
-              }}
-            >
-              <Repeat className="size-4" /> Exchange
-            </Button>
-            {!activeShift && (
-              <Button className="h-11" onClick={() => setOpenShiftOpen(true)}>
-                Open shift
+            <div className="flex shrink-0 gap-2">
+              <Button variant="outline" className="h-11" onClick={openCustomerDisplay}>
+                <MonitorPlay className="size-4" />
+                <span className="hidden xl:inline">Customer screen</span>
               </Button>
-            )}
+              {!activeShift && (
+                <Button className="h-11" onClick={() => setOpenShiftOpen(true)}>
+                  Open shift
+                </Button>
+              )}
+            </div>
           </div>
 
           {!activeShift && (
-            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
               <Lock className="size-4" />
-              <span>
-                Selling is locked at {currentStore.name}. Open a shift to ring up sales.
-              </span>
+              <span>Selling is locked at {currentStore.name}. Open a shift to ring up sales.</span>
             </div>
           )}
 
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2">
             {categories.map((c) => (
               <button
                 key={c}
@@ -598,38 +581,38 @@ function Register() {
             ))}
           </div>
 
-          <ScrollArea className="mt-4 min-h-0 flex-1 pr-2">
-            <div className="grid grid-cols-2 gap-3 pb-6 sm:grid-cols-3 xl:grid-cols-4">
+          <ScrollArea className="min-h-0 flex-1 pr-2">
+            <div className="grid grid-cols-2 gap-3 pb-6 xl:grid-cols-3">
               {filtered.map((p) => (
                 <div key={p.id} className="relative">
-                <button
-                  onClick={() => addLine(p.id)}
-                  disabled={!activeShift}
-                  className="group flex h-full w-full flex-col justify-between rounded-lg border border-border bg-card p-3 text-left transition-colors hover:border-primary/60 hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border disabled:hover:bg-card"
-                >
-                  <span className="pr-6 text-sm font-medium leading-snug">{p.name}</span>
-                  <span className="mt-2 flex items-center justify-between">
-                    <span className="numeric text-base font-semibold text-primary">
-                      {money(p.price)}
+                  <button
+                    onClick={() => addLine(p.id)}
+                    disabled={!activeShift}
+                    className="group flex h-full w-full flex-col justify-between rounded-lg border border-border bg-card p-3 text-left transition-colors hover:border-primary/60 hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border disabled:hover:bg-card"
+                  >
+                    <span className="pr-6 text-sm font-medium leading-snug">{p.name}</span>
+                    <span className="mt-2 flex items-center justify-between">
+                      <span className="numeric text-base font-semibold text-primary">
+                        {money(p.price)}
+                      </span>
+                      <span
+                        className={`numeric text-[11px] ${
+                          stockAt(p, currentStore.id) <= p.reorderLevel
+                            ? "text-warning"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        {stockAt(p, currentStore.id)} left
+                      </span>
                     </span>
-                    <span
-                      className={`numeric text-[11px] ${
-                        stockAt(p, currentStore.id) <= p.reorderLevel
-                          ? "text-warning"
-                          : "text-muted-foreground"
-                      }`}
-                    >
-                      {stockAt(p, currentStore.id)} left
-                    </span>
-                  </span>
-                </button>
-                <button
-                  aria-label={`Stock across stores for ${p.name}`}
-                  onClick={() => setDetailId(p.id)}
-                  className="absolute right-2 top-2 rounded p-1 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
-                >
-                  <Info className="size-3.5" />
-                </button>
+                  </button>
+                  <button
+                    aria-label={`Stock across stores for ${p.name}`}
+                    onClick={() => setDetailId(p.id)}
+                    className="absolute right-2 top-2 rounded p-1 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+                  >
+                    <Info className="size-3.5" />
+                  </button>
                 </div>
               ))}
               {filtered.length === 0 && (
@@ -641,23 +624,34 @@ function Register() {
           </ScrollArea>
         </section>
 
-        {/* Ticket */}
-        <aside className="flex w-full shrink-0 flex-col border-l border-border bg-sidebar lg:w-[380px]">
+        {/* ── CENTER: active cart & register (grows with the window) ───── */}
+        <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-sidebar">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
-            <div>
-              <p className="text-sm font-semibold">Current ticket</p>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">Current ticket</p>
               <p className="numeric text-[11px] text-muted-foreground">
                 {activeShift ? `${activeShift.cashier} · shift open` : "No shift open"}
               </p>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={!lines.length}
-              onClick={() => void clearCart()}
-            >
-              <Trash2 className="size-4" /> Clear
-            </Button>
+            <div className="flex shrink-0 items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  if (await requirePermission("can_process_exchange")) setExchangeOpen(true);
+                }}
+              >
+                <Repeat className="size-4" /> Exchange
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={!lines.length}
+                onClick={() => void clearCart()}
+              >
+                <Trash2 className="size-4" /> Clear
+              </Button>
+            </div>
           </div>
 
           <div className="border-b border-border px-4 py-3">
@@ -666,7 +660,7 @@ function Register() {
             </Label>
             {member ? (
               <div className="mt-2 flex items-center gap-2 rounded-md border border-accent/50 bg-accent/10 px-3 py-2">
-                <BadgeCheck className="size-4 text-accent" />
+                <BadgeCheck className="size-4 shrink-0 text-accent" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{member.name}</p>
                   <p className="numeric text-[11px] text-muted-foreground">
@@ -676,7 +670,7 @@ function Register() {
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="size-7"
+                  className="size-7 shrink-0"
                   aria-label="Purchase history"
                   onClick={() => setHistoryMemberId(memberId)}
                 >
@@ -685,7 +679,7 @@ function Register() {
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="size-7"
+                  className="size-7 shrink-0"
                   aria-label="Detach member"
                   onClick={() => setMemberId(null)}
                 >
@@ -694,7 +688,7 @@ function Register() {
               </div>
             ) : (
               <>
-                <div className="relative mt-2">
+                <div className="relative mt-2 max-w-md">
                   <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     value={memberQuery}
@@ -754,7 +748,7 @@ function Register() {
                   key={`${l.credit ? "C" : "S"}-${l.productId}-${i}`}
                   className={`px-4 py-3 ${l.credit ? "bg-accent/5" : ""}`}
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium">
                         {l.name}
@@ -773,17 +767,27 @@ function Register() {
                         {money(l.price)} · tax {(l.taxRate * 100).toFixed(0)}%
                       </p>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Button size="icon" variant="outline" className="size-7" onClick={() => void setQty(i, -1)}>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        className="size-8"
+                        onClick={() => void setQty(i, -1)}
+                      >
                         <Minus className="size-3" />
                       </Button>
-                      <span className="numeric w-6 text-center text-sm">{l.qty}</span>
-                      <Button size="icon" variant="outline" className="size-7" onClick={() => void setQty(i, 1)}>
+                      <span className="numeric w-7 text-center text-sm">{l.qty}</span>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        className="size-8"
+                        onClick={() => void setQty(i, 1)}
+                      >
                         <Plus className="size-3" />
                       </Button>
                     </div>
                     <span
-                      className={`numeric w-20 shrink-0 text-right text-sm font-semibold ${l.credit ? "text-accent" : ""}`}
+                      className={`numeric w-24 shrink-0 text-right text-sm font-semibold ${l.credit ? "text-accent" : ""}`}
                     >
                       {money((l.price - lineUnitDiscount(l)) * l.qty)}
                     </span>
@@ -852,125 +856,148 @@ function Register() {
                 </button>
               </div>
             )}
-            <Row label="Subtotal" value={money(totals.subtotal)} />
-            {totals.credit > 0 && (
-              <Row
-                label={`Store credit #${exchangeRef ?? ""}`}
-                value={`-${money(totals.credit)}`}
-              />
-            )}
-            {!discountAllowed && (
-              <button
-                onClick={() => void unlockDiscounts()}
-                className="flex w-full items-center justify-between text-muted-foreground"
-              >
-                <span>Bill discount</span>
-                <span className="text-[11px] underline-offset-2 hover:underline">
-                  locked · supervisor override
-                </span>
-              </button>
-            )}
-            <div className={`flex items-center justify-between ${discountAllowed ? "" : "hidden"}`}>
-              <span className="text-muted-foreground">Bill discount</span>
-              <div className="flex items-center gap-1">
-                <Input
-                  value={cartDiscount || ""}
-                  onChange={(e) => setCartDiscount(Number(e.target.value) || 0)}
-                  placeholder="0.00"
-                  className="numeric h-8 w-20 text-right"
-                />
-                <div className="flex overflow-hidden rounded-md border border-border">
-                  {(["amount", "percent"] as const).map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => setCartDiscountType(t)}
-                      className={`px-2 py-1.5 text-xs ${
-                        cartDiscountType === t
-                          ? "bg-primary/15 text-primary"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      {t === "amount" ? "$" : "%"}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-            {promo.promoDiscount > 0 && (
-              <Row label="Promotion discount" value={`-${money(promo.promoDiscount)}`} />
-            )}
-            <Row label="Discount applied" value={`-${money(totals.discount)}`} />
-            {promo.applied.length > 0 && (
-              <div className="rounded-md border border-success/30 bg-success/5 px-2 py-2">
-                <p className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-success">
-                  <Sparkles className="size-3" /> Active promotions applied
-                </p>
-                <ul className="mt-1 space-y-0.5">
-                  {promo.applied.map((a) => (
-                    <li key={a.id} className="text-[11px] text-muted-foreground">
-                      <span className="font-medium text-foreground">{a.name}</span> · {a.detail}
-                    </li>
-                  ))}
-                </ul>
-                {member && (
-                  <p className="numeric mt-1 text-[11px] text-muted-foreground">
-                    {member.name} earns {pointsEarned} pts on this bill
-                  </p>
+            <div className="grid gap-x-8 gap-y-2 xl:grid-cols-2">
+              <div className="space-y-2">
+                <Row label="Subtotal" value={money(totals.subtotal)} />
+                {totals.credit > 0 && (
+                  <Row
+                    label={`Store credit #${exchangeRef ?? ""}`}
+                    value={`-${money(totals.credit)}`}
+                  />
                 )}
+                {!discountAllowed && (
+                  <button
+                    onClick={() => void unlockDiscounts()}
+                    className="flex w-full items-center justify-between text-muted-foreground"
+                  >
+                    <span>Bill discount</span>
+                    <span className="text-[11px] underline-offset-2 hover:underline">
+                      locked · supervisor override
+                    </span>
+                  </button>
+                )}
+                <div
+                  className={`flex items-center justify-between ${discountAllowed ? "" : "hidden"}`}
+                >
+                  <span className="text-muted-foreground">Bill discount</span>
+                  <div className="flex items-center gap-1">
+                    <Input
+                      value={cartDiscount || ""}
+                      onChange={(e) => setCartDiscount(Number(e.target.value) || 0)}
+                      placeholder="0.00"
+                      className="numeric h-8 w-20 text-right"
+                    />
+                    <div className="flex overflow-hidden rounded-md border border-border">
+                      {(["amount", "percent"] as const).map((t) => (
+                        <button
+                          key={t}
+                          onClick={() => setCartDiscountType(t)}
+                          className={`px-2 py-1.5 text-xs ${
+                            cartDiscountType === t
+                              ? "bg-primary/15 text-primary"
+                              : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {t === "amount" ? "$" : "%"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                {promo.promoDiscount > 0 && (
+                  <Row label="Promotion discount" value={`-${money(promo.promoDiscount)}`} />
+                )}
+                <Row label="Discount applied" value={`-${money(totals.discount)}`} />
+                <Row
+                  label={
+                    !taxSettings.enabled
+                      ? "Tax (disabled)"
+                      : taxSettings.mode === "inclusive"
+                        ? `Tax ${taxSettings.rate}% (included)`
+                        : `Tax ${taxSettings.rate}%`
+                  }
+                  value={money(totals.tax)}
+                />
               </div>
-            )}
-            <Row
-              label={
-                !taxSettings.enabled
-                  ? "Tax (disabled)"
-                  : taxSettings.mode === "inclusive"
-                    ? `Tax ${taxSettings.rate}% (included)`
-                    : `Tax ${taxSettings.rate}%`
-              }
-              value={money(totals.tax)}
-            />
-            <Separator />
-            <div className="flex items-center justify-between">
-              <span className="text-base font-semibold">
-                {refundDue > 0 ? "Refund due" : "Balance due"}
-              </span>
-              <span
-                className={`numeric text-2xl font-bold ${refundDue > 0 ? "text-accent" : "text-primary"}`}
-              >
-                {money(refundDue > 0 ? refundDue : balanceDue)}
-              </span>
+
+              <div className="space-y-2">
+                {promo.applied.length > 0 && (
+                  <div className="rounded-md border border-success/30 bg-success/5 px-2 py-2">
+                    <p className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-success">
+                      <Sparkles className="size-3" /> Active promotions applied
+                    </p>
+                    <ul className="mt-1 space-y-0.5">
+                      {promo.applied.map((a) => (
+                        <li key={a.id} className="text-[11px] text-muted-foreground">
+                          <span className="font-medium text-foreground">{a.name}</span> · {a.detail}
+                        </li>
+                      ))}
+                    </ul>
+                    {member && (
+                      <p className="numeric mt-1 text-[11px] text-muted-foreground">
+                        {member.name} earns {pointsEarned} pts on this bill
+                      </p>
+                    )}
+                  </div>
+                )}
+                {coupon && (
+                  <div className="flex items-center justify-between rounded-md border border-primary/40 bg-primary/10 px-2 py-1.5 text-[11px]">
+                    <span>
+                      Coupon <span className="font-semibold">{coupon.code}</span> applied
+                    </span>
+                    <button
+                      className="text-muted-foreground hover:text-foreground"
+                      onClick={() => {
+                        setCoupon(null);
+                        setCartDiscount(0);
+                      }}
+                    >
+                      remove
+                    </button>
+                  </div>
+                )}
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <span className="text-base font-semibold">
+                    {refundDue > 0 ? "Refund due" : "Balance due"}
+                  </span>
+                  <span
+                    className={`numeric text-2xl font-bold ${refundDue > 0 ? "text-accent" : "text-primary"}`}
+                  >
+                    {money(refundDue > 0 ? refundDue : balanceDue)}
+                  </span>
+                </div>
+                <Button
+                  className="h-12 w-full text-base"
+                  disabled={!lines.length || !activeShift || (refundDue > 0 && !canRefund)}
+                  onClick={() => openPayment()}
+                >
+                  {!activeShift
+                    ? "Shift closed — selling locked"
+                    : refundDue > 0
+                      ? canRefund
+                        ? `Refund ${money(refundDue)}`
+                        : "Refunds locked for this user"
+                      : `Charge ${money(balanceDue)}`}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-11 w-full"
+                  disabled={!lines.length || !activeShift || refundDue > 0}
+                  onClick={() => {
+                    setDeposit("");
+                    setBookName(member?.name ?? "");
+                    setBookPhone(member?.phone ?? "");
+                    setBookOpen(true);
+                  }}
+                >
+                  <CalendarClock className="size-4" /> Book &amp; pay later
+                </Button>
+              </div>
             </div>
-            <Button
-              className="mt-1 h-12 w-full text-base"
-              disabled={!lines.length || !activeShift || (refundDue > 0 && !canRefund)}
-              onClick={() => {
-                setTendered(Math.max(0, totals.total).toFixed(2));
-                setPayOpen(true);
-              }}
-            >
-              {!activeShift
-                ? "Shift closed — selling locked"
-                : refundDue > 0
-                  ? canRefund
-                    ? `Refund ${money(refundDue)}`
-                    : "Refunds locked for this user"
-                  : `Charge ${money(balanceDue)}`}
-            </Button>
-            <Button
-              variant="outline"
-              className="h-11 w-full"
-              disabled={!lines.length || !activeShift || refundDue > 0}
-              onClick={() => {
-                setDeposit("");
-                setBookName(member?.name ?? "");
-                setBookPhone(member?.phone ?? "");
-                setBookOpen(true);
-              }}
-            >
-              <CalendarClock className="size-4" /> Book &amp; pay later
-            </Button>
+
             {lastSale && (
-              <div className="flex flex-wrap gap-2 pt-1">
+              <div className="flex flex-wrap items-center gap-2 border-t border-border pt-2">
                 <Button
                   variant="outline"
                   size="sm"
@@ -999,7 +1026,7 @@ function Register() {
                   Kitchen
                 </Button>
                 {wa.enabled && (
-                  <div className="flex w-full flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <Input
                       value={waNumber}
                       onChange={(e) => setWaNumber(e.target.value)}
@@ -1020,8 +1047,240 @@ function Register() {
               </div>
             )}
           </div>
+        </section>
+
+        {/* ── RIGHT: operation deck (fixed width) ─────────────────────── */}
+        <aside className="w-full shrink-0 space-y-3 overflow-y-auto border-t border-border bg-background p-3 lg:w-[288px] lg:border-l lg:border-t-0">
+          {/* Card 1 · transaction actions */}
+          <div className="rounded-lg border border-border bg-card p-3">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Transaction actions
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant="outline"
+                className="h-16 flex-col gap-1 text-xs"
+                disabled={!lines.length}
+                onClick={holdOrder}
+              >
+                <PauseCircle className="size-4" /> Hold order
+              </Button>
+              <Button
+                variant="outline"
+                className="h-16 flex-col gap-1 text-xs text-destructive hover:text-destructive"
+                disabled={!lines.length}
+                onClick={() => void clearCart()}
+              >
+                <Trash2 className="size-4" /> Void cart
+              </Button>
+              <Button
+                variant="outline"
+                className="h-16 flex-col gap-1 text-xs"
+                onClick={() => setCouponOpen(true)}
+              >
+                <TicketPercent className="size-4" /> Apply coupon
+              </Button>
+              <Button
+                variant="outline"
+                className="h-16 flex-col gap-1 text-xs"
+                disabled={balanceDue <= 0}
+                onClick={() => setSplitOpen(true)}
+              >
+                <Split className="size-4" /> Split bill
+              </Button>
+            </div>
+            {held.length > 0 && (
+              <div className="mt-2 space-y-1">
+                <p className="text-[11px] text-muted-foreground">Held orders ({held.length})</p>
+                {held.map((h) => (
+                  <button
+                    key={h.id}
+                    onClick={() => resumeHeld(h.id)}
+                    className="flex w-full items-center justify-between rounded-md border border-border px-2 py-1.5 text-[11px] hover:border-primary/60"
+                  >
+                    <span className="truncate">{h.label}</span>
+                    <span className="numeric font-semibold">{money(h.total)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Card 2 · payment execution */}
+          <div className="rounded-lg border border-border bg-card p-3">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Payment execution
+            </p>
+            <div className="space-y-2">
+              <Button
+                className="h-14 w-full justify-start gap-3 text-base"
+                disabled={!lines.length || !activeShift}
+                onClick={() => openPayment("cash")}
+              >
+                <Banknote className="size-5" /> Cash
+              </Button>
+              <Button
+                variant="secondary"
+                className="h-14 w-full justify-start gap-3 text-base"
+                disabled={!lines.length || !activeShift}
+                onClick={() => openPayment("card")}
+              >
+                <CreditCard className="size-5" /> Card
+              </Button>
+              <Button
+                variant="outline"
+                className="h-14 w-full justify-start gap-3 text-base"
+                disabled={!lines.length || !activeShift}
+                onClick={() => openPayment("wallet")}
+              >
+                <Wallet className="size-5" /> Digital pay
+              </Button>
+            </div>
+            <p className="numeric mt-2 text-center text-[11px] text-muted-foreground">
+              Due {money(refundDue > 0 ? refundDue : balanceDue)}
+            </p>
+          </div>
+
+          {/* Card 3 · device & printing */}
+          <div className="rounded-lg border border-border bg-card p-3">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Device &amp; printing
+            </p>
+            <Button
+              variant="outline"
+              className="h-12 w-full justify-start gap-3"
+              onClick={async () => {
+                if (await requirePermission("can_open_drawer")) openCashDrawer();
+              }}
+            >
+              <Vault className="size-4" /> Open cash drawer
+            </Button>
+            <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
+              <Label htmlFor="live-receipt" className="text-xs leading-tight">
+                Live receipt preview
+                <span className="block text-[11px] font-normal text-muted-foreground">
+                  Opens as an overlay
+                </span>
+              </Label>
+              <Switch
+                id="live-receipt"
+                checked={receiptPreview}
+                onCheckedChange={setReceiptPreview}
+              />
+            </div>
+          </div>
         </aside>
       </div>
+
+      {/* Live receipt preview overlay */}
+      <Sheet open={receiptPreview} onOpenChange={setReceiptPreview}>
+        <SheetContent side="right" className="w-[420px] sm:max-w-none">
+          <SheetHeader>
+            <SheetTitle>Live receipt preview</SheetTitle>
+          </SheetHeader>
+          <div className="mt-4 h-[calc(100vh-8rem)] overflow-hidden rounded-md border border-border bg-white">
+            {previewHtml ? (
+              <iframe
+                title="Receipt preview"
+                srcDoc={previewHtml}
+                className="h-full w-full"
+              />
+            ) : (
+              <p className="p-6 text-center text-sm text-muted-foreground">
+                Add items to the ticket to preview the printed receipt.
+              </p>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Apply coupon */}
+      <Dialog open={couponOpen} onOpenChange={setCouponOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Apply coupon</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>Coupon code</Label>
+            <Input
+              autoFocus
+              value={couponCode}
+              onChange={(e) => setCouponCode(e.target.value)}
+              placeholder="e.g. WEEKEND10"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Codes match an active threshold promotion by name. The value is applied as a bill
+              discount.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCouponOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => void applyCoupon()}>Apply</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Split bill */}
+      <Dialog open={splitOpen} onOpenChange={setSplitOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Split bill</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Bill total</span>
+              <span className="numeric font-semibold">{money(balanceDue)}</span>
+            </div>
+            <div className="space-y-1">
+              <Label>Split between</Label>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={() => setSplitWays((n) => Math.max(2, n - 1))}
+                >
+                  <Minus className="size-3" />
+                </Button>
+                <span className="numeric w-10 text-center text-lg font-semibold">{splitWays}</span>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={() => setSplitWays((n) => Math.min(12, n + 1))}
+                >
+                  <Plus className="size-3" />
+                </Button>
+                <span className="text-sm text-muted-foreground">guests</span>
+              </div>
+            </div>
+            <div className="rounded-md border border-border p-3">
+              {splitShares.map((amount, i) => (
+                <div key={i} className="flex items-center justify-between py-0.5 text-sm">
+                  <span className="text-muted-foreground">Guest {i + 1}</span>
+                  <span className="numeric font-semibold">{money(amount)}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Take each share as a separate tender, then complete the bill on the final payment.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSplitOpen(false)}>
+              Close
+            </Button>
+            <Button
+              onClick={() => {
+                setSplitOpen(false);
+                openPayment("cash");
+              }}
+            >
+              Take payment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Cross-store stock */}
       <Dialog open={!!detail} onOpenChange={(o) => !o && setDetailId(null)}>
