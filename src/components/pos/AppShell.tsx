@@ -308,7 +308,28 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Button>
         </header>
 
-        <main className="min-w-0 flex-1">{children}</main>
+        <main className="min-w-0 flex-1">
+          {(() => {
+            // Decided before the page body renders: no flash of protected data.
+            const required = requiredPermission(location.pathname);
+            const allowed =
+              required === null ? true : required === "unknown" ? isAdmin : can(required);
+            if (allowed) return children;
+            return (
+              <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 p-8 text-center">
+                <Lock className="size-8 text-muted-foreground" />
+                <h1 className="text-lg font-semibold">Access restricted</h1>
+                <p className="max-w-sm text-sm text-muted-foreground">
+                  Your account does not have permission to open this screen. Ask an administrator to
+                  enable it in Staff Management.
+                </p>
+                <Button asChild variant="outline" size="sm">
+                  <Link to="/">Back to the register</Link>
+                </Button>
+              </div>
+            );
+          })()}
+        </main>
       </div>
     </div>
   );
