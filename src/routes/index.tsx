@@ -1803,6 +1803,115 @@ function Register() {
                 : "Attach a member to pay with points."}
             </p>
           )}
+          {method === "card" && refundDue === 0 && tenders.length === 0 && (
+            <div className="space-y-2">
+              <Label>Bank / card machine used</Label>
+              <Input
+                value={bankName}
+                onChange={(e) => setBankName(e.target.value)}
+                placeholder="e.g. HSBC terminal 2"
+              />
+            </div>
+          )}
+
+          {refundDue === 0 && (
+            <div className="space-y-2 rounded-md border border-border p-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Split across tenders
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    if (!(await requirePermission("can_edit_tenders"))) return;
+                    const remaining = r2(balanceDue - paymentsTotal(tenders));
+                    setTenders((ts) => [
+                      ...ts,
+                      {
+                        id: crypto.randomUUID(),
+                        method: "cash",
+                        amount: Math.max(0, remaining),
+                      },
+                    ]);
+                  }}
+                >
+                  <Plus className="size-3" /> Add tender
+                </Button>
+              </div>
+              {tenders.map((t, i) => (
+                <div key={t.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <select
+                      value={t.method}
+                      onChange={(e) =>
+                        setTenders((ts) =>
+                          ts.map((x, xi) =>
+                            xi === i ? { ...x, method: e.target.value as PaymentMethod } : x,
+                          ),
+                        )
+                      }
+                      className="h-9 rounded-md border border-border bg-background px-2 text-xs"
+                    >
+                      {(Object.keys(PAYMENT_LABELS) as PaymentMethod[]).map((m) => (
+                        <option key={m} value={m}>
+                          {PAYMENT_LABELS[m]}
+                        </option>
+                      ))}
+                    </select>
+                    {t.method === "card" ? (
+                      <Input
+                        value={t.bankName ?? ""}
+                        onChange={(e) =>
+                          setTenders((ts) =>
+                            ts.map((x, xi) => (xi === i ? { ...x, bankName: e.target.value } : x)),
+                          )
+                        }
+                        placeholder="Bank / machine"
+                        className="h-9 text-xs"
+                      />
+                    ) : (
+                      <Input
+                        value={t.ref ?? ""}
+                        onChange={(e) =>
+                          setTenders((ts) =>
+                            ts.map((x, xi) => (xi === i ? { ...x, ref: e.target.value } : x)),
+                          )
+                        }
+                        placeholder="Reference"
+                        className="h-9 text-xs"
+                      />
+                    )}
+                  </div>
+                  <Input
+                    value={t.amount || ""}
+                    onChange={(e) =>
+                      setTenders((ts) =>
+                        ts.map((x, xi) =>
+                          xi === i ? { ...x, amount: Number(e.target.value) || 0 } : x,
+                        ),
+                      )
+                    }
+                    className="numeric h-9 w-24 text-right"
+                  />
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-8"
+                    onClick={() => setTenders((ts) => ts.filter((_, xi) => xi !== i))}
+                  >
+                    <X className="size-3" />
+                  </Button>
+                </div>
+              ))}
+              {tenders.length > 0 && (
+                <p className="numeric text-[11px] text-muted-foreground">
+                  Tendered {money(paymentsTotal(tenders))} of {money(balanceDue)} ·{" "}
+                  {paymentsLabel(tenders)}
+                </p>
+              )}
+            </div>
+          )}
           {method === "bank_transfer" && (
             <div className="space-y-2 rounded-md border border-border p-3">
               <p className="text-xs text-muted-foreground">
