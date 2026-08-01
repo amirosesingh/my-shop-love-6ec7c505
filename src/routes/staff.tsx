@@ -321,124 +321,77 @@ function StaffManagement() {
                 <DialogHeader>
                   <DialogTitle>Create staff account</DialogTitle>
                   <DialogDescription>
-                    Cashiers sign in with a User ID and 4-digit PIN. Supervisors and admins sign in
-                    with email and password.
+                    Every account — cashier, supervisor or admin — signs in with an email address
+                    and password.
                   </DialogDescription>
                 </DialogHeader>
-                <Tabs
-                  value={form.kind}
-                  onValueChange={(v) =>
-                    setForm({
-                      ...form,
-                      kind: v as "cashier" | "manager",
-                      role: v === "cashier" ? "cashier" : "supervisor",
-                    })
-                  }
-                >
-                  <TabsList className="w-full">
-                    <TabsTrigger value="cashier" className="flex-1">
-                      Cashier (PIN)
-                    </TabsTrigger>
-                    <TabsTrigger value="manager" className="flex-1">
-                      Supervisor / Admin
-                    </TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="cashier" className="space-y-3 pt-3">
-                    <div className="space-y-1">
-                      <Label htmlFor="nu-id">User ID</Label>
-                      <Input
-                        id="nu-id"
-                        placeholder="101"
-                        value={form.user_id}
-                        onChange={(e) => setForm({ ...form, user_id: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="nu-name">Full name</Label>
-                      <Input
-                        id="nu-name"
-                        value={form.full_name}
-                        onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="nu-pin">4-digit PIN</Label>
-                      <Input
-                        id="nu-pin"
-                        type="password"
-                        inputMode="numeric"
-                        maxLength={4}
-                        autoComplete="off"
-                        value={form.pin}
-                        onChange={(e) =>
-                          setForm({ ...form, pin: e.target.value.replace(/\D/g, "").slice(0, 4) })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label>Assigned store</Label>
-                      <Select
-                        value={form.store_id}
-                        onValueChange={(v) => setForm({ ...form, store_id: v })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select store" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {stores.map((s) => (
-                            <SelectItem key={s.id} value={s.id}>
-                              {s.code} · {s.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </TabsContent>
-                  <TabsContent value="manager" className="space-y-3 pt-3">
-                    <div className="space-y-1">
-                      <Label htmlFor="nu-mname">Full name</Label>
-                      <Input
-                        id="nu-mname"
-                        value={form.full_name}
-                        onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="nu-email">Email</Label>
-                      <Input
-                        id="nu-email"
-                        type="email"
-                        value={form.email}
-                        onChange={(e) => setForm({ ...form, email: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="nu-pass">Password</Label>
-                      <Input
-                        id="nu-pass"
-                        type="password"
-                        autoComplete="new-password"
-                        value={form.password}
-                        onChange={(e) => setForm({ ...form, password: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label>Role</Label>
-                      <Select
-                        value={form.role}
-                        onValueChange={(v) => setForm({ ...form, role: v as StaffRole })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="supervisor">Supervisor</SelectItem>
-                          <SelectItem value="admin">Admin</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </TabsContent>
-                </Tabs>
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="nu-name">Full name</Label>
+                    <Input
+                      id="nu-name"
+                      value={form.full_name}
+                      onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="nu-email">Email</Label>
+                    <Input
+                      id="nu-email"
+                      type="email"
+                      autoComplete="off"
+                      placeholder="cashier@store.com"
+                      value={form.email}
+                      onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="nu-pass">Password</Label>
+                    <Input
+                      id="nu-pass"
+                      type="password"
+                      autoComplete="new-password"
+                      value={form.password}
+                      onChange={(e) => setForm({ ...form, password: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Role</Label>
+                    <Select
+                      value={form.role}
+                      onValueChange={(v) => setForm({ ...form, role: v as StaffRole })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STAFF_ROLES.map((r) => (
+                          <SelectItem key={r} value={r} className="capitalize">
+                            {r}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Assigned store</Label>
+                    <Select
+                      value={form.store_id}
+                      onValueChange={(v) => setForm({ ...form, store_id: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select store" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {stores.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.code} · {s.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
                 <DialogFooter>
                   <Button onClick={() => void createUser()} disabled={creating}>
                     {creating && <Loader2 className="size-4 animate-spin" />} Create account
