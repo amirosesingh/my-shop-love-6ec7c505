@@ -1985,7 +1985,7 @@ function Register() {
                   storeId: currentStore.id,
                   terminalId: null,
                   shiftId: activeShift?.id ?? null,
-                  staffId: user?.id ?? "unknown",
+                  staffId: user?.staffId ?? "unknown",
                   staffName: user?.name ?? "Unknown",
                   role: user?.role ?? "unknown",
                   reason: noSaleReason,
