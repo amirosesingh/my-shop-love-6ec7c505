@@ -183,6 +183,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
             tax: { ...defaultSettings.tax, ...cloud.settings.tax },
             receipt: { ...defaultSettings.receipt, ...cloud.settings.receipt },
             payment: { ...defaultSettings.payment, ...cloud.settings.payment },
+            whatsapp: { ...defaultSettings.whatsapp, ...cloud.settings.whatsapp },
           },
           // Keep the bill counter ahead of every receipt already in the cloud.
           counter: cloud.sales.reduce(
@@ -688,6 +689,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
         tax: { ...prev.tax, ...(patch.tax ?? {}) },
         receipt: { ...prev.receipt, ...(patch.receipt ?? {}) },
         payment: { ...prev.payment, ...(patch.payment ?? {}) },
+        whatsapp: { ...prev.whatsapp, ...(patch.whatsapp ?? {}) },
       });
     }
     setState((s) => ({
@@ -696,6 +698,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
         tax: { ...s.settings.tax, ...(patch.tax ?? {}) },
         receipt: { ...s.settings.receipt, ...(patch.receipt ?? {}) },
         payment: { ...s.settings.payment, ...(patch.payment ?? {}) },
+        whatsapp: { ...s.settings.whatsapp, ...(patch.whatsapp ?? {}) },
       },
     }));
   }, []);

@@ -157,6 +157,10 @@ const rowToSettings = (r: Row | null): AppSettings =>
           ...defaultSettings.payment,
           ...((r.payment_details ?? {}) as object),
         },
+        whatsapp: {
+          ...defaultSettings.whatsapp,
+          ...((r.whatsapp_settings ?? {}) as object),
+        },
       }
     : defaultSettings;
 
@@ -171,6 +175,7 @@ const BRANDING_COLUMNS = [
   "custom_lines",
   "qr",
   "payment_details",
+  "whatsapp_settings",
 ] as const;
 
 const settingsToRow = (s: AppSettings): Row => ({
@@ -188,6 +193,7 @@ const settingsToRow = (s: AppSettings): Row => ({
   custom_lines: s.receipt.customLines,
   qr: s.receipt.qr,
   payment_details: s.payment,
+  whatsapp_settings: s.whatsapp,
   header_text: s.receipt.headerText,
   footer_text: s.receipt.footerText,
   show_logo: s.receipt.showLogo,
