@@ -24,7 +24,9 @@ import { Route as StaffRouteImport } from './routes/staff'
 import { Route as StoresRouteImport } from './routes/stores'
 import { Route as TransfersRouteImport } from './routes/transfers'
 import { Route as SettingsDisplayRouteImport } from './routes/settings.display'
+import { Route as SettingsIdentityRouteImport } from './routes/settings.identity'
 import { Route as SettingsTaxRouteImport } from './routes/settings.tax'
+import { Route as SettingsTypeRouteImport } from './routes/settings.type'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -101,9 +103,19 @@ const SettingsDisplayRoute = SettingsDisplayRouteImport.update({
   path: '/display',
   getParentRoute: () => SettingsRoute,
 } as any)
+const SettingsIdentityRoute = SettingsIdentityRouteImport.update({
+  id: '/identity',
+  path: '/identity',
+  getParentRoute: () => SettingsRoute,
+} as any)
 const SettingsTaxRoute = SettingsTaxRouteImport.update({
   id: '/tax',
   path: '/tax',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsTypeRoute = SettingsTypeRouteImport.update({
+  id: '/type',
+  path: '/type',
   getParentRoute: () => SettingsRoute,
 } as any)
 
@@ -123,7 +135,9 @@ export interface FileRoutesByFullPath {
   '/stores': typeof StoresRoute
   '/transfers': typeof TransfersRoute
   '/settings/display': typeof SettingsDisplayRoute
+  '/settings/identity': typeof SettingsIdentityRoute
   '/settings/tax': typeof SettingsTaxRoute
+  '/settings/type': typeof SettingsTypeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -141,7 +155,9 @@ export interface FileRoutesByTo {
   '/stores': typeof StoresRoute
   '/transfers': typeof TransfersRoute
   '/settings/display': typeof SettingsDisplayRoute
+  '/settings/identity': typeof SettingsIdentityRoute
   '/settings/tax': typeof SettingsTaxRoute
+  '/settings/type': typeof SettingsTypeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -160,7 +176,9 @@ export interface FileRoutesById {
   '/stores': typeof StoresRoute
   '/transfers': typeof TransfersRoute
   '/settings/display': typeof SettingsDisplayRoute
+  '/settings/identity': typeof SettingsIdentityRoute
   '/settings/tax': typeof SettingsTaxRoute
+  '/settings/type': typeof SettingsTypeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -180,7 +198,9 @@ export interface FileRouteTypes {
     | '/stores'
     | '/transfers'
     | '/settings/display'
+    | '/settings/identity'
     | '/settings/tax'
+    | '/settings/type'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -198,7 +218,9 @@ export interface FileRouteTypes {
     | '/stores'
     | '/transfers'
     | '/settings/display'
+    | '/settings/identity'
     | '/settings/tax'
+    | '/settings/type'
   id:
     | '__root__'
     | '/'
@@ -216,7 +238,9 @@ export interface FileRouteTypes {
     | '/stores'
     | '/transfers'
     | '/settings/display'
+    | '/settings/identity'
     | '/settings/tax'
+    | '/settings/type'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -343,6 +367,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsDisplayRouteImport
       parentRoute: typeof SettingsRoute
     }
+    '/settings/identity': {
+      id: '/settings/identity'
+      path: '/identity'
+      fullPath: '/settings/identity'
+      preLoaderRoute: typeof SettingsIdentityRouteImport
+      parentRoute: typeof SettingsRoute
+    }
     '/settings/tax': {
       id: '/settings/tax'
       path: '/tax'
@@ -350,17 +381,28 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsTaxRouteImport
       parentRoute: typeof SettingsRoute
     }
+    '/settings/type': {
+      id: '/settings/type'
+      path: '/type'
+      fullPath: '/settings/type'
+      preLoaderRoute: typeof SettingsTypeRouteImport
+      parentRoute: typeof SettingsRoute
+    }
   }
 }
 
 interface SettingsRouteChildren {
   SettingsDisplayRoute: typeof SettingsDisplayRoute
+  SettingsIdentityRoute: typeof SettingsIdentityRoute
   SettingsTaxRoute: typeof SettingsTaxRoute
+  SettingsTypeRoute: typeof SettingsTypeRoute
 }
 
 const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsDisplayRoute: SettingsDisplayRoute,
+  SettingsIdentityRoute: SettingsIdentityRoute,
   SettingsTaxRoute: SettingsTaxRoute,
+  SettingsTypeRoute: SettingsTypeRoute,
 }
 
 const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
