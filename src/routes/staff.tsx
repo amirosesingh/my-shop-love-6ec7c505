@@ -133,6 +133,9 @@ function StaffManagement() {
   const [creating, setCreating] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [passwordReset, setPasswordReset] = useState("");
+  const [roleChange, setRoleChange] = useState<{ row: StaffRow; target: StaffRole } | null>(
+    null,
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -427,6 +430,138 @@ function StaffManagement() {
     void load();
   };
 
+  /**
+   * Applies a role change. Cashiers (username + PIN, public.cashiers) and
+   * staff accounts (email + password, public.app_users) live in different
+   * tables, so crossing that boundary creates the new record first and only
+   * deletes the old one once the new one exists.
+   */
+  const convertRole = async (
+    row: StaffRow,
+    target: StaffRole,
+    creds: { username: string; pin: string; email: string; password: string },
+    permsMode: "defaults" | "keep",
+  ): Promise<boolean> => {
+    const permissions = (
+      permsMode === "defaults"
+        ? (rolePermissions(target) as unknown as Record<string, boolean>)
+        : row.permissions
+    ) as Record<string, boolean>;
+
+    // --- same family: plain app_users role update ---------------------------
+    if (row.kind === "account" && target !== "cashier") {
+      const { error } = await sb.rpc("set_app_user_profile", {
+        p_user_id: row.user_id,
+        p_full_name: row.full_name,
+        p_role: toDbRole(target),
+        p_store_id: row.store_id,
+        p_is_active: row.is_active,
+      });
+      if (error) {
+        toast.error("Could not change role", { description: errText(error) });
+        return false;
+      }
+      if (permsMode === "defaults") {
+        await sb.rpc("set_app_user_permissions", {
+          p_user_id: row.user_id,
+          p_permissions: permissions,
+        });
+      }
+      toast.success(`Role changed to ${target}`);
+      setSelectedId(row.user_id);
+      void load();
+      return true;
+    }
+
+    // --- account -> cashier -------------------------------------------------
+    if (target === "cashier") {
+      const username = creds.username.trim().toLowerCase();
+      if (!/^[a-z0-9._-]{3,}$/.test(username)) {
+        toast.error("Enter a username (3+ characters, letters/numbers)");
+        return false;
+      }
+      if (!/^\d{6}$/.test(creds.pin)) {
+        toast.error("PIN must be exactly 6 digits");
+        return false;
+      }
+      let cashierId = "";
+      try {
+        cashierId = await upsertCashier({
+          username,
+          fullName: row.full_name || username,
+          pin: creds.pin,
+          storeId: row.store_id,
+          isActive: row.is_active,
+        });
+        await setCashierPermissions(cashierId, permissions);
+      } catch (e) {
+        toast.error("Could not create the cashier login", { description: cashierErrText(e) });
+        return false;
+      }
+      const { error } = await sb.rpc("delete_terminal_user", { p_user_id: row.user_id });
+      if (error) {
+        toast.error("Cashier created, but the old account could not be removed", {
+          description: errText(error),
+        });
+      }
+      toast.success(`${row.full_name || username} is now a cashier`);
+      setSelectedId(username);
+      void load();
+      return true;
+    }
+
+    // --- cashier -> warehouse / supervisor / admin --------------------------
+    const email = creds.email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error("Enter a valid email address");
+      return false;
+    }
+    if (creds.password.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return false;
+    }
+    const auth = await createStaffAccount({
+      email,
+      fullName: row.full_name || email,
+      password: creds.password,
+      role: target === "admin" ? "admin" : target === "warehouse" ? "warehouse" : "supervisor",
+      storeId: row.store_id,
+    });
+    if (!auth.ok && !/already/i.test(auth.error ?? "")) {
+      toast.error("Could not create the login account", { description: auth.error });
+      return false;
+    }
+    const newUserId = staffUserId(email);
+    const { error } = await sb.rpc("upsert_terminal_user", {
+      p_user_id: newUserId,
+      p_full_name: row.full_name || email,
+      p_role: toDbRole(target),
+      p_store_id: row.store_id,
+      p_email: email,
+      p_pin: String(Math.floor(1000 + Math.random() * 9000)),
+      p_password: creds.password,
+    });
+    if (error) {
+      toast.error("Could not save the new staff profile", { description: errText(error) });
+      return false;
+    }
+    await sb.rpc("set_app_user_permissions", {
+      p_user_id: newUserId,
+      p_permissions: permissions,
+    });
+    try {
+      await deleteCashier(row.id);
+    } catch (e) {
+      toast.error("Account created, but the old cashier record remains", {
+        description: cashierErrText(e),
+      });
+    }
+    toast.success(`${row.full_name || email} is now a ${target}`);
+    setSelectedId(newUserId);
+    void load();
+    return true;
+  };
+
   if (!isAdmin) {
     return (
       <AppShell>
@@ -708,41 +843,36 @@ function StaffManagement() {
                     </div>
                     {selected.kind === "cashier" ? (
                       <div className="space-y-1">
-                        <Label>Role</Label>
-                        <Input value="Cashier (PIN login)" readOnly />
+                        <Label>Login</Label>
+                        <Input value="Username + 6-digit PIN" readOnly />
                       </div>
                     ) : (
-                      <>
-                        <div className="space-y-1">
-                          <Label>Email</Label>
-                          <Input value={selected.email} readOnly />
-                        </div>
-                        <div className="space-y-1">
-                          <Label>Role</Label>
-                          <Select
-                            value={selected.role}
-                            onValueChange={(v) => {
-                              const role = v as StaffRole;
-                              patchRow(selected.user_id, {
-                                role,
-                                permissions: rolePermissions(role),
-                              });
-                            }}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {STAFF_ROLES.filter((r) => r !== "cashier").map((r) => (
-                                <SelectItem key={r} value={r} className="capitalize">
-                                  {r}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </>
+                      <div className="space-y-1">
+                        <Label>Email</Label>
+                        <Input value={selected.email} readOnly />
+                      </div>
                     )}
+                    <div className="space-y-1">
+                      <Label>Role</Label>
+                      <Select
+                        value={selected.role}
+                        onValueChange={(v) => {
+                          const role = v as StaffRole;
+                          if (role !== selected.role) setRoleChange({ row: selected, target: role });
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {STAFF_ROLES.map((r) => (
+                            <SelectItem key={r} value={r} className="capitalize">
+                              {r}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div className="space-y-1">
                       <Label>Assigned store</Label>
                       <Select
@@ -865,6 +995,161 @@ function StaffManagement() {
           )}
         </div>
       </div>
+
+      <ChangeRoleDialog
+        request={roleChange}
+        onCancel={() => setRoleChange(null)}
+        onConfirm={async (creds, mode) => {
+          if (!roleChange) return;
+          const ok = await convertRole(roleChange.row, roleChange.target, creds, mode);
+          if (ok) setRoleChange(null);
+        }}
+      />
     </AppShell>
+  );
+}
+
+type RoleCreds = { username: string; pin: string; email: string; password: string };
+const EMPTY_CREDS: RoleCreds = { username: "", pin: "", email: "", password: "" };
+
+function ChangeRoleDialog({
+  request,
+  onCancel,
+  onConfirm,
+}: {
+  request: { row: StaffRow; target: StaffRole } | null;
+  onCancel: () => void;
+  onConfirm: (creds: RoleCreds, mode: "defaults" | "keep") => Promise<void>;
+}) {
+  const [creds, setCreds] = useState<RoleCreds>(EMPTY_CREDS);
+  const [mode, setMode] = useState<"defaults" | "keep">("defaults");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (request) {
+      setCreds({ ...EMPTY_CREDS, email: request.row.email });
+      setMode("defaults");
+    }
+  }, [request]);
+
+  if (!request) return null;
+  const { row, target } = request;
+  const toCashier = target === "cashier";
+  const crossing = toCashier || row.kind === "cashier";
+
+  const submit = async () => {
+    setBusy(true);
+    try {
+      await onConfirm(creds, mode);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && !busy && onCancel()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="capitalize">Change role to {target}</DialogTitle>
+          <DialogDescription>
+            {crossing
+              ? `${row.full_name || row.user_id} needs a new login for this role. Their current login stops working once the change is saved.`
+              : `Update the role for ${row.full_name || row.user_id}.`}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {crossing && toCashier && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label>Username</Label>
+                <Input
+                  className="numeric"
+                  placeholder="cashier101"
+                  value={creds.username}
+                  onChange={(e) => setCreds((c) => ({ ...c, username: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>6-digit PIN</Label>
+                <Input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={6}
+                  autoComplete="new-password"
+                  value={creds.pin}
+                  onChange={(e) =>
+                    setCreds((c) => ({ ...c, pin: e.target.value.replace(/\D/g, "").slice(0, 6) }))
+                  }
+                />
+              </div>
+            </div>
+          )}
+          {crossing && !toCashier && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  autoComplete="off"
+                  value={creds.email}
+                  onChange={(e) => setCreds((c) => ({ ...c, email: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Password</Label>
+                <Input
+                  type="password"
+                  autoComplete="new-password"
+                  value={creds.password}
+                  onChange={(e) => setCreds((c) => ({ ...c, password: e.target.value }))}
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-2 rounded-md border border-border p-3">
+            <p className="text-xs font-semibold">Feature permissions</p>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="radio"
+                className="mt-1"
+                checked={mode === "defaults"}
+                onChange={() => setMode("defaults")}
+              />
+              <span>
+                Use the new role&apos;s defaults
+                <span className="block text-[11px] text-muted-foreground">
+                  Applies the standard preset for a {target}; still editable afterwards.
+                </span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="radio"
+                className="mt-1"
+                checked={mode === "keep"}
+                onChange={() => setMode("keep")}
+              />
+              <span>
+                Keep current toggles
+                <span className="block text-[11px] text-muted-foreground">
+                  Every switch stays exactly as it is today.
+                </span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onCancel} disabled={busy}>
+            Cancel
+          </Button>
+          <Button onClick={() => void submit()} disabled={busy}>
+            {busy && <Loader2 className="size-4 animate-spin" />} Change role
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
