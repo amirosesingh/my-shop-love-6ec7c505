@@ -112,11 +112,21 @@ export const CASHIER_PERMISSIONS: StaffPermissions = build([
 /** Kept for existing screens that still ask for the older coarse flags. */
 export const DEFAULT_PERMISSIONS = CASHIER_PERMISSIONS;
 
+/** Baseline a brand-new warehouse user starts with. Every key stays editable
+ *  from the Staff Management permission matrix — nothing is hard-locked. */
+export const WAREHOUSE_PERMISSIONS: StaffPermissions = build([
+  "can_view_inventory",
+  "can_add_new_product",
+  "can_receive_purchase_order",
+]);
+
 // --------------------------------------------------------------------------
 // Simplified roles. The database enum is app_role (admin | manager | staff).
+// Cashiers live in public.cashiers, so an app_users row with role `staff`
+// is a warehouse account.
 // --------------------------------------------------------------------------
-export type StaffRole = "cashier" | "supervisor" | "admin";
-export const STAFF_ROLES: StaffRole[] = ["cashier", "supervisor", "admin"];
+export type StaffRole = "cashier" | "warehouse" | "supervisor" | "admin";
+export const STAFF_ROLES: StaffRole[] = ["cashier", "warehouse", "supervisor", "admin"];
 
 export type DbRole = "admin" | "manager" | "staff";
 
@@ -124,10 +134,14 @@ export const toDbRole = (role: StaffRole): DbRole =>
   role === "admin" ? "admin" : role === "supervisor" ? "manager" : "staff";
 
 export const fromDbRole = (role: string | null | undefined): StaffRole =>
-  role === "admin" ? "admin" : role === "manager" ? "supervisor" : "cashier";
+  role === "admin" ? "admin" : role === "manager" ? "supervisor" : "warehouse";
 
 export const rolePermissions = (role: StaffRole): StaffPermissions =>
-  role === "cashier" ? { ...CASHIER_PERMISSIONS } : { ...FULL_PERMISSIONS };
+  role === "cashier"
+    ? { ...CASHIER_PERMISSIONS }
+    : role === "warehouse"
+      ? { ...WAREHOUSE_PERMISSIONS }
+      : { ...FULL_PERMISSIONS };
 
 // --------------------------------------------------------------------------
 // Legacy flag aliases used by older screens / nav config.
@@ -157,8 +171,10 @@ export function normalizePermissions(
   raw: Record<string, unknown> | null | undefined,
   role: StaffRole = "cashier",
 ): StaffPermissions {
-  const base = role === "cashier" ? { ...NO_PERMISSIONS } : { ...FULL_PERMISSIONS };
-  if (!raw) return role === "cashier" ? { ...CASHIER_PERMISSIONS } : base;
+  const limited = role === "cashier" || role === "warehouse";
+  const base = limited ? { ...NO_PERMISSIONS } : { ...FULL_PERMISSIONS };
+  // No stored matrix yet → fall back to the role's default preset.
+  if (!raw) return rolePermissions(role);
   for (const [key, value] of Object.entries(raw)) {
     const resolved = resolvePermission(key as PermissionFlag);
     if (resolved in base) base[resolved] = !!value;
