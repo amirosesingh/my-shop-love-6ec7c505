@@ -146,6 +146,8 @@ type AuthCtx = {
   isAdmin: boolean;
   /** supervisor or admin — may reach settings, reports, inventory, user management */
   isSupervisor: boolean;
+  /** admin, or a supervisor assigned to "All stores" — may switch branches */
+  canSwitchStores: boolean;
   /** cashier accounts are limited to the POS terminal */
   isCashier: boolean;
   /** raw Supabase user id of the signed-in account */
