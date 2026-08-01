@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -22,7 +23,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { supabaseExternal } from "@/integrations/supabase/external-client";
-import { APP_ROLES, type AppRole } from "@/lib/pos-auth";
+import {
+  APP_ROLES,
+  DEFAULT_PERMISSIONS,
+  PERMISSION_LABELS,
+  type AppRole,
+  type StaffPermissions,
+} from "@/lib/pos-auth";
 
 const sb = supabaseExternal as unknown as SupabaseClient;
 
@@ -34,6 +41,7 @@ type TerminalRow = {
   email: string;
   is_active: boolean;
   last_login_at: string | null;
+  permissions: Partial<StaffPermissions> | null;
 };
 
 const EMPTY = {
@@ -55,11 +63,33 @@ export function TerminalUsersPanel() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await sb.rpc("list_terminal_users");
-    if (error) toast.error("Could not load terminal users", { description: error.message });
+    const { data, error } = await sb.rpc("list_app_users");
+    if (error) toast.error("Could not load users", { description: error.message });
     setRows((data ?? []) as TerminalRow[]);
     setLoading(false);
   }, []);
+
+  const togglePermission = async (
+    row: TerminalRow,
+    key: keyof StaffPermissions,
+    value: boolean,
+  ) => {
+    setRows((prev) =>
+      prev.map((r) =>
+        r.user_code === row.user_code
+          ? { ...r, permissions: { ...(r.permissions ?? {}), [key]: value } }
+          : r,
+      ),
+    );
+    const { error } = await sb.rpc("set_app_user_permissions", {
+      p_user_code: row.user_code,
+      p_permissions: { [key]: value },
+    });
+    if (error) {
+      toast.error("Could not update permission", { description: error.message });
+      void load();
+    }
+  };
 
   useEffect(() => {
     void load();
@@ -202,6 +232,7 @@ export function TerminalUsersPanel() {
             <TableHead>Name</TableHead>
             <TableHead>Role</TableHead>
             <TableHead>Store</TableHead>
+            <TableHead>Permissions</TableHead>
             <TableHead>Last login</TableHead>
             <TableHead />
           </TableRow>
@@ -216,6 +247,24 @@ export function TerminalUsersPanel() {
               </TableCell>
               <TableCell className="capitalize">{r.role}</TableCell>
               <TableCell>{r.store_id ?? "—"}</TableCell>
+              <TableCell>
+                <div className="space-y-1.5">
+                  {PERMISSION_LABELS.map((p) => (
+                    <label
+                      key={p.key}
+                      className="flex items-center gap-2 text-xs text-muted-foreground"
+                    >
+                      <Switch
+                        checked={
+                          { ...DEFAULT_PERMISSIONS, ...(r.permissions ?? {}) }[p.key]
+                        }
+                        onCheckedChange={(v) => void togglePermission(r, p.key, v)}
+                      />
+                      <span>{p.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </TableCell>
               <TableCell className="text-xs text-muted-foreground">
                 {r.last_login_at ? new Date(r.last_login_at).toLocaleString() : "Never"}
               </TableCell>
@@ -233,7 +282,7 @@ export function TerminalUsersPanel() {
           ))}
           {!loading && !rows.length && (
             <TableRow>
-              <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+              <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                 No terminal logins yet. Add one above so cashiers can sign in with a User ID and PIN.
               </TableCell>
             </TableRow>
