@@ -371,6 +371,18 @@ function Inventory() {
                       <Button size="icon" variant="outline" className="size-7" onClick={() => adjustStock(p.id, 1)}>
                         <Plus className="size-3" />
                       </Button>
+                      {canAdjust && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="size-7"
+                          title="Adjust / recount stock"
+                          aria-label={`Adjust stock for ${p.name}`}
+                          onClick={() => setAdjustTarget(p)}
+                        >
+                          <Scale className="size-3.5" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>
