@@ -445,16 +445,20 @@ revoke all on function public.current_app_user() from public;
 grant execute on function public.current_app_user() to authenticated;
 
 -- Admin/manager listing including permission toggles.
+-- The listing exposes the account identifier as `user_id`.
+alter table public.app_users add column if not exists user_id text;
+update public.app_users set user_id = user_code where user_id is null;
+
 drop function if exists public.list_app_users();
 create or replace function public.list_app_users()
-returns table (auth_user_id uuid, user_code text, full_name text, role app_role, store_id text,
+returns table (auth_user_id uuid, user_id text, full_name text, role app_role, store_id text,
                email text, permissions jsonb, is_active boolean, last_login_at timestamptz)
 language sql stable security definer set search_path = public as $$
-  select a.auth_user_id, a.user_code, a.full_name, a.role, a.store_id, a.email, a.permissions,
+  select a.auth_user_id, a.user_id, a.full_name, a.role, a.store_id, a.email, a.permissions,
          a.is_active, a.last_login_at
   from public.app_users a
   where public.has_role(auth.uid(),'admin') or public.has_role(auth.uid(),'manager')
-  order by a.user_code
+  order by a.user_id
 $$;
 
 revoke all on function public.list_app_users() from public;
