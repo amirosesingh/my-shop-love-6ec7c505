@@ -365,40 +365,11 @@ function StaffManagement() {
                 <DialogHeader>
                   <DialogTitle>Create staff account</DialogTitle>
                   <DialogDescription>
-                    Every account — cashier, supervisor or admin — signs in with an email address
-                    and password.
+                    Cashiers sign in with a username and 6-digit PIN. Supervisors and admins sign
+                    in with email and password.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-3">
-                  <div className="space-y-1">
-                    <Label htmlFor="nu-name">Full name</Label>
-                    <Input
-                      id="nu-name"
-                      value={form.full_name}
-                      onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="nu-email">Email</Label>
-                    <Input
-                      id="nu-email"
-                      type="email"
-                      autoComplete="off"
-                      placeholder="cashier@store.com"
-                      value={form.email}
-                      onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="nu-pass">Password</Label>
-                    <Input
-                      id="nu-pass"
-                      type="password"
-                      autoComplete="new-password"
-                      value={form.password}
-                      onChange={(e) => setForm({ ...form, password: e.target.value })}
-                    />
-                  </div>
                   <div className="space-y-1">
                     <Label>Role</Label>
                     <Select
@@ -417,6 +388,68 @@ function StaffManagement() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="nu-name">Full name</Label>
+                    <Input
+                      id="nu-name"
+                      value={form.full_name}
+                      onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+                    />
+                  </div>
+                  {form.role === "cashier" ? (
+                    <>
+                      <div className="space-y-1">
+                        <Label htmlFor="nu-username">Username</Label>
+                        <Input
+                          id="nu-username"
+                          autoComplete="off"
+                          placeholder="cashier101"
+                          value={form.user_id}
+                          onChange={(e) =>
+                            setForm({ ...form, user_id: e.target.value.replace(/\s+/g, "") })
+                          }
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="nu-pin">6-digit PIN</Label>
+                        <Input
+                          id="nu-pin"
+                          type="password"
+                          inputMode="numeric"
+                          maxLength={6}
+                          autoComplete="off"
+                          value={form.pin}
+                          onChange={(e) =>
+                            setForm({ ...form, pin: e.target.value.replace(/\D/g, "").slice(0, 6) })
+                          }
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="space-y-1">
+                        <Label htmlFor="nu-email">Email</Label>
+                        <Input
+                          id="nu-email"
+                          type="email"
+                          autoComplete="off"
+                          placeholder="supervisor@store.com"
+                          value={form.email}
+                          onChange={(e) => setForm({ ...form, email: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="nu-pass">Password</Label>
+                        <Input
+                          id="nu-pass"
+                          type="password"
+                          autoComplete="new-password"
+                          value={form.password}
+                          onChange={(e) => setForm({ ...form, password: e.target.value })}
+                        />
+                      </div>
+                    </>
+                  )}
                   <div className="space-y-1">
                     <Label>Assigned store</Label>
                     <Select
