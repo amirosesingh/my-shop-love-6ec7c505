@@ -163,9 +163,9 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
-}
 
-select,
+  /* Native dropdown popups follow the theme instead of the OS default white */
+  select,
   option,
   optgroup {
     background-color: var(--color-popover);
