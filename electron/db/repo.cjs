@@ -150,6 +150,7 @@ async function applyOp(op) {
 
 async function pendingRows(table, limit = 200) {
   assertTable(table);
+  assertTable(table);
   const res = await getPool()
     .request()
     .input("limit", sql.Int, limit)
