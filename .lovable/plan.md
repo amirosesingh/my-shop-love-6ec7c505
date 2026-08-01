@@ -1,18 +1,17 @@
-# Give supervisors all-store access
+# Supervisors: all-stores or single-store assignment
 
-Today only admins can see every branch. A supervisor account (role `manager` in the staff table) that signs in without the `supervisor` metadata tag gets treated like a cashier: pinned to one store, no store switcher, and management screens redirect back to the register.
+Admins always see every branch. Supervisors should be assignable either way — "All stores" (they oversee every branch) or one specific branch — chosen per supervisor in Staff Management.
 
 ## What changes
 
-- Supervisors get the branch switcher in the sidebar (desktop and mobile drawer), same as admins, so they can view and work across every store.
-- Supervisors are no longer force-pinned to a single assigned branch.
-- Supervisors keep access to the management screens (Settings, Staff, Locations, Promotions, Audit) instead of being bounced to the register.
-- Cashiers are unaffected: still locked to their assigned branch, still hidden from management screens.
-- Admin remains the only role that can be created/edited freely; supervisor permissions still come from their permission matrix, not blanket full access.
+- Creating a supervisor: the "Assigned store" dropdown gains an **All stores** choice alongside the individual branches. Editing an existing supervisor already offers it; both places will behave consistently.
+- A supervisor set to **All stores** gets the branch switcher in the sidebar (desktop and mobile) and can move between branches like an admin.
+- A supervisor assigned to **one branch** is pinned to that branch: no switcher, data filtered to their store — same as a cashier's isolation, but keeping their supervisor permissions.
+- Admins are unchanged (always all stores). Cashiers are unchanged (always single store).
 
 ## Technical notes
 
-- `src/lib/pos-auth.tsx`: recognise supervisors from all sources — `metaRole === "supervisor"`, `roles.includes("manager")`, and `appUser.role === "manager"` — and expose a single `isSupervisor` (true for admin too). Supervisors resolve with `storeId: null` (all stores) while keeping their granular permissions; only true admins keep the full-permission shortcut.
-- `src/components/pos/AppShell.tsx`: replace the `isAdmin` checks driving the store picker, the store-pinning effect, the `ADMIN_PATHS` redirect and `canSee` (adminOnly nav items) with `isSupervisor`.
-- `src/routes/staff.tsx`, `stores.tsx`, `promotions.tsx`, `audit.tsx`, `settings.tsx`, `shifts.tsx`: swap the `isAdmin` gate for `isSupervisor` so supervisors reach the same management views. Staff management stays admin-only for editing admin accounts.
-- No database or schema changes needed.
+- `src/lib/pos-auth.tsx`: today any account with a supervisor role is collapsed into `role: "admin"` with `storeId: null`. Change it so supervisors keep their own `store_id` from `app_users`, and expose a derived `canSwitchStores` = admin OR (supervisor AND `storeId == null`). Supervisor permissions continue to come from their permission matrix; only true admins keep the blanket full-permission shortcut.
+- `src/components/pos/AppShell.tsx`: drive the store picker and the "pin to assigned store" effect off `canSwitchStores` instead of `isAdmin`. Screen access (`ADMIN_PATHS`, `adminOnly` nav items) stays on the existing supervisor/admin check, unaffected by store scope.
+- `src/routes/staff.tsx`: add an `All stores` option (value `none` → stored as `null`) to the create-account store dropdown; show it only when the selected role is supervisor or admin, not cashier.
+- No database or schema changes needed — `app_users.store_id` is already nullable.
