@@ -18,6 +18,7 @@ import {
   X,
   Repeat,
   Sparkles,
+  History,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
@@ -40,6 +41,7 @@ import type { CartLine, DiscountType, PaymentMethod, Sale } from "@/lib/pos-type
 import { lineUnitDiscount, r2 } from "@/lib/pos-types";
 import { evaluatePromotions, focLine } from "@/lib/pos-promotions";
 import { openCashDrawer, printSaleReceipt } from "@/lib/pos-print";
+import { MemberHistoryDialog } from "@/components/pos/MemberHistoryDialog";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -79,6 +81,7 @@ function Register() {
   const [method, setMethod] = useState<PaymentMethod>("cash");
   const [lastSale, setLastSale] = useState<Sale | null>(null);
   const [memberQuery, setMemberQuery] = useState("");
+  const [historyMemberId, setHistoryMemberId] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
 
   const categories = useMemo(
@@ -441,6 +444,15 @@ function Register() {
                   size="icon"
                   variant="ghost"
                   className="size-7"
+                  aria-label="Purchase history"
+                  onClick={() => setHistoryMemberId(memberId)}
+                >
+                  <History className="size-3.5" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="size-7"
                   aria-label="Detach member"
                   onClick={() => setMemberId(null)}
                 >
@@ -470,6 +482,14 @@ function Register() {
                           {m.phone} · {m.points} pts · {m.tier}
                         </p>
                       </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-[11px]"
+                        onClick={() => setHistoryMemberId(m.id)}
+                      >
+                        <History className="size-3" /> History
+                      </Button>
                       <Button
                         size="sm"
                         variant="outline"
@@ -991,6 +1011,11 @@ function Register() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <MemberHistoryDialog
+        member={state.members.find((m) => m.id === historyMemberId) ?? null}
+        onOpenChange={(o) => !o && setHistoryMemberId(null)}
+      />
     </AppShell>
   );
 }
