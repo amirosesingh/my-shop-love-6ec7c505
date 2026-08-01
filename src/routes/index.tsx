@@ -23,6 +23,9 @@ import {
   MonitorPlay,
   Landmark,
   MessageCircle,
+  PauseCircle,
+  TicketPercent,
+  Split,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
@@ -39,6 +42,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { availableAt, cartTotals, money, stockAt, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
 import { useUserPermissions } from "@/lib/pos-permissions";
@@ -47,7 +57,12 @@ import { lineUnitDiscount, r2 } from "@/lib/pos-types";
 import { buildBookingMessage, buildSaleMessage, sendBillOnWhatsApp } from "@/lib/whatsapp";
 import { logger } from "@/lib/audit-log";
 import { evaluatePromotions, focLine } from "@/lib/pos-promotions";
-import { openCashDrawer, printBookingSlip, printSaleReceipt } from "@/lib/pos-print";
+import {
+  openCashDrawer,
+  printBookingSlip,
+  printSaleReceipt,
+  saleReceiptPreview,
+} from "@/lib/pos-print";
 import {
   openCustomerDisplay,
   publishDisplay,
@@ -120,6 +135,15 @@ function Register() {
   const [bookName, setBookName] = useState("");
   const [bookPhone, setBookPhone] = useState("");
   const [bookNote, setBookNote] = useState("");
+  /* Operation deck state */
+  type HeldOrder = { id: string; label: string; total: number; lines: CartLine[] };
+  const [held, setHeld] = useState<HeldOrder[]>([]);
+  const [receiptPreview, setReceiptPreview] = useState(false);
+  const [couponOpen, setCouponOpen] = useState(false);
+  const [couponCode, setCouponCode] = useState("");
+  const [coupon, setCoupon] = useState<{ code: string } | null>(null);
+  const [splitOpen, setSplitOpen] = useState(false);
+  const [splitWays, setSplitWays] = useState(2);
 
   const categories = useMemo(
     () => ["All", ...Array.from(new Set(state.products.map((p) => p.category)))],
