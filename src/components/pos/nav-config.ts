@@ -16,7 +16,6 @@ import {
   Truck,
   Users,
   UserCog,
-  UserPlus,
   Wallet,
 } from "lucide-react";
 
