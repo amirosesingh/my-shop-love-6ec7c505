@@ -51,10 +51,15 @@ import {
 } from "@/lib/permissions";
 import {
   createStaffAccount,
-  createCashierAccount,
-  cashierEmail,
   staffUserId,
 } from "@/lib/pos-users";
+import {
+  cashierErrText,
+  deleteCashier,
+  listCashiers,
+  setCashierPermissions,
+  upsertCashier,
+} from "@/lib/pos-cashiers";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/staff")({
@@ -89,6 +94,10 @@ const errText = (e: unknown): string => {
 };
 
 type StaffRow = {
+  /** cashiers live in public.cashiers, everyone else in public.app_users */
+  kind: "account" | "cashier";
+  /** cashiers.id (uuid) — empty for account rows */
+  id: string;
   user_id: string;
   full_name: string;
   email: string;
@@ -126,9 +135,11 @@ function StaffManagement() {
     setLoading(true);
     const { data, error } = await sb.rpc("list_app_users");
     if (error) toast.error("Could not load staff", { description: error.message });
-    const mapped = ((data ?? []) as Record<string, unknown>[]).map((r) => {
+    const accounts = ((data ?? []) as Record<string, unknown>[]).map((r) => {
       const role = fromDbRole(r["role"] as string | null);
       return {
+        kind: "account" as const,
+        id: "",
         user_id: String(r["user_id"] ?? ""),
         full_name: String(r["full_name"] ?? ""),
         email: String(r["email"] ?? ""),
@@ -141,7 +152,27 @@ function StaffManagement() {
           role,
         ),
       } satisfies StaffRow;
-    });
+    }).filter((r) => r.role !== "cashier");
+
+    let cashiers: StaffRow[] = [];
+    try {
+      cashiers = (await listCashiers()).map((c) => ({
+        kind: "cashier" as const,
+        id: c.id,
+        user_id: c.username,
+        full_name: c.full_name,
+        email: "",
+        role: "cashier" as StaffRole,
+        store_id: c.store_id,
+        is_active: c.is_active,
+        last_login_at: c.last_login_at,
+        permissions: c.permissions as unknown as Record<string, boolean>,
+      }));
+    } catch (e) {
+      toast.error("Could not load cashiers", { description: cashierErrText(e) });
+    }
+
+    const mapped = [...accounts, ...cashiers];
     setRows(mapped);
     setSelectedId((prev) => prev ?? mapped[0]?.user_id ?? null);
     setLoading(false);
@@ -168,6 +199,23 @@ function StaffManagement() {
 
   const saveProfile = async (row: StaffRow) => {
     setSaving(true);
+    if (row.kind === "cashier") {
+      try {
+        await upsertCashier({
+          id: row.id,
+          username: row.user_id,
+          fullName: row.full_name,
+          storeId: row.store_id,
+          isActive: row.is_active,
+        });
+        toast.success("Profile saved");
+      } catch (e) {
+        toast.error("Could not save profile", { description: cashierErrText(e) });
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
     const { error } = await sb.rpc("set_app_user_profile", {
       p_user_id: row.user_id,
       p_full_name: row.full_name,
@@ -185,6 +233,15 @@ function StaffManagement() {
 
   const togglePermission = async (row: StaffRow, key: PermissionKey, value: boolean) => {
     patchRow(row.user_id, { permissions: { ...row.permissions, [key]: value } });
+    if (row.kind === "cashier") {
+      try {
+        await setCashierPermissions(row.id, { [key]: value });
+      } catch (e) {
+        toast.error("Could not update permission", { description: cashierErrText(e) });
+        void load();
+      }
+      return;
+    }
     const { error } = await sb.rpc("set_app_user_permissions", {
       p_user_id: row.user_id,
       p_permissions: { [key]: value },
@@ -198,6 +255,15 @@ function StaffManagement() {
   const setGroup = async (row: StaffRow, keys: readonly string[], value: boolean) => {
     const patch = Object.fromEntries(keys.map((k) => [k, value]));
     patchRow(row.user_id, { permissions: { ...row.permissions, ...patch } });
+    if (row.kind === "cashier") {
+      try {
+        await setCashierPermissions(row.id, patch);
+      } catch (e) {
+        toast.error("Could not update permissions", { description: cashierErrText(e) });
+        void load();
+      }
+      return;
+    }
     const { error } = await sb.rpc("set_app_user_permissions", {
       p_user_id: row.user_id,
       p_permissions: patch,
@@ -221,28 +287,16 @@ function StaffManagement() {
           toast.error("PIN must be exactly 6 digits");
           return;
         }
-        const auth = await createCashierAccount({
-          userId: username,
-          fullName: form.full_name || username,
-          pin: form.pin,
-          storeId: form.store_id || null,
-        });
-        if (!auth.ok && !/already/i.test(auth.error ?? "")) {
-          toast.error("Could not create account", { description: auth.error });
-          return;
-        }
-        const { error: cashierError } = await sb.rpc("upsert_terminal_user", {
-          p_user_id: username,
-          p_full_name: form.full_name.trim() || username,
-          p_role: toDbRole("cashier"),
-          p_store_id: form.store_id || null,
-          p_email: cashierEmail(username),
-          // Legacy 4-digit column; the real PIN lives in the auth secret.
-          p_pin: String(Math.floor(1000 + Math.random() * 9000)),
-          p_password: "",
-        });
-        if (cashierError) {
-          toast.error("Could not save staff profile", { description: errText(cashierError) });
+        try {
+          await upsertCashier({
+            username,
+            fullName: form.full_name.trim() || username,
+            pin: form.pin,
+            storeId: form.store_id || null,
+            isActive: true,
+          });
+        } catch (e) {
+          toast.error("Could not create cashier", { description: cashierErrText(e) });
           return;
         }
         toast.success(`Cashier ${username} created`);
@@ -298,6 +352,27 @@ function StaffManagement() {
   };
 
   const resetPassword = async (row: StaffRow) => {
+    if (row.kind === "cashier") {
+      if (!/^\d{6}$/.test(passwordReset)) {
+        toast.error("PIN must be exactly 6 digits");
+        return;
+      }
+      try {
+        await upsertCashier({
+          id: row.id,
+          username: row.user_id,
+          fullName: row.full_name,
+          pin: passwordReset,
+          storeId: row.store_id,
+          isActive: row.is_active,
+        });
+        setPasswordReset("");
+        toast.success("PIN updated");
+      } catch (e) {
+        toast.error("Could not update PIN", { description: cashierErrText(e) });
+      }
+      return;
+    }
     if (passwordReset.length < 6) {
       toast.error("Password must be at least 6 characters");
       return;
@@ -320,6 +395,18 @@ function StaffManagement() {
   };
 
   const removeUser = async (row: StaffRow) => {
+    if (row.kind === "cashier") {
+      try {
+        await deleteCashier(row.id);
+      } catch (e) {
+        toast.error("Delete failed", { description: cashierErrText(e) });
+        return;
+      }
+      setSelectedId(null);
+      toast.success(`${row.full_name || row.user_id} removed`);
+      void load();
+      return;
+    }
     const { error } = await sb.rpc("delete_terminal_user", { p_user_id: row.user_id });
     if (error) {
       toast.error("Delete failed", { description: error.message });
@@ -503,8 +590,20 @@ function StaffManagement() {
             </div>
             <Separator />
             <ul className="max-h-[70vh] overflow-y-auto">
-              {filtered.map((r) => (
-                <li key={r.user_id}>
+              {(
+                [
+                  ["Supervisors & admins", filtered.filter((r) => r.kind === "account")],
+                  ["Cashiers", filtered.filter((r) => r.kind === "cashier")],
+                ] as const
+              ).flatMap(([label, group]) => [
+                <li
+                  key={`h-${label}`}
+                  className="bg-muted/40 px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+                >
+                  {label} · {group.length}
+                </li>,
+                ...group.map((r) => (
+                <li key={`${r.kind}-${r.user_id}`}>
                   <button
                     type="button"
                     onClick={() => setSelectedId(r.user_id)}
@@ -528,7 +627,8 @@ function StaffManagement() {
                     </span>
                   </button>
                 </li>
-              ))}
+                )),
+              ])}
               {!loading && !filtered.length && (
                 <li className="p-6 text-center text-sm text-muted-foreground">
                   No staff accounts yet.
@@ -581,37 +681,46 @@ function StaffManagement() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label>User ID</Label>
+                      <Label>{selected.kind === "cashier" ? "Username" : "User ID"}</Label>
                       <Input className="numeric" value={selected.user_id} readOnly />
                     </div>
-                    <div className="space-y-1">
-                      <Label>Email</Label>
-                      <Input value={selected.email} readOnly />
-                    </div>
-                    <div className="space-y-1">
-                      <Label>Role</Label>
-                      <Select
-                        value={selected.role}
-                        onValueChange={(v) => {
-                          const role = v as StaffRole;
-                          patchRow(selected.user_id, {
-                            role,
-                            permissions: rolePermissions(role),
-                          });
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {STAFF_ROLES.map((r) => (
-                            <SelectItem key={r} value={r} className="capitalize">
-                              {r}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    {selected.kind === "cashier" ? (
+                      <div className="space-y-1">
+                        <Label>Role</Label>
+                        <Input value="Cashier (PIN login)" readOnly />
+                      </div>
+                    ) : (
+                      <>
+                        <div className="space-y-1">
+                          <Label>Email</Label>
+                          <Input value={selected.email} readOnly />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Role</Label>
+                          <Select
+                            value={selected.role}
+                            onValueChange={(v) => {
+                              const role = v as StaffRole;
+                              patchRow(selected.user_id, {
+                                role,
+                                permissions: rolePermissions(role),
+                              });
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {STAFF_ROLES.filter((r) => r !== "cashier").map((r) => (
+                                <SelectItem key={r} value={r} className="capitalize">
+                                  {r}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </>
+                    )}
                     <div className="space-y-1">
                       <Label>Assigned store</Label>
                       <Select
@@ -649,18 +758,27 @@ function StaffManagement() {
                   <div className="flex flex-wrap items-end gap-3 rounded-md border border-border p-3">
                     <div className="space-y-1">
                       <Label className="flex items-center gap-1 text-xs">
-                        <KeyRound className="size-3.5" /> Set new password
+                        <KeyRound className="size-3.5" />{" "}
+                        {selected.kind === "cashier" ? "Set new 6-digit PIN" : "Set new password"}
                       </Label>
                       <Input
                         className="w-48"
                         type="password"
+                        inputMode={selected.kind === "cashier" ? "numeric" : undefined}
+                        maxLength={selected.kind === "cashier" ? 6 : undefined}
                         autoComplete="new-password"
                         value={passwordReset}
-                        onChange={(e) => setPasswordReset(e.target.value)}
+                        onChange={(e) =>
+                          setPasswordReset(
+                            selected.kind === "cashier"
+                              ? e.target.value.replace(/\D/g, "").slice(0, 6)
+                              : e.target.value,
+                          )
+                        }
                       />
                     </div>
                     <Button variant="outline" onClick={() => void resetPassword(selected)}>
-                      Update password
+                      {selected.kind === "cashier" ? "Update PIN" : "Update password"}
                     </Button>
                     <p className="text-[11px] text-muted-foreground">
                       Credentials are stored securely and can never be read back.

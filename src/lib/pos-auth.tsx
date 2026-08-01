@@ -9,7 +9,8 @@ import {
 } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
-import { cashierEmail, cashierSecret, type MetaRole } from "@/lib/pos-users";
+import { type MetaRole } from "@/lib/pos-users";
+import { verifyCashierPin } from "@/lib/pos-cashiers";
 import {
   CASHIER_PERMISSIONS,
   FULL_PERMISSIONS,
@@ -114,6 +115,10 @@ export type TerminalUser = {
   role: AppRole;
   storeId: string | null;
   email: string;
+  /** row id in public.cashiers when this is a cashier terminal session */
+  cashierId?: string;
+  /** permission matrix loaded with the cashier row */
+  permissions?: Partial<StaffPermissions>;
   /** signed in locally because the backend terminal tables are not provisioned yet */
   local?: boolean;
 };
@@ -296,11 +301,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const code = userId.trim().toLowerCase();
     if (!code) return { ok: false, error: "Enter your username" };
     if (!/^\d{6}$/.test(pin)) return { ok: false, error: "Enter your 6-digit PIN" };
-    const { error } = await supabase.auth.signInWithPassword({
-      email: cashierEmail(code),
-      password: cashierSecret(code, pin),
-    });
-    return error ? { ok: false, error: "Invalid username or PIN" } : { ok: true };
+    let row: Awaited<ReturnType<typeof verifyCashierPin>> = null;
+    try {
+      row = await verifyCashierPin(code, pin);
+    } catch {
+      return {
+        ok: false,
+        error: "Cashier accounts are not set up in the backend yet. Apply supabase/schema5.sql.",
+      };
+    }
+    if (!row) return { ok: false, error: "Invalid username or PIN" };
+    const next: TerminalUser = {
+      userCode: row.username,
+      name: row.full_name || row.username,
+      role: "staff",
+      storeId: row.store_id,
+      email: "",
+      cashierId: row.id,
+      permissions: row.permissions,
+    };
+    setTerminalUser(next);
+    try {
+      window.sessionStorage.setItem(TERMINAL_KEY, JSON.stringify(next));
+    } catch {
+      /* session storage unavailable */
+    }
+    return { ok: true };
   }, []);
 
   const pinLogin = useCallback(async (userCode: string, pin: string) => {
@@ -425,7 +451,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         metaRole: isLocalAdmin ? "admin" : "cashier",
         roles: [terminalUser.role],
         storeId: isLocalAdmin ? null : terminalUser.storeId,
-        permissions: isLocalAdmin ? FULL_PERMISSIONS : { ...DEFAULT_PERMISSIONS },
+        permissions: isLocalAdmin
+          ? FULL_PERMISSIONS
+          : normalizePermissions(terminalUser.permissions ?? {}, "cashier"),
       };
     }
     const email = account.email ?? "";
