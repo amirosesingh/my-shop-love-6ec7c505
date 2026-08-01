@@ -2,6 +2,7 @@ import { toast } from "sonner";
 import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
 import { defaultSettings, seedState } from "./pos-seed";
 import { drainOutbox } from "./sync-engine";
+import { localDb } from "./local-db";
 import { enqueue, type SyncOp } from "./sync-outbox";
 import type {
   AppSettings,
@@ -342,11 +343,21 @@ export async function loadCloudState(): Promise<CloudSlice> {
 /* ------------------------------- writers ------------------------------- */
 
 /**
- * Writes never hit the network directly: they are appended to the offline
- * outbox and pushed by the sync engine. The till therefore keeps working with
- * no connection, and nothing is lost when it comes back.
+ * Writes never hit the network directly.
+ *
+ * On the Windows desktop shell they are committed to the local Microsoft SQL
+ * Server instance (the source of truth) and the background worker pushes them
+ * to the cloud later. In the browser they go to the localStorage outbox and the
+ * in-page sync engine drains them. Either way the till keeps working offline.
  */
 const queue = (context: string, op: SyncOp) => {
+  const bridge = localDb();
+  if (bridge) {
+    void bridge.write(context, op).then((res) => {
+      if (!res.ok) dbError(context, new Error(res.error ?? "Local database write failed"));
+    });
+    return;
+  }
   enqueue(context, op);
   void drainOutbox();
 };

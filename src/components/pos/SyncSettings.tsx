@@ -5,6 +5,8 @@ import { Switch } from "@/components/ui/switch";
 import { usePos } from "@/lib/pos-store";
 import { downloadSqlBackup } from "@/lib/backup-sql";
 import { drainOutbox } from "@/lib/sync-engine";
+import { LocalDatabaseSettings } from "@/components/pos/LocalDatabaseSettings";
+import { localDb } from "@/lib/local-db";
 import {
   discardQuarantined,
   isOnline,
@@ -53,10 +55,14 @@ export function SyncSettings() {
           onCheckedChange={(v) => {
             setOnlineSyncEnabled(v);
             bump();
+            // The desktop worker owns pushing when the shell is present.
+            void localDb()?.setSyncEnabled(v);
             if (v) void drainOutbox();
           }}
         />
       </div>
+
+      <LocalDatabaseSettings />
 
       <div className="grid gap-2 rounded-md border border-border px-3 py-2 text-sm sm:grid-cols-3">
         <Stat label="Connection" value={isOnline() ? "Online" : "Offline"} />
