@@ -10,7 +10,7 @@ import {
 } from "@/lib/sync-outbox";
 
 /** Header pill: connection, queued writes and a manual push button. */
-export function SyncStatus() {
+export function SyncStatus({ className = "" }: { className?: string }) {
   const [, force] = useState(0);
   const bump = () => force((n) => n + 1);
 
@@ -49,7 +49,7 @@ export function SyncStatus() {
       title={
         conflicts ? `${conflicts} operation(s) need attention in Settings → Sync` : "Push queued changes now"
       }
-      className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs"
+      className={`flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs ${className}`}
     >
       {conflicts ? (
         <TriangleAlert className={`h-3.5 w-3.5 ${tone}`} />
