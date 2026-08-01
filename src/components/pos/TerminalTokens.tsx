@@ -224,7 +224,11 @@ export function TerminalTokens() {
               onChange={(e) => setDeviceName(e.target.value)}
             />
           </div>
-          <Button className="h-9" disabled={issuing} onClick={() => void generate()}>
+          <Button
+            className="h-9"
+            disabled={issuing || !locationId || !deviceName.trim()}
+            onClick={() => void generate()}
+          >
             {issuing ? <Loader2 className="size-4 animate-spin" /> : <KeyRound className="size-4" />}
             Generate activation token
           </Button>
