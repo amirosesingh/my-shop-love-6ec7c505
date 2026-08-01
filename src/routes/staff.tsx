@@ -51,10 +51,15 @@ import {
 } from "@/lib/permissions";
 import {
   createStaffAccount,
-  createCashierAccount,
-  cashierEmail,
   staffUserId,
 } from "@/lib/pos-users";
+import {
+  cashierErrText,
+  deleteCashier,
+  listCashiers,
+  setCashierPermissions,
+  upsertCashier,
+} from "@/lib/pos-cashiers";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/staff")({
@@ -89,6 +94,10 @@ const errText = (e: unknown): string => {
 };
 
 type StaffRow = {
+  /** cashiers live in public.cashiers, everyone else in public.app_users */
+  kind: "account" | "cashier";
+  /** cashiers.id (uuid) — empty for account rows */
+  id: string;
   user_id: string;
   full_name: string;
   email: string;
@@ -126,9 +135,11 @@ function StaffManagement() {
     setLoading(true);
     const { data, error } = await sb.rpc("list_app_users");
     if (error) toast.error("Could not load staff", { description: error.message });
-    const mapped = ((data ?? []) as Record<string, unknown>[]).map((r) => {
+    const accounts = ((data ?? []) as Record<string, unknown>[]).map((r) => {
       const role = fromDbRole(r["role"] as string | null);
       return {
+        kind: "account" as const,
+        id: "",
         user_id: String(r["user_id"] ?? ""),
         full_name: String(r["full_name"] ?? ""),
         email: String(r["email"] ?? ""),
@@ -141,7 +152,27 @@ function StaffManagement() {
           role,
         ),
       } satisfies StaffRow;
-    });
+    }).filter((r) => r.role !== "cashier");
+
+    let cashiers: StaffRow[] = [];
+    try {
+      cashiers = (await listCashiers()).map((c) => ({
+        kind: "cashier" as const,
+        id: c.id,
+        user_id: c.username,
+        full_name: c.full_name,
+        email: "",
+        role: "cashier" as StaffRole,
+        store_id: c.store_id,
+        is_active: c.is_active,
+        last_login_at: c.last_login_at,
+        permissions: c.permissions as unknown as Record<string, boolean>,
+      }));
+    } catch (e) {
+      toast.error("Could not load cashiers", { description: cashierErrText(e) });
+    }
+
+    const mapped = [...accounts, ...cashiers];
     setRows(mapped);
     setSelectedId((prev) => prev ?? mapped[0]?.user_id ?? null);
     setLoading(false);
@@ -168,6 +199,23 @@ function StaffManagement() {
 
   const saveProfile = async (row: StaffRow) => {
     setSaving(true);
+    if (row.kind === "cashier") {
+      try {
+        await upsertCashier({
+          id: row.id,
+          username: row.user_id,
+          fullName: row.full_name,
+          storeId: row.store_id,
+          isActive: row.is_active,
+        });
+        toast.success("Profile saved");
+      } catch (e) {
+        toast.error("Could not save profile", { description: cashierErrText(e) });
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
     const { error } = await sb.rpc("set_app_user_profile", {
       p_user_id: row.user_id,
       p_full_name: row.full_name,
@@ -185,6 +233,15 @@ function StaffManagement() {
 
   const togglePermission = async (row: StaffRow, key: PermissionKey, value: boolean) => {
     patchRow(row.user_id, { permissions: { ...row.permissions, [key]: value } });
+    if (row.kind === "cashier") {
+      try {
+        await setCashierPermissions(row.id, { [key]: value });
+      } catch (e) {
+        toast.error("Could not update permission", { description: cashierErrText(e) });
+        void load();
+      }
+      return;
+    }
     const { error } = await sb.rpc("set_app_user_permissions", {
       p_user_id: row.user_id,
       p_permissions: { [key]: value },
@@ -198,6 +255,15 @@ function StaffManagement() {
   const setGroup = async (row: StaffRow, keys: readonly string[], value: boolean) => {
     const patch = Object.fromEntries(keys.map((k) => [k, value]));
     patchRow(row.user_id, { permissions: { ...row.permissions, ...patch } });
+    if (row.kind === "cashier") {
+      try {
+        await setCashierPermissions(row.id, patch);
+      } catch (e) {
+        toast.error("Could not update permissions", { description: cashierErrText(e) });
+        void load();
+      }
+      return;
+    }
     const { error } = await sb.rpc("set_app_user_permissions", {
       p_user_id: row.user_id,
       p_permissions: patch,
