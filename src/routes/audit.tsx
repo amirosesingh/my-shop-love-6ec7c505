@@ -260,21 +260,85 @@ function AuditPage() {
           )}
         </section>
 
+        <div className="flex justify-end">
+          <ToggleGroup
+            type="single"
+            value={view}
+            onValueChange={(v) => v && setView(v as "table" | "stream")}
+            variant="outline"
+          >
+            <ToggleGroupItem value="table" aria-label="Table view">
+              <Rows3 className="size-4" /> Table
+            </ToggleGroupItem>
+            <ToggleGroupItem value="stream" aria-label="Activity stream view">
+              <List className="size-4" /> Activity stream
+            </ToggleGroupItem>
+          </ToggleGroup>
+        </div>
+
+        {view === "stream" ? (
+          <section className="rounded-lg border border-border bg-card">
+            <ol className="relative p-4">
+              {pager.pageItems.map((l) => {
+                const { icon: Icon, className } = visualFor(l);
+                return (
+                  <li key={l.id} className="relative flex gap-3 pb-5 last:pb-0">
+                    <div className="flex flex-col items-center">
+                      <span className={`grid size-8 shrink-0 place-items-center rounded-full ${className}`}>
+                        <Icon className="size-4" />
+                      </span>
+                      <span className="mt-1 w-px flex-1 bg-border" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm">{describeLog(l)}</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                        <span className="numeric">{new Date(l.at).toLocaleString()}</span>
+                        <Badge variant="outline" className="text-[10px]">{l.category}</Badge>
+                        <span className="capitalize">{l.module}</span>
+                        <Badge variant={l.synced_to_cloud ? "secondary" : "outline"} className="text-[10px]">
+                          {l.synced_to_cloud ? "synced" : "pending"}
+                        </Badge>
+                        <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => setDetail(l)}>
+                          <Eye className="size-3" /> Details
+                        </Button>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+              {!rows.length && (
+                <li className="py-10 text-center text-sm text-muted-foreground">
+                  No activity matches these filters.
+                </li>
+              )}
+            </ol>
+            <TablePagination
+              page={pager.page}
+              pageCount={pager.pageCount}
+              pageSize={pager.pageSize}
+              total={pager.total}
+              from={pager.from}
+              to={pager.to}
+              label="events"
+              onPage={pager.setPage}
+              onPageSize={pager.setPageSize}
+            />
+          </section>
+        ) : (
         <section className="rounded-lg border border-border bg-card">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Timestamp</TableHead>
+                <TableHead>Date &amp; time</TableHead>
                 <TableHead>Staff</TableHead>
                 <TableHead>Category</TableHead>
-                <TableHead>Action</TableHead>
-                <TableHead>Module</TableHead>
+                <TableHead>Action description</TableHead>
                 <TableHead>Sync</TableHead>
                 <TableHead className="text-right">Details</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.slice(0, 300).map((l) => (
+              {pager.pageItems.map((l) => (
                 <TableRow key={l.id}>
                   <TableCell className="numeric whitespace-nowrap text-muted-foreground">
                     {new Date(l.at).toLocaleString()}
@@ -288,8 +352,7 @@ function AuditPage() {
                   <TableCell>
                     <Badge variant="outline">{l.category}</Badge>
                   </TableCell>
-                  <TableCell className="font-medium">{l.action}</TableCell>
-                  <TableCell className="capitalize text-muted-foreground">{l.module}</TableCell>
+                  <TableCell className="max-w-md">{describeLog(l)}</TableCell>
                   <TableCell>
                     <Badge variant={l.synced_to_cloud ? "secondary" : "outline"}>
                       {l.synced_to_cloud ? "synced" : "pending"}
@@ -304,14 +367,26 @@ function AuditPage() {
               ))}
               {!rows.length && (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
                     No activity matches these filters.
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
+          <TablePagination
+            page={pager.page}
+            pageCount={pager.pageCount}
+            pageSize={pager.pageSize}
+            total={pager.total}
+            from={pager.from}
+            to={pager.to}
+            label="events"
+            onPage={pager.setPage}
+            onPageSize={pager.setPageSize}
+          />
         </section>
+        )}
       </div>
 
       <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
