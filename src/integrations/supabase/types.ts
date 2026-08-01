@@ -527,6 +527,33 @@ export type Database = {
           },
         ]
       }
+      secure_settings: {
+        Row: {
+          ciphertext: string
+          created_at: string
+          hint: string | null
+          key: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          ciphertext: string
+          created_at?: string
+          hint?: string | null
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          ciphertext?: string
+          created_at?: string
+          hint?: string | null
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
