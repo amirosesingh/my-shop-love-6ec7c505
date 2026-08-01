@@ -1,5 +1,6 @@
 import { logger } from "./audit-log";
 import { sendWhatsAppBill } from "./whatsapp.functions";
+import { getPosCallerAuth } from "./pos-caller-auth";
 import {
   PAYMENT_LABELS,
   bookingBalance,
@@ -95,7 +96,7 @@ export async function sendBillOnWhatsApp({ cfg, to, body, reference, member }: S
   if (!number) return { ok: false, error: "This customer has no WhatsApp number on file" };
 
   const res = await sendWhatsAppBill({
-    data: { phoneNumberId: cfg.phoneNumberId, to: number, body },
+    data: { ...(await getPosCallerAuth()), phoneNumberId: cfg.phoneNumberId, to: number, body },
   }).catch((e: unknown) => ({ ok: false as const, error: String(e) }));
 
   logger.log(

@@ -30,6 +30,7 @@ import type {
 import { bookingBalance, lineUnitDiscount, r2, type DiscountType } from "./pos-types";
 import { logger } from "./audit-log";
 import { db, dbError, loadCloudState } from "./pos-db";
+import { useAuth } from "./pos-auth";
 
 const KEY = "pos-state-v2";
 
@@ -141,6 +142,10 @@ const PosContext = createContext<Ctx | null>(null);
 export function PosProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<PosState>(seedState);
   const [ready, setReady] = useState(false);
+  const { authUserId, terminalUser, ready: authReady } = useAuth();
+  // Nothing is fetched from the cloud until a cashier or supervisor session
+  // exists — visitors never receive catalogue, member or sales data.
+  const signedIn = Boolean(authUserId || terminalUser);
   // Latest snapshot for audit logging without re-creating every callback.
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -177,6 +182,11 @@ export function PosProvider({ children }: { children: ReactNode }) {
     }
 
     void (async () => {
+      // Anonymous visitors get nothing: no products, members or sales.
+      if (!signedIn) {
+        if (authReady && !cancelled) setReady(true);
+        return;
+      }
       try {
         const cloud = await loadCloudState();
         if (cancelled) return;
@@ -215,7 +225,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [signedIn, authReady]);
 
   useEffect(() => {
     if (!ready) return;

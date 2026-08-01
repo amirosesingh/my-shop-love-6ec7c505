@@ -10,6 +10,8 @@ import {
 import type { Session } from "@supabase/supabase-js";
 import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
 import { type MetaRole } from "@/lib/pos-users";
+import { TERMINAL_TOKEN_KEY } from "@/lib/pos-caller-auth";
+import { issueCashierSession } from "@/lib/pos-session.functions";
 import { verifyCashierPin } from "@/lib/pos-cashiers";
 import {
   CASHIER_PERMISSIONS,
@@ -327,6 +329,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       /* session storage unavailable */
     }
+    // Signed terminal session so privileged server functions can verify the
+    // cashier — the PIN is re-checked server-side when minting it.
+    try {
+      const issued = await issueCashierSession({ data: { username: code, pin } });
+      if (issued.ok) window.sessionStorage.setItem(TERMINAL_TOKEN_KEY, issued.token);
+    } catch {
+      /* messaging features stay locked without a terminal token */
+    }
     return { ok: true };
   }, []);
 
@@ -350,6 +360,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setTerminalUser(null);
     try {
       window.sessionStorage.removeItem(TERMINAL_KEY);
+      window.sessionStorage.removeItem(TERMINAL_TOKEN_KEY);
     } catch {
       /* ignore */
     }
