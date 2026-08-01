@@ -106,6 +106,42 @@ export const paymentsLabel = (ps: Payment[] | undefined) =>
     )
     .join(" + ");
 
+export type TenderCheck = {
+  /** everything entered across the tender lines */
+  paid: number;
+  /** what is still outstanding (0 once the bill is covered) */
+  balance: number;
+  /** cash overpay handed back to the customer */
+  change: number;
+  /** blocking reason, or null when the tenders can complete the sale */
+  error: string | null;
+};
+
+/**
+ * Validates a split-tender payment: part cash, part card, part anything else.
+ * Only cash may overpay (that becomes change); every card line must name the
+ * bank / card machine used so the takings can be reconciled per terminal.
+ */
+export function validateTenders(total: number, tenders: Payment[]): TenderCheck {
+  const target = r2(total);
+  const paid = paymentsTotal(tenders);
+  const balance = r2(Math.max(0, target - paid));
+  const cash = paymentsTotal(tenders.filter((t) => t.method === "cash"));
+  const nonCash = r2(paid - cash);
+  const change = r2(Math.max(0, paid - target));
+
+  let error: string | null = null;
+  if (tenders.length === 0) error = "Add at least one tender";
+  else if (tenders.some((t) => !(Number(t.amount) > 0)))
+    error = "Every tender needs an amount above zero";
+  else if (tenders.some((t) => t.method === "card" && !t.bankName?.trim()))
+    error = "Enter the bank / card machine used for every card tender";
+  else if (balance > 0) error = `Short by ${balance.toFixed(2)}`;
+  else if (nonCash > target) error = "Only cash tenders may exceed the bill total";
+
+  return { paid, balance, change, error };
+}
+
 export type Sale = {
   id: string;
   receiptNo: string;
