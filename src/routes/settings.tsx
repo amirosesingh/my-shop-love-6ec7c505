@@ -3,6 +3,8 @@ import { useMemo, useState } from "react";
 import { Percent, Plus, Printer, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
+import { SyncSettings } from "@/components/pos/SyncSettings";
+import { SecureCredentials } from "@/components/pos/SecureCredentials";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -295,6 +297,7 @@ function Settings() {
                   <TabsTrigger value="elements">Elements</TabsTrigger>
                   <TabsTrigger value="payment">Bank transfer</TabsTrigger>
                   <TabsTrigger value="whatsapp">WhatsApp bills</TabsTrigger>
+                  <TabsTrigger value="sync">Sync &amp; backup</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="identity" className="space-y-3 pt-4">
@@ -620,6 +623,61 @@ function Settings() {
                       }
                     />
                   </div>
+
+                  <div className="space-y-3 rounded-md border border-border p-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm">Payment QR on customer display</p>
+                        <p className="text-xs text-muted-foreground">
+                          Paste your bank / e-wallet QR payload (EMVCo, UPI, PromptPay, DuitNow) or
+                          a payment link.
+                        </p>
+                      </div>
+                      <Switch
+                        aria-label="Payment QR on customer display"
+                        checked={paymentQr.enabled}
+                        onCheckedChange={(v) => setPaymentQr({ enabled: v })}
+                      />
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Caption</Label>
+                        <Input
+                          value={paymentQr.label}
+                          onChange={(e) => setPaymentQr({ label: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Mode</Label>
+                        <div className="flex gap-2">
+                          {(["static", "dynamic"] as const).map((m) => (
+                            <Button
+                              key={m}
+                              type="button"
+                              size="sm"
+                              variant={paymentQr.mode === m ? "default" : "outline"}
+                              onClick={() => setPaymentQr({ mode: m })}
+                            >
+                              {m === "static" ? "Static" : "Dynamic"}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">QR payload</Label>
+                      <Textarea
+                        rows={3}
+                        placeholder="00020101021226...  or  https://pay.example.com?amt={amount}&ref={reference}"
+                        value={paymentQr.payload}
+                        onChange={(e) => setPaymentQr({ payload: e.target.value })}
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        Dynamic mode replaces {"{amount}"} and {"{reference}"} with the live bill
+                        total and receipt number at checkout.
+                      </p>
+                    </div>
+                  </div>
                 </TabsContent>
 
                 <TabsContent value="whatsapp" className="space-y-3 pt-4">
@@ -712,6 +770,11 @@ function Settings() {
                       onCheckedChange={(v) => setWhatsApp({ autoSendOnBooking: v })}
                     />
                   </div>
+                  <SecureCredentials />
+                </TabsContent>
+
+                <TabsContent value="sync" className="pt-4">
+                  <SyncSettings />
                 </TabsContent>
               </Tabs>
 
