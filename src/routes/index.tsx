@@ -542,15 +542,14 @@ function Register() {
     if (!(await requirePermission("can_process_sale"))) return;
     if (isRefund && !(await requirePermission("can_process_refund"))) return;
     const splitting = tenders.length > 0;
-    const splitPaid = paymentsTotal(tenders);
-    if (!isRefund && splitting && splitPaid < r2(totals.total)) {
+    const split = validateTenders(totals.total, tenders);
+    const splitPaid = split.paid;
+    if (!isRefund && splitting && split.error) {
       toast.error(
-        `Split tenders cover ${money(splitPaid)} of ${money(totals.total)} — add another tender`,
+        split.balance > 0
+          ? `Split tenders cover ${money(splitPaid)} of ${money(totals.total)} — ${split.error}`
+          : split.error,
       );
-      return;
-    }
-    if (!isRefund && splitting && tenders.some((t) => t.method === "card" && !t.bankName?.trim())) {
-      toast.error("Enter the bank / card machine used for every card tender");
       return;
     }
     const paid = isRefund
