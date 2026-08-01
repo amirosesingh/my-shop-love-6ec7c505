@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { Loader2, RefreshCw, ShieldAlert, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
+import { TerminalUsersPanel } from "@/components/pos/TerminalUsersPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
@@ -193,6 +194,8 @@ function RolesPage() {
             </TableBody>
           </Table>
         </section>
+
+        <TerminalUsersPanel />
       </div>
     </AppShell>
   );
