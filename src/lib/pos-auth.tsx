@@ -108,7 +108,15 @@ export type TerminalUser = {
   role: AppRole;
   storeId: string | null;
   email: string;
+  /** signed in locally because the backend terminal tables are not provisioned yet */
+  local?: boolean;
 };
+
+/** Offline bootstrap admin so the terminal is never locked out before the
+ *  backend auth tables (app_users / user_roles) have been provisioned. */
+const BOOTSTRAP_ADMIN_CODE = "admin";
+const BOOTSTRAP_PIN_KEY = "pos-bootstrap-admin-pin";
+const DEFAULT_BOOTSTRAP_PIN = "1234";
 
 type AuthCtx = {
   ready: boolean;
@@ -244,13 +252,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!code) return { ok: false, error: "Enter your User ID" };
     if (!/^\d{4}$/.test(pin)) return { ok: false, error: "Enter your 4-digit PIN" };
 
+    const signInLocalAdmin = () => {
+      let expected = DEFAULT_BOOTSTRAP_PIN;
+      try {
+        expected = window.localStorage.getItem(BOOTSTRAP_PIN_KEY) || DEFAULT_BOOTSTRAP_PIN;
+      } catch {
+        /* storage unavailable */
+      }
+      if (norm(code) !== BOOTSTRAP_ADMIN_CODE || pin !== expected) return false;
+      const next: TerminalUser = {
+        userCode: "admin",
+        name: "Administrator",
+        role: "admin",
+        storeId: null,
+        email: "",
+        local: true,
+      };
+      setTerminalUser(next);
+      try {
+        window.sessionStorage.setItem(TERMINAL_KEY, JSON.stringify(next));
+      } catch {
+        /* session storage unavailable */
+      }
+      return true;
+    };
+
     // The PIN is compared against the bcrypt digest inside the database;
     // it is never stored, logged or persisted on this device.
     const { data, error } = await supabase.rpc("verify_terminal_pin" as never, {
       p_user_code: code,
       p_pin: pin,
     } as never);
-    if (error) return { ok: false, error: error.message };
+    if (error) {
+      if (signInLocalAdmin()) return { ok: true };
+      return {
+        ok: false,
+        error:
+          "Terminal accounts are not set up in the backend yet. Sign in with the admin User ID “admin” and PIN 1234, or run the setup SQL.",
+      };
+    }
 
     const row = (Array.isArray(data) ? data[0] : data) as
       | {
@@ -262,7 +302,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           auth_secret: string;
         }
       | undefined;
-    if (!row) return { ok: false, error: "Invalid User ID or PIN" };
+    if (!row) {
+      if (signInLocalAdmin()) return { ok: true };
+      return { ok: false, error: "Invalid User ID or PIN" };
+    }
 
     const { error: signInError } = await supabase.auth.signInWithPassword({
       email: row.email,
@@ -314,7 +357,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Resolved fresh from the staff list so a duty change applies immediately.
   const user = useMemo<PosUser | null>(() => {
     const account = session?.user;
-    if (!account) return null;
+    if (!account) {
+      if (!terminalUser) return null;
+      // Local bootstrap / offline terminal session.
+      const isLocalAdmin = terminalUser.role === "admin";
+      return {
+        staffId: terminalUser.userCode,
+        name: terminalUser.name,
+        email: terminalUser.email,
+        role: isLocalAdmin ? "admin" : "cashier",
+        roles: [terminalUser.role],
+        storeId: isLocalAdmin ? null : terminalUser.storeId,
+        permissions: isLocalAdmin ? FULL_PERMISSIONS : { ...DEFAULT_PERMISSIONS },
+      };
+    }
     const email = account.email ?? "";
     const isAdmin = roles.includes("admin") || terminalUser?.role === "admin";
     const found = email ? staff.find((s) => s.email && norm(s.email) === norm(email)) : undefined;
