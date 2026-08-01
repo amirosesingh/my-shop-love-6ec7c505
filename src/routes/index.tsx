@@ -205,11 +205,15 @@ function Register() {
     setLines((ls) => ls.map((l, i) => (i === index ? { ...l, ...patch } : l)));
   }
 
-  async function clearCart() {
-    if (lines.length && !(await requirePermission("can_void_item"))) return;
+  function resetCart() {
     setLines([]);
     setCartDiscount(0);
     setExchangeRef(null);
+  }
+
+  async function clearCart() {
+    if (lines.length && !(await requirePermission("can_void_item"))) return;
+    resetCart();
   }
 
   function lookupBill() {
