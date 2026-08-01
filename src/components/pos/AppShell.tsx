@@ -251,11 +251,11 @@ export function AppShell({ children }: { children: ReactNode }) {
               {user.staffId} · {user.role}
             </p>
           </div>
-          <SyncStatus />
+          <SyncStatus className="ml-auto" />
           <Button
             variant="outline"
             size="sm"
-            className="ml-auto h-8 text-xs"
+            className="h-8 text-xs"
             onClick={() => void lock()}
           >
             <Lock className="size-3.5" /> Lock / Switch user
