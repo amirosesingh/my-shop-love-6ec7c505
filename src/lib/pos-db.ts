@@ -12,6 +12,7 @@ import type {
   Product,
   Promotion,
   Sale,
+  Store,
   PaperSize,
   PaymentMethod,
   PromoType,
@@ -22,7 +23,7 @@ import type {
 export type CloudSlice = Pick<
   PosState,
   "products" | "members" | "sales" | "promotions" | "settings"
->;
+> & { stores: Store[] };
 
 type Row = Record<string, any>;
 
@@ -113,6 +114,22 @@ const rowToPromotion = (r: Row): Promotion => ({
   valueType: num(r.discount_percent) ? "percent" : "amount",
   tierRates: (r.tier_rates ?? undefined) as Record<MemberTier, number> | undefined,
   partner: r.partner ?? undefined,
+});
+
+export const rowToStore = (r: Row): Store => ({
+  id: r.id,
+  code: r.code ?? "",
+  name: r.name ?? "",
+  address: r.address ?? "",
+  phone: r.phone ?? "",
+});
+
+export const storeToRow = (s: Store): Row => ({
+  id: s.id,
+  code: s.code,
+  name: s.name,
+  address: s.address || null,
+  phone: s.phone || null,
 });
 
 const promotionToRow = (p: Promotion): Row => ({
@@ -330,7 +347,7 @@ export async function loadCloudState(): Promise<CloudSlice> {
   if (first.error) throw first.error;
   if (!first.data?.length) await seedCloud();
 
-  const [products, members, sales, promotions, settings] = await Promise.all([
+  const [products, members, sales, promotions, settings, stores] = await Promise.all([
     supabase.from("products").select("*").order("name"),
     supabase.from("members").select("*").order("created_at"),
     supabase
@@ -340,6 +357,12 @@ export async function loadCloudState(): Promise<CloudSlice> {
       .limit(500),
     supabase.from("promotions").select("*").order("created_at"),
     supabase.from("pos_settings").select("*").eq("id", 1).maybeSingle(),
+    // The stores table only exists once schema10.sql has been applied; a
+    // missing table must not stop the till from loading.
+    (supabase.from("stores" as never).select("*") as unknown as Promise<{
+      data: Row[] | null;
+      error: unknown;
+    }>).catch(() => ({ data: null, error: null })),
   ]);
 
   const err = products.error || members.error || sales.error || promotions.error || settings.error;
@@ -351,6 +374,7 @@ export async function loadCloudState(): Promise<CloudSlice> {
     sales: (sales.data ?? []).map(rowToSale),
     promotions: (promotions.data ?? []).map(rowToPromotion),
     settings: rowToSettings(settings.data as Row | null),
+    stores: ((stores.data as Row[] | null) ?? []).map(rowToStore),
   };
 }
 
@@ -385,6 +409,15 @@ export const db = {
   },
   deleteProduct: (id: string) =>
     queue("Deleting product", { kind: "delete", table: "products", match: { id } }),
+
+  upsertStore: (s: Store) =>
+    queue("Saving location", { kind: "upsert", table: "stores", rows: [storeToRow(s)] }),
+  upsertStores: (list: Store[]) => {
+    if (!list.length) return;
+    queue("Saving locations", { kind: "upsert", table: "stores", rows: list.map(storeToRow) });
+  },
+  deleteStore: (id: string) =>
+    queue("Deleting location", { kind: "delete", table: "stores", match: { id } }),
 
   upsertMember: (m: Member) =>
     queue("Saving member", { kind: "upsert", table: "members", rows: [memberToRow(m, tierId)] }),

@@ -37,6 +37,7 @@ import { Route as SettingsPaymentRouteImport } from './routes/settings.payment'
 import { Route as SettingsQrRouteImport } from './routes/settings.qr'
 import { Route as SettingsSyncRouteImport } from './routes/settings.sync'
 import { Route as SettingsTaxRouteImport } from './routes/settings.tax'
+import { Route as SettingsTerminalsRouteImport } from './routes/settings.terminals'
 import { Route as SettingsTypeRouteImport } from './routes/settings.type'
 import { Route as SettingsWhatsappRouteImport } from './routes/settings.whatsapp'
 
@@ -180,6 +181,11 @@ const SettingsTaxRoute = SettingsTaxRouteImport.update({
   path: '/settings/tax',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsTerminalsRoute = SettingsTerminalsRouteImport.update({
+  id: '/settings/terminals',
+  path: '/settings/terminals',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsTypeRoute = SettingsTypeRouteImport.update({
   id: '/settings/type',
   path: '/settings/type',
@@ -218,6 +224,7 @@ export interface FileRoutesByFullPath {
   '/settings/qr': typeof SettingsQrRoute
   '/settings/sync': typeof SettingsSyncRoute
   '/settings/tax': typeof SettingsTaxRoute
+  '/settings/terminals': typeof SettingsTerminalsRoute
   '/settings/type': typeof SettingsTypeRoute
   '/settings/whatsapp': typeof SettingsWhatsappRoute
   '/reports/': typeof ReportsIndexRoute
@@ -250,6 +257,7 @@ export interface FileRoutesByTo {
   '/settings/qr': typeof SettingsQrRoute
   '/settings/sync': typeof SettingsSyncRoute
   '/settings/tax': typeof SettingsTaxRoute
+  '/settings/terminals': typeof SettingsTerminalsRoute
   '/settings/type': typeof SettingsTypeRoute
   '/settings/whatsapp': typeof SettingsWhatsappRoute
   '/reports': typeof ReportsIndexRoute
@@ -283,6 +291,7 @@ export interface FileRoutesById {
   '/settings/qr': typeof SettingsQrRoute
   '/settings/sync': typeof SettingsSyncRoute
   '/settings/tax': typeof SettingsTaxRoute
+  '/settings/terminals': typeof SettingsTerminalsRoute
   '/settings/type': typeof SettingsTypeRoute
   '/settings/whatsapp': typeof SettingsWhatsappRoute
   '/reports/': typeof ReportsIndexRoute
@@ -317,6 +326,7 @@ export interface FileRouteTypes {
     | '/settings/qr'
     | '/settings/sync'
     | '/settings/tax'
+    | '/settings/terminals'
     | '/settings/type'
     | '/settings/whatsapp'
     | '/reports/'
@@ -349,6 +359,7 @@ export interface FileRouteTypes {
     | '/settings/qr'
     | '/settings/sync'
     | '/settings/tax'
+    | '/settings/terminals'
     | '/settings/type'
     | '/settings/whatsapp'
     | '/reports'
@@ -381,6 +392,7 @@ export interface FileRouteTypes {
     | '/settings/qr'
     | '/settings/sync'
     | '/settings/tax'
+    | '/settings/terminals'
     | '/settings/type'
     | '/settings/whatsapp'
     | '/reports/'
@@ -414,6 +426,7 @@ export interface RootRouteChildren {
   SettingsQrRoute: typeof SettingsQrRoute
   SettingsSyncRoute: typeof SettingsSyncRoute
   SettingsTaxRoute: typeof SettingsTaxRoute
+  SettingsTerminalsRoute: typeof SettingsTerminalsRoute
   SettingsTypeRoute: typeof SettingsTypeRoute
   SettingsWhatsappRoute: typeof SettingsWhatsappRoute
   ReportsIndexRoute: typeof ReportsIndexRoute
@@ -618,6 +631,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsTaxRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/terminals': {
+      id: '/settings/terminals'
+      path: '/settings/terminals'
+      fullPath: '/settings/terminals'
+      preLoaderRoute: typeof SettingsTerminalsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/type': {
       id: '/settings/type'
       path: '/settings/type'
@@ -662,6 +682,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsQrRoute: SettingsQrRoute,
   SettingsSyncRoute: SettingsSyncRoute,
   SettingsTaxRoute: SettingsTaxRoute,
+  SettingsTerminalsRoute: SettingsTerminalsRoute,
   SettingsTypeRoute: SettingsTypeRoute,
   SettingsWhatsappRoute: SettingsWhatsappRoute,
   ReportsIndexRoute: ReportsIndexRoute,
@@ -670,13 +691,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
