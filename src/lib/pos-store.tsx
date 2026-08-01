@@ -116,6 +116,12 @@ type Ctx = {
   upsertProduct: (product: Product) => void;
   removeProduct: (id: string) => void;
   adjustStock: (id: string, delta: number, storeId?: string) => void;
+  applyStockCount: (
+    entries: { productId: string; counted: number }[],
+    reason: StockAdjustmentReason,
+    note?: string,
+    storeId?: string,
+  ) => void;
   upsertMember: (member: Member) => void;
   removeMember: (id: string) => void;
   upsertPromotion: (promotion: Promotion) => void;
