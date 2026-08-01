@@ -22,6 +22,7 @@ import { Route as ShiftsRouteImport } from './routes/shifts'
 import { Route as StaffRouteImport } from './routes/staff'
 import { Route as StoresRouteImport } from './routes/stores'
 import { Route as TransfersRouteImport } from './routes/transfers'
+import { Route as ReportsIndexRouteImport } from './routes/reports.index'
 import { Route as SettingsIndexRouteImport } from './routes/settings.index'
 import { Route as SettingsDisplayRouteImport } from './routes/settings.display'
 import { Route as SettingsElementsRouteImport } from './routes/settings.elements'
@@ -97,6 +98,11 @@ const StoresRoute = StoresRouteImport.update({
 const TransfersRoute = TransfersRouteImport.update({
   id: '/transfers',
   path: '/transfers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsIndexRoute = ReportsIndexRouteImport.update({
+  id: '/reports/',
+  path: '/reports/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsIndexRoute = SettingsIndexRouteImport.update({
@@ -179,6 +185,7 @@ export interface FileRoutesByFullPath {
   '/settings/tax': typeof SettingsTaxRoute
   '/settings/type': typeof SettingsTypeRoute
   '/settings/whatsapp': typeof SettingsWhatsappRoute
+  '/reports/': typeof ReportsIndexRoute
   '/settings/': typeof SettingsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -205,6 +212,7 @@ export interface FileRoutesByTo {
   '/settings/tax': typeof SettingsTaxRoute
   '/settings/type': typeof SettingsTypeRoute
   '/settings/whatsapp': typeof SettingsWhatsappRoute
+  '/reports': typeof ReportsIndexRoute
   '/settings': typeof SettingsIndexRoute
 }
 export interface FileRoutesById {
@@ -232,6 +240,7 @@ export interface FileRoutesById {
   '/settings/tax': typeof SettingsTaxRoute
   '/settings/type': typeof SettingsTypeRoute
   '/settings/whatsapp': typeof SettingsWhatsappRoute
+  '/reports/': typeof ReportsIndexRoute
   '/settings/': typeof SettingsIndexRoute
 }
 export interface FileRouteTypes {
@@ -260,6 +269,7 @@ export interface FileRouteTypes {
     | '/settings/tax'
     | '/settings/type'
     | '/settings/whatsapp'
+    | '/reports/'
     | '/settings/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -286,6 +296,7 @@ export interface FileRouteTypes {
     | '/settings/tax'
     | '/settings/type'
     | '/settings/whatsapp'
+    | '/reports'
     | '/settings'
   id:
     | '__root__'
@@ -312,6 +323,7 @@ export interface FileRouteTypes {
     | '/settings/tax'
     | '/settings/type'
     | '/settings/whatsapp'
+    | '/reports/'
     | '/settings/'
   fileRoutesById: FileRoutesById
 }
@@ -339,6 +351,7 @@ export interface RootRouteChildren {
   SettingsTaxRoute: typeof SettingsTaxRoute
   SettingsTypeRoute: typeof SettingsTypeRoute
   SettingsWhatsappRoute: typeof SettingsWhatsappRoute
+  ReportsIndexRoute: typeof ReportsIndexRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
 }
 
@@ -433,6 +446,13 @@ declare module '@tanstack/react-router' {
       path: '/transfers'
       fullPath: '/transfers'
       preLoaderRoute: typeof TransfersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports/': {
+      id: '/reports/'
+      path: '/reports'
+      fullPath: '/reports/'
+      preLoaderRoute: typeof ReportsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings/': {
@@ -539,6 +559,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsTaxRoute: SettingsTaxRoute,
   SettingsTypeRoute: SettingsTypeRoute,
   SettingsWhatsappRoute: SettingsWhatsappRoute,
+  ReportsIndexRoute: ReportsIndexRoute,
   SettingsIndexRoute: SettingsIndexRoute,
 }
 export const routeTree = rootRouteImport
