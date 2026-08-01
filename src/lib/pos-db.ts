@@ -166,20 +166,6 @@ const rowToSettings = (r: Row | null): AppSettings =>
       }
     : defaultSettings;
 
-/** Columns added by supabase/schema_final.sql; dropped when the DB predates it. */
-const BRANDING_COLUMNS = [
-  "company_name",
-  "tax_number",
-  "reg_number",
-  "phone",
-  "website",
-  "fonts",
-  "custom_lines",
-  "qr",
-  "payment_details",
-  "whatsapp_settings",
-] as const;
-
 const settingsToRow = (s: AppSettings): Row => ({
   id: 1,
   tax_percentage: s.tax.rate,
@@ -464,35 +450,36 @@ export const db = {
       qty: number;
     }[],
   ) {
-    try {
-      const { data, error } = await supabase
-        .from("purchase_orders")
-        .insert({
+    // The id is minted locally so the items can reference the invoice without
+    // waiting for a server round-trip (works fully offline).
+    const poId = crypto.randomUUID();
+    queue("Saving purchase order", {
+      kind: "insert",
+      table: "purchase_orders",
+      rows: [
+        {
+          id: poId,
           po_number: po.poNumber,
           supplier_name: po.supplier,
           operator_name: po.operator,
           total_cost: po.totalCost,
           total_items_count: po.itemCount,
-        } as never)
-        .select("id")
-        .single();
-      if (error) throw error;
-      const poId = (data as unknown as { id: string }).id;
-      const { error: itemsError } = await supabase.from("purchase_order_items").insert(
-        items.map((i) => ({
-          po_id: poId,
-          product_id: i.productId,
-          barcode: i.barcode,
-          product_name: i.name,
-          cost_price: i.cost,
-          selling_price: i.price,
-          quantity_received: i.qty,
-          subtotal_cost: i.cost * i.qty,
-        })) as never,
-      );
-      if (itemsError) throw itemsError;
-    } catch (e) {
-      dbError("Saving purchase order", e);
-    }
+        },
+      ],
+    });
+    queue("Saving purchase order items", {
+      kind: "insert",
+      table: "purchase_order_items",
+      rows: items.map((i) => ({
+        po_id: poId,
+        product_id: i.productId,
+        barcode: i.barcode,
+        product_name: i.name,
+        cost_price: i.cost,
+        selling_price: i.price,
+        quantity_received: i.qty,
+        subtotal_cost: i.cost * i.qty,
+      })),
+    });
   },
 };
