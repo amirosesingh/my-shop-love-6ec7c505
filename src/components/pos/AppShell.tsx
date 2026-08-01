@@ -2,7 +2,7 @@ import { Loader2, Lock, LogOut, Menu, MapPin, ReceiptText, Store } from "lucide-
 import { useEffect, useState, type ReactNode } from "react";
 import { usePos } from "@/lib/pos-store";
 import { useAuth, type PermissionFlag } from "@/lib/pos-auth";
-import { useLocation, useNavigate } from "@tanstack/react-router";
+import { Link, useLocation } from "@tanstack/react-router";
 import { TerminalLogin } from "@/components/pos/TerminalLogin";
 import {
   TerminalActivation,
@@ -76,7 +76,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Windows tills must be registered to a location before they can be used.
   const terminal = useRevocationCheck();
   const location = useLocation();
-  const navigate = useNavigate();
 
   // Terminal-wide font / control scaling preference.
   useUiScale();
