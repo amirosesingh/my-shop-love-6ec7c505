@@ -315,7 +315,7 @@ function Register() {
     if (method === "cash") openCashDrawer();
     printSaleReceipt(sale, member, "sale");
     setLastSale(sale);
-    clearCart();
+    resetCart();
     setMemberId(null);
     setTendered("");
     setPayOpen(false);
@@ -448,7 +448,7 @@ function Register() {
               variant="ghost"
               size="sm"
               disabled={!lines.length}
-              onClick={clearCart}
+              onClick={() => void clearCart()}
             >
               <Trash2 className="size-4" /> Clear
             </Button>
@@ -568,11 +568,11 @@ function Register() {
                       </p>
                     </div>
                     <div className="flex items-center gap-1">
-                      <Button size="icon" variant="outline" className="size-7" onClick={() => setQty(i, -1)}>
+                      <Button size="icon" variant="outline" className="size-7" onClick={() => void setQty(i, -1)}>
                         <Minus className="size-3" />
                       </Button>
                       <span className="numeric w-6 text-center text-sm">{l.qty}</span>
-                      <Button size="icon" variant="outline" className="size-7" onClick={() => setQty(i, 1)}>
+                      <Button size="icon" variant="outline" className="size-7" onClick={() => void setQty(i, 1)}>
                         <Plus className="size-3" />
                       </Button>
                     </div>
