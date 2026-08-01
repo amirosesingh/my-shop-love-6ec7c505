@@ -1580,6 +1580,13 @@ function Register() {
             <Button
               onClick={() => {
                 setSplitOpen(false);
+                logger.log("sale", "Bill split across guests", "register", {
+                  ways: splitWays,
+                  billTotal: balanceDue,
+                  shares: splitShares,
+                  storeId: currentStore.id,
+                  memberId,
+                });
                 openPayment("cash");
               }}
             >
