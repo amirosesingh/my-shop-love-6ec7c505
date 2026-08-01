@@ -48,8 +48,8 @@ export const navGroups: NavGroup[] = [
     icon: Wallet,
     items: [
       { to: "/", label: "Register POS", icon: LayoutGrid, keywords: "checkout cart sale" },
-      { to: "/shifts", label: "Shift Management", icon: Clock, flag: "financials", keywords: "open close drawer z-report" },
-      { to: "/receipts", label: "Bill Search & History", icon: ScrollText, flag: "financials", keywords: "invoice receipt reprint" },
+      { to: "/shifts", label: "Shift Management", icon: Clock, flag: "can_view_sales_reports", keywords: "open close drawer z-report" },
+      { to: "/receipts", label: "Bill Search & History", icon: ScrollText, flag: "can_view_sales_reports", keywords: "invoice receipt reprint" },
     ],
   },
   {
@@ -58,7 +58,7 @@ export const navGroups: NavGroup[] = [
     icon: Boxes,
     items: [
       { to: "/inventory", label: "Inventory Catalog", icon: Boxes, keywords: "stock products import" },
-      { to: "/purchasing", label: "Purchasing", icon: ScanBarcode, flag: "products", keywords: "po invoice receiving barcode" },
+      { to: "/purchasing", label: "Purchasing", icon: ScanBarcode, flag: "can_receive_purchase_order", keywords: "po invoice receiving barcode" },
       { to: "/transfers", label: "Stock Transfers", icon: ArrowLeftRight, keywords: "request move branch" },
       { to: "/stores", label: "Locations / Warehouses", icon: Truck, adminOnly: true, keywords: "branch store warehouse" },
     ],

@@ -66,7 +66,6 @@ function Register() {
   const { requirePermission } = useUserPermissions();
   const canDiscount = can("can_give_discount");
   const canRefund = can("can_process_refund");
-  const canOpenDrawer = can("can_open_drawer");
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
   const [lines, setLines] = useState<CartLine[]>([]);

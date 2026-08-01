@@ -64,9 +64,9 @@ const blank = (storeId: string): Product => ({
 function Inventory() {
   const { state, stores, currentStore, upsertProduct, removeProduct, adjustStock } = usePos();
   const { can } = useAuth();
-  const showMoney = can("financials");
-  const canEdit = can("products");
-  const canEcom = can("ecommerce");
+  const showMoney = can("can_view_sales_reports");
+  const canEdit = can("can_add_new_product");
+  const canEcom = can("can_edit_product_price");
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState<Product | null>(null);
