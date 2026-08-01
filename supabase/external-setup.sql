@@ -5,7 +5,7 @@
 -- the legacy `user_code` name is migrated away automatically.
 -- ============================================================================
 
-create extension if not exists pgcrypto;
+create extension if not exists pgcrypto with schema extensions;
 create extension if not exists pgcrypto with schema extensions;
 
 do $$ begin
@@ -185,12 +185,12 @@ create table if not exists public.user_roles (
 );
 
 create or replace function public.has_role(_user_id uuid, _role public.app_role)
-returns boolean language sql stable security definer set search_path = public as $$
+returns boolean language sql stable security definer set search_path = public, extensions as $$
   select exists (select 1 from public.user_roles where user_id = _user_id and role = _role)
 $$;
 
 create or replace function public.is_staff(_user_id uuid)
-returns boolean language sql stable security definer set search_path = public as $$
+returns boolean language sql stable security definer set search_path = public, extensions as $$
   select exists (
     select 1 from public.user_roles
     where user_id = _user_id and role in ('admin','manager','staff')
@@ -376,7 +376,7 @@ begin
   select * into u from public.app_users a
    where lower(a.user_id) = lower(trim(p_user_id)) and a.is_active;
   if not found then return; end if;
-  if u.pin_hash = '' or u.pin_hash <> crypt(p_pin, u.pin_hash) then return; end if;
+  if u.pin_hash = '' or u.pin_hash <> extensions.crypt(p_pin, u.pin_hash) then return; end if;
   update public.app_users set last_login_at = now() where id = u.id;
   return query select u.user_id::text, u.full_name::text, u.role, u.store_id::text,
                       u.email::text, u.auth_secret;
@@ -390,7 +390,7 @@ drop function if exists public.current_app_user();
 create or replace function public.current_app_user()
 returns table (id uuid, user_id text, full_name text, role app_role, store_id text,
                email text, permissions jsonb, is_active boolean)
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = public, extensions as $$
   select a.id, a.user_id::text, a.full_name::text, a.role, a.store_id::text,
          a.email::text, a.permissions, a.is_active
   from public.app_users a
@@ -408,7 +408,7 @@ create or replace function public.list_app_users()
 returns table (id uuid, auth_user_id uuid, user_id text, full_name text, email text,
                role app_role, store_id text, is_active boolean, permissions jsonb,
                last_login_at timestamptz, created_at timestamptz)
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = public, extensions as $$
   select a.id, a.auth_user_id, a.user_id::text, a.full_name::text, a.email::text,
          a.role, a.store_id::text, a.is_active, a.permissions, a.last_login_at, a.created_at
   from public.app_users a
@@ -423,7 +423,7 @@ grant execute on function public.list_app_users() to anon, authenticated, servic
 drop function if exists public.set_app_user_permissions(text, jsonb);
 create or replace function public.set_app_user_permissions(p_user_id text, p_permissions jsonb)
 returns void
-language plpgsql security definer set search_path = public as $$
+language plpgsql security definer set search_path = public, extensions as $$
 begin
   if not (public.has_role(auth.uid(),'admin') or public.has_role(auth.uid(),'manager')) then
     raise exception 'Only supervisors can change permissions';
@@ -453,7 +453,7 @@ begin
   end if;
   insert into public.app_users (user_id, full_name, role, store_id, email, pin_hash, auth_secret)
   values (trim(p_user_id), trim(p_full_name), p_role, nullif(trim(coalesce(p_store_id,'')),''),
-          lower(trim(p_email)), crypt(p_pin, gen_salt('bf', 10)), p_password)
+          lower(trim(p_email)), extensions.crypt(p_pin, extensions.gen_salt('bf', 10)), p_password)
   on conflict (user_id) do update
     set full_name   = excluded.full_name,
         role        = excluded.role,
@@ -469,7 +469,7 @@ grant execute on function public.upsert_terminal_user(text, text, app_role, text
 
 drop function if exists public.set_terminal_active(text, boolean);
 create or replace function public.set_terminal_active(p_user_id text, p_active boolean)
-returns void language plpgsql security definer set search_path = public as $$
+returns void language plpgsql security definer set search_path = public, extensions as $$
 begin
   if not (public.has_role(auth.uid(),'admin') or public.has_role(auth.uid(),'manager')) then
     raise exception 'Only supervisors can manage terminal users';
@@ -483,7 +483,7 @@ grant execute on function public.set_terminal_active(text, boolean) to authentic
 
 drop function if exists public.delete_terminal_user(text);
 create or replace function public.delete_terminal_user(p_user_id text)
-returns void language plpgsql security definer set search_path = public as $$
+returns void language plpgsql security definer set search_path = public, extensions as $$
 begin
   if not public.has_role(auth.uid(),'admin') then
     raise exception 'Only admins can delete terminal users';
@@ -499,7 +499,7 @@ grant execute on function public.delete_terminal_user(text) to authenticated, se
 -- ---------------------------------------------------------------------------
 create or replace function public.sync_auth_user_to_public()
 returns trigger
-language plpgsql security definer set search_path = public as $$
+language plpgsql security definer set search_path = public, extensions as $$
 declare
   v_code text := coalesce(nullif(trim(new.raw_user_meta_data ->> 'user_id'), ''),
                           split_part(new.email, '@', 1));
@@ -557,7 +557,7 @@ drop function if exists public.set_app_user_profile(text, text, app_role, text, 
 create or replace function public.set_app_user_profile(
   p_user_id text, p_full_name text, p_role app_role, p_store_id text, p_is_active boolean)
 returns void
-language plpgsql security definer set search_path = public as $$
+language plpgsql security definer set search_path = public, extensions as $$
 begin
   if not (public.has_role(auth.uid(),'admin') or public.has_role(auth.uid(),'manager')) then
     raise exception 'Only supervisors can edit staff profiles';

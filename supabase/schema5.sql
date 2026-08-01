@@ -2,7 +2,7 @@
 -- schema5.sql — cashiers live in their own table (no auth account)
 -- Idempotent: safe to run multiple times.
 -- ============================================================================
-create extension if not exists pgcrypto;
+create extension if not exists pgcrypto with schema extensions;
 
 -- ---------------------------------------------------------------------------
 -- Supervisor guard (re-created here so this script can run standalone)
@@ -12,7 +12,7 @@ returns boolean
 language plpgsql
 stable
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare ok boolean := false;
 begin
@@ -95,7 +95,7 @@ returns table (
 language sql
 stable
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
   select c.id, c.username, c.full_name, c.store_id, c.permissions,
          c.is_active, c.last_login_at, c.created_at
@@ -115,7 +115,7 @@ create or replace function public.upsert_cashier(
 returns uuid
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare v_id uuid;
 begin
@@ -135,7 +135,7 @@ begin
     end if;
     insert into public.cashiers (username, full_name, pin_hash, store_id, is_active)
     values (lower(trim(p_username)), coalesce(p_full_name, ''),
-            crypt(p_pin, gen_salt('bf')), p_store_id, coalesce(p_is_active, true))
+            extensions.crypt(p_pin, extensions.gen_salt('bf')), p_store_id, coalesce(p_is_active, true))
     returning id into v_id;
   else
     update public.cashiers set
@@ -144,7 +144,7 @@ begin
       store_id = p_store_id,
       is_active = coalesce(p_is_active, is_active),
       pin_hash = case when p_pin is null or p_pin = '' then pin_hash
-                      else crypt(p_pin, gen_salt('bf')) end
+                      else extensions.crypt(p_pin, extensions.gen_salt('bf')) end
     where id = p_id
     returning id into v_id;
   end if;
@@ -159,7 +159,7 @@ create or replace function public.set_cashier_permissions(
 returns void
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 begin
   if not public.is_app_supervisor() then
@@ -175,7 +175,7 @@ create or replace function public.delete_cashier(p_id uuid)
 returns void
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 begin
   if not public.is_app_supervisor() then
@@ -196,7 +196,7 @@ returns table (
 )
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare v_row public.cashiers;
 begin
@@ -204,7 +204,7 @@ begin
    where lower(c.username) = lower(trim(p_username)) and c.is_active
    limit 1;
   if v_row.id is null then return; end if;
-  if v_row.pin_hash <> crypt(p_pin, v_row.pin_hash) then return; end if;
+  if v_row.pin_hash <> extensions.crypt(p_pin, v_row.pin_hash) then return; end if;
 
   update public.cashiers set last_login_at = now() where public.cashiers.id = v_row.id;
 
@@ -253,7 +253,7 @@ begin
       r.full_name,
       -- keep the existing digest when present, otherwise a locked PIN that
       -- must be reset by a supervisor
-      coalesce(nullif(r.pin_hash, ''), crypt(gen_random_uuid()::text, gen_salt('bf'))),
+      coalesce(nullif(r.pin_hash, ''), extensions.crypt(gen_random_uuid()::text, extensions.gen_salt('bf'))),
       r.store_id,
       r.permissions,
       r.is_active
