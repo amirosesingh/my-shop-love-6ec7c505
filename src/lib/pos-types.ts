@@ -423,6 +423,17 @@ export type AppSettings = {
   receipt: ReceiptSettings;
   payment: PaymentDetails;
   whatsapp: WhatsAppSettings;
+  review: ReviewThresholds;
+};
+
+/** Daily limits that flag a cashier for review on the dashboard. */
+export type ReviewThresholds = {
+  maxVoids: number;
+  maxRefunds: number;
+  maxRefundValue: number;
+  maxNoSaleOpens: number;
+  /** manual discount as a percentage of that cashier's takings */
+  maxDiscountPct: number;
 };
 
 export type Promotion = {
