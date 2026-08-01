@@ -430,6 +430,138 @@ function StaffManagement() {
     void load();
   };
 
+  /**
+   * Applies a role change. Cashiers (username + PIN, public.cashiers) and
+   * staff accounts (email + password, public.app_users) live in different
+   * tables, so crossing that boundary creates the new record first and only
+   * deletes the old one once the new one exists.
+   */
+  const convertRole = async (
+    row: StaffRow,
+    target: StaffRole,
+    creds: { username: string; pin: string; email: string; password: string },
+    permsMode: "defaults" | "keep",
+  ): Promise<boolean> => {
+    const permissions = (
+      permsMode === "defaults"
+        ? (rolePermissions(target) as unknown as Record<string, boolean>)
+        : row.permissions
+    ) as Record<string, boolean>;
+
+    // --- same family: plain app_users role update ---------------------------
+    if (row.kind === "account" && target !== "cashier") {
+      const { error } = await sb.rpc("set_app_user_profile", {
+        p_user_id: row.user_id,
+        p_full_name: row.full_name,
+        p_role: toDbRole(target),
+        p_store_id: row.store_id,
+        p_is_active: row.is_active,
+      });
+      if (error) {
+        toast.error("Could not change role", { description: errText(error) });
+        return false;
+      }
+      if (permsMode === "defaults") {
+        await sb.rpc("set_app_user_permissions", {
+          p_user_id: row.user_id,
+          p_permissions: permissions,
+        });
+      }
+      toast.success(`Role changed to ${target}`);
+      setSelectedId(row.user_id);
+      void load();
+      return true;
+    }
+
+    // --- account -> cashier -------------------------------------------------
+    if (target === "cashier") {
+      const username = creds.username.trim().toLowerCase();
+      if (!/^[a-z0-9._-]{3,}$/.test(username)) {
+        toast.error("Enter a username (3+ characters, letters/numbers)");
+        return false;
+      }
+      if (!/^\d{6}$/.test(creds.pin)) {
+        toast.error("PIN must be exactly 6 digits");
+        return false;
+      }
+      let cashierId = "";
+      try {
+        cashierId = await upsertCashier({
+          username,
+          fullName: row.full_name || username,
+          pin: creds.pin,
+          storeId: row.store_id,
+          isActive: row.is_active,
+        });
+        await setCashierPermissions(cashierId, permissions);
+      } catch (e) {
+        toast.error("Could not create the cashier login", { description: cashierErrText(e) });
+        return false;
+      }
+      const { error } = await sb.rpc("delete_terminal_user", { p_user_id: row.user_id });
+      if (error) {
+        toast.error("Cashier created, but the old account could not be removed", {
+          description: errText(error),
+        });
+      }
+      toast.success(`${row.full_name || username} is now a cashier`);
+      setSelectedId(username);
+      void load();
+      return true;
+    }
+
+    // --- cashier -> warehouse / supervisor / admin --------------------------
+    const email = creds.email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error("Enter a valid email address");
+      return false;
+    }
+    if (creds.password.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return false;
+    }
+    const auth = await createStaffAccount({
+      email,
+      fullName: row.full_name || email,
+      password: creds.password,
+      role: target === "admin" ? "admin" : target === "warehouse" ? "warehouse" : "supervisor",
+      storeId: row.store_id,
+    });
+    if (!auth.ok && !/already/i.test(auth.error ?? "")) {
+      toast.error("Could not create the login account", { description: auth.error });
+      return false;
+    }
+    const newUserId = staffUserId(email);
+    const { error } = await sb.rpc("upsert_terminal_user", {
+      p_user_id: newUserId,
+      p_full_name: row.full_name || email,
+      p_role: toDbRole(target),
+      p_store_id: row.store_id,
+      p_email: email,
+      p_pin: String(Math.floor(1000 + Math.random() * 9000)),
+      p_password: creds.password,
+    });
+    if (error) {
+      toast.error("Could not save the new staff profile", { description: errText(error) });
+      return false;
+    }
+    await sb.rpc("set_app_user_permissions", {
+      p_user_id: newUserId,
+      p_permissions: permissions,
+    });
+    try {
+      await deleteCashier(row.id);
+    } catch (e) {
+      toast.error("Account created, but the old cashier record remains", {
+        description: cashierErrText(e),
+      });
+    }
+    toast.success(`${row.full_name || email} is now a ${target}`);
+    setSelectedId(newUserId);
+    void load();
+    return true;
+  };
+
   if (!isAdmin) {
     return (
       <AppShell>
