@@ -150,7 +150,7 @@ type AuthCtx = {
   /** public.app_users record backing the signed-in account */
   appUser: AppUserProfile | null;
   /** permission check that always passes for the admin */
-  can: (flag: keyof StaffPermissions) => boolean;
+  can: (flag: PermissionFlag) => boolean;
   staff: StaffMember[];
   addStaff: (member: Omit<StaffMember, "id">) => void;
   updateStaff: (member: StaffMember) => void;
@@ -460,13 +460,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           found?.storeId ??
           null),
       permissions: isAdmin
-        ? FULL_PERMISSIONS
-        : {
-            ...DEFAULT_PERMISSIONS,
-            ...(found?.permissions ?? {}),
-            // public.app_users is the source of truth when the account has a row.
-            ...(appUser?.permissions ?? {}),
-          },
+        ? { ...FULL_PERMISSIONS }
+        : // public.app_users is the source of truth when the account has a row.
+          normalizePermissions(
+            {
+              ...(found?.permissions ?? {}),
+              ...(appUser?.permissions ?? {}),
+            },
+            fromDbRole(appUser?.role ?? null),
+          ),
     };
   }, [session, roles, staff, terminalUser, appUser]);
 
@@ -480,7 +482,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       authUserId: userId,
       terminalUser,
       appUser,
-      can: (flag) => user?.role === "admin" || !!user?.permissions?.[flag],
+      can: (flag) =>
+        user?.role === "admin" || !!user?.permissions?.[resolvePermission(flag)],
       staff,
       addStaff,
       updateStaff,
