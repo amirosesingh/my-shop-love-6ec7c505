@@ -75,6 +75,7 @@ function RolesPage() {
     }
     const rows = (userRows ?? []) as {
       auth_user_id: string | null;
+      user_id?: string | null;
       user_code: string | null;
       full_name: string | null;
       email: string | null;
@@ -87,7 +88,7 @@ function RolesPage() {
           id: r.auth_user_id as string,
           email: r.email,
           full_name: r.full_name,
-          user_code: r.user_code,
+          user_code: r.user_id ?? r.user_code,
           role: r.role,
         })),
     );
