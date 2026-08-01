@@ -553,6 +553,100 @@ function Register() {
     );
   }
 
+  /* ── Operation deck helpers ─────────────────────────────────────── */
+
+  function openPayment(preset?: PaymentMethod) {
+    if (!lines.length) return;
+    if (preset) setMethod(preset);
+    setTendered(Math.max(0, totals.total).toFixed(2));
+    setPayOpen(true);
+  }
+
+  function holdOrder() {
+    if (!lines.length) return;
+    const snapshot = lines;
+    setHeld((hs) => [
+      ...hs,
+      {
+        id: `H${Date.now()}`,
+        label: `${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · ${snapshot.length} item(s)`,
+        total: totals.total,
+        lines: snapshot,
+      },
+    ]);
+    resetCart();
+    toast.success("Order held — resume it from the operation deck");
+  }
+
+  function resumeHeld(id: string) {
+    const order = held.find((h) => h.id === id);
+    if (!order) return;
+    if (lines.length) {
+      toast.error("Clear or hold the current ticket first");
+      return;
+    }
+    setLines(order.lines);
+    setHeld((hs) => hs.filter((h) => h.id !== id));
+    toast.success("Held order resumed");
+  }
+
+  async function applyCoupon() {
+    const code = couponCode.trim();
+    if (!code) return;
+    const rule = state.promotions.find(
+      (p) => p.active && p.name.toLowerCase() === code.toLowerCase() && p.value,
+    );
+    if (!rule) {
+      toast.error(`No active promotion matches “${code}”`);
+      return;
+    }
+    if (!(await unlockDiscounts())) return;
+    setCartDiscountType(rule.valueType ?? "amount");
+    setCartDiscount(rule.value ?? 0);
+    setCoupon({ code: rule.name });
+    setCouponCode("");
+    setCouponOpen(false);
+    toast.success(`Coupon ${rule.name} applied`);
+  }
+
+  const splitShares = useMemo(() => {
+    const cents = Math.round(balanceDue * 100);
+    const base = Math.floor(cents / splitWays);
+    return Array.from({ length: splitWays }, (_, i) =>
+      (base + (i < cents - base * splitWays ? 1 : 0)) / 100,
+    );
+  }, [balanceDue, splitWays]);
+
+  /** Provisional receipt rendered from the live ticket for the overlay. */
+  const previewHtml = useMemo(() => {
+    if (!receiptPreview) return "";
+    const source: Sale | null = lines.length
+      ? {
+          id: "preview",
+          receiptNo: "PREVIEW",
+          storeId: currentStore.id,
+          shiftId: activeShift?.id ?? "",
+          lines,
+          subtotal: totals.subtotal,
+          discount: totals.discount,
+          tax: totals.tax,
+          total: totals.total,
+          paid: 0,
+          change: 0,
+          method,
+          memberId,
+          pointsEarned,
+          cashier: activeShift?.cashier ?? cashier,
+          createdAt: new Date().toISOString(),
+          ...(exchangeRef
+            ? { exchangeOfReceiptNo: exchangeRef, exchangeCredit: totals.credit }
+            : {}),
+        }
+      : lastSale;
+    return source ? saleReceiptPreview(source, member, "sale") : "";
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [receiptPreview, displayKey, method, lastSale, member]);
+
   return (
     <AppShell>
       <div className="flex h-screen min-w-0 flex-col overflow-hidden lg:flex-row">
