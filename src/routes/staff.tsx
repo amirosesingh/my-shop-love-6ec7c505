@@ -562,25 +562,21 @@ function StaffManagement() {
                   <div className="flex flex-wrap items-end gap-3 rounded-md border border-border p-3">
                     <div className="space-y-1">
                       <Label className="flex items-center gap-1 text-xs">
-                        <KeyRound className="size-3.5" /> Reset 4-digit PIN
+                        <KeyRound className="size-3.5" /> Set new password
                       </Label>
                       <Input
-                        className="w-32"
+                        className="w-48"
                         type="password"
-                        inputMode="numeric"
-                        maxLength={4}
-                        autoComplete="off"
-                        value={pinReset}
-                        onChange={(e) =>
-                          setPinReset(e.target.value.replace(/\D/g, "").slice(0, 4))
-                        }
+                        autoComplete="new-password"
+                        value={passwordReset}
+                        onChange={(e) => setPasswordReset(e.target.value)}
                       />
                     </div>
-                    <Button variant="outline" onClick={() => void resetPin(selected)}>
-                      Update PIN
+                    <Button variant="outline" onClick={() => void resetPassword(selected)}>
+                      Update password
                     </Button>
                     <p className="text-[11px] text-muted-foreground">
-                      PINs are hashed in the database and can never be read back.
+                      Credentials are stored securely and can never be read back.
                     </p>
                   </div>
 
