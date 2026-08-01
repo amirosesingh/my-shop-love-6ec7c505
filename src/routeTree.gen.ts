@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuditRouteImport } from './routes/audit'
+import { Route as DisplayRouteImport } from './routes/display'
 import { Route as InventoryRouteImport } from './routes/inventory'
 import { Route as MembersRouteImport } from './routes/members'
 import { Route as PromotionsRouteImport } from './routes/promotions'
@@ -30,6 +31,11 @@ const IndexRoute = IndexRouteImport.update({
 const AuditRoute = AuditRouteImport.update({
   id: '/audit',
   path: '/audit',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DisplayRoute = DisplayRouteImport.update({
+  id: '/display',
+  path: '/display',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InventoryRoute = InventoryRouteImport.update({
@@ -86,6 +92,7 @@ const TransfersRoute = TransfersRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/audit': typeof AuditRoute
+  '/display': typeof DisplayRoute
   '/inventory': typeof InventoryRoute
   '/members': typeof MembersRoute
   '/promotions': typeof PromotionsRoute
@@ -100,6 +107,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/audit': typeof AuditRoute
+  '/display': typeof DisplayRoute
   '/inventory': typeof InventoryRoute
   '/members': typeof MembersRoute
   '/promotions': typeof PromotionsRoute
@@ -115,6 +123,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/audit': typeof AuditRoute
+  '/display': typeof DisplayRoute
   '/inventory': typeof InventoryRoute
   '/members': typeof MembersRoute
   '/promotions': typeof PromotionsRoute
@@ -131,6 +140,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/audit'
+    | '/display'
     | '/inventory'
     | '/members'
     | '/promotions'
@@ -145,6 +155,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/audit'
+    | '/display'
     | '/inventory'
     | '/members'
     | '/promotions'
@@ -159,6 +170,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/audit'
+    | '/display'
     | '/inventory'
     | '/members'
     | '/promotions'
@@ -174,6 +186,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuditRoute: typeof AuditRoute
+  DisplayRoute: typeof DisplayRoute
   InventoryRoute: typeof InventoryRoute
   MembersRoute: typeof MembersRoute
   PromotionsRoute: typeof PromotionsRoute
@@ -200,6 +213,13 @@ declare module '@tanstack/react-router' {
       path: '/audit'
       fullPath: '/audit'
       preLoaderRoute: typeof AuditRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/display': {
+      id: '/display'
+      path: '/display'
+      fullPath: '/display'
+      preLoaderRoute: typeof DisplayRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/inventory': {
@@ -278,6 +298,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuditRoute: AuditRoute,
+  DisplayRoute: DisplayRoute,
   InventoryRoute: InventoryRoute,
   MembersRoute: MembersRoute,
   PromotionsRoute: PromotionsRoute,
