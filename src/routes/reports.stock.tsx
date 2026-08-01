@@ -45,7 +45,7 @@ export const Route = createFileRoute("/reports/stock")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: StockReport;
+  component: StockReport,
 });
 
 const ALL = "__all__";
