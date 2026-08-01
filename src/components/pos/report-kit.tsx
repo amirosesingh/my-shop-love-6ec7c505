@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/pos-auth";
 
 /** Shared date-range state helpers for every report page. */
 export const isoDay = (d: Date) => d.toISOString().slice(0, 10);
