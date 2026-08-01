@@ -477,6 +477,9 @@ function Register() {
             >
               <Vault className="size-4" /> Open drawer
             </Button>
+            <Button variant="outline" className="h-11" onClick={openCustomerDisplay}>
+              <MonitorPlay className="size-4" /> Customer screen
+            </Button>
             <Button
               variant="outline"
               className="h-11"
