@@ -54,7 +54,117 @@ export function TerminalLogin() {
           <Lock className="ml-auto size-4 text-muted-foreground" />
         </div>
 
-        <form
+        <Tabs
+          defaultValue="cashier"
+          onValueChange={() => {
+            setError("");
+            setPin("");
+          }}
+        >
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="cashier">Cashier PIN</TabsTrigger>
+            <TabsTrigger value="admin">Supervisor / Admin</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="cashier" className="space-y-5 pt-4">
+            <div className="space-y-1">
+              <Label htmlFor="username">Username</Label>
+              <Input
+                id="username"
+                autoFocus
+                autoComplete="username"
+                placeholder="cashier101"
+                value={username}
+                onChange={(e) => {
+                  setUsername(e.target.value.replace(/\s+/g, ""));
+                  setError("");
+                }}
+                className="h-11 text-center text-base tracking-wide"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>6-digit PIN</Label>
+              <div
+                className="flex items-center justify-center gap-3 rounded-md border border-border bg-surface-2 py-3"
+                aria-label="PIN entry"
+                role="status"
+              >
+                {[0, 1, 2, 3, 4, 5].map((i) => (
+                  <span
+                    key={i}
+                    className={cn(
+                      "size-3.5 rounded-full border border-border",
+                      i < pin.length ? "bg-primary" : "bg-transparent",
+                    )}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              {KEYS.map((k) => (
+                <Button
+                  key={k}
+                  type="button"
+                  variant="outline"
+                  className="h-14 text-lg"
+                  disabled={busy}
+                  onClick={() => press(k)}
+                >
+                  {k}
+                </Button>
+              ))}
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-14 text-xs"
+                disabled={busy}
+                onClick={() => {
+                  setPin("");
+                  setError("");
+                }}
+              >
+                Clear
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-14 text-lg"
+                disabled={busy}
+                onClick={() => press("0")}
+              >
+                0
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-14"
+                aria-label="Delete last digit"
+                disabled={busy}
+                onClick={() => setPin(pin.slice(0, -1))}
+              >
+                <Delete className="size-5" />
+              </Button>
+            </div>
+
+            {error && <p className="text-center text-sm text-destructive">{error}</p>}
+
+            <Button
+              className="w-full"
+              disabled={busy || pin.length !== 6}
+              onClick={() => void submitPin()}
+            >
+              {busy && <Loader2 className="size-4 animate-spin" />}
+              Sign in
+            </Button>
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              PINs are verified by the backend — they are never stored on this terminal.
+            </p>
+          </TabsContent>
+
+          <TabsContent value="admin" className="pt-4">
+            <form
               className="space-y-4"
               onSubmit={async (e) => {
                 e.preventDefault();
@@ -70,9 +180,8 @@ export function TerminalLogin() {
                 <Input
                   id="email"
                   type="email"
-                  autoFocus
                   autoComplete="email"
-                  placeholder="you@store.com"
+                  placeholder="supervisor@store.com"
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);
@@ -99,10 +208,12 @@ export function TerminalLogin() {
                 Sign in
               </Button>
               <p className="text-[11px] leading-relaxed text-muted-foreground">
-                Cashiers, supervisors and admins all sign in with their email and password.
-                Permissions are applied automatically from the staff profile.
+                Supervisor and admin accounts sign in with email and password; cashiers use the
+                PIN tab.
               </p>
-        </form>
+            </form>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
