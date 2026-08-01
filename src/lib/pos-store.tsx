@@ -176,6 +176,11 @@ export function PosProvider({ children }: { children: ReactNode }) {
 
   const openShift = useCallback(
     (cashier: string, openingFloat: number) => {
+      logger.log("sale_event", "Shift opened", "shifts", {
+        cashier,
+        openingFloat,
+        storeId: stateRef.current.currentStoreId,
+      });
       setState((s) => ({
         ...s,
         shifts: [
@@ -209,6 +214,13 @@ export function PosProvider({ children }: { children: ReactNode }) {
         ...s,
         shifts: s.shifts.map((x) => (x.id === closed.id ? closed : x)),
       }));
+      logger.log("sale_event", "Shift closed", "shifts", {
+        shiftId: closed.id,
+        storeId: closed.storeId,
+        openingFloat: closed.openingFloat,
+        countedCash: countedCash,
+        note,
+      });
       return closed;
     },
     [activeShift],
