@@ -53,6 +53,20 @@ const ROUTE_PERMISSIONS: Record<string, PermissionFlag> = {
   "/members": "can_add_member",
 };
 
+/** The only screens any signed-in account may open. Everything else must have
+ *  an entry above — unknown paths are denied, never silently allowed. */
+const PUBLIC_ROUTES = new Set(["/", "/display"]);
+
+/** Longest matching prefix wins so a child page can tighten its parent gate. */
+function requiredPermission(pathname: string): PermissionFlag | null | "unknown" {
+  if (PUBLIC_ROUTES.has(pathname)) return null;
+  const key =
+    Object.keys(ROUTE_PERMISSIONS)
+      .filter((p) => pathname === p || pathname.startsWith(`${p}/`))
+      .sort((a, b) => b.length - a.length)[0] ?? "";
+  return ROUTE_PERMISSIONS[key] ?? "unknown";
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const { activeShift, stores, currentStore, setCurrentStore, state, ready: dataReady } = usePos();
   const { ready, user, isAdmin, canSwitchStores, logout, lock, can } = useAuth();
