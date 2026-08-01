@@ -61,7 +61,12 @@ export function useRevocationCheck(): RevocationState {
   const [lastCheckedAt, setLastCheckedAt] = useState<string | null>(null);
 
   useEffect(() => subscribeTerminalConfig(() => setConfig(readTerminalConfig())), []);
-  useEffect(() => subscribeRevocation(() => setRevoked(isTerminalRevoked())), []);
+  useEffect(() => {
+    const off = subscribeRevocation(() => setRevoked(isTerminalRevoked()));
+    return () => {
+      off();
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
