@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/table";
 import { money, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
+import { useUserPermissions } from "@/lib/pos-permissions";
 import { openCashDrawer, printSaleReceipt, printShiftReport } from "@/lib/pos-print";
 
 export const Route = createFileRoute("/shifts")({
@@ -46,6 +47,7 @@ export const Route = createFileRoute("/shifts")({
 function Shifts() {
   const { state, activeShift, openShift, closeShift, refundSale, currentStore, stores } = usePos();
   const { user, isAdmin } = useAuth();
+  const { requirePermission } = useUserPermissions();
   const [cashier, setCashier] = useState(user?.name ?? "Cashier");
   const [float, setFloat] = useState("150");
   const [counted, setCounted] = useState("");
@@ -75,7 +77,12 @@ function Shifts() {
               Drawer control, X / Z reports and full sales history
             </p>
           </div>
-          <Button variant="outline" onClick={() => openCashDrawer()}>
+          <Button
+            variant="outline"
+            onClick={async () => {
+              if (await requirePermission("can_open_drawer")) openCashDrawer();
+            }}
+          >
             <Vault className="size-4" /> Open drawer
           </Button>
         </header>
@@ -129,7 +136,8 @@ function Shifts() {
                   <Printer className="size-4" /> Print X report
                 </Button>
                 <Button
-                  onClick={() => {
+                  onClick={async () => {
+                    if (!(await requirePermission("can_close_drawer"))) return;
                     setCounted(expected.toFixed(2));
                     setCloseOpen(true);
                   }}
@@ -153,7 +161,8 @@ function Shifts() {
                 />
               </div>
               <Button
-                onClick={() => {
+                onClick={async () => {
+                  if (!(await requirePermission("can_open_drawer"))) return;
                   openShift(cashier || "Cashier", Number(float) || 0);
                   openCashDrawer();
                   toast.success("Shift opened");
@@ -218,7 +227,8 @@ function Shifts() {
                           size="sm"
                           variant="ghost"
                           disabled={s.refunded}
-                          onClick={() => {
+                          onClick={async () => {
+                            if (!(await requirePermission("can_process_refund"))) return;
                             refundSale(s.id);
                             printSaleReceipt(s, member, "refund");
                             openCashDrawer();

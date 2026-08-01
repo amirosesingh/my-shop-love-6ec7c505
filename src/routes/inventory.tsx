@@ -66,7 +66,8 @@ function Inventory() {
   const { can } = useAuth();
   const showMoney = can("can_view_sales_reports");
   const canEdit = can("can_add_new_product");
-  const canEcom = can("can_edit_product_price");
+  const canPrice = can("can_edit_product_price");
+  const canEcom = canPrice;
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState<Product | null>(null);
