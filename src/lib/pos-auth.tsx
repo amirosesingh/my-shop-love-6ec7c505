@@ -84,7 +84,7 @@ const SEED_STAFF: StaffMember[] = [
     staffId: "EMP-101",
     email: "",
     storeId: "s1",
-    permissions: { ...DEFAULT_PERMISSIONS, financials: true, products: true },
+    permissions: { ...DEFAULT_PERMISSIONS, can_view_sales_reports: true, can_add_new_product: true },
   },
   {
     id: "u2",
@@ -92,7 +92,7 @@ const SEED_STAFF: StaffMember[] = [
     staffId: "EMP-102",
     email: "",
     storeId: "s2",
-    permissions: { ...DEFAULT_PERMISSIONS, financials: true },
+    permissions: { ...DEFAULT_PERMISSIONS, can_view_sales_reports: true },
   },
   {
     id: "u3",
