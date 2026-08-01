@@ -61,7 +61,12 @@ async function createAccount(
     password,
     options: { data: metadata },
   });
-  if (error) return { ok: false, error: error.message };
+  if (error) {
+    const message = error.message === "Database error saving new user"
+      ? "The authentication profile sync failed. Apply supabase/schema4.sql, then retry."
+      : error.message;
+    return { ok: false, error: message };
+  }
   return { ok: true, needsConfirmation: !data.session };
 }
 
