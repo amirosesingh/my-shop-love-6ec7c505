@@ -83,6 +83,29 @@ export const PAYMENT_LABELS: Record<PaymentMethod, string> = {
   bank_transfer: "Bank transfer",
 };
 
+/** One tender line on a split payment. A bill may carry several. */
+export type Payment = {
+  id: string;
+  method: PaymentMethod;
+  amount: number;
+  /** free-text bank / card machine used for a card tender */
+  bankName?: string;
+  /** slip, approval or transfer reference */
+  ref?: string;
+};
+
+export const paymentsTotal = (ps: Payment[] | undefined) =>
+  r2((ps ?? []).reduce((a, p) => a + (Number(p.amount) || 0), 0));
+
+/** Human-readable one-line tender summary, e.g. "Cash 20.00 + Card (HSBC) 15.00". */
+export const paymentsLabel = (ps: Payment[] | undefined) =>
+  (ps ?? [])
+    .map(
+      (p) =>
+        `${PAYMENT_LABELS[p.method]}${p.bankName ? ` (${p.bankName})` : ""} ${p.amount.toFixed(2)}`,
+    )
+    .join(" + ");
+
 export type Sale = {
   id: string;
   receiptNo: string;
@@ -96,6 +119,8 @@ export type Sale = {
   paid: number;
   change: number;
   method: PaymentMethod;
+  /** full split-tender breakdown; single-tender bills carry one entry */
+  payments?: Payment[];
   memberId: string | null;
   pointsEarned: number;
   cashier: string;
