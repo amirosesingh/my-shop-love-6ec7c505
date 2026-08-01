@@ -191,6 +191,13 @@
   min-width: calc(1.75rem * var(--pos-scale));
 }
 
+.pos-compact .pos-scaled button,
+.pos-compact .pos-scaled [role="button"],
+.pos-compact .pos-scaled input,
+.pos-compact .pos-scaled select {
+  min-height: calc(2.1rem * var(--pos-scale));
+}
+
 @media (pointer: coarse) {
   .pos-scaled button,
   .pos-scaled [role="button"],

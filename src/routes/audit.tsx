@@ -304,7 +304,7 @@ function AuditPage() {
                       <p className="text-sm">{describeLog(l)}</p>
                       <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
                         <span className="numeric">{new Date(l.at).toLocaleString()}</span>
-                        <Badge variant="outline" className="text-[10px]">{l.category}</Badge>
+                        <Badge variant="outline" className="text-[10px]">{categoryLabel(l.category)}</Badge>
                         <span className="capitalize">{l.module}</span>
                         <Badge variant={l.synced_to_cloud ? "secondary" : "outline"} className="text-[10px]">
                           {l.synced_to_cloud ? "synced" : "pending"}
@@ -361,7 +361,7 @@ function AuditPage() {
                     </span>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline">{l.category}</Badge>
+                    <Badge variant="outline">{categoryLabel(l.category)}</Badge>
                   </TableCell>
                   <TableCell className="max-w-md">{describeLog(l)}</TableCell>
                   <TableCell>
@@ -415,7 +415,7 @@ function AuditPage() {
               </p>
               <dl className="grid grid-cols-2 gap-2 text-sm">
                 <Row label="Staff" value={`${detail.staffName} (${detail.staffId})`} />
-                <Row label="Category" value={detail.category} />
+                <Row label="Category" value={categoryLabel(detail.category)} />
                 <Row label="Route" value={detail.route} />
                 <Row label="Store" value={detail.storeId ?? "all stores"} />
                 <Row
