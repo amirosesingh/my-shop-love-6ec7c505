@@ -51,6 +51,8 @@ import {
 } from "@/lib/permissions";
 import {
   createStaffAccount,
+  createCashierAccount,
+  cashierEmail,
   staffUserId,
 } from "@/lib/pos-users";
 import { cn } from "@/lib/utils";
@@ -90,6 +92,8 @@ type StaffRow = {
 };
 
 const NEW_USER = {
+  user_id: "",
+  pin: "",
   full_name: "",
   email: "",
   password: "",
@@ -199,6 +203,46 @@ function StaffManagement() {
   const createUser = async () => {
     setCreating(true);
     try {
+      if (form.role === "cashier") {
+        const username = form.user_id.trim().toLowerCase();
+        if (!/^[a-z0-9._-]{3,}$/.test(username)) {
+          toast.error("Enter a username (3+ characters, letters/numbers)");
+          return;
+        }
+        if (!/^\d{6}$/.test(form.pin)) {
+          toast.error("PIN must be exactly 6 digits");
+          return;
+        }
+        const auth = await createCashierAccount({
+          userId: username,
+          fullName: form.full_name || username,
+          pin: form.pin,
+          storeId: form.store_id || null,
+        });
+        if (!auth.ok && !/already/i.test(auth.error ?? "")) {
+          toast.error("Could not create account", { description: auth.error });
+          return;
+        }
+        const { error: cashierError } = await sb.rpc("upsert_terminal_user", {
+          p_user_id: username,
+          p_full_name: form.full_name.trim() || username,
+          p_role: toDbRole("cashier"),
+          p_store_id: form.store_id || null,
+          p_email: cashierEmail(username),
+          // Legacy 4-digit column; the real PIN lives in the auth secret.
+          p_pin: String(Math.floor(1000 + Math.random() * 9000)),
+          p_password: "",
+        });
+        if (cashierError) {
+          toast.error("Could not save staff profile", { description: cashierError.message });
+          return;
+        }
+        toast.success(`Cashier ${username} created`);
+        setForm(NEW_USER);
+        setDialogOpen(false);
+        void load();
+        return;
+      }
       const email = form.email.trim().toLowerCase();
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         toast.error("Enter a valid email address");
@@ -212,7 +256,7 @@ function StaffManagement() {
         email,
         fullName: form.full_name || email,
         password: form.password,
-        role: form.role === "admin" ? "admin" : form.role === "cashier" ? "cashier" : "supervisor",
+        role: form.role === "admin" ? "admin" : "supervisor",
         storeId: form.store_id || null,
       });
       if (!auth.ok && !/already/i.test(auth.error ?? "")) {
@@ -321,40 +365,11 @@ function StaffManagement() {
                 <DialogHeader>
                   <DialogTitle>Create staff account</DialogTitle>
                   <DialogDescription>
-                    Every account — cashier, supervisor or admin — signs in with an email address
-                    and password.
+                    Cashiers sign in with a username and 6-digit PIN. Supervisors and admins sign
+                    in with email and password.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-3">
-                  <div className="space-y-1">
-                    <Label htmlFor="nu-name">Full name</Label>
-                    <Input
-                      id="nu-name"
-                      value={form.full_name}
-                      onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="nu-email">Email</Label>
-                    <Input
-                      id="nu-email"
-                      type="email"
-                      autoComplete="off"
-                      placeholder="cashier@store.com"
-                      value={form.email}
-                      onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="nu-pass">Password</Label>
-                    <Input
-                      id="nu-pass"
-                      type="password"
-                      autoComplete="new-password"
-                      value={form.password}
-                      onChange={(e) => setForm({ ...form, password: e.target.value })}
-                    />
-                  </div>
                   <div className="space-y-1">
                     <Label>Role</Label>
                     <Select
@@ -373,6 +388,68 @@ function StaffManagement() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="nu-name">Full name</Label>
+                    <Input
+                      id="nu-name"
+                      value={form.full_name}
+                      onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+                    />
+                  </div>
+                  {form.role === "cashier" ? (
+                    <>
+                      <div className="space-y-1">
+                        <Label htmlFor="nu-username">Username</Label>
+                        <Input
+                          id="nu-username"
+                          autoComplete="off"
+                          placeholder="cashier101"
+                          value={form.user_id}
+                          onChange={(e) =>
+                            setForm({ ...form, user_id: e.target.value.replace(/\s+/g, "") })
+                          }
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="nu-pin">6-digit PIN</Label>
+                        <Input
+                          id="nu-pin"
+                          type="password"
+                          inputMode="numeric"
+                          maxLength={6}
+                          autoComplete="off"
+                          value={form.pin}
+                          onChange={(e) =>
+                            setForm({ ...form, pin: e.target.value.replace(/\D/g, "").slice(0, 6) })
+                          }
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="space-y-1">
+                        <Label htmlFor="nu-email">Email</Label>
+                        <Input
+                          id="nu-email"
+                          type="email"
+                          autoComplete="off"
+                          placeholder="supervisor@store.com"
+                          value={form.email}
+                          onChange={(e) => setForm({ ...form, email: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="nu-pass">Password</Label>
+                        <Input
+                          id="nu-pass"
+                          type="password"
+                          autoComplete="new-password"
+                          value={form.password}
+                          onChange={(e) => setForm({ ...form, password: e.target.value })}
+                        />
+                      </div>
+                    </>
+                  )}
                   <div className="space-y-1">
                     <Label>Assigned store</Label>
                     <Select
