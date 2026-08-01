@@ -156,6 +156,18 @@ const rowToSettings = (r: Row | null): AppSettings =>
       }
     : defaultSettings;
 
+/** Columns added by supabase/schema6.sql; dropped when the DB predates it. */
+const BRANDING_COLUMNS = [
+  "company_name",
+  "tax_number",
+  "reg_number",
+  "phone",
+  "website",
+  "fonts",
+  "custom_lines",
+  "qr",
+] as const;
+
 const settingsToRow = (s: AppSettings): Row => ({
   id: 1,
   tax_percentage: s.tax.rate,
