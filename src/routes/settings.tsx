@@ -41,7 +41,8 @@ const TOGGLES: { key: keyof ReceiptSettings; label: string }[] = [
 
 function Settings() {
   const { state, currentStore, updateSettings } = usePos();
-  const { isAdmin } = useAuth();
+  const { isAdmin, can } = useAuth();
+  const canSettings = isAdmin || can("can_access_pos_settings");
   const { tax, receipt } = state.settings;
 
   const sample: Sale = useMemo(() => {
@@ -98,7 +99,7 @@ function Settings() {
 
   const geometry = paperCss(receipt.paper);
 
-  if (!isAdmin) {
+  if (!canSettings) {
     return (
       <AppShell>
         <div className="p-6">

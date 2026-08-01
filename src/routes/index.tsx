@@ -65,6 +65,14 @@ function Register() {
   const { user, can } = useAuth();
   const { requirePermission } = useUserPermissions();
   const canDiscount = can("can_give_discount");
+  const [discountOverride, setDiscountOverride] = useState(false);
+  const discountAllowed = canDiscount || discountOverride;
+  async function unlockDiscounts() {
+    if (discountAllowed) return true;
+    const ok = await requirePermission("can_give_discount");
+    if (ok) setDiscountOverride(true);
+    return ok;
+  }
   const canRefund = can("can_process_refund");
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
@@ -189,7 +197,11 @@ function Register() {
     });
   }
 
-  function setQty(index: number, delta: number) {
+  async function setQty(index: number, delta: number) {
+    const line = lines[index];
+    const removes = line && !line.credit && line.qty + delta <= 0;
+    // Removing a line from the ticket is a void and needs the permission.
+    if (removes && !(await requirePermission("can_void_item"))) return;
     setLines((ls) =>
       ls
         .map((l, i) => (i === index ? { ...l, qty: l.credit ? l.qty - delta : l.qty + delta } : l))
@@ -201,10 +213,15 @@ function Register() {
     setLines((ls) => ls.map((l, i) => (i === index ? { ...l, ...patch } : l)));
   }
 
-  function clearCart() {
+  function resetCart() {
     setLines([]);
     setCartDiscount(0);
     setExchangeRef(null);
+  }
+
+  async function clearCart() {
+    if (lines.length && !(await requirePermission("can_void_item"))) return;
+    resetCart();
   }
 
   function lookupBill() {
@@ -306,7 +323,7 @@ function Register() {
     if (method === "cash") openCashDrawer();
     printSaleReceipt(sale, member, "sale");
     setLastSale(sale);
-    clearCart();
+    resetCart();
     setMemberId(null);
     setTendered("");
     setPayOpen(false);
@@ -439,7 +456,7 @@ function Register() {
               variant="ghost"
               size="sm"
               disabled={!lines.length}
-              onClick={clearCart}
+              onClick={() => void clearCart()}
             >
               <Trash2 className="size-4" /> Clear
             </Button>
@@ -559,11 +576,11 @@ function Register() {
                       </p>
                     </div>
                     <div className="flex items-center gap-1">
-                      <Button size="icon" variant="outline" className="size-7" onClick={() => setQty(i, -1)}>
+                      <Button size="icon" variant="outline" className="size-7" onClick={() => void setQty(i, -1)}>
                         <Minus className="size-3" />
                       </Button>
                       <span className="numeric w-6 text-center text-sm">{l.qty}</span>
-                      <Button size="icon" variant="outline" className="size-7" onClick={() => setQty(i, 1)}>
+                      <Button size="icon" variant="outline" className="size-7" onClick={() => void setQty(i, 1)}>
                         <Plus className="size-3" />
                       </Button>
                     </div>
@@ -573,7 +590,17 @@ function Register() {
                       {money((l.price - lineUnitDiscount(l)) * l.qty)}
                     </span>
                   </div>
-                  {!l.credit && !l.foc && canDiscount && (
+                  {!l.credit && !l.foc && !discountAllowed && (
+                    <div className="mt-2 flex justify-end">
+                      <button
+                        onClick={() => void unlockDiscounts()}
+                        className="text-[11px] text-muted-foreground underline-offset-2 hover:underline"
+                      >
+                        Discount locked · supervisor override
+                      </button>
+                    </div>
+                  )}
+                  {!l.credit && !l.foc && discountAllowed && (
                     <div className="mt-2 flex items-center justify-end gap-1">
                       <span className="text-[11px] text-muted-foreground">Disc</span>
                       <Input
@@ -634,7 +661,18 @@ function Register() {
                 value={`-${money(totals.credit)}`}
               />
             )}
-            <div className={`flex items-center justify-between ${canDiscount ? "" : "hidden"}`}>
+            {!discountAllowed && (
+              <button
+                onClick={() => void unlockDiscounts()}
+                className="flex w-full items-center justify-between text-muted-foreground"
+              >
+                <span>Bill discount</span>
+                <span className="text-[11px] underline-offset-2 hover:underline">
+                  locked · supervisor override
+                </span>
+              </button>
+            )}
+            <div className={`flex items-center justify-between ${discountAllowed ? "" : "hidden"}`}>
               <span className="text-muted-foreground">Bill discount</span>
               <div className="flex items-center gap-1">
                 <Input

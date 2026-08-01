@@ -66,7 +66,8 @@ function Inventory() {
   const { can } = useAuth();
   const showMoney = can("can_view_sales_reports");
   const canEdit = can("can_add_new_product");
-  const canEcom = can("can_edit_product_price");
+  const canPrice = can("can_edit_product_price");
+  const canEcom = canPrice;
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState<Product | null>(null);
@@ -183,6 +184,7 @@ function Inventory() {
                     </Field>
                     <Field label="Price">
                       <Input
+                        disabled={!canPrice}
                         className="numeric"
                         value={draft.price}
                         onChange={(e) => setDraft({ ...draft, price: Number(e.target.value) || 0 })}
@@ -190,6 +192,7 @@ function Inventory() {
                     </Field>
                     <Field label="E-com price">
                       <Input
+                        disabled={!canPrice}
                         className="numeric"
                         value={draft.ecomPrice ?? 0}
                         onChange={(e) =>
@@ -199,6 +202,7 @@ function Inventory() {
                     </Field>
                     <Field label="Cost">
                       <Input
+                        disabled={!canPrice}
                         className="numeric"
                         value={draft.cost}
                         onChange={(e) => setDraft({ ...draft, cost: Number(e.target.value) || 0 })}
