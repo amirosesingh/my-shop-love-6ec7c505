@@ -72,7 +72,7 @@ export const Route = createFileRoute("/")({
 });
 
 function Register() {
-  const { state, activeShift, recordSale, openShift, currentStore } = usePos();
+  const { state, activeShift, recordSale, createBooking, openShift, currentStore } = usePos();
   const { user, can } = useAuth();
   const { requirePermission } = useUserPermissions();
   const canDiscount = can("can_give_discount");
@@ -106,6 +106,13 @@ function Register() {
   const [memberQuery, setMemberQuery] = useState("");
   const [historyMemberId, setHistoryMemberId] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [bookOpen, setBookOpen] = useState(false);
+  const [deposit, setDeposit] = useState("");
+  const [depositMethod, setDepositMethod] = useState<PaymentMethod>("cash");
+  const [dueDate, setDueDate] = useState(isoDaysFromNow(14));
+  const [bookName, setBookName] = useState("");
+  const [bookPhone, setBookPhone] = useState("");
+  const [bookNote, setBookNote] = useState("");
 
   const categories = useMemo(
     () => ["All", ...Array.from(new Set(state.products.map((p) => p.category)))],
