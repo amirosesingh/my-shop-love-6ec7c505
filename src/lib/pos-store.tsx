@@ -390,6 +390,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       saleId,
       receiptNo: stateRef.current.sales.find((x) => x.id === saleId)?.receiptNo ?? null,
     });
+
     {
       const snap = stateRef.current;
       const sale = snap.sales.find((x) => x.id === saleId);
