@@ -116,6 +116,22 @@ const rowToPromotion = (r: Row): Promotion => ({
   partner: r.partner ?? undefined,
 });
 
+export const rowToStore = (r: Row): Store => ({
+  id: r.id,
+  code: r.code ?? "",
+  name: r.name ?? "",
+  address: r.address ?? "",
+  phone: r.phone ?? "",
+});
+
+export const storeToRow = (s: Store): Row => ({
+  id: s.id,
+  code: s.code,
+  name: s.name,
+  address: s.address || null,
+  phone: s.phone || null,
+});
+
 const promotionToRow = (p: Promotion): Row => ({
   id: p.id,
   title: p.name,
