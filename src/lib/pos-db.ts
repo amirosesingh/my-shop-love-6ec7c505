@@ -1,5 +1,5 @@
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
 import { defaultSettings, seedState } from "./pos-seed";
 import type {
   AppSettings,
