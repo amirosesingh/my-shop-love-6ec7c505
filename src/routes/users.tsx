@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/lib/pos-auth";
+import { TerminalUsersPanel } from "@/components/pos/TerminalUsersPanel";
 import { usePos } from "@/lib/pos-store";
 import {
   cashierEmail,
@@ -260,6 +261,8 @@ function UsersPage() {
             </div>
           </section>
         </div>
+
+        <TerminalUsersPanel />
       </div>
     </AppShell>
   );
