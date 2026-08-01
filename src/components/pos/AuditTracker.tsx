@@ -29,6 +29,7 @@ export function AuditTracker() {
     setAuditActor({
       staffId: user?.staffId ?? "anonymous",
       staffName: user?.name ?? "Signed out",
+      role: user?.role ?? "signed out",
       storeId: user?.storeId ?? null,
       authUserId,
     });
@@ -56,15 +57,21 @@ export function AuditTracker() {
       ) as HTMLElement | null;
       if (!el) return;
       const isTab = el.getAttribute("role") === "tab";
-      logger.log(isTab ? "navigation" : "ui_click", isTab ? "Tab switch" : "Button click", moduleFor(window.location.pathname), {
-        label: labelOf(el),
+      const label = labelOf(el);
+      logger.log(
+        isTab ? "navigation" : "interaction",
+        isTab ? "Tab switch" : "Button click",
+        moduleFor(window.location.pathname),
+        {
+        label,
         elementId: el.id || null,
         tag: el.tagName.toLowerCase(),
         href: el.getAttribute("href"),
         route: window.location.pathname,
         coordinates: { x: e.clientX, y: e.clientY },
         timestamp: new Date().toISOString(),
-      });
+        },
+      );
     };
 
     const onInput = (e: Event) => {
@@ -78,7 +85,7 @@ export function AuditTracker() {
       if (prev) clearTimeout(prev);
       const t = setTimeout(() => {
         if (!el.value.trim()) return;
-        logger.log("search", "Search query", moduleFor(window.location.pathname), {
+        logger.log("lookup", "Search query", moduleFor(window.location.pathname), {
           field: el.getAttribute("placeholder") ?? el.getAttribute("aria-label") ?? el.name,
           query: el.value.slice(0, 120),
         });
@@ -96,14 +103,14 @@ export function AuditTracker() {
       dialogs.forEach((d) => {
         if (open.has(d)) return;
         open.add(d);
-        logger.log("modal", "Modal opened", moduleFor(window.location.pathname), {
+        logger.log("interaction", "Modal opened", moduleFor(window.location.pathname), {
           title: d.querySelector("h1,h2,[data-slot='dialog-title']")?.textContent?.trim() ?? "(untitled)",
         });
       });
       open.forEach((d) => {
         if (dialogs.has(d)) return;
         open.delete(d);
-        logger.log("modal", "Modal closed", moduleFor(window.location.pathname), {
+        logger.log("interaction", "Modal closed", moduleFor(window.location.pathname), {
           title: d.querySelector("h1,h2,[data-slot='dialog-title']")?.textContent?.trim() ?? "(untitled)",
         });
       });
