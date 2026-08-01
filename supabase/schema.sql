@@ -1,11 +1,24 @@
--- Master schema for the POS backend. Run this in your Supabase SQL editor.
--- Includes the full POS schema, app_users identity table and auth sync trigger.
+-- ============================================================================
+-- Northwind POS — master database schema
+-- Run this whole file in the Supabase SQL editor. It is idempotent: safe to
+-- re-run at any time. The account identifier column is `user_id` everywhere;
+-- the legacy `user_code` name is migrated away automatically.
+-- ============================================================================
 
 create extension if not exists pgcrypto;
+create extension if not exists pgcrypto with schema extensions;
+
+do $$ begin
+  create type public.app_role as enum ('admin','manager','staff');
+exception when duplicate_object then null; end $$;
+
+-- ============================================================================
+-- Core POS tables
+-- ============================================================================
 
 create table if not exists public.membership_tiers (
   id uuid primary key default gen_random_uuid(),
-  name text not null,
+  name text not null unique,
   discount_percentage numeric not null default 0,
   points_multiplier numeric not null default 1.0,
   created_at timestamptz not null default now()
@@ -38,7 +51,7 @@ create table if not exists public.members (
   email text,
   address text,
   date_of_birth date,
-  tier_id uuid references public.membership_tiers(id),
+  tier_id uuid references public.membership_tiers(id) on delete set null,
   loyalty_points numeric not null default 0,
   total_spent numeric not null default 0,
   created_at timestamptz not null default now()
@@ -47,7 +60,7 @@ create table if not exists public.members (
 create table if not exists public.sales (
   id uuid primary key default gen_random_uuid(),
   bill_number text not null unique,
-  member_id uuid references public.members(id),
+  member_id uuid references public.members(id) on delete set null,
   store_id text,
   shift_id text,
   cashier_name text,
@@ -71,7 +84,7 @@ create table if not exists public.sales (
 create table if not exists public.sale_items (
   id uuid primary key default gen_random_uuid(),
   sale_id uuid not null references public.sales(id) on delete cascade,
-  product_id uuid references public.products(id),
+  product_id uuid references public.products(id) on delete set null,
   product_name text not null,
   unit_price numeric not null default 0,
   quantity integer not null default 1,
@@ -97,7 +110,7 @@ create table if not exists public.purchase_orders (
 create table if not exists public.purchase_order_items (
   id uuid primary key default gen_random_uuid(),
   po_id uuid not null references public.purchase_orders(id) on delete cascade,
-  product_id uuid references public.products(id),
+  product_id uuid references public.products(id) on delete set null,
   barcode text,
   product_name text,
   cost_price numeric not null default 0,
@@ -114,9 +127,9 @@ create table if not exists public.promotions (
   min_spend numeric not null default 0,
   discount_percent numeric not null default 0,
   discount_amount numeric not null default 0,
-  foc_product_id uuid references public.products(id),
+  foc_product_id uuid references public.products(id) on delete set null,
   points_per_dollar numeric not null default 1,
-  tier_rates jsonb,
+  tier_rates jsonb default '{}'::jsonb,
   is_active boolean not null default true,
   start_date date,
   end_date date,
@@ -144,21 +157,24 @@ create table if not exists public.audit_logs (
   action_category text not null,
   action_name text not null,
   target_module text,
-  details jsonb,
+  details jsonb default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
 
--- Profiles + role system (signed-in staff model).
-create table if not exists public.profiles (
-  id uuid primary key references auth.users(id) on delete cascade,
-  email text,
-  full_name text,
-  created_at timestamptz not null default now()
-);
+-- Indexes used by the register lookups.
+create index if not exists products_barcode_idx      on public.products (barcode);
+create index if not exists products_name_idx         on public.products (lower(name));
+create index if not exists members_phone_idx         on public.members (phone);
+create index if not exists members_name_idx          on public.members (lower(full_name));
+create index if not exists sales_bill_number_idx     on public.sales (bill_number);
+create index if not exists sales_created_at_idx      on public.sales (created_at desc);
+create index if not exists sale_items_sale_id_idx    on public.sale_items (sale_id);
+create index if not exists po_items_po_id_idx        on public.purchase_order_items (po_id);
+create index if not exists audit_logs_created_at_idx on public.audit_logs (created_at desc);
 
-do $$ begin
-  create type public.app_role as enum ('admin','manager','staff');
-exception when duplicate_object then null; end $$;
+-- ============================================================================
+-- Roles (RBAC) — roles live in their own table, never on a profile row.
+-- ============================================================================
 
 create table if not exists public.user_roles (
   id uuid primary key default gen_random_uuid(),
@@ -181,34 +197,6 @@ returns boolean language sql stable security definer set search_path = public as
   )
 $$;
 
-create or replace function public.handle_new_user()
-returns trigger language plpgsql security definer set search_path = public as $$
-begin
-  insert into public.profiles (id, email, full_name)
-  values (new.id, new.email, new.raw_user_meta_data ->> 'full_name')
-  on conflict (id) do update set email = excluded.email;
-  return new;
-end $$;
-
-drop trigger if exists on_auth_user_created on auth.users;
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute function public.handle_new_user();
-
--- Backfill profiles for accounts that already exist.
-insert into public.profiles (id, email)
-select id, email from auth.users on conflict (id) do nothing;
-
-grant select, insert, update on public.profiles to authenticated;
-grant all on public.profiles to service_role;
-alter table public.profiles enable row level security;
-drop policy if exists "Signed-in users can read profiles" on public.profiles;
-create policy "Signed-in users can read profiles" on public.profiles
-  for select to authenticated using (true);
-drop policy if exists "Users update own profile" on public.profiles;
-create policy "Users update own profile" on public.profiles
-  for update to authenticated using (id = auth.uid()) with check (id = auth.uid());
-
 grant select, insert, update, delete on public.user_roles to authenticated;
 grant all on public.user_roles to service_role;
 alter table public.user_roles enable row level security;
@@ -221,7 +209,7 @@ create policy "Admins manage roles" on public.user_roles
   using (public.has_role(auth.uid(),'admin'))
   with check (public.has_role(auth.uid(),'admin'));
 
--- Grants + policies: signed-in users read, staff/manager/admin write.
+-- Grants + policies for the POS tables: signed-in users read, staff write.
 do $$
 declare t text;
 begin
@@ -243,137 +231,19 @@ begin
   end loop;
 end $$;
 
--- Bootstrap: make the first account an admin (run once, replace the email).
--- insert into public.user_roles (user_id, role)
--- select id, 'admin' from auth.users where email = 'you@example.com'
--- on conflict do nothing;
-
--- Baseline rows the app expects.
-insert into public.membership_tiers (name, discount_percentage, points_multiplier)
-values ('Bronze',0,1),('Silver',5,1.25),('Gold',10,1.5)
-on conflict do nothing;
-
-insert into public.pos_settings (id) values (1) on conflict (id) do nothing;
-
--- ============================================================
--- Terminal login: User ID + 4-digit PIN (bcrypt hashed)
--- ============================================================
-create extension if not exists pgcrypto with schema extensions;
+-- ============================================================================
+-- public.app_users — identity, role and per-cashier permission toggles
+-- ============================================================================
 
 create table if not exists public.app_users (
   id uuid primary key default gen_random_uuid(),
-  user_code text not null unique,
-  full_name text not null,
+  user_id varchar(64) not null unique,     -- login identifier typed at the terminal
+  full_name varchar(160) not null,
+  email varchar(255) not null,
   role app_role not null default 'staff',
-  store_id text,
-  email text not null,
-  pin_hash text not null,          -- bcrypt digest, never returned to clients
-  auth_secret text not null,       -- backend sign-in secret, released only on a correct PIN
+  store_id varchar(64),
   is_active boolean not null default true,
-  last_login_at timestamptz,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
--- No direct table access at all: every read/write goes through the
--- security-definer functions below, so pin_hash can never be selected.
-revoke all on public.app_users from anon;
-revoke all on public.app_users from authenticated;
-grant all on public.app_users to service_role;
-alter table public.app_users enable row level security;
-
--- Verify a terminal login. Hashing/compare happens inside the database.
-create or replace function public.verify_terminal_pin(p_user_code text, p_pin text)
-returns table (user_code text, full_name text, role app_role, store_id text, email text, auth_secret text)
-language plpgsql security definer set search_path = public, extensions as $$
-declare u public.app_users%rowtype;
-begin
-  select * into u from public.app_users
-   where lower(app_users.user_code) = lower(trim(p_user_code)) and is_active;
-  if not found then return; end if;
-  if u.pin_hash <> crypt(p_pin, u.pin_hash) then return; end if;
-  update public.app_users set last_login_at = now() where id = u.id;
-  return query select u.user_code, u.full_name, u.role, u.store_id, u.email, u.auth_secret;
-end $$;
-
-revoke all on function public.verify_terminal_pin(text, text) from public;
-grant execute on function public.verify_terminal_pin(text, text) to anon, authenticated;
-
--- Admin-only listing (never exposes pin_hash or auth_secret).
-create or replace function public.list_terminal_users()
-returns table (user_code text, full_name text, role app_role, store_id text, email text,
-               is_active boolean, last_login_at timestamptz)
-language sql security definer set search_path = public as $$
-  select a.user_code, a.full_name, a.role, a.store_id, a.email, a.is_active, a.last_login_at
-  from public.app_users a
-  where public.has_role(auth.uid(),'admin')
-  order by a.user_code
-$$;
-
-revoke all on function public.list_terminal_users() from public;
-grant execute on function public.list_terminal_users() to authenticated;
-
--- Admin-only provisioning. The PIN arrives over TLS and is hashed here.
-create or replace function public.upsert_terminal_user(
-  p_user_code text, p_full_name text, p_role app_role, p_store_id text,
-  p_email text, p_pin text, p_password text)
-returns void
-language plpgsql security definer set search_path = public, extensions as $$
-begin
-  if not public.has_role(auth.uid(),'admin') then
-    raise exception 'Only admins can manage terminal users';
-  end if;
-  if p_pin !~ '^[0-9]{4}$' then
-    raise exception 'PIN must be exactly 4 digits';
-  end if;
-  insert into public.app_users (user_code, full_name, role, store_id, email, pin_hash, auth_secret)
-  values (trim(p_user_code), trim(p_full_name), p_role, nullif(trim(coalesce(p_store_id,'')),''),
-          lower(trim(p_email)), crypt(p_pin, gen_salt('bf', 10)), p_password)
-  on conflict (user_code) do update
-    set full_name = excluded.full_name,
-        role = excluded.role,
-        store_id = excluded.store_id,
-        email = excluded.email,
-        pin_hash = excluded.pin_hash,
-        auth_secret = excluded.auth_secret,
-        updated_at = now();
-end $$;
-
-revoke all on function public.upsert_terminal_user(text, text, app_role, text, text, text, text) from public;
-grant execute on function public.upsert_terminal_user(text, text, app_role, text, text, text, text) to authenticated;
-
-create or replace function public.set_terminal_active(p_user_code text, p_active boolean)
-returns void language plpgsql security definer set search_path = public as $$
-begin
-  if not public.has_role(auth.uid(),'admin') then
-    raise exception 'Only admins can manage terminal users';
-  end if;
-  update public.app_users set is_active = p_active, updated_at = now()
-   where lower(user_code) = lower(trim(p_user_code));
-end $$;
-
-revoke all on function public.set_terminal_active(text, boolean) from public;
-grant execute on function public.set_terminal_active(text, boolean) to authenticated;
-
-create or replace function public.delete_terminal_user(p_user_code text)
-returns void language plpgsql security definer set search_path = public as $$
-begin
-  if not public.has_role(auth.uid(),'admin') then
-    raise exception 'Only admins can manage terminal users';
-  end if;
-  delete from public.app_users where lower(user_code) = lower(trim(p_user_code));
-end $$;
-
-revoke all on function public.delete_terminal_user(text) from public;
-grant execute on function public.delete_terminal_user(text) to authenticated;
-
--- ============================================================================
--- App users: identity, role and per-cashier permission toggles
--- ============================================================================
-
--- Permission toggles consumed by the POS UI.
-alter table public.app_users
-  add column if not exists permissions jsonb not null default jsonb_build_object(
+  permissions jsonb not null default jsonb_build_object(
     'financials', false,
     'products', false,
     'ecommerce', false,
@@ -381,12 +251,183 @@ alter table public.app_users
     'can_refund', false,
     'can_open_drawer_manual', false
   ),
-  add column if not exists auth_user_id uuid;
+  pin_hash text not null default '',       -- bcrypt digest, never returned to clients
+  auth_secret text not null default '',    -- backend sign-in secret, released only on a correct PIN
+  auth_user_id uuid,
+  last_login_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
 
+-- Migrate older installs that still use the `user_code` column name.
+do $$ begin
+  if exists (select 1 from information_schema.columns
+              where table_schema = 'public' and table_name = 'app_users'
+                and column_name = 'user_code')
+     and not exists (select 1 from information_schema.columns
+              where table_schema = 'public' and table_name = 'app_users'
+                and column_name = 'user_id') then
+    alter table public.app_users rename column user_code to user_id;
+  elsif exists (select 1 from information_schema.columns
+              where table_schema = 'public' and table_name = 'app_users'
+                and column_name = 'user_code') then
+    update public.app_users set user_id = coalesce(user_id, user_code);
+    alter table public.app_users drop column user_code;
+  end if;
+end $$;
+
+alter table public.app_users
+  add column if not exists auth_user_id uuid,
+  add column if not exists store_id varchar(64),
+  add column if not exists last_login_at timestamptz,
+  add column if not exists permissions jsonb not null default '{}'::jsonb;
+
+create unique index if not exists app_users_user_id_key
+  on public.app_users (lower(user_id));
 create unique index if not exists app_users_auth_user_id_key
   on public.app_users (auth_user_id) where auth_user_id is not null;
 
--- Keep public.app_users in sync with Supabase Authentication accounts.
+-- No direct table access: pin_hash / auth_secret must never be selectable.
+-- Every read and write goes through the security-definer functions below.
+revoke all on public.app_users from anon;
+revoke all on public.app_users from authenticated;
+grant all on public.app_users to service_role;
+alter table public.app_users enable row level security;
+
+-- ---------------------------------------------------------------------------
+-- Terminal login: User ID + 4-digit PIN (bcrypt hashed inside the database)
+-- ---------------------------------------------------------------------------
+drop function if exists public.verify_terminal_pin(text, text);
+create or replace function public.verify_terminal_pin(p_user_id text, p_pin text)
+returns table (user_id text, full_name text, role app_role, store_id text,
+               email text, auth_secret text)
+language plpgsql security definer set search_path = public, extensions as $$
+declare u public.app_users%rowtype;
+begin
+  select * into u from public.app_users a
+   where lower(a.user_id) = lower(trim(p_user_id)) and a.is_active;
+  if not found then return; end if;
+  if u.pin_hash = '' or u.pin_hash <> crypt(p_pin, u.pin_hash) then return; end if;
+  update public.app_users set last_login_at = now() where id = u.id;
+  return query select u.user_id::text, u.full_name::text, u.role, u.store_id::text,
+                      u.email::text, u.auth_secret;
+end $$;
+
+revoke all on function public.verify_terminal_pin(text, text) from public;
+grant execute on function public.verify_terminal_pin(text, text) to anon, authenticated, service_role;
+
+-- The signed-in account's own profile + permissions (no secrets exposed).
+drop function if exists public.current_app_user();
+create or replace function public.current_app_user()
+returns table (id uuid, user_id text, full_name text, role app_role, store_id text,
+               email text, permissions jsonb, is_active boolean)
+language sql stable security definer set search_path = public as $$
+  select a.id, a.user_id::text, a.full_name::text, a.role, a.store_id::text,
+         a.email::text, a.permissions, a.is_active
+  from public.app_users a
+  where a.auth_user_id = auth.uid()
+     or lower(a.email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+  limit 1
+$$;
+
+revoke all on function public.current_app_user() from public;
+grant execute on function public.current_app_user() to anon, authenticated, service_role;
+
+-- Admin/manager listing including permission toggles (no secrets exposed).
+drop function if exists public.list_app_users();
+create or replace function public.list_app_users()
+returns table (id uuid, auth_user_id uuid, user_id text, full_name text, email text,
+               role app_role, store_id text, is_active boolean, permissions jsonb,
+               last_login_at timestamptz, created_at timestamptz)
+language sql stable security definer set search_path = public as $$
+  select a.id, a.auth_user_id, a.user_id::text, a.full_name::text, a.email::text,
+         a.role, a.store_id::text, a.is_active, a.permissions, a.last_login_at, a.created_at
+  from public.app_users a
+  where public.has_role(auth.uid(),'admin') or public.has_role(auth.uid(),'manager')
+  order by a.user_id
+$$;
+
+revoke all on function public.list_app_users() from public;
+grant execute on function public.list_app_users() to anon, authenticated, service_role;
+
+-- Supervisors toggle permissions for a cashier.
+drop function if exists public.set_app_user_permissions(text, jsonb);
+create or replace function public.set_app_user_permissions(p_user_id text, p_permissions jsonb)
+returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not (public.has_role(auth.uid(),'admin') or public.has_role(auth.uid(),'manager')) then
+    raise exception 'Only supervisors can change permissions';
+  end if;
+  update public.app_users a
+     set permissions = coalesce(a.permissions, '{}'::jsonb) || p_permissions,
+         updated_at = now()
+   where lower(a.user_id) = lower(trim(p_user_id));
+end $$;
+
+revoke all on function public.set_app_user_permissions(text, jsonb) from public;
+grant execute on function public.set_app_user_permissions(text, jsonb) to authenticated, service_role;
+
+-- Admin provisioning. The PIN arrives over TLS and is hashed here.
+drop function if exists public.upsert_terminal_user(text, text, app_role, text, text, text, text);
+create or replace function public.upsert_terminal_user(
+  p_user_id text, p_full_name text, p_role app_role, p_store_id text,
+  p_email text, p_pin text, p_password text)
+returns void
+language plpgsql security definer set search_path = public, extensions as $$
+begin
+  if not (public.has_role(auth.uid(),'admin') or public.has_role(auth.uid(),'manager')) then
+    raise exception 'Only supervisors can manage terminal users';
+  end if;
+  if p_pin !~ '^[0-9]{4}$' then
+    raise exception 'PIN must be exactly 4 digits';
+  end if;
+  insert into public.app_users (user_id, full_name, role, store_id, email, pin_hash, auth_secret)
+  values (trim(p_user_id), trim(p_full_name), p_role, nullif(trim(coalesce(p_store_id,'')),''),
+          lower(trim(p_email)), crypt(p_pin, gen_salt('bf', 10)), p_password)
+  on conflict (user_id) do update
+    set full_name   = excluded.full_name,
+        role        = excluded.role,
+        store_id    = excluded.store_id,
+        email       = excluded.email,
+        pin_hash    = excluded.pin_hash,
+        auth_secret = excluded.auth_secret,
+        updated_at  = now();
+end $$;
+
+revoke all on function public.upsert_terminal_user(text, text, app_role, text, text, text, text) from public;
+grant execute on function public.upsert_terminal_user(text, text, app_role, text, text, text, text) to authenticated, service_role;
+
+drop function if exists public.set_terminal_active(text, boolean);
+create or replace function public.set_terminal_active(p_user_id text, p_active boolean)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not (public.has_role(auth.uid(),'admin') or public.has_role(auth.uid(),'manager')) then
+    raise exception 'Only supervisors can manage terminal users';
+  end if;
+  update public.app_users a set is_active = p_active, updated_at = now()
+   where lower(a.user_id) = lower(trim(p_user_id));
+end $$;
+
+revoke all on function public.set_terminal_active(text, boolean) from public;
+grant execute on function public.set_terminal_active(text, boolean) to authenticated, service_role;
+
+drop function if exists public.delete_terminal_user(text);
+create or replace function public.delete_terminal_user(p_user_id text)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.has_role(auth.uid(),'admin') then
+    raise exception 'Only admins can delete terminal users';
+  end if;
+  delete from public.app_users a where lower(a.user_id) = lower(trim(p_user_id));
+end $$;
+
+revoke all on function public.delete_terminal_user(text) from public;
+grant execute on function public.delete_terminal_user(text) to authenticated, service_role;
+
+-- ---------------------------------------------------------------------------
+-- Supabase Auth auto-sync: creating an account seeds public.app_users
+-- ---------------------------------------------------------------------------
 create or replace function public.sync_auth_user_to_public()
 returns trigger
 language plpgsql security definer set search_path = public as $$
@@ -412,9 +453,9 @@ declare
   end;
 begin
   insert into public.app_users
-    (user_code, full_name, role, store_id, email, pin_hash, auth_secret, permissions, auth_user_id)
-  values (v_code, v_name, v_role, v_store, lower(new.email), '', '', v_perms, new.id)
-  on conflict (user_code) do update
+    (user_id, full_name, role, store_id, email, permissions, auth_user_id)
+  values (v_code, v_name, v_role, v_store, lower(new.email), v_perms, new.id)
+  on conflict (user_id) do update
     set full_name    = excluded.full_name,
         role         = excluded.role,
         store_id     = coalesce(excluded.store_id, public.app_users.store_id),
@@ -429,54 +470,44 @@ create trigger on_auth_user_created
   after insert or update of email, raw_user_meta_data on auth.users
   for each row execute function public.sync_auth_user_to_public();
 
--- The signed-in account's own profile + permissions (no secrets exposed).
-create or replace function public.current_app_user()
-returns table (user_code text, full_name text, role app_role, store_id text,
-               email text, permissions jsonb, is_active boolean)
-language sql stable security definer set search_path = public as $$
-  select a.user_code, a.full_name, a.role, a.store_id, a.email, a.permissions, a.is_active
-  from public.app_users a
-  where a.auth_user_id = auth.uid()
-     or lower(a.email) = lower(coalesce(auth.jwt() ->> 'email', ''))
-  limit 1
-$$;
+-- ============================================================================
+-- Default seed data
+-- ============================================================================
 
-revoke all on function public.current_app_user() from public;
-grant execute on function public.current_app_user() to authenticated;
+insert into public.membership_tiers (name, discount_percentage, points_multiplier)
+values ('Bronze', 5, 1), ('Silver', 10, 1.25), ('Gold', 15, 1.5)
+on conflict (name) do nothing;
 
--- Admin/manager listing including permission toggles.
--- The listing exposes the account identifier as `user_id`.
-alter table public.app_users add column if not exists user_id text;
-update public.app_users set user_id = user_code where user_id is null;
+insert into public.pos_settings (id, tax_percentage, enable_tax, tax_mode, paper_size,
+                                 header_text, footer_text)
+values (1, 0, true, 'exclusive', '80mm', 'Northwind POS', 'Thank you for shopping with us!')
+on conflict (id) do nothing;
 
-drop function if exists public.list_app_users();
-create or replace function public.list_app_users()
-returns table (auth_user_id uuid, user_id text, full_name text, role app_role, store_id text,
-               email text, permissions jsonb, is_active boolean, last_login_at timestamptz)
-language sql stable security definer set search_path = public as $$
-  select a.auth_user_id, a.user_id, a.full_name, a.role, a.store_id, a.email, a.permissions,
-         a.is_active, a.last_login_at
-  from public.app_users a
-  where public.has_role(auth.uid(),'admin') or public.has_role(auth.uid(),'manager')
-  order by a.user_id
-$$;
+-- Default terminal accounts (User ID + PIN). Change these PINs after setup.
+--   admin      / 1234   full access
+--   supervisor / 2345   manager access
+--   101        / 1111   cashier
+insert into public.app_users (user_id, full_name, email, role, store_id, permissions,
+                              pin_hash, auth_secret)
+values
+  ('admin', 'Administrator', 'admin@store.internal', 'admin', null,
+   jsonb_build_object('financials', true, 'products', true, 'ecommerce', true,
+                      'can_give_discount', true, 'can_refund', true,
+                      'can_open_drawer_manual', true),
+   extensions.crypt('1234', extensions.gen_salt('bf', 10)), 'pos-admin-1234'),
+  ('supervisor', 'Store Supervisor', 'supervisor@store.internal', 'manager', null,
+   jsonb_build_object('financials', true, 'products', true, 'ecommerce', true,
+                      'can_give_discount', true, 'can_refund', true,
+                      'can_open_drawer_manual', true),
+   extensions.crypt('2345', extensions.gen_salt('bf', 10)), 'pos-supervisor-2345'),
+  ('101', 'Cashier 101', '101@store.internal', 'staff', 's1',
+   jsonb_build_object('financials', false, 'products', false, 'ecommerce', false,
+                      'can_give_discount', false, 'can_refund', false,
+                      'can_open_drawer_manual', false),
+   extensions.crypt('1111', extensions.gen_salt('bf', 10)), 'pos-101-1111')
+on conflict (user_id) do nothing;
 
-revoke all on function public.list_app_users() from public;
-grant execute on function public.list_app_users() to authenticated;
-
--- Supervisors toggle permissions for a cashier.
-create or replace function public.set_app_user_permissions(p_user_code text, p_permissions jsonb)
-returns void
-language plpgsql security definer set search_path = public as $$
-begin
-  if not (public.has_role(auth.uid(),'admin') or public.has_role(auth.uid(),'manager')) then
-    raise exception 'Only supervisors can change permissions';
-  end if;
-  update public.app_users
-     set permissions = coalesce(permissions, '{}'::jsonb) || p_permissions,
-         updated_at = now()
-   where lower(user_code) = lower(trim(p_user_code));
-end $$;
-
-revoke all on function public.set_app_user_permissions(text, jsonb) from public;
-grant execute on function public.set_app_user_permissions(text, jsonb) to authenticated;
+-- Bootstrap: grant the admin role to an existing Supabase Auth account.
+-- insert into public.user_roles (user_id, role)
+-- select id, 'admin' from auth.users where email = 'you@example.com'
+-- on conflict do nothing;

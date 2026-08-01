@@ -34,7 +34,7 @@ import {
 const sb = supabaseExternal as unknown as SupabaseClient;
 
 type TerminalRow = {
-  user_code: string;
+  user_id: string;
   full_name: string;
   role: AppRole;
   store_id: string | null;
@@ -45,7 +45,7 @@ type TerminalRow = {
 };
 
 const EMPTY = {
-  user_code: "",
+  user_id: "",
   full_name: "",
   role: "staff" as AppRole,
   store_id: "",
@@ -76,13 +76,13 @@ export function TerminalUsersPanel() {
   ) => {
     setRows((prev) =>
       prev.map((r) =>
-        r.user_code === row.user_code
+        r.user_id === row.user_id
           ? { ...r, permissions: { ...(r.permissions ?? {}), [key]: value } }
           : r,
       ),
     );
     const { error } = await sb.rpc("set_app_user_permissions", {
-      p_user_code: row.user_code,
+      p_user_id: row.user_id,
       p_permissions: { [key]: value },
     });
     if (error) {
@@ -102,7 +102,7 @@ export function TerminalUsersPanel() {
     }
     setSaving(true);
     const { error } = await sb.rpc("upsert_terminal_user", {
-      p_user_code: form.user_code,
+      p_user_id: form.user_id,
       p_full_name: form.full_name,
       p_role: form.role,
       p_store_id: form.store_id || null,
@@ -122,7 +122,7 @@ export function TerminalUsersPanel() {
   };
 
   const remove = async (code: string) => {
-    const { error } = await sb.rpc("delete_terminal_user", { p_user_code: code });
+    const { error } = await sb.rpc("delete_terminal_user", { p_user_id: code });
     if (error) {
       toast.error("Delete failed", { description: error.message });
       return;
@@ -142,9 +142,9 @@ export function TerminalUsersPanel() {
           <Label htmlFor="tu-code">User ID</Label>
           <Input
             id="tu-code"
-            value={form.user_code}
+            value={form.user_id}
             placeholder="EMP-101"
-            onChange={(e) => setForm({ ...form, user_code: e.target.value })}
+            onChange={(e) => setForm({ ...form, user_id: e.target.value })}
           />
         </div>
         <div className="space-y-1">
@@ -239,8 +239,8 @@ export function TerminalUsersPanel() {
         </TableHeader>
         <TableBody>
           {rows.map((r) => (
-            <TableRow key={r.user_code}>
-              <TableCell className="font-medium">{r.user_code}</TableCell>
+            <TableRow key={r.user_id}>
+              <TableCell className="font-medium">{r.user_id}</TableCell>
               <TableCell>
                 {r.full_name}
                 <p className="text-xs text-muted-foreground">{r.email}</p>
@@ -272,8 +272,8 @@ export function TerminalUsersPanel() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  aria-label={`Delete ${r.user_code}`}
-                  onClick={() => void remove(r.user_code)}
+                  aria-label={`Delete ${r.user_id}`}
+                  onClick={() => void remove(r.user_id)}
                 >
                   <Trash2 className="size-4 text-destructive" />
                 </Button>

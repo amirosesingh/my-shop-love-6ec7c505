@@ -48,7 +48,7 @@ type AppUserRow = {
   id: string;
   email: string | null;
   full_name: string | null;
-  user_code: string | null;
+  user_id: string | null;
   role: AppRole | null;
 };
 
@@ -75,8 +75,7 @@ function RolesPage() {
     }
     const rows = (userRows ?? []) as {
       auth_user_id: string | null;
-      user_id?: string | null;
-      user_code: string | null;
+      user_id: string | null;
       full_name: string | null;
       email: string | null;
       role: AppRole | null;
@@ -88,7 +87,7 @@ function RolesPage() {
           id: r.auth_user_id as string,
           email: r.email,
           full_name: r.full_name,
-          user_code: r.user_id ?? r.user_code,
+          user_id: r.user_id,
           role: r.role,
         })),
     );
@@ -143,7 +142,7 @@ function RolesPage() {
   }
 
   const filtered = accounts.filter((p) =>
-    `${p.email ?? ""} ${p.full_name ?? ""} ${p.user_code ?? ""}`
+    `${p.email ?? ""} ${p.full_name ?? ""} ${p.user_id ?? ""}`
       .toLowerCase()
       .includes(query.trim().toLowerCase()),
   );
@@ -202,7 +201,7 @@ function RolesPage() {
                     <p className="text-xs text-muted-foreground">{p.email}</p>
                   </TableCell>
                   <TableCell className="numeric text-xs text-muted-foreground">
-                    {p.user_code || p.id}
+                    {p.user_id || p.id}
                   </TableCell>
                   {APP_ROLES.map((r) => (
                     <TableCell key={r}>
