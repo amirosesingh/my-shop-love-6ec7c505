@@ -156,7 +156,7 @@ const rowToSettings = (r: Row | null): AppSettings =>
       }
     : defaultSettings;
 
-/** Columns added by supabase/schema6.sql; dropped when the DB predates it. */
+/** Columns added by supabase/schema_final.sql; dropped when the DB predates it. */
 const BRANDING_COLUMNS = [
   "company_name",
   "tax_number",
@@ -388,7 +388,7 @@ export const db = {
         .from("pos_settings")
         .upsert(row as never, { onConflict: "id" });
       // Older databases lack the receipt-branding columns; keep the core
-      // settings saving and tell the operator to run supabase/schema6.sql.
+      // settings saving and tell the operator to run supabase/schema_final.sql.
       if (res.error?.code === "PGRST204") {
         const legacy = { ...row };
         for (const k of BRANDING_COLUMNS) delete legacy[k];
@@ -399,7 +399,7 @@ export const db = {
         return {
           error: {
             message:
-              "Receipt branding could not be saved: your database is missing the branding columns. Run supabase/schema6.sql in your SQL editor.",
+              "Receipt branding could not be saved: your database is missing the branding columns. Run supabase/schema_final.sql in your SQL editor.",
           },
         } as typeof res;
       }

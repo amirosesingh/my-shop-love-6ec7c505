@@ -308,7 +308,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       return {
         ok: false,
-        error: "Cashier accounts are not set up in the backend yet. Apply supabase/schema5.sql.",
+        error: "Cashier accounts are not set up in the backend yet. Run supabase/schema_final.sql.",
       };
     }
     if (!row) return { ok: false, error: "Invalid username or PIN" };
