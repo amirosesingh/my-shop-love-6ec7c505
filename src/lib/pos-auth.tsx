@@ -9,6 +9,7 @@ import {
 } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
+import { cashierEmail, cashierSecret, type MetaRole } from "@/lib/pos-users";
 
 export type PosRole = "cashier" | "admin";
 
@@ -64,6 +65,8 @@ export type PosUser = {
   name: string;
   email: string;
   role: PosRole;
+  /** role stored on the Supabase account (user_metadata.role) */
+  metaRole: MetaRole | null;
   /** backend roles granted to this account */
   roles: AppRole[];
   /** null for admin = access to every store */
@@ -122,6 +125,10 @@ type AuthCtx = {
   ready: boolean;
   user: PosUser | null;
   isAdmin: boolean;
+  /** supervisor or admin — may reach settings, reports, inventory, user management */
+  isSupervisor: boolean;
+  /** cashier accounts are limited to the POS terminal */
+  isCashier: boolean;
   /** raw Supabase user id of the signed-in account */
   authUserId: string | null;
   /** cashier currently signed in at the terminal (User ID + PIN) */
@@ -133,6 +140,8 @@ type AuthCtx = {
   updateStaff: (member: StaffMember) => void;
   removeStaff: (id: string) => void;
   login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
+  /** Cashier tab: numeric User ID + PIN mapped onto a Supabase email account. */
+  cashierLogin: (userId: string, pin: string) => Promise<{ ok: boolean; error?: string }>;
   /** User ID + 4-digit PIN sign-in; the PIN is verified inside the database. */
   pinLogin: (userCode: string, pin: string) => Promise<{ ok: boolean; error?: string }>;
   signUp: (
