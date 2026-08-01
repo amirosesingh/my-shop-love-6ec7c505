@@ -1,7 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
 import { Eye, Percent, Plus, Printer, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { AppShell } from "@/components/pos/AppShell";
 import { SyncSettings } from "@/components/pos/SyncSettings";
 import { SecureCredentials } from "@/components/pos/SecureCredentials";
@@ -41,7 +42,23 @@ import type {
   TaxMode,
 } from "@/lib/pos-types";
 
+const SECTIONS = [
+  "display",
+  "tax",
+  "identity",
+  "type",
+  "lines",
+  "qr",
+  "elements",
+  "payment",
+  "whatsapp",
+  "sync",
+] as const;
+
 export const Route = createFileRoute("/settings")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    section: typeof search["section"] === "string" ? search["section"] : "",
+  }),
   head: () => ({
     meta: [
       { title: "Tax & Receipt Settings — Northwind POS" },
@@ -88,6 +105,22 @@ const IDENTITY_FIELDS: { key: keyof ReceiptOverride; label: string; placeholder:
 ];
 
 function Settings() {
+  const { section } = Route.useSearch();
+  const navigate = useNavigate({ from: "/settings" });
+  const openSection = (value: string) =>
+    void navigate({ search: { section: value }, replace: true });
+
+  // Bring the section chosen from the sidebar into view.
+  useEffect(() => {
+    if (!section || !SECTIONS.includes(section as (typeof SECTIONS)[number])) return;
+    const t = setTimeout(() => {
+      document
+        .querySelector(`[data-section="${section}"]`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 120);
+    return () => clearTimeout(t);
+  }, [section]);
+
   const { state, stores, currentStore, updateSettings, upsertStore } = usePos();
   const { isAdmin, can } = useAuth();
   const canSettings = isAdmin || can("can_access_pos_settings");
@@ -257,80 +290,24 @@ function Settings() {
           </Sheet>
         </header>
 
-        <DisplayScalingSettings />
-
         <section className="rounded-lg border border-border bg-card p-5">
           <h2 className="flex items-center gap-2 text-lg font-semibold">
-            <Percent className="size-4 text-primary" /> Tax &amp; pricing settings
+            <Printer className="size-4 text-primary" /> System &amp; settings
           </h2>
-          <div className="mt-4 grid gap-4 md:grid-cols-3">
-            <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
-              <div>
-                <p className="text-sm font-medium">Enable tax</p>
-                <p className="text-[11px] text-muted-foreground">Global tax calculation</p>
-              </div>
-              <Switch
-                checked={tax.enabled}
-                aria-label="Enable tax"
-                onCheckedChange={(v) => updateSettings({ tax: { ...tax, enabled: v } })}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Tax rate (%)</Label>
-              <Input
-                className="numeric"
-                value={tax.rate}
-                onChange={(e) =>
-                  updateSettings({ tax: { ...tax, rate: Number(e.target.value) || 0 } })
-                }
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Tax mode</Label>
-              <div className="flex overflow-hidden rounded-md border border-border">
-                {(
-                  [
-                    { m: "inclusive", label: "Prices Include Tax" },
-                    { m: "exclusive", label: "Tax Added at Checkout" },
-                  ] as { m: TaxMode; label: string }[]
-                ).map((o) => (
-                  <button
-                    key={o.m}
-                    onClick={() => updateSettings({ tax: { ...tax, mode: o.m } })}
-                    className={`flex-1 px-2 py-2 text-xs ${
-                      tax.mode === o.m
-                        ? "bg-primary/15 text-primary"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {o.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="space-y-5">
-          <div className="rounded-lg border border-border bg-card p-5">
-            <h2 className="flex items-center gap-2 text-lg font-semibold">
-              <Printer className="size-4 text-primary" /> Receipt &amp; slip customizer
-            </h2>
-            <div className="mt-4 space-y-4">
+          <p className="mt-1 text-xs text-muted-foreground">
+            Open one area at a time — pick a section here or straight from the sidebar.
+          </p>
+          <div className="mt-4 space-y-4">
               <div className="flex flex-wrap items-center gap-3 rounded-md border border-border px-3 py-2">
                 <div className="space-y-1">
                   <Label className="text-[11px] text-muted-foreground">Editing branch</Label>
-                  <select
+                  <ThemedSelect
+                    ariaLabel="Editing branch"
+                    className="h-8 w-56"
                     value={branchId}
-                    onChange={(e) => setBranchId(e.target.value)}
-                    className="h-8 rounded-md border border-input bg-transparent px-2 text-sm"
-                  >
-                    {stores.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({s.code})
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setBranchId}
+                    options={stores.map((s) => ({ value: s.id, label: `${s.name} (${s.code})` }))}
+                  />
                 </div>
                 <div className="ml-auto flex items-center gap-2">
                   <span className="text-xs text-muted-foreground">
@@ -344,9 +321,73 @@ function Settings() {
                 </div>
               </div>
 
-              <Accordion type="single" collapsible className="w-full">
+              <Accordion
+                type="single"
+                collapsible
+                className="w-full"
+                value={section}
+                onValueChange={openSection}
+              >
+                <AccordionItem value="display" data-section="display">
+  <AccordionTrigger className="text-sm font-medium">Display &amp; text size</AccordionTrigger>
+  <AccordionContent className="pt-4">
+                  <DisplayScalingSettings bare />
+                  </AccordionContent>
+</AccordionItem>
 
-                <AccordionItem value="identity">
+                <AccordionItem value="tax" data-section="tax">
+  <AccordionTrigger className="text-sm font-medium">Tax &amp; pricing</AccordionTrigger>
+  <AccordionContent className="pt-4">
+      <div className="mt-4 grid gap-4 md:grid-cols-3">
+        <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+          <div>
+            <p className="text-sm font-medium">Enable tax</p>
+            <p className="text-[11px] text-muted-foreground">Global tax calculation</p>
+          </div>
+          <Switch
+            checked={tax.enabled}
+            aria-label="Enable tax"
+            onCheckedChange={(v) => updateSettings({ tax: { ...tax, enabled: v } })}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Tax rate (%)</Label>
+          <Input
+            className="numeric"
+            value={tax.rate}
+            onChange={(e) =>
+              updateSettings({ tax: { ...tax, rate: Number(e.target.value) || 0 } })
+            }
+          />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Tax mode</Label>
+          <div className="flex overflow-hidden rounded-md border border-border">
+            {(
+              [
+                { m: "inclusive", label: "Prices Include Tax" },
+                { m: "exclusive", label: "Tax Added at Checkout" },
+              ] as { m: TaxMode; label: string }[]
+            ).map((o) => (
+              <button
+                key={o.m}
+                onClick={() => updateSettings({ tax: { ...tax, mode: o.m } })}
+                className={`flex-1 px-2 py-2 text-xs ${
+                  tax.mode === o.m
+                    ? "bg-primary/15 text-primary"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+                  </AccordionContent>
+</AccordionItem>
+
+                <AccordionItem value="identity" data-section="identity">
   <AccordionTrigger className="text-sm font-medium">Business identity</AccordionTrigger>
   <AccordionContent className="space-y-3 pt-4">
                   <div className="grid gap-3 sm:grid-cols-2">
@@ -382,7 +423,7 @@ function Settings() {
                   </AccordionContent>
 </AccordionItem>
 
-                <AccordionItem value="type">
+                <AccordionItem value="type" data-section="type">
   <AccordionTrigger className="text-sm font-medium">Receipt typography</AccordionTrigger>
   <AccordionContent className="space-y-3 pt-4">
                   <p className="text-[11px] text-muted-foreground">
@@ -396,19 +437,12 @@ function Settings() {
                         <div className="mt-2 grid gap-3 sm:grid-cols-4">
                           <div className="space-y-1">
                             <Label className="text-[11px] text-muted-foreground">Family</Label>
-                            <select
+                            <ThemedSelect
+                              ariaLabel="Font family"
                               value={f.family}
-                              onChange={(e) =>
-                                setFont(scope.key, { family: e.target.value as FontFamilyKey })
-                              }
-                              className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm"
-                            >
-                              {FAMILIES.map((o) => (
-                                <option key={o.key} value={o.key}>
-                                  {o.label}
-                                </option>
-                              ))}
-                            </select>
+                              onChange={(v) => setFont(scope.key, { family: v as FontFamilyKey })}
+                              options={FAMILIES.map((o) => ({ value: o.key, label: o.label }))}
+                            />
                           </div>
                           <div className="space-y-1">
                             <Label className="text-[11px] text-muted-foreground">Size (px)</Label>
@@ -454,7 +488,7 @@ function Settings() {
                   </AccordionContent>
 </AccordionItem>
 
-                <AccordionItem value="lines">
+                <AccordionItem value="lines" data-section="lines">
   <AccordionTrigger className="text-sm font-medium">Extra lines</AccordionTrigger>
   <AccordionContent className="space-y-3 pt-4">
                   {(effective.customLines ?? []).length === 0 && (
@@ -477,26 +511,25 @@ function Settings() {
                           )
                         }
                       />
-                      <select
+                      <ThemedSelect
+                        ariaLabel="Line placement"
+                        className="w-40 shrink-0"
                         value={line.placement}
-                        onChange={(e) =>
+                        onChange={(v) =>
                           setField(
                             "customLines",
                             effective.customLines.map((l) =>
                               l.id === line.id
-                                ? {
-                                    ...l,
-                                    placement: e.target.value as ReceiptCustomLine["placement"],
-                                  }
+                                ? { ...l, placement: v as ReceiptCustomLine["placement"] }
                                 : l,
                             ),
                           )
                         }
-                        className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
-                      >
-                        <option value="header">Below header</option>
-                        <option value="footer">Above footer</option>
-                      </select>
+                        options={[
+                          { value: "header", label: "Below header" },
+                          { value: "footer", label: "Above footer" },
+                        ]}
+                      />
                       <Button
                         variant="ghost"
                         size="icon"
@@ -544,7 +577,7 @@ function Settings() {
                   </AccordionContent>
 </AccordionItem>
 
-                <AccordionItem value="qr">
+                <AccordionItem value="qr" data-section="qr">
   <AccordionTrigger className="text-sm font-medium">QR code</AccordionTrigger>
   <AccordionContent className="space-y-3 pt-4">
                   <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
@@ -579,40 +612,39 @@ function Settings() {
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Placement</Label>
-                      <select
+                      <ThemedSelect
+                        ariaLabel="QR placement"
                         value={effective.qr.placement}
-                        onChange={(e) =>
+                        onChange={(v) =>
                           setField("qr", {
                             ...effective.qr,
-                            placement: e.target.value as ReceiptCustomLine["placement"],
+                            placement: v as ReceiptCustomLine["placement"],
                           })
                         }
-                        className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm"
-                      >
-                        <option value="header">Top of receipt</option>
-                        <option value="footer">Bottom of receipt</option>
-                      </select>
+                        options={[
+                          { value: "header", label: "Top of receipt" },
+                          { value: "footer", label: "Bottom of receipt" },
+                        ]}
+                      />
                     </div>
                   </div>
                   </AccordionContent>
 </AccordionItem>
 
-                <AccordionItem value="elements">
+                <AccordionItem value="elements" data-section="elements">
   <AccordionTrigger className="text-sm font-medium">Receipt elements</AccordionTrigger>
   <AccordionContent className="space-y-3 pt-4">
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Paper size</Label>
-                    <select
+                    <ThemedSelect
+                      ariaLabel="Paper size"
                       value={receipt.paper}
-                      onChange={(e) => setGlobal({ paper: e.target.value as PaperSize })}
-                      className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
-                    >
-                      {(Object.keys(PAPER_LABELS) as PaperSize[]).map((p) => (
-                        <option key={p} value={p}>
-                          {PAPER_LABELS[p]}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(v) => setGlobal({ paper: v as PaperSize })}
+                      options={(Object.keys(PAPER_LABELS) as PaperSize[]).map((p) => ({
+                        value: p,
+                        label: PAPER_LABELS[p],
+                      }))}
+                    />
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {TOGGLES.map((t) => (
@@ -634,7 +666,7 @@ function Settings() {
                   </AccordionContent>
 </AccordionItem>
 
-                <AccordionItem value="payment">
+                <AccordionItem value="payment" data-section="payment">
   <AccordionTrigger className="text-sm font-medium">Bank transfer details</AccordionTrigger>
   <AccordionContent className="space-y-3 pt-4">
                   <p className="text-xs text-muted-foreground">
@@ -761,7 +793,7 @@ function Settings() {
                   </AccordionContent>
 </AccordionItem>
 
-                <AccordionItem value="whatsapp">
+                <AccordionItem value="whatsapp" data-section="whatsapp">
   <AccordionTrigger className="text-sm font-medium">WhatsApp bills</AccordionTrigger>
   <AccordionContent className="space-y-3 pt-4">
                   <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
@@ -855,7 +887,7 @@ function Settings() {
                   </AccordionContent>
 </AccordionItem>
 
-                <AccordionItem value="sync">
+                <AccordionItem value="sync" data-section="sync">
   <AccordionTrigger className="text-sm font-medium">Sync &amp; backup</AccordionTrigger>
   <AccordionContent className="pt-4">
                   <SyncSettings />
@@ -873,8 +905,6 @@ function Settings() {
                 Apply to printers
               </Button>
             </div>
-          </div>
-
         </section>
       </div>
     </AppShell>

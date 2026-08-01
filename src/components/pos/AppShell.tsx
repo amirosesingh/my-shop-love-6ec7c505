@@ -6,6 +6,7 @@ import { useLocation, useNavigate } from "@tanstack/react-router";
 import { TerminalLogin } from "@/components/pos/TerminalLogin";
 import { SidebarNav, useSidebarCollapsed } from "@/components/pos/SidebarNav";
 import { SyncStatus } from "@/components/pos/SyncStatus";
+import { ThemeToggle } from "@/components/pos/ThemeToggle";
 import { startSyncEngine } from "@/lib/sync-engine";
 import type { NavItem } from "@/components/pos/nav-config";
 import { setPrintStore, setPrintSettings } from "@/lib/pos-print";
@@ -237,6 +238,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             {currentStore.code}
           </Badge>
           <SyncStatus />
+          <ThemeToggle />
           <Button
             variant="outline"
             size="sm"
@@ -256,6 +258,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </p>
           </div>
           <SyncStatus className="ml-auto" />
+          <ThemeToggle />
           <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => void lock()}>
             <Lock className="size-3.5" /> Lock / Switch user
           </Button>

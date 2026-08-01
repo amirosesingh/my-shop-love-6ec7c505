@@ -1,4 +1,4 @@
-import { MonitorCog } from "lucide-react";
+import { Monitor, MonitorCog, Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
@@ -8,6 +8,13 @@ import {
   useUiScalePrefs,
   type UiDensity,
 } from "@/lib/use-ui-scale";
+import { useTheme, type ThemeChoice } from "@/lib/theme";
+
+const THEMES: { value: ThemeChoice; label: string; icon: typeof Sun }[] = [
+  { value: "system", label: "System", icon: Monitor },
+  { value: "light", label: "Light", icon: Sun },
+  { value: "dark", label: "Dark", icon: Moon },
+];
 
 const MODES: { value: "auto" | "manual"; label: string; hint: string }[] = [
   { value: "auto", label: "Automatic", hint: "Follows the window size" },
@@ -20,20 +27,43 @@ const DENSITIES: { value: UiDensity; label: string }[] = [
 ];
 
 /** Terminal-local control for font size and control height across the app. */
-export function DisplayScalingSettings() {
+export function DisplayScalingSettings({ bare = false }: { bare?: boolean }) {
   const prefs = useUiScalePrefs();
+  const { theme, setTheme } = useTheme();
   const auto =
     typeof window === "undefined" ? 1 : computeUiScale(window.innerWidth, window.innerHeight);
   const effective = prefs.mode === "manual" ? prefs.scale : auto;
 
   return (
-    <section className="rounded-lg border border-border bg-card p-5">
-      <h2 className="flex items-center gap-2 text-lg font-semibold">
-        <MonitorCog className="size-4 text-primary" /> Display &amp; text size
-      </h2>
+    <section className={bare ? "" : "rounded-lg border border-border bg-card p-5"}>
+      {!bare && (
+        <h2 className="flex items-center gap-2 text-lg font-semibold">
+          <MonitorCog className="size-4 text-primary" /> Display &amp; text size
+        </h2>
+      )}
       <p className="mt-1 text-xs text-muted-foreground">
         Applies to this terminal only. Buttons never drop below a touch-safe size.
       </p>
+
+      <div className="mt-4 space-y-1">
+        <Label className="text-xs text-muted-foreground">Appearance</Label>
+        <div className="flex overflow-hidden rounded-md border border-border">
+          {THEMES.map((t) => (
+            <button
+              key={t.value}
+              type="button"
+              onClick={() => setTheme(t.value)}
+              className={`flex flex-1 items-center justify-center gap-2 px-3 py-2 text-xs ${
+                theme === t.value
+                  ? "bg-primary/15 text-primary"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <t.icon className="size-3.5" /> {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <div className="space-y-3">

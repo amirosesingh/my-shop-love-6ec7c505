@@ -16,6 +16,7 @@ import { AuthProvider } from "../lib/pos-auth";
 import { PermissionsProvider } from "../lib/pos-permissions";
 import { Toaster } from "../components/ui/sonner";
 import { AuditTracker } from "../components/pos/AuditTracker";
+import { ThemeProvider, themeBootScript } from "../lib/theme";
 
 function NotFoundComponent() {
   return (
@@ -122,6 +123,7 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="en">
       <head>
         <HeadContent />
+        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
       </head>
       <body>
         {children}
@@ -136,6 +138,7 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
       <AuthProvider>
         <PermissionsProvider>
         <PosProvider>
@@ -146,6 +149,7 @@ function RootComponent() {
         </PosProvider>
         </PermissionsProvider>
       </AuthProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

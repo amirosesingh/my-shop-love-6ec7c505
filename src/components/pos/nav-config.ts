@@ -1,6 +1,14 @@
 import {
   ArrowLeftRight,
   Boxes,
+  Building2,
+  Landmark,
+  ListPlus,
+  MessageCircle,
+  MonitorCog,
+  QrCode,
+  RefreshCw,
+  Type,
   CalendarClock,
   Clock,
   LayoutGrid,
@@ -32,6 +40,8 @@ export type NavItem = {
   flag?: NavFlag;
   adminOnly?: boolean;
   search?: Record<string, string>;
+  /** Settings page section to expand when this item is opened. */
+  section?: string;
   hash?: string;
   keywords?: string;
 };
@@ -90,12 +100,20 @@ export const navGroups: NavGroup[] = [
     label: "System & Settings",
     icon: SettingsIcon,
     items: [
-      { to: "/settings", label: "Tax & Pricing", icon: ReceiptText, adminOnly: true, flag: "can_access_pos_settings", keywords: "vat rate inclusive" },
-      { to: "/settings", label: "Receipt / Print Customizer", icon: Printer, adminOnly: true, flag: "can_access_pos_settings", hash: "receipt", keywords: "80mm 58mm a4 header footer" },
+      { to: "/settings", label: "Display & Text Size", icon: MonitorCog, adminOnly: true, flag: "can_access_pos_settings", section: "display", keywords: "font size scaling zoom theme dark light density" },
+      { to: "/settings", label: "Tax & Pricing", icon: ReceiptText, adminOnly: true, flag: "can_access_pos_settings", section: "tax", keywords: "vat rate inclusive" },
+      { to: "/settings", label: "Business Identity", icon: Building2, adminOnly: true, flag: "can_access_pos_settings", section: "identity", keywords: "company name logo tax number registration phone website" },
+      { to: "/settings", label: "Receipt Typography", icon: Type, adminOnly: true, flag: "can_access_pos_settings", section: "type", keywords: "font header body footer size bold paper 80mm 58mm a4" },
+      { to: "/settings", label: "Receipt Extra Lines", icon: ListPlus, adminOnly: true, flag: "can_access_pos_settings", section: "lines", keywords: "custom line note terms" },
+      { to: "/settings", label: "Receipt QR Code", icon: QrCode, adminOnly: true, flag: "can_access_pos_settings", section: "qr", keywords: "qr barcode link placement" },
+      { to: "/settings", label: "Receipt Elements", icon: Printer, adminOnly: true, flag: "can_access_pos_settings", section: "elements", keywords: "logo points barcode tax toggles" },
+      { to: "/settings", label: "Bank Transfer Details", icon: Landmark, adminOnly: true, flag: "can_access_pos_settings", section: "payment", keywords: "bank account iban qr payment transfer" },
+      { to: "/settings", label: "WhatsApp Bills", icon: MessageCircle, adminOnly: true, flag: "can_access_pos_settings", section: "whatsapp", keywords: "whatsapp send bill api token" },
+      { to: "/settings", label: "Sync & Backup", icon: RefreshCw, adminOnly: true, flag: "can_access_pos_settings", section: "sync", keywords: "offline outbox backup sql local database" },
       { to: "/promotions", label: "Point Rules", icon: Sparkles, adminOnly: true, flag: "can_access_pos_settings", hash: "points", keywords: "loyalty points per dollar policy" },
     ],
   },
 ];
 
-export const navItemKey = (i: NavItem) => `${i.to}#${i.hash ?? ""}`;
+export const navItemKey = (i: NavItem) => `${i.to}#${i.hash ?? ""}?${i.section ?? ""}`;
 export { Store };
