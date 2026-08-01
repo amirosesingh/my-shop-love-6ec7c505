@@ -24,7 +24,10 @@ import { Route as StaffRouteImport } from './routes/staff'
 import { Route as StoresRouteImport } from './routes/stores'
 import { Route as TransfersRouteImport } from './routes/transfers'
 import { Route as SettingsDisplayRouteImport } from './routes/settings.display'
+import { Route as SettingsElementsRouteImport } from './routes/settings.elements'
 import { Route as SettingsIdentityRouteImport } from './routes/settings.identity'
+import { Route as SettingsLinesRouteImport } from './routes/settings.lines'
+import { Route as SettingsQrRouteImport } from './routes/settings.qr'
 import { Route as SettingsTaxRouteImport } from './routes/settings.tax'
 import { Route as SettingsTypeRouteImport } from './routes/settings.type'
 
@@ -103,9 +106,24 @@ const SettingsDisplayRoute = SettingsDisplayRouteImport.update({
   path: '/display',
   getParentRoute: () => SettingsRoute,
 } as any)
+const SettingsElementsRoute = SettingsElementsRouteImport.update({
+  id: '/elements',
+  path: '/elements',
+  getParentRoute: () => SettingsRoute,
+} as any)
 const SettingsIdentityRoute = SettingsIdentityRouteImport.update({
   id: '/identity',
   path: '/identity',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsLinesRoute = SettingsLinesRouteImport.update({
+  id: '/lines',
+  path: '/lines',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsQrRoute = SettingsQrRouteImport.update({
+  id: '/qr',
+  path: '/qr',
   getParentRoute: () => SettingsRoute,
 } as any)
 const SettingsTaxRoute = SettingsTaxRouteImport.update({
@@ -135,7 +153,10 @@ export interface FileRoutesByFullPath {
   '/stores': typeof StoresRoute
   '/transfers': typeof TransfersRoute
   '/settings/display': typeof SettingsDisplayRoute
+  '/settings/elements': typeof SettingsElementsRoute
   '/settings/identity': typeof SettingsIdentityRoute
+  '/settings/lines': typeof SettingsLinesRoute
+  '/settings/qr': typeof SettingsQrRoute
   '/settings/tax': typeof SettingsTaxRoute
   '/settings/type': typeof SettingsTypeRoute
 }
@@ -155,7 +176,10 @@ export interface FileRoutesByTo {
   '/stores': typeof StoresRoute
   '/transfers': typeof TransfersRoute
   '/settings/display': typeof SettingsDisplayRoute
+  '/settings/elements': typeof SettingsElementsRoute
   '/settings/identity': typeof SettingsIdentityRoute
+  '/settings/lines': typeof SettingsLinesRoute
+  '/settings/qr': typeof SettingsQrRoute
   '/settings/tax': typeof SettingsTaxRoute
   '/settings/type': typeof SettingsTypeRoute
 }
@@ -176,7 +200,10 @@ export interface FileRoutesById {
   '/stores': typeof StoresRoute
   '/transfers': typeof TransfersRoute
   '/settings/display': typeof SettingsDisplayRoute
+  '/settings/elements': typeof SettingsElementsRoute
   '/settings/identity': typeof SettingsIdentityRoute
+  '/settings/lines': typeof SettingsLinesRoute
+  '/settings/qr': typeof SettingsQrRoute
   '/settings/tax': typeof SettingsTaxRoute
   '/settings/type': typeof SettingsTypeRoute
 }
@@ -198,7 +225,10 @@ export interface FileRouteTypes {
     | '/stores'
     | '/transfers'
     | '/settings/display'
+    | '/settings/elements'
     | '/settings/identity'
+    | '/settings/lines'
+    | '/settings/qr'
     | '/settings/tax'
     | '/settings/type'
   fileRoutesByTo: FileRoutesByTo
@@ -218,7 +248,10 @@ export interface FileRouteTypes {
     | '/stores'
     | '/transfers'
     | '/settings/display'
+    | '/settings/elements'
     | '/settings/identity'
+    | '/settings/lines'
+    | '/settings/qr'
     | '/settings/tax'
     | '/settings/type'
   id:
@@ -238,7 +271,10 @@ export interface FileRouteTypes {
     | '/stores'
     | '/transfers'
     | '/settings/display'
+    | '/settings/elements'
     | '/settings/identity'
+    | '/settings/lines'
+    | '/settings/qr'
     | '/settings/tax'
     | '/settings/type'
   fileRoutesById: FileRoutesById
@@ -367,11 +403,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsDisplayRouteImport
       parentRoute: typeof SettingsRoute
     }
+    '/settings/elements': {
+      id: '/settings/elements'
+      path: '/elements'
+      fullPath: '/settings/elements'
+      preLoaderRoute: typeof SettingsElementsRouteImport
+      parentRoute: typeof SettingsRoute
+    }
     '/settings/identity': {
       id: '/settings/identity'
       path: '/identity'
       fullPath: '/settings/identity'
       preLoaderRoute: typeof SettingsIdentityRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/lines': {
+      id: '/settings/lines'
+      path: '/lines'
+      fullPath: '/settings/lines'
+      preLoaderRoute: typeof SettingsLinesRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/qr': {
+      id: '/settings/qr'
+      path: '/qr'
+      fullPath: '/settings/qr'
+      preLoaderRoute: typeof SettingsQrRouteImport
       parentRoute: typeof SettingsRoute
     }
     '/settings/tax': {
@@ -393,14 +450,20 @@ declare module '@tanstack/react-router' {
 
 interface SettingsRouteChildren {
   SettingsDisplayRoute: typeof SettingsDisplayRoute
+  SettingsElementsRoute: typeof SettingsElementsRoute
   SettingsIdentityRoute: typeof SettingsIdentityRoute
+  SettingsLinesRoute: typeof SettingsLinesRoute
+  SettingsQrRoute: typeof SettingsQrRoute
   SettingsTaxRoute: typeof SettingsTaxRoute
   SettingsTypeRoute: typeof SettingsTypeRoute
 }
 
 const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsDisplayRoute: SettingsDisplayRoute,
+  SettingsElementsRoute: SettingsElementsRoute,
   SettingsIdentityRoute: SettingsIdentityRoute,
+  SettingsLinesRoute: SettingsLinesRoute,
+  SettingsQrRoute: SettingsQrRoute,
   SettingsTaxRoute: SettingsTaxRoute,
   SettingsTypeRoute: SettingsTypeRoute,
 }
