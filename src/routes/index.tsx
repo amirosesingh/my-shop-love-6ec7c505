@@ -587,15 +587,25 @@ function Register() {
   function holdOrder() {
     if (!lines.length) return;
     const snapshot = lines;
+    const id = `H${Date.now()}`;
     setHeld((hs) => [
       ...hs,
       {
-        id: `H${Date.now()}`,
+        id,
         label: `${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · ${snapshot.length} item(s)`,
         total: totals.total,
         lines: snapshot,
+        heldAt: new Date().toISOString(),
       },
     ]);
+    logger.log("sale", "Order put on hold", "register", {
+      holdRef: id,
+      lines: snapshot.length,
+      value: totals.total,
+      storeId: currentStore.id,
+      memberId,
+      items: snapshot.map((l) => ({ name: l.name, qty: l.qty, price: l.price })),
+    });
     resetCart();
     toast.success("Order held — resume it from the operation deck");
   }
@@ -609,6 +619,14 @@ function Register() {
     }
     setLines(order.lines);
     setHeld((hs) => hs.filter((h) => h.id !== id));
+    logger.log("sale", "Held order resumed", "register", {
+      holdRef: order.id,
+      lines: order.lines.length,
+      value: order.total,
+      heldAt: order.heldAt,
+      heldForSeconds: Math.round((Date.now() - new Date(order.heldAt).getTime()) / 1000),
+      storeId: currentStore.id,
+    });
     toast.success("Held order resumed");
   }
 
@@ -622,13 +640,97 @@ function Register() {
       toast.error(`No active promotion matches “${code}”`);
       return;
     }
+    const targetIndex = lines.findIndex((l) => l.productId === couponLine);
+    if (couponScope === "item" && targetIndex < 0) {
+      toast.error("Pick the item the coupon applies to");
+      return;
+    }
     if (!(await unlockDiscounts())) return;
-    setCartDiscountType(rule.valueType ?? "amount");
-    setCartDiscount(rule.value ?? 0);
-    setCoupon({ code: rule.name });
+    const at = new Date().toISOString();
+    if (couponScope === "item") {
+      const line = lines[targetIndex]!;
+      const unit =
+        rule.valueType === "percent"
+          ? r2((line.price * (rule.value ?? 0)) / 100)
+          : r2(rule.value ?? 0);
+      const value = r2(unit * line.qty);
+      patchLine(targetIndex, {
+        discount: rule.value ?? 0,
+        discountType: rule.valueType ?? "amount",
+        couponCode: rule.name,
+        couponDiscount: value,
+      });
+      setCoupon({
+        code: rule.name,
+        promoId: rule.id,
+        scope: "item",
+        discount: value,
+        productId: line.productId,
+        productName: line.name,
+        appliedAt: at,
+      });
+      logger.log("promotion", "Coupon applied to an item", "register", {
+        coupon: rule.name,
+        promotionId: rule.id,
+        scope: "item",
+        product: line.name,
+        productId: line.productId,
+        qty: line.qty,
+        discountValue: value,
+        storeId: currentStore.id,
+        memberId,
+        appliedAt: at,
+      });
+    } else {
+      setCartDiscountType(rule.valueType ?? "amount");
+      setCartDiscount(rule.value ?? 0);
+      const value =
+        rule.valueType === "percent"
+          ? r2((promoBase * (rule.value ?? 0)) / 100)
+          : r2(rule.value ?? 0);
+      setCoupon({
+        code: rule.name,
+        promoId: rule.id,
+        scope: "bill",
+        discount: value,
+        appliedAt: at,
+      });
+      logger.log("promotion", "Coupon applied to the bill", "register", {
+        coupon: rule.name,
+        promotionId: rule.id,
+        scope: "bill",
+        discountValue: value,
+        billBase: promoBase,
+        storeId: currentStore.id,
+        memberId,
+        appliedAt: at,
+      });
+    }
     setCouponCode("");
     setCouponOpen(false);
     toast.success(`Coupon ${rule.name} applied`);
+  }
+
+  /** Take the coupon off the ticket and record who removed it. */
+  function removeCoupon() {
+    if (!coupon) return;
+    if (coupon.scope === "item") {
+      const i = lines.findIndex((l) => l.couponCode === coupon.code);
+      if (i >= 0)
+        patchLine(i, { discount: 0, couponCode: undefined, couponDiscount: undefined });
+    } else {
+      setCartDiscount(0);
+    }
+    logger.log("promotion", "Coupon removed", "register", {
+      coupon: coupon.code,
+      promotionId: coupon.promoId,
+      scope: coupon.scope,
+      product: coupon.productName ?? null,
+      discountValue: coupon.discount,
+      appliedAt: coupon.appliedAt,
+      storeId: currentStore.id,
+    });
+    setCoupon(null);
   }
 
   const splitShares = useMemo(() => {
