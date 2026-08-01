@@ -44,6 +44,13 @@ export const reservedAt = (bookings: Booking[], productId: string, storeId: stri
       0,
     );
 
+/** Stock a cashier may actually sell right now: on hand minus booked units. */
+export const availableAt = (
+  product: Product,
+  storeId: string,
+  bookings: Booking[] = [],
+) => stockAt(product, storeId) - reservedAt(bookings, product.id, storeId);
+
 const bump = (p: Product, storeId: string, delta: number): Product => ({
   ...p,
   stockByStore: { ...p.stockByStore, [storeId]: stockAt(p, storeId) + delta },
