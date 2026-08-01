@@ -1169,6 +1169,116 @@ function Register() {
         </DialogContent>
       </Dialog>
 
+      {/* Book & pay later */}
+      <Dialog open={bookOpen} onOpenChange={setBookOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Book &amp; pay later</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="rounded-md border border-border px-3 py-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Booking total</span>
+                <span className="numeric font-semibold">{money(totals.total)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Balance after deposit</span>
+                <span className="numeric font-semibold text-primary">
+                  {money(r2(Math.max(0, totals.total - Number(deposit || 0))))}
+                </span>
+              </div>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                {lines.reduce((a, l) => a + l.qty, 0)} unit(s) are reserved at{" "}
+                {currentStore.name} until the collect-by date.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>Deposit taken now</Label>
+                <Input
+                  value={deposit}
+                  onChange={(e) => setDeposit(e.target.value)}
+                  placeholder="0.00"
+                  className="numeric"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Deposit method</Label>
+                <div className="flex overflow-hidden rounded-md border border-border">
+                  {(["cash", "card", "wallet"] as const).map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => setDepositMethod(m)}
+                      className={`flex-1 px-2 py-2 text-xs capitalize ${
+                        depositMethod === m
+                          ? "bg-primary/15 text-primary"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>Collect &amp; settle by</Label>
+                <Input
+                  type="date"
+                  value={dueDate}
+                  min={isoDaysFromNow(0)}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  className="numeric"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Quick window</Label>
+                <div className="flex gap-1">
+                  {[7, 14, 30, 60].map((d) => (
+                    <button
+                      key={d}
+                      onClick={() => setDueDate(isoDaysFromNow(d))}
+                      className="flex-1 rounded-md border border-border py-2 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      {d}d
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>Customer name</Label>
+                <Input value={bookName} onChange={(e) => setBookName(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label>Phone</Label>
+                <Input
+                  value={bookPhone}
+                  onChange={(e) => setBookPhone(e.target.value)}
+                  className="numeric"
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Note</Label>
+              <Input
+                value={bookNote}
+                onChange={(e) => setBookNote(e.target.value)}
+                placeholder="Colour, size, collection instructions…"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBookOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => void bookAndPayLater()}>Reserve &amp; print slip</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Open shift */}
       <Dialog open={openShiftOpen} onOpenChange={setOpenShiftOpen}>
         <DialogContent>
