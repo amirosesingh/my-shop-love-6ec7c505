@@ -132,7 +132,7 @@ export type TerminalUser = {
 
 /** Row loaded from public.app_users for the signed-in account. */
 export type AppUserProfile = {
-  user_code: string;
+  user_id: string;
   full_name: string;
   role: AppRole;
   store_id: string | null;
@@ -348,7 +348,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // The PIN is compared against the bcrypt digest inside the database;
     // it is never stored, logged or persisted on this device.
     const { data, error } = await supabase.rpc("verify_terminal_pin" as never, {
-      p_user_code: code,
+      p_user_id: code,
       p_pin: pin,
     } as never);
     if (error) {
@@ -362,7 +362,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const row = (Array.isArray(data) ? data[0] : data) as
       | {
-          user_code: string;
+          user_id: string;
           full_name: string;
           role: AppRole;
           store_id: string | null;
@@ -382,7 +382,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (signInError) return { ok: false, error: signInError.message };
 
     const next: TerminalUser = {
-      userCode: row.user_code,
+      userCode: row.user_id,
       name: row.full_name,
       role: row.role,
       storeId: row.store_id,
@@ -454,7 +454,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       (meta["full_name"] as string | undefined) || email.split("@")[0] || "User";
     return {
       staffId:
-        appUser?.user_code ??
+        appUser?.user_id ??
         (meta["user_id"] as string | undefined) ??
         terminalUser?.userCode ??
         found?.staffId ??
