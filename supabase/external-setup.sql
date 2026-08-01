@@ -254,3 +254,115 @@ values ('Bronze',0,1),('Silver',5,1.25),('Gold',10,1.5)
 on conflict do nothing;
 
 insert into public.pos_settings (id) values (1) on conflict (id) do nothing;
+
+-- ============================================================
+-- Terminal login: User ID + 4-digit PIN (bcrypt hashed)
+-- ============================================================
+create extension if not exists pgcrypto with schema extensions;
+
+create table if not exists public.app_users (
+  id uuid primary key default gen_random_uuid(),
+  user_code text not null unique,
+  full_name text not null,
+  role app_role not null default 'staff',
+  store_id text,
+  email text not null,
+  pin_hash text not null,          -- bcrypt digest, never returned to clients
+  auth_secret text not null,       -- backend sign-in secret, released only on a correct PIN
+  is_active boolean not null default true,
+  last_login_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- No direct table access at all: every read/write goes through the
+-- security-definer functions below, so pin_hash can never be selected.
+revoke all on public.app_users from anon;
+revoke all on public.app_users from authenticated;
+grant all on public.app_users to service_role;
+alter table public.app_users enable row level security;
+
+-- Verify a terminal login. Hashing/compare happens inside the database.
+create or replace function public.verify_terminal_pin(p_user_code text, p_pin text)
+returns table (user_code text, full_name text, role app_role, store_id text, email text, auth_secret text)
+language plpgsql security definer set search_path = public, extensions as $$
+declare u public.app_users%rowtype;
+begin
+  select * into u from public.app_users
+   where lower(app_users.user_code) = lower(trim(p_user_code)) and is_active;
+  if not found then return; end if;
+  if u.pin_hash <> crypt(p_pin, u.pin_hash) then return; end if;
+  update public.app_users set last_login_at = now() where id = u.id;
+  return query select u.user_code, u.full_name, u.role, u.store_id, u.email, u.auth_secret;
+end $$;
+
+revoke all on function public.verify_terminal_pin(text, text) from public;
+grant execute on function public.verify_terminal_pin(text, text) to anon, authenticated;
+
+-- Admin-only listing (never exposes pin_hash or auth_secret).
+create or replace function public.list_terminal_users()
+returns table (user_code text, full_name text, role app_role, store_id text, email text,
+               is_active boolean, last_login_at timestamptz)
+language sql security definer set search_path = public as $$
+  select a.user_code, a.full_name, a.role, a.store_id, a.email, a.is_active, a.last_login_at
+  from public.app_users a
+  where public.has_role(auth.uid(),'admin')
+  order by a.user_code
+$$;
+
+revoke all on function public.list_terminal_users() from public;
+grant execute on function public.list_terminal_users() to authenticated;
+
+-- Admin-only provisioning. The PIN arrives over TLS and is hashed here.
+create or replace function public.upsert_terminal_user(
+  p_user_code text, p_full_name text, p_role app_role, p_store_id text,
+  p_email text, p_pin text, p_password text)
+returns void
+language plpgsql security definer set search_path = public, extensions as $$
+begin
+  if not public.has_role(auth.uid(),'admin') then
+    raise exception 'Only admins can manage terminal users';
+  end if;
+  if p_pin !~ '^[0-9]{4}$' then
+    raise exception 'PIN must be exactly 4 digits';
+  end if;
+  insert into public.app_users (user_code, full_name, role, store_id, email, pin_hash, auth_secret)
+  values (trim(p_user_code), trim(p_full_name), p_role, nullif(trim(coalesce(p_store_id,'')),''),
+          lower(trim(p_email)), crypt(p_pin, gen_salt('bf', 10)), p_password)
+  on conflict (user_code) do update
+    set full_name = excluded.full_name,
+        role = excluded.role,
+        store_id = excluded.store_id,
+        email = excluded.email,
+        pin_hash = excluded.pin_hash,
+        auth_secret = excluded.auth_secret,
+        updated_at = now();
+end $$;
+
+revoke all on function public.upsert_terminal_user(text, text, app_role, text, text, text, text) from public;
+grant execute on function public.upsert_terminal_user(text, text, app_role, text, text, text, text) to authenticated;
+
+create or replace function public.set_terminal_active(p_user_code text, p_active boolean)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.has_role(auth.uid(),'admin') then
+    raise exception 'Only admins can manage terminal users';
+  end if;
+  update public.app_users set is_active = p_active, updated_at = now()
+   where lower(user_code) = lower(trim(p_user_code));
+end $$;
+
+revoke all on function public.set_terminal_active(text, boolean) from public;
+grant execute on function public.set_terminal_active(text, boolean) to authenticated;
+
+create or replace function public.delete_terminal_user(p_user_code text)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.has_role(auth.uid(),'admin') then
+    raise exception 'Only admins can manage terminal users';
+  end if;
+  delete from public.app_users where lower(user_code) = lower(trim(p_user_code));
+end $$;
+
+revoke all on function public.delete_terminal_user(text) from public;
+grant execute on function public.delete_terminal_user(text) to authenticated;

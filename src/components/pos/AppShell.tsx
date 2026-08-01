@@ -1,8 +1,8 @@
-import { Loader2, LogOut, Menu, ReceiptText, Store } from "lucide-react";
+import { Loader2, Lock, LogOut, Menu, ReceiptText, Store } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
-import { LoginScreen } from "@/components/pos/LoginScreen";
+import { TerminalLogin } from "@/components/pos/TerminalLogin";
 import { SidebarNav, useSidebarCollapsed } from "@/components/pos/SidebarNav";
 import type { NavItem } from "@/components/pos/nav-config";
 import { setPrintStore, setPrintSettings } from "@/lib/pos-print";
@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { activeShift, stores, currentStore, setCurrentStore, state, ready: dataReady } = usePos();
-  const { ready, user, isAdmin, logout, can } = useAuth();
+  const { ready, user, isAdmin, logout, lock, can } = useAuth();
   const [collapsed, setCollapsed] = useSidebarCollapsed();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -40,7 +40,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [user, isAdmin, currentStore.id, setCurrentStore]);
 
   if (!ready) return null;
-  if (!user) return <LoginScreen />;
+  if (!user) return <TerminalLogin />;
   if (!dataReady)
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3">
@@ -205,6 +205,32 @@ export function AppShell({ children }: { children: ReactNode }) {
           >
             {currentStore.code}
           </Badge>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 shrink-0 px-2 text-[11px]"
+            onClick={() => void lock()}
+          >
+            <Lock className="size-3.5" /> Lock
+          </Button>
+        </header>
+
+        {/* Desktop header: signed-in cashier + quick lock / switch user */}
+        <header className="hidden items-center gap-3 border-b border-border bg-sidebar px-4 py-2 md:flex">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium">{user.name}</p>
+            <p className="text-[11px] capitalize text-muted-foreground">
+              {user.staffId} · {user.role}
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="ml-auto h-8 text-xs"
+            onClick={() => void lock()}
+          >
+            <Lock className="size-3.5" /> Lock / Switch user
+          </Button>
         </header>
 
         <main className="min-w-0 flex-1">{children}</main>

@@ -20,7 +20,7 @@ const labelOf = (el: HTMLElement) =>
 
 /** Global, app-wide UI telemetry: clicks, navigation, modals and search queries. */
 export function AuditTracker() {
-  const { user } = useAuth();
+  const { user, authUserId } = useAuth();
   const path = useRouterState({ select: (s) => s.location.pathname });
   const lastPath = useRef<string | null>(null);
   const searchTimers = useRef(new Map<HTMLInputElement, ReturnType<typeof setTimeout>>());
@@ -30,8 +30,9 @@ export function AuditTracker() {
       staffId: user?.staffId ?? "anonymous",
       staffName: user?.name ?? "Signed out",
       storeId: user?.storeId ?? null,
+      authUserId,
     });
-  }, [user]);
+  }, [user, authUserId]);
 
   useEffect(() => {
     startAuditSync();
