@@ -7,6 +7,7 @@ import type {
   Store,
   WhatsAppSettings,
 } from "./pos-types";
+import { defaultPaymentQr } from "./pos-types";
 
 export const defaultPaymentDetails: PaymentDetails = {
   accountName: "",
@@ -15,6 +16,7 @@ export const defaultPaymentDetails: PaymentDetails = {
   whatsapp: "",
   note: "Send the transfer slip on WhatsApp to confirm your booking.",
   showOnBookingSlip: true,
+  paymentQr: defaultPaymentQr,
 };
 
 export const defaultReceiptSettings: ReceiptSettings = {

@@ -67,9 +67,7 @@ export const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
 /** Resolve a cart line's per-unit discount in currency. */
 export const lineUnitDiscount = (l: Pick<CartLine, "price" | "discount" | "discountType">) =>
-  l.discountType === "percent"
-    ? r2((l.price * (l.discount || 0)) / 100)
-    : r2(l.discount || 0);
+  l.discountType === "percent" ? r2((l.price * (l.discount || 0)) / 100) : r2(l.discount || 0);
 
 export type PaymentMethod = "cash" | "card" | "wallet" | "points" | "bank_transfer";
 
@@ -123,12 +121,7 @@ export type Shift = {
 };
 
 export type TransferKind = "transfer" | "request";
-export type TransferStatus =
-  | "requested"
-  | "in_transit"
-  | "received"
-  | "rejected"
-  | "cancelled";
+export type TransferStatus = "requested" | "in_transit" | "received" | "rejected" | "cancelled";
 
 export type TransferItem = {
   productId: string;
@@ -221,6 +214,41 @@ export type PaymentDetails = {
   note: string;
   /** also print the transfer block on booking slips */
   showOnBookingSlip: boolean;
+  /** payment QR shown on the customer display when paying by transfer */
+  paymentQr?: PaymentQr;
+};
+
+/**
+ * A bank / e-wallet payment QR. `static` prints the payload as-is; `dynamic`
+ * substitutes {amount} and {reference} with the live bill figures.
+ */
+export type PaymentQr = {
+  enabled: boolean;
+  mode: "static" | "dynamic";
+  /** EMVCo / UPI / PromptPay / DuitNow payload, or any URL */
+  payload: string;
+  label: string;
+};
+
+export const defaultPaymentQr: PaymentQr = {
+  enabled: false,
+  mode: "static",
+  payload: "",
+  label: "Scan to pay",
+};
+
+/** Fill a dynamic QR payload with the amount due and the bill reference. */
+export const resolvePaymentQr = (
+  qr: PaymentQr | undefined,
+  amount: number,
+  reference: string,
+): string => {
+  if (!qr?.enabled || !qr.payload.trim()) return "";
+  if (qr.mode === "static") return qr.payload.trim();
+  return qr.payload
+    .replaceAll("{amount}", r2(amount).toFixed(2))
+    .replaceAll("{reference}", reference || "")
+    .trim();
 };
 
 export const whatsappLink = (number: string) => {

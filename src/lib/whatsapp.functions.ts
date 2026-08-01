@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 const payload = z.object({
-  phoneNumberId: z.string().min(5).max(40),
+  phoneNumberId: z.string().max(40).optional(),
   /** digits only, international format */
   to: z.string().regex(/^\d{6,15}$/),
   body: z.string().min(1).max(3000),
@@ -15,12 +15,19 @@ const payload = z.object({
 export const sendWhatsAppBill = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => payload.parse(data))
   .handler(async ({ data }) => {
-    const token = process.env["WHATSAPP_TOKEN"];
+    const { readSecureSetting } = await import("./secure-settings.server");
+    // Prefer the encrypted value saved in Settings, fall back to the secret.
+    const token = (await readSecureSetting("whatsapp_token")) ?? process.env["WHATSAPP_TOKEN"];
     if (!token) {
       return { ok: false as const, error: "WhatsApp access token is not configured" };
     }
+    const phoneNumberId =
+      (await readSecureSetting("whatsapp_phone_number_id")) ?? data.phoneNumberId;
+    if (!phoneNumberId) {
+      return { ok: false as const, error: "WhatsApp phone number ID is not configured" };
+    }
     const res = await fetch(
-      `https://graph.facebook.com/v21.0/${data.phoneNumberId}/messages`,
+      `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`,
       {
         method: "POST",
         headers: {

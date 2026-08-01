@@ -7,7 +7,7 @@ import {
   type DisplaySnapshot,
 } from "@/lib/customer-display";
 import { qrSvg } from "@/lib/pos-print";
-import { whatsappLink } from "@/lib/pos-types";
+import { resolvePaymentQr, whatsappLink } from "@/lib/pos-types";
 
 export const Route = createFileRoute("/display")({
   head: () => ({
@@ -31,8 +31,7 @@ export const Route = createFileRoute("/display")({
   component: CustomerDisplay,
 });
 
-const money = (n: number) =>
-  n.toLocaleString(undefined, { style: "currency", currency: "USD" });
+const money = (n: number) => n.toLocaleString(undefined, { style: "currency", currency: "USD" });
 
 function CustomerDisplay() {
   const [snap, setSnap] = useState<DisplaySnapshot | null>(null);
@@ -45,16 +44,15 @@ function CustomerDisplay() {
   const pay = snap?.payment ?? null;
   const transferMode = snap?.mode === "transfer";
   const wa = pay?.whatsapp ? whatsappLink(pay.whatsapp) : "";
+  const payQr = resolvePaymentQr(pay?.paymentQr, snap?.total ?? 0, snap?.reference ?? "");
   const showTransfer =
-    !!pay && (!!pay.accountNumber || !!pay.whatsapp || !!pay.accountName);
+    !!pay && (!!pay.accountNumber || !!pay.whatsapp || !!pay.accountName || !!payQr);
 
   return (
     <main className="flex min-h-screen flex-col bg-background text-foreground">
       <header className="flex items-baseline justify-between border-b border-border px-8 py-5">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            {snap?.companyName || "Welcome"}
-          </h1>
+          <h1 className="text-2xl font-bold tracking-tight">{snap?.companyName || "Welcome"}</h1>
           <p className="text-sm text-muted-foreground">
             {snap?.storeName ?? "Please wait for the cashier"}
           </p>
@@ -62,9 +60,7 @@ function CustomerDisplay() {
         {snap?.memberName && (
           <div className="text-right">
             <p className="text-sm font-semibold">{snap.memberName}</p>
-            <p className="numeric text-xs text-muted-foreground">
-              {snap.memberPoints ?? 0} points
-            </p>
+            <p className="numeric text-xs text-muted-foreground">{snap.memberPoints ?? 0} points</p>
           </div>
         )}
       </header>
@@ -141,9 +137,7 @@ function CustomerDisplay() {
               <div className="mt-3 space-y-1 border-t border-border pt-3">
                 <Row label="Paid" value={money(snap.paid)} />
                 <Row label="Change" value={money(snap.change)} />
-                <p className="numeric text-xs text-muted-foreground">
-                  Receipt {snap.reference}
-                </p>
+                <p className="numeric text-xs text-muted-foreground">Receipt {snap.reference}</p>
               </div>
             )}
             {snap?.mode === "booking" && (
@@ -175,26 +169,37 @@ function CustomerDisplay() {
               <div className="mt-3 space-y-1 text-sm">
                 {pay?.bankName && <Row label="Bank" value={pay.bankName} />}
                 {pay?.accountName && <Row label="Account name" value={pay.accountName} />}
-                {pay?.accountNumber && (
-                  <Row label="Account no." value={pay.accountNumber} strong />
-                )}
+                {pay?.accountNumber && <Row label="Account no." value={pay.accountNumber} strong />}
                 {pay?.whatsapp && <Row label="WhatsApp" value={pay.whatsapp} />}
                 {transferMode && snap?.transferRef && (
                   <Row label="Reference" value={snap.transferRef} strong />
                 )}
               </div>
               {pay?.note && <p className="mt-2 text-xs text-muted-foreground">{pay.note}</p>}
-              {wa && (
-                <div className="mt-3 flex items-center gap-3">
-                  <div
-                    className="rounded bg-white p-2"
-                    dangerouslySetInnerHTML={{ __html: qrSvg(wa, transferMode ? 150 : 110) }}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Scan to send your transfer slip on WhatsApp.
-                  </p>
-                </div>
-              )}
+              <div className="mt-3 flex flex-wrap items-start gap-4">
+                {payQr && (
+                  <div className="text-center">
+                    <div
+                      className="rounded bg-white p-2"
+                      dangerouslySetInnerHTML={{
+                        __html: qrSvg(payQr, transferMode ? 190 : 130),
+                      }}
+                    />
+                    <p className="mt-1 text-xs font-medium">
+                      {pay?.paymentQr?.label || "Scan to pay"}
+                    </p>
+                  </div>
+                )}
+                {wa && (
+                  <div className="text-center">
+                    <div
+                      className="rounded bg-white p-2"
+                      dangerouslySetInnerHTML={{ __html: qrSvg(wa, transferMode ? 150 : 110) }}
+                    />
+                    <p className="mt-1 text-xs text-muted-foreground">Send your slip on WhatsApp</p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </aside>
@@ -203,15 +208,7 @@ function CustomerDisplay() {
   );
 }
 
-function Row({
-  label,
-  value,
-  strong,
-}: {
-  label: string;
-  value: string;
-  strong?: boolean;
-}) {
+function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
     <div className="flex items-center justify-between py-0.5">
       <span className="text-sm text-muted-foreground">{label}</span>

@@ -5,6 +5,8 @@ import { useAuth, type PermissionFlag } from "@/lib/pos-auth";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { TerminalLogin } from "@/components/pos/TerminalLogin";
 import { SidebarNav, useSidebarCollapsed } from "@/components/pos/SidebarNav";
+import { SyncStatus } from "@/components/pos/SyncStatus";
+import { startSyncEngine } from "@/lib/sync-engine";
 import type { NavItem } from "@/components/pos/nav-config";
 import { setPrintStore, setPrintSettings } from "@/lib/pos-print";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +38,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Background outbox drain: keeps offline sales flowing once the link returns.
+  useEffect(() => startSyncEngine(), []);
 
   // Cashier accounts are limited to the register; management screens are
   // reserved for supervisors and admins.
@@ -227,6 +232,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           >
             {currentStore.code}
           </Badge>
+          <SyncStatus />
           <Button
             variant="outline"
             size="sm"
@@ -245,12 +251,8 @@ export function AppShell({ children }: { children: ReactNode }) {
               {user.staffId} · {user.role}
             </p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="ml-auto h-8 text-xs"
-            onClick={() => void lock()}
-          >
+          <SyncStatus className="ml-auto" />
+          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => void lock()}>
             <Lock className="size-3.5" /> Lock / Switch user
           </Button>
         </header>

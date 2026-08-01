@@ -3,6 +3,8 @@ import { useMemo, useState } from "react";
 import { Percent, Plus, Printer, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
+import { SyncSettings } from "@/components/pos/SyncSettings";
+import { SecureCredentials } from "@/components/pos/SecureCredentials";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +22,7 @@ import {
   setPreviewReceiptCfg,
   setPrintSettings,
 } from "@/lib/pos-print";
+import { defaultPaymentQr } from "@/lib/pos-types";
 import type {
   FontFamilyKey,
   FontStyleSettings,
@@ -86,6 +89,9 @@ function Settings() {
   const whatsapp = state.settings.whatsapp ?? defaultWhatsApp;
   const setWhatsApp = (patch: Partial<typeof whatsapp>) =>
     updateSettings({ whatsapp: { ...whatsapp, ...patch } });
+  const paymentQr = payment.paymentQr ?? defaultPaymentQr;
+  const setPaymentQr = (patch: Partial<typeof paymentQr>) =>
+    updateSettings({ payment: { ...payment, paymentQr: { ...paymentQr, ...patch } } });
 
   const [branchId, setBranchId] = useState(currentStore.id);
   const branch = stores.find((s) => s.id === branchId) ?? currentStore;
@@ -125,8 +131,22 @@ function Settings() {
 
   const sample: Sale = useMemo(() => {
     const lines = [
-      { productId: "x1", name: "Espresso Beans 250g", price: 12.5, qty: 2, taxRate: 0.05, discount: 0 },
-      { productId: "x2", name: "Butter Croissant", price: 3.75, qty: 1, taxRate: 0.05, discount: 0 },
+      {
+        productId: "x1",
+        name: "Espresso Beans 250g",
+        price: 12.5,
+        qty: 2,
+        taxRate: 0.05,
+        discount: 0,
+      },
+      {
+        productId: "x2",
+        name: "Butter Croissant",
+        price: 3.75,
+        qty: 1,
+        taxRate: 0.05,
+        discount: 0,
+      },
     ];
     const subtotal = 28.75;
     const rate = tax.enabled ? tax.rate / 100 : 0;
@@ -135,7 +155,10 @@ function Settings() {
         ? Number((subtotal - subtotal / (1 + rate)).toFixed(2))
         : Number((subtotal * rate).toFixed(2))
       : 0;
-    const total = tax.enabled && tax.mode === "exclusive" ? Number((subtotal + taxAmount).toFixed(2)) : subtotal;
+    const total =
+      tax.enabled && tax.mode === "exclusive"
+        ? Number((subtotal + taxAmount).toFixed(2))
+        : subtotal;
     return {
       id: "preview",
       receiptNo: `${currentStore.code}-000001`,
@@ -199,7 +222,8 @@ function Settings() {
         <header>
           <h1 className="text-2xl font-semibold">Settings</h1>
           <p className="text-sm text-muted-foreground">
-            Tax rules apply to every register instantly. Receipt styling applies to all printed slips.
+            Tax rules apply to every register instantly. Receipt styling applies to all printed
+            slips.
           </p>
         </header>
 
@@ -224,7 +248,9 @@ function Settings() {
               <Input
                 className="numeric"
                 value={tax.rate}
-                onChange={(e) => updateSettings({ tax: { ...tax, rate: Number(e.target.value) || 0 } })}
+                onChange={(e) =>
+                  updateSettings({ tax: { ...tax, rate: Number(e.target.value) || 0 } })
+                }
               />
             </div>
             <div className="space-y-1">
@@ -295,6 +321,7 @@ function Settings() {
                   <TabsTrigger value="elements">Elements</TabsTrigger>
                   <TabsTrigger value="payment">Bank transfer</TabsTrigger>
                   <TabsTrigger value="whatsapp">WhatsApp bills</TabsTrigger>
+                  <TabsTrigger value="sync">Sync &amp; backup</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="identity" className="space-y-3 pt-4">
@@ -370,7 +397,9 @@ function Settings() {
                             />
                           </div>
                           <div className="space-y-1">
-                            <Label className="text-[11px] text-muted-foreground">Spacing (px)</Label>
+                            <Label className="text-[11px] text-muted-foreground">
+                              Spacing (px)
+                            </Label>
                             <Input
                               type="number"
                               min={0}
@@ -425,7 +454,10 @@ function Settings() {
                             "customLines",
                             effective.customLines.map((l) =>
                               l.id === line.id
-                                ? { ...l, placement: e.target.value as ReceiptCustomLine["placement"] }
+                                ? {
+                                    ...l,
+                                    placement: e.target.value as ReceiptCustomLine["placement"],
+                                  }
                                 : l,
                             ),
                           )
@@ -556,7 +588,9 @@ function Settings() {
                         <Switch
                           aria-label={t.label}
                           checked={!!receipt[t.key]}
-                          onCheckedChange={(v) => setGlobal({ [t.key]: v } as Partial<ReceiptSettings>)}
+                          onCheckedChange={(v) =>
+                            setGlobal({ [t.key]: v } as Partial<ReceiptSettings>)
+                          }
                         />
                       </div>
                     ))}
@@ -573,14 +607,18 @@ function Settings() {
                       <Label className="text-xs text-muted-foreground">Bank name</Label>
                       <Input
                         value={payment.bankName}
-                        onChange={(e) => updateSettings({ payment: { ...payment, bankName: e.target.value } })}
+                        onChange={(e) =>
+                          updateSettings({ payment: { ...payment, bankName: e.target.value } })
+                        }
                       />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Account name</Label>
                       <Input
                         value={payment.accountName}
-                        onChange={(e) => updateSettings({ payment: { ...payment, accountName: e.target.value } })}
+                        onChange={(e) =>
+                          updateSettings({ payment: { ...payment, accountName: e.target.value } })
+                        }
                       />
                     </div>
                     <div className="space-y-1">
@@ -588,7 +626,9 @@ function Settings() {
                       <Input
                         className="numeric"
                         value={payment.accountNumber}
-                        onChange={(e) => updateSettings({ payment: { ...payment, accountNumber: e.target.value } })}
+                        onChange={(e) =>
+                          updateSettings({ payment: { ...payment, accountNumber: e.target.value } })
+                        }
                       />
                     </div>
                     <div className="space-y-1">
@@ -599,7 +639,9 @@ function Settings() {
                         className="numeric"
                         placeholder="+15550100"
                         value={payment.whatsapp}
-                        onChange={(e) => updateSettings({ payment: { ...payment, whatsapp: e.target.value } })}
+                        onChange={(e) =>
+                          updateSettings({ payment: { ...payment, whatsapp: e.target.value } })
+                        }
                       />
                     </div>
                   </div>
@@ -607,7 +649,9 @@ function Settings() {
                     <Label className="text-xs text-muted-foreground">Instruction note</Label>
                     <Input
                       value={payment.note}
-                      onChange={(e) => updateSettings({ payment: { ...payment, note: e.target.value } })}
+                      onChange={(e) =>
+                        updateSettings({ payment: { ...payment, note: e.target.value } })
+                      }
                     />
                   </div>
                   <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
@@ -619,6 +663,61 @@ function Settings() {
                         updateSettings({ payment: { ...payment, showOnBookingSlip: v } })
                       }
                     />
+                  </div>
+
+                  <div className="space-y-3 rounded-md border border-border p-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm">Payment QR on customer display</p>
+                        <p className="text-xs text-muted-foreground">
+                          Paste your bank / e-wallet QR payload (EMVCo, UPI, PromptPay, DuitNow) or
+                          a payment link.
+                        </p>
+                      </div>
+                      <Switch
+                        aria-label="Payment QR on customer display"
+                        checked={paymentQr.enabled}
+                        onCheckedChange={(v) => setPaymentQr({ enabled: v })}
+                      />
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Caption</Label>
+                        <Input
+                          value={paymentQr.label}
+                          onChange={(e) => setPaymentQr({ label: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Mode</Label>
+                        <div className="flex gap-2">
+                          {(["static", "dynamic"] as const).map((m) => (
+                            <Button
+                              key={m}
+                              type="button"
+                              size="sm"
+                              variant={paymentQr.mode === m ? "default" : "outline"}
+                              onClick={() => setPaymentQr({ mode: m })}
+                            >
+                              {m === "static" ? "Static" : "Dynamic"}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">QR payload</Label>
+                      <Textarea
+                        rows={3}
+                        placeholder="00020101021226...  or  https://pay.example.com?amt={amount}&ref={reference}"
+                        value={paymentQr.payload}
+                        onChange={(e) => setPaymentQr({ payload: e.target.value })}
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        Dynamic mode replaces {"{amount}"} and {"{reference}"} with the live bill
+                        total and receipt number at checkout.
+                      </p>
+                    </div>
                   </div>
                 </TabsContent>
 
@@ -648,9 +747,7 @@ function Settings() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">
-                        Default country code
-                      </Label>
+                      <Label className="text-xs text-muted-foreground">Default country code</Label>
                       <Input
                         className="numeric"
                         placeholder="+1"
@@ -712,6 +809,11 @@ function Settings() {
                       onCheckedChange={(v) => setWhatsApp({ autoSendOnBooking: v })}
                     />
                   </div>
+                  <SecureCredentials />
+                </TabsContent>
+
+                <TabsContent value="sync" className="pt-4">
+                  <SyncSettings />
                 </TabsContent>
               </Tabs>
 
