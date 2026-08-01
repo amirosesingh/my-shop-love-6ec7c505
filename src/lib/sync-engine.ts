@@ -1,4 +1,4 @@
-import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
+import { supabaseExternal } from "@/integrations/supabase/external-client";
 import {
   failOp,
   isOnline,
@@ -32,22 +32,33 @@ const strip = (table: string, rows: Record<string, unknown>[]) =>
     return copy;
   });
 
-async function execute(op: SyncOp): Promise<{ error?: { message: string; code?: string } }> {
+/** Table names are dynamic here, so the generated row types don't apply. */
+type LooseQuery = {
+  insert: (rows: unknown) => PromiseLike<QueryResult>;
+  upsert: (rows: unknown, opts: { onConflict: string }) => PromiseLike<QueryResult>;
+  update: (values: unknown) => LooseFilter;
+  delete: () => LooseFilter;
+};
+type LooseFilter = PromiseLike<QueryResult> & { eq: (col: string, val: unknown) => LooseFilter };
+type QueryResult = { error: { message: string; code?: string } | null };
+
+const from = (table: string) =>
+  (supabaseExternal as unknown as { from: (t: string) => LooseQuery }).from(table);
+
+async function execute(op: SyncOp): Promise<QueryResult> {
   switch (op.kind) {
     case "insert":
-      return supabase.from(op.table).insert(op.rows as never);
+      return from(op.table).insert(op.rows);
     case "upsert":
-      return supabase
-        .from(op.table)
-        .upsert(op.rows as never, { onConflict: op.onConflict ?? "id" });
+      return from(op.table).upsert(op.rows, { onConflict: op.onConflict ?? "id" });
     case "update": {
-      let q = supabase.from(op.table).update(op.values as never);
-      for (const [k, v] of Object.entries(op.match)) q = q.eq(k, v as never);
+      let q = from(op.table).update(op.values);
+      for (const [k, v] of Object.entries(op.match)) q = q.eq(k, v);
       return q;
     }
     case "delete": {
-      let q = supabase.from(op.table).delete();
-      for (const [k, v] of Object.entries(op.match)) q = q.eq(k, v as never);
+      let q = from(op.table).delete();
+      for (const [k, v] of Object.entries(op.match)) q = q.eq(k, v);
       return q;
     }
   }
