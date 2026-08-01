@@ -287,28 +287,16 @@ function StaffManagement() {
           toast.error("PIN must be exactly 6 digits");
           return;
         }
-        const auth = await createCashierAccount({
-          userId: username,
-          fullName: form.full_name || username,
-          pin: form.pin,
-          storeId: form.store_id || null,
-        });
-        if (!auth.ok && !/already/i.test(auth.error ?? "")) {
-          toast.error("Could not create account", { description: auth.error });
-          return;
-        }
-        const { error: cashierError } = await sb.rpc("upsert_terminal_user", {
-          p_user_id: username,
-          p_full_name: form.full_name.trim() || username,
-          p_role: toDbRole("cashier"),
-          p_store_id: form.store_id || null,
-          p_email: cashierEmail(username),
-          // Legacy 4-digit column; the real PIN lives in the auth secret.
-          p_pin: String(Math.floor(1000 + Math.random() * 9000)),
-          p_password: "",
-        });
-        if (cashierError) {
-          toast.error("Could not save staff profile", { description: errText(cashierError) });
+        try {
+          await upsertCashier({
+            username,
+            fullName: form.full_name.trim() || username,
+            pin: form.pin,
+            storeId: form.store_id || null,
+            isActive: true,
+          });
+        } catch (e) {
+          toast.error("Could not create cashier", { description: cashierErrText(e) });
           return;
         }
         toast.success(`Cashier ${username} created`);
