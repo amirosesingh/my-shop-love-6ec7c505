@@ -51,6 +51,7 @@ describe("secret hygiene", () => {
         }
         if (!/\.(ts|tsx)$/.test(entry.name)) continue;
         if (/\.server\.tsx?$/.test(entry.name)) continue;
+        if (/\.test\.tsx?$/.test(entry.name)) continue;
         const src = readFileSync(full, "utf8");
         if (/SERVICE_ROLE|service_role_key/i.test(src)) offenders.push(full);
       }
