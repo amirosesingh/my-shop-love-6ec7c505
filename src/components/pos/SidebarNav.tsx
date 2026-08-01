@@ -44,6 +44,7 @@ export function SidebarNav({
 }: Props) {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const hash = useRouterState({ select: (r) => r.location.hash });
+  const search = useRouterState({ select: (r) => r.location.search as Record<string, unknown> });
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState<string[]>([]);
 
@@ -101,7 +102,9 @@ export function SidebarNav({
     const pathOk = i.to === "/" ? pathname === "/" : pathname.startsWith(i.to);
     if (!pathOk) return false;
     const current = (hash ?? "").replace(/^#/, "");
-    return (i.hash ?? "") === current;
+    if ((i.hash ?? "") !== current) return false;
+    const activeSection = typeof search?.["section"] === "string" ? search["section"] : "";
+    return (i.section ?? "") === activeSection;
   };
 
   const toggleGroup = (id: string) =>
@@ -111,6 +114,7 @@ export function SidebarNav({
     <Link
       to={item.to}
       hash={item.hash}
+      search={item.section ? { section: item.section } : {}}
       onClick={onNavigate}
       className={cn(
         "flex items-center gap-2 rounded-md px-2 py-2 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground",
