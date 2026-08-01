@@ -293,20 +293,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const cashierLogin = useCallback(async (userId: string, pin: string) => {
-    const code = userId.trim();
-    if (!code) return { ok: false, error: "Enter your User ID" };
-    if (!/^\d{4}$/.test(pin)) return { ok: false, error: "Enter your 4-digit PIN" };
+    const code = userId.trim().toLowerCase();
+    if (!code) return { ok: false, error: "Enter your username" };
+    if (!/^\d{6}$/.test(pin)) return { ok: false, error: "Enter your 6-digit PIN" };
     const { error } = await supabase.auth.signInWithPassword({
       email: cashierEmail(code),
       password: cashierSecret(code, pin),
     });
-    return error ? { ok: false, error: "Invalid User ID or PIN" } : { ok: true };
+    return error ? { ok: false, error: "Invalid username or PIN" } : { ok: true };
   }, []);
 
   const pinLogin = useCallback(async (userCode: string, pin: string) => {
     const code = userCode.trim();
-    if (!code) return { ok: false, error: "Enter your User ID" };
-    if (!/^\d{4}$/.test(pin)) return { ok: false, error: "Enter your 4-digit PIN" };
+    if (!code) return { ok: false, error: "Enter your username" };
+    if (!/^\d{4,6}$/.test(pin)) return { ok: false, error: "Enter your PIN" };
 
     const signInLocalAdmin = () => {
       let expected = DEFAULT_BOOTSTRAP_PIN;
