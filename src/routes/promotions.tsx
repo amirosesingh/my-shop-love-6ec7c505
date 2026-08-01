@@ -235,6 +235,21 @@ function Promotions() {
                 />
               </div>
 
+              <div className="col-span-2 space-y-1">
+                <Label className="text-xs text-muted-foreground">
+                  Partner / collaborator (optional)
+                </Label>
+                <Input
+                  value={draft.partner ?? ""}
+                  onChange={(e) => setDraft({ ...draft, partner: e.target.value })}
+                  placeholder="e.g. Sarah — Instagram"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Coupon redemptions from this rule are grouped under this name in the Coupon
+                  Usage report, so collaboration payouts are easy to total.
+                </p>
+              </div>
+
               {draft.type === "points" && (
                 <div className="col-span-2 space-y-1">
                   <Label className="text-xs text-muted-foreground">Points per $1 spent</Label>
