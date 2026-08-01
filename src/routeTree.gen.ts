@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuditRouteImport } from './routes/audit'
 import { Route as BookingsRouteImport } from './routes/bookings'
+import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as DisplayRouteImport } from './routes/display'
 import { Route as InventoryRouteImport } from './routes/inventory'
 import { Route as MembersRouteImport } from './routes/members'
@@ -54,6 +55,11 @@ const AuditRoute = AuditRouteImport.update({
 const BookingsRoute = BookingsRouteImport.update({
   id: '/bookings',
   path: '/bookings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DisplayRoute = DisplayRouteImport.update({
@@ -201,6 +207,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/audit': typeof AuditRoute
   '/bookings': typeof BookingsRoute
+  '/dashboard': typeof DashboardRoute
   '/display': typeof DisplayRoute
   '/inventory': typeof InventoryRoute
   '/members': typeof MembersRoute
@@ -234,6 +241,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/audit': typeof AuditRoute
   '/bookings': typeof BookingsRoute
+  '/dashboard': typeof DashboardRoute
   '/display': typeof DisplayRoute
   '/inventory': typeof InventoryRoute
   '/members': typeof MembersRoute
@@ -268,6 +276,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/audit': typeof AuditRoute
   '/bookings': typeof BookingsRoute
+  '/dashboard': typeof DashboardRoute
   '/display': typeof DisplayRoute
   '/inventory': typeof InventoryRoute
   '/members': typeof MembersRoute
@@ -303,6 +312,7 @@ export interface FileRouteTypes {
     | '/'
     | '/audit'
     | '/bookings'
+    | '/dashboard'
     | '/display'
     | '/inventory'
     | '/members'
@@ -336,6 +346,7 @@ export interface FileRouteTypes {
     | '/'
     | '/audit'
     | '/bookings'
+    | '/dashboard'
     | '/display'
     | '/inventory'
     | '/members'
@@ -369,6 +380,7 @@ export interface FileRouteTypes {
     | '/'
     | '/audit'
     | '/bookings'
+    | '/dashboard'
     | '/display'
     | '/inventory'
     | '/members'
@@ -403,6 +415,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuditRoute: typeof AuditRoute
   BookingsRoute: typeof BookingsRoute
+  DashboardRoute: typeof DashboardRoute
   DisplayRoute: typeof DisplayRoute
   InventoryRoute: typeof InventoryRoute
   MembersRoute: typeof MembersRoute
@@ -454,6 +467,13 @@ declare module '@tanstack/react-router' {
       path: '/bookings'
       fullPath: '/bookings'
       preLoaderRoute: typeof BookingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/display': {
@@ -659,6 +679,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuditRoute: AuditRoute,
   BookingsRoute: BookingsRoute,
+  DashboardRoute: DashboardRoute,
   DisplayRoute: DisplayRoute,
   InventoryRoute: InventoryRoute,
   MembersRoute: MembersRoute,
