@@ -998,6 +998,25 @@ function Register() {
                 >
                   Kitchen
                 </Button>
+                {wa.enabled && (
+                  <div className="flex w-full flex-wrap items-center gap-2">
+                    <Input
+                      value={waNumber}
+                      onChange={(e) => setWaNumber(e.target.value)}
+                      placeholder="WhatsApp number"
+                      className="numeric h-9 w-44"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={waSending || !waNumber.trim()}
+                      onClick={() => void sendSaleOnWhatsApp(lastSale, waNumber)}
+                    >
+                      <MessageCircle className="size-4" />
+                      {waSending ? "Sending…" : "Send bill"}
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1073,13 +1092,14 @@ function Register() {
               ticket.
             </p>
           )}
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-5 gap-2">
             {(
               [
                 { m: "cash", icon: Banknote, label: "Cash" },
                 { m: "card", icon: CreditCard, label: "Card" },
                 { m: "wallet", icon: Wallet, label: "Wallet" },
                 { m: "points", icon: BadgeCheck, label: "Points" },
+                { m: "bank_transfer", icon: Landmark, label: "Transfer" },
               ] as const
             ).map((opt) => (
               <button
@@ -1133,6 +1153,29 @@ function Register() {
                 ? `${member.name} has ${member.points} points (100 pts = $1).`
                 : "Attach a member to pay with points."}
             </p>
+          )}
+          {method === "bank_transfer" && (
+            <div className="space-y-2 rounded-md border border-border p-3">
+              <p className="text-xs text-muted-foreground">
+                The customer screen is now showing your bank details and WhatsApp QR code so the
+                shopper can transfer {money(balanceDue)}.
+              </p>
+              <div className="numeric space-y-0.5 text-sm">
+                {state.settings.payment.bankName && <p>{state.settings.payment.bankName}</p>}
+                {state.settings.payment.accountName && (
+                  <p>{state.settings.payment.accountName}</p>
+                )}
+                {state.settings.payment.accountNumber && (
+                  <p className="font-bold">{state.settings.payment.accountNumber}</p>
+                )}
+              </div>
+              <Label>Transfer reference / slip number</Label>
+              <Input
+                value={transferRef}
+                onChange={(e) => setTransferRef(e.target.value)}
+                placeholder="e.g. TRX-889210"
+              />
+            </div>
           )}
 
           <DialogFooter>
