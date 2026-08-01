@@ -99,6 +99,16 @@ const SEED_STAFF: StaffMember[] = [
 ];
 
 const STAFF_KEY = "pos-staff-v1";
+/** Terminal identity of the cashier at the till. Never stores the PIN. */
+const TERMINAL_KEY = "pos-terminal-user-v1";
+
+export type TerminalUser = {
+  userCode: string;
+  name: string;
+  role: AppRole;
+  storeId: string | null;
+  email: string;
+};
 
 type AuthCtx = {
   ready: boolean;
@@ -106,6 +116,8 @@ type AuthCtx = {
   isAdmin: boolean;
   /** raw Supabase user id of the signed-in account */
   authUserId: string | null;
+  /** cashier currently signed in at the terminal (User ID + PIN) */
+  terminalUser: TerminalUser | null;
   /** permission check that always passes for the admin */
   can: (flag: keyof StaffPermissions) => boolean;
   staff: StaffMember[];
@@ -113,12 +125,16 @@ type AuthCtx = {
   updateStaff: (member: StaffMember) => void;
   removeStaff: (id: string) => void;
   login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
+  /** User ID + 4-digit PIN sign-in; the PIN is verified inside the database. */
+  pinLogin: (userCode: string, pin: string) => Promise<{ ok: boolean; error?: string }>;
   signUp: (
     email: string,
     password: string,
     fullName: string,
   ) => Promise<{ ok: boolean; error?: string; needsConfirmation?: boolean }>;
   logout: () => Promise<void>;
+  /** Lock the till / switch user — clears the session without losing local data. */
+  lock: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthCtx | null>(null);
