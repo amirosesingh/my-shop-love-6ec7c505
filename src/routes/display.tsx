@@ -43,6 +43,7 @@ function CustomerDisplay() {
   }, []);
 
   const pay = snap?.payment ?? null;
+  const transferMode = snap?.mode === "transfer";
   const wa = pay?.whatsapp ? whatsappLink(pay.whatsapp) : "";
   const showTransfer =
     !!pay && (!!pay.accountNumber || !!pay.whatsapp || !!pay.accountName);
@@ -126,7 +127,11 @@ function CustomerDisplay() {
             ) : null}
             <div className="mt-3 flex items-end justify-between border-t border-border pt-3">
               <span className="text-sm uppercase tracking-wide text-muted-foreground">
-                {snap?.mode === "booking" ? "Booking total" : "Total"}
+                {snap?.mode === "booking"
+                  ? "Booking total"
+                  : transferMode
+                    ? "Amount to transfer"
+                    : "Total"}
               </span>
               <span className="numeric text-4xl font-bold text-primary">
                 {money(snap?.total ?? 0)}
@@ -154,10 +159,19 @@ function CustomerDisplay() {
           </div>
 
           {showTransfer && (
-            <div className="rounded-xl border border-border p-5">
+            <div
+              className={`rounded-xl border p-5 ${
+                transferMode ? "border-primary bg-primary/5" : "border-border"
+              }`}
+            >
               <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                Pay by bank transfer
+                {transferMode ? "Please transfer to" : "Pay by bank transfer"}
               </p>
+              {transferMode && (
+                <p className="numeric mt-1 text-3xl font-bold text-primary">
+                  {money(snap?.total ?? 0)}
+                </p>
+              )}
               <div className="mt-3 space-y-1 text-sm">
                 {pay?.bankName && <Row label="Bank" value={pay.bankName} />}
                 {pay?.accountName && <Row label="Account name" value={pay.accountName} />}
@@ -165,13 +179,16 @@ function CustomerDisplay() {
                   <Row label="Account no." value={pay.accountNumber} strong />
                 )}
                 {pay?.whatsapp && <Row label="WhatsApp" value={pay.whatsapp} />}
+                {transferMode && snap?.transferRef && (
+                  <Row label="Reference" value={snap.transferRef} strong />
+                )}
               </div>
               {pay?.note && <p className="mt-2 text-xs text-muted-foreground">{pay.note}</p>}
               {wa && (
                 <div className="mt-3 flex items-center gap-3">
                   <div
                     className="rounded bg-white p-2"
-                    dangerouslySetInnerHTML={{ __html: qrSvg(wa, 110) }}
+                    dangerouslySetInnerHTML={{ __html: qrSvg(wa, transferMode ? 150 : 110) }}
                   />
                   <p className="text-xs text-muted-foreground">
                     Scan to send your transfer slip on WhatsApp.

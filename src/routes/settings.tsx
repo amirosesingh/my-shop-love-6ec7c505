@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePos } from "@/lib/pos-store";
-import { defaultPaymentDetails } from "@/lib/pos-seed";
+import { defaultPaymentDetails, defaultWhatsApp } from "@/lib/pos-seed";
 import { useAuth } from "@/lib/pos-auth";
 import {
   PAPER_LABELS,
@@ -83,6 +83,9 @@ function Settings() {
   const canSettings = isAdmin || can("can_access_pos_settings");
   const { tax, receipt } = state.settings;
   const payment = state.settings.payment ?? defaultPaymentDetails;
+  const whatsapp = state.settings.whatsapp ?? defaultWhatsApp;
+  const setWhatsApp = (patch: Partial<typeof whatsapp>) =>
+    updateSettings({ whatsapp: { ...whatsapp, ...patch } });
 
   const [branchId, setBranchId] = useState(currentStore.id);
   const branch = stores.find((s) => s.id === branchId) ?? currentStore;
@@ -291,6 +294,7 @@ function Settings() {
                   <TabsTrigger value="qr">QR code</TabsTrigger>
                   <TabsTrigger value="elements">Elements</TabsTrigger>
                   <TabsTrigger value="payment">Bank transfer</TabsTrigger>
+                  <TabsTrigger value="whatsapp">WhatsApp bills</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="identity" className="space-y-3 pt-4">
