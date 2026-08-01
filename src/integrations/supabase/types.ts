@@ -120,46 +120,70 @@ export type Database = {
       }
       pos_settings: {
         Row: {
+          company_name: string
+          custom_lines: Json
           enable_tax: boolean
+          fonts: Json
           footer_text: string | null
           header_text: string | null
           id: number
           paper_size: string
+          phone: string | null
+          qr: Json
+          reg_number: string | null
           show_barcode: boolean
           show_logo: boolean
           show_points: boolean
           show_tax_details: boolean
           tax_mode: string
+          tax_number: string | null
           tax_percentage: number
           updated_at: string
+          website: string | null
         }
         Insert: {
+          company_name?: string
+          custom_lines?: Json
           enable_tax?: boolean
+          fonts?: Json
           footer_text?: string | null
           header_text?: string | null
           id?: number
           paper_size?: string
+          phone?: string | null
+          qr?: Json
+          reg_number?: string | null
           show_barcode?: boolean
           show_logo?: boolean
           show_points?: boolean
           show_tax_details?: boolean
           tax_mode?: string
+          tax_number?: string | null
           tax_percentage?: number
           updated_at?: string
+          website?: string | null
         }
         Update: {
+          company_name?: string
+          custom_lines?: Json
           enable_tax?: boolean
+          fonts?: Json
           footer_text?: string | null
           header_text?: string | null
           id?: number
           paper_size?: string
+          phone?: string | null
+          qr?: Json
+          reg_number?: string | null
           show_barcode?: boolean
           show_logo?: boolean
           show_points?: boolean
           show_tax_details?: boolean
           tax_mode?: string
+          tax_number?: string | null
           tax_percentage?: number
           updated_at?: string
+          website?: string | null
         }
         Relationships: []
       }
