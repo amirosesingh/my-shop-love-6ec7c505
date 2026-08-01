@@ -21,7 +21,12 @@ export function SyncSettings() {
   const { state } = usePos();
   const [, force] = useState(0);
   const bump = () => force((n) => n + 1);
-  useEffect(() => subscribeOutbox(bump), []);
+  useEffect(() => {
+    const off = subscribeOutbox(bump);
+    return () => {
+      off();
+    };
+  }, []);
 
   const queue = listQueue();
   const quarantined = queue.filter((q) => q.quarantined);
