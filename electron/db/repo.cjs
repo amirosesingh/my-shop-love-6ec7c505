@@ -2,7 +2,7 @@
  * Table helpers: turn the app's serialisable sync operations into parameterised
  * T-SQL, and expose the queries the sync worker needs.
  */
-const { sql, getPool } = require("./pool");
+const { sql, getPool } = require("./pool.cjs");
 
 const SETTINGS_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -262,6 +262,60 @@ async function setState(key, value) {
     `);
 }
 
+/**
+ * Commits a completed bill to the local branch database in one transaction:
+ * the sale header, every line, the stock movement and the member update all
+ * land together or not at all. Rows are stamped `is_synced = 0` so the
+ * background worker pushes them whenever the branch is back online.
+ */
+async function createSale({ sale, items, products = [], member = null, branchId = null, exchangeOfBillNumber = null }) {
+  const pool = getPool();
+  const tx = new sql.Transaction(pool);
+  await tx.begin();
+  try {
+    await upsertRow(tx, "sales", { ...sale, branch_id: sale.branch_id ?? branchId });
+    for (const line of items) {
+      await upsertRow(tx, "sale_items", { ...line, branch_id: line.branch_id ?? branchId });
+    }
+    for (const product of products) await upsertRow(tx, "products", product);
+    if (member) await upsertRow(tx, "members", member);
+    if (exchangeOfBillNumber) {
+      await updateRows(
+        tx,
+        "sales",
+        { exchanged_to_bill_number: sale.bill_number },
+        { bill_number: exchangeOfBillNumber },
+      );
+    }
+    await tx.commit();
+    return { id: sale.id, billNumber: sale.bill_number };
+  } catch (err) {
+    await tx.rollback();
+    throw err;
+  }
+}
+
+/** Full local catalogue — the register never fetches products over HTTP. */
+async function getProducts() {
+  const res = await getPool().request().query("SELECT * FROM dbo.products ORDER BY name ASC;");
+  return res.recordset;
+}
+
+/** How many locally-created rows are still waiting for the central server. */
+async function pendingSyncCount() {
+  let total = 0;
+  let sales = 0;
+  for (const table of TABLES) {
+    const res = await getPool()
+      .request()
+      .query(`SELECT COUNT(*) AS n FROM dbo.[${table}] WHERE is_synced = 0;`);
+    const n = res.recordset[0]?.n ?? 0;
+    total += n;
+    if (table === "sales") sales = n;
+  }
+  return { total, sales };
+}
+
 /** Strips local-only bookkeeping before a row is sent to the cloud. */
 function toCloudRow(table, row) {
   const { is_synced: _s, sync_status: _st, ...rest } = row;
@@ -277,6 +331,9 @@ module.exports = {
   CATALOGUE_TABLES,
   SETTINGS_ID,
   applyOp,
+  createSale,
+  getProducts,
+  pendingSyncCount,
   pendingRows,
   markSynced,
   markFailed,

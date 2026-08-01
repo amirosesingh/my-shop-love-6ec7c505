@@ -18,11 +18,21 @@ import { Route as MembersRouteImport } from './routes/members'
 import { Route as PromotionsRouteImport } from './routes/promotions'
 import { Route as PurchasingRouteImport } from './routes/purchasing'
 import { Route as ReceiptsRouteImport } from './routes/receipts'
-import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ShiftsRouteImport } from './routes/shifts'
 import { Route as StaffRouteImport } from './routes/staff'
 import { Route as StoresRouteImport } from './routes/stores'
 import { Route as TransfersRouteImport } from './routes/transfers'
+import { Route as SettingsIndexRouteImport } from './routes/settings.index'
+import { Route as SettingsDisplayRouteImport } from './routes/settings.display'
+import { Route as SettingsElementsRouteImport } from './routes/settings.elements'
+import { Route as SettingsIdentityRouteImport } from './routes/settings.identity'
+import { Route as SettingsLinesRouteImport } from './routes/settings.lines'
+import { Route as SettingsPaymentRouteImport } from './routes/settings.payment'
+import { Route as SettingsQrRouteImport } from './routes/settings.qr'
+import { Route as SettingsSyncRouteImport } from './routes/settings.sync'
+import { Route as SettingsTaxRouteImport } from './routes/settings.tax'
+import { Route as SettingsTypeRouteImport } from './routes/settings.type'
+import { Route as SettingsWhatsappRouteImport } from './routes/settings.whatsapp'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -69,11 +79,6 @@ const ReceiptsRoute = ReceiptsRouteImport.update({
   path: '/receipts',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ShiftsRoute = ShiftsRouteImport.update({
   id: '/shifts',
   path: '/shifts',
@@ -94,6 +99,61 @@ const TransfersRoute = TransfersRouteImport.update({
   path: '/transfers',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsIndexRoute = SettingsIndexRouteImport.update({
+  id: '/settings/',
+  path: '/settings/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsDisplayRoute = SettingsDisplayRouteImport.update({
+  id: '/settings/display',
+  path: '/settings/display',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsElementsRoute = SettingsElementsRouteImport.update({
+  id: '/settings/elements',
+  path: '/settings/elements',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsIdentityRoute = SettingsIdentityRouteImport.update({
+  id: '/settings/identity',
+  path: '/settings/identity',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsLinesRoute = SettingsLinesRouteImport.update({
+  id: '/settings/lines',
+  path: '/settings/lines',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsPaymentRoute = SettingsPaymentRouteImport.update({
+  id: '/settings/payment',
+  path: '/settings/payment',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsQrRoute = SettingsQrRouteImport.update({
+  id: '/settings/qr',
+  path: '/settings/qr',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsSyncRoute = SettingsSyncRouteImport.update({
+  id: '/settings/sync',
+  path: '/settings/sync',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsTaxRoute = SettingsTaxRouteImport.update({
+  id: '/settings/tax',
+  path: '/settings/tax',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsTypeRoute = SettingsTypeRouteImport.update({
+  id: '/settings/type',
+  path: '/settings/type',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsWhatsappRoute = SettingsWhatsappRouteImport.update({
+  id: '/settings/whatsapp',
+  path: '/settings/whatsapp',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -105,11 +165,21 @@ export interface FileRoutesByFullPath {
   '/promotions': typeof PromotionsRoute
   '/purchasing': typeof PurchasingRoute
   '/receipts': typeof ReceiptsRoute
-  '/settings': typeof SettingsRoute
   '/shifts': typeof ShiftsRoute
   '/staff': typeof StaffRoute
   '/stores': typeof StoresRoute
   '/transfers': typeof TransfersRoute
+  '/settings/display': typeof SettingsDisplayRoute
+  '/settings/elements': typeof SettingsElementsRoute
+  '/settings/identity': typeof SettingsIdentityRoute
+  '/settings/lines': typeof SettingsLinesRoute
+  '/settings/payment': typeof SettingsPaymentRoute
+  '/settings/qr': typeof SettingsQrRoute
+  '/settings/sync': typeof SettingsSyncRoute
+  '/settings/tax': typeof SettingsTaxRoute
+  '/settings/type': typeof SettingsTypeRoute
+  '/settings/whatsapp': typeof SettingsWhatsappRoute
+  '/settings/': typeof SettingsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -121,11 +191,21 @@ export interface FileRoutesByTo {
   '/promotions': typeof PromotionsRoute
   '/purchasing': typeof PurchasingRoute
   '/receipts': typeof ReceiptsRoute
-  '/settings': typeof SettingsRoute
   '/shifts': typeof ShiftsRoute
   '/staff': typeof StaffRoute
   '/stores': typeof StoresRoute
   '/transfers': typeof TransfersRoute
+  '/settings/display': typeof SettingsDisplayRoute
+  '/settings/elements': typeof SettingsElementsRoute
+  '/settings/identity': typeof SettingsIdentityRoute
+  '/settings/lines': typeof SettingsLinesRoute
+  '/settings/payment': typeof SettingsPaymentRoute
+  '/settings/qr': typeof SettingsQrRoute
+  '/settings/sync': typeof SettingsSyncRoute
+  '/settings/tax': typeof SettingsTaxRoute
+  '/settings/type': typeof SettingsTypeRoute
+  '/settings/whatsapp': typeof SettingsWhatsappRoute
+  '/settings': typeof SettingsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -138,11 +218,21 @@ export interface FileRoutesById {
   '/promotions': typeof PromotionsRoute
   '/purchasing': typeof PurchasingRoute
   '/receipts': typeof ReceiptsRoute
-  '/settings': typeof SettingsRoute
   '/shifts': typeof ShiftsRoute
   '/staff': typeof StaffRoute
   '/stores': typeof StoresRoute
   '/transfers': typeof TransfersRoute
+  '/settings/display': typeof SettingsDisplayRoute
+  '/settings/elements': typeof SettingsElementsRoute
+  '/settings/identity': typeof SettingsIdentityRoute
+  '/settings/lines': typeof SettingsLinesRoute
+  '/settings/payment': typeof SettingsPaymentRoute
+  '/settings/qr': typeof SettingsQrRoute
+  '/settings/sync': typeof SettingsSyncRoute
+  '/settings/tax': typeof SettingsTaxRoute
+  '/settings/type': typeof SettingsTypeRoute
+  '/settings/whatsapp': typeof SettingsWhatsappRoute
+  '/settings/': typeof SettingsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -156,11 +246,21 @@ export interface FileRouteTypes {
     | '/promotions'
     | '/purchasing'
     | '/receipts'
-    | '/settings'
     | '/shifts'
     | '/staff'
     | '/stores'
     | '/transfers'
+    | '/settings/display'
+    | '/settings/elements'
+    | '/settings/identity'
+    | '/settings/lines'
+    | '/settings/payment'
+    | '/settings/qr'
+    | '/settings/sync'
+    | '/settings/tax'
+    | '/settings/type'
+    | '/settings/whatsapp'
+    | '/settings/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -172,11 +272,21 @@ export interface FileRouteTypes {
     | '/promotions'
     | '/purchasing'
     | '/receipts'
-    | '/settings'
     | '/shifts'
     | '/staff'
     | '/stores'
     | '/transfers'
+    | '/settings/display'
+    | '/settings/elements'
+    | '/settings/identity'
+    | '/settings/lines'
+    | '/settings/payment'
+    | '/settings/qr'
+    | '/settings/sync'
+    | '/settings/tax'
+    | '/settings/type'
+    | '/settings/whatsapp'
+    | '/settings'
   id:
     | '__root__'
     | '/'
@@ -188,11 +298,21 @@ export interface FileRouteTypes {
     | '/promotions'
     | '/purchasing'
     | '/receipts'
-    | '/settings'
     | '/shifts'
     | '/staff'
     | '/stores'
     | '/transfers'
+    | '/settings/display'
+    | '/settings/elements'
+    | '/settings/identity'
+    | '/settings/lines'
+    | '/settings/payment'
+    | '/settings/qr'
+    | '/settings/sync'
+    | '/settings/tax'
+    | '/settings/type'
+    | '/settings/whatsapp'
+    | '/settings/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -205,11 +325,21 @@ export interface RootRouteChildren {
   PromotionsRoute: typeof PromotionsRoute
   PurchasingRoute: typeof PurchasingRoute
   ReceiptsRoute: typeof ReceiptsRoute
-  SettingsRoute: typeof SettingsRoute
   ShiftsRoute: typeof ShiftsRoute
   StaffRoute: typeof StaffRoute
   StoresRoute: typeof StoresRoute
   TransfersRoute: typeof TransfersRoute
+  SettingsDisplayRoute: typeof SettingsDisplayRoute
+  SettingsElementsRoute: typeof SettingsElementsRoute
+  SettingsIdentityRoute: typeof SettingsIdentityRoute
+  SettingsLinesRoute: typeof SettingsLinesRoute
+  SettingsPaymentRoute: typeof SettingsPaymentRoute
+  SettingsQrRoute: typeof SettingsQrRoute
+  SettingsSyncRoute: typeof SettingsSyncRoute
+  SettingsTaxRoute: typeof SettingsTaxRoute
+  SettingsTypeRoute: typeof SettingsTypeRoute
+  SettingsWhatsappRoute: typeof SettingsWhatsappRoute
+  SettingsIndexRoute: typeof SettingsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -277,13 +407,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReceiptsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/shifts': {
       id: '/shifts'
       path: '/shifts'
@@ -312,6 +435,83 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TransfersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/': {
+      id: '/settings/'
+      path: '/settings'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof SettingsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/display': {
+      id: '/settings/display'
+      path: '/settings/display'
+      fullPath: '/settings/display'
+      preLoaderRoute: typeof SettingsDisplayRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/elements': {
+      id: '/settings/elements'
+      path: '/settings/elements'
+      fullPath: '/settings/elements'
+      preLoaderRoute: typeof SettingsElementsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/identity': {
+      id: '/settings/identity'
+      path: '/settings/identity'
+      fullPath: '/settings/identity'
+      preLoaderRoute: typeof SettingsIdentityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/lines': {
+      id: '/settings/lines'
+      path: '/settings/lines'
+      fullPath: '/settings/lines'
+      preLoaderRoute: typeof SettingsLinesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/payment': {
+      id: '/settings/payment'
+      path: '/settings/payment'
+      fullPath: '/settings/payment'
+      preLoaderRoute: typeof SettingsPaymentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/qr': {
+      id: '/settings/qr'
+      path: '/settings/qr'
+      fullPath: '/settings/qr'
+      preLoaderRoute: typeof SettingsQrRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/sync': {
+      id: '/settings/sync'
+      path: '/settings/sync'
+      fullPath: '/settings/sync'
+      preLoaderRoute: typeof SettingsSyncRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/tax': {
+      id: '/settings/tax'
+      path: '/settings/tax'
+      fullPath: '/settings/tax'
+      preLoaderRoute: typeof SettingsTaxRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/type': {
+      id: '/settings/type'
+      path: '/settings/type'
+      fullPath: '/settings/type'
+      preLoaderRoute: typeof SettingsTypeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/whatsapp': {
+      id: '/settings/whatsapp'
+      path: '/settings/whatsapp'
+      fullPath: '/settings/whatsapp'
+      preLoaderRoute: typeof SettingsWhatsappRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -325,22 +525,22 @@ const rootRouteChildren: RootRouteChildren = {
   PromotionsRoute: PromotionsRoute,
   PurchasingRoute: PurchasingRoute,
   ReceiptsRoute: ReceiptsRoute,
-  SettingsRoute: SettingsRoute,
   ShiftsRoute: ShiftsRoute,
   StaffRoute: StaffRoute,
   StoresRoute: StoresRoute,
   TransfersRoute: TransfersRoute,
+  SettingsDisplayRoute: SettingsDisplayRoute,
+  SettingsElementsRoute: SettingsElementsRoute,
+  SettingsIdentityRoute: SettingsIdentityRoute,
+  SettingsLinesRoute: SettingsLinesRoute,
+  SettingsPaymentRoute: SettingsPaymentRoute,
+  SettingsQrRoute: SettingsQrRoute,
+  SettingsSyncRoute: SettingsSyncRoute,
+  SettingsTaxRoute: SettingsTaxRoute,
+  SettingsTypeRoute: SettingsTypeRoute,
+  SettingsWhatsappRoute: SettingsWhatsappRoute,
+  SettingsIndexRoute: SettingsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

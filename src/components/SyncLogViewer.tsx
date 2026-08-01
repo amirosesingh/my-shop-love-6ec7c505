@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ArrowDownToLine, ArrowUpFromLine, HardDriveDownload, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { drainOutbox } from "@/lib/sync-engine";
-import { lastSyncedAt, subscribeOutbox } from "@/lib/sync-outbox";
+import { isOnline, lastSyncedAt, listQueue, subscribeOutbox } from "@/lib/sync-outbox";
+import { electronDb, readBranch } from "@/lib/local-db";
 import { clearSyncLog, listSyncLog, subscribeSyncLog, type SyncDirection } from "@/lib/sync-log";
 
 const stamp = (iso: string | null) =>
@@ -17,16 +18,48 @@ const directionIcon = (d: SyncDirection) =>
 export function SyncLogViewer() {
   const [, force] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [online, setOnline] = useState(true);
+  const [pending, setPending] = useState(0);
   const bump = () => force((n) => n + 1);
+  const branch = readBranch();
+
+  /** Pending count comes from local SQL Server when the shell is present. */
+  const refreshPending = useCallback(async () => {
+    const bridge = electronDb();
+    if (!bridge) {
+      setPending(listQueue().length);
+      return;
+    }
+    try {
+      const res = await bridge.getPendingSyncCount();
+      setPending(res.ok ? res.total : 0);
+    } catch {
+      setPending(0);
+    }
+  }, []);
 
   useEffect(() => {
     const offLog = subscribeSyncLog(bump);
-    const offBox = subscribeOutbox(bump);
+    const offBox = subscribeOutbox(() => {
+      bump();
+      void refreshPending();
+    });
+    const sync = () => {
+      setOnline(isOnline());
+      void refreshPending();
+    };
+    sync();
+    const timer = window.setInterval(sync, 10_000);
+    window.addEventListener("online", sync);
+    window.addEventListener("offline", sync);
     return () => {
       offLog();
       offBox();
+      window.clearInterval(timer);
+      window.removeEventListener("online", sync);
+      window.removeEventListener("offline", sync);
     };
-  }, []);
+  }, [refreshPending]);
 
   const entries = listSyncLog();
 
@@ -36,48 +69,71 @@ export function SyncLogViewer() {
       const { pushed, failed } = await drainOutbox();
       if (failed) toast.error(`Sync stopped after ${pushed} change(s) — see the log below`);
       else toast.success(pushed ? `Pushed ${pushed} change(s)` : "Everything is already up to date");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Branch sync failed");
     } finally {
+      void refreshPending();
       setBusy(false);
     }
   };
 
   return (
     <section className="space-y-3">
-      <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-border px-3 py-2 sm:flex sm:justify-between">
-        <div className="min-w-0">
-          <p className="text-sm font-medium">Sync &amp; backup log</p>
+      <header className="flex flex-wrap items-center gap-3 rounded-md border border-border px-3 py-2">
+        <div className="min-w-0 flex-1">
+          <p className="flex items-center gap-2 text-sm font-medium">
+            <span
+              aria-hidden
+              className={`size-2.5 rounded-full ${online ? "bg-emerald-500" : "bg-muted-foreground"}`}
+            />
+            Branch: {branch.branchName || branch.branchId || "Not configured"}
+            <span className="text-xs font-normal text-muted-foreground">
+              {online ? "Connected to central server" : "Offline mode"}
+            </span>
+          </p>
           <p className="truncate text-xs text-muted-foreground">
             Last successful sync: <span className="numeric">{stamp(lastSyncedAt())}</span>
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <Badge variant={pending ? "destructive" : "secondary"} className="whitespace-nowrap">
+            {pending} sale{pending === 1 ? "" : "s"} waiting for cloud sync
+          </Badge>
           {entries.length > 0 && (
             <Button variant="ghost" size="sm" onClick={() => clearSyncLog()}>
               Clear
             </Button>
           )}
-          <Button size="sm" disabled={busy} onClick={() => void syncNow()}>
+          <Button size="sm" disabled={busy || !online} onClick={() => void syncNow()}>
             <RefreshCw className={`size-4 ${busy ? "animate-spin" : ""}`} />
-            Sync now
+            Sync branch data now
           </Button>
         </div>
       </header>
+
+      {!online && (
+        <p className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+          The branch is offline. Sales keep saving to the local database and will push
+          automatically once the connection returns.
+        </p>
+      )}
 
       <div className="max-h-80 overflow-auto rounded-md border border-border">
         <table className="w-full text-left text-xs">
           <thead className="sticky top-0 bg-sidebar text-muted-foreground">
             <tr>
+              <th className="px-3 py-2 font-medium">Transaction ID</th>
               <th className="px-3 py-2 font-medium">Timestamp</th>
               <th className="px-3 py-2 font-medium">Direction</th>
               <th className="px-3 py-2 font-medium">Table</th>
               <th className="px-3 py-2 font-medium">Status</th>
-              <th className="px-3 py-2 font-medium">Details</th>
+              <th className="px-3 py-2 font-medium">Error message</th>
             </tr>
           </thead>
           <tbody>
             {entries.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">
+                <td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">
                   No sync activity recorded yet.
                 </td>
               </tr>
@@ -86,17 +142,24 @@ export function SyncLogViewer() {
               const Icon = directionIcon(e.direction);
               return (
                 <tr key={e.id} className="border-t border-border align-top">
+                  <td className="numeric whitespace-nowrap px-3 py-2 text-muted-foreground">
+                    {e.id.slice(0, 8)}
+                  </td>
                   <td className="numeric whitespace-nowrap px-3 py-2">{stamp(e.at)}</td>
                   <td className="px-3 py-2">
                     <span className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 uppercase tracking-wide">
                       <Icon className="size-3" />
-                      {e.direction}
+                      {e.direction === "push"
+                        ? "PUSH local → central"
+                        : e.direction === "pull"
+                          ? "PULL central → local"
+                          : "BACKUP"}
                     </span>
                   </td>
                   <td className="px-3 py-2">{e.table}</td>
                   <td className="px-3 py-2">
                     <Badge variant={e.ok ? "secondary" : "destructive"}>
-                      {e.ok ? "Success" : "Error"}
+                      {e.ok ? "Synced" : "Error"}
                     </Badge>
                   </td>
                   <td className="max-w-[24rem] break-words px-3 py-2 text-muted-foreground">

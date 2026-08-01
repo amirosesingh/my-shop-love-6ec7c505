@@ -50,7 +50,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Cashier accounts are limited to the register; management screens are
   // reserved for supervisors and admins.
   useEffect(() => {
-    const required = ADMIN_PATHS[location.pathname];
+    // Settings has child pages (/settings/tax …) that inherit the same gate.
+    const key =
+      Object.keys(ADMIN_PATHS).find(
+        (p) => location.pathname === p || location.pathname.startsWith(`${p}/`),
+      ) ?? "";
+    const required = ADMIN_PATHS[key];
     if (user && !isAdmin && required && !can(required)) {
       void navigate({ to: "/", replace: true });
     }

@@ -21,7 +21,7 @@ export type LocalDbConfig = {
 
 export const defaultLocalDbConfig: LocalDbConfig = {
   server: "localhost\\SQLEXPRESS",
-  database: "LovablePOS",
+  database: "POS_Branch_DB",
   auth: "windows",
   user: "",
   password: "",
@@ -61,7 +61,64 @@ export type PosBridge = {
 declare global {
   interface Window {
     pos?: PosBridge;
+    electronAPI?: ElectronDbApi;
   }
+}
+
+/* ------------------------- offline register API ------------------------- */
+
+export type LocalSaleRow = Record<string, unknown>;
+
+export type CreateSalePayload = {
+  sale: LocalSaleRow;
+  items: LocalSaleRow[];
+  products?: LocalSaleRow[];
+  member?: LocalSaleRow | null;
+  branchId?: string | null;
+  exchangeOfBillNumber?: string | null;
+};
+
+export type BranchInfo = { branchId: string | null; branchName: string | null };
+
+export type ElectronDbApi = {
+  /** Commits a bill to local SQL Server in one transaction. Never uses HTTP. */
+  createSale: (
+    payload: CreateSalePayload,
+  ) => Promise<{ ok: boolean; error?: string; id?: string; billNumber?: string }>;
+  getProducts: () => Promise<{ ok: boolean; error?: string; products?: LocalSaleRow[] }>;
+  getPendingSyncCount: () => Promise<{
+    ok: boolean;
+    total: number;
+    sales: number;
+    error?: string;
+  }>;
+  getBranch: () => Promise<{ ok: boolean } & Partial<BranchInfo>>;
+  setBranch: (branch: BranchInfo) => Promise<{ ok: boolean; error?: string }>;
+};
+
+/** The offline database API, or null in a plain browser. */
+export const electronDb = (): ElectronDbApi | null =>
+  typeof window === "undefined" ? null : (window.electronAPI ?? null);
+
+const BRANCH_KEY = "pos.branch";
+
+export const defaultBranch: BranchInfo = { branchId: null, branchName: null };
+
+/** Branch identity for this till, mirrored locally so the UI can render it. */
+export function readBranch(): BranchInfo {
+  if (typeof window === "undefined") return defaultBranch;
+  try {
+    const raw = window.localStorage.getItem(BRANCH_KEY);
+    return raw ? { ...defaultBranch, ...(JSON.parse(raw) as Partial<BranchInfo>) } : defaultBranch;
+  } catch {
+    return defaultBranch;
+  }
+}
+
+export function writeBranch(branch: BranchInfo) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(BRANCH_KEY, JSON.stringify(branch));
+  void electronDb()?.setBranch(branch);
 }
 
 /** True when running inside the Windows desktop shell. */

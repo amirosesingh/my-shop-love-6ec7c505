@@ -319,3 +319,28 @@ END
 CLOSE tables;
 DEALLOCATE tables;
 GO
+
+/* ------------------------------------------------------------------
+   Branch identity — this till belongs to exactly one branch, and every
+   locally-created sale carries that id so the central server can tell
+   the stores apart after a push.
+   ------------------------------------------------------------------ */
+IF COL_LENGTH('dbo.sales', 'branch_id') IS NULL
+  ALTER TABLE dbo.sales ADD branch_id NVARCHAR(60) NULL;
+GO
+
+IF COL_LENGTH('dbo.sale_items', 'branch_id') IS NULL
+  ALTER TABLE dbo.sale_items ADD branch_id NVARCHAR(60) NULL;
+GO
+
+/* Friendly branch-facing names used by the offline checkout path.
+   Single-table views, so INSERT/UPDATE flow straight through. */
+IF OBJECT_ID('dbo.BranchSales', 'V') IS NOT NULL DROP VIEW dbo.BranchSales;
+GO
+CREATE VIEW dbo.BranchSales AS SELECT * FROM dbo.sales;
+GO
+
+IF OBJECT_ID('dbo.BranchSaleItems', 'V') IS NOT NULL DROP VIEW dbo.BranchSaleItems;
+GO
+CREATE VIEW dbo.BranchSaleItems AS SELECT * FROM dbo.sale_items;
+GO
