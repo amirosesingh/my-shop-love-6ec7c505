@@ -254,57 +254,309 @@ function Settings() {
               <Printer className="size-4 text-primary" /> Receipt &amp; slip customizer
             </h2>
             <div className="mt-4 space-y-4">
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Paper size</Label>
-                <select
-                  value={receipt.paper}
-                  onChange={(e) =>
-                    updateSettings({ receipt: { ...receipt, paper: e.target.value as PaperSize } })
-                  }
-                  className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
-                >
-                  {(Object.keys(PAPER_LABELS) as PaperSize[]).map((p) => (
-                    <option key={p} value={p}>
-                      {PAPER_LABELS[p]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Header text (address / phone)</Label>
-                <Textarea
-                  rows={2}
-                  value={receipt.headerText}
-                  onChange={(e) =>
-                    updateSettings({ receipt: { ...receipt, headerText: e.target.value } })
-                  }
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Footer / thank-you note</Label>
-                <Textarea
-                  rows={2}
-                  value={receipt.footerText}
-                  onChange={(e) =>
-                    updateSettings({ receipt: { ...receipt, footerText: e.target.value } })
-                  }
-                />
-              </div>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {TOGGLES.map((t) => (
-                  <div
-                    key={t.key}
-                    className="flex items-center justify-between rounded-md border border-border px-3 py-2"
+              <div className="flex flex-wrap items-center gap-3 rounded-md border border-border px-3 py-2">
+                <div className="space-y-1">
+                  <Label className="text-[11px] text-muted-foreground">Editing branch</Label>
+                  <select
+                    value={branchId}
+                    onChange={(e) => setBranchId(e.target.value)}
+                    className="h-8 rounded-md border border-input bg-transparent px-2 text-sm"
                   >
-                    <span className="text-sm">{t.label}</span>
-                    <Switch
-                      aria-label={t.label}
-                      checked={!!receipt[t.key]}
-                      onCheckedChange={(v) => updateSettings({ receipt: { ...receipt, [t.key]: v } })}
+                    {stores.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({s.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="ml-auto flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">
+                    {overrideOn ? "Custom for this branch" : "Using global profile"}
+                  </span>
+                  <Switch
+                    aria-label="Override for this branch"
+                    checked={overrideOn}
+                    onCheckedChange={toggleOverride}
+                  />
+                </div>
+              </div>
+
+              <Tabs defaultValue="identity">
+                <TabsList className="flex flex-wrap">
+                  <TabsTrigger value="identity">Identity</TabsTrigger>
+                  <TabsTrigger value="type">Typography</TabsTrigger>
+                  <TabsTrigger value="lines">Extra lines</TabsTrigger>
+                  <TabsTrigger value="qr">QR code</TabsTrigger>
+                  <TabsTrigger value="elements">Elements</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="identity" className="space-y-3 pt-4">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {IDENTITY_FIELDS.map((f) => (
+                      <div key={f.key} className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">{f.label}</Label>
+                        <Input
+                          placeholder={f.placeholder}
+                          value={(effective[f.key as keyof ReceiptSettings] as string) ?? ""}
+                          onChange={(e) => setField(f.key, e.target.value as never)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">
+                      Header text (address / extra info)
+                    </Label>
+                    <Textarea
+                      rows={2}
+                      value={effective.headerText}
+                      onChange={(e) => setField("headerText", e.target.value)}
                     />
                   </div>
-                ))}
-              </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Footer / thank-you note</Label>
+                    <Textarea
+                      rows={2}
+                      value={effective.footerText}
+                      onChange={(e) => setField("footerText", e.target.value)}
+                    />
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="type" className="space-y-3 pt-4">
+                  <p className="text-[11px] text-muted-foreground">
+                    Typography is shared by every branch.
+                  </p>
+                  {FONT_SCOPES.map((scope) => {
+                    const f = receipt.fonts[scope.key];
+                    return (
+                      <div key={scope.key} className="rounded-md border border-border p-3">
+                        <p className="text-sm font-medium">{scope.label}</p>
+                        <div className="mt-2 grid gap-3 sm:grid-cols-4">
+                          <div className="space-y-1">
+                            <Label className="text-[11px] text-muted-foreground">Family</Label>
+                            <select
+                              value={f.family}
+                              onChange={(e) =>
+                                setFont(scope.key, { family: e.target.value as FontFamilyKey })
+                              }
+                              className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm"
+                            >
+                              {FAMILIES.map((o) => (
+                                <option key={o.key} value={o.key}>
+                                  {o.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-[11px] text-muted-foreground">Size (px)</Label>
+                            <Input
+                              type="number"
+                              min={7}
+                              max={40}
+                              className="numeric"
+                              value={f.size}
+                              onChange={(e) =>
+                                setFont(scope.key, { size: Number(e.target.value) || 12 })
+                              }
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-[11px] text-muted-foreground">Spacing (px)</Label>
+                            <Input
+                              type="number"
+                              min={0}
+                              max={8}
+                              step={0.5}
+                              className="numeric"
+                              value={f.spacing}
+                              onChange={(e) =>
+                                setFont(scope.key, { spacing: Number(e.target.value) || 0 })
+                              }
+                            />
+                          </div>
+                          <div className="flex items-end justify-between gap-2">
+                            <Label className="text-[11px] text-muted-foreground">Bold</Label>
+                            <Switch
+                              aria-label={`${scope.label} bold`}
+                              checked={f.bold}
+                              onCheckedChange={(v) => setFont(scope.key, { bold: v })}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </TabsContent>
+
+                <TabsContent value="lines" className="space-y-3 pt-4">
+                  {(effective.customLines ?? []).length === 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      No custom lines yet — add policy notes, promotions or opening hours.
+                    </p>
+                  )}
+                  {(effective.customLines ?? []).map((line, i) => (
+                    <div key={line.id} className="flex flex-wrap items-center gap-2">
+                      <Input
+                        className="min-w-[180px] flex-1"
+                        value={line.text}
+                        placeholder="Return policy: 7 days with receipt"
+                        onChange={(e) =>
+                          setField(
+                            "customLines",
+                            effective.customLines.map((l) =>
+                              l.id === line.id ? { ...l, text: e.target.value } : l,
+                            ),
+                          )
+                        }
+                      />
+                      <select
+                        value={line.placement}
+                        onChange={(e) =>
+                          setField(
+                            "customLines",
+                            effective.customLines.map((l) =>
+                              l.id === line.id
+                                ? { ...l, placement: e.target.value as ReceiptCustomLine["placement"] }
+                                : l,
+                            ),
+                          )
+                        }
+                        className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
+                      >
+                        <option value="header">Below header</option>
+                        <option value="footer">Above footer</option>
+                      </select>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Move up"
+                        disabled={i === 0}
+                        onClick={() => {
+                          const next = [...effective.customLines];
+                          [next[i - 1], next[i]] = [next[i], next[i - 1]];
+                          setField("customLines", next);
+                        }}
+                      >
+                        ↑
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Remove line"
+                        onClick={() =>
+                          setField(
+                            "customLines",
+                            effective.customLines.filter((l) => l.id !== line.id),
+                          )
+                        }
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setField("customLines", [
+                        ...(effective.customLines ?? []),
+                        {
+                          id: `line-${Date.now()}`,
+                          text: "",
+                          placement: "footer" as const,
+                        },
+                      ])
+                    }
+                  >
+                    <Plus className="mr-1 size-4" /> Add line
+                  </Button>
+                </TabsContent>
+
+                <TabsContent value="qr" className="space-y-3 pt-4">
+                  <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+                    <span className="text-sm">Print QR code</span>
+                    <Switch
+                      aria-label="Print QR code"
+                      checked={effective.qr.enabled}
+                      onCheckedChange={(v) => setField("qr", { ...effective.qr, enabled: v })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Link or text</Label>
+                    <Input
+                      placeholder="https://example.com/feedback"
+                      value={effective.qr.value}
+                      onChange={(e) => setField("qr", { ...effective.qr, value: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Size (px)</Label>
+                      <Input
+                        type="number"
+                        min={48}
+                        max={220}
+                        className="numeric"
+                        value={effective.qr.size}
+                        onChange={(e) =>
+                          setField("qr", { ...effective.qr, size: Number(e.target.value) || 96 })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Placement</Label>
+                      <select
+                        value={effective.qr.placement}
+                        onChange={(e) =>
+                          setField("qr", {
+                            ...effective.qr,
+                            placement: e.target.value as ReceiptCustomLine["placement"],
+                          })
+                        }
+                        className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm"
+                      >
+                        <option value="header">Top of receipt</option>
+                        <option value="footer">Bottom of receipt</option>
+                      </select>
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="elements" className="space-y-3 pt-4">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Paper size</Label>
+                    <select
+                      value={receipt.paper}
+                      onChange={(e) => setGlobal({ paper: e.target.value as PaperSize })}
+                      className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+                    >
+                      {(Object.keys(PAPER_LABELS) as PaperSize[]).map((p) => (
+                        <option key={p} value={p}>
+                          {PAPER_LABELS[p]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {TOGGLES.map((t) => (
+                      <div
+                        key={t.key}
+                        className="flex items-center justify-between rounded-md border border-border px-3 py-2"
+                      >
+                        <span className="text-sm">{t.label}</span>
+                        <Switch
+                          aria-label={t.label}
+                          checked={!!receipt[t.key]}
+                          onCheckedChange={(v) => setGlobal({ [t.key]: v } as Partial<ReceiptSettings>)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </TabsContent>
+              </Tabs>
+
               <Button
                 variant="outline"
                 onClick={() => {
