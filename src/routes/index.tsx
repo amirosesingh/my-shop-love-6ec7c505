@@ -879,6 +879,19 @@ function Register() {
                     : "Refunds locked for this user"
                   : `Charge ${money(balanceDue)}`}
             </Button>
+            <Button
+              variant="outline"
+              className="h-11 w-full"
+              disabled={!lines.length || !activeShift || refundDue > 0}
+              onClick={() => {
+                setDeposit("");
+                setBookName(member?.name ?? "");
+                setBookPhone(member?.phone ?? "");
+                setBookOpen(true);
+              }}
+            >
+              <CalendarClock className="size-4" /> Book &amp; pay later
+            </Button>
             {lastSale && (
               <div className="flex flex-wrap gap-2 pt-1">
                 <Button
