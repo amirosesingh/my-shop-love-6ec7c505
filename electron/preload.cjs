@@ -22,3 +22,15 @@ contextBridge.exposeInMainWorld("pos", {
     return () => ipcRenderer.removeListener("pos:status-changed", handler);
   },
 });
+
+/**
+ * Database surface used by the register. Checkout runs 100% offline through
+ * these calls — never over HTTP.
+ */
+contextBridge.exposeInMainWorld("electronAPI", {
+  createSale: (payload) => invoke("db:create-sale", payload),
+  getProducts: () => invoke("db:get-products"),
+  getPendingSyncCount: () => invoke("db:get-pending-sync-count"),
+  getBranch: () => invoke("db:get-branch"),
+  setBranch: (branch) => invoke("db:set-branch", branch),
+});
