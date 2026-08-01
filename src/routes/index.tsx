@@ -357,6 +357,38 @@ function Register() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayKey, state.settings.payment]);
 
+  /** Show bank-transfer instructions on the customer screen while the
+   *  cashier has that tender selected. */
+  useEffect(() => {
+    if (!payOpen) return;
+    publishDisplay({
+      ...cartSnapshot(),
+      mode: method === "bank_transfer" ? "transfer" : "cart",
+      method,
+      transferRef,
+      balance: totals.total,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [payOpen, method, transferRef, displayKey]);
+
+  const wa = state.settings.whatsapp;
+
+  /** Sends the finished bill to the customer's WhatsApp. */
+  async function sendSaleOnWhatsApp(sale: Sale, to: string) {
+    setWaSending(true);
+    const buyer = state.members.find((m) => m.id === sale.memberId) ?? null;
+    const res = await sendBillOnWhatsApp({
+      cfg: wa,
+      to,
+      body: buildSaleMessage(sale, displayBase.companyName, wa),
+      reference: sale.receiptNo,
+      member: buyer,
+    });
+    setWaSending(false);
+    if (res.ok) toast.success(`Bill ${sale.receiptNo} sent on WhatsApp`);
+    else toast.error("WhatsApp send failed", { description: res.error });
+  }
+
   async function bookAndPayLater() {
     if (!activeShift) {
       toast.error("Open a shift before taking a booking");
