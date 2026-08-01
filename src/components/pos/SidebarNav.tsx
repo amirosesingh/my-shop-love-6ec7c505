@@ -99,7 +99,11 @@ export function SidebarNav({
     : groups;
 
   const isActive = (i: NavItem) => {
-    const pathOk = i.to === "/" ? pathname === "/" : pathname.startsWith(i.to);
+    // "/settings" is a hub with real child pages, so it must not stay lit on them.
+    const exactOnly = i.to === "/" || i.to === "/settings";
+    const pathOk = exactOnly
+      ? pathname === i.to
+      : pathname === i.to || pathname.startsWith(`${i.to}/`);
     if (!pathOk) return false;
     const current = (hash ?? "").replace(/^#/, "");
     if ((i.hash ?? "") !== current) return false;
