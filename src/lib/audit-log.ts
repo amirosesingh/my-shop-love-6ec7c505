@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { db } from "./pos-db";
 
 export type AuditCategory =
   | "ui_click"
@@ -103,6 +104,7 @@ export const logger = {
     };
     logs = [entry, ...logs].slice(0, MAX);
     emit();
+    scheduleFlush();
     return entry;
   },
   all() {
@@ -123,6 +125,16 @@ export const logger = {
 
 let syncTimer: ReturnType<typeof setInterval> | null = null;
 const BATCH = 50;
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Debounced push so fresh activity reaches the cloud within seconds. */
+function scheduleFlush() {
+  if (typeof window === "undefined" || flushTimer) return;
+  flushTimer = setTimeout(() => {
+    flushTimer = null;
+    void flushBatch();
+  }, 3000);
+}
 
 export type SyncState = { online: boolean; pending: number; lastSyncAt: string | null };
 
@@ -141,10 +153,25 @@ async function flushBatch() {
   setSync({ online, pending: pending.length });
   if (!online || !pending.length) return;
 
-  // Push in batches. No cloud backend is connected yet, so the transport is a
-  // no-op that resolves immediately; swap this for a real endpoint later.
-  const batch = pending.slice(0, BATCH).map((l) => l.id);
-  await Promise.resolve();
+  // Push in batches to the cloud audit_logs table; failures stay pending.
+  const slice = pending.slice(0, BATCH);
+  let batch: string[];
+  try {
+    batch = await db.pushAuditLogs(
+      slice.map((l) => ({
+        id: l.id,
+        at: l.at,
+        staffName: l.staffName,
+        category: l.category,
+        action: l.action,
+        module: l.module,
+        details: { ...l.details, route: l.route, staffId: l.staffId, storeId: l.storeId },
+      })),
+    );
+  } catch (e) {
+    console.error("[audit] sync failed", e);
+    return;
+  }
   const at = new Date().toISOString();
   logs = logs.map((l) => (batch.includes(l.id) ? { ...l, synced_to_cloud: true, syncedAt: at } : l));
   emit();

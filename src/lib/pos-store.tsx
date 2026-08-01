@@ -25,6 +25,7 @@ import type {
 } from "./pos-types";
 import { lineUnitDiscount, r2, type DiscountType } from "./pos-types";
 import { logger } from "./audit-log";
+import { db, dbError, loadCloudState } from "./pos-db";
 
 const KEY = "pos-state-v2";
 
@@ -96,6 +97,9 @@ export function PosProvider({ children }: { children: ReactNode }) {
   stateRef.current = state;
 
   useEffect(() => {
+    let cancelled = false;
+    // Local-only slices (stores, shifts, transfers, counters) stay on the
+    // terminal; catalogue, members, bills, promos and settings come from cloud.
     try {
       const raw = window.localStorage.getItem(KEY);
       if (raw) {
@@ -107,21 +111,50 @@ export function PosProvider({ children }: { children: ReactNode }) {
             ? t
             : { ...t, items: [{ productId: legacy.productId ?? "", qty: legacy.qty ?? 0 }] };
         });
-        setState({
-          ...seedState,
-          ...saved,
+        setState((s) => ({
+          ...s,
+          stores: saved.stores?.length ? saved.stores : s.stores,
+          currentStoreId: saved.currentStoreId ?? s.currentStoreId,
+          shifts: saved.shifts ?? [],
           transfers,
-          promotions: saved.promotions?.length ? saved.promotions : seedState.promotions,
-          settings: {
-            tax: { ...defaultSettings.tax, ...(saved.settings?.tax ?? {}) },
-            receipt: { ...defaultSettings.receipt, ...(saved.settings?.receipt ?? {}) },
-          },
-        });
+          counter: saved.counter ?? 0,
+          transferCounter: saved.transferCounter ?? 0,
+        }));
       }
     } catch {
       /* ignore corrupt storage */
     }
-    setReady(true);
+
+    void (async () => {
+      try {
+        const cloud = await loadCloudState();
+        if (cancelled) return;
+        setState((s) => ({
+          ...s,
+          products: cloud.products,
+          members: cloud.members,
+          sales: cloud.sales,
+          promotions: cloud.promotions.length ? cloud.promotions : s.promotions,
+          settings: {
+            tax: { ...defaultSettings.tax, ...cloud.settings.tax },
+            receipt: { ...defaultSettings.receipt, ...cloud.settings.receipt },
+          },
+          // Keep the bill counter ahead of every receipt already in the cloud.
+          counter: cloud.sales.reduce(
+            (max, sale) => Math.max(max, Number(sale.receiptNo.split("-").pop()) || 0),
+            s.counter,
+          ),
+        }));
+      } catch (e) {
+        dbError("Loading data", e);
+      } finally {
+        if (!cancelled) setReady(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -227,16 +260,34 @@ export function PosProvider({ children }: { children: ReactNode }) {
   );
 
   const recordSale = useCallback((input: Omit<Sale, "id" | "receiptNo" | "createdAt">) => {
+    const snapshot = stateRef.current;
+    const counter = snapshot.counter + 1;
+    const store = snapshot.stores.find((x) => x.id === input.storeId);
     const sale: Sale = {
       ...input,
       id: crypto.randomUUID(),
-      receiptNo: "",
+      receiptNo: `${store?.code ?? "R"}-${String(counter).padStart(6, "0")}`,
       createdAt: new Date().toISOString(),
     };
+
+    const touchedProducts = snapshot.products
+      .filter((p) => input.lines.some((l) => l.productId === p.id))
+      .map((p) => {
+        const line = input.lines.find((l) => l.productId === p.id)!;
+        return bump(p, input.storeId, -line.qty);
+      });
+    const member = snapshot.members.find((m) => m.id === input.memberId) ?? null;
+    const updatedMember = member
+      ? {
+          ...member,
+          points:
+            member.points + input.pointsEarned - (input.method === "points" ? input.paid : 0),
+          totalSpend: Number((member.totalSpend + input.total).toFixed(2)),
+        }
+      : null;
+    void db.recordSale(sale, touchedProducts, updatedMember);
+
     setState((s) => {
-      const counter = s.counter + 1;
-      const store = s.stores.find((x) => x.id === input.storeId);
-      sale.receiptNo = `${store?.code ?? "R"}-${String(counter).padStart(6, "0")}`;
       const products = s.products.map((p) => {
         const line = input.lines.find((l) => l.productId === p.id);
         return line ? bump(p, input.storeId, -line.qty) : p;
@@ -257,7 +308,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
               : x,
           )
         : s.sales;
-      return { ...s, counter, products, members, sales: [sale, ...tagged] };
+      return { ...s, counter: Math.max(counter, s.counter + 1), products, members, sales: [sale, ...tagged] };
     });
     logger.log(
       "sale_event",
@@ -294,6 +345,16 @@ export function PosProvider({ children }: { children: ReactNode }) {
       saleId,
       receiptNo: stateRef.current.sales.find((x) => x.id === saleId)?.receiptNo ?? null,
     });
+    {
+      const snap = stateRef.current;
+      const sale = snap.sales.find((x) => x.id === saleId);
+      if (sale && !sale.refunded) {
+        const restocked = snap.products
+          .filter((p) => sale.lines.some((l) => l.productId === p.id))
+          .map((p) => bump(p, sale.storeId, sale.lines.find((l) => l.productId === p.id)!.qty));
+        void db.refundSale(saleId, restocked);
+      }
+    }
     setState((s) => {
       const sale = s.sales.find((x) => x.id === saleId);
       if (!sale || sale.refunded) return s;
@@ -325,6 +386,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
         ecomPrice: product.ecomPrice,
       },
     });
+    void db.upsertProduct(product);
     setState((s) => ({
       ...s,
       products: s.products.some((p) => p.id === product.id)
@@ -334,6 +396,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const removeProduct = useCallback((id: string) => {
+    void db.deleteProduct(id);
     setState((s) => ({ ...s, products: s.products.filter((p) => p.id !== id) }));
   }, []);
 
@@ -348,6 +411,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       previousStock: before ? stockAt(before, target) : null,
       updatedStock: before ? stockAt(before, target) + delta : null,
     });
+    if (before) void db.upsertProduct(bump(before, target, delta));
     setState((s) => ({
       ...s,
       products: s.products.map((p) =>
@@ -366,6 +430,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       updated: { points: member.points, tier: member.tier, phone: member.phone },
       pointsDelta: prev ? member.points - prev.points : member.points,
     });
+    void db.upsertMember(member);
     setState((s) => ({
       ...s,
       members: s.members.some((m) => m.id === member.id)
@@ -375,10 +440,12 @@ export function PosProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const removeMember = useCallback((id: string) => {
+    void db.deleteMember(id);
     setState((s) => ({ ...s, members: s.members.filter((m) => m.id !== id) }));
   }, []);
 
   const upsertPromotion = useCallback((promotion: Promotion) => {
+    void db.upsertPromotion(promotion);
     setState((s) => ({
       ...s,
       promotions: s.promotions.some((p) => p.id === promotion.id)
@@ -388,10 +455,15 @@ export function PosProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const removePromotion = useCallback((id: string) => {
+    void db.deletePromotion(id);
     setState((s) => ({ ...s, promotions: s.promotions.filter((p) => p.id !== id) }));
   }, []);
 
   const togglePromotion = useCallback((id: string, active: boolean) => {
+    {
+      const p = stateRef.current.promotions.find((x) => x.id === id);
+      if (p) void db.upsertPromotion({ ...p, active });
+    }
     setState((s) => ({
       ...s,
       promotions: s.promotions.map((p) => (p.id === id ? { ...p, active } : p)),
@@ -403,6 +475,13 @@ export function PosProvider({ children }: { children: ReactNode }) {
       previous: stateRef.current.settings,
       updated: patch,
     });
+    {
+      const prev = stateRef.current.settings;
+      void db.saveSettings({
+        tax: { ...prev.tax, ...(patch.tax ?? {}) },
+        receipt: { ...prev.receipt, ...(patch.receipt ?? {}) },
+      });
+    }
     setState((s) => ({
       ...s,
       settings: {
@@ -434,10 +513,27 @@ export function PosProvider({ children }: { children: ReactNode }) {
           : s.products;
       return { ...s, transferCounter, products, transfers: [transfer, ...s.transfers] };
     });
+    if (transfer.status === "in_transit") {
+      void db.upsertProducts(
+        bumpItems(stateRef.current.products, input.items, input.fromStoreId, -1).filter((p) =>
+          input.items.some((i) => i.productId === p.id),
+        ),
+      );
+    }
     return transfer;
   }, []);
 
   const approveTransfer = useCallback((id: string) => {
+    {
+      const s = stateRef.current;
+      const t = s.transfers.find((x) => x.id === id);
+      if (t && t.status === "requested")
+        void db.upsertProducts(
+          bumpItems(s.products, t.items, t.fromStoreId, -1).filter((p) =>
+            t.items.some((i) => i.productId === p.id),
+          ),
+        );
+    }
     setState((s) => {
       const t = s.transfers.find((x) => x.id === id);
       if (!t || t.status !== "requested") return s;
@@ -452,6 +548,16 @@ export function PosProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const receiveTransfer = useCallback((id: string) => {
+    {
+      const s = stateRef.current;
+      const t = s.transfers.find((x) => x.id === id);
+      if (t && t.status === "in_transit")
+        void db.upsertProducts(
+          bumpItems(s.products, t.items, t.toStoreId, 1).filter((p) =>
+            t.items.some((i) => i.productId === p.id),
+          ),
+        );
+    }
     setState((s) => {
       const t = s.transfers.find((x) => x.id === id);
       if (!t || t.status !== "in_transit") return s;
@@ -466,6 +572,16 @@ export function PosProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const rejectTransfer = useCallback((id: string) => {
+    {
+      const s = stateRef.current;
+      const t = s.transfers.find((x) => x.id === id);
+      if (t && t.status === "in_transit")
+        void db.upsertProducts(
+          bumpItems(s.products, t.items, t.fromStoreId, 1).filter((p) =>
+            t.items.some((i) => i.productId === p.id),
+          ),
+        );
+    }
     setState((s) => {
       const t = s.transfers.find((x) => x.id === id);
       if (!t || (t.status !== "requested" && t.status !== "in_transit")) return s;

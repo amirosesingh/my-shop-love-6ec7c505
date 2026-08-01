@@ -14,7 +14,495 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      audit_logs: {
+        Row: {
+          action_category: string
+          action_name: string
+          created_at: string
+          details: Json | null
+          id: string
+          target_module: string | null
+          user_name: string | null
+        }
+        Insert: {
+          action_category: string
+          action_name: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          target_module?: string | null
+          user_name?: string | null
+        }
+        Update: {
+          action_category?: string
+          action_name?: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          target_module?: string | null
+          user_name?: string | null
+        }
+        Relationships: []
+      }
+      members: {
+        Row: {
+          address: string | null
+          created_at: string
+          date_of_birth: string | null
+          email: string | null
+          full_name: string
+          id: string
+          loyalty_points: number
+          member_code: string
+          phone: string
+          tier_id: string | null
+          total_spent: number
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          email?: string | null
+          full_name: string
+          id?: string
+          loyalty_points?: number
+          member_code: string
+          phone: string
+          tier_id?: string | null
+          total_spent?: number
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          email?: string | null
+          full_name?: string
+          id?: string
+          loyalty_points?: number
+          member_code?: string
+          phone?: string
+          tier_id?: string | null
+          total_spent?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "members_tier_id_fkey"
+            columns: ["tier_id"]
+            isOneToOne: false
+            referencedRelation: "membership_tiers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      membership_tiers: {
+        Row: {
+          created_at: string
+          discount_percentage: number
+          id: string
+          name: string
+          points_multiplier: number
+        }
+        Insert: {
+          created_at?: string
+          discount_percentage?: number
+          id?: string
+          name: string
+          points_multiplier?: number
+        }
+        Update: {
+          created_at?: string
+          discount_percentage?: number
+          id?: string
+          name?: string
+          points_multiplier?: number
+        }
+        Relationships: []
+      }
+      pos_settings: {
+        Row: {
+          enable_tax: boolean
+          footer_text: string | null
+          header_text: string | null
+          id: number
+          paper_size: string
+          show_barcode: boolean
+          show_logo: boolean
+          show_points: boolean
+          show_tax_details: boolean
+          tax_mode: string
+          tax_percentage: number
+          updated_at: string
+        }
+        Insert: {
+          enable_tax?: boolean
+          footer_text?: string | null
+          header_text?: string | null
+          id?: number
+          paper_size?: string
+          show_barcode?: boolean
+          show_logo?: boolean
+          show_points?: boolean
+          show_tax_details?: boolean
+          tax_mode?: string
+          tax_percentage?: number
+          updated_at?: string
+        }
+        Update: {
+          enable_tax?: boolean
+          footer_text?: string | null
+          header_text?: string | null
+          id?: number
+          paper_size?: string
+          show_barcode?: boolean
+          show_logo?: boolean
+          show_points?: boolean
+          show_tax_details?: boolean
+          tax_mode?: string
+          tax_percentage?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      products: {
+        Row: {
+          barcode: string
+          category: string | null
+          cost_price: number
+          created_at: string
+          custom_points: number | null
+          ecom_price: number | null
+          ecom_visible: boolean
+          id: string
+          name: string
+          point_multiplier: number
+          reorder_level: number
+          selling_price: number
+          sku: string | null
+          stock_by_store: Json
+          stock_quantity: number
+          tax_rate: number
+        }
+        Insert: {
+          barcode: string
+          category?: string | null
+          cost_price?: number
+          created_at?: string
+          custom_points?: number | null
+          ecom_price?: number | null
+          ecom_visible?: boolean
+          id?: string
+          name: string
+          point_multiplier?: number
+          reorder_level?: number
+          selling_price?: number
+          sku?: string | null
+          stock_by_store?: Json
+          stock_quantity?: number
+          tax_rate?: number
+        }
+        Update: {
+          barcode?: string
+          category?: string | null
+          cost_price?: number
+          created_at?: string
+          custom_points?: number | null
+          ecom_price?: number | null
+          ecom_visible?: boolean
+          id?: string
+          name?: string
+          point_multiplier?: number
+          reorder_level?: number
+          selling_price?: number
+          sku?: string | null
+          stock_by_store?: Json
+          stock_quantity?: number
+          tax_rate?: number
+        }
+        Relationships: []
+      }
+      promotions: {
+        Row: {
+          created_at: string
+          discount_amount: number
+          discount_percent: number
+          end_date: string | null
+          foc_product_id: string | null
+          id: string
+          is_active: boolean
+          min_spend: number
+          points_per_dollar: number
+          promo_type: string
+          start_date: string | null
+          tier_rates: Json | null
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          discount_amount?: number
+          discount_percent?: number
+          end_date?: string | null
+          foc_product_id?: string | null
+          id?: string
+          is_active?: boolean
+          min_spend?: number
+          points_per_dollar?: number
+          promo_type: string
+          start_date?: string | null
+          tier_rates?: Json | null
+          title: string
+        }
+        Update: {
+          created_at?: string
+          discount_amount?: number
+          discount_percent?: number
+          end_date?: string | null
+          foc_product_id?: string | null
+          id?: string
+          is_active?: boolean
+          min_spend?: number
+          points_per_dollar?: number
+          promo_type?: string
+          start_date?: string | null
+          tier_rates?: Json | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promotions_foc_product_id_fkey"
+            columns: ["foc_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_order_items: {
+        Row: {
+          barcode: string | null
+          cost_price: number
+          created_at: string
+          id: string
+          po_id: string
+          product_id: string | null
+          product_name: string | null
+          quantity_received: number
+          selling_price: number
+          subtotal_cost: number
+        }
+        Insert: {
+          barcode?: string | null
+          cost_price?: number
+          created_at?: string
+          id?: string
+          po_id: string
+          product_id?: string | null
+          product_name?: string | null
+          quantity_received?: number
+          selling_price?: number
+          subtotal_cost?: number
+        }
+        Update: {
+          barcode?: string | null
+          cost_price?: number
+          created_at?: string
+          id?: string
+          po_id?: string
+          product_id?: string | null
+          product_name?: string | null
+          quantity_received?: number
+          selling_price?: number
+          subtotal_cost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_order_items_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_orders: {
+        Row: {
+          created_at: string
+          id: string
+          operator_name: string | null
+          po_number: string
+          supplier_name: string | null
+          total_cost: number
+          total_items_count: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          operator_name?: string | null
+          po_number: string
+          supplier_name?: string | null
+          total_cost?: number
+          total_items_count?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          operator_name?: string | null
+          po_number?: string
+          supplier_name?: string | null
+          total_cost?: number
+          total_items_count?: number
+        }
+        Relationships: []
+      }
+      sale_items: {
+        Row: {
+          created_at: string
+          discount_amount: number
+          discount_percent: number
+          id: string
+          is_foc: boolean
+          is_return: boolean
+          product_id: string | null
+          product_name: string
+          promo_id: string | null
+          quantity: number
+          sale_id: string
+          tax_rate: number
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string
+          discount_amount?: number
+          discount_percent?: number
+          id?: string
+          is_foc?: boolean
+          is_return?: boolean
+          product_id?: string | null
+          product_name: string
+          promo_id?: string | null
+          quantity?: number
+          sale_id: string
+          tax_rate?: number
+          unit_price?: number
+        }
+        Update: {
+          created_at?: string
+          discount_amount?: number
+          discount_percent?: number
+          id?: string
+          is_foc?: boolean
+          is_return?: boolean
+          product_id?: string | null
+          product_name?: string
+          promo_id?: string | null
+          quantity?: number
+          sale_id?: string
+          tax_rate?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sale_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_items_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales: {
+        Row: {
+          bill_number: string
+          cashier_name: string | null
+          change_amount: number
+          created_at: string
+          discount_amount: number
+          exchange_credit: number
+          exchanged_to_bill_number: string | null
+          id: string
+          is_exchange: boolean
+          is_refunded: boolean
+          member_id: string | null
+          original_bill_number: string | null
+          paid_amount: number
+          payment_type: string
+          points_earned: number
+          points_redeemed: number
+          shift_id: string | null
+          store_id: string | null
+          subtotal_amount: number
+          tax_amount: number
+          total_amount: number
+        }
+        Insert: {
+          bill_number: string
+          cashier_name?: string | null
+          change_amount?: number
+          created_at?: string
+          discount_amount?: number
+          exchange_credit?: number
+          exchanged_to_bill_number?: string | null
+          id?: string
+          is_exchange?: boolean
+          is_refunded?: boolean
+          member_id?: string | null
+          original_bill_number?: string | null
+          paid_amount?: number
+          payment_type?: string
+          points_earned?: number
+          points_redeemed?: number
+          shift_id?: string | null
+          store_id?: string | null
+          subtotal_amount?: number
+          tax_amount?: number
+          total_amount?: number
+        }
+        Update: {
+          bill_number?: string
+          cashier_name?: string | null
+          change_amount?: number
+          created_at?: string
+          discount_amount?: number
+          exchange_credit?: number
+          exchanged_to_bill_number?: string | null
+          id?: string
+          is_exchange?: boolean
+          is_refunded?: boolean
+          member_id?: string | null
+          original_bill_number?: string | null
+          paid_amount?: number
+          payment_type?: string
+          points_earned?: number
+          points_redeemed?: number
+          shift_id?: string | null
+          store_id?: string | null
+          subtotal_amount?: number
+          tax_amount?: number
+          total_amount?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

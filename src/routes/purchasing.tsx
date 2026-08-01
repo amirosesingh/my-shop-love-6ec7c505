@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { FilePlus2, PackagePlus, ScanBarcode, ShieldAlert, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
+import { db } from "@/lib/pos-db";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -227,6 +228,24 @@ function Purchasing() {
       storeCode: currentStore.code,
     };
     setHistory((h) => [record, ...h]);
+
+    void db.recordPurchaseOrder(
+      {
+        poNumber: ref,
+        supplier: record.supplier,
+        operator: record.operator,
+        totalCost: totals.cost,
+        itemCount: lines.length,
+      },
+      lines.map((l) => ({
+        productId: l.productId,
+        barcode: l.barcode,
+        name: l.name,
+        cost: l.cost,
+        price: l.price,
+        qty: l.qty,
+      })),
+    );
 
     logger.log("inventory_edit", "Receiving order finalized", "purchasing", {
       ...record,

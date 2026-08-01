@@ -1,0 +1,19 @@
+
+ALTER TABLE public.products
+  ADD COLUMN sku TEXT,
+  ADD COLUMN reorder_level INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN tax_rate NUMERIC NOT NULL DEFAULT 0,
+  ADD COLUMN ecom_visible BOOLEAN NOT NULL DEFAULT true,
+  ADD COLUMN stock_by_store JSONB NOT NULL DEFAULT '{}'::jsonb;
+
+ALTER TABLE public.sales
+  ADD COLUMN shift_id TEXT,
+  ADD COLUMN paid_amount NUMERIC NOT NULL DEFAULT 0,
+  ADD COLUMN change_amount NUMERIC NOT NULL DEFAULT 0,
+  ADD COLUMN exchange_credit NUMERIC NOT NULL DEFAULT 0,
+  ADD COLUMN exchanged_to_bill_number TEXT;
+
+ALTER TABLE public.sale_items
+  ADD COLUMN tax_rate NUMERIC NOT NULL DEFAULT 0,
+  ADD COLUMN is_foc BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN promo_id TEXT;

@@ -1,4 +1,4 @@
-import { LogOut, Menu, ReceiptText, Store } from "lucide-react";
+import { Loader2, LogOut, Menu, ReceiptText, Store } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
@@ -19,7 +19,7 @@ import {
 import { cn } from "@/lib/utils";
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { activeShift, stores, currentStore, setCurrentStore, state } = usePos();
+  const { activeShift, stores, currentStore, setCurrentStore, state, ready: dataReady } = usePos();
   const { ready, user, isAdmin, logout, can } = useAuth();
   const [collapsed, setCollapsed] = useSidebarCollapsed();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -41,6 +41,13 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   if (!ready) return null;
   if (!user) return <LoginScreen />;
+  if (!dataReady)
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3">
+        <Loader2 className="size-6 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground">Loading store data…</p>
+      </div>
+    );
 
   const inbound = state.transfers.filter(
     (t) =>
