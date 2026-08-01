@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo } from "react";
-import { Percent, Printer } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Percent, Plus, Printer, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
@@ -8,10 +8,27 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
-import { PAPER_LABELS, paperCss, saleReceiptPreview, setPrintSettings } from "@/lib/pos-print";
-import type { PaperSize, ReceiptSettings, Sale, TaxMode } from "@/lib/pos-types";
+import {
+  PAPER_LABELS,
+  paperCss,
+  resolveReceiptCfg,
+  saleReceiptPreview,
+  setPreviewReceiptCfg,
+  setPrintSettings,
+} from "@/lib/pos-print";
+import type {
+  FontFamilyKey,
+  FontStyleSettings,
+  PaperSize,
+  ReceiptCustomLine,
+  ReceiptOverride,
+  ReceiptSettings,
+  Sale,
+  TaxMode,
+} from "@/lib/pos-types";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -39,11 +56,67 @@ const TOGGLES: { key: keyof ReceiptSettings; label: string }[] = [
   { key: "showTax", label: "Tax details" },
 ];
 
+const FONT_SCOPES: { key: keyof ReceiptSettings["fonts"]; label: string }[] = [
+  { key: "header", label: "Header" },
+  { key: "body", label: "Body" },
+  { key: "footer", label: "Footer" },
+];
+
+const FAMILIES: { key: FontFamilyKey; label: string }[] = [
+  { key: "mono", label: "Monospace" },
+  { key: "sans", label: "Sans" },
+  { key: "serif", label: "Serif" },
+];
+
+const IDENTITY_FIELDS: { key: keyof ReceiptOverride; label: string; placeholder: string }[] = [
+  { key: "companyName", label: "Company name", placeholder: "NORTHWIND & CO." },
+  { key: "taxNumber", label: "Tax / VAT number", placeholder: "88-2201194" },
+  { key: "regNumber", label: "Registration number", placeholder: "REG-000123" },
+  { key: "phone", label: "Phone", placeholder: "555-0100" },
+  { key: "website", label: "Website", placeholder: "www.example.com" },
+];
+
 function Settings() {
-  const { state, currentStore, updateSettings } = usePos();
+  const { state, stores, currentStore, updateSettings, upsertStore } = usePos();
   const { isAdmin, can } = useAuth();
   const canSettings = isAdmin || can("can_access_pos_settings");
   const { tax, receipt } = state.settings;
+
+  const [branchId, setBranchId] = useState(currentStore.id);
+  const branch = stores.find((s) => s.id === branchId) ?? currentStore;
+  const overrideOn = !!branch.receiptOverrides;
+  /** what the printer will actually use for the branch being edited */
+  const effective = useMemo(
+    () => resolveReceiptCfg(receipt, overrideOn ? branch : null),
+    [receipt, branch, overrideOn],
+  );
+
+  /** Writes branch-overridable fields to the branch when override mode is on. */
+  const setField = <K extends keyof ReceiptOverride>(key: K, value: ReceiptOverride[K]) => {
+    if (overrideOn) {
+      upsertStore({ ...branch, receiptOverrides: { ...branch.receiptOverrides, [key]: value } });
+    } else {
+      updateSettings({ receipt: { ...receipt, [key]: value } as ReceiptSettings });
+    }
+  };
+
+  const setGlobal = (patch: Partial<ReceiptSettings>) =>
+    updateSettings({ receipt: { ...receipt, ...patch } });
+
+  const setFont = (scope: keyof ReceiptSettings["fonts"], patch: Partial<FontStyleSettings>) =>
+    setGlobal({ fonts: { ...receipt.fonts, [scope]: { ...receipt.fonts[scope], ...patch } } });
+
+  const toggleOverride = (on: boolean) =>
+    upsertStore({
+      ...branch,
+      receiptOverrides: on
+        ? {
+            companyName: receipt.companyName,
+            headerText: receipt.headerText,
+            footerText: receipt.footerText,
+          }
+        : undefined,
+    });
 
   const sample: Sale = useMemo(() => {
     const lines = [
@@ -79,7 +152,7 @@ function Settings() {
   }, [tax, currentStore]);
 
   const previewHtml = useMemo(() => {
-    setPrintSettings(receipt, tax);
+    setPreviewReceiptCfg(effective, tax);
     return saleReceiptPreview(
       sample,
       {
@@ -95,9 +168,9 @@ function Settings() {
       },
       "sale",
     );
-  }, [receipt, tax, sample]);
+  }, [effective, tax, sample]);
 
-  const geometry = paperCss(receipt.paper);
+  const geometry = paperCss(effective.paper);
 
   if (!canSettings) {
     return (
