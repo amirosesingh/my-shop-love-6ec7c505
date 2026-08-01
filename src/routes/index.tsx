@@ -18,6 +18,7 @@ import {
   X,
   Repeat,
   Sparkles,
+  History,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
@@ -40,6 +41,7 @@ import type { CartLine, DiscountType, PaymentMethod, Sale } from "@/lib/pos-type
 import { lineUnitDiscount, r2 } from "@/lib/pos-types";
 import { evaluatePromotions, focLine } from "@/lib/pos-promotions";
 import { openCashDrawer, printSaleReceipt } from "@/lib/pos-print";
+import { MemberHistoryDialog } from "@/components/pos/MemberHistoryDialog";
 
 export const Route = createFileRoute("/")({
   head: () => ({
