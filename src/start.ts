@@ -4,6 +4,7 @@ import { renderErrorPage } from "./lib/error-page";
 // Auth helpers target the external Supabase project (qhrufhtbeguxydenzfey),
 // not the managed Cloud backend.
 import { attachExternalSupabaseAuth } from "@/integrations/supabase/external-auth-attacher";
+import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 
 const errorMiddleware = createMiddleware().server(async ({ next }) => {
   try {
@@ -28,6 +29,6 @@ const csrfMiddleware = createCsrfMiddleware({
 });
 
 export const startInstance = createStart(() => ({
-  functionMiddleware: [attachExternalSupabaseAuth],
+  functionMiddleware: [attachSupabaseAuth, attachExternalSupabaseAuth],
   requestMiddleware: [errorMiddleware, csrfMiddleware],
 }));
