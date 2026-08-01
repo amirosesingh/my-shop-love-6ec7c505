@@ -186,6 +186,12 @@ export function PosProvider({ children }: { children: ReactNode }) {
           members: cloud.members,
           sales: cloud.sales,
           promotions: cloud.promotions.length ? cloud.promotions : s.promotions,
+          // Locations are central now; the local list is the fallback until
+          // the directory has been populated (and gets pushed up below).
+          stores: cloud.stores.length ? cloud.stores : s.stores,
+          currentStoreId: cloud.stores.length
+            ? (cloud.stores.find((x) => x.id === s.currentStoreId)?.id ?? cloud.stores[0].id)
+            : s.currentStoreId,
           settings: {
             tax: { ...defaultSettings.tax, ...cloud.settings.tax },
             receipt: { ...defaultSettings.receipt, ...cloud.settings.receipt },
@@ -198,6 +204,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
             s.counter,
           ),
         }));
+        if (!cloud.stores.length) db.upsertStores(stateRef.current.stores);
       } catch (e) {
         dbError("Loading data", e);
       } finally {
