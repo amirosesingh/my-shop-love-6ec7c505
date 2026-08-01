@@ -171,11 +171,16 @@ export type Database = {
           created_at: string
           custom_points: number | null
           ecom_price: number | null
+          ecom_visible: boolean
           id: string
           name: string
           point_multiplier: number
+          reorder_level: number
           selling_price: number
+          sku: string | null
+          stock_by_store: Json
           stock_quantity: number
+          tax_rate: number
         }
         Insert: {
           barcode: string
@@ -184,11 +189,16 @@ export type Database = {
           created_at?: string
           custom_points?: number | null
           ecom_price?: number | null
+          ecom_visible?: boolean
           id?: string
           name: string
           point_multiplier?: number
+          reorder_level?: number
           selling_price?: number
+          sku?: string | null
+          stock_by_store?: Json
           stock_quantity?: number
+          tax_rate?: number
         }
         Update: {
           barcode?: string
@@ -197,11 +207,16 @@ export type Database = {
           created_at?: string
           custom_points?: number | null
           ecom_price?: number | null
+          ecom_visible?: boolean
           id?: string
           name?: string
           point_multiplier?: number
+          reorder_level?: number
           selling_price?: number
+          sku?: string | null
+          stock_by_store?: Json
           stock_quantity?: number
+          tax_rate?: number
         }
         Relationships: []
       }
@@ -351,11 +366,14 @@ export type Database = {
           discount_amount: number
           discount_percent: number
           id: string
+          is_foc: boolean
           is_return: boolean
           product_id: string | null
           product_name: string
+          promo_id: string | null
           quantity: number
           sale_id: string
+          tax_rate: number
           unit_price: number
         }
         Insert: {
@@ -363,11 +381,14 @@ export type Database = {
           discount_amount?: number
           discount_percent?: number
           id?: string
+          is_foc?: boolean
           is_return?: boolean
           product_id?: string | null
           product_name: string
+          promo_id?: string | null
           quantity?: number
           sale_id: string
+          tax_rate?: number
           unit_price?: number
         }
         Update: {
@@ -375,11 +396,14 @@ export type Database = {
           discount_amount?: number
           discount_percent?: number
           id?: string
+          is_foc?: boolean
           is_return?: boolean
           product_id?: string | null
           product_name?: string
+          promo_id?: string | null
           quantity?: number
           sale_id?: string
+          tax_rate?: number
           unit_price?: number
         }
         Relationships: [
@@ -403,16 +427,21 @@ export type Database = {
         Row: {
           bill_number: string
           cashier_name: string | null
+          change_amount: number
           created_at: string
           discount_amount: number
+          exchange_credit: number
+          exchanged_to_bill_number: string | null
           id: string
           is_exchange: boolean
           is_refunded: boolean
           member_id: string | null
           original_bill_number: string | null
+          paid_amount: number
           payment_type: string
           points_earned: number
           points_redeemed: number
+          shift_id: string | null
           store_id: string | null
           subtotal_amount: number
           tax_amount: number
@@ -421,16 +450,21 @@ export type Database = {
         Insert: {
           bill_number: string
           cashier_name?: string | null
+          change_amount?: number
           created_at?: string
           discount_amount?: number
+          exchange_credit?: number
+          exchanged_to_bill_number?: string | null
           id?: string
           is_exchange?: boolean
           is_refunded?: boolean
           member_id?: string | null
           original_bill_number?: string | null
+          paid_amount?: number
           payment_type?: string
           points_earned?: number
           points_redeemed?: number
+          shift_id?: string | null
           store_id?: string | null
           subtotal_amount?: number
           tax_amount?: number
@@ -439,16 +473,21 @@ export type Database = {
         Update: {
           bill_number?: string
           cashier_name?: string | null
+          change_amount?: number
           created_at?: string
           discount_amount?: number
+          exchange_credit?: number
+          exchanged_to_bill_number?: string | null
           id?: string
           is_exchange?: boolean
           is_refunded?: boolean
           member_id?: string | null
           original_bill_number?: string | null
+          paid_amount?: number
           payment_type?: string
           points_earned?: number
           points_redeemed?: number
+          shift_id?: string | null
           store_id?: string | null
           subtotal_amount?: number
           tax_amount?: number
