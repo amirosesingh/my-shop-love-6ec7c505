@@ -7,7 +7,7 @@ import {
   type DisplaySnapshot,
 } from "@/lib/customer-display";
 import { qrSvg } from "@/lib/pos-print";
-import { whatsappLink } from "@/lib/pos-types";
+import { resolvePaymentQr, whatsappLink } from "@/lib/pos-types";
 
 export const Route = createFileRoute("/display")({
   head: () => ({
@@ -45,8 +45,9 @@ function CustomerDisplay() {
   const pay = snap?.payment ?? null;
   const transferMode = snap?.mode === "transfer";
   const wa = pay?.whatsapp ? whatsappLink(pay.whatsapp) : "";
+  const payQr = resolvePaymentQr(pay?.paymentQr, snap?.total ?? 0, snap?.reference ?? "");
   const showTransfer =
-    !!pay && (!!pay.accountNumber || !!pay.whatsapp || !!pay.accountName);
+    !!pay && (!!pay.accountNumber || !!pay.whatsapp || !!pay.accountName || !!payQr);
 
   return (
     <main className="flex min-h-screen flex-col bg-background text-foreground">
@@ -184,17 +185,32 @@ function CustomerDisplay() {
                 )}
               </div>
               {pay?.note && <p className="mt-2 text-xs text-muted-foreground">{pay.note}</p>}
-              {wa && (
-                <div className="mt-3 flex items-center gap-3">
-                  <div
-                    className="rounded bg-white p-2"
-                    dangerouslySetInnerHTML={{ __html: qrSvg(wa, transferMode ? 150 : 110) }}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Scan to send your transfer slip on WhatsApp.
-                  </p>
-                </div>
-              )}
+              <div className="mt-3 flex flex-wrap items-start gap-4">
+                {payQr && (
+                  <div className="text-center">
+                    <div
+                      className="rounded bg-white p-2"
+                      dangerouslySetInnerHTML={{
+                        __html: qrSvg(payQr, transferMode ? 190 : 130),
+                      }}
+                    />
+                    <p className="mt-1 text-xs font-medium">
+                      {pay?.paymentQr?.label || "Scan to pay"}
+                    </p>
+                  </div>
+                )}
+                {wa && (
+                  <div className="text-center">
+                    <div
+                      className="rounded bg-white p-2"
+                      dangerouslySetInnerHTML={{ __html: qrSvg(wa, transferMode ? 150 : 110) }}
+                    />
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Send your slip on WhatsApp
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </aside>
