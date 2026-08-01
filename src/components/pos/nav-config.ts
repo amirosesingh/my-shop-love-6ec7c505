@@ -65,6 +65,7 @@ export const navGroups: NavGroup[] = [
     icon: Wallet,
     items: [
       { to: "/", label: "Register POS", icon: LayoutGrid, keywords: "checkout cart sale" },
+      { to: "/dashboard", label: "Live Dashboard", icon: Activity, flag: "can_view_sales_reports", keywords: "revenue profit margin peak hours charts kpi review flags" },
       { to: "/shifts", label: "Shift Management", icon: Clock, flag: "can_view_sales_reports", keywords: "open close drawer z-report" },
       { to: "/bookings", label: "Bookings / Pay Later", icon: CalendarClock, keywords: "layaway reserve deposit balance due collect" },
       { to: "/display", label: "Customer Display", icon: MonitorPlay, keywords: "second screen customer facing transfer qr" },
