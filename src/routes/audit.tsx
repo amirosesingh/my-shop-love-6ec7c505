@@ -1,6 +1,23 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { CloudOff, Cloud, Download, Eye, ShieldAlert } from "lucide-react";
+import {
+  CloudOff,
+  Cloud,
+  Download,
+  Eye,
+  ShieldAlert,
+  ShoppingCart,
+  RefreshCw,
+  Tag,
+  MousePointerClick,
+  Compass,
+  Search as SearchIcon,
+  PanelTop,
+  UserRound,
+  Settings2,
+  List,
+  Rows3,
+} from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +56,9 @@ import {
   type AuditLog,
 } from "@/lib/audit-log";
 import { useAuth } from "@/lib/pos-auth";
+import { describeLog } from "@/lib/audit-format";
+import { TablePagination, usePagination } from "@/components/pos/TablePagination";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 export const Route = createFileRoute("/audit")({
   head: () => ({
@@ -61,6 +81,27 @@ export const Route = createFileRoute("/audit")({
 
 type RangeKey = "all" | "today" | "yesterday" | "custom";
 
+const categoryVisual: Record<
+  string,
+  { icon: typeof ShoppingCart; className: string }
+> = {
+  sale_event: { icon: ShoppingCart, className: "bg-emerald-500/15 text-emerald-500" },
+  inventory_edit: { icon: Tag, className: "bg-sky-500/15 text-sky-500" },
+  member_event: { icon: UserRound, className: "bg-violet-500/15 text-violet-500" },
+  settings: { icon: Settings2, className: "bg-amber-500/15 text-amber-500" },
+  sync: { icon: RefreshCw, className: "bg-orange-500/15 text-orange-500" },
+  navigation: { icon: Compass, className: "bg-teal-500/15 text-teal-500" },
+  search: { icon: SearchIcon, className: "bg-slate-500/15 text-slate-400" },
+  modal: { icon: PanelTop, className: "bg-indigo-500/15 text-indigo-400" },
+  ui_click: { icon: MousePointerClick, className: "bg-muted text-muted-foreground" },
+};
+
+const visualFor = (l: AuditLog) => {
+  if (l.action.toLowerCase().includes("exchange"))
+    return { icon: RefreshCw, className: "bg-orange-500/15 text-orange-500" };
+  return categoryVisual[l.category] ?? categoryVisual["ui_click"]!;
+};
+
 const dayStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 
 function AuditPage() {
@@ -74,6 +115,7 @@ function AuditPage() {
   const [category, setCategory] = useState("all");
   const [q, setQ] = useState("");
   const [detail, setDetail] = useState<AuditLog | null>(null);
+  const [view, setView] = useState<"table" | "stream">("table");
 
   const rows = useMemo(() => {
     const now = new Date();
