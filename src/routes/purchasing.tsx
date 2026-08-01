@@ -228,6 +228,24 @@ function Purchasing() {
     };
     setHistory((h) => [record, ...h]);
 
+    void db.recordPurchaseOrder(
+      {
+        poNumber: ref,
+        supplier: record.supplier,
+        operator: record.operator,
+        totalCost: totals.cost,
+        itemCount: lines.length,
+      },
+      lines.map((l) => ({
+        productId: l.productId,
+        barcode: l.barcode,
+        name: l.name,
+        cost: l.cost,
+        price: l.price,
+        qty: l.qty,
+      })),
+    );
+
     logger.log("inventory_edit", "Receiving order finalized", "purchasing", {
       ...record,
       stockMovements: movements,
