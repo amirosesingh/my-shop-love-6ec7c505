@@ -4,6 +4,7 @@ import type {
   PosState,
   Promotion,
   ReceiptSettings,
+  ReviewThresholds,
   Store,
   WhatsAppSettings,
 } from "./pos-types";
@@ -52,11 +53,21 @@ export const defaultWhatsApp: WhatsAppSettings = {
   signoff: "Keep this message as your digital receipt.",
 };
 
+/** Daily limits used to flag unusual cashier behaviour for review. */
+export const defaultReviewThresholds: ReviewThresholds = {
+  maxVoids: 5,
+  maxRefunds: 3,
+  maxRefundValue: 200,
+  maxNoSaleOpens: 5,
+  maxDiscountPct: 15,
+};
+
 export const defaultSettings: AppSettings = {
   tax: { enabled: true, rate: 5, mode: "exclusive" },
   receipt: defaultReceiptSettings,
   payment: defaultPaymentDetails,
   whatsapp: defaultWhatsApp,
+  review: defaultReviewThresholds,
 };
 
 export const seedPromotions: Promotion[] = [

@@ -11,9 +11,9 @@ A bill can be settled with any mix of tenders instead of one method.
 - The sale stores a `payments[]` breakdown; the legacy single `method` is set to the largest tender so existing reports and receipt code keep working.
 - Receipts, customer display, bill history and the sales report show the full tender breakdown including bank names.
 
-## 2. Real-time dashboard (`/dashboard`, in Reports)
+## 2. Real-time dashboard (`/dashboard`, in side pannel )
 
-New page in the Reports & Analytics nav group, gated by the sales-report permission.
+New page in the nav , gated by the sales-report permission.
 
 - Today KPIs: revenue, transactions, average basket, gross profit and margin % (selling minus cost price), refunds, discounts.
 - Revenue by hour bar chart with the peak hour highlighted.

@@ -185,6 +185,19 @@ const rowToSettings = (r: Row | null): AppSettings =>
           ...defaultSettings.whatsapp,
           ...((r.whatsapp_settings ?? {}) as object),
         },
+        review: {
+          maxVoids: num(r.review_max_voids, defaultSettings.review.maxVoids),
+          maxRefunds: num(r.review_max_refunds, defaultSettings.review.maxRefunds),
+          maxRefundValue: num(
+            r.review_max_refund_value,
+            defaultSettings.review.maxRefundValue,
+          ),
+          maxNoSaleOpens: num(r.review_max_nosale, defaultSettings.review.maxNoSaleOpens),
+          maxDiscountPct: num(
+            r.review_max_discount_pct,
+            defaultSettings.review.maxDiscountPct,
+          ),
+        },
       }
     : defaultSettings;
 
@@ -210,6 +223,11 @@ const settingsToRow = (s: AppSettings): Row => ({
   show_points: s.receipt.showPoints,
   show_barcode: s.receipt.showBarcode,
   show_tax_details: s.receipt.showTax,
+  review_max_voids: s.review.maxVoids,
+  review_max_refunds: s.review.maxRefunds,
+  review_max_refund_value: s.review.maxRefundValue,
+  review_max_nosale: s.review.maxNoSaleOpens,
+  review_max_discount_pct: s.review.maxDiscountPct,
   updated_at: new Date().toISOString(),
 });
 
@@ -239,6 +257,7 @@ const rowToSale = (r: Row): Sale => ({
   paid: num(r.paid_amount),
   change: num(r.change_amount),
   method: (r.payment_type ?? "cash") as PaymentMethod,
+  payments: Array.isArray(r.payments) ? (r.payments as Sale["payments"]) : undefined,
   memberId: r.member_id ?? null,
   pointsEarned: num(r.points_earned),
   cashier: r.cashier_name ?? "",
@@ -265,6 +284,7 @@ const saleToRow = (s: Sale): Row => ({
   discount_amount: s.discount,
   tax_amount: s.tax,
   payment_type: s.method,
+  payments: s.payments ?? [],
   points_earned: s.pointsEarned,
   points_redeemed: s.method === "points" ? s.paid : 0,
   is_exchange: !!s.exchangeOfReceiptNo,
@@ -514,6 +534,41 @@ export const db = {
   },
 
   /** Purchase order / receiving invoice. */
+  /** No-sale cash-drawer open, queued so it survives an offline till. */
+  recordDrawerEvent(row: {
+    id: string;
+    storeId: string | null;
+    terminalId: string | null;
+    shiftId: string | null;
+    staffId: string | null;
+    staffName: string | null;
+    role: string | null;
+    reason: string;
+    note: string | null;
+    approvedBy: string | null;
+    at: string;
+  }) {
+    queue("Logging drawer open", {
+      kind: "insert",
+      table: "drawer_events",
+      rows: [
+        {
+          id: row.id,
+          store_id: row.storeId,
+          terminal_id: row.terminalId,
+          shift_id: row.shiftId,
+          staff_id: row.staffId,
+          staff_name: row.staffName,
+          role: row.role,
+          reason: row.reason,
+          note: row.note,
+          approved_by: row.approvedBy,
+          created_at: row.at,
+        },
+      ],
+    });
+  },
+
   async recordPurchaseOrder(
     po: {
       poNumber: string;

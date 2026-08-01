@@ -54,7 +54,9 @@ import { useAuth } from "@/lib/pos-auth";
 import { useUserPermissions } from "@/lib/pos-permissions";
 import { useUiScale } from "@/lib/use-ui-scale";
 import type { CartLine, DiscountType, PaymentMethod, Sale } from "@/lib/pos-types";
-import { lineUnitDiscount, r2 } from "@/lib/pos-types";
+import type { Payment } from "@/lib/pos-types";
+import { lineUnitDiscount, paymentsLabel, paymentsTotal, PAYMENT_LABELS, r2 } from "@/lib/pos-types";
+import { NO_SALE_REASONS, recordNoSale, type NoSaleReason } from "@/lib/drawer-events";
 import { buildBookingMessage, buildSaleMessage, sendBillOnWhatsApp } from "@/lib/whatsapp";
 import { logger } from "@/lib/audit-log";
 import { evaluatePromotions, focLine } from "@/lib/pos-promotions";
@@ -162,6 +164,13 @@ function Register() {
   } | null>(null);
   const [splitOpen, setSplitOpen] = useState(false);
   const [splitWays, setSplitWays] = useState(2);
+  /* Split tenders + card machine capture */
+  const [tenders, setTenders] = useState<Payment[]>([]);
+  const [bankName, setBankName] = useState("");
+  /* No-sale drawer open */
+  const [noSaleOpen, setNoSaleOpen] = useState(false);
+  const [noSaleReason, setNoSaleReason] = useState<NoSaleReason>("change_float");
+  const [noSaleNote, setNoSaleNote] = useState("");
 
   const categories = useMemo(
     () => ["All", ...Array.from(new Set(state.products.map((p) => p.category)))],
@@ -272,8 +281,27 @@ function Register() {
   async function setQty(index: number, delta: number) {
     const line = lines[index];
     const removes = line && !line.credit && line.qty + delta <= 0;
-    // Removing a line from the ticket is a void and needs the permission.
-    if (removes && !(await requirePermission("can_void_item"))) return;
+    // Removing a line, or reducing a quantity, needs manager approval unless
+    // the cashier holds the right themselves.
+    if (removes) {
+      if (!(await requirePermission("can_delete_line"))) return;
+      logger.log("refund", "Line deleted from the cart", "register", {
+        product: line?.name,
+        productId: line?.productId,
+        qty: line?.qty,
+        price: line?.price,
+        storeId: currentStore.id,
+      });
+    } else if (delta < 0 && line && !line.credit) {
+      if (!(await requirePermission("can_reduce_qty"))) return;
+      logger.log("sale", "Item quantity reduced", "register", {
+        product: line.name,
+        productId: line.productId,
+        from: line.qty,
+        to: line.qty - 1,
+        storeId: currentStore.id,
+      });
+    }
     setLines((ls) =>
       ls
         .map((l, i) => (i === index ? { ...l, qty: l.credit ? l.qty - delta : l.qty + delta } : l))
@@ -293,7 +321,7 @@ function Register() {
   }
 
   async function clearCart() {
-    if (lines.length && !(await requirePermission("can_void_item"))) return;
+    if (lines.length && !(await requirePermission("can_void_cart"))) return;
     if (lines.length) {
       logger.log("refund", "Cart voided", "register", {
         lines: lines.length,
@@ -512,19 +540,56 @@ function Register() {
     const isRefund = totals.total < 0;
     if (!(await requirePermission("can_process_sale"))) return;
     if (isRefund && !(await requirePermission("can_process_refund"))) return;
-    const paid = isRefund ? totals.total : method === "cash" ? Number(tendered || 0) : totals.total;
-    if (!isRefund && method === "cash" && paid < totals.total) {
+    const splitting = tenders.length > 0;
+    const splitPaid = paymentsTotal(tenders);
+    if (!isRefund && splitting && splitPaid < r2(totals.total)) {
+      toast.error(
+        `Split tenders cover ${money(splitPaid)} of ${money(totals.total)} — add another tender`,
+      );
+      return;
+    }
+    if (!isRefund && splitting && tenders.some((t) => t.method === "card" && !t.bankName?.trim())) {
+      toast.error("Enter the bank / card machine used for every card tender");
+      return;
+    }
+    const paid = isRefund
+      ? totals.total
+      : splitting
+        ? splitPaid
+        : method === "cash"
+          ? Number(tendered || 0)
+          : totals.total;
+    if (!isRefund && !splitting && method === "cash" && paid < totals.total) {
       toast.error("Tendered amount is less than the total");
       return;
     }
-    if (!isRefund && method === "bank_transfer" && !transferRef.trim()) {
+    if (!isRefund && !splitting && method === "card" && !bankName.trim()) {
+      toast.error("Enter which bank card machine was used");
+      return;
+    }
+    if (!isRefund && !splitting && method === "bank_transfer" && !transferRef.trim()) {
       toast.error("Enter the transfer reference shown on the customer's slip");
       return;
     }
-    if (!isRefund && method === "points" && (member?.points ?? 0) < totals.total * 100) {
+    if (!isRefund && !splitting && method === "points" && (member?.points ?? 0) < totals.total * 100) {
       toast.error("Not enough points on this member");
       return;
     }
+    const payments: Payment[] = splitting
+      ? tenders
+      : [
+          {
+            id: crypto.randomUUID(),
+            method,
+            amount: r2(Math.abs(totals.total)),
+            ...(method === "card" && bankName.trim() ? { bankName: bankName.trim() } : {}),
+            ...(method === "bank_transfer" && transferRef.trim()
+              ? { ref: transferRef.trim() }
+              : {}),
+          },
+        ];
+    // The headline method stays the largest tender so reports keep working.
+    const headline = payments.reduce((a, p) => (p.amount > a.amount ? p : a), payments[0]!).method;
     const sale = recordSale({
       storeId: currentStore.id,
       shiftId: activeShift.id,
@@ -535,7 +600,8 @@ function Register() {
       total: totals.total,
       paid,
       change: r2(Math.max(0, paid - totals.total)),
-      method,
+      method: splitting ? headline : method,
+      payments,
       memberId,
       pointsEarned,
       cashier: activeShift.cashier,
@@ -564,7 +630,15 @@ function Register() {
         storeId: sale.storeId,
       });
     }
-    if (method === "cash") openCashDrawer();
+    if (payments.some((p) => p.method === "cash")) openCashDrawer();
+    if (splitting || payments.some((p) => p.bankName)) {
+      logger.log("sale", "Split payment recorded", "register", {
+        receiptNo: sale.receiptNo,
+        total: sale.total,
+        tenders: paymentsLabel(payments),
+        storeId: sale.storeId,
+      });
+    }
     if (method === "bank_transfer") {
       logger.log("sale", "Bank transfer payment recorded", "register", {
         receiptNo: sale.receiptNo,
@@ -593,6 +667,8 @@ function Register() {
     setMemberId(null);
     setTendered("");
     setTransferRef("");
+    setTenders([]);
+    setBankName("");
     setPayOpen(false);
     toast.success(
       exchangeRef
@@ -1417,7 +1493,10 @@ function Register() {
               variant="outline"
               className="h-12 w-full justify-start gap-3"
               onClick={async () => {
-                if (await requirePermission("can_open_drawer")) openCashDrawer();
+                if (!(await requirePermission("can_open_drawer"))) return;
+                setNoSaleNote("");
+                setNoSaleReason("change_float");
+                setNoSaleOpen(true);
               }}
             >
               <Vault className="size-4" /> Open cash drawer
@@ -1727,6 +1806,115 @@ function Register() {
                 : "Attach a member to pay with points."}
             </p>
           )}
+          {method === "card" && refundDue === 0 && tenders.length === 0 && (
+            <div className="space-y-2">
+              <Label>Bank / card machine used</Label>
+              <Input
+                value={bankName}
+                onChange={(e) => setBankName(e.target.value)}
+                placeholder="e.g. HSBC terminal 2"
+              />
+            </div>
+          )}
+
+          {refundDue === 0 && (
+            <div className="space-y-2 rounded-md border border-border p-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Split across tenders
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    if (!(await requirePermission("can_edit_tenders"))) return;
+                    const remaining = r2(balanceDue - paymentsTotal(tenders));
+                    setTenders((ts) => [
+                      ...ts,
+                      {
+                        id: crypto.randomUUID(),
+                        method: "cash",
+                        amount: Math.max(0, remaining),
+                      },
+                    ]);
+                  }}
+                >
+                  <Plus className="size-3" /> Add tender
+                </Button>
+              </div>
+              {tenders.map((t, i) => (
+                <div key={t.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <select
+                      value={t.method}
+                      onChange={(e) =>
+                        setTenders((ts) =>
+                          ts.map((x, xi) =>
+                            xi === i ? { ...x, method: e.target.value as PaymentMethod } : x,
+                          ),
+                        )
+                      }
+                      className="h-9 rounded-md border border-border bg-background px-2 text-xs"
+                    >
+                      {(Object.keys(PAYMENT_LABELS) as PaymentMethod[]).map((m) => (
+                        <option key={m} value={m}>
+                          {PAYMENT_LABELS[m]}
+                        </option>
+                      ))}
+                    </select>
+                    {t.method === "card" ? (
+                      <Input
+                        value={t.bankName ?? ""}
+                        onChange={(e) =>
+                          setTenders((ts) =>
+                            ts.map((x, xi) => (xi === i ? { ...x, bankName: e.target.value } : x)),
+                          )
+                        }
+                        placeholder="Bank / machine"
+                        className="h-9 text-xs"
+                      />
+                    ) : (
+                      <Input
+                        value={t.ref ?? ""}
+                        onChange={(e) =>
+                          setTenders((ts) =>
+                            ts.map((x, xi) => (xi === i ? { ...x, ref: e.target.value } : x)),
+                          )
+                        }
+                        placeholder="Reference"
+                        className="h-9 text-xs"
+                      />
+                    )}
+                  </div>
+                  <Input
+                    value={t.amount || ""}
+                    onChange={(e) =>
+                      setTenders((ts) =>
+                        ts.map((x, xi) =>
+                          xi === i ? { ...x, amount: Number(e.target.value) || 0 } : x,
+                        ),
+                      )
+                    }
+                    className="numeric h-9 w-24 text-right"
+                  />
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-8"
+                    onClick={() => setTenders((ts) => ts.filter((_, xi) => xi !== i))}
+                  >
+                    <X className="size-3" />
+                  </Button>
+                </div>
+              ))}
+              {tenders.length > 0 && (
+                <p className="numeric text-[11px] text-muted-foreground">
+                  Tendered {money(paymentsTotal(tenders))} of {money(balanceDue)} ·{" "}
+                  {paymentsLabel(tenders)}
+                </p>
+              )}
+            </div>
+          )}
           {method === "bank_transfer" && (
             <div className="space-y-2 rounded-md border border-border p-3">
               <p className="text-xs text-muted-foreground">
@@ -1756,6 +1944,61 @@ function Register() {
               Cancel
             </Button>
             <Button onClick={completeSale}>Complete &amp; print</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* No-sale drawer open */}
+      <Dialog open={noSaleOpen} onOpenChange={setNoSaleOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Open drawer without a sale</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground">
+            This open is logged against {user?.name ?? "this user"} with a timestamp.
+          </p>
+          <div className="space-y-2">
+            <Label>Reason</Label>
+            <select
+              value={noSaleReason}
+              onChange={(e) => setNoSaleReason(e.target.value as NoSaleReason)}
+              className="h-10 w-full rounded-md border border-border bg-background px-2 text-sm"
+            >
+              {NO_SALE_REASONS.map((r) => (
+                <option key={r.value} value={r.value}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+            <Label>Note (optional)</Label>
+            <Input value={noSaleNote} onChange={(e) => setNoSaleNote(e.target.value)} />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNoSaleOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                const approved = await requirePermission("can_no_sale_open");
+                if (!approved) return;
+                recordNoSale({
+                  storeId: currentStore.id,
+                  terminalId: null,
+                  shiftId: activeShift?.id ?? null,
+                  staffId: user?.staffId ?? "unknown",
+                  staffName: user?.name ?? "Unknown",
+                  role: user?.role ?? "unknown",
+                  reason: noSaleReason,
+                  note: noSaleNote.trim(),
+                  approvedBy: can("can_no_sale_open") ? null : "supervisor override",
+                });
+                openCashDrawer();
+                setNoSaleOpen(false);
+                toast.success("Drawer opened and logged");
+              }}
+            >
+              Open &amp; log
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

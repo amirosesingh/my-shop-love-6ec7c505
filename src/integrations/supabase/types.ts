@@ -44,6 +44,48 @@ export type Database = {
         }
         Relationships: []
       }
+      drawer_events: {
+        Row: {
+          approved_by: string | null
+          created_at: string
+          id: string
+          note: string | null
+          reason: string
+          role: string | null
+          shift_id: string | null
+          staff_id: string | null
+          staff_name: string | null
+          store_id: string | null
+          terminal_id: string | null
+        }
+        Insert: {
+          approved_by?: string | null
+          created_at?: string
+          id?: string
+          note?: string | null
+          reason: string
+          role?: string | null
+          shift_id?: string | null
+          staff_id?: string | null
+          staff_name?: string | null
+          store_id?: string | null
+          terminal_id?: string | null
+        }
+        Update: {
+          approved_by?: string | null
+          created_at?: string
+          id?: string
+          note?: string | null
+          reason?: string
+          role?: string | null
+          shift_id?: string | null
+          staff_id?: string | null
+          staff_name?: string | null
+          store_id?: string | null
+          terminal_id?: string | null
+        }
+        Relationships: []
+      }
       members: {
         Row: {
           address: string | null
@@ -131,6 +173,11 @@ export type Database = {
           phone: string | null
           qr: Json
           reg_number: string | null
+          review_max_discount_pct: number
+          review_max_nosale: number
+          review_max_refund_value: number
+          review_max_refunds: number
+          review_max_voids: number
           show_barcode: boolean
           show_logo: boolean
           show_points: boolean
@@ -153,6 +200,11 @@ export type Database = {
           phone?: string | null
           qr?: Json
           reg_number?: string | null
+          review_max_discount_pct?: number
+          review_max_nosale?: number
+          review_max_refund_value?: number
+          review_max_refunds?: number
+          review_max_voids?: number
           show_barcode?: boolean
           show_logo?: boolean
           show_points?: boolean
@@ -175,6 +227,11 @@ export type Database = {
           phone?: string | null
           qr?: Json
           reg_number?: string | null
+          review_max_discount_pct?: number
+          review_max_nosale?: number
+          review_max_refund_value?: number
+          review_max_refunds?: number
+          review_max_voids?: number
           show_barcode?: boolean
           show_logo?: boolean
           show_points?: boolean
@@ -476,6 +533,7 @@ export type Database = {
           original_bill_number: string | null
           paid_amount: number
           payment_type: string
+          payments: Json
           points_earned: number
           points_redeemed: number
           shift_id: string | null
@@ -503,6 +561,7 @@ export type Database = {
           original_bill_number?: string | null
           paid_amount?: number
           payment_type?: string
+          payments?: Json
           points_earned?: number
           points_redeemed?: number
           shift_id?: string | null
@@ -530,6 +589,7 @@ export type Database = {
           original_bill_number?: string | null
           paid_amount?: number
           payment_type?: string
+          payments?: Json
           points_earned?: number
           points_redeemed?: number
           shift_id?: string | null
