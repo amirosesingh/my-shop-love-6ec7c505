@@ -681,37 +681,46 @@ function StaffManagement() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label>User ID</Label>
+                      <Label>{selected.kind === "cashier" ? "Username" : "User ID"}</Label>
                       <Input className="numeric" value={selected.user_id} readOnly />
                     </div>
-                    <div className="space-y-1">
-                      <Label>Email</Label>
-                      <Input value={selected.email} readOnly />
-                    </div>
-                    <div className="space-y-1">
-                      <Label>Role</Label>
-                      <Select
-                        value={selected.role}
-                        onValueChange={(v) => {
-                          const role = v as StaffRole;
-                          patchRow(selected.user_id, {
-                            role,
-                            permissions: rolePermissions(role),
-                          });
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {STAFF_ROLES.map((r) => (
-                            <SelectItem key={r} value={r} className="capitalize">
-                              {r}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    {selected.kind === "cashier" ? (
+                      <div className="space-y-1">
+                        <Label>Role</Label>
+                        <Input value="Cashier (PIN login)" readOnly />
+                      </div>
+                    ) : (
+                      <>
+                        <div className="space-y-1">
+                          <Label>Email</Label>
+                          <Input value={selected.email} readOnly />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Role</Label>
+                          <Select
+                            value={selected.role}
+                            onValueChange={(v) => {
+                              const role = v as StaffRole;
+                              patchRow(selected.user_id, {
+                                role,
+                                permissions: rolePermissions(role),
+                              });
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {STAFF_ROLES.filter((r) => r !== "cashier").map((r) => (
+                                <SelectItem key={r} value={r} className="capitalize">
+                                  {r}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </>
+                    )}
                     <div className="space-y-1">
                       <Label>Assigned store</Label>
                       <Select
