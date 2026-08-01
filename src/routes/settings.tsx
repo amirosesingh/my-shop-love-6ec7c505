@@ -88,6 +88,9 @@ function Settings() {
   const whatsapp = state.settings.whatsapp ?? defaultWhatsApp;
   const setWhatsApp = (patch: Partial<typeof whatsapp>) =>
     updateSettings({ whatsapp: { ...whatsapp, ...patch } });
+  const paymentQr = payment.paymentQr ?? defaultPaymentQr;
+  const setPaymentQr = (patch: Partial<typeof paymentQr>) =>
+    updateSettings({ payment: { ...payment, paymentQr: { ...paymentQr, ...patch } } });
 
   const [branchId, setBranchId] = useState(currentStore.id);
   const branch = stores.find((s) => s.id === branchId) ?? currentStore;
