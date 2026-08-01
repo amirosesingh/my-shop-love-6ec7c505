@@ -1,42 +1,30 @@
 import { useState } from "react";
 import { Delete, Loader2, Lock, ReceiptText } from "lucide-react";
 import { useAuth } from "@/lib/pos-auth";
-import { LoginScreen } from "@/components/pos/LoginScreen";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
 export function TerminalLogin() {
-  const { pinLogin } = useAuth();
+  const { cashierLogin, pinLogin, login } = useAuth();
   const [userId, setUserId] = useState("");
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [emailMode, setEmailMode] = useState(false);
-
-  if (emailMode) {
-    return (
-      <div className="relative">
-        <LoginScreen />
-        <Button
-          variant="ghost"
-          className="absolute inset-x-0 bottom-6 mx-auto w-fit text-xs"
-          onClick={() => setEmailMode(false)}
-        >
-          Back to terminal PIN login
-        </Button>
-      </div>
-    );
-  }
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   const submit = async (value = pin) => {
     if (busy) return;
     setBusy(true);
     setError("");
-    const res = await pinLogin(userId, value);
+    let res = await cashierLogin(userId, value);
+    // Legacy hashed-PIN terminal accounts / offline bootstrap admin.
+    if (!res.ok) res = await pinLogin(userId, value);
     if (!res.ok) {
       setError(res.error ?? "Invalid User ID or PIN");
       setPin("");
@@ -66,14 +54,27 @@ export function TerminalLogin() {
           <Lock className="ml-auto size-4 text-muted-foreground" />
         </div>
 
+        <Tabs
+          defaultValue="cashier"
+          onValueChange={() => {
+            setError("");
+            setPin("");
+          }}
+        >
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="cashier">Cashier PIN</TabsTrigger>
+            <TabsTrigger value="admin">Supervisor / Admin</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="cashier" className="space-y-5 pt-4">
         <div className="space-y-1">
           <Label htmlFor="userId">User ID</Label>
           <Input
             id="userId"
             autoFocus
             autoComplete="off"
-            inputMode="text"
-            placeholder="EMP-101"
+            inputMode="numeric"
+            placeholder="101"
             value={userId}
             onChange={(e) => {
               setUserId(e.target.value);
@@ -154,20 +155,62 @@ export function TerminalLogin() {
           {busy && <Loader2 className="size-4 animate-spin" />}
           Sign in
         </Button>
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              PINs are verified by the backend — they are never stored on this terminal.
+            </p>
+          </TabsContent>
 
-        <Button
-          type="button"
-          variant="ghost"
-          className="w-full text-xs"
-          onClick={() => setEmailMode(true)}
-        >
-          Admin? Sign in with email instead
-        </Button>
-
-        <p className="text-[11px] leading-relaxed text-muted-foreground">
-          PINs are verified against a hashed record in the backend — they are never stored on this
-          terminal.
-        </p>
+          <TabsContent value="admin" className="pt-4">
+            <form
+              className="space-y-4"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setBusy(true);
+                setError("");
+                const res = await login(email, password);
+                if (!res.ok) setError(res.error ?? "Sign in failed");
+                setBusy(false);
+              }}
+            >
+              <div className="space-y-1">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="supervisor@store.com"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setError("");
+                  }}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setError("");
+                  }}
+                />
+              </div>
+              {error && <p className="text-sm text-destructive">{error}</p>}
+              <Button type="submit" className="w-full" disabled={busy}>
+                {busy && <Loader2 className="size-4 animate-spin" />}
+                Sign in
+              </Button>
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                Supervisor and admin accounts unlock settings, reports, inventory and user
+                management.
+              </p>
+            </form>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
