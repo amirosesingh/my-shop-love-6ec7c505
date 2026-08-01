@@ -242,6 +242,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
   );
 
   const upsertStore = useCallback((store: Store) => {
+    db.upsertStore(store);
     setState((s) => ({
       ...s,
       stores: s.stores.some((x) => x.id === store.id)
@@ -256,6 +257,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const removeStore = useCallback((id: string) => {
+    db.deleteStore(id);
     setState((s) => {
       if (s.stores.length <= 1) return s;
       const stores = s.stores.filter((x) => x.id !== id);
