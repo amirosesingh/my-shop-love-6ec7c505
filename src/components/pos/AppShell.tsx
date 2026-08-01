@@ -1,7 +1,7 @@
 import { Loader2, Lock, LogOut, Menu, ReceiptText, Store } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { usePos } from "@/lib/pos-store";
-import { useAuth } from "@/lib/pos-auth";
+import { useAuth, type PermissionFlag } from "@/lib/pos-auth";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { TerminalLogin } from "@/components/pos/TerminalLogin";
 import { SidebarNav, useSidebarCollapsed } from "@/components/pos/SidebarNav";
