@@ -28,6 +28,8 @@ type Row = Record<string, any>;
 export function dbError(context: string, error: unknown) {
   const message = (error as { message?: string })?.message ?? String(error);
   console.error(`[db] ${context}:`, error);
+  // Offline is a normal state for a till — the outbox will retry.
+  if (typeof navigator !== "undefined" && !navigator.onLine) return;
   toast.error(`${context} failed`, { description: message });
 }
 
