@@ -1,0 +1,31 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
+import { TerminalTokens } from "@/components/pos/TerminalTokens";
+
+export const Route = createFileRoute("/settings/terminals")({
+  head: () => ({
+    meta: [
+      { title: "Terminal Activation — POS Settings" },
+      {
+        name: "description",
+        content:
+          "Issue and revoke activation tokens that bind each Windows POS terminal to a location or warehouse.",
+      },
+      { property: "og:title", content: "Terminal Activation — POS Settings" },
+      {
+        property: "og:description",
+        content: "Register Windows tills per location and disconnect them remotely.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
+  component: () => (
+    <SettingsFrame
+      title="Terminal activation"
+      description="Every Windows till registers once with a code issued here. Revoke a token to cut a machine off from the company data."
+    >
+      <TerminalTokens />
+    </SettingsFrame>
+  ),
+});
