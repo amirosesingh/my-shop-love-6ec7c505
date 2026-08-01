@@ -4,18 +4,9 @@ import { createClient } from "@supabase/supabase-js";
 
 export type MetaRole = "cashier" | "warehouse" | "supervisor" | "admin";
 
-/** Internal email domain used to turn a numeric cashier User ID into a login. */
-export const CASHIER_EMAIL_DOMAIN = "store.internal";
-
-export const cashierEmail = (userId: string) =>
-  `${userId.trim().toLowerCase()}@${CASHIER_EMAIL_DOMAIN}`;
-
-/**
- * Supabase enforces a 6-character minimum password, so the 4-digit PIN is
- * expanded into a deterministic secret. The plain PIN is never persisted.
- */
-export const cashierSecret = (userId: string, pin: string) =>
-  `pos-${userId.trim().toLowerCase()}-${pin}`;
+// Cashiers do NOT get a Supabase Auth account. They live in public.cashiers
+// with a server-side hashed PIN verified through the verify_cashier_pin RPC,
+// so no login password is ever derived from the low-entropy PIN.
 
 const SUPABASE_URL =
   (import.meta.env["VITE_SUPABASE_EXTERNAL_URL"] as string | undefined) ??
@@ -68,20 +59,6 @@ async function createAccount(
     return { ok: false, error: message };
   }
   return { ok: true, needsConfirmation: !data.session };
-}
-
-export function createCashierAccount(opts: {
-  userId: string;
-  fullName: string;
-  pin: string;
-  storeId?: string | null;
-}) {
-  return createAccount(cashierEmail(opts.userId), cashierSecret(opts.userId, opts.pin), {
-    role: "cashier" satisfies MetaRole,
-    user_id: opts.userId.trim(),
-    full_name: opts.fullName.trim(),
-    store_id: opts.storeId ?? null,
-  });
 }
 
 export function createSupervisorAccount(opts: {
