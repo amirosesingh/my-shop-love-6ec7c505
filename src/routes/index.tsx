@@ -65,6 +65,14 @@ function Register() {
   const { user, can } = useAuth();
   const { requirePermission } = useUserPermissions();
   const canDiscount = can("can_give_discount");
+  const [discountOverride, setDiscountOverride] = useState(false);
+  const discountAllowed = canDiscount || discountOverride;
+  async function unlockDiscounts() {
+    if (discountAllowed) return true;
+    const ok = await requirePermission("can_give_discount");
+    if (ok) setDiscountOverride(true);
+    return ok;
+  }
   const canRefund = can("can_process_refund");
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
@@ -582,7 +590,17 @@ function Register() {
                       {money((l.price - lineUnitDiscount(l)) * l.qty)}
                     </span>
                   </div>
-                  {!l.credit && !l.foc && canDiscount && (
+                  {!l.credit && !l.foc && !discountAllowed && (
+                    <div className="mt-2 flex justify-end">
+                      <button
+                        onClick={() => void unlockDiscounts()}
+                        className="text-[11px] text-muted-foreground underline-offset-2 hover:underline"
+                      >
+                        Discount locked · supervisor override
+                      </button>
+                    </div>
+                  )}
+                  {!l.credit && !l.foc && discountAllowed && (
                     <div className="mt-2 flex items-center justify-end gap-1">
                       <span className="text-[11px] text-muted-foreground">Disc</span>
                       <Input
@@ -643,7 +661,18 @@ function Register() {
                 value={`-${money(totals.credit)}`}
               />
             )}
-            <div className={`flex items-center justify-between ${canDiscount ? "" : "hidden"}`}>
+            {!discountAllowed && (
+              <button
+                onClick={() => void unlockDiscounts()}
+                className="flex w-full items-center justify-between text-muted-foreground"
+              >
+                <span>Bill discount</span>
+                <span className="text-[11px] underline-offset-2 hover:underline">
+                  locked · supervisor override
+                </span>
+              </button>
+            )}
+            <div className={`flex items-center justify-between ${discountAllowed ? "" : "hidden"}`}>
               <span className="text-muted-foreground">Bill discount</span>
               <div className="flex items-center gap-1">
                 <Input
