@@ -184,6 +184,7 @@ function Inventory() {
                     </Field>
                     <Field label="Price">
                       <Input
+                        disabled={!canPrice}
                         className="numeric"
                         value={draft.price}
                         onChange={(e) => setDraft({ ...draft, price: Number(e.target.value) || 0 })}
@@ -191,6 +192,7 @@ function Inventory() {
                     </Field>
                     <Field label="E-com price">
                       <Input
+                        disabled={!canPrice}
                         className="numeric"
                         value={draft.ecomPrice ?? 0}
                         onChange={(e) =>
@@ -200,6 +202,7 @@ function Inventory() {
                     </Field>
                     <Field label="Cost">
                       <Input
+                        disabled={!canPrice}
                         className="numeric"
                         value={draft.cost}
                         onChange={(e) => setDraft({ ...draft, cost: Number(e.target.value) || 0 })}
