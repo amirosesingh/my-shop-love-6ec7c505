@@ -80,6 +80,14 @@ export const Route = createFileRoute("/staff")({
 
 const sb = supabaseExternal as unknown as SupabaseClient;
 
+/** Never surface an empty object as an error message. */
+const errText = (e: unknown): string => {
+  if (!e) return "Unknown error";
+  if (typeof e === "string") return e;
+  const o = e as { message?: string; details?: string; hint?: string; code?: string };
+  return o.message || o.details || o.hint || o.code || "Unexpected error";
+};
+
 type StaffRow = {
   user_id: string;
   full_name: string;
