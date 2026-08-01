@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/table";
 import { money, stockAt, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
+import { TablePagination, usePagination } from "@/components/pos/TablePagination";
 import { Switch } from "@/components/ui/switch";
 import { BulkImportDialog } from "@/components/pos/BulkImportDialog";
 import type { Product } from "@/lib/pos-types";
@@ -75,7 +76,10 @@ function Inventory() {
   const rows = state.products.filter((p) =>
     `${p.name} ${p.sku} ${p.barcode} ${p.category}`.toLowerCase().includes(query.toLowerCase()),
   );
-  const allShownSelected = rows.length > 0 && rows.every((p) => selected.includes(p.id));
+  const pager = usePagination(rows, 25);
+  const pageRows = pager.pageItems;
+  const allShownSelected =
+    pageRows.length > 0 && pageRows.every((p) => selected.includes(p.id));
 
   function toggle(id: string, on: boolean) {
     setSelected((prev) => (on ? [...new Set([...prev, id])] : prev.filter((x) => x !== id)));
@@ -275,7 +279,7 @@ function Inventory() {
                   <Checkbox
                     checked={allShownSelected}
                     onCheckedChange={(v) =>
-                      setSelected(v ? rows.map((p) => p.id) : [])
+                      setSelected(v ? pageRows.map((p) => p.id) : [])
                     }
                     aria-label="Select all products"
                   />
@@ -292,7 +296,7 @@ function Inventory() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((p) => (
+              {pageRows.map((p) => (
                 <TableRow key={p.id}>
                   <TableCell>
                     <Checkbox
@@ -388,6 +392,17 @@ function Inventory() {
               ))}
             </TableBody>
           </Table>
+          <TablePagination
+            page={pager.page}
+            pageCount={pager.pageCount}
+            pageSize={pager.pageSize}
+            total={pager.total}
+            from={pager.from}
+            to={pager.to}
+            label="items"
+            onPage={pager.setPage}
+            onPageSize={pager.setPageSize}
+          />
         </div>
       </div>
       {canEdit && <BulkImportDialog open={importOpen} onOpenChange={setImportOpen} />}

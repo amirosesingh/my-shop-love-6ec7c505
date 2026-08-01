@@ -1,6 +1,23 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { CloudOff, Cloud, Download, Eye, ShieldAlert } from "lucide-react";
+import {
+  CloudOff,
+  Cloud,
+  Download,
+  Eye,
+  ShieldAlert,
+  ShoppingCart,
+  RefreshCw,
+  Tag,
+  MousePointerClick,
+  Compass,
+  Search as SearchIcon,
+  PanelTop,
+  UserRound,
+  Settings2,
+  List,
+  Rows3,
+} from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +56,9 @@ import {
   type AuditLog,
 } from "@/lib/audit-log";
 import { useAuth } from "@/lib/pos-auth";
+import { describeLog } from "@/lib/audit-format";
+import { TablePagination, usePagination } from "@/components/pos/TablePagination";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 export const Route = createFileRoute("/audit")({
   head: () => ({
@@ -61,6 +81,27 @@ export const Route = createFileRoute("/audit")({
 
 type RangeKey = "all" | "today" | "yesterday" | "custom";
 
+const categoryVisual: Record<
+  string,
+  { icon: typeof ShoppingCart; className: string }
+> = {
+  sale_event: { icon: ShoppingCart, className: "bg-emerald-500/15 text-emerald-500" },
+  inventory_edit: { icon: Tag, className: "bg-sky-500/15 text-sky-500" },
+  member_event: { icon: UserRound, className: "bg-violet-500/15 text-violet-500" },
+  settings: { icon: Settings2, className: "bg-amber-500/15 text-amber-500" },
+  sync: { icon: RefreshCw, className: "bg-orange-500/15 text-orange-500" },
+  navigation: { icon: Compass, className: "bg-teal-500/15 text-teal-500" },
+  search: { icon: SearchIcon, className: "bg-slate-500/15 text-slate-400" },
+  modal: { icon: PanelTop, className: "bg-indigo-500/15 text-indigo-400" },
+  ui_click: { icon: MousePointerClick, className: "bg-muted text-muted-foreground" },
+};
+
+const visualFor = (l: AuditLog) => {
+  if (l.action.toLowerCase().includes("exchange"))
+    return { icon: RefreshCw, className: "bg-orange-500/15 text-orange-500" };
+  return categoryVisual[l.category] ?? categoryVisual["ui_click"]!;
+};
+
 const dayStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 
 function AuditPage() {
@@ -74,6 +115,7 @@ function AuditPage() {
   const [category, setCategory] = useState("all");
   const [q, setQ] = useState("");
   const [detail, setDetail] = useState<AuditLog | null>(null);
+  const [view, setView] = useState<"table" | "stream">("table");
 
   const rows = useMemo(() => {
     const now = new Date();
@@ -92,7 +134,7 @@ function AuditPage() {
       if (category !== "all" && l.category !== category) return false;
       if (
         text &&
-        !`${l.action} ${l.module} ${l.staffName} ${l.staffId} ${l.route} ${JSON.stringify(
+        !`${describeLog(l)} ${l.action} ${l.module} ${l.staffName} ${l.staffId} ${l.route} ${JSON.stringify(
           l.details,
         )}`
           .toLowerCase()
@@ -102,6 +144,8 @@ function AuditPage() {
       return true;
     });
   }, [logs, range, from, to, who, category, q]);
+
+  const pager = usePagination(rows, 25);
 
   if (!isAdmin) {
     return (
@@ -216,21 +260,85 @@ function AuditPage() {
           )}
         </section>
 
+        <div className="flex justify-end">
+          <ToggleGroup
+            type="single"
+            value={view}
+            onValueChange={(v) => v && setView(v as "table" | "stream")}
+            variant="outline"
+          >
+            <ToggleGroupItem value="table" aria-label="Table view">
+              <Rows3 className="size-4" /> Table
+            </ToggleGroupItem>
+            <ToggleGroupItem value="stream" aria-label="Activity stream view">
+              <List className="size-4" /> Activity stream
+            </ToggleGroupItem>
+          </ToggleGroup>
+        </div>
+
+        {view === "stream" ? (
+          <section className="rounded-lg border border-border bg-card">
+            <ol className="relative p-4">
+              {pager.pageItems.map((l) => {
+                const { icon: Icon, className } = visualFor(l);
+                return (
+                  <li key={l.id} className="relative flex gap-3 pb-5 last:pb-0">
+                    <div className="flex flex-col items-center">
+                      <span className={`grid size-8 shrink-0 place-items-center rounded-full ${className}`}>
+                        <Icon className="size-4" />
+                      </span>
+                      <span className="mt-1 w-px flex-1 bg-border" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm">{describeLog(l)}</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                        <span className="numeric">{new Date(l.at).toLocaleString()}</span>
+                        <Badge variant="outline" className="text-[10px]">{l.category}</Badge>
+                        <span className="capitalize">{l.module}</span>
+                        <Badge variant={l.synced_to_cloud ? "secondary" : "outline"} className="text-[10px]">
+                          {l.synced_to_cloud ? "synced" : "pending"}
+                        </Badge>
+                        <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => setDetail(l)}>
+                          <Eye className="size-3" /> Details
+                        </Button>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+              {!rows.length && (
+                <li className="py-10 text-center text-sm text-muted-foreground">
+                  No activity matches these filters.
+                </li>
+              )}
+            </ol>
+            <TablePagination
+              page={pager.page}
+              pageCount={pager.pageCount}
+              pageSize={pager.pageSize}
+              total={pager.total}
+              from={pager.from}
+              to={pager.to}
+              label="events"
+              onPage={pager.setPage}
+              onPageSize={pager.setPageSize}
+            />
+          </section>
+        ) : (
         <section className="rounded-lg border border-border bg-card">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Timestamp</TableHead>
+                <TableHead>Date &amp; time</TableHead>
                 <TableHead>Staff</TableHead>
                 <TableHead>Category</TableHead>
-                <TableHead>Action</TableHead>
-                <TableHead>Module</TableHead>
+                <TableHead>Action description</TableHead>
                 <TableHead>Sync</TableHead>
                 <TableHead className="text-right">Details</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.slice(0, 300).map((l) => (
+              {pager.pageItems.map((l) => (
                 <TableRow key={l.id}>
                   <TableCell className="numeric whitespace-nowrap text-muted-foreground">
                     {new Date(l.at).toLocaleString()}
@@ -244,8 +352,7 @@ function AuditPage() {
                   <TableCell>
                     <Badge variant="outline">{l.category}</Badge>
                   </TableCell>
-                  <TableCell className="font-medium">{l.action}</TableCell>
-                  <TableCell className="capitalize text-muted-foreground">{l.module}</TableCell>
+                  <TableCell className="max-w-md">{describeLog(l)}</TableCell>
                   <TableCell>
                     <Badge variant={l.synced_to_cloud ? "secondary" : "outline"}>
                       {l.synced_to_cloud ? "synced" : "pending"}
@@ -260,14 +367,26 @@ function AuditPage() {
               ))}
               {!rows.length && (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
                     No activity matches these filters.
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
+          <TablePagination
+            page={pager.page}
+            pageCount={pager.pageCount}
+            pageSize={pager.pageSize}
+            total={pager.total}
+            from={pager.from}
+            to={pager.to}
+            label="events"
+            onPage={pager.setPage}
+            onPageSize={pager.setPageSize}
+          />
         </section>
+        )}
       </div>
 
       <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
@@ -280,6 +399,9 @@ function AuditPage() {
           </DialogHeader>
           {detail && (
             <div className="space-y-4">
+              <p className="rounded-md border border-border bg-muted/40 p-3 text-sm">
+                {describeLog(detail)}
+              </p>
               <dl className="grid grid-cols-2 gap-2 text-sm">
                 <Row label="Staff" value={`${detail.staffName} (${detail.staffId})`} />
                 <Row label="Category" value={detail.category} />
