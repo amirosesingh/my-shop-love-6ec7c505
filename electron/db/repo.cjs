@@ -262,7 +262,6 @@ async function setState(key, value) {
     `);
 }
 
-/** Strips local-only bookkeeping before a row is sent to the cloud. */
 /**
  * Commits a completed bill to the local branch database in one transaction:
  * the sale header, every line, the stock movement and the member update all
@@ -317,6 +316,7 @@ async function pendingSyncCount() {
   return { total, sales };
 }
 
+/** Strips local-only bookkeeping before a row is sent to the cloud. */
 function toCloudRow(table, row) {
   const { is_synced: _s, sync_status: _st, ...rest } = row;
   if (table === "pos_settings") {
