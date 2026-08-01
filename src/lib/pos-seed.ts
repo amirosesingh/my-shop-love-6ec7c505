@@ -1,16 +1,30 @@
-import type { AppSettings, PosState, Promotion, Store } from "./pos-types";
+import type { AppSettings, PosState, Promotion, ReceiptSettings, Store } from "./pos-types";
+
+export const defaultReceiptSettings: ReceiptSettings = {
+  paper: "80mm",
+  companyName: "NORTHWIND & CO.",
+  taxNumber: "88-2201194",
+  regNumber: "",
+  phone: "555-0100",
+  website: "",
+  headerText: "42 Harbour Street, Unit 3\nTel 555-0100 · VAT 88-2201194",
+  footerText: "Thank you — see you again soon",
+  showLogo: true,
+  showPoints: true,
+  showBarcode: true,
+  showTax: true,
+  fonts: {
+    header: { family: "mono", size: 15, bold: true, spacing: 2 },
+    body: { family: "mono", size: 12, bold: false, spacing: 0 },
+    footer: { family: "mono", size: 11, bold: false, spacing: 0 },
+  },
+  customLines: [],
+  qr: { enabled: false, value: "", size: 96, placement: "footer" },
+};
 
 export const defaultSettings: AppSettings = {
   tax: { enabled: true, rate: 5, mode: "exclusive" },
-  receipt: {
-    paper: "80mm",
-    headerText: "42 Harbour Street, Unit 3\nTel 555-0100 · VAT 88-2201194",
-    footerText: "Thank you — see you again soon",
-    showLogo: true,
-    showPoints: true,
-    showBarcode: true,
-    showTax: true,
-  },
+  receipt: defaultReceiptSettings,
 };
 
 export const seedPromotions: Promotion[] = [
