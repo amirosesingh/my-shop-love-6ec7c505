@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePos } from "@/lib/pos-store";
+import { defaultPaymentDetails } from "@/lib/pos-seed";
 import { useAuth } from "@/lib/pos-auth";
 import {
   PAPER_LABELS,
