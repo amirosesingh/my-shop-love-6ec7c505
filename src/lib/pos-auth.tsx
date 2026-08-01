@@ -192,6 +192,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [ready, setReady] = useState(false);
   const [terminalUser, setTerminalUser] = useState<TerminalUser | null>(null);
+  const [appUser, setAppUser] = useState<AppUserProfile | null>(null);
 
   useEffect(() => {
     try {
@@ -243,6 +244,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then(({ data }) => {
         if (!cancelled) setRoles(((data ?? []) as { role: AppRole }[]).map((r) => r.role));
       });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  // Identity + permission toggles from public.app_users for the signed-in account.
+  useEffect(() => {
+    let cancelled = false;
+    if (!userId) {
+      setAppUser(null);
+      return;
+    }
+    void supabase.rpc("current_app_user" as never).then(({ data }) => {
+      if (cancelled) return;
+      const row = (Array.isArray(data) ? data[0] : data) as AppUserProfile | undefined;
+      setAppUser(row ?? null);
+    });
     return () => {
       cancelled = true;
     };
@@ -427,29 +445,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       metaRole === "admin" ||
       metaRole === "supervisor" ||
       roles.includes("admin") ||
+      appUser?.role === "admin" ||
       terminalUser?.role === "admin";
     const found = email ? staff.find((s) => s.email && norm(s.email) === norm(email)) : undefined;
     const fallbackName =
       (meta["full_name"] as string | undefined) || email.split("@")[0] || "User";
     return {
       staffId:
-        (meta["user_id"] as string | undefined) ?? terminalUser?.userCode ?? found?.staffId ?? email,
-      name: terminalUser?.name ?? found?.name ?? fallbackName,
+        appUser?.user_code ??
+        (meta["user_id"] as string | undefined) ??
+        terminalUser?.userCode ??
+        found?.staffId ??
+        email,
+      name: appUser?.full_name ?? terminalUser?.name ?? found?.name ?? fallbackName,
       email,
       role: isAdmin ? "admin" : "cashier",
       metaRole,
       roles,
       storeId: isAdmin
         ? null
-        : ((meta["store_id"] as string | null | undefined) ??
+        : (appUser?.store_id ??
+          (meta["store_id"] as string | null | undefined) ??
           terminalUser?.storeId ??
           found?.storeId ??
           null),
       permissions: isAdmin
         ? FULL_PERMISSIONS
-        : { ...DEFAULT_PERMISSIONS, ...(found?.permissions ?? {}) },
+        : {
+            ...DEFAULT_PERMISSIONS,
+            ...(found?.permissions ?? {}),
+            // public.app_users is the source of truth when the account has a row.
+            ...(appUser?.permissions ?? {}),
+          },
     };
-  }, [session, roles, staff, terminalUser]);
+  }, [session, roles, staff, terminalUser, appUser]);
 
   const value = useMemo<AuthCtx>(
     () => ({
@@ -460,6 +489,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isCashier: user?.metaRole === "cashier" || (!!user && user.role !== "admin"),
       authUserId: userId,
       terminalUser,
+      appUser,
       can: (flag) => user?.role === "admin" || !!user?.permissions?.[flag],
       staff,
       addStaff,
@@ -477,6 +507,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       userId,
       terminalUser,
+      appUser,
       staff,
       addStaff,
       updateStaff,
