@@ -16,6 +16,7 @@ import { AuthProvider } from "../lib/pos-auth";
 import { PermissionsProvider } from "../lib/pos-permissions";
 import { Toaster } from "../components/ui/sonner";
 import { AuditTracker } from "../components/pos/AuditTracker";
+import { FirstRunSetup } from "../components/pos/FirstRunSetup";
 import { ThemeProvider, themeBootScript } from "../lib/theme";
 
 function NotFoundComponent() {
@@ -144,7 +145,9 @@ function RootComponent() {
         <PosProvider>
           {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
           <AuditTracker />
-          <Outlet />
+          <FirstRunSetup>
+            <Outlet />
+          </FirstRunSetup>
           <Toaster position="top-center" />
         </PosProvider>
         </PermissionsProvider>
