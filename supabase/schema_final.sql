@@ -287,7 +287,7 @@ begin
     execute format('drop policy if exists "Signed-in staff can read" on public.%I', t);
     execute format('drop policy if exists "Staff can write" on public.%I', t);
     execute format(
-      'create policy "Signed-in staff can read" on public.%I for select to authenticated using (true)', t);
+      'create policy "Signed-in staff can read" on public.%I for select to authenticated using (public.is_staff(auth.uid()))', t);
     execute format(
       'create policy "Staff can write" on public.%I for all to authenticated using (public.is_staff(auth.uid())) with check (public.is_staff(auth.uid()))', t);
   end loop;
@@ -315,7 +315,6 @@ create table if not exists public.app_users (
     'can_access_pos_settings', false, 'can_manage_staff', false
   ),
   pin_hash text not null default '',       -- bcrypt digest, never returned to clients
-  auth_secret text not null default '',    -- backend sign-in secret, released only on a correct PIN
   auth_user_id uuid,
   last_login_at timestamptz,
   created_at timestamptz not null default now(),
@@ -349,7 +348,6 @@ alter table public.app_users
   add column if not exists email varchar(255),
   add column if not exists role app_role not null default 'staff',
   add column if not exists pin_hash text not null default '',
-  add column if not exists auth_secret text not null default '',
   add column if not exists created_at timestamptz not null default now(),
   add column if not exists updated_at timestamptz not null default now();
 
@@ -418,7 +416,11 @@ create unique index if not exists app_users_user_id_key
 create unique index if not exists app_users_auth_user_id_key
   on public.app_users (auth_user_id) where auth_user_id is not null;
 
--- No direct table access: pin_hash / auth_secret must never be selectable.
+-- Legacy installs stored a reusable sign-in password here; drop it so a PIN
+-- check can never hand back a real account password.
+alter table public.app_users drop column if exists auth_secret;
+
+-- No direct table access: pin_hash must never be selectable.
 -- Every read and write goes through the security-definer functions below.
 revoke all on public.app_users from anon;
 revoke all on public.app_users from authenticated;
@@ -431,7 +433,7 @@ alter table public.app_users enable row level security;
 drop function if exists public.verify_terminal_pin(text, text);
 create or replace function public.verify_terminal_pin(p_user_id text, p_pin text)
 returns table (user_id text, full_name text, role app_role, store_id text,
-               email text, auth_secret text)
+               email text)
 language plpgsql security definer set search_path = public, extensions as $$
 declare u public.app_users%rowtype;
 begin
@@ -440,8 +442,9 @@ begin
   if not found then return; end if;
   if u.pin_hash = '' or u.pin_hash <> extensions.crypt(p_pin::text, u.pin_hash::text) then return; end if;
   update public.app_users set last_login_at = now() where id = u.id;
+  -- Never returns any credential: PIN verification confirms identity only.
   return query select u.user_id::text, u.full_name::text, u.role, u.store_id::text,
-                      u.email::text, u.auth_secret;
+                      u.email::text;
 end $$;
 
 revoke all on function public.verify_terminal_pin(text, text) from public;
@@ -513,16 +516,15 @@ begin
   if p_pin !~ '^[0-9]{4,6}$' then
     raise exception 'PIN must be 4 to 6 digits';
   end if;
-  insert into public.app_users (user_id, full_name, role, store_id, email, pin_hash, auth_secret)
+  insert into public.app_users (user_id, full_name, role, store_id, email, pin_hash)
   values (trim(p_user_id), trim(p_full_name), p_role, nullif(trim(coalesce(p_store_id,'')),''),
-          lower(trim(p_email)), extensions.crypt(p_pin::text, extensions.gen_salt('bf'::text, 10)), p_password)
+          lower(trim(p_email)), extensions.crypt(p_pin::text, extensions.gen_salt('bf'::text, 10)))
   on conflict (user_id) do update
     set full_name   = excluded.full_name,
         role        = excluded.role,
         store_id    = excluded.store_id,
         email       = excluded.email,
         pin_hash    = excluded.pin_hash,
-        auth_secret = excluded.auth_secret,
         updated_at  = now();
 end $$;
 
@@ -566,25 +568,12 @@ declare
   v_code text := coalesce(nullif(trim(new.raw_user_meta_data ->> 'user_id'), ''),
                           split_part(new.email, '@', 1));
   v_name text := coalesce(nullif(trim(new.raw_user_meta_data ->> 'full_name'), ''), v_code);
-  v_meta_role text := lower(coalesce(new.raw_user_meta_data ->> 'role', 'cashier'));
-  v_role app_role := case v_meta_role
-                       when 'admin' then 'admin'::app_role
-                       when 'supervisor' then 'manager'::app_role
-                       when 'manager' then 'manager'::app_role
-                       else 'staff'::app_role
-                     end;
+  -- Client-supplied signup metadata is NOT trusted for privilege: every new
+  -- account starts at the lowest role and must be elevated by an admin through
+  -- set_app_user_profile()/user_roles.
+  v_role app_role := 'staff'::app_role;
   v_store text := nullif(trim(coalesce(new.raw_user_meta_data ->> 'store_id', '')), '');
-  v_perms jsonb := case when v_role in ('admin','manager')
-    then jsonb_build_object(
-      'can_open_drawer', true, 'can_close_drawer', true, 'can_view_drawer_balance', true,
-      'can_process_sale', true, 'can_give_discount', true, 'can_void_item', true,
-      'can_hold_cart', true, 'can_process_refund', true, 'can_process_exchange', true,
-      'can_view_inventory', true, 'can_edit_product_price', true, 'can_add_new_product', true,
-      'can_receive_purchase_order', true, 'can_add_member', true, 'can_edit_member_points', true,
-      'can_apply_member_discount', true, 'can_view_sales_reports', true,
-      'can_access_pos_settings', true, 'can_manage_staff', true
-    )
-    else jsonb_build_object(
+  v_perms jsonb := jsonb_build_object(
       'can_open_drawer', true, 'can_close_drawer', true, 'can_view_drawer_balance', false,
       'can_process_sale', true, 'can_give_discount', false, 'can_void_item', false,
       'can_hold_cart', true, 'can_process_refund', false, 'can_process_exchange', false,
@@ -592,15 +581,14 @@ declare
       'can_receive_purchase_order', false, 'can_add_member', true, 'can_edit_member_points', false,
       'can_apply_member_discount', true, 'can_view_sales_reports', false,
       'can_access_pos_settings', false, 'can_manage_staff', false
-    )
-  end;
+  );
 begin
   insert into public.app_users
     (user_id, full_name, role, store_id, email, permissions, auth_user_id)
   values (v_code, v_name, v_role, v_store, lower(new.email), v_perms, new.id)
   on conflict (user_id) do update
+    -- role is deliberately NOT updated here: only admins may change it.
     set full_name    = excluded.full_name,
-        role         = excluded.role,
         store_id     = coalesce(excluded.store_id, public.app_users.store_id),
         email        = excluded.email,
         auth_user_id = excluded.auth_user_id,
@@ -649,44 +637,9 @@ insert into public.pos_settings (id, tax_percentage, enable_tax, tax_mode, paper
 values (1, 0, true, 'exclusive', '80mm', 'Northwind POS', 'Thank you for shopping with us!')
 on conflict (id) do nothing;
 
--- Default terminal accounts (User ID + PIN). Change these PINs after setup.
---   admin      / 1234   full access
---   supervisor / 2345   manager access
---   101        / 1111   cashier
-insert into public.app_users (user_id, full_name, email, role, store_id, permissions,
-                              pin_hash, auth_secret)
-values
-  ('admin', 'Administrator', 'admin@store.internal', 'admin', null,
-   jsonb_build_object(
-     'can_open_drawer', true, 'can_close_drawer', true, 'can_view_drawer_balance', true,
-     'can_process_sale', true, 'can_give_discount', true, 'can_void_item', true,
-     'can_hold_cart', true, 'can_process_refund', true, 'can_process_exchange', true,
-     'can_view_inventory', true, 'can_edit_product_price', true, 'can_add_new_product', true,
-     'can_receive_purchase_order', true, 'can_add_member', true, 'can_edit_member_points', true,
-     'can_apply_member_discount', true, 'can_view_sales_reports', true,
-     'can_access_pos_settings', true, 'can_manage_staff', true),
-   extensions.crypt('1234'::text, extensions.gen_salt('bf'::text, 10)), 'pos-admin-1234'),
-  ('supervisor', 'Store Supervisor', 'supervisor@store.internal', 'manager', null,
-   jsonb_build_object(
-     'can_open_drawer', true, 'can_close_drawer', true, 'can_view_drawer_balance', true,
-     'can_process_sale', true, 'can_give_discount', true, 'can_void_item', true,
-     'can_hold_cart', true, 'can_process_refund', true, 'can_process_exchange', true,
-     'can_view_inventory', true, 'can_edit_product_price', true, 'can_add_new_product', true,
-     'can_receive_purchase_order', true, 'can_add_member', true, 'can_edit_member_points', true,
-     'can_apply_member_discount', true, 'can_view_sales_reports', true,
-     'can_access_pos_settings', true, 'can_manage_staff', true),
-   extensions.crypt('2345'::text, extensions.gen_salt('bf'::text, 10)), 'pos-supervisor-2345'),
-  ('101', 'Cashier 101', '101@store.internal', 'staff', 's1',
-   jsonb_build_object(
-     'can_open_drawer', true, 'can_close_drawer', true, 'can_view_drawer_balance', false,
-     'can_process_sale', true, 'can_give_discount', false, 'can_void_item', false,
-     'can_hold_cart', true, 'can_process_refund', false, 'can_process_exchange', false,
-     'can_view_inventory', true, 'can_edit_product_price', false, 'can_add_new_product', false,
-     'can_receive_purchase_order', false, 'can_add_member', true, 'can_edit_member_points', false,
-     'can_apply_member_discount', true, 'can_view_sales_reports', false,
-     'can_access_pos_settings', false, 'can_manage_staff', false),
-   extensions.crypt('1111'::text, extensions.gen_salt('bf'::text, 10)), 'pos-101-1111')
-on conflict (user_id) do nothing;
+-- No default terminal accounts are seeded. Credentials must never be committed
+-- to source control: create the first admin through Supabase Auth, grant it the
+-- admin role below, then add staff and cashiers from the Staff Management screen.
 
 -- Bootstrap: grant the admin role to an existing Supabase Auth account.
 -- insert into public.user_roles (user_id, role)
@@ -719,7 +672,7 @@ alter table public.cashiers enable row level security;
 
 drop policy if exists "Signed-in staff can read cashiers" on public.cashiers;
 create policy "Signed-in staff can read cashiers"
-  on public.cashiers for select to authenticated using (true);
+  on public.cashiers for select to authenticated using (public.is_staff(auth.uid()));
 
 drop policy if exists "Supervisors manage cashiers" on public.cashiers;
 create policy "Supervisors manage cashiers"

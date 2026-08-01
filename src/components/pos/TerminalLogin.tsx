@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
 export function TerminalLogin() {
-  const { login, cashierLogin, pinLogin } = useAuth();
+  const { login, cashierLogin } = useAuth();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [email, setEmail] = useState("");
@@ -22,9 +22,7 @@ export function TerminalLogin() {
     if (busy) return;
     setBusy(true);
     setError("");
-    let res = await cashierLogin(username, value);
-    // Legacy hashed-PIN terminal accounts / offline bootstrap admin.
-    if (!res.ok) res = await pinLogin(username, value);
+    const res = await cashierLogin(username, value);
     if (!res.ok) {
       setError(res.error ?? "Invalid username or PIN");
       setPin("");

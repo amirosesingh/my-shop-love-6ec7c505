@@ -138,9 +138,6 @@ export type AppUserProfile = {
 
 /** Offline bootstrap admin so the terminal is never locked out before the
  *  backend auth tables (app_users / user_roles) have been provisioned. */
-const BOOTSTRAP_ADMIN_CODE = "admin";
-const BOOTSTRAP_PIN_KEY = "pos-bootstrap-admin-pin";
-const DEFAULT_BOOTSTRAP_PIN = "1234";
 
 type AuthCtx = {
   ready: boolean;
@@ -169,8 +166,6 @@ type AuthCtx = {
   login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
   /** Cashier tab: numeric User ID + PIN mapped onto a Supabase email account. */
   cashierLogin: (userId: string, pin: string) => Promise<{ ok: boolean; error?: string }>;
-  /** User ID + 4-digit PIN sign-in; the PIN is verified inside the database. */
-  pinLogin: (userCode: string, pin: string) => Promise<{ ok: boolean; error?: string }>;
   signUp: (
     email: string,
     password: string,
@@ -313,7 +308,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       return {
         ok: false,
-        error: "Cashier accounts are not set up in the backend yet. Apply supabase/schema5.sql.",
+        error: "Cashier accounts are not set up in the backend yet. Run supabase/schema_final.sql.",
       };
     }
     if (!row) return { ok: false, error: "Invalid username or PIN" };
@@ -325,88 +320,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: "",
       cashierId: row.id,
       permissions: row.permissions,
-    };
-    setTerminalUser(next);
-    try {
-      window.sessionStorage.setItem(TERMINAL_KEY, JSON.stringify(next));
-    } catch {
-      /* session storage unavailable */
-    }
-    return { ok: true };
-  }, []);
-
-  const pinLogin = useCallback(async (userCode: string, pin: string) => {
-    const code = userCode.trim();
-    if (!code) return { ok: false, error: "Enter your username" };
-    if (!/^\d{4,6}$/.test(pin)) return { ok: false, error: "Enter your PIN" };
-
-    const signInLocalAdmin = () => {
-      let expected = DEFAULT_BOOTSTRAP_PIN;
-      try {
-        expected = window.localStorage.getItem(BOOTSTRAP_PIN_KEY) || DEFAULT_BOOTSTRAP_PIN;
-      } catch {
-        /* storage unavailable */
-      }
-      if (norm(code) !== BOOTSTRAP_ADMIN_CODE || pin !== expected) return false;
-      const next: TerminalUser = {
-        userCode: "admin",
-        name: "Administrator",
-        role: "admin",
-        storeId: null,
-        email: "",
-        local: true,
-      };
-      setTerminalUser(next);
-      try {
-        window.sessionStorage.setItem(TERMINAL_KEY, JSON.stringify(next));
-      } catch {
-        /* session storage unavailable */
-      }
-      return true;
-    };
-
-    // The PIN is compared against the bcrypt digest inside the database;
-    // it is never stored, logged or persisted on this device.
-    const { data, error } = await supabase.rpc("verify_terminal_pin" as never, {
-      p_user_id: code,
-      p_pin: pin,
-    } as never);
-    if (error) {
-      if (signInLocalAdmin()) return { ok: true };
-      return {
-        ok: false,
-        error:
-          "Terminal accounts are not set up in the backend yet. Sign in with the admin User ID “admin” and PIN 1234, or run the setup SQL.",
-      };
-    }
-
-    const row = (Array.isArray(data) ? data[0] : data) as
-      | {
-          user_id: string;
-          full_name: string;
-          role: AppRole;
-          store_id: string | null;
-          email: string;
-          auth_secret: string;
-        }
-      | undefined;
-    if (!row) {
-      if (signInLocalAdmin()) return { ok: true };
-      return { ok: false, error: "Invalid User ID or PIN" };
-    }
-
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: row.email,
-      password: row.auth_secret,
-    });
-    if (signInError) return { ok: false, error: signInError.message };
-
-    const next: TerminalUser = {
-      userCode: row.user_id,
-      name: row.full_name,
-      role: row.role,
-      storeId: row.store_id,
-      email: row.email,
     };
     setTerminalUser(next);
     try {
@@ -552,7 +465,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       removeStaff,
       login,
       cashierLogin,
-      pinLogin,
       signUp,
       logout,
       lock: logout,
@@ -570,7 +482,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       removeStaff,
       login,
       cashierLogin,
-      pinLogin,
       signUp,
       logout,
     ],
