@@ -423,6 +423,15 @@ function Register() {
     });
     if (paidNow > 0 && depositMethod === "cash") openCashDrawer();
     printBookingSlip(booking, member, state.settings.payment);
+    if (wa.enabled && wa.autoSendOnBooking) {
+      void sendBillOnWhatsApp({
+        cfg: wa,
+        to: bookPhone.trim() || member?.phone || "",
+        body: buildBookingMessage(booking, displayBase.companyName, wa),
+        reference: booking.ref,
+        member,
+      });
+    }
     publishDisplay({
       ...cartSnapshot(),
       mode: "booking",
@@ -430,6 +439,7 @@ function Register() {
       balance: r2(booking.total - booking.paid),
       reference: booking.ref,
       dueDate: booking.dueDate,
+      method: depositMethod,
     });
     resetCart();
     setMemberId(null);
@@ -455,6 +465,10 @@ function Register() {
       toast.error("Tendered amount is less than the total");
       return;
     }
+    if (!isRefund && method === "bank_transfer" && !transferRef.trim()) {
+      toast.error("Enter the transfer reference shown on the customer's slip");
+      return;
+    }
     if (!isRefund && method === "points" && (member?.points ?? 0) < totals.total * 100) {
       toast.error("Not enough points on this member");
       return;
@@ -473,23 +487,40 @@ function Register() {
       memberId,
       pointsEarned,
       cashier: activeShift.cashier,
+      ...(method === "bank_transfer" ? { transferRef: transferRef.trim() } : {}),
       ...(exchangeRef
         ? { exchangeOfReceiptNo: exchangeRef, exchangeCredit: totals.credit }
         : {}),
     });
     if (method === "cash") openCashDrawer();
+    if (method === "bank_transfer") {
+      logger.log("sale", "Bank transfer payment recorded", "register", {
+        receiptNo: sale.receiptNo,
+        total: sale.total,
+        transferRef: sale.transferRef,
+        bank: state.settings.payment.bankName,
+      });
+    }
     printSaleReceipt(sale, member, "sale");
     setLastSale(sale);
+    const customerNumber = member?.phone ?? "";
+    setWaNumber(customerNumber);
+    if (wa.enabled && wa.autoSendOnSale && customerNumber) {
+      void sendSaleOnWhatsApp(sale, customerNumber);
+    }
     publishDisplay({
       ...cartSnapshot(),
       mode: "paid",
       paid: sale.paid,
       change: sale.change,
       reference: sale.receiptNo,
+      method: sale.method,
+      transferRef: sale.transferRef ?? "",
     });
     resetCart();
     setMemberId(null);
     setTendered("");
+    setTransferRef("");
     setPayOpen(false);
     toast.success(
       exchangeRef
