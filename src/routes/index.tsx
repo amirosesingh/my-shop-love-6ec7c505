@@ -540,19 +540,56 @@ function Register() {
     const isRefund = totals.total < 0;
     if (!(await requirePermission("can_process_sale"))) return;
     if (isRefund && !(await requirePermission("can_process_refund"))) return;
-    const paid = isRefund ? totals.total : method === "cash" ? Number(tendered || 0) : totals.total;
-    if (!isRefund && method === "cash" && paid < totals.total) {
+    const splitting = tenders.length > 0;
+    const splitPaid = paymentsTotal(tenders);
+    if (!isRefund && splitting && splitPaid < r2(totals.total)) {
+      toast.error(
+        `Split tenders cover ${money(splitPaid)} of ${money(totals.total)} — add another tender`,
+      );
+      return;
+    }
+    if (!isRefund && splitting && tenders.some((t) => t.method === "card" && !t.bankName?.trim())) {
+      toast.error("Enter the bank / card machine used for every card tender");
+      return;
+    }
+    const paid = isRefund
+      ? totals.total
+      : splitting
+        ? splitPaid
+        : method === "cash"
+          ? Number(tendered || 0)
+          : totals.total;
+    if (!isRefund && !splitting && method === "cash" && paid < totals.total) {
       toast.error("Tendered amount is less than the total");
       return;
     }
-    if (!isRefund && method === "bank_transfer" && !transferRef.trim()) {
+    if (!isRefund && !splitting && method === "card" && !bankName.trim()) {
+      toast.error("Enter which bank card machine was used");
+      return;
+    }
+    if (!isRefund && !splitting && method === "bank_transfer" && !transferRef.trim()) {
       toast.error("Enter the transfer reference shown on the customer's slip");
       return;
     }
-    if (!isRefund && method === "points" && (member?.points ?? 0) < totals.total * 100) {
+    if (!isRefund && !splitting && method === "points" && (member?.points ?? 0) < totals.total * 100) {
       toast.error("Not enough points on this member");
       return;
     }
+    const payments: Payment[] = splitting
+      ? tenders
+      : [
+          {
+            id: crypto.randomUUID(),
+            method,
+            amount: r2(Math.abs(totals.total)),
+            ...(method === "card" && bankName.trim() ? { bankName: bankName.trim() } : {}),
+            ...(method === "bank_transfer" && transferRef.trim()
+              ? { ref: transferRef.trim() }
+              : {}),
+          },
+        ];
+    // The headline method stays the largest tender so reports keep working.
+    const headline = payments.reduce((a, p) => (p.amount > a.amount ? p : a), payments[0]!).method;
     const sale = recordSale({
       storeId: currentStore.id,
       shiftId: activeShift.id,
@@ -563,7 +600,8 @@ function Register() {
       total: totals.total,
       paid,
       change: r2(Math.max(0, paid - totals.total)),
-      method,
+      method: splitting ? headline : method,
+      payments,
       memberId,
       pointsEarned,
       cashier: activeShift.cashier,
@@ -592,7 +630,15 @@ function Register() {
         storeId: sale.storeId,
       });
     }
-    if (method === "cash") openCashDrawer();
+    if (payments.some((p) => p.method === "cash")) openCashDrawer();
+    if (splitting || payments.some((p) => p.bankName)) {
+      logger.log("sale", "Split payment recorded", "register", {
+        receiptNo: sale.receiptNo,
+        total: sale.total,
+        tenders: paymentsLabel(payments),
+        storeId: sale.storeId,
+      });
+    }
     if (method === "bank_transfer") {
       logger.log("sale", "Bank transfer payment recorded", "register", {
         receiptNo: sale.receiptNo,
@@ -621,6 +667,8 @@ function Register() {
     setMemberId(null);
     setTendered("");
     setTransferRef("");
+    setTenders([]);
+    setBankName("");
     setPayOpen(false);
     toast.success(
       exchangeRef
