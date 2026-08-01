@@ -477,10 +477,6 @@ function Register() {
   }
 
   async function completeSale() {
-    return completeSaleImpl();
-  }
-
-  async function completeSaleImpl() {
     if (!activeShift) {
       toast.error("Open a shift before taking payment");
       return;
