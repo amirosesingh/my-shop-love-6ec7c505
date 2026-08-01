@@ -33,18 +33,21 @@ const sb = supabaseExternal as unknown as SupabaseClient;
 
 type Ctx = {
   permissions: StaffPermissions;
-  hasPermission: (flag: PermissionFlag) => boolean;
+  /** app_users row for the signed-in account (via rpc current_app_user). */
+  appUser: ReturnType<typeof useAuth>["appUser"];
+  role: string | null;
+  hasPermission: (flag: PermissionFlag | string) => boolean;
   /**
    * Resolves true when the user already holds the permission, or after a
    * supervisor authorises the action with their User ID + PIN.
    */
-  requirePermission: (flag: PermissionFlag) => Promise<boolean>;
+  requirePermission: (flag: PermissionFlag | string) => Promise<boolean>;
 };
 
 const PermissionsContext = createContext<Ctx | null>(null);
 
 export function PermissionsProvider({ children }: { children: ReactNode }) {
-  const { user, can } = useAuth();
+  const { user, can, appUser } = useAuth();
   const [pending, setPending] = useState<PermissionFlag | null>(null);
   const [userId, setUserId] = useState("");
   const [pin, setPin] = useState("");
@@ -54,7 +57,10 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
 
   const permissions = (user?.permissions ?? {}) as StaffPermissions;
 
-  const hasPermission = useCallback((flag: PermissionFlag) => can(flag), [can]);
+  const hasPermission = useCallback(
+    (flag: PermissionFlag | string) => can(flag as PermissionFlag),
+    [can],
+  );
 
   const close = (ok: boolean) => {
     resolver.current?.(ok);
@@ -66,15 +72,15 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
   };
 
   const requirePermission = useCallback(
-    (flag: PermissionFlag) =>
+    (flag: PermissionFlag | string) =>
       new Promise<boolean>((resolve) => {
-        if (can(flag)) {
+        if (can(flag as PermissionFlag)) {
           resolve(true);
           return;
         }
         resolver.current = resolve;
         setError("");
-        setPending(flag);
+        setPending(flag as PermissionFlag);
       }),
     [can],
   );
@@ -103,8 +109,14 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
   };
 
   const value = useMemo<Ctx>(
-    () => ({ permissions, hasPermission, requirePermission }),
-    [permissions, hasPermission, requirePermission],
+    () => ({
+      permissions,
+      appUser,
+      role: appUser?.role ?? null,
+      hasPermission,
+      requirePermission,
+    }),
+    [permissions, appUser, hasPermission, requirePermission],
   );
 
   return (
