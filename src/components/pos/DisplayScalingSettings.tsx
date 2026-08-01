@@ -20,17 +20,19 @@ const DENSITIES: { value: UiDensity; label: string }[] = [
 ];
 
 /** Terminal-local control for font size and control height across the app. */
-export function DisplayScalingSettings() {
+export function DisplayScalingSettings({ bare = false }: { bare?: boolean }) {
   const prefs = useUiScalePrefs();
   const auto =
     typeof window === "undefined" ? 1 : computeUiScale(window.innerWidth, window.innerHeight);
   const effective = prefs.mode === "manual" ? prefs.scale : auto;
 
   return (
-    <section className="rounded-lg border border-border bg-card p-5">
-      <h2 className="flex items-center gap-2 text-lg font-semibold">
-        <MonitorCog className="size-4 text-primary" /> Display &amp; text size
-      </h2>
+    <section className={bare ? "" : "rounded-lg border border-border bg-card p-5"}>
+      {!bare && (
+        <h2 className="flex items-center gap-2 text-lg font-semibold">
+          <MonitorCog className="size-4 text-primary" /> Display &amp; text size
+        </h2>
+      )}
       <p className="mt-1 text-xs text-muted-foreground">
         Applies to this terminal only. Buttons never drop below a touch-safe size.
       </p>

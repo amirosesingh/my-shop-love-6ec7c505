@@ -1,5 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
 import { Eye, Percent, Plus, Printer, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
@@ -41,7 +41,23 @@ import type {
   TaxMode,
 } from "@/lib/pos-types";
 
+const SECTIONS = [
+  "display",
+  "tax",
+  "identity",
+  "type",
+  "lines",
+  "qr",
+  "elements",
+  "payment",
+  "whatsapp",
+  "sync",
+] as const;
+
 export const Route = createFileRoute("/settings")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    section: typeof search["section"] === "string" ? search["section"] : "",
+  }),
   head: () => ({
     meta: [
       { title: "Tax & Receipt Settings — Northwind POS" },
@@ -88,6 +104,22 @@ const IDENTITY_FIELDS: { key: keyof ReceiptOverride; label: string; placeholder:
 ];
 
 function Settings() {
+  const { section } = Route.useSearch();
+  const navigate = useNavigate({ from: "/settings" });
+  const openSection = (value: string) =>
+    void navigate({ search: { section: value }, replace: true });
+
+  // Bring the section chosen from the sidebar into view.
+  useEffect(() => {
+    if (!section || !SECTIONS.includes(section as (typeof SECTIONS)[number])) return;
+    const t = setTimeout(() => {
+      document
+        .querySelector(`[data-section="${section}"]`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 120);
+    return () => clearTimeout(t);
+  }, [section]);
+
   const { state, stores, currentStore, updateSettings, upsertStore } = usePos();
   const { isAdmin, can } = useAuth();
   const canSettings = isAdmin || can("can_access_pos_settings");
@@ -299,14 +331,14 @@ function Settings() {
                 value={section}
                 onValueChange={openSection}
               >
-                <AccordionItem value="display">
+                <AccordionItem value="display" data-section="display">
   <AccordionTrigger className="text-sm font-medium">Display &amp; text size</AccordionTrigger>
   <AccordionContent className="pt-4">
-                  <DisplayScalingSettings />
+                  <DisplayScalingSettings bare />
                   </AccordionContent>
 </AccordionItem>
 
-                <AccordionItem value="tax">
+                <AccordionItem value="tax" data-section="tax">
   <AccordionTrigger className="text-sm font-medium">Tax &amp; pricing</AccordionTrigger>
   <AccordionContent className="pt-4">
       <div className="mt-4 grid gap-4 md:grid-cols-3">
@@ -358,7 +390,7 @@ function Settings() {
                   </AccordionContent>
 </AccordionItem>
 
-                <AccordionItem value="identity">
+                <AccordionItem value="identity" data-section="identity">
   <AccordionTrigger className="text-sm font-medium">Business identity</AccordionTrigger>
   <AccordionContent className="space-y-3 pt-4">
                   <div className="grid gap-3 sm:grid-cols-2">
@@ -394,7 +426,7 @@ function Settings() {
                   </AccordionContent>
 </AccordionItem>
 
-                <AccordionItem value="type">
+                <AccordionItem value="type" data-section="type">
   <AccordionTrigger className="text-sm font-medium">Receipt typography</AccordionTrigger>
   <AccordionContent className="space-y-3 pt-4">
                   <p className="text-[11px] text-muted-foreground">
@@ -466,7 +498,7 @@ function Settings() {
                   </AccordionContent>
 </AccordionItem>
 
-                <AccordionItem value="lines">
+                <AccordionItem value="lines" data-section="lines">
   <AccordionTrigger className="text-sm font-medium">Extra lines</AccordionTrigger>
   <AccordionContent className="space-y-3 pt-4">
                   {(effective.customLines ?? []).length === 0 && (
@@ -556,7 +588,7 @@ function Settings() {
                   </AccordionContent>
 </AccordionItem>
 
-                <AccordionItem value="qr">
+                <AccordionItem value="qr" data-section="qr">
   <AccordionTrigger className="text-sm font-medium">QR code</AccordionTrigger>
   <AccordionContent className="space-y-3 pt-4">
                   <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
@@ -609,7 +641,7 @@ function Settings() {
                   </AccordionContent>
 </AccordionItem>
 
-                <AccordionItem value="elements">
+                <AccordionItem value="elements" data-section="elements">
   <AccordionTrigger className="text-sm font-medium">Receipt elements</AccordionTrigger>
   <AccordionContent className="space-y-3 pt-4">
                   <div className="space-y-1">
@@ -646,7 +678,7 @@ function Settings() {
                   </AccordionContent>
 </AccordionItem>
 
-                <AccordionItem value="payment">
+                <AccordionItem value="payment" data-section="payment">
   <AccordionTrigger className="text-sm font-medium">Bank transfer details</AccordionTrigger>
   <AccordionContent className="space-y-3 pt-4">
                   <p className="text-xs text-muted-foreground">
@@ -773,7 +805,7 @@ function Settings() {
                   </AccordionContent>
 </AccordionItem>
 
-                <AccordionItem value="whatsapp">
+                <AccordionItem value="whatsapp" data-section="whatsapp">
   <AccordionTrigger className="text-sm font-medium">WhatsApp bills</AccordionTrigger>
   <AccordionContent className="space-y-3 pt-4">
                   <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
@@ -867,7 +899,7 @@ function Settings() {
                   </AccordionContent>
 </AccordionItem>
 
-                <AccordionItem value="sync">
+                <AccordionItem value="sync" data-section="sync">
   <AccordionTrigger className="text-sm font-medium">Sync &amp; backup</AccordionTrigger>
   <AccordionContent className="pt-4">
                   <SyncSettings />
@@ -885,8 +917,6 @@ function Settings() {
                 Apply to printers
               </Button>
             </div>
-          </div>
-
         </section>
       </div>
     </AppShell>
