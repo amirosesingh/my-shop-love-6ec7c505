@@ -84,20 +84,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Background outbox drain: keeps offline sales flowing once the link returns.
   useEffect(() => startSyncEngine(), []);
 
-  // Cashier accounts are limited to the register; management screens are
-  // reserved for supervisors and admins.
-  useEffect(() => {
-    // Longest prefix wins so a child page can tighten its parent's gate.
-    const key =
-      Object.keys(ROUTE_PERMISSIONS)
-        .filter((p) => location.pathname === p || location.pathname.startsWith(`${p}/`))
-        .sort((a, b) => b.length - a.length)[0] ?? "";
-    const required = ROUTE_PERMISSIONS[key];
-    if (user && !isAdmin && required && !can(required)) {
-      void navigate({ to: "/", replace: true });
-    }
-  }, [user, isAdmin, can, location.pathname, navigate]);
-
   useEffect(() => {
     setPrintStore(currentStore ?? null);
   }, [currentStore]);
