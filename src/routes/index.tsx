@@ -649,7 +649,7 @@ function Register() {
 
   return (
     <AppShell>
-      <div className="flex h-screen min-w-0 flex-col overflow-hidden lg:flex-row">
+      <div className="pos-scaled flex h-screen min-w-0 flex-col overflow-hidden lg:flex-row">
         {/* ── LEFT: product catalog (fixed min width, never shrinks) ───── */}
         <section className="flex min-h-0 w-full shrink-0 flex-col gap-3 border-b border-border p-4 lg:w-[clamp(340px,32vw,520px)] lg:min-w-[340px] lg:border-b-0 lg:border-r">
           <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
