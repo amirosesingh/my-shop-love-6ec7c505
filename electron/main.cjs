@@ -92,6 +92,59 @@ function registerIpc() {
   });
 
   ipcMain.handle("pos:status", () => worker.status());
+
+  /* ---------------- offline register database surface ---------------- */
+
+  ipcMain.handle("db:create-sale", async (_e, payload) => {
+    try {
+      const branchId = payload?.branchId ?? (await repo.getState("branch_id"));
+      const result = await repo.createSale({ ...payload, branchId });
+      void worker.run();
+      return { ok: true, ...result };
+    } catch (err) {
+      return fail(err);
+    }
+  });
+
+  ipcMain.handle("db:get-products", async () => {
+    try {
+      return { ok: true, products: await repo.getProducts() };
+    } catch (err) {
+      return fail(err);
+    }
+  });
+
+  ipcMain.handle("db:get-pending-sync-count", async () => {
+    try {
+      const counts = await repo.pendingSyncCount();
+      return { ok: true, ...counts };
+    } catch (err) {
+      return { ok: false, total: 0, sales: 0, error: fail(err).error };
+    }
+  });
+
+  ipcMain.handle("db:get-branch", async () => {
+    try {
+      return {
+        ok: true,
+        branchId: await repo.getState("branch_id"),
+        branchName: await repo.getState("branch_name"),
+      };
+    } catch (err) {
+      return fail(err);
+    }
+  });
+
+  ipcMain.handle("db:set-branch", async (_e, branch) => {
+    try {
+      await repo.setState("branch_id", branch?.branchId ?? null);
+      await repo.setState("branch_name", branch?.branchName ?? null);
+      return { ok: true };
+    } catch (err) {
+      return fail(err);
+    }
+  });
+
   ipcMain.handle("pos:push", () => worker.push());
   ipcMain.handle("pos:pull", () => worker.pull());
   ipcMain.handle("pos:set-sync-enabled", (_e, on) => worker.setEnabled(on));
