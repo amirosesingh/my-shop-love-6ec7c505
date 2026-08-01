@@ -392,6 +392,17 @@ function Inventory() {
               ))}
             </TableBody>
           </Table>
+          <TablePagination
+            page={pager.page}
+            pageCount={pager.pageCount}
+            pageSize={pager.pageSize}
+            total={pager.total}
+            from={pager.from}
+            to={pager.to}
+            label="items"
+            onPage={pager.setPage}
+            onPageSize={pager.setPageSize}
+          />
         </div>
       </div>
       {canEdit && <BulkImportDialog open={importOpen} onOpenChange={setImportOpen} />}
