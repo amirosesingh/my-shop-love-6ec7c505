@@ -2,6 +2,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 const payload = z.object({
+  /** Supabase access token of a signed-in supervisor/admin, when available. */
+  accessToken: z.string().min(10).optional(),
+  /** Signed terminal session token issued at cashier PIN sign-in. */
+  terminalToken: z.string().min(10).optional(),
   phoneNumberId: z.string().max(40).optional(),
   /** digits only, international format */
   to: z.string().regex(/^\d{6,15}$/),
@@ -15,6 +19,19 @@ const payload = z.object({
 export const sendWhatsAppBill = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => payload.parse(data))
   .handler(async ({ data }) => {
+    // Only signed-in POS staff may send from the business account.
+    const { verifyCashierSession } = await import("./pos-session.server");
+    let caller = data.terminalToken ? verifyCashierSession(data.terminalToken)?.username : null;
+    if (!caller && data.accessToken) {
+      const { verifyPosStaff } = await import("./secure-settings.server");
+      try {
+        caller = (await verifyPosStaff(data.accessToken)).userId;
+      } catch {
+        caller = null;
+      }
+    }
+    if (!caller) return { ok: false as const, error: "Not authorised" };
+
     const { readSecureSetting } = await import("./secure-settings.server");
     // Prefer the encrypted value saved in Settings, fall back to the secret.
     const token = (await readSecureSetting("whatsapp_token")) ?? process.env["WHATSAPP_TOKEN"];
