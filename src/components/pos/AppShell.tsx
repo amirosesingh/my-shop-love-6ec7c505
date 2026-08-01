@@ -30,7 +30,7 @@ const ADMIN_PATHS = [
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { activeShift, stores, currentStore, setCurrentStore, state, ready: dataReady } = usePos();
-  const { ready, user, isAdmin, logout, lock, can } = useAuth();
+  const { ready, user, isAdmin, canSwitchStores, logout, lock, can } = useAuth();
   const [collapsed, setCollapsed] = useSidebarCollapsed();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const location = useLocation();
@@ -52,12 +52,12 @@ export function AppShell({ children }: { children: ReactNode }) {
     setPrintSettings(state.settings.receipt, state.settings.tax);
   }, [state.settings]);
 
-  // Cashiers are pinned to their assigned branch — no manual switching.
+  // Anyone with a single assigned branch is pinned to it — no manual switching.
   useEffect(() => {
-    if (user && !isAdmin && user.storeId && currentStore.id !== user.storeId) {
+    if (user && !canSwitchStores && user.storeId && currentStore.id !== user.storeId) {
       setCurrentStore(user.storeId);
     }
-  }, [user, isAdmin, currentStore.id, setCurrentStore]);
+  }, [user, canSwitchStores, currentStore.id, setCurrentStore]);
 
   if (!ready) return null;
   if (!user) return <TerminalLogin />;
@@ -96,7 +96,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 
   const StorePicker = () =>
-    isAdmin ? (
+    canSwitchStores ? (
       <Select value={currentStore.id} onValueChange={setCurrentStore}>
         <SelectTrigger className="h-9 w-full text-xs">
           <Store className="size-3.5 text-muted-foreground" />
