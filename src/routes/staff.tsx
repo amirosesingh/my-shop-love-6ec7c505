@@ -50,7 +50,7 @@ function StaffConfiguration() {
   const { isAdmin, staff, addStaff, updateStaff, removeStaff } = useAuth();
   const [name, setName] = useState("");
   const [staffId, setStaffId] = useState("");
-  const [password, setPassword] = useState("123");
+  const [password, setPassword] = useState("");
   const [storeId, setStoreId] = useState(stores[0]?.id ?? "");
 
   const storeLabel = (id: string) => {
@@ -92,7 +92,7 @@ function StaffConfiguration() {
               <TableRow>
                 <TableHead>Employee name</TableHead>
                 <TableHead>Staff ID</TableHead>
-                <TableHead>Password</TableHead>
+                <TableHead>Login email</TableHead>
                 <TableHead>Assigned store duty</TableHead>
                 <TableHead>Modify System Roles</TableHead>
                 <TableHead className="text-right">Remove</TableHead>
@@ -117,9 +117,11 @@ function StaffConfiguration() {
                   </TableCell>
                   <TableCell>
                     <Input
-                      className="h-9 w-28"
-                      value={s.password}
-                      onChange={(e) => updateStaff({ ...s, password: e.target.value })}
+                      className="h-9 w-52"
+                      type="email"
+                      placeholder="cashier@store.com"
+                      value={s.email ?? ""}
+                      onChange={(e) => updateStaff({ ...s, email: e.target.value })}
                     />
                   </TableCell>
                   <TableCell>
@@ -206,9 +208,11 @@ function StaffConfiguration() {
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Password</Label>
+              <Label className="text-xs text-muted-foreground">Login email</Label>
               <Input
-                className="w-28"
+                className="w-56"
+                type="email"
+                placeholder="cashier@store.com"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
@@ -230,8 +234,8 @@ function StaffConfiguration() {
             </div>
             <Button
               onClick={() => {
-                if (!name.trim() || !staffId.trim() || !password) {
-                  toast.error("Name, staff ID and password are required");
+                if (!name.trim() || !staffId.trim() || !password.trim()) {
+                  toast.error("Name, staff ID and login email are required");
                   return;
                 }
                 if (staff.some((s) => s.staffId.toLowerCase() === staffId.trim().toLowerCase())) {
@@ -241,13 +245,13 @@ function StaffConfiguration() {
                 addStaff({
                   name: name.trim(),
                   staffId: staffId.trim(),
-                  password,
+                  email: password.trim().toLowerCase(),
                   storeId,
                   permissions: { ...DEFAULT_PERMISSIONS },
                 });
                 setName("");
                 setStaffId("");
-                setPassword("123");
+                setPassword("");
                 toast.success("Employee added");
               }}
             >
