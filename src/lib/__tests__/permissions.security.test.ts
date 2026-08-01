@@ -18,11 +18,16 @@ import {
 const CASHIER_ALLOWED: PermissionKey[] = [
   "can_open_drawer",
   "can_close_drawer",
+  "can_open_shift",
+  "can_close_shift",
   "can_process_sale",
   "can_hold_cart",
+  "can_reprint_bill",
+  "can_manage_bookings",
   "can_view_inventory",
   "can_add_member",
   "can_apply_member_discount",
+  "can_view_member_history",
 ];
 
 const WAREHOUSE_ALLOWED: PermissionKey[] = [
@@ -30,6 +35,9 @@ const WAREHOUSE_ALLOWED: PermissionKey[] = [
   "can_add_new_product",
   "can_receive_purchase_order",
   "can_adjust_stock",
+  "can_create_transfer",
+  "can_receive_transfer",
+  "can_manage_locations",
 ];
 
 const granted = (matrix: Record<string, boolean>) =>
@@ -55,6 +63,12 @@ describe("permission presets", () => {
       "can_edit_product_price",
       "can_process_refund",
       "can_adjust_stock",
+      "can_view_dashboard",
+      "can_export_reports",
+      "can_view_audit_trail",
+      "can_manage_terminals",
+      "can_manage_sync_backup",
+      "can_manage_promotions",
     ] as PermissionKey[]) {
       expect(CASHIER_PERMISSIONS[key], key).toBe(false);
     }
@@ -67,6 +81,10 @@ describe("permission presets", () => {
       "can_manage_staff",
       "can_process_sale",
       "can_process_refund",
+      "can_view_dashboard",
+      "can_export_reports",
+      "can_manage_terminals",
+      "can_manage_sync_backup",
     ] as PermissionKey[]) {
       expect(WAREHOUSE_PERMISSIONS[key], key).toBe(false);
     }
