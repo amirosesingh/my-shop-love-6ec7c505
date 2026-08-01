@@ -150,7 +150,6 @@ async function applyOp(op) {
 
 async function pendingRows(table, limit = 200) {
   assertTable(table);
-  assertTable(table);
   const res = await getPool()
     .request()
     .input("limit", sql.Int, limit)
@@ -278,6 +277,9 @@ module.exports = {
   CATALOGUE_TABLES,
   SETTINGS_ID,
   applyOp,
+  createSale,
+  getProducts,
+  pendingSyncCount,
   pendingRows,
   markSynced,
   markFailed,
