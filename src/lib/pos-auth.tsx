@@ -25,24 +25,39 @@ export type StaffPermissions = {
   products: boolean;
   /** Can Toggle E-commerce Website Visibility */
   ecommerce: boolean;
+  /** Can apply line / bill discounts at the register */
+  can_give_discount: boolean;
+  /** Can complete refunds and exchanges that pay money back */
+  can_refund: boolean;
+  /** Can pop the cash drawer outside of a sale */
+  can_open_drawer_manual: boolean;
 };
 
 export const FULL_PERMISSIONS: StaffPermissions = {
   financials: true,
   products: true,
   ecommerce: true,
+  can_give_discount: true,
+  can_refund: true,
+  can_open_drawer_manual: true,
 };
 
 export const DEFAULT_PERMISSIONS: StaffPermissions = {
   financials: false,
   products: false,
   ecommerce: false,
+  can_give_discount: false,
+  can_refund: false,
+  can_open_drawer_manual: false,
 };
 
 export const PERMISSION_LABELS: { key: keyof StaffPermissions; label: string }[] = [
   { key: "financials", label: "Can Access Financial History Reports" },
   { key: "products", label: "Can Create New Products / Access PO Engine" },
   { key: "ecommerce", label: "Can Toggle E-commerce Website Visibility" },
+  { key: "can_give_discount", label: "Can Give Discounts" },
+  { key: "can_refund", label: "Can Process Refunds / Exchanges" },
+  { key: "can_open_drawer_manual", label: "Can Open Cash Drawer Manually" },
 ];
 
 /** An employee record the admin can edit at any time. */
@@ -81,7 +96,7 @@ const SEED_STAFF: StaffMember[] = [
     staffId: "EMP-101",
     email: "",
     storeId: "s1",
-    permissions: { financials: true, products: true, ecommerce: false },
+    permissions: { ...DEFAULT_PERMISSIONS, financials: true, products: true },
   },
   {
     id: "u2",
@@ -89,7 +104,7 @@ const SEED_STAFF: StaffMember[] = [
     staffId: "EMP-102",
     email: "",
     storeId: "s2",
-    permissions: { financials: true, products: false, ecommerce: false },
+    permissions: { ...DEFAULT_PERMISSIONS, financials: true },
   },
   {
     id: "u3",
@@ -115,6 +130,17 @@ export type TerminalUser = {
   local?: boolean;
 };
 
+/** Row loaded from public.app_users for the signed-in account. */
+export type AppUserProfile = {
+  user_code: string;
+  full_name: string;
+  role: AppRole;
+  store_id: string | null;
+  email: string;
+  permissions: Partial<StaffPermissions> | null;
+  is_active: boolean;
+};
+
 /** Offline bootstrap admin so the terminal is never locked out before the
  *  backend auth tables (app_users / user_roles) have been provisioned. */
 const BOOTSTRAP_ADMIN_CODE = "admin";
@@ -133,6 +159,8 @@ type AuthCtx = {
   authUserId: string | null;
   /** cashier currently signed in at the terminal (User ID + PIN) */
   terminalUser: TerminalUser | null;
+  /** public.app_users record backing the signed-in account */
+  appUser: AppUserProfile | null;
   /** permission check that always passes for the admin */
   can: (flag: keyof StaffPermissions) => boolean;
   staff: StaffMember[];
@@ -164,6 +192,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [ready, setReady] = useState(false);
   const [terminalUser, setTerminalUser] = useState<TerminalUser | null>(null);
+  const [appUser, setAppUser] = useState<AppUserProfile | null>(null);
 
   useEffect(() => {
     try {
@@ -215,6 +244,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then(({ data }) => {
         if (!cancelled) setRoles(((data ?? []) as { role: AppRole }[]).map((r) => r.role));
       });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  // Identity + permission toggles from public.app_users for the signed-in account.
+  useEffect(() => {
+    let cancelled = false;
+    if (!userId) {
+      setAppUser(null);
+      return;
+    }
+    void supabase.rpc("current_app_user" as never).then(({ data }) => {
+      if (cancelled) return;
+      const row = (Array.isArray(data) ? data[0] : data) as unknown as
+        | AppUserProfile
+        | undefined;
+      setAppUser(row ?? null);
+    });
     return () => {
       cancelled = true;
     };
@@ -399,29 +447,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       metaRole === "admin" ||
       metaRole === "supervisor" ||
       roles.includes("admin") ||
+      appUser?.role === "admin" ||
       terminalUser?.role === "admin";
     const found = email ? staff.find((s) => s.email && norm(s.email) === norm(email)) : undefined;
     const fallbackName =
       (meta["full_name"] as string | undefined) || email.split("@")[0] || "User";
     return {
       staffId:
-        (meta["user_id"] as string | undefined) ?? terminalUser?.userCode ?? found?.staffId ?? email,
-      name: terminalUser?.name ?? found?.name ?? fallbackName,
+        appUser?.user_code ??
+        (meta["user_id"] as string | undefined) ??
+        terminalUser?.userCode ??
+        found?.staffId ??
+        email,
+      name: appUser?.full_name ?? terminalUser?.name ?? found?.name ?? fallbackName,
       email,
       role: isAdmin ? "admin" : "cashier",
       metaRole,
       roles,
       storeId: isAdmin
         ? null
-        : ((meta["store_id"] as string | null | undefined) ??
+        : (appUser?.store_id ??
+          (meta["store_id"] as string | null | undefined) ??
           terminalUser?.storeId ??
           found?.storeId ??
           null),
       permissions: isAdmin
         ? FULL_PERMISSIONS
-        : { ...DEFAULT_PERMISSIONS, ...(found?.permissions ?? {}) },
+        : {
+            ...DEFAULT_PERMISSIONS,
+            ...(found?.permissions ?? {}),
+            // public.app_users is the source of truth when the account has a row.
+            ...(appUser?.permissions ?? {}),
+          },
     };
-  }, [session, roles, staff, terminalUser]);
+  }, [session, roles, staff, terminalUser, appUser]);
 
   const value = useMemo<AuthCtx>(
     () => ({
@@ -432,6 +491,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isCashier: user?.metaRole === "cashier" || (!!user && user.role !== "admin"),
       authUserId: userId,
       terminalUser,
+      appUser,
       can: (flag) => user?.role === "admin" || !!user?.permissions?.[flag],
       staff,
       addStaff,
@@ -449,6 +509,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       userId,
       terminalUser,
+      appUser,
       staff,
       addStaff,
       updateStaff,
