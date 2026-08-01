@@ -225,7 +225,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [signedIn, authReady]);
 
   useEffect(() => {
     if (!ready) return;
