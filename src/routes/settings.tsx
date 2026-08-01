@@ -22,6 +22,7 @@ import {
   setPreviewReceiptCfg,
   setPrintSettings,
 } from "@/lib/pos-print";
+import { defaultPaymentQr } from "@/lib/pos-types";
 import type {
   FontFamilyKey,
   FontStyleSettings,
