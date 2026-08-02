@@ -131,6 +131,9 @@ function Register() {
   const [openShiftOpen, setOpenShiftOpen] = useState(false);
   const [float, setFloat] = useState("150");
   const [cashier, setCashier] = useState(user?.name ?? "Cashier");
+  /** Who is actually signed in right now — sales are stamped with this, not
+   *  the name captured when the shift was opened (users may switch mid-shift). */
+  const activeCashier = user?.name || activeShift?.cashier || cashier;
   const [tendered, setTendered] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("cash");
   const [transferRef, setTransferRef] = useState("");
