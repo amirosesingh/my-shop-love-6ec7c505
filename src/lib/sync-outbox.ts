@@ -7,6 +7,8 @@
  * drains the queue in order once the network (and the Online Sync toggle)
  * allow it.
  */
+import { stamp } from "./activity-journal";
+
 export type Row = Record<string, unknown>;
 
 export type SyncOp =
@@ -24,6 +26,14 @@ export type QueuedOp = {
   lastError?: string;
   /** repeatedly failing ops are parked so they cannot block the queue */
   quarantined?: boolean;
+  /** branch the write happened at (multi-branch replay) */
+  branchId?: string | null;
+  /** till that produced the write */
+  terminalId?: string;
+  /** monotonic per-terminal order — replay never runs out of sequence */
+  seq?: number;
+  /** device clock reading when the action happened */
+  occurredAt?: string;
 };
 
 const QUEUE_KEY = "pos.sync.outbox";
@@ -73,12 +83,17 @@ export function conflictCount(): number {
 }
 
 export function enqueue(context: string, op: SyncOp): QueuedOp {
+  const s = stamp();
   const entry: QueuedOp = {
     id: crypto.randomUUID(),
     context,
     op,
     createdAt: new Date().toISOString(),
     attempts: 0,
+    branchId: s.branchId,
+    terminalId: s.terminalId,
+    seq: s.seq,
+    occurredAt: s.deviceTime,
   };
   write([...read(), entry]);
   return entry;

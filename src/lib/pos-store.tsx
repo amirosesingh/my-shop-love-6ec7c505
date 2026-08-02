@@ -187,9 +187,21 @@ export function PosProvider({ children }: { children: ReactNode }) {
         if (authReady && !cancelled) setReady(true);
         return;
       }
+      // Offline-first boot: paint the last known good snapshot immediately so
+      // the till is usable with no connection, then refresh in the background.
+      const snap = readSnapshot();
+      if (snap && !cancelled) {
+        setState((s) => applyCloud(s, snap));
+        setReady(true);
+      }
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        if (!cancelled) setReady(true);
+        return;
+      }
       try {
         const cloud = await loadCloudState();
         if (cancelled) return;
+        writeSnapshot(cloud);
         setState((s) => ({
           ...s,
           products: cloud.products,
