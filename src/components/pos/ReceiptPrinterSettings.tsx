@@ -45,7 +45,7 @@ export function ReceiptPrinterSettings() {
         <Label className="text-xs text-muted-foreground">Printer</Label>
         <ThemedSelect
           value={prefs.deviceName || "__default__"}
-          onValueChange={(v) => update({ ...prefs, deviceName: v === "__default__" ? "" : v })}
+          onChange={(v: string) => update({ ...prefs, deviceName: v === "__default__" ? "" : v })}
           options={[
             { value: "__default__", label: "System default printer" },
             ...printers.map((p) => ({ value: p.name, label: p.displayName || p.name })),
