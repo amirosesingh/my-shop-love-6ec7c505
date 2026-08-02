@@ -58,6 +58,7 @@
     "html5-qrcode": "^2.3.8",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.575.0",
+    "mssql": "^11.0.1",
     "qrcode-generator": "^2.0.4",
     "react": "^19.2.0",
     "react-day-picker": "^9.14.0",
@@ -96,5 +97,8 @@
     "typescript-eslint": "^8.56.1",
     "vite": "^8.1.5",
     "vitest": "^4.1.10"
+  },
+  "optionalDependencies": {
+    "msnodesqlv8": "^4.4.0"
   }
 }
