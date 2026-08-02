@@ -118,6 +118,8 @@ function Register() {
   }
   const canRefund = can("can_process_refund");
   const [query, setQuery] = useState("");
+  /** Narrow-window product browser. */
+  const [catalogOpen, setCatalogOpen] = useState(false);
   const [category, setCategory] = useState("All");
   const [lines, setLines] = useState<CartLine[]>([]);
   const [cartDiscount, setCartDiscount] = useState(0);
