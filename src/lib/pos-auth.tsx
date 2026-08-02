@@ -13,6 +13,7 @@ import { type MetaRole } from "@/lib/pos-users";
 import { TERMINAL_TOKEN_KEY } from "@/lib/pos-caller-auth";
 import { issueCashierSession } from "@/lib/pos-session.functions";
 import { verifyCashierPin } from "@/lib/pos-cashiers";
+import { cacheCredential, verifyCachedPin } from "@/lib/offline-credentials";
 import { recordSignIn } from "@/lib/shift-attendance";
 import {
   CASHIER_PERMISSIONS,
@@ -306,24 +307,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!code) return { ok: false, error: "Enter your username" };
     if (!/^\d{6}$/.test(pin)) return { ok: false, error: "Enter your 6-digit PIN" };
     let row: Awaited<ReturnType<typeof verifyCashierPin>> = null;
+    let offline = false;
     try {
       row = await verifyCashierPin(code, pin);
     } catch {
-      return {
-        ok: false,
-        error: "Cashier accounts are not set up in the backend yet. Run supabase/schema_final.sql.",
-      };
+      offline = true;
     }
-    if (!row) return { ok: false, error: "Invalid username or PIN" };
-    const next: TerminalUser = {
-      userCode: row.username,
-      name: row.full_name || row.username,
-      role: "staff",
-      storeId: row.store_id,
-      email: "",
-      cashierId: row.id,
-      permissions: row.permissions,
-    };
+    if (offline || typeof navigator === "undefined" ? false : !navigator.onLine) offline = true;
+
+    let next: TerminalUser;
+    if (row) {
+      next = {
+        userCode: row.username,
+        name: row.full_name || row.username,
+        role: "staff",
+        storeId: row.store_id,
+        email: "",
+        cashierId: row.id,
+        permissions: row.permissions,
+      };
+      // Remember this employee so the till still opens with no connection.
+      void cacheCredential(pin, {
+        username: row.username,
+        cashierId: row.id,
+        fullName: row.full_name || row.username,
+        storeId: row.store_id,
+        permissions: row.permissions as unknown as Record<string, boolean>,
+      });
+    } else if (offline) {
+      const cached = await verifyCachedPin(code, pin);
+      if (!cached)
+        return {
+          ok: false,
+          error:
+            "No connection and this account has not signed in on this terminal before. Connect to the internet once, then you can sign in offline.",
+        };
+      next = {
+        userCode: cached.username,
+        name: cached.fullName,
+        role: "staff",
+        storeId: cached.storeId,
+        email: "",
+        cashierId: cached.cashierId,
+        permissions: cached.permissions as unknown as TerminalUser["permissions"],
+      };
+    } else {
+      return { ok: false, error: "Invalid username or PIN" };
+    }
     setTerminalUser(next);
     try {
       window.sessionStorage.setItem(TERMINAL_KEY, JSON.stringify(next));
