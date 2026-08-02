@@ -141,6 +141,35 @@ type Ctx = {
 
 const PosContext = createContext<Ctx | null>(null);
 
+/** Merge a cloud (or cached snapshot) slice into local state. */
+function applyCloud(s: PosState, cloud: CloudSlice): PosState {
+  return {
+    ...s,
+    products: cloud.products,
+    members: cloud.members,
+    sales: cloud.sales,
+    promotions: cloud.promotions.length ? cloud.promotions : s.promotions,
+    // Locations are central now; the local list is the fallback until
+    // the directory has been populated (and gets pushed up below).
+    stores: cloud.stores.length ? cloud.stores : s.stores,
+    currentStoreId: cloud.stores.length
+      ? (cloud.stores.find((x) => x.id === s.currentStoreId)?.id ?? cloud.stores[0].id)
+      : s.currentStoreId,
+    settings: {
+      tax: { ...defaultSettings.tax, ...cloud.settings.tax },
+      receipt: { ...defaultSettings.receipt, ...cloud.settings.receipt },
+      payment: { ...defaultSettings.payment, ...cloud.settings.payment },
+      whatsapp: { ...defaultSettings.whatsapp, ...cloud.settings.whatsapp },
+      review: { ...defaultSettings.review, ...cloud.settings.review },
+    },
+    // Keep the bill counter ahead of every receipt already in the cloud.
+    counter: cloud.sales.reduce(
+      (max, sale) => Math.max(max, Number(sale.receiptNo.split("-").pop()) || 0),
+      s.counter,
+    ),
+  };
+}
+
 export function PosProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<PosState>(seedState);
   const [ready, setReady] = useState(false);
