@@ -1,51 +1,60 @@
-# Offline database review (Microsoft SQL Server) + gap fixes
+# Fix "Cannot find module 'mssql'" when launching Electron
 
-## What already exists
+## What the error means
 
-The Windows desktop shell already runs a real Microsoft SQL Server database on the
-till. Nothing needs to be introduced — it needs completing.
+`electron/db/pool.cjs` does `require("mssql")` at the top of the file, and
+`electron/main.cjs` requires that module while the app starts. `mssql` is not
+listed in `package.json` dependencies, so it was never installed — Electron
+aborts before the window opens. The stack you saw (`pool.cjs` -> `main.cjs`) is
+exactly that chain.
 
-- `electron/db/pool.cjs` — `mssql` connection pool, Windows integrated auth
-  (`msnodesqlv8`) or SQL login, and it runs the schema on every start.
-- `electron/db/schema.sql` — 15 local tables, all idempotent:
-  sync_state, products, membership_tiers, members, sales, sale_items,
-  purchase_orders, purchase_order_items, promotions, shifts, bookings,
-  booking_payments, transfers, audit_logs, pos_settings, plus the
-  `BranchSales` / `BranchSaleItems` views and `branch_id` columns.
-- Every table carries the sync block (`is_synced`, `sync_status`, `created_at`,
-  `updated_at`), a `(is_synced, created_at)` index, and a touch trigger that
-  re-queues any edited row.
-- `electron/db/repo.cjs` — parameterised T-SQL only, `createSale` commits the
-  bill + lines + stock in one transaction.
-- `electron/sync/worker.cjs` — push pending rows oldest-first, pull catalogue
-  only; the renderer reaches it through `window.pos` / `window.electronAPI`.
-- Settings -> Sync & backup already has server, database, port, auth mode,
-  Test connection, Save & connect, Pull, Backup (`BACKUP DATABASE ... TO DISK`).
+Same trap waits behind it: Windows integrated auth needs `msnodesqlv8`, also
+not installed.
 
-## Gaps found against the cloud schema
+## Fix
 
-1. `dbo.sales` is missing five columns the cloud has: `payments` (the split
-   cash/card/wallet tenders), `coupon_code`, `coupon_discount`,
-   `coupon_promo_id`, `coupon_scope`. A split-tender or coupon bill made
-   offline loses that detail on push.
-2. No `dbo.drawer_events` table — no-sale drawer opens exist in the cloud but
-   are not recorded locally.
-3. The activity journal and the sync outbox still live in browser
-   localStorage, not in SQL Server, so clearing app data loses queued work.
+### 1. Declare the desktop dependencies
 
-## Changes to make
+Add to `package.json`:
 
-- Extend `electron/db/schema.sql` with idempotent `ALTER TABLE` blocks adding
-  the five sales columns, and a new `dbo.drawer_events` table with the standard
-  sync block, index and trigger.
-- Add `drawer_events` to the push table order in `electron/sync/worker.cjs`
-  and to the allow-list in `electron/db/repo.cjs`; map the new sale columns in
-  `createSale` and `toCloudRow`.
-- Add `dbo.activity_journal` and `dbo.outbox` tables so journal entries and
-  queued operations survive on disk, and mirror writes there from
-  `src/lib/activity-journal.ts` / `src/lib/sync-outbox.ts` when the bridge is
-  present (localStorage stays as the browser fallback).
-- Update `docs/windows-sql-server.md` with the final table list.
+- `mssql` (dependencies) — the SQL Server driver
+- `msnodesqlv8` (optionalDependencies) — only needed for Windows auth, and it
+  compiles native code, so it must not break `npm install` on other machines
+- `electron`, `@electron/packager`, `cross-env` (devDependencies) — already
+  required by the desktop scripts but currently only documented
 
-No UI or business-logic changes; existing databases upgrade in place because
-every statement is guarded.
+### 2. Make the driver load lazily so the app never dies at boot
+
+Change `electron/db/pool.cjs` to require `mssql` inside the functions that
+actually use it (`connect`, `test`), wrapped so a missing module returns a clear
+message instead of crashing:
+
+```text
+Local database driver not installed. Run: npm install mssql
+```
+
+`electron/main.cjs` keeps registering IPC and opening the window; the till then
+runs in its existing local-storage + outbox fallback mode, and only the
+Local database section in Settings reports the problem. Same treatment for the
+`msnodesqlv8` path: if Windows auth is selected and the driver is absent, the
+returned error names the package to install.
+
+### 3. Surface it in the UI
+
+`src/components/pos/LocalDatabaseSettings.tsx` already renders the error string
+from `pos:test` / `pos:connect`; the new messages flow through unchanged, so the
+user sees the install command in the app instead of a console stack.
+
+### 4. Docs
+
+Update `docs/run-locally.md` and `docs/windows-sql-server.md`: after
+`npm install`, `mssql` now comes with the project; `msnodesqlv8` is optional and
+needs Visual Studio Build Tools on Windows if integrated auth is wanted.
+
+## Files touched
+
+- `package.json` — add mssql / msnodesqlv8 / electron toolchain entries
+- `electron/db/pool.cjs` — lazy, guarded driver require
+- `docs/run-locally.md`, `docs/windows-sql-server.md` — install notes
+
+No UI, business logic or backend changes.
