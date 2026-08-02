@@ -1,5 +1,6 @@
 const path = require("node:path");
 const fs = require("node:fs");
+const os = require("node:os");
 const net = require("node:net");
 const { spawn } = require("node:child_process");
 const { app, BrowserWindow, ipcMain, screen, dialog } = require("electron");
@@ -100,6 +101,14 @@ function createWindows() {
     height: 900,
     show: false,
     backgroundColor: "#0b0b0c",
+    // Frameless shell: Windows still draws the real minimise / maximise /
+    // close buttons through the overlay, so the app owns the whole surface.
+    titleBarStyle: "hidden",
+    ...(process.platform === "darwin"
+      ? { trafficLightPosition: { x: 12, y: 12 } }
+      : {
+          titleBarOverlay: { color: "#0b0b0c", symbolColor: "#e7e7ea", height: 34 },
+        }),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
