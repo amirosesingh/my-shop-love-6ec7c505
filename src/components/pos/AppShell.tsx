@@ -28,6 +28,8 @@ import {
 import { cn } from "@/lib/utils";
 import { useUiScale } from "@/lib/use-ui-scale";
 import { useBranding, isDesktop } from "@/lib/branding";
+import { setBranchId } from "@/lib/activity-journal";
+import { flushWhatsAppQueue } from "@/lib/whatsapp";
 
 /** Permission required to open each screen. Keys are path prefixes, so child
  *  pages (/settings/tax, /reports/sales …) inherit the parent gate unless they
@@ -57,6 +59,13 @@ const ROUTE_PERMISSIONS: Record<string, PermissionFlag> = {
  *  an entry above — unknown paths are denied, never silently allowed. */
 const PUBLIC_ROUTES = new Set(["/", "/display"]);
 
+/** Cloud-only admin tools. The Windows till never manages accounts, branches,
+ *  messaging credentials or device activation — those stay in the web console. */
+const DESKTOP_BLOCKED = ["/settings/terminals", "/settings/whatsapp", "/staff", "/stores"];
+
+const isDesktopBlocked = (pathname: string) =>
+  DESKTOP_BLOCKED.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+
 /** Longest matching prefix wins so a child page can tighten its parent gate. */
 function requiredPermission(pathname: string): PermissionFlag | null | "unknown" {
   if (PUBLIC_ROUTES.has(pathname)) return null;
@@ -83,8 +92,21 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Background outbox drain: keeps offline sales flowing once the link returns.
   useEffect(() => startSyncEngine(), []);
 
+  // Bills queued while offline go out as soon as the link is back.
+  useEffect(() => {
+    const flush = () => void flushWhatsAppQueue().catch(() => {});
+    flush();
+    window.addEventListener("online", flush);
+    return () => window.removeEventListener("online", flush);
+  }, []);
+
   useEffect(() => {
     setPrintStore(currentStore ?? null);
+  }, [currentStore]);
+
+  // Stamp every journal entry and queued write with the branch in use.
+  useEffect(() => {
+    setBranchId(currentStore?.id ?? null);
   }, [currentStore]);
 
   useEffect(() => {
@@ -123,6 +145,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     state.settings.receipt.companyName?.trim() || branding.company;
 
   const canSee = (item: NavItem) => {
+    if (item.desktopHidden && isDesktop()) return false;
     if (item.flag && !can(item.flag)) return false;
     if (item.adminOnly && !isAdmin && !item.flag) return false;
     return true;
@@ -207,7 +230,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     );
 
   return (
-    <div className="pos-scaled flex min-h-screen bg-background text-foreground">
+    <div className="pos-scaled flex h-screen overflow-hidden bg-background text-foreground">
       {/* Desktop / tablet sidebar */}
       <aside
         className={cn(
@@ -230,9 +253,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         />
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {/* Mobile top bar + slide-out drawer */}
-        <header className="flex items-center gap-2 border-b border-border bg-sidebar px-3 py-2 md:hidden">
+        <header className="flex shrink-0 items-center gap-2 border-b border-border bg-sidebar px-3 py-2 md:hidden">
           <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" aria-label="Open menu">
@@ -285,7 +308,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </header>
 
         {/* Desktop header: signed-in cashier + quick lock / switch user */}
-        <header className="hidden items-center gap-3 border-b border-border bg-sidebar px-4 py-2 md:flex">
+        <header className="hidden shrink-0 items-center gap-3 border-b border-border bg-sidebar px-4 py-2 md:flex">
           <div className="min-w-0">
             <p className="truncate text-sm font-medium">{user.name}</p>
             <p className="text-[11px] capitalize text-muted-foreground">
@@ -308,9 +331,23 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Button>
         </header>
 
-        <main className="min-w-0 flex-1">
+        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
           {(() => {
             // Decided before the page body renders: no flash of protected data.
+            if (isDesktop() && isDesktopBlocked(location.pathname))
+              return (
+                <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 p-8 text-center">
+                  <Lock className="size-8 text-muted-foreground" />
+                  <h1 className="text-lg font-semibold">Managed in the web console</h1>
+                  <p className="max-w-sm text-sm text-muted-foreground">
+                    Accounts, branches, messaging credentials and device activation are handled
+                    centrally, not from a till. Open the web admin console to change them.
+                  </p>
+                  <Button asChild variant="outline" size="sm">
+                    <Link to="/">Back to the register</Link>
+                  </Button>
+                </div>
+              );
             const required = requiredPermission(location.pathname);
             const allowed =
               required === null ? true : required === "unknown" ? isAdmin : can(required);

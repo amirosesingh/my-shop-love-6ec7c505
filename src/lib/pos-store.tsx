@@ -30,6 +30,8 @@ import type {
 import { bookingBalance, lineUnitDiscount, r2, type DiscountType } from "./pos-types";
 import { logger } from "./audit-log";
 import { db, dbError, loadCloudState } from "./pos-db";
+import type { CloudSlice } from "./pos-db";
+import { readSnapshot, writeSnapshot } from "./offline-snapshot";
 import { useAuth } from "./pos-auth";
 
 const KEY = "pos-state-v2";
@@ -139,6 +141,35 @@ type Ctx = {
 
 const PosContext = createContext<Ctx | null>(null);
 
+/** Merge a cloud (or cached snapshot) slice into local state. */
+function applyCloud(s: PosState, cloud: CloudSlice): PosState {
+  return {
+    ...s,
+    products: cloud.products,
+    members: cloud.members,
+    sales: cloud.sales,
+    promotions: cloud.promotions.length ? cloud.promotions : s.promotions,
+    // Locations are central now; the local list is the fallback until
+    // the directory has been populated (and gets pushed up below).
+    stores: cloud.stores.length ? cloud.stores : s.stores,
+    currentStoreId: cloud.stores.length
+      ? (cloud.stores.find((x) => x.id === s.currentStoreId)?.id ?? cloud.stores[0].id)
+      : s.currentStoreId,
+    settings: {
+      tax: { ...defaultSettings.tax, ...cloud.settings.tax },
+      receipt: { ...defaultSettings.receipt, ...cloud.settings.receipt },
+      payment: { ...defaultSettings.payment, ...cloud.settings.payment },
+      whatsapp: { ...defaultSettings.whatsapp, ...cloud.settings.whatsapp },
+      review: { ...defaultSettings.review, ...cloud.settings.review },
+    },
+    // Keep the bill counter ahead of every receipt already in the cloud.
+    counter: cloud.sales.reduce(
+      (max, sale) => Math.max(max, Number(sale.receiptNo.split("-").pop()) || 0),
+      s.counter,
+    ),
+  };
+}
+
 export function PosProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<PosState>(seedState);
   const [ready, setReady] = useState(false);
@@ -187,34 +218,22 @@ export function PosProvider({ children }: { children: ReactNode }) {
         if (authReady && !cancelled) setReady(true);
         return;
       }
+      // Offline-first boot: paint the last known good snapshot immediately so
+      // the till is usable with no connection, then refresh in the background.
+      const snap = readSnapshot();
+      if (snap && !cancelled) {
+        setState((s) => applyCloud(s, snap));
+        setReady(true);
+      }
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        if (!cancelled) setReady(true);
+        return;
+      }
       try {
         const cloud = await loadCloudState();
         if (cancelled) return;
-        setState((s) => ({
-          ...s,
-          products: cloud.products,
-          members: cloud.members,
-          sales: cloud.sales,
-          promotions: cloud.promotions.length ? cloud.promotions : s.promotions,
-          // Locations are central now; the local list is the fallback until
-          // the directory has been populated (and gets pushed up below).
-          stores: cloud.stores.length ? cloud.stores : s.stores,
-          currentStoreId: cloud.stores.length
-            ? (cloud.stores.find((x) => x.id === s.currentStoreId)?.id ?? cloud.stores[0].id)
-            : s.currentStoreId,
-          settings: {
-            tax: { ...defaultSettings.tax, ...cloud.settings.tax },
-            receipt: { ...defaultSettings.receipt, ...cloud.settings.receipt },
-            payment: { ...defaultSettings.payment, ...cloud.settings.payment },
-            whatsapp: { ...defaultSettings.whatsapp, ...cloud.settings.whatsapp },
-            review: { ...defaultSettings.review, ...cloud.settings.review },
-          },
-          // Keep the bill counter ahead of every receipt already in the cloud.
-          counter: cloud.sales.reduce(
-            (max, sale) => Math.max(max, Number(sale.receiptNo.split("-").pop()) || 0),
-            s.counter,
-          ),
-        }));
+        writeSnapshot(cloud);
+        setState((s) => applyCloud(s, cloud));
         if (!cloud.stores.length) db.upsertStores(stateRef.current.stores);
       } catch (e) {
         dbError("Loading data", e);

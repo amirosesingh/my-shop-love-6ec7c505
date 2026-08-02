@@ -1,5 +1,6 @@
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { logSync } from "./sync-log";
+import { replayOrder } from "./activity-journal";
 import { isTerminalRevoked } from "./use-revocation-check";
 import {
   failOp,
@@ -90,8 +91,10 @@ async function runOne(entry: QueuedOp): Promise<boolean> {
 let draining = false;
 
 /**
- * Push queued writes in order. Stops on the first failure so operations that
- * depend on each other (sale then sale_items) never land out of order.
+ * Push queued writes in the order they happened. Entries are replayed
+ * oldest-first per terminal, and a failure blocks only that terminal's queue,
+ * so one stuck branch never holds up another. Dependent operations (sale then
+ * sale_items) therefore always land in sequence.
  */
 export async function drainOutbox(): Promise<{ pushed: number; failed: number }> {
   // A revoked terminal keeps selling locally but is cut off from the cloud.
@@ -100,9 +103,12 @@ export async function drainOutbox(): Promise<{ pushed: number; failed: number }>
   draining = true;
   let pushed = 0;
   let failed = 0;
+  const blocked = new Set<string>();
   try {
-    for (const entry of listQueue()) {
+    for (const entry of replayOrder(listQueue())) {
       if (entry.quarantined) continue;
+      const terminal = entry.terminalId ?? "legacy";
+      if (blocked.has(terminal)) continue;
       // Exponential backoff: 0s, 5s, 20s, 45s ... since the last attempt.
       const wait = entry.attempts ** 2 * 5000;
       if (wait && Date.now() - new Date(entry.createdAt).getTime() < wait) continue;
@@ -110,7 +116,7 @@ export async function drainOutbox(): Promise<{ pushed: number; failed: number }>
       if (ok) pushed += 1;
       else {
         failed += 1;
-        break;
+        blocked.add(terminal);
       }
     }
     if (pushed) markSynced();

@@ -1,5 +1,6 @@
 import { logger } from "./audit-log";
 import { sendWhatsAppBill } from "./whatsapp.functions";
+import { listQueuedMessages, queueMessage, resolveMessage } from "./whatsapp-queue";
 import { getPosCallerAuth } from "./pos-caller-auth";
 import {
   PAYMENT_LABELS,
@@ -95,6 +96,17 @@ export async function sendBillOnWhatsApp({ cfg, to, body, reference, member }: S
   const number = normalizeWhatsAppNumber(to, cfg.countryCode);
   if (!number) return { ok: false, error: "This customer has no WhatsApp number on file" };
 
+  // No connection: park the message and tell the cashier it will go out later.
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    queueMessage({ phoneNumberId: cfg.phoneNumberId, to: number, body, reference });
+    logger.log("messaging", "WhatsApp bill queued (offline)", "messaging", {
+      reference,
+      to: number,
+      customer: member?.name ?? null,
+    });
+    return { ok: true, queued: true as const };
+  }
+
   const res = await sendWhatsAppBill({
     data: { ...(await getPosCallerAuth()), phoneNumberId: cfg.phoneNumberId, to: number, body },
   }).catch((e: unknown) => ({ ok: false as const, error: String(e) }));
@@ -112,4 +124,30 @@ export async function sendBillOnWhatsApp({ cfg, to, body, reference, member }: S
     },
   );
   return res.ok ? { ok: true } : { ok: false, error: ("error" in res && res.error) || "Send failed" };
+}
+
+
+/** Flush anything queued while the till was offline. */
+export async function flushWhatsAppQueue() {
+  if (typeof navigator !== "undefined" && !navigator.onLine) return { sent: 0 };
+  let sent = 0;
+  for (const msg of listQueuedMessages()) {
+    const res = await sendWhatsAppBill({
+      data: {
+        ...(await getPosCallerAuth()),
+        phoneNumberId: msg.phoneNumberId,
+        to: msg.to,
+        body: msg.body,
+      },
+    }).catch(() => ({ ok: false as const }));
+    if (!res.ok) break;
+    resolveMessage(msg.id);
+    sent += 1;
+    logger.log("messaging", "Queued WhatsApp bill sent", "messaging", {
+      reference: msg.reference,
+      to: msg.to,
+      queuedAt: msg.queuedAt,
+    });
+  }
+  return { sent };
 }

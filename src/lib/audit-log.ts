@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { db } from "./pos-db";
+import { replayOrder, stamp } from "./activity-journal";
 
 /** Action types — what the person actually did, never a button name. */
 export type AuditCategory =
@@ -93,10 +94,18 @@ export type AuditLog = {
   details: Record<string, unknown>;
   synced_to_cloud: boolean;
   syncedAt: string | null;
+  /** till that produced the entry */
+  terminalId?: string;
+  /** monotonic per-terminal order, used when replaying after an outage */
+  seq?: number;
+  /** device clock reading (may differ from the cloud's received time) */
+  deviceTime?: string;
 };
 
 const KEY = "pos-audit-logs-v1";
-const MAX = 4000;
+/** Cap applies to already-synced history only — pending entries are never
+ *  dropped, however long the terminal stays offline. */
+const MAX_SYNCED = 4000;
 
 let logs: AuditLog[] = [];
 let loaded = false;
@@ -129,10 +138,20 @@ function load() {
 function persist() {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(KEY, JSON.stringify(logs.slice(0, MAX)));
+    window.localStorage.setItem(KEY, JSON.stringify(trim(logs)));
   } catch {
     /* storage full */
   }
+}
+
+/** Keep every pending entry; only archive old, already-synced ones. */
+function trim(rows: AuditLog[]): AuditLog[] {
+  let synced = 0;
+  return rows.filter((r) => {
+    if (!r.synced_to_cloud) return true;
+    synced += 1;
+    return synced <= MAX_SYNCED;
+  });
 }
 
 function emit() {
@@ -150,22 +169,26 @@ export const logger = {
   ) {
     if (typeof window === "undefined") return;
     load();
+    const s = stamp(actor.storeId);
     const entry: AuditLog = {
       id: crypto.randomUUID(),
-      at: new Date().toISOString(),
+      at: s.deviceTime,
       category: resolveCategory(category, actionName),
       action: actionName,
       module,
       staffId: actor.staffId,
       staffName: actor.staffName,
       role: actor.role,
-      storeId: actor.storeId,
+      storeId: actor.storeId ?? s.branchId,
       route: window.location.pathname,
       details: { ...details, role: actor.role, authUserId: actor.authUserId },
       synced_to_cloud: false,
       syncedAt: null,
+      terminalId: s.terminalId,
+      seq: s.seq,
+      deviceTime: s.deviceTime,
     };
-    logs = [entry, ...logs].slice(0, MAX);
+    logs = trim([entry, ...logs]);
     emit();
     scheduleFlush();
     return entry;
@@ -212,7 +235,9 @@ const setSync = (patch: Partial<SyncState>) => {
 async function flushBatch() {
   load();
   const online = typeof navigator === "undefined" ? true : navigator.onLine;
-  const pending = logs.filter((l) => !l.synced_to_cloud);
+  // Oldest first, in per-terminal sequence, so the cloud sees the same order
+  // the branch experienced — even after days offline.
+  const pending = replayOrder(logs.filter((l) => !l.synced_to_cloud));
   setSync({ online, pending: pending.length });
   if (!online || !pending.length) return;
 
@@ -234,6 +259,10 @@ async function flushBatch() {
           staffId: l.staffId,
           role: l.role,
           storeId: l.storeId,
+          terminalId: l.terminalId,
+          seq: l.seq,
+          deviceTime: l.deviceTime ?? l.at,
+          receivedAt: new Date().toISOString(),
         },
       })),
     );
