@@ -34,6 +34,10 @@ contextBridge.exposeInMainWorld("pos", {
   /* activation mirror that survives updates */
   readTerminalConfig: () => invoke("terminal:read"),
   writeTerminalConfig: (config) => invoke("terminal:write", config),
+  /* boot health / safe mode */
+  reportReady: () => invoke("app:ready"),
+  healthState: () => invoke("health:state"),
+  rollbackNow: () => invoke("health:rollback"),
   onStatus: (cb) => {
     const handler = (_e, payload) => cb(payload);
     ipcRenderer.on("pos:status-changed", handler);
