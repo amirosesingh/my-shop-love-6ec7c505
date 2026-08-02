@@ -28,6 +28,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useUiScale } from "@/lib/use-ui-scale";
 import { useBranding, isDesktop } from "@/lib/branding";
+import { setBranchId } from "@/lib/activity-journal";
 
 /** Permission required to open each screen. Keys are path prefixes, so child
  *  pages (/settings/tax, /reports/sales …) inherit the parent gate unless they
