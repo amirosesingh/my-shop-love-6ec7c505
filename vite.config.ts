@@ -21,6 +21,7 @@ export default defineConfig({
     tsConfigPaths(),
     nitro({
       preset: "node-server",
+      output: { dir: "dist" },
     }),
   ],
 });

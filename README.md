@@ -60,7 +60,7 @@ npm install
 npm run build
 ```
 
-The build output is placed in `.output/`.
+The build output is placed in `dist/`.
 
 ### Run locally
 
@@ -95,9 +95,9 @@ docker run -p 3000:3000 --env-file .env northwind-pos
 ### Deploying to any Node.js host
 
 1. Build the project (`npm run build`).
-2. Copy `.output/` to the server.
+2. Copy `dist/` to the server.
 3. Set the environment variables.
-4. Run `node .output/server/index.mjs`.
+4. Run `node dist/server/index.mjs`.
 
 The app is now fully independent of Lovable hosting and branding.
 
