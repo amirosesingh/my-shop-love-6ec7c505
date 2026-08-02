@@ -30,8 +30,9 @@ electron/
    npm install msnodesqlv8
    ```
 
-4. Add `"main": "electron/main.cjs"` to `package.json` and set `base: './'` in
-   `vite.config.ts` so `file://` loading resolves assets.
+4. Nothing else to wire up: `package.json` already declares
+   `"main": "electron/main.cjs"`, and the desktop build sets `base: './'`
+   automatically (see `docs/run-locally.md`).
 
 ## Running and packaging
 
