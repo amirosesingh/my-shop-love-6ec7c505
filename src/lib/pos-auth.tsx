@@ -448,6 +448,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [session, roles, staff, terminalUser, appUser]);
 
+  // Local, per-terminal record of who signed in today. Lets a shift opened by
+  // one cashier be continued by another while still showing every user.
+  useEffect(() => {
+    if (!user) return;
+    recordSignIn({
+      staffId: user.staffId,
+      name: user.name,
+      role: user.metaRole ?? user.role,
+    });
+  }, [user?.staffId, user?.name, user?.role, user?.metaRole]);
+
   const isWarehouse =
     !!session?.user &&
     !terminalUser?.cashierId &&
