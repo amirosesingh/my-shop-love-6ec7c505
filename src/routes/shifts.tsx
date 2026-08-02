@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { Printer, RotateCcw, Vault } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Printer, RotateCcw, Users, Vault } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ import { money, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
 import { useUserPermissions } from "@/lib/pos-permissions";
 import { openCashDrawer, printSaleReceipt, printShiftReport } from "@/lib/pos-print";
+import { signInsForDay, type SignInEntry } from "@/lib/shift-attendance";
 
 export const Route = createFileRoute("/shifts")({
   head: () => ({
@@ -53,6 +54,15 @@ function Shifts() {
   const [counted, setCounted] = useState("");
   const [note, setNote] = useState("");
   const [closeOpen, setCloseOpen] = useState(false);
+  const [signIns, setSignIns] = useState<SignInEntry[]>([]);
+
+  // Local per-terminal log — read after mount so SSR and hydration match.
+  useEffect(() => {
+    const refresh = () => setSignIns(signInsForDay());
+    refresh();
+    const t = window.setInterval(refresh, 30_000);
+    return () => window.clearInterval(t);
+  }, [user?.staffId]);
 
   const storeSales = state.sales.filter((s) => s.storeId === currentStore.id);
   const storeShifts = state.shifts.filter((s) => s.storeId === currentStore.id);
@@ -121,13 +131,18 @@ function Shifts() {
         <section className="rounded-lg border border-border bg-card p-5">
           {activeShift ? (
             <div className="grid gap-4 md:grid-cols-4">
-              <Metric label="Cashier" value={activeShift.cashier} />
+              <Metric label="Opened by" value={activeShift.cashier} />
+              <Metric label="Serving now" value={user?.name || activeShift.cashier} />
               <Metric
                 label="Opened"
                 value={new Date(activeShift.openedAt).toLocaleTimeString()}
               />
               <Metric label="Transactions" value={String(shiftSales.length)} />
               <Metric label="Expected drawer" value={money(expected)} highlight />
+              <p className="md:col-span-4 text-xs text-muted-foreground">
+                Another user can lock the till and sign in without closing this shift — each sale is
+                recorded under whoever is signed in at the time.
+              </p>
               <div className="md:col-span-4 flex flex-wrap gap-2">
                 <Button
                   variant="outline"
@@ -171,6 +186,50 @@ function Shifts() {
                 Open shift
               </Button>
             </div>
+          )}
+        </section>
+
+        <section className="rounded-lg border border-border bg-card">
+          <h2 className="flex items-center gap-2 px-5 py-3 text-sm font-semibold">
+            <Users className="size-4" /> Signed in today on this terminal
+          </h2>
+          <Separator />
+          {signIns.length === 0 ? (
+            <p className="px-5 py-4 text-sm text-muted-foreground">No sign-ins recorded yet today.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>User</TableHead>
+                  <TableHead>Staff ID</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>First sign-in</TableHead>
+                  <TableHead>Last seen</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {signIns.map((e) => (
+                  <TableRow key={e.staffId}>
+                    <TableCell className="font-medium">
+                      {e.name}
+                      {user && (user.staffId === e.staffId || user.name === e.name) && (
+                        <Badge variant="outline" className="ml-2">
+                          signed in
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="numeric text-muted-foreground">{e.staffId}</TableCell>
+                    <TableCell className="capitalize text-muted-foreground">{e.role}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {new Date(e.firstSeen).toLocaleTimeString()}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {new Date(e.lastSeen).toLocaleTimeString()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </section>
 

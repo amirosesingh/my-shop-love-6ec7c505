@@ -131,6 +131,9 @@ function Register() {
   const [openShiftOpen, setOpenShiftOpen] = useState(false);
   const [float, setFloat] = useState("150");
   const [cashier, setCashier] = useState(user?.name ?? "Cashier");
+  /** Who is actually signed in right now — sales are stamped with this, not
+   *  the name captured when the shift was opened (users may switch mid-shift). */
+  const activeCashier = user?.name || activeShift?.cashier || cashier;
   const [tendered, setTendered] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("cash");
   const [transferRef, setTransferRef] = useState("");
@@ -406,7 +409,7 @@ function Register() {
   const displayBase = {
     companyName: state.settings.receipt.companyName || currentStore.name,
     storeName: `${currentStore.name} (${currentStore.code})`,
-    cashier: activeShift?.cashier ?? cashier,
+    cashier: activeCashier,
     payment: state.settings.payment,
   };
 
@@ -507,7 +510,7 @@ function Register() {
       customerName: bookName.trim() || member?.name || "Walk-in",
       customerPhone: bookPhone.trim() || member?.phone || "",
       note: bookNote.trim(),
-      cashier: activeShift.cashier,
+      cashier: activeCashier,
     });
     if (paidNow > 0 && depositMethod === "cash") openCashDrawer();
     printBookingSlip(booking, member, state.settings.payment);
@@ -612,7 +615,7 @@ function Register() {
       payments,
       memberId,
       pointsEarned,
-      cashier: activeShift.cashier,
+      cashier: activeCashier,
       ...(method === "bank_transfer" ? { transferRef: transferRef.trim() } : {}),
       ...(exchangeRef
         ? { exchangeOfReceiptNo: exchangeRef, exchangeCredit: totals.credit }
@@ -870,7 +873,7 @@ function Register() {
           method,
           memberId,
           pointsEarned,
-          cashier: activeShift?.cashier ?? cashier,
+          cashier: activeCashier,
           createdAt: new Date().toISOString(),
           ...(exchangeRef
             ? { exchangeOfReceiptNo: exchangeRef, exchangeCredit: totals.credit }
