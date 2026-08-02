@@ -30,6 +30,7 @@ import { useUiScale } from "@/lib/use-ui-scale";
 import { useBranding, isDesktop } from "@/lib/branding";
 import { setBranchId } from "@/lib/activity-journal";
 import { flushWhatsAppQueue } from "@/lib/whatsapp";
+import { reportAppReady } from "@/lib/app-health";
 
 /** Permission required to open each screen. Keys are path prefixes, so child
  *  pages (/settings/tax, /reports/sales …) inherit the parent gate unless they
@@ -91,6 +92,10 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   // Background outbox drain: keeps offline sales flowing once the link returns.
   useEffect(() => startSyncEngine(), []);
+
+  // Tells the desktop shell this build actually started, so it never falls
+  // back into safe mode after a healthy launch.
+  useEffect(() => reportAppReady(), []);
 
   // Bills queued while offline go out as soon as the link is back.
   useEffect(() => {

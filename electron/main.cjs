@@ -3,13 +3,15 @@ const fs = require("node:fs");
 const os = require("node:os");
 const net = require("node:net");
 const { spawn } = require("node:child_process");
-const { app, BrowserWindow, ipcMain, screen, dialog } = require("electron");
+const { app, BrowserWindow, ipcMain, screen, dialog, shell } = require("electron");
 
 const pool = require("./db/pool.cjs");
 const repo = require("./db/repo.cjs");
 const worker = require("./sync/worker.cjs");
 const updater = require("./updater.cjs");
 const terminalStore = require("./terminal-store.cjs");
+const health = require("./health.cjs");
+const recovery = require("./recovery.cjs");
 
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
 const DEBUG = process.env.POS_DEBUG === "1";
@@ -21,6 +23,20 @@ let mainWindow = null;
 let displayWindow = null;
 let serverProcess = null;
 let baseUrl = DEV_URL || null;
+/** Cleared as soon as the renderer reports that the till actually mounted. */
+let readyWatchdog = null;
+let safeMode = false;
+
+function enterSafeMode(reason) {
+  if (safeMode) return;
+  safeMode = true;
+  if (reason) health.markFailed(reason);
+  updater.pause();
+  for (const win of BrowserWindow.getAllWindows()) win.destroy();
+  mainWindow = null;
+  displayWindow = null;
+  recovery.open();
+}
 
 /* ------------------------- local app server ------------------------- */
 
@@ -223,6 +239,48 @@ function printRaw(bytes, share) {
 }
 
 function registerIpc() {
+  /* ----------------------- boot health & safe mode -------------------- */
+
+  // The healthy signal: the register mounted, so this build works.
+  ipcMain.handle("app:ready", () => {
+    if (readyWatchdog) clearTimeout(readyWatchdog);
+    readyWatchdog = null;
+    return { ok: true, health: health.markHealthy() };
+  });
+
+  ipcMain.handle("health:state", () => {
+    const state = health.read();
+    const lastGood = state.lastGoodVersion;
+    const canRollback =
+      process.platform === "win32" && Boolean(lastGood) && lastGood !== app.getVersion();
+    return {
+      ...state,
+      version: app.getVersion(),
+      safeMode,
+      canRollback,
+      rollbackHint: !lastGood
+        ? "No earlier working version has been recorded on this machine yet."
+        : lastGood === app.getVersion()
+          ? "The installed version is already the last one that started cleanly."
+          : null,
+    };
+  });
+
+  ipcMain.handle("health:rollback", async () => {
+    const { lastGoodVersion } = health.read();
+    updater.pause();
+    return updater.rollback(lastGoodVersion, (percent) => recovery.progress({ percent }));
+  });
+
+  ipcMain.handle("health:retry", () => {
+    health.reset();
+    app.relaunch();
+    app.exit(0);
+  });
+
+  ipcMain.handle("health:open-logs", () => shell.openPath(app.getPath("userData")));
+  ipcMain.handle("health:quit", () => app.quit());
+
   ipcMain.handle("print:silent", async (_e, html, options) => {
     try {
       return await printSilent(String(html), options?.deviceName || undefined);
@@ -404,22 +462,33 @@ function registerIpc() {
 
 app.whenReady().then(async () => {
   registerIpc();
+  const boot = health.beginBoot();
+  if (health.shouldEnterSafeMode(boot)) {
+    safeMode = true;
+    updater.pause();
+    recovery.open();
+    return;
+  }
   try {
     if (!baseUrl) baseUrl = await startAppServer();
   } catch (err) {
     console.error(err);
-    dialog.showErrorBox("Cannot start the POS", err instanceof Error ? err.message : String(err));
-    app.quit();
+    // There is always a way back: recovery, not a dead end.
+    enterSafeMode(err instanceof Error ? err.message : String(err));
     return;
   }
   createWindows();
   updater.start();
+  // If the till never reports in, the build is broken — recover instead of
+  // leaving the operator staring at a blank window.
+  readyWatchdog = setTimeout(() => enterSafeMode("Startup timed out"), 60_000);
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindows();
   });
 });
 
 app.on("window-all-closed", async () => {
+  if (readyWatchdog) clearTimeout(readyWatchdog);
   worker.stop();
   updater.stop();
   stopAppServer();

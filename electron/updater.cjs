@@ -8,13 +8,18 @@
  * Updates download in the background and are only applied when the operator
  * restarts, so a shift is never interrupted.
  */
-const { app, BrowserWindow } = require("electron");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+const { spawn } = require("node:child_process");
+const { app, BrowserWindow, net } = require("electron");
 
 const SIX_HOURS = 6 * 60 * 60 * 1000;
 
 let autoUpdater = null;
 let state = { status: "idle", version: app.getVersion(), percent: 0, error: null };
 let timer = null;
+let paused = false;
 
 function broadcast() {
   for (const win of BrowserWindow.getAllWindows()) {
@@ -73,6 +78,7 @@ function load() {
 async function check() {
   const updater = load();
   if (!updater) return state;
+  if (paused) return state;
   if (!app.isPackaged) {
     set({ status: "unavailable", error: "Updates only run in the installed app." });
     return state;
@@ -92,6 +98,7 @@ function install() {
 }
 
 function start() {
+  if (paused) return;
   void check();
   timer = setInterval(() => void check(), SIX_HOURS);
   if (timer.unref) timer.unref();
@@ -102,4 +109,76 @@ function stop() {
   timer = null;
 }
 
-module.exports = { start, stop, check, install, status: () => state };
+/** Safe mode calls this so a broken build cannot keep reinstalling itself. */
+function pause() {
+  paused = true;
+  stop();
+}
+
+/* ------------------------------ rollback ------------------------------ */
+
+const artifact = (version) => `${app.getName()} Setup ${version}.exe`;
+
+/** Where the installer for a given version lives on the configured feed. */
+function rollbackUrl(version) {
+  const target = feed();
+  if (!target) return null;
+  const file = encodeURIComponent(artifact(version));
+  if (target.provider === "github") {
+    return `https://github.com/${target.owner}/${target.repo}/releases/download/v${version}/${file}`;
+  }
+  return `${target.url.replace(/\/+$/, "")}/${file}`;
+}
+
+function download(url, destination, onProgress) {
+  return new Promise((resolve, reject) => {
+    const request = net.request({ url, redirect: "follow" });
+    request.on("response", (response) => {
+      if (response.statusCode !== 200) {
+        reject(new Error(`Download failed (HTTP ${response.statusCode})`));
+        response.resume?.();
+        return;
+      }
+      const total = Number(response.headers["content-length"] || 0);
+      let received = 0;
+      const out = fs.createWriteStream(destination);
+      response.on("data", (chunk) => {
+        received += chunk.length;
+        out.write(chunk);
+        if (total && onProgress) onProgress(Math.round((received / total) * 100));
+      });
+      response.on("end", () => out.end(() => resolve(destination)));
+      response.on("error", reject);
+    });
+    request.on("error", reject);
+    request.end();
+  });
+}
+
+/**
+ * Fetch the installer for an earlier version and run it silently. NSIS
+ * reinstalls in place, so the user-data folder — activation mirror, settings,
+ * local database pointer — is left alone.
+ */
+async function rollback(version, onProgress) {
+  if (!version) return { ok: false, error: "No earlier version has been recorded yet." };
+  if (process.platform !== "win32")
+    return { ok: false, error: "Roll back is only supported on Windows." };
+  const url = rollbackUrl(version);
+  if (!url) return { ok: false, error: "No update feed is configured for this build." };
+  const file = path.join(os.tmpdir(), `pos-rollback-${version}.exe`);
+  try {
+    await download(url, file, onProgress);
+  } catch (err) {
+    return { ok: false, error: `Could not download version ${version}: ${err?.message || err}` };
+  }
+  try {
+    spawn(file, ["/S"], { detached: true, stdio: "ignore", windowsHide: true }).unref();
+  } catch (err) {
+    return { ok: false, error: `Could not start the installer: ${err?.message || err}` };
+  }
+  setTimeout(() => app.quit(), 1500);
+  return { ok: true, version };
+}
+
+module.exports = { start, stop, pause, check, install, rollback, status: () => state };
