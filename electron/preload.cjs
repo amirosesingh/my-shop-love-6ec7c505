@@ -21,6 +21,19 @@ contextBridge.exposeInMainWorld("pos", {
   setSyncEnabled: (on) => invoke("pos:set-sync-enabled", on),
   backup: (path) => invoke("pos:backup", path),
   retryErrored: () => invoke("pos:retry-errored"),
+  /* auto-update */
+  appVersion: () => invoke("app:version"),
+  updateStatus: () => invoke("update:status"),
+  checkForUpdates: () => invoke("update:check"),
+  installUpdate: () => invoke("update:install"),
+  onUpdateStatus: (cb) => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on("update:status", handler);
+    return () => ipcRenderer.removeListener("update:status", handler);
+  },
+  /* activation mirror that survives updates */
+  readTerminalConfig: () => invoke("terminal:read"),
+  writeTerminalConfig: (config) => invoke("terminal:write", config),
   onStatus: (cb) => {
     const handler = (_e, payload) => cb(payload);
     ipcRenderer.on("pos:status-changed", handler);

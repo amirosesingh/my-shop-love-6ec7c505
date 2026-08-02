@@ -13,6 +13,7 @@ import {
   clearTerminalConfig,
   fetchTokenStatus,
   readTerminalConfig,
+  restoreTerminalConfigFromDisk,
   stampHeartbeat,
   subscribeTerminalConfig,
   type TerminalConfig,
@@ -61,6 +62,11 @@ export function useRevocationCheck(): RevocationState {
   const [lastCheckedAt, setLastCheckedAt] = useState<string | null>(null);
 
   useEffect(() => subscribeTerminalConfig(() => setConfig(readTerminalConfig())), []);
+  // After an in-place desktop update the renderer storage can come back empty;
+  // the shell keeps a copy of the activation on disk.
+  useEffect(() => {
+    void restoreTerminalConfigFromDisk();
+  }, []);
   useEffect(() => {
     const off = subscribeRevocation(() => setRevoked(isTerminalRevoked()));
     return () => {

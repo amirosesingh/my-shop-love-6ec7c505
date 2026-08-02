@@ -8,6 +8,8 @@ const { app, BrowserWindow, ipcMain, screen, dialog } = require("electron");
 const pool = require("./db/pool.cjs");
 const repo = require("./db/repo.cjs");
 const worker = require("./sync/worker.cjs");
+const updater = require("./updater.cjs");
+const terminalStore = require("./terminal-store.cjs");
 
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
 const DEBUG = process.env.POS_DEBUG === "1";
@@ -298,6 +300,16 @@ function registerIpc() {
 
   ipcMain.handle("pos:status", () => worker.status());
 
+  /* ------------------- updates & terminal registration ---------------- */
+
+  ipcMain.handle("update:status", () => updater.status());
+  ipcMain.handle("update:check", () => updater.check());
+  ipcMain.handle("update:install", () => updater.install());
+  ipcMain.handle("app:version", () => app.getVersion());
+
+  ipcMain.handle("terminal:read", () => ({ ok: true, config: terminalStore.read() }));
+  ipcMain.handle("terminal:write", (_e, config) => terminalStore.write(config));
+
   /* ---------------- offline register database surface ---------------- */
 
   ipcMain.handle("db:create-sale", async (_e, payload) => {
@@ -401,6 +413,7 @@ app.whenReady().then(async () => {
     return;
   }
   createWindows();
+  updater.start();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindows();
   });
@@ -408,6 +421,7 @@ app.whenReady().then(async () => {
 
 app.on("window-all-closed", async () => {
   worker.stop();
+  updater.stop();
   stopAppServer();
   await pool.close();
   if (process.platform !== "darwin") app.quit();
