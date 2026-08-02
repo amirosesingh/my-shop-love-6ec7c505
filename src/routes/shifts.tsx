@@ -190,8 +190,51 @@ function Shifts() {
         </section>
 
         <section className="rounded-lg border border-border bg-card">
-          <h2 className="px-5 py-3 text-sm font-semibold">Receipts</h2>
+          <h2 className="flex items-center gap-2 px-5 py-3 text-sm font-semibold">
+            <Users className="size-4" /> Signed in today on this terminal
+          </h2>
           <Separator />
+          {signIns.length === 0 ? (
+            <p className="px-5 py-4 text-sm text-muted-foreground">No sign-ins recorded yet today.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>User</TableHead>
+                  <TableHead>Staff ID</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>First sign-in</TableHead>
+                  <TableHead>Last seen</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {signIns.map((e) => (
+                  <TableRow key={e.staffId}>
+                    <TableCell className="font-medium">
+                      {e.name}
+                      {user && (user.staffId === e.staffId || user.name === e.name) && (
+                        <Badge variant="outline" className="ml-2">
+                          signed in
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="numeric text-muted-foreground">{e.staffId}</TableCell>
+                    <TableCell className="capitalize text-muted-foreground">{e.role}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {new Date(e.firstSeen).toLocaleTimeString()}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {new Date(e.lastSeen).toLocaleTimeString()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </section>
+
+        <section className="rounded-lg border border-border bg-card">
+          <h2 className="px-5 py-3 text-sm font-semibold">Receipts</h2>
           <Separator />
           <Table>
             <TableHeader>
