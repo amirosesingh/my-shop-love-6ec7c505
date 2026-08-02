@@ -84,3 +84,24 @@ so an update never de-registers the machine.
 Settings → Terminal activation → **Re-issue code** on an existing row gives that
 same counter a fresh activation code (old one stops working) without creating a
 second entry. Requires `supabase/schema12.sql` to be run once.
+
+## Safe mode and rollback
+
+Each launch writes a pending marker; the till clears it once the register screen
+mounts. A launch that crashes or hangs leaves the marker, and two failures in a
+row open **safe mode** instead of the till:
+
+- Automatic updates pause, so a broken build cannot reinstall itself.
+- The recovery window shows the installed version, the last version that started
+  cleanly, and the failure time, with **Roll back**, **Try starting again**,
+  **Open log folder** and **Close**.
+- Roll back downloads `<Product> Setup <version>.exe` for the last known-good
+  version from the same feed (`POS_UPDATE_FEED`) and runs it silently.
+
+The same window appears if the internal app server cannot start, so the machine
+never dead-ends on an error box.
+
+Recovery never touches `%APPDATA%\LovablePOS` — `terminal-config.json`,
+settings and the local SQL Server data survive, so the till comes back
+registered with no new activation code. The same rollback action is available
+while the app runs from Settings → Display → System health.
