@@ -887,97 +887,58 @@ function Register() {
   return (
     <AppShell>
       <div className="pos-scaled flex h-full min-h-0 min-w-0 flex-col overflow-hidden lg:flex-row">
-        {/* ── LEFT: product catalog (fixed min width, never shrinks) ───── */}
-        <section className="flex min-h-0 w-full shrink-0 flex-col gap-3 border-b border-border p-4 lg:w-[clamp(340px,32vw,520px)] lg:min-w-[340px] lg:border-b-0 lg:border-r">
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-            <form onSubmit={scanSubmit} className="relative min-w-0">
-              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                autoFocus
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Scan barcode or search products…"
-                className="numeric h-11 pl-9"
-              />
-            </form>
-            <div className="flex shrink-0 gap-2">
-              <Button variant="outline" className="h-11" onClick={openCustomerDisplay}>
-                <MonitorPlay className="size-4" />
-                <span className="hidden xl:inline">Customer screen</span>
-              </Button>
-              {!activeShift && (
-                <Button className="h-11" onClick={() => setOpenShiftOpen(true)}>
-                  Open shift
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {!activeShift && (
-            <div className="flex flex-wrap items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              <Lock className="size-4" />
-              <span>Selling is locked at {currentStore.name}. Open a shift to ring up sales.</span>
-            </div>
-          )}
-
-          <div className="flex flex-wrap gap-2">
-            {categories.map((c) => (
-              <button
-                key={c}
-                onClick={() => setCategory(c)}
-                className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                  category === c
-                    ? "border-primary bg-primary/15 text-primary"
-                    : "border-border text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {c}
-              </button>
-            ))}
-          </div>
-
-          <ScrollArea className="min-h-0 flex-1 pr-2">
-            <div className="grid grid-cols-2 gap-3 pb-6 xl:grid-cols-3">
-              {filtered.map((p) => (
-                <div key={p.id} className="relative">
-                  <button
-                    onClick={() => addLine(p.id)}
-                    disabled={!activeShift}
-                    className="group flex h-full w-full flex-col justify-between rounded-lg border border-border bg-card p-3 text-left transition-colors hover:border-primary/60 hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border disabled:hover:bg-card"
-                  >
-                    <span className="pr-6 text-sm font-medium leading-snug">{p.name}</span>
-                    <span className="mt-2 flex items-center justify-between">
-                      <span className="numeric text-base font-semibold text-primary">
-                        {money(p.price)}
-                      </span>
-                      <span
-                        className={`numeric text-[11px] ${
-                          stockAt(p, currentStore.id) <= p.reorderLevel
-                            ? "text-warning"
-                            : "text-muted-foreground"
-                        }`}
-                      >
-                        {stockAt(p, currentStore.id)} left
-                      </span>
-                    </span>
-                  </button>
-                  <button
-                    aria-label={`Stock across stores for ${p.name}`}
-                    onClick={() => setDetailId(p.id)}
-                    className="absolute right-2 top-2 rounded p-1 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
-                  >
-                    <Info className="size-3.5" />
-                  </button>
-                </div>
-              ))}
-              {filtered.length === 0 && (
-                <p className="col-span-full py-10 text-center text-sm text-muted-foreground">
-                  No products match “{query}”.
-                </p>
-              )}
-            </div>
-          </ScrollArea>
+        {/* ── LEFT: product catalog (hidden on narrow windows) ─────────── */}
+        <section className="hidden min-h-0 w-full shrink-0 flex-col gap-3 border-b border-border p-4 lg:flex lg:w-[clamp(340px,32vw,520px)] lg:min-w-[340px] lg:border-b-0 lg:border-r">
+          <CatalogPanel
+            query={query}
+            onQueryChange={setQuery}
+            onScanSubmit={scanSubmit}
+            categories={categories}
+            category={category}
+            onCategoryChange={setCategory}
+            products={filtered}
+            storeId={currentStore.id}
+            storeName={currentStore.name}
+            shiftOpen={!!activeShift}
+            onAdd={addLine}
+            onDetail={setDetailId}
+            onOpenCustomerDisplay={openCustomerDisplay}
+            onOpenShift={() => setOpenShiftOpen(true)}
+          />
         </section>
+
+        {/* Narrow windows: the catalog opens as a searchable popup instead. */}
+        <Dialog open={catalogOpen} onOpenChange={setCatalogOpen}>
+          <DialogContent className="flex h-[85vh] max-w-3xl flex-col gap-3 overflow-hidden">
+            <DialogHeader>
+              <DialogTitle>Search &amp; add products</DialogTitle>
+            </DialogHeader>
+            <CatalogPanel
+              query={query}
+              onQueryChange={setQuery}
+              onScanSubmit={(e) => {
+                scanSubmit(e);
+                setCatalogOpen(false);
+              }}
+              categories={categories}
+              category={category}
+              onCategoryChange={setCategory}
+              products={filtered}
+              storeId={currentStore.id}
+              storeName={currentStore.name}
+              shiftOpen={!!activeShift}
+              onAdd={(id) => {
+                addLine(id);
+                setCatalogOpen(false);
+              }}
+              onDetail={(id) => {
+                setDetailId(id);
+                setCatalogOpen(false);
+              }}
+              showHeaderActions={false}
+            />
+          </DialogContent>
+        </Dialog>
 
         {/* ── CENTER: active cart & register (grows with the window) ───── */}
         <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-sidebar">
