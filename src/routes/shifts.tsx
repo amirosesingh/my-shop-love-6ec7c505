@@ -192,6 +192,7 @@ function Shifts() {
         <section className="rounded-lg border border-border bg-card">
           <h2 className="px-5 py-3 text-sm font-semibold">Receipts</h2>
           <Separator />
+          <Separator />
           <Table>
             <TableHeader>
               <TableRow>
