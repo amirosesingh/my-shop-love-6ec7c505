@@ -6,14 +6,24 @@
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
+const isDesktop = Boolean(process.env["DESKTOP_BUILD"]);
+
 export default defineConfig({
-  // Electron loads the built files over file://, where absolute asset paths
-  // ("/assets/...") resolve to the drive root and the window renders blank.
-  // The desktop build sets DESKTOP_BUILD=1 and gets relative paths instead;
-  // the browser/cloud build is unchanged.
-  vite: {
-    base: process.env["DESKTOP_BUILD"] ? "./" : "/",
-  },
+  // The desktop (Electron) build targets a plain Node server that the Electron
+  // main process starts on 127.0.0.1 — this app is SSR, so there is no static
+  // index.html to load over file://. The browser/cloud build is unchanged.
+  ...(isDesktop
+    ? {
+        nitro: {
+          preset: "node-server" as const,
+          output: {
+            dir: "dist-desktop",
+            serverDir: "dist-desktop/server",
+            publicDir: "dist-desktop/public",
+          },
+        },
+      }
+    : {}),
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this

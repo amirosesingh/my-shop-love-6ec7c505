@@ -79,10 +79,19 @@ attached, the customer display (`/display`) full-screen on it.
 
 | Symptom | Cause and fix |
 | --- | --- |
-| Blank white window | Built without `DESKTOP_BUILD=1`. Use `npm run desktop:build`. |
+| Blank / black window | The desktop build was missing or built for the cloud target. Run `npm run desktop:build` (it builds into `dist-desktop\` and starts Electron). Add `POS_DEBUG=1` to open DevTools and see the real error. |
 | `Unable to find Electron app` | `"main": "electron/main.cjs"` missing from `package.json`. |
 | `Cannot find module 'mssql'` | `npm install` was run before this package was added. Re-run `npm install`. The app still starts and reports it in Settings > Local database. |
 | `Cannot find module 'msnodesqlv8'` | Only needed for Windows auth; run `npm install msnodesqlv8` or switch the connection to a SQL login. |
+| `Desktop build missing (...)` dialog | You launched `electron .` directly. Use `npm run desktop:build` first. |
+
+### How the desktop app runs
+
+This POS is a server-rendered app, so there is no single `index.html` to open
+from disk. `npm run desktop:build` compiles it into a small local Node server
+(`dist-desktop\`); Electron starts that server on `127.0.0.1` at a free port
+and points the window at it. Nothing is exposed to your network, and the
+packaged app needs no separate Node.js install.
 
 ## 3. Local SQL Server database (optional)
 
