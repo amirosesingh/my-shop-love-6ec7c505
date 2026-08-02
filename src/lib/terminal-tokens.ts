@@ -46,6 +46,13 @@ type LooseClient = {
 const table = () => (supabaseExternal as unknown as LooseClient).from("terminal_tokens");
 const storesTable = () => (supabaseExternal as unknown as LooseClient).from("stores");
 
+/** Narrow SECURITY DEFINER helpers — the only token access an unregistered till has. */
+const rpc = (fn: string, args: Record<string, unknown>) =>
+  (supabaseExternal as unknown as { rpc: (n: string, a: unknown) => PromiseLike<any> }).rpc(
+    fn,
+    args,
+  );
+
 export type TokenLocation = {
   id: string;
   code: string;
@@ -185,20 +192,18 @@ export const TERMINAL_CONFIG_EVENT = EVENT;
 export async function fetchTokenStatus(
   tokenId: string,
 ): Promise<{ status: TokenStatus; locationName: string } | null> {
-  const { data, error } = await table()
-    .select("id, status, location_name")
-    .eq("id", tokenId)
-    .maybeSingle();
+  const { data, error } = await rpc("terminal_token_status", { p_token_id: tokenId });
   if (error) throw error;
-  if (!data) return null;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return null;
   return {
-    status: data.status === "revoked" ? "revoked" : "active",
-    locationName: data.location_name ?? "",
+    status: row.status === "revoked" ? "revoked" : "active",
+    locationName: row.location_name ?? "",
   };
 }
 
 export async function stampHeartbeat(tokenId: string): Promise<void> {
-  await table().update({ last_seen_at: new Date().toISOString() }).eq("id", tokenId);
+  await rpc("terminal_token_heartbeat", { p_token_id: tokenId, p_activate: false });
 }
 
 export class ActivationError extends Error {}
@@ -229,8 +234,6 @@ export async function activateTerminal(code: string): Promise<TerminalConfig> {
     activatedAt: new Date().toISOString(),
   };
   writeTerminalConfig(config);
-  await table()
-    .update({ activated_at: config.activatedAt, last_seen_at: config.activatedAt })
-    .eq("id", config.tokenId);
+  await rpc("terminal_token_heartbeat", { p_token_id: config.tokenId, p_activate: true });
   return config;
 }

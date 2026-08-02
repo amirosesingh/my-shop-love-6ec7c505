@@ -69,17 +69,16 @@ CREATE INDEX IF NOT EXISTS terminal_tokens_location_idx
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.terminal_tokens TO authenticated;
 GRANT ALL ON public.terminal_tokens TO service_role;
--- A terminal that has not signed in yet must still be able to check its own
--- token status (activation + kill-switch heartbeat), so anon gets read only.
-GRANT SELECT, UPDATE (last_seen_at, activated_at) ON public.terminal_tokens TO anon;
+-- No anon grants: an unregistered till reaches its own token only through the
+-- narrow SECURITY DEFINER helpers below, never by listing the table.
+REVOKE ALL ON public.terminal_tokens FROM anon;
 ALTER TABLE public.terminal_tokens ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Anyone can check a token status" ON public.terminal_tokens;
-CREATE POLICY "Anyone can check a token status" ON public.terminal_tokens
-  FOR SELECT TO anon, authenticated USING (true);
 DROP POLICY IF EXISTS "Terminals can stamp their heartbeat" ON public.terminal_tokens;
-CREATE POLICY "Terminals can stamp their heartbeat" ON public.terminal_tokens
-  FOR UPDATE TO anon USING (status = 'active') WITH CHECK (status = 'active');
+DROP POLICY IF EXISTS "Staff can read tokens" ON public.terminal_tokens;
+CREATE POLICY "Staff can read tokens" ON public.terminal_tokens
+  FOR SELECT TO authenticated USING (public.is_staff(auth.uid()));
 DROP POLICY IF EXISTS "Staff can issue tokens" ON public.terminal_tokens;
 CREATE POLICY "Staff can issue tokens" ON public.terminal_tokens
   FOR INSERT TO authenticated WITH CHECK (public.is_staff(auth.uid()));
@@ -90,3 +89,39 @@ CREATE POLICY "Staff can manage tokens" ON public.terminal_tokens
 DROP POLICY IF EXISTS "Staff can delete tokens" ON public.terminal_tokens;
 CREATE POLICY "Staff can delete tokens" ON public.terminal_tokens
   FOR DELETE TO authenticated USING (public.is_staff(auth.uid()));
+
+-- ------------------------------------------- single-token lookup + heartbeat ---
+-- Returns nothing unless the caller already knows the exact token id, so the
+-- table can never be enumerated by an unauthenticated visitor.
+CREATE OR REPLACE FUNCTION public.terminal_token_status(p_token_id uuid)
+RETURNS TABLE (status text, location_name text)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT t.status, coalesce(t.location_name, '')
+  FROM public.terminal_tokens t
+  WHERE t.id = p_token_id
+$$;
+
+CREATE OR REPLACE FUNCTION public.terminal_token_heartbeat(
+  p_token_id uuid,
+  p_activate boolean DEFAULT false
+)
+RETURNS void
+LANGUAGE sql
+VOLATILE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  UPDATE public.terminal_tokens
+  SET last_seen_at = now(),
+      activated_at = CASE WHEN p_activate THEN coalesce(activated_at, now()) ELSE activated_at END
+  WHERE id = p_token_id AND status = 'active'
+$$;
+
+REVOKE ALL ON FUNCTION public.terminal_token_status(uuid) FROM public;
+REVOKE ALL ON FUNCTION public.terminal_token_heartbeat(uuid, boolean) FROM public;
+GRANT EXECUTE ON FUNCTION public.terminal_token_status(uuid) TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.terminal_token_heartbeat(uuid, boolean) TO anon, authenticated, service_role;
