@@ -1,4 +1,16 @@
 import { describe, expect, it, beforeEach } from "vitest";
+
+// Minimal browser surface: these modules only need localStorage + crypto.
+const store = new Map<string, string>();
+(globalThis as unknown as { window: unknown }).window = {
+  localStorage: {
+    getItem: (k: string) => store.get(k) ?? null,
+    setItem: (k: string, v: string) => void store.set(k, v),
+    removeItem: (k: string) => void store.delete(k),
+    clear: () => store.clear(),
+  },
+} as never;
+const window = (globalThis as unknown as { window: { localStorage: Storage } }).window;
 import { replayOrder, nextSeq, terminalId, setBranchId, branchId } from "../activity-journal";
 import { cacheCredential, verifyCachedPin, isExpired, listCachedCredentials } from "../offline-credentials";
 
