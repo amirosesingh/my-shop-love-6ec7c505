@@ -953,6 +953,9 @@ function Register() {
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              <Button size="sm" className="lg:hidden" onClick={() => setCatalogOpen(true)}>
+                <Search className="size-4" /> Add product
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
@@ -1370,7 +1373,7 @@ function Register() {
         </section>
 
         {/* ── RIGHT: operation deck (fixed width) ─────────────────────── */}
-        <aside className="w-full shrink-0 space-y-3 overflow-y-auto border-t border-border bg-background p-3 lg:w-[288px] lg:border-l lg:border-t-0">
+        <aside className="max-h-[45vh] w-full shrink-0 space-y-3 overflow-y-auto border-t border-border bg-background p-3 lg:max-h-none lg:w-[288px] lg:border-l lg:border-t-0">
           {/* Card 1 · transaction actions */}
           <div className="rounded-lg border border-border bg-card p-3">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
