@@ -13,6 +13,7 @@ import { type MetaRole } from "@/lib/pos-users";
 import { TERMINAL_TOKEN_KEY } from "@/lib/pos-caller-auth";
 import { issueCashierSession } from "@/lib/pos-session.functions";
 import { verifyCashierPin } from "@/lib/pos-cashiers";
+import { recordSignIn } from "@/lib/shift-attendance";
 import {
   CASHIER_PERMISSIONS,
   FULL_PERMISSIONS,
