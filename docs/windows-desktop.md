@@ -59,3 +59,28 @@ Fix it by running `supabase/schema11.sql` once in the POS database SQL editor.
 It only creates the two functions and their grants — no table or data changes,
 and it is safe to re-run. Activation codes issued earlier keep working; there
 is no need to reissue them.
+
+## Automatic updates
+
+Build the installer with `npm run desktop:installer` (NSIS, in-place updates).
+Pick one feed at build time:
+
+```bat
+:: GitHub releases
+set POS_UPDATE_FEED=github
+set POS_UPDATE_REPO=your-org/your-repo
+
+:: or a plain web folder holding the installer + latest.yml
+set POS_UPDATE_FEED=https://updates.example.com/pos
+```
+
+The till checks on launch and every 6 hours, downloads in the background, and
+installs on restart (Settings → Display → App updates). The terminal
+activation is mirrored to `terminal-config.json` in the app's user-data folder,
+so an update never de-registers the machine.
+
+## Re-issuing a terminal code
+
+Settings → Terminal activation → **Re-issue code** on an existing row gives that
+same counter a fresh activation code (old one stops working) without creating a
+second entry. Requires `supabase/schema12.sql` to be run once.

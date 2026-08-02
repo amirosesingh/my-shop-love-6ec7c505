@@ -9,6 +9,7 @@ import {
   KeyRound,
   Loader2,
   MonitorSmartphone,
+  RefreshCw,
   RotateCcw,
   ShieldX,
 } from "lucide-react";
@@ -43,6 +44,7 @@ import {
   ensureLocations,
   issueTerminalToken,
   listTerminalTokens,
+  reissueTerminalToken,
   restoreTerminalToken,
   revokeTerminalToken,
   type TerminalToken,
@@ -69,6 +71,10 @@ export function TerminalTokens() {
   const [code, setCode] = useState("");
   const [copied, setCopied] = useState(false);
   const [pendingRevoke, setPendingRevoke] = useState<TerminalToken | null>(null);
+  const [pendingReissue, setPendingReissue] = useState<TerminalToken | null>(null);
+  const [reissuing, setReissuing] = useState("");
+  const [reissued, setReissued] = useState<{ token: TerminalToken; code: string } | null>(null);
+  const [reissueCopied, setReissueCopied] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -111,6 +117,10 @@ export function TerminalTokens() {
   }, [stores]);
 
   const qr = useMemo(() => (code ? qrDataUrl(code) : ""), [code]);
+  const reissueQr = useMemo(
+    () => (reissued ? qrDataUrl(reissued.code) : ""),
+    [reissued],
+  );
   const locationName = useMemo(() => {
     const s = stores.find((x) => x.id === locationId);
     return s ? `${s.name} — ${s.code}` : "";
@@ -186,6 +196,34 @@ export function TerminalTokens() {
         description: (e as { message?: string })?.message,
       });
     }
+  };
+
+  const reissue = async (token: TerminalToken) => {
+    setReissuing(token.id);
+    try {
+      const result = await reissueTerminalToken(token);
+      setReissued(result);
+      setReissueCopied(false);
+      logger.log("settings_change", "Terminal token re-issued", "terminals", {
+        device: token.deviceName,
+        location: token.locationName,
+      });
+      toast.success(`New code issued for ${token.deviceName}`);
+      await refresh();
+    } catch (e) {
+      toast.error("Could not re-issue the code", {
+        description: (e as { message?: string })?.message,
+      });
+    } finally {
+      setReissuing("");
+    }
+  };
+
+  const copyReissued = async () => {
+    if (!reissued) return;
+    await navigator.clipboard.writeText(reissued.code);
+    setReissueCopied(true);
+    window.setTimeout(() => setReissueCopied(false), 1500);
   };
 
   return (
@@ -269,6 +307,44 @@ export function TerminalTokens() {
 
         {error && <p className="px-5 py-4 text-sm text-destructive">{error}</p>}
 
+        {reissued && (
+          <div className="m-5 grid gap-4 rounded-lg border border-border bg-surface-2 p-4 sm:grid-cols-[auto_minmax(0,1fr)]">
+            <img
+              src={reissueQr}
+              alt="Replacement activation code QR"
+              className="mx-auto size-40 rounded-md bg-white p-2"
+            />
+            <div className="min-w-0 space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Replacement code for <strong>{reissued.token.deviceName}</strong> at{" "}
+                {reissued.token.locationName || "this location"}. The previous code no longer works.
+              </p>
+              <pre className="max-h-32 overflow-auto rounded-md border border-border bg-background p-2 text-[10px] leading-relaxed break-all whitespace-pre-wrap">
+                {reissued.code}
+              </pre>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => void copyReissued()}
+                >
+                  {reissueCopied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+                  {reissueCopied ? "Copied" : "Copy activation code"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => setReissued(null)}
+                >
+                  Dismiss
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex items-center gap-2 px-5 py-6 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin" /> Loading terminals…
@@ -284,6 +360,7 @@ export function TerminalTokens() {
                 <TableHead>Status</TableHead>
                 <TableHead>Date created</TableHead>
                 <TableHead>Last seen</TableHead>
+                <TableHead>Re-issued</TableHead>
                 <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
@@ -310,26 +387,45 @@ export function TerminalTokens() {
                   <TableCell className="text-xs text-muted-foreground">
                     {formatDate(t.lastSeenAt)}
                   </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {formatDate(t.reissuedAt)}
+                  </TableCell>
                   <TableCell className="text-right">
-                    {t.status === "active" ? (
+                    <div className="flex justify-end gap-2">
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-8 border-destructive/40 text-xs text-destructive hover:bg-destructive/10"
-                        onClick={() => setPendingRevoke(t)}
-                      >
-                        <ShieldX className="size-3.5" /> Revoke authenticity
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        size="sm"
                         className="h-8 text-xs"
-                        onClick={() => void restore(t)}
+                        disabled={reissuing === t.id || Boolean(t.replacedBy)}
+                        onClick={() => setPendingReissue(t)}
                       >
-                        <RotateCcw className="size-3.5" /> Re-enable
+                        {reissuing === t.id ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <RefreshCw className="size-3.5" />
+                        )}
+                        Re-issue code
                       </Button>
-                    )}
+                      {t.status === "active" ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 border-destructive/40 text-xs text-destructive hover:bg-destructive/10"
+                          onClick={() => setPendingRevoke(t)}
+                        >
+                          <ShieldX className="size-3.5" /> Revoke authenticity
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 text-xs"
+                          onClick={() => void restore(t)}
+                        >
+                          <RotateCcw className="size-3.5" /> Re-enable
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -358,6 +454,31 @@ export function TerminalTokens() {
               }}
             >
               Revoke access
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!pendingReissue} onOpenChange={(o) => !o && setPendingReissue(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Issue a replacement code for this terminal?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingReissue?.deviceName} at {pendingReissue?.locationName || "this location"} keeps
+              its place in this list. The current code stops working immediately and the till must be
+              activated again with the new one.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const token = pendingReissue;
+                setPendingReissue(null);
+                if (token) void reissue(token);
+              }}
+            >
+              Re-issue code
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

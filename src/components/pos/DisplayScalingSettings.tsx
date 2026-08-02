@@ -33,6 +33,7 @@ export function DisplayScalingSettings({ bare = false }: { bare?: boolean }) {
   const auto =
     typeof window === "undefined" ? 1 : computeUiScale(window.innerWidth, window.innerHeight);
   const effective = prefs.mode === "manual" ? prefs.scale : auto;
+  const text = prefs.textScale;
 
   return (
     <section className={bare ? "" : "rounded-lg border border-border bg-card p-5"}>
@@ -89,7 +90,7 @@ export function DisplayScalingSettings({ bare = false }: { bare?: boolean }) {
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-xs text-muted-foreground">Text &amp; button size</Label>
+              <Label className="text-xs text-muted-foreground">Interface size</Label>
               <span className="numeric text-xs">{Math.round(effective * 100)}%</span>
             </div>
             <Slider
@@ -101,6 +102,27 @@ export function DisplayScalingSettings({ bare = false }: { bare?: boolean }) {
               value={[Math.round(effective * 100)]}
               onValueChange={([v]) => setUiScalePrefs({ mode: "manual", scale: (v ?? 100) / 100 })}
             />
+            <p className="text-[10px] text-muted-foreground">
+              Buttons, inputs and overall layout density.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs text-muted-foreground">Text size</Label>
+              <span className="numeric text-xs">{Math.round(text * 100)}%</span>
+            </div>
+            <Slider
+              aria-label="Text size"
+              min={90}
+              max={160}
+              step={5}
+              value={[Math.round(text * 100)]}
+              onValueChange={([v]) => setUiScalePrefs({ textScale: (v ?? 100) / 100 })}
+            />
+            <p className="text-[10px] text-muted-foreground">
+              Font size only — works independently of the display size.
+            </p>
           </div>
 
           <div className="space-y-1">
@@ -126,7 +148,7 @@ export function DisplayScalingSettings({ bare = false }: { bare?: boolean }) {
             variant="ghost"
             size="sm"
             onClick={() =>
-              setUiScalePrefs({ mode: "auto", scale: 1, density: "comfortable" })
+              setUiScalePrefs({ mode: "auto", scale: 1, textScale: 1, density: "comfortable" })
             }
           >
             Reset to automatic
@@ -135,7 +157,7 @@ export function DisplayScalingSettings({ bare = false }: { bare?: boolean }) {
 
         <div
           className="rounded-md border border-border p-4"
-          style={{ fontSize: `calc(0.875rem * ${effective})` }}
+          style={{ fontSize: `calc(0.875rem * ${effective} * ${text})` }}
         >
           <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Preview</p>
           <p className="mt-2 font-medium">Espresso Beans 250g</p>

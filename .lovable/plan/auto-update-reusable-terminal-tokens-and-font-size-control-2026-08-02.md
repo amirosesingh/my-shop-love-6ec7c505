@@ -7,7 +7,7 @@ Three separate improvements: the Windows app updates itself, a branch's terminal
 - Add `electron-updater` and package the Windows build as an installer so updates can be applied in place.
 - On launch and every 6 hours the app checks the update feed, downloads in the background, and shows a small "Update ready — restart to install" toast. Restarting applies it; nothing is forced mid-shift.
 - The saved terminal registration survives updates: it lives in the app's persistent user-data profile, not the program folder. The plan also mirrors it to a JSON file via the desktop bridge as a safety net, restored automatically if the browser storage is ever wiped — so after an update the till starts already activated and goes straight to login.
-- Update feed: configured by a build-time URL (`POS_UPDATE_FEED`). Tell me where builds will be hosted (GitHub releases or a plain web folder) and I wire that in.
+- Update feed: configured by a build-time URL (`POS_UPDATE_FEED`). Tell me where builds will be hosted (GitHub releases or a plain web folder) and I wire that in. for now put both options
 - Settings → Display gains an "App updates" card: current version, "Check for updates" button, download progress.
 
 ## 2. Re-issue a token for an existing terminal

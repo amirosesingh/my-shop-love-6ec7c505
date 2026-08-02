@@ -12,10 +12,16 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
 export type UiDensity = "comfortable" | "compact";
-export type UiScalePrefs = { mode: "auto" | "manual"; scale: number; density: UiDensity };
+export type UiScalePrefs = {
+  mode: "auto" | "manual";
+  scale: number;
+  /** Font-only multiplier, layered on top of the interface scale. */
+  textScale: number;
+  density: UiDensity;
+};
 
 const KEY = "pos.ui-scale";
-const DEFAULTS: UiScalePrefs = { mode: "auto", scale: 1, density: "comfortable" };
+const DEFAULTS: UiScalePrefs = { mode: "auto", scale: 1, textScale: 1, density: "comfortable" };
 
 let prefs: UiScalePrefs = DEFAULTS;
 const listeners = new Set<() => void>();
@@ -30,6 +36,7 @@ function load(): UiScalePrefs {
     return {
       mode: parsed.mode === "manual" ? "manual" : "auto",
       scale: clamp(Number(parsed.scale) || 1, 0.85, 1.5),
+      textScale: clamp(Number(parsed.textScale) || 1, 0.9, 1.6),
       density: parsed.density === "compact" ? "compact" : "comfortable",
     };
   } catch {
@@ -81,7 +88,7 @@ export function computeUiScale(width: number, height: number): number {
 
 /** Applies the effective scale + density to the document root. */
 export function useUiScale(): number {
-  const { mode, scale: manual, density } = useUiScalePrefs();
+  const { mode, scale: manual, textScale, density } = useUiScalePrefs();
   const [auto, setAuto] = useState(1);
 
   useEffect(() => {
@@ -95,8 +102,9 @@ export function useUiScale(): number {
 
   useEffect(() => {
     document.documentElement.style.setProperty("--pos-scale", String(scale));
+    document.documentElement.style.setProperty("--pos-text-scale", String(textScale));
     document.documentElement.classList.toggle("pos-compact", density === "compact");
-  }, [scale, density]);
+  }, [scale, textScale, density]);
 
   return scale;
 }

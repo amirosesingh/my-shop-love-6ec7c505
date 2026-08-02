@@ -184,10 +184,11 @@
    register stays touch-friendly on any Windows resolution.                */
 :root {
   --pos-scale: 1;
+  --pos-text-scale: 1;
 }
 
 .pos-scaled {
-  font-size: calc(0.875rem * var(--pos-scale));
+  font-size: calc(0.875rem * var(--pos-scale) * var(--pos-text-scale));
   line-height: 1.45;
 }
 
