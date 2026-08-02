@@ -91,6 +91,14 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Background outbox drain: keeps offline sales flowing once the link returns.
   useEffect(() => startSyncEngine(), []);
 
+  // Bills queued while offline go out as soon as the link is back.
+  useEffect(() => {
+    const flush = () => void flushWhatsAppQueue().catch(() => {});
+    flush();
+    window.addEventListener("online", flush);
+    return () => window.removeEventListener("online", flush);
+  }, []);
+
   useEffect(() => {
     setPrintStore(currentStore ?? null);
   }, [currentStore]);
