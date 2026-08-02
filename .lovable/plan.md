@@ -36,3 +36,7 @@ A small `src/lib/shift-attendance.ts` keeps a per-day list in local storage (sta
 - `src/lib/pos-print.ts`: `printShiftReport` gains a per-cashier section for X and Z reports.
 
 Permissions and the lock/sign-in flow are unchanged — locking already returns to the existing sign-in screen, and the shift simply no longer depends on who is signed in.
+
+## Also: hide the "Edit with Lovable" badge
+
+Turn off the badge on published deployments via the publish settings (requires a Pro plan or higher). No code change.
