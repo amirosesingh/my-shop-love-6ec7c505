@@ -1,5 +1,9 @@
 # Fix "Cannot find module 'mssql'" when launching Electron
 
+Microsoft SQL Server stays the local database — nothing changes about that.
+`mssql` is the official Microsoft SQL Server driver for Node (not MySQL); the
+error is purely that the package was never installed.
+
 ## What the error means
 
 `electron/db/pool.cjs` does `require("mssql")` at the top of the file, and
