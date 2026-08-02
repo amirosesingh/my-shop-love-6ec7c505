@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>POS Recovery</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+        background: #0b0b0c; color: #e7e7ea; padding: 32px;
+        font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      }
+      .card { width: 100%; max-width: 620px; border: 1px solid #26262b; border-radius: 14px; background: #131316; padding: 28px; }
+      h1 { margin: 0 0 6px; font-size: 20px; }
+      p { margin: 0 0 14px; color: #a1a1aa; font-size: 14px; line-height: 1.55; }
+      .pill { display: inline-block; font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+        color: #fbbf24; border: 1px solid #46391a; background: #241d0d; border-radius: 999px; padding: 4px 10px; margin-bottom: 14px; }
+      dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; font-size: 13px; margin: 18px 0; }
+      dt { color: #71717a; } dd { margin: 0; }
+      .safe { border: 1px solid #1f3d2c; background: #10231a; color: #86efac; border-radius: 10px; padding: 10px 12px; font-size: 13px; }
+      .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+      button { font: inherit; font-size: 14px; border-radius: 9px; padding: 10px 16px; cursor: pointer; border: 1px solid #2f2f36; background: #1c1c21; color: #e7e7ea; }
+      button.primary { background: #e7e7ea; color: #101014; border-color: #e7e7ea; }
+      button:disabled { opacity: .5; cursor: default; }
+      #msg { margin-top: 14px; font-size: 13px; color: #a1a1aa; min-height: 18px; }
+      code { color: #d4d4d8; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <span class="pill">Safe mode</span>
+      <h1>The POS did not start correctly</h1>
+      <p>
+        The last <span id="failures">2</span> attempts to launch version <code id="version">—</code>
+        never reached the till screen. Automatic updates are paused until this build starts cleanly.
+      </p>
+      <div class="safe">
+        Your terminal registration, local database and settings are untouched — recovering here never
+        makes you activate this machine again.
+      </div>
+      <dl>
+        <dt>Installed version</dt><dd id="version2">—</dd>
+        <dt>Last working version</dt><dd id="lastGood">None recorded</dd>
+        <dt>Last failure</dt><dd id="failedAt">—</dd>
+        <dt>Reason</dt><dd id="reason">Startup timed out</dd>
+      </dl>
+      <div class="actions">
+        <button class="primary" id="rollback">Roll back to previous version</button>
+        <button id="retry">Try starting again</button>
+        <button id="logs">Open log folder</button>
+        <button id="quit">Close</button>
+      </div>
+      <div id="msg"></div>
+    </div>
+    <script>
+      const api = window.recovery;
+      const msg = document.getElementById("msg");
+      const rollbackBtn = document.getElementById("rollback");
+
+      api.state().then((s) => {
+        document.getElementById("failures").textContent = String(s.failures || 1);
+        document.getElementById("version").textContent = s.version || "—";
+        document.getElementById("version2").textContent = s.version || "—";
+        document.getElementById("lastGood").textContent = s.lastGoodVersion || "None recorded";
+        document.getElementById("failedAt").textContent = s.lastFailureAt
+          ? new Date(s.lastFailureAt).toLocaleString()
+          : "—";
+        document.getElementById("reason").textContent = s.reason || "Startup timed out";
+        if (!s.canRollback) {
+          rollbackBtn.disabled = true;
+          rollbackBtn.textContent = "Roll back (unavailable)";
+          msg.textContent = s.rollbackHint || "No earlier version is available to roll back to.";
+        } else {
+          rollbackBtn.textContent = "Roll back to " + s.lastGoodVersion;
+        }
+      });
+
+      rollbackBtn.onclick = async () => {
+        rollbackBtn.disabled = true;
+        msg.textContent = "Downloading the previous version…";
+        const res = await api.rollback();
+        if (!res.ok) {
+          rollbackBtn.disabled = false;
+          msg.textContent = res.error || "Roll back failed.";
+        } else {
+          msg.textContent = "Installer starting. The POS will close and reopen on the older version.";
+        }
+      };
+      api.onProgress((p) => { if (p && p.percent != null) msg.textContent = "Downloading… " + p.percent + "%"; });
+      document.getElementById("retry").onclick = () => api.retry();
+      document.getElementById("logs").onclick = () => api.openLogs();
+      document.getElementById("quit").onclick = () => api.quit();
+    </script>
+  </body>
+</html>
