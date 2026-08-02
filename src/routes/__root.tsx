@@ -7,7 +7,7 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useRouter } from "@tanstack/react-router";
+import { type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { PosProvider } from "../lib/pos-store";
