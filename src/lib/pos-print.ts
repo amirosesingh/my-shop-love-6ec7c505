@@ -376,7 +376,7 @@ function memberBody(member: Member, sales: Sale[]) {
 function printHtml(title: string, body: string) {
   // Electron prints silently; the browser keeps the dialog-based iframe path.
   const desktopHtml = shell(title, body, false);
-  void silentPrint(desktopHtml).then((handled) => {
+  void silentPrint(desktopHtml).then((handled: boolean) => {
     if (handled) return;
     browserPrint(shell(title, body));
   });
@@ -584,8 +584,15 @@ export function printTransferNote(
  */
 export function openCashDrawer() {
   const kick = "\x1B\x70\x00\x19\xFA";
-  printHtml(
-    "drawer",
-    `<pre style="font-size:1px;line-height:1px">${kick}</pre><div class="c muted">DRAWER OPEN</div>`,
-  );
+  const bytes = Array.from(kick, (c) => c.charCodeAt(0));
+  void rawPulse(bytes).then((handled: boolean) => {
+    if (handled) return;
+    // Browser fallback: the pulse rides along on a tiny printed slip.
+    browserPrint(
+      shell(
+        "drawer",
+        `<pre style="font-size:1px;line-height:1px">${kick}</pre><div class="c muted">DRAWER OPEN</div>`,
+      ),
+    );
+  });
 }
