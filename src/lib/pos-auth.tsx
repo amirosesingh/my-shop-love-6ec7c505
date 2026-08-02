@@ -313,7 +313,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       offline = true;
     }
-    if (offline || typeof navigator === "undefined" ? false : !navigator.onLine) offline = true;
+    if (typeof navigator !== "undefined" && !navigator.onLine) offline = true;
 
     let next: TerminalUser;
     if (row) {
@@ -331,7 +331,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         username: row.username,
         cashierId: row.id,
         fullName: row.full_name || row.username,
-        storeId: row.store_id,
+        storeId: row.store_id ?? "",
         permissions: row.permissions as unknown as Record<string, boolean>,
       });
     } else if (offline) {
