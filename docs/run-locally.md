@@ -45,12 +45,13 @@ Open the URL it prints (usually http://localhost:8080).
 
 ## 2. Desktop (Electron) run
 
-Install the desktop-only packages once:
+`npm install` already pulls Electron, the packager and `mssql` (the Microsoft
+SQL Server driver) — they are listed in `package.json`. The only extra is the
+native driver used for Windows integrated authentication:
 
 ```bash
-npm install --save-dev electron @electron/packager cross-env
-npm install mssql
-# only for Windows integrated authentication against SQL Server:
+# optional: only for Windows integrated auth against SQL Server
+# (needs Visual Studio Build Tools)
 npm install msnodesqlv8
 ```
 
@@ -80,8 +81,8 @@ attached, the customer display (`/display`) full-screen on it.
 | --- | --- |
 | Blank white window | Built without `DESKTOP_BUILD=1`. Use `npm run desktop:build`. |
 | `Unable to find Electron app` | `"main": "electron/main.cjs"` missing from `package.json`. |
-| `Cannot find module 'mssql'` | Run `npm install mssql`. |
-| `Cannot find module 'msnodesqlv8'` | Only needed for Windows auth; install it or switch the connection to a SQL login. |
+| `Cannot find module 'mssql'` | `npm install` was run before this package was added. Re-run `npm install`. The app still starts and reports it in Settings > Local database. |
+| `Cannot find module 'msnodesqlv8'` | Only needed for Windows auth; run `npm install msnodesqlv8` or switch the connection to a SQL login. |
 
 ## 3. Local SQL Server database (optional)
 

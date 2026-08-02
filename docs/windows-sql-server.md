@@ -21,12 +21,12 @@ electron/
 1. Install SQL Server Express and enable TCP/IP for the instance.
 2. Create an empty database (default name `LovablePOS`). Tables are created
    automatically on first connect.
-3. Install the shell dependencies:
+3. Install dependencies. Electron, the packager and the `mssql` SQL Server
+   driver ship in `package.json`, so `npm install` is enough:
 
    ```bash
-   npm install --save-dev electron @electron/packager
-   npm install mssql
-   # Windows integrated auth also needs:
+   npm install
+   # Windows integrated auth also needs (requires VS Build Tools):
    npm install msnodesqlv8
    ```
 

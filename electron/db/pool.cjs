@@ -5,12 +5,54 @@
  */
 const fs = require("node:fs");
 const path = require("node:path");
-const sql = require("mssql");
+
+const DRIVER_HINT =
+  "Local database driver not installed. Run: npm install mssql";
+const WINDOWS_AUTH_HINT =
+  "Windows authentication needs the msnodesqlv8 driver. Run: npm install msnodesqlv8 (requires Visual Studio Build Tools), or switch to a SQL Server login.";
+
+let driver = null;
+
+/** Loads the mssql driver on first use so a missing module never kills boot. */
+function loadDriver() {
+  if (driver) return driver;
+  try {
+    driver = require("mssql");
+  } catch (err) {
+    const e = new Error(DRIVER_HINT);
+    e.cause = err;
+    throw e;
+  }
+  return driver;
+}
+
+function requireWindowsDriver() {
+  try {
+    require.resolve("msnodesqlv8");
+  } catch (err) {
+    const e = new Error(WINDOWS_AUTH_HINT);
+    e.cause = err;
+    throw e;
+  }
+}
+
+/**
+ * Lazy stand-in for the mssql namespace: `sql.Int`, `new sql.Transaction(...)`
+ * etc. keep working, but the module is only required when actually touched.
+ */
+const sql = new Proxy(
+  {},
+  {
+    get: (_t, prop) => Reflect.get(loadDriver(), prop),
+    has: (_t, prop) => Reflect.has(loadDriver(), prop),
+  },
+);
 
 let pool = null;
 let activeConfig = null;
 
 function toDriverConfig(config) {
+  loadDriver();
   const base = {
     server: config.server,
     database: config.database,
@@ -24,6 +66,7 @@ function toDriverConfig(config) {
   };
   if (config.auth === "windows") {
     // msnodesqlv8 driver handles integrated auth on Windows.
+    requireWindowsDriver();
     base.driver = "msnodesqlv8";
     base.options.trustedConnection = true;
   } else {
@@ -35,7 +78,8 @@ function toDriverConfig(config) {
 
 async function connect(config) {
   await close();
-  pool = await new sql.ConnectionPool(toDriverConfig(config)).connect();
+  const driverConfig = toDriverConfig(config);
+  pool = await new (loadDriver().ConnectionPool)(driverConfig).connect();
   activeConfig = config;
   await applySchema();
   return pool;
@@ -75,7 +119,8 @@ async function applySchema() {
 }
 
 async function test(config) {
-  const probe = await new sql.ConnectionPool(toDriverConfig(config)).connect();
+  const driverConfig = toDriverConfig(config);
+  const probe = await new (loadDriver().ConnectionPool)(driverConfig).connect();
   try {
     const res = await probe.request().query("SELECT @@VERSION AS version");
     return { ok: true, version: res.recordset[0].version };
