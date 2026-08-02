@@ -378,6 +378,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           })()}
         </main>
       </div>
+      </div>
     </div>
   );
 }
