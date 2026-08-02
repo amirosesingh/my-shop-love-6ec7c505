@@ -208,6 +208,29 @@ export async function stampHeartbeat(tokenId: string): Promise<void> {
 
 export class ActivationError extends Error {}
 
+/**
+ * Turn a failed status lookup into a message an operator can act on. The old
+ * blanket "cannot reach the server" hid the common case: the database is
+ * missing the activation helpers (PGRST202).
+ */
+function activationFailureMessage(e: unknown): string {
+  const err = e as { code?: string; message?: string } | null;
+  const code = err?.code ?? "";
+  const message = err?.message ?? "";
+  if (code === "PGRST202" || /terminal_token_status/.test(message)) {
+    return "This database is missing the terminal activation setup. Run supabase/schema11.sql on the POS database, then try again.";
+  }
+  if (
+    e instanceof TypeError ||
+    /failed to fetch|network|load failed/i.test(message)
+  ) {
+    return "Cannot reach the server to verify this code. Check the connection.";
+  }
+  return message
+    ? `Could not verify this activation code: ${message}`
+    : "Could not verify this activation code. Try again in a moment.";
+}
+
 /** Decrypt, verify against the server and register this machine. */
 export async function activateTerminal(code: string): Promise<TerminalConfig> {
   let payload: ActivationPayload;
@@ -217,8 +240,8 @@ export async function activateTerminal(code: string): Promise<TerminalConfig> {
     throw new ActivationError("This activation code is not valid.");
   }
 
-  const remote = await fetchTokenStatus(payload.token_id).catch(() => {
-    throw new ActivationError("Cannot reach the server to verify this code. Check the connection.");
+  const remote = await fetchTokenStatus(payload.token_id).catch((e: unknown) => {
+    throw new ActivationError(activationFailureMessage(e));
   });
   if (!remote) throw new ActivationError("This activation code is not recognised.");
   if (remote.status === "revoked") {
