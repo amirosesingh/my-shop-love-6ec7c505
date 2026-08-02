@@ -7,6 +7,13 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
+  // Electron loads the built files over file://, where absolute asset paths
+  // ("/assets/...") resolve to the drive root and the window renders blank.
+  // The desktop build sets DESKTOP_BUILD=1 and gets relative paths instead;
+  // the browser/cloud build is unchanged.
+  vite: {
+    base: process.env["DESKTOP_BUILD"] ? "./" : "/",
+  },
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
