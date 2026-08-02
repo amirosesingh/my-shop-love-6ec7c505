@@ -4,9 +4,7 @@ Move the application off Lovable-managed hosting so the "Edit with Lovable" badg
 
 ## Goal
 
-- The public site must be served from the user's own infrastructure (no Lovable hosting).
 - No externally injected "Edit with Lovable" badge or Lovable branding.
-- The current POS database/auth/ storage remains available during the transition.
 
 ## What we will change
 
@@ -43,16 +41,6 @@ Move the application off Lovable-managed hosting so the "Edit with Lovable" badg
 
 - `src/lib/lovable-error-reporting.ts` reports to Lovable preview hooks. It is harmless and only runs when `window.__lovableEvents` exists, but it is Lovable-specific.
 - Remove this file and its import from `src/routes/__root.tsx` to eliminate any Lovable runtime dependency.
-
-### 7. Build and deploy
-
-- Add `build:node` and `start` scripts to `package.json` for the Node preset.
-- Verify the production build passes (`vite build`, `node .output/server/index.mjs`) in a clean environment.
-- Provide a deployment checklist: Nginx reverse proxy, SSL certificate, environment variables, and health-check endpoint.
-
-### 8. Desktop build path
-
-- The existing Electron docs assume the app is bundled from the Lovable project. The self-hosted build artifacts will feed the same Electron shell, so no Electron change is needed unless the build output directory changes.
 
 ## Out of scope
 
