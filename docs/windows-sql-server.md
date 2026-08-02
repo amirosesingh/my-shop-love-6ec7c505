@@ -30,19 +30,16 @@ electron/
    npm install msnodesqlv8
    ```
 
-4. Add `"main": "electron/main.cjs"` to `package.json` and set `base: './'` in
-   `vite.config.ts` so `file://` loading resolves assets.
+4. Nothing else to wire up: `package.json` already declares
+   `"main": "electron/main.cjs"`, and the desktop build sets `base: './'`
+   automatically (see `docs/run-locally.md`).
 
 ## Running and packaging
 
 ```bash
-# development: point the shell at the dev server
-VITE_DEV_SERVER_URL=http://localhost:8080 npx electron .
-
-# production
-npx vite build
-npx @electron/packager . "POS" --platform=win32 --arch=x64 \
-  --out=electron-release --overwrite
+npm run desktop:dev      # against a running `npm run dev`
+npm run desktop:build    # run the production build in the shell
+npm run desktop:package  # release/LovablePOS-win32-x64/
 ```
 
 Cloud credentials come from `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` in the
