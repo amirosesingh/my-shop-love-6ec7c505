@@ -30,7 +30,7 @@ jobs:
 
       # 4. Compile React & package Electron into .exe
       - name: Build Electron (.exe)
-        run: npm run electron-build
+        run: npm run desktop:release
 
       # 5. Push output files (latest.yml & .exe) directly to Cloudflare R2
       - name: Deploy Update Files to Cloudflare R2
