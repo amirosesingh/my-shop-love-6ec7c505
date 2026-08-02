@@ -17,6 +17,7 @@ import type {
 import { bookingBalance, lineUnitDiscount, whatsappLink } from "./pos-types";
 import { defaultReceiptSettings } from "./pos-seed";
 import qrcode from "qrcode-generator";
+import { rawPulse, silentPrint } from "./receipt-printer";
 
 export const STORE = {
   name: "NORTHWIND & CO.",
@@ -373,7 +374,15 @@ function memberBody(member: Member, sales: Sale[]) {
 }
 
 function printHtml(title: string, body: string) {
-  const html = shell(title, body);
+  // Electron prints silently; the browser keeps the dialog-based iframe path.
+  const desktopHtml = shell(title, body, false);
+  void silentPrint(desktopHtml).then((handled: boolean) => {
+    if (handled) return;
+    browserPrint(shell(title, body));
+  });
+}
+
+function browserPrint(html: string) {
   const frame = document.createElement("iframe");
   frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
   document.body.appendChild(frame);
@@ -575,8 +584,15 @@ export function printTransferNote(
  */
 export function openCashDrawer() {
   const kick = "\x1B\x70\x00\x19\xFA";
-  printHtml(
-    "drawer",
-    `<pre style="font-size:1px;line-height:1px">${kick}</pre><div class="c muted">DRAWER OPEN</div>`,
-  );
+  const bytes = Array.from(kick, (c) => c.charCodeAt(0));
+  void rawPulse(bytes).then((handled: boolean) => {
+    if (handled) return;
+    // Browser fallback: the pulse rides along on a tiny printed slip.
+    browserPrint(
+      shell(
+        "drawer",
+        `<pre style="font-size:1px;line-height:1px">${kick}</pre><div class="c muted">DRAWER OPEN</div>`,
+      ),
+    );
+  });
 }

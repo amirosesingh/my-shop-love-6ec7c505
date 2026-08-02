@@ -219,3 +219,17 @@
     min-height: max(44px, calc(2.5rem * var(--pos-scale)));
   }
 }
+
+/* Frameless Electron window: the strip below the OS overlay drags the window,
+   while interactive elements inside it stay clickable. */
+.app-drag {
+  -webkit-app-region: drag;
+}
+
+.app-drag button,
+.app-drag a,
+.app-drag input,
+.app-drag [role="button"],
+.app-no-drag {
+  -webkit-app-region: no-drag;
+}

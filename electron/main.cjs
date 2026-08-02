@@ -1,5 +1,6 @@
 const path = require("node:path");
 const fs = require("node:fs");
+const os = require("node:os");
 const net = require("node:net");
 const { spawn } = require("node:child_process");
 const { app, BrowserWindow, ipcMain, screen, dialog } = require("electron");
@@ -100,6 +101,14 @@ function createWindows() {
     height: 900,
     show: false,
     backgroundColor: "#0b0b0c",
+    // Frameless shell: Windows still draws the real minimise / maximise /
+    // close buttons through the overlay, so the app owns the whole surface.
+    titleBarStyle: "hidden",
+    ...(process.platform === "darwin"
+      ? { trafficLightPosition: { x: 12, y: 12 } }
+      : {
+          titleBarOverlay: { color: "#0b0b0c", symbolColor: "#e7e7ea", height: 34 },
+        }),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
@@ -137,7 +146,123 @@ function broadcastStatus(payload) {
 
 const fail = (err) => ({ ok: false, error: err instanceof Error ? err.message : String(err) });
 
+/* ----------------------------- printing ----------------------------- */
+
+/**
+ * Renders receipt HTML offscreen and prints it without any dialog. When no
+ * printer name is configured the system default is used.
+ */
+function printSilent(html, deviceName) {
+  return new Promise((resolve) => {
+    const win = new BrowserWindow({
+      show: false,
+      webPreferences: { offscreen: true, contextIsolation: true, nodeIntegration: false },
+    });
+    const done = (result) => {
+      if (!win.isDestroyed()) win.destroy();
+      resolve(result);
+    };
+    win.webContents.once("did-finish-load", () => {
+      // Small settle delay so fonts/QR SVG are laid out before the snapshot.
+      setTimeout(() => {
+        win.webContents.print(
+          {
+            silent: true,
+            printBackground: true,
+            margins: { marginType: "none" },
+            ...(deviceName ? { deviceName } : {}),
+          },
+          (success, reason) => done(success ? { ok: true } : { ok: false, error: reason }),
+        );
+      }, 120);
+    });
+    win.webContents.once("did-fail-load", (_e, code, description) =>
+      done({ ok: false, error: `${description} (${code})` }),
+    );
+    void win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+  });
+}
+
+/**
+ * Writes raw ESC/POS bytes to the printer. Drawers are wired to the receipt
+ * printer over RJ11, so the kick pulse has to reach the device unprocessed —
+ * a driver-rendered page would swallow it.
+ */
+function printRaw(bytes, share) {
+  return new Promise((resolve) => {
+    const buffer = Buffer.from(bytes);
+    const file = path.join(os.tmpdir(), `pos-raw-${Date.now()}.bin`);
+    fs.writeFileSync(file, buffer);
+    const cleanup = () => {
+      try {
+        fs.unlinkSync(file);
+      } catch {
+        /* temp file already gone */
+      }
+    };
+    if (process.platform !== "win32") {
+      cleanup();
+      resolve({ ok: false, error: "Raw printing is only supported on Windows" });
+      return;
+    }
+    const target = share && share.startsWith("\\\\") ? share : `\\\\localhost\\${share || "POS"}`;
+    const child = spawn("cmd", ["/c", "copy", "/b", file, target], { windowsHide: true });
+    let stderr = "";
+    child.stderr.on("data", (d) => (stderr += String(d)));
+    child.on("error", (err) => {
+      cleanup();
+      resolve(fail(err));
+    });
+    child.on("exit", (code) => {
+      cleanup();
+      resolve(code === 0 ? { ok: true } : { ok: false, error: stderr.trim() || `copy exited ${code}` });
+    });
+  });
+}
+
 function registerIpc() {
+  ipcMain.handle("print:silent", async (_e, html, options) => {
+    try {
+      return await printSilent(String(html), options?.deviceName || undefined);
+    } catch (err) {
+      return fail(err);
+    }
+  });
+
+  ipcMain.handle("print:raw", async (_e, bytes, options) => {
+    try {
+      const result = await printRaw(bytes, options?.share || options?.deviceName);
+      if (result.ok) return result;
+      // Fall back to a silent one-line page carrying the same escape sequence,
+      // which still avoids any print dialog.
+      return await printSilent(
+        `<!doctype html><meta charset="utf-8"><body style="margin:0"><pre style="font-size:1px;line-height:1px">${Buffer.from(
+          bytes,
+        ).toString("binary")}</pre></body>`,
+        options?.deviceName || undefined,
+      );
+    } catch (err) {
+      return fail(err);
+    }
+  });
+
+  ipcMain.handle("print:list", async () => {
+    try {
+      const target = mainWindow ?? BrowserWindow.getAllWindows()[0];
+      const printers = target ? await target.webContents.getPrintersAsync() : [];
+      return {
+        ok: true,
+        printers: printers.map((p) => ({
+          name: p.name,
+          displayName: p.displayName || p.name,
+          isDefault: Boolean(p.isDefault),
+        })),
+      };
+    } catch (err) {
+      return { ok: false, printers: [], error: fail(err).error };
+    }
+  });
+
   ipcMain.handle("pos:connect", async (_e, config) => {
     try {
       await pool.connect(config);

@@ -11,6 +11,11 @@ contextBridge.exposeInMainWorld("pos", {
   connect: (config) => invoke("pos:connect", config),
   test: (config) => invoke("pos:test", config),
   status: () => invoke("pos:status"),
+  /** Silent receipt printing — no Windows print dialog. */
+  print: (html, options) => invoke("print:silent", html, options),
+  /** Raw ESC/POS bytes (cash drawer kick) straight to the printer. */
+  printRaw: (bytes, options) => invoke("print:raw", bytes, options),
+  listPrinters: () => invoke("print:list"),
   push: () => invoke("pos:push"),
   pull: () => invoke("pos:pull"),
   setSyncEnabled: (on) => invoke("pos:set-sync-enabled", on),

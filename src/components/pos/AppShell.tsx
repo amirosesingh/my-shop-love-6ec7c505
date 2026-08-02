@@ -230,7 +230,17 @@ export function AppShell({ children }: { children: ReactNode }) {
     );
 
   return (
-    <div className="pos-scaled flex h-screen overflow-hidden bg-background text-foreground">
+    <div className="pos-scaled flex h-screen flex-col overflow-hidden bg-background text-foreground">
+      {/* Frameless desktop shell: draggable strip under the native window buttons. */}
+      {isDesktop() && (
+        <div className="app-drag flex h-[34px] shrink-0 items-center gap-2 border-b border-border bg-sidebar px-3">
+          <ReceiptText className="size-3.5 shrink-0 text-primary" />
+          <span className="truncate text-[11px] font-semibold text-muted-foreground">
+            {companyName}
+          </span>
+        </div>
+      )}
+      <div className="flex min-h-0 flex-1">
       {/* Desktop / tablet sidebar */}
       <aside
         className={cn(
@@ -367,6 +377,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             );
           })()}
         </main>
+      </div>
       </div>
     </div>
   );
