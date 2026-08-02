@@ -46,3 +46,16 @@ what you test in the browser, and it has first-class raw-device support on Windo
   never overwrite cloud data. Operations still failing after 6 attempts are
   quarantined and surfaced in Settings -> Sync & backup to retry or discard.
 - Settings -> Sync & backup also exports a full re-runnable SQL backup.
+
+## 4. Terminal activation prerequisites
+
+Activating a till calls two database helpers, `terminal_token_status` and
+`terminal_token_heartbeat`. Databases set up before those helpers existed only
+have the `terminal_tokens` table, and activation then fails with:
+
+> This database is missing the terminal activation setup.
+
+Fix it by running `supabase/schema11.sql` once in the POS database SQL editor.
+It only creates the two functions and their grants — no table or data changes,
+and it is safe to re-run. Activation codes issued earlier keep working; there
+is no need to reissue them.
