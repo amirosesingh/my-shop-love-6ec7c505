@@ -202,31 +202,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
         const cloud = await loadCloudState();
         if (cancelled) return;
         writeSnapshot(cloud);
-        setState((s) => ({
-          ...s,
-          products: cloud.products,
-          members: cloud.members,
-          sales: cloud.sales,
-          promotions: cloud.promotions.length ? cloud.promotions : s.promotions,
-          // Locations are central now; the local list is the fallback until
-          // the directory has been populated (and gets pushed up below).
-          stores: cloud.stores.length ? cloud.stores : s.stores,
-          currentStoreId: cloud.stores.length
-            ? (cloud.stores.find((x) => x.id === s.currentStoreId)?.id ?? cloud.stores[0].id)
-            : s.currentStoreId,
-          settings: {
-            tax: { ...defaultSettings.tax, ...cloud.settings.tax },
-            receipt: { ...defaultSettings.receipt, ...cloud.settings.receipt },
-            payment: { ...defaultSettings.payment, ...cloud.settings.payment },
-            whatsapp: { ...defaultSettings.whatsapp, ...cloud.settings.whatsapp },
-            review: { ...defaultSettings.review, ...cloud.settings.review },
-          },
-          // Keep the bill counter ahead of every receipt already in the cloud.
-          counter: cloud.sales.reduce(
-            (max, sale) => Math.max(max, Number(sale.receiptNo.split("-").pop()) || 0),
-            s.counter,
-          ),
-        }));
+        setState((s) => applyCloud(s, cloud));
         if (!cloud.stores.length) db.upsertStores(stateRef.current.stores);
       } catch (e) {
         dbError("Loading data", e);
