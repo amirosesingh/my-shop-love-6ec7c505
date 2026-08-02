@@ -39,5 +39,5 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: auto
         run: |
-          aws s3 sync dist s3://updatelccms/pos-app --endpoint-url ${{ secrets.R2_ENDPOINT }}
+          aws s3 sync release s3://updatelccms/pos-app --endpoint-url ${{ secrets.R2_ENDPOINT }}
       
