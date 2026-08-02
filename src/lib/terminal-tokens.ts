@@ -28,6 +28,8 @@ export type TerminalToken = {
   activatedAt: string | null;
   revokedAt: string | null;
   lastSeenAt: string | null;
+  reissuedAt: string | null;
+  replacedBy: string | null;
 };
 
 /** The table is not in the generated types, so queries go through a loose view. */
@@ -91,6 +93,8 @@ const rowToToken = (r: Record<string, any>): TerminalToken => ({
   activatedAt: r.activated_at ?? null,
   revokedAt: r.revoked_at ?? null,
   lastSeenAt: r.last_seen_at ?? null,
+  reissuedAt: r.reissued_at ?? null,
+  replacedBy: r.replaced_by ?? null,
 });
 
 /* ----------------------------- admin surface ---------------------------- */
@@ -138,6 +142,43 @@ export async function revokeTerminalToken(id: string): Promise<void> {
   if (error) throw error;
 }
 
+/**
+ * Replace the code of an existing terminal without creating a second entry for
+ * the same counter: the old row is retired and a new row inherits the device
+ * name and location, so the branch keeps one row in the table.
+ */
+export async function reissueTerminalToken(
+  token: TerminalToken,
+): Promise<{ token: TerminalToken; code: string }> {
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+  const row = {
+    id,
+    location_id: token.locationId,
+    location_name: token.locationName,
+    device_name: token.deviceName,
+    status: "active" as const,
+    created_at: now,
+    reissued_at: now,
+  };
+  const { error } = await table().insert([row]);
+  if (error) throw error;
+
+  const { error: retireError } = await table()
+    .update({ status: "revoked", revoked_at: now, replaced_by: id })
+    .eq("id", token.id);
+  if (retireError) throw retireError;
+
+  const payload: ActivationPayload = {
+    token_id: id,
+    location_id: token.locationId ?? "",
+    location_name: token.locationName,
+    supabase_url: POS_SUPABASE_URL,
+    supabase_key: POS_SUPABASE_KEY,
+  };
+  return { token: rowToToken(row), code: await encryptActivation(payload) };
+}
+
 export async function restoreTerminalToken(id: string): Promise<void> {
   const { error } = await table().update({ status: "active", revoked_at: null }).eq("id", id);
   if (error) throw error;
@@ -170,6 +211,7 @@ export function readTerminalConfig(): TerminalConfig | null {
 export function writeTerminalConfig(config: TerminalConfig) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+  void desktopBridge()?.writeTerminalConfig(config);
   window.dispatchEvent(new CustomEvent(EVENT));
 }
 
@@ -177,7 +219,41 @@ export function writeTerminalConfig(config: TerminalConfig) {
 export function clearTerminalConfig() {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(CONFIG_KEY);
+  void desktopBridge()?.writeTerminalConfig(null);
   window.dispatchEvent(new CustomEvent(EVENT));
+}
+
+/* --------------- desktop mirror (survives app updates) ------------------ */
+
+type TerminalBridge = {
+  readTerminalConfig: () => Promise<{ ok: boolean; config?: TerminalConfig | null }>;
+  writeTerminalConfig: (config: TerminalConfig | null) => Promise<{ ok: boolean }>;
+};
+
+const desktopBridge = (): TerminalBridge | null => {
+  if (typeof window === "undefined") return null;
+  const api = (window as unknown as { pos?: Partial<TerminalBridge> }).pos;
+  return api && typeof api.writeTerminalConfig === "function" ? (api as TerminalBridge) : null;
+};
+
+/**
+ * An installer refresh can wipe the renderer's storage. The desktop shell keeps
+ * a copy of the activation in its user-data folder, so the till comes back
+ * already registered instead of asking for a new code.
+ */
+export async function restoreTerminalConfigFromDisk(): Promise<TerminalConfig | null> {
+  const bridge = desktopBridge();
+  if (!bridge || readTerminalConfig()) return readTerminalConfig();
+  try {
+    const result = await bridge.readTerminalConfig();
+    const config = result?.config;
+    if (!config?.tokenId) return null;
+    window.localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+    window.dispatchEvent(new CustomEvent(EVENT));
+    return config;
+  } catch {
+    return null;
+  }
 }
 
 export function subscribeTerminalConfig(cb: () => void) {
