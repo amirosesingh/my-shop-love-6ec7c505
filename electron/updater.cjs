@@ -34,7 +34,7 @@ function set(patch) {
 
 function feed() {
   const configured = (process.env.POS_UPDATE_FEED || "").trim();
-  if (!configured) return null;
+  if (!configured) return bakedFeed();
   if (configured.toLowerCase() === "github") {
     const repo = (process.env.POS_UPDATE_REPO || "").trim();
     if (!repo.includes("/")) return null;
@@ -42,6 +42,27 @@ function feed() {
     return { provider: "github", owner, repo: name };
   }
   if (/^https?:\/\//i.test(configured)) return { provider: "generic", url: configured };
+  return null;
+}
+
+/**
+ * Feed baked into the installer at build time (electron-builder writes
+ * app-update.yml from the `build.publish` config). Used when no
+ * POS_UPDATE_FEED env var overrides it.
+ */
+function bakedFeed() {
+  try {
+    const file = path.join(process.resourcesPath || "", "app-update.yml");
+    const text = fs.readFileSync(file, "utf8");
+    const url = /^\s*url:\s*(.+)\s*$/m.exec(text)?.[1]?.trim().replace(/^["']|["']$/g, "");
+    const owner = /^\s*owner:\s*(.+)\s*$/m.exec(text)?.[1]?.trim();
+    const repo = /^\s*repo:\s*(.+)\s*$/m.exec(text)?.[1]?.trim();
+    if (owner && repo) return { provider: "github", owner, repo };
+    if (url && /^https?:\/\//i.test(url) && !/updates\.example\.com/i.test(url))
+      return { provider: "generic", url };
+  } catch {
+    /* not packaged, or no feed baked in */
+  }
   return null;
 }
 

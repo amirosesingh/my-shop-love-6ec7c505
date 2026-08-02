@@ -15,7 +15,8 @@
     "desktop:dev": "cross-env VITE_DEV_SERVER_URL=http://localhost:8080 electron .",
     "desktop:build": "cross-env DESKTOP_BUILD=1 vite build && electron .",
     "desktop:package": "cross-env DESKTOP_BUILD=1 vite build && electron-packager . \"LovablePOS\" --platform=win32 --arch=x64 --out=release --overwrite --ignore=\"^/src\" --ignore=\"^/dist$\" --ignore=\"^/release\"",
-    "desktop:installer": "cross-env DESKTOP_BUILD=1 vite build && electron-builder --win nsis --publish never"
+    "desktop:installer": "cross-env DESKTOP_BUILD=1 vite build && electron-builder --win nsis --publish never",
+    "desktop:release": "node scripts/desktop-release.cjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -116,18 +117,24 @@
     "win": {
       "target": [
         "nsis"
-      ]
+      ],
+      "artifactName": "${productName} Setup ${version}.exe"
     },
     "nsis": {
       "oneClick": false,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "differentialPackage": true
     },
     "publish": [
       {
         "provider": "generic",
-        "url": "https://updates.example.com/pos"
+        "url": "${env.POS_UPDATE_URL}",
+        "channel": "latest"
       }
-    ]
+    ],
+    "directories": {
+      "output": "release"
+    }
   }
 }

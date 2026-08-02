@@ -62,22 +62,56 @@ is no need to reissue them.
 
 ## Automatic updates
 
-Build the installer with `npm run desktop:installer` (NSIS, in-place updates).
-Pick one feed at build time:
+Build the installer with `npm run desktop:release` (NSIS, in-place updates).
+The feed URL is baked into the installer from `POS_UPDATE_URL`; an installed
+till can still be pointed elsewhere with `POS_UPDATE_FEED`:
 
 ```bat
+:: plain web folder holding the installer + latest.yml (what we use)
+set POS_UPDATE_URL=https://updates.example.com/pos
+
+:: runtime override, optional
+set POS_UPDATE_FEED=https://updates.example.com/pos
+
 :: GitHub releases
 set POS_UPDATE_FEED=github
 set POS_UPDATE_REPO=your-org/your-repo
-
-:: or a plain web folder holding the installer + latest.yml
-set POS_UPDATE_FEED=https://updates.example.com/pos
 ```
 
 The till checks on launch and every 6 hours, downloads in the background, and
 installs on restart (Settings → Display → App updates). The terminal
 activation is mirrored to `terminal-config.json` in the app's user-data folder,
 so an update never de-registers the machine.
+
+## Building and publishing a release
+
+1. One-time: in the GitHub repository, add a repository variable
+   `POS_UPDATE_URL` (Settings → Secrets and variables → Actions → Variables)
+   pointing at your web folder, e.g. `https://updates.example.com/pos`.
+2. Bump `version` in `package.json`, commit, then push a matching tag:
+
+   ```bash
+   git tag v1.0.1 && git push origin v1.0.1
+   ```
+
+   (Or run the **Desktop release (Windows .exe)** workflow manually.)
+3. The Windows runner builds and publishes three files as a build artifact
+   (and attaches them to the GitHub release for tag runs):
+
+   - `LovablePOS Setup <version>.exe`
+   - `latest.yml`
+   - `LovablePOS Setup <version>.exe.blockmap`
+4. Upload all three to your web folder, keeping the exact file names. The
+   folder must be reachable over plain HTTPS with no login.
+5. Every till picks the update up within 6 hours (or immediately via
+   Settings → Display → App updates → Check for updates) and installs it on
+   the next restart. Only the very first install needs the `.exe` to be
+   copied to the machine by hand.
+
+Builds are not code-signed yet, so the first install shows a Windows
+SmartScreen prompt — choose **More info → Run anyway**. To sign later, add the
+certificate as repository secrets and set `CSC_LINK` / `CSC_KEY_PASSWORD` in
+the workflow's build step; nothing else changes.
 
 ## Re-issuing a terminal code
 
