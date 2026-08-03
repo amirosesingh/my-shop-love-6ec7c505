@@ -201,6 +201,22 @@ export function TerminalTokens() {
     }
   };
 
+  const remove = async (token: TerminalToken) => {
+    try {
+      await deleteTerminalToken(token.id);
+      logger.log("settings_change", "Terminal entry deleted", "terminals", {
+        device: token.deviceName,
+        location: token.locationName,
+      });
+      toast.success(`${token.deviceName} removed`);
+      await refresh();
+    } catch (e) {
+      toast.error("Could not delete the terminal", {
+        description: (e as { message?: string })?.message,
+      });
+    }
+  };
+
   const reissue = async (token: TerminalToken) => {
     setReissuing(token.id);
     try {
@@ -361,6 +377,7 @@ export function TerminalTokens() {
                 <TableHead>Device name</TableHead>
                 <TableHead>Location / warehouse</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Claimed by</TableHead>
                 <TableHead>Date created</TableHead>
                 <TableHead>Last seen</TableHead>
                 <TableHead>Re-issued</TableHead>
@@ -378,11 +395,16 @@ export function TerminalTokens() {
                       className={
                         t.status === "active"
                           ? "border-success/40 bg-success/10 text-success"
-                          : "border-destructive/40 bg-destructive/10 text-destructive"
+                          : t.status === "used"
+                            ? "border-primary/40 bg-primary/10 text-primary"
+                            : "border-destructive/40 bg-destructive/10 text-destructive"
                       }
                     >
-                      {t.status === "active" ? "Active" : "Revoked"}
+                      {t.status === "active" ? "Active" : t.status === "used" ? "In use" : "Revoked"}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="max-w-[14rem] truncate text-xs text-muted-foreground">
+                    {t.claimedByDevice ? t.claimedByDevice : "—"}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
                     {formatDate(t.createdAt)}
@@ -419,14 +441,35 @@ export function TerminalTokens() {
                           <ShieldX className="size-3.5" /> Revoke authenticity
                         </Button>
                       ) : (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 text-xs"
-                          onClick={() => void restore(t)}
-                        >
-                          <RotateCcw className="size-3.5" /> Re-enable
-                        </Button>
+                        <>
+                          {t.status === "used" ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 border-destructive/40 text-xs text-destructive hover:bg-destructive/10"
+                              onClick={() => setPendingRevoke(t)}
+                            >
+                              <ShieldX className="size-3.5" /> Revoke authenticity
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 text-xs"
+                              onClick={() => void restore(t)}
+                            >
+                              <RotateCcw className="size-3.5" /> Re-enable
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 text-xs text-destructive hover:bg-destructive/10"
+                            onClick={() => setPendingDelete(t)}
+                          >
+                            <Trash2 className="size-3.5" /> Delete
+                          </Button>
+                        </>
                       )}
                     </div>
                   </TableCell>
