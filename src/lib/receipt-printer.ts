@@ -27,9 +27,11 @@ export type PrinterPrefs = {
   deviceName: string;
   /** Shared name used for the raw drawer pulse; defaults to the device name. */
   share: string;
+  /** Drawer connector pin the printer pulses: 2 (standard) or 5. */
+  drawerPin?: 2 | 5;
 };
 
-const EMPTY: PrinterPrefs = { deviceName: "", share: "" };
+const EMPTY: PrinterPrefs = { deviceName: "", share: "", drawerPin: 2 };
 
 export function printBridge(): PrintBridge | null {
   if (typeof window === "undefined") return null;
@@ -43,7 +45,11 @@ export function getPrinterPrefs(): PrinterPrefs {
     const raw = window.localStorage.getItem(PRINTER_KEY);
     if (!raw) return EMPTY;
     const parsed = JSON.parse(raw) as Partial<PrinterPrefs>;
-    return { deviceName: parsed.deviceName ?? "", share: parsed.share ?? "" };
+    return {
+      deviceName: parsed.deviceName ?? "",
+      share: parsed.share ?? "",
+      drawerPin: parsed.drawerPin === 5 ? 5 : 2,
+    };
   } catch {
     return EMPTY;
   }
@@ -75,19 +81,32 @@ export async function silentPrint(html: string): Promise<boolean> {
   return true;
 }
 
-/** Raw ESC/POS pulse for the cash drawer. Returns false without a bridge. */
-export async function rawPulse(bytes: number[]): Promise<boolean> {
+export type PulseResult = { handled: boolean; ok: boolean; error?: string };
+
+/**
+ * Raw ESC/POS pulse for the cash drawer.
+ * `handled: false` means there is no desktop bridge (plain browser).
+ */
+export async function rawPulse(bytes: number[]): Promise<PulseResult> {
   const bridge = printBridge();
-  if (!bridge?.printRaw) return false;
+  if (!bridge?.printRaw) return { handled: false, ok: false };
   const { deviceName, share } = getPrinterPrefs();
   try {
     const res = await bridge.printRaw(bytes, {
       ...(deviceName ? { deviceName } : {}),
-      ...(share || deviceName ? { share: share || deviceName } : {}),
+      ...(share ? { share } : {}),
     });
     if (!res?.ok) console.error("Drawer kick failed:", res?.error);
+    return { handled: true, ok: !!res?.ok, ...(res?.error ? { error: res.error } : {}) };
   } catch (err) {
-    console.error("Drawer kick failed:", err);
+    const error = err instanceof Error ? err.message : String(err);
+    console.error("Drawer kick failed:", error);
+    return { handled: true, ok: false, error };
   }
-  return true;
+}
+
+/** ESC/POS drawer kick bytes for the configured connector pin. */
+export function drawerPulseBytes(): number[] {
+  const pin = getPrinterPrefs().drawerPin === 5 ? 1 : 0;
+  return [0x1b, 0x70, pin, 0x19, 0xfa];
 }
