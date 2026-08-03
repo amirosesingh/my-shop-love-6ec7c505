@@ -29,10 +29,20 @@ export default defineConfig({
         },
       }
     : {}),
-  // The phone build keeps nitro's default output layout: TanStack's SPA shell
-  // prerender boots the built server from dist/, and only the static client
-  // files are copied into the APK afterwards (scripts/mobile-build.cjs).
-  ...(isMobile ? { nitro: { preset: "node-server" as const } } : {}),
+  // Android build: a plain Node server output that scripts/mobile-build.cjs
+  // renders once into a static app shell, which is what ships inside the APK.
+  ...(isMobile
+    ? {
+        nitro: {
+          preset: "node-server" as const,
+          output: {
+            dir: "dist-mobile",
+            serverDir: "dist-mobile/server",
+            publicDir: "dist-mobile/public",
+          },
+        },
+      }
+    : {}),
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
@@ -40,6 +50,5 @@ export default defineConfig({
     // The phone build renders entirely on the device: prerender the shell once
     // and let the client router take every route from there (file:// has no
     // server to ask for HTML).
-    ...(isMobile ? { spa: { enabled: true } } : {}),
   },
 });
