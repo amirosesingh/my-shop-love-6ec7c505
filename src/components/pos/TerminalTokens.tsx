@@ -531,6 +531,32 @@ export function TerminalTokens() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={!!pendingDelete} onOpenChange={(o) => !o && setPendingDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Permanently remove this terminal entry?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDelete?.deviceName} at {pendingDelete?.locationName || "this location"} is
+              revoked, so nothing is cut off by deleting it. The row disappears from this list for
+              good — issue a new terminal if the counter comes back.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                const token = pendingDelete;
+                setPendingDelete(null);
+                if (token) void remove(token);
+              }}
+            >
+              Delete entry
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
