@@ -31,18 +31,7 @@ export default defineConfig({
     : {}),
   // Android build: a plain Node server output that scripts/mobile-build.cjs
   // renders once into a static app shell, which is what ships inside the APK.
-  ...(isMobile
-    ? {
-        nitro: {
-          preset: "node-server" as const,
-          output: {
-            dir: "dist-mobile",
-            serverDir: "dist-mobile/server",
-            publicDir: "dist-mobile/public",
-          },
-        },
-      }
-    : {}),
+  ...(isMobile ? { nitro: { preset: "node-server" as const } } : {}),
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
