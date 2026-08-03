@@ -8,6 +8,7 @@ import {
   MonitorCog,
   MonitorSmartphone,
   DownloadCloud,
+  ArrowLeft,
   Printer,
   QrCode,
   ReceiptText,
@@ -139,6 +140,14 @@ function SettingsHub() {
   return (
     <AppShell>
       <div className="mx-auto w-full max-w-4xl space-y-5 p-6">
+        <div className="sticky top-0 z-20 -mx-6 -mt-6 border-b border-border bg-background/95 px-4 py-2 backdrop-blur">
+          <Link
+            to="/"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <ArrowLeft className="size-4" /> Back to register
+          </Link>
+        </div>
         <header>
           <h1 className="text-2xl font-semibold">System & settings</h1>
           <p className="text-sm text-muted-foreground">
