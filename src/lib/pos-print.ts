@@ -439,8 +439,25 @@ export function printShiftReport(shift: Shift, sales: Sale[], kind: "xreport" | 
   printHtml(kind, shiftBody(shift, sales, kind));
 }
 
+/** Short sample slip used by the printer settings "Test receipt" button. */
+export function printTestReceipt() {
+  const body = `${header("TEST RECEIPT")}
+    <table>
+      <tr><td>Printer test</td><td class="r b">OK</td></tr>
+      <tr><td>Date</td><td class="r">${new Date().toLocaleString()}</td></tr>
+    </table>
+    <hr>
+    <table>
+      <tr><td>Sample item<div class="muted">1 x 10.00</div></td><td class="r">10.00</td></tr>
+      <tr class="b big"><td>TOTAL</td><td class="r">10.00</td></tr>
+    </table>
+    <hr>
+    <div class="c muted">If you can read this, printing works.</div>`;
+  printHtml("Printer test", body);
+}
+
 export function printMemberStatement(member: Member, sales: Sale[]) {
-  printHtml(`${member.code} statement`, memberBody(member, sales));
+  printHtml(`${member.code} statement`, memberBody(member, sales), false);
 }
 
 /* ------------------------------ bookings ------------------------------ */
@@ -606,7 +623,7 @@ export function printTransferNote(
   from: Store,
   to: Store,
 ) {
-  printHtml(transfer.ref, transferBody(transfer, products, from, to));
+  printHtml(transfer.ref, transferBody(transfer, products, from, to), false);
 }
 
 /**
