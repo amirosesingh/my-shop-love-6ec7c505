@@ -1,19 +1,22 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 /**
- * Android wrapper for the POS. The app is server-rendered, so the phone loads
- * the hosted site rather than a bundled static build; POS_MOBILE_URL overrides
- * the default at build time.
+ * Android wrapper for the POS.
+ *
+ * The whole app ships inside the APK (see scripts/mobile-build.cjs), so the
+ * phone never needs a server to start — it works fully offline and only talks
+ * to the cloud to sync. Set POS_MOBILE_URL only when you deliberately want a
+ * thin shell that loads a hosted site instead.
  */
+const remote = process.env["POS_MOBILE_URL"];
+
 const config: CapacitorConfig = {
   appId: "com.luckycharms.pos",
   appName: "Northwind POS",
   webDir: "capacitor-shell",
-  server: {
-    url: process.env["POS_MOBILE_URL"] || "https://updatecms.luckycharmsdnbhd.com",
-    cleartext: false,
-    androidScheme: "https",
-  },
+  ...(remote
+    ? { server: { url: remote, cleartext: false, androidScheme: "https" } }
+    : { server: { androidScheme: "https" } }),
   android: {
     allowMixedContent: false,
   },
