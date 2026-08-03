@@ -398,6 +398,25 @@ function registerIpc() {
   ipcMain.handle("branding:read", () => ({ ok: true, branding: brandingStore.read() }));
   ipcMain.handle("branding:write", (_e, branding) => brandingStore.write(branding));
 
+  /* in-window title bar buttons */
+  const owner = (event) => BrowserWindow.fromWebContents(event.sender) ?? mainWindow;
+  ipcMain.handle("window:minimize", (e) => {
+    owner(e)?.minimize();
+    return { ok: true };
+  });
+  ipcMain.handle("window:maximize", (e) => {
+    const win = owner(e);
+    if (!win) return { ok: false, maximized: false };
+    if (win.isMaximized()) win.unmaximize();
+    else win.maximize();
+    return { ok: true, maximized: win.isMaximized() };
+  });
+  ipcMain.handle("window:close", (e) => {
+    owner(e)?.close();
+    return { ok: true };
+  });
+  ipcMain.handle("window:is-maximized", (e) => ({ maximized: !!owner(e)?.isMaximized() }));
+
   /* ---------------- offline register database surface ---------------- */
 
   ipcMain.handle("db:create-sale", async (_e, payload) => {
