@@ -461,14 +461,16 @@ export function TerminalTokens() {
                               <RotateCcw className="size-3.5" /> Re-enable
                             </Button>
                           )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 text-xs text-destructive hover:bg-destructive/10"
-                            onClick={() => setPendingDelete(t)}
-                          >
-                            <Trash2 className="size-3.5" /> Delete
-                          </Button>
+                          {t.status === "revoked" && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 text-xs text-destructive hover:bg-destructive/10"
+                              onClick={() => setPendingDelete(t)}
+                            >
+                              <Trash2 className="size-3.5" /> Delete
+                            </Button>
+                          )}
                         </>
                       )}
                     </div>
