@@ -16,7 +16,9 @@
     "desktop:build": "cross-env DESKTOP_BUILD=1 vite build && electron .",
     "desktop:package": "cross-env DESKTOP_BUILD=1 vite build && electron-packager . \"LovablePOS\" --platform=win32 --arch=x64 --out=release --overwrite --ignore=\"^/src\" --ignore=\"^/dist$\" --ignore=\"^/release\"",
     "desktop:installer": "cross-env DESKTOP_BUILD=1 vite build && electron-builder --win nsis --publish never",
-    "desktop:release": "node scripts/desktop-release.cjs"
+    "desktop:release": "node scripts/desktop-release.cjs",
+    "mobile:build": "node scripts/mobile-build.cjs",
+    "mobile:sync": "node scripts/mobile-build.cjs && npx cap sync android"
   },
   "dependencies": {
     "@capacitor-community/file-opener": "^8.0.1",
