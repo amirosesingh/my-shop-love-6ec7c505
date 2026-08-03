@@ -10,6 +10,7 @@ const repo = require("./db/repo.cjs");
 const worker = require("./sync/worker.cjs");
 const updater = require("./updater.cjs");
 const terminalStore = require("./terminal-store.cjs");
+const brandingStore = require("./branding-store.cjs");
 const health = require("./health.cjs");
 const recovery = require("./recovery.cjs");
 
@@ -40,7 +41,23 @@ function enterSafeMode(reason) {
 
 /* ------------------------- local app server ------------------------- */
 
-function freePort() {
+/**
+ * The renderer keeps preferences (branding, theme, scale) in browser storage,
+ * which is keyed by origin — so the local server must come back on the SAME
+ * port every launch. Only fall back to a random port if it is taken.
+ */
+const PREFERRED_PORT = Number(process.env.POS_APP_PORT) || 43117;
+
+function portFree(port) {
+  return new Promise((resolve) => {
+    const probe = net.createServer();
+    probe.unref();
+    probe.once("error", () => resolve(false));
+    probe.listen(port, "127.0.0.1", () => probe.close(() => resolve(true)));
+  });
+}
+
+function randomPort() {
   return new Promise((resolve, reject) => {
     const probe = net.createServer();
     probe.unref();
@@ -50,6 +67,11 @@ function freePort() {
       probe.close(() => resolve(port));
     });
   });
+}
+
+async function choosePort() {
+  if (await portFree(PREFERRED_PORT)) return PREFERRED_PORT;
+  return randomPort();
 }
 
 function waitForPort(port, timeoutMs = 30000) {
@@ -76,7 +98,7 @@ async function startAppServer() {
   if (!fs.existsSync(serverEntry)) {
     throw new Error(`Desktop build missing (${serverEntry}). Run: npm run desktop:build`);
   }
-  const port = await freePort();
+  const port = await choosePort();
   // ELECTRON_RUN_AS_NODE makes the bundled Electron binary behave as plain
   // Node, so the packaged app needs no separate Node.js install.
   serverProcess = spawn(process.execPath, [serverEntry], {
@@ -367,6 +389,10 @@ function registerIpc() {
 
   ipcMain.handle("terminal:read", () => ({ ok: true, config: terminalStore.read() }));
   ipcMain.handle("terminal:write", (_e, config) => terminalStore.write(config));
+
+  /* branding mirror so first-run setup only ever runs once */
+  ipcMain.handle("branding:read", () => ({ ok: true, branding: brandingStore.read() }));
+  ipcMain.handle("branding:write", (_e, branding) => brandingStore.write(branding));
 
   /* ---------------- offline register database surface ---------------- */
 
