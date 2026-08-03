@@ -1,7 +1,13 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { navGroups, navItemKey, type NavGroup, type NavItem } from "./nav-config";
+import {
+  navGroups,
+  navItemKey,
+  standaloneNavItems,
+  type NavGroup,
+  type NavItem,
+} from "./nav-config";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,6 +68,12 @@ export function SidebarNav({
   }, [groups, pathname]);
 
   const q = query.trim().toLowerCase();
+  const pinned = useMemo(() => standaloneNavItems.filter(canSee), [canSee]);
+  const pinnedFiltered = q
+    ? pinned.filter(
+        (i) => i.label.toLowerCase().includes(q) || (i.keywords ?? "").includes(q),
+      )
+    : pinned;
   const filtered = q
     ? groups
         .map((g) => ({
@@ -144,8 +156,31 @@ export function SidebarNav({
             const register = groups.flatMap((g) => g.items).find((i) => i.to === "/");
             return register ? <ItemLink item={register} /> : null;
           })()}
+        {!collapsed &&
+          !q &&
+          pinned.map((i) => <ItemLink key={navItemKey(i)} item={i} />)}
+        {collapsed &&
+          pinned.map((i) => (
+            <Link
+              key={navItemKey(i)}
+              to={i.to}
+              onClick={onNavigate}
+              aria-label={i.label}
+              className={cn(
+                "flex w-full items-center justify-center rounded-md py-2.5 text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground",
+                pathname.startsWith(i.to) && "bg-sidebar-accent text-primary",
+              )}
+            >
+              <i.icon className="size-5" />
+            </Link>
+          ))}
         {!collapsed && q
-          ? filtered.flatMap((g) => g.items.map((i) => <ItemLink key={navItemKey(i)} item={i} />))
+          ? [
+              ...pinnedFiltered.map((i) => <ItemLink key={navItemKey(i)} item={i} />),
+              ...filtered.flatMap((g) =>
+                g.items.map((i) => <ItemLink key={navItemKey(i)} item={i} />),
+              ),
+            ]
           : filtered.map((g) => {
           if (collapsed) {
             return (
@@ -205,7 +240,7 @@ export function SidebarNav({
           );
         })}
 
-        {filtered.length === 0 && (
+        {filtered.length === 0 && pinnedFiltered.length === 0 && (
           <p className="px-2 py-4 text-center text-xs text-muted-foreground">No matches</p>
         )}
       </nav>
