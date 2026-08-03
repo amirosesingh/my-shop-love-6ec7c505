@@ -79,8 +79,12 @@ async function runOne(entry: QueuedOp): Promise<boolean> {
     res = await execute({ ...entry.op, rows } as SyncOp);
   }
   if (res.error) {
-    failOp(entry.id, res.error.message);
-    logSync("push", entry.op.table, false, `${entry.context}: ${res.error.message}`);
+    const message =
+      res.error.code === "PGRST205"
+        ? `The "${entry.op.table}" table is missing on the database — run supabase/schema14.sql once, then this will sync automatically.`
+        : res.error.message;
+    failOp(entry.id, message);
+    logSync("push", entry.op.table, false, `${entry.context}: ${message}`);
     return false;
   }
   resolveOp(entry.id);
