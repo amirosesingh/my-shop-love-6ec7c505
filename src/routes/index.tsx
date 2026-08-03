@@ -1163,7 +1163,7 @@ function Register() {
             </div>
           </ScrollArea>
 
-          <div className="space-y-2 border-t border-border px-4 py-3 text-sm">
+          <div className="shrink-0 space-y-2 border-t border-border px-4 py-3 text-sm">
             {exchangeRef && (
               <div className="flex items-center justify-between rounded-md border border-accent/40 bg-accent/10 px-2 py-1.5 text-[11px]">
                 <span>Exchange against bill #{exchangeRef}</span>
