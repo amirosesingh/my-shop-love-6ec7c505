@@ -3,7 +3,7 @@ import { ReceiptText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { isDesktop, readBranding, writeBranding } from "@/lib/branding";
+import { isDesktop, restoreBrandingFromDisk, writeBranding } from "@/lib/branding";
 import { usePos } from "@/lib/pos-store";
 
 /**
@@ -13,13 +13,23 @@ import { usePos } from "@/lib/pos-store";
 export function FirstRunSetup({ children }: { children: React.ReactNode }) {
   const { state, updateSettings } = usePos();
   const [needed, setNeeded] = useState(false);
+  const [checked, setChecked] = useState(false);
   const [company, setCompany] = useState("");
   const [terminal, setTerminal] = useState("POS Terminal 01");
 
   useEffect(() => {
-    setNeeded(isDesktop() && !readBranding().configured);
+    if (!isDesktop()) {
+      setChecked(true);
+      return;
+    }
+    // The on-disk mirror wins: setup must only ever run on a fresh install.
+    void restoreBrandingFromDisk().then((b) => {
+      setNeeded(!b.configured);
+      setChecked(true);
+    });
   }, []);
 
+  if (!checked) return null;
   if (!needed) return <>{children}</>;
 
   return (

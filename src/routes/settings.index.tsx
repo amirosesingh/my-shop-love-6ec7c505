@@ -1,10 +1,13 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import {
   Building2,
   Landmark,
   ListPlus,
   MessageCircle,
   MonitorCog,
+  MonitorSmartphone,
+  DownloadCloud,
   Printer,
   QrCode,
   ReceiptText,
@@ -13,18 +16,82 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/pos/AppShell";
 import { useAuth } from "@/lib/pos-auth";
+import { isDesktop } from "@/lib/branding";
 
 const PAGES = [
-  { to: "/settings/display", label: "Display & text size", icon: MonitorCog, blurb: "Interface scale, density and light / dark theme." },
-  { to: "/settings/tax", label: "Tax & pricing", icon: ReceiptText, blurb: "Global tax rate and inclusive or exclusive pricing." },
-  { to: "/settings/identity", label: "Business identity", icon: Building2, blurb: "Company name, tax numbers, header and footer." },
-  { to: "/settings/type", label: "Receipt typography", icon: Type, blurb: "Fonts, sizes and spacing for printed slips." },
-  { to: "/settings/lines", label: "Receipt extra lines", icon: ListPlus, blurb: "Policy notes, promotions and opening hours." },
-  { to: "/settings/qr", label: "Receipt QR code", icon: QrCode, blurb: "QR payload, size and placement on the slip." },
-  { to: "/settings/elements", label: "Receipt elements", icon: Printer, blurb: "Paper size, logo, points, barcode and tax blocks." },
-  { to: "/settings/payment", label: "Bank transfer details", icon: Landmark, blurb: "Bank account and payment QR for the customer display." },
-  { to: "/settings/whatsapp", label: "WhatsApp bills", icon: MessageCircle, blurb: "Send receipts over the WhatsApp Cloud API." },
-  { to: "/settings/sync", label: "Sync & backup", icon: RefreshCw, blurb: "Branch identity, offline sync queue and backups." },
+  {
+    to: "/settings/display",
+    label: "Display & text size",
+    icon: MonitorCog,
+    blurb: "Interface scale, density and light / dark theme.",
+  },
+  {
+    to: "/settings/updates",
+    label: "Software updates",
+    icon: DownloadCloud,
+    blurb: "App version, background updates and system health.",
+  },
+  {
+    to: "/settings/tax",
+    label: "Tax & pricing",
+    icon: ReceiptText,
+    blurb: "Global tax rate and inclusive or exclusive pricing.",
+  },
+  {
+    to: "/settings/identity",
+    label: "Business identity",
+    icon: Building2,
+    blurb: "Company name, tax numbers, header and footer.",
+  },
+  {
+    to: "/settings/type",
+    label: "Receipt typography",
+    icon: Type,
+    blurb: "Fonts, sizes and spacing for printed slips.",
+  },
+  {
+    to: "/settings/lines",
+    label: "Receipt extra lines",
+    icon: ListPlus,
+    blurb: "Policy notes, promotions and opening hours.",
+  },
+  {
+    to: "/settings/qr",
+    label: "Receipt QR code",
+    icon: QrCode,
+    blurb: "QR payload, size and placement on the slip.",
+  },
+  {
+    to: "/settings/elements",
+    label: "Receipt elements",
+    icon: Printer,
+    blurb: "Paper size, logo, points, barcode and tax blocks.",
+  },
+  {
+    to: "/settings/payment",
+    label: "Bank transfer details",
+    icon: Landmark,
+    blurb: "Bank account and payment QR for the customer display.",
+  },
+  {
+    to: "/settings/whatsapp",
+    label: "WhatsApp bills",
+    icon: MessageCircle,
+    blurb: "Send receipts over the WhatsApp Cloud API.",
+  },
+  {
+    to: "/settings/sync",
+    label: "Sync & backup",
+    icon: RefreshCw,
+    blurb: "Branch identity, offline sync queue and backups.",
+  },
+  {
+    to: "/settings/terminals",
+    label: "Terminal activation",
+    icon: MonitorSmartphone,
+    blurb: "Register Windows tills, issue and revoke activation codes.",
+    cloudOnly: true,
+  },
 ] as const;
 
 const LEGACY: Record<string, string> = Object.fromEntries(
@@ -45,9 +112,16 @@ export const Route = createFileRoute("/settings/")({
   head: () => ({
     meta: [
       { title: "System & Settings — Northwind POS" },
-      { name: "description", content: "Every POS configuration area in one place: display scaling, tax, receipt design, payment details, WhatsApp bills and offline sync." },
+      {
+        name: "description",
+        content:
+          "Every POS configuration area in one place: display scaling, tax, receipt design, payment details, WhatsApp bills and offline sync.",
+      },
       { property: "og:title", content: "System & Settings — Northwind POS" },
-      { property: "og:description", content: "All register configuration areas for the point of sale." },
+      {
+        property: "og:description",
+        content: "All register configuration areas for the point of sale.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -58,6 +132,9 @@ export const Route = createFileRoute("/settings/")({
 function SettingsHub() {
   const { isAdmin, can } = useAuth();
   const allowed = isAdmin || can("can_access_pos_settings");
+  const [desktop, setDesktop] = useState(false);
+  useEffect(() => setDesktop(isDesktop()), []);
+  const pages = PAGES.filter((p) => !("cloudOnly" in p && p.cloudOnly && desktop));
 
   return (
     <AppShell>
@@ -75,7 +152,7 @@ function SettingsHub() {
           </p>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
-            {PAGES.map((p) => (
+            {pages.map((p) => (
               <Link
                 key={p.to}
                 to={p.to}

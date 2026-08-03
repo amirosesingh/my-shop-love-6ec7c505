@@ -126,7 +126,7 @@
     "publish": [
       {
         "provider": "generic",
-        "url": "${env.POS_UPDATE_URL}",
+        "url": "https://updatecms.luckycharmsdnbhd.com/pos-app/",
         "channel": "latest"
       }
     ],

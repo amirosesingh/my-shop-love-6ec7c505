@@ -68,10 +68,10 @@ till can still be pointed elsewhere with `POS_UPDATE_FEED`:
 
 ```bat
 :: plain web folder holding the installer + latest.yml (what we use)
-set POS_UPDATE_URL=https://updates.example.com/pos
+set POS_UPDATE_URL=https://updatecms.luckycharmsdnbhd.com/pos-app/
 
 :: runtime override, optional
-set POS_UPDATE_FEED=https://updates.example.com/pos
+set POS_UPDATE_FEED=https://updatecms.luckycharmsdnbhd.com/pos-app/
 
 :: GitHub releases
 set POS_UPDATE_FEED=github
@@ -79,7 +79,7 @@ set POS_UPDATE_REPO=your-org/your-repo
 ```
 
 The till checks on launch and every 6 hours, downloads in the background, and
-installs on restart (Settings → Display → App updates). The terminal
+installs on restart (Settings → Software updates). The terminal
 activation is mirrored to `terminal-config.json` in the app's user-data folder,
 so an update never de-registers the machine.
 
@@ -87,7 +87,7 @@ so an update never de-registers the machine.
 
 1. One-time: in the GitHub repository, add a repository variable
    `POS_UPDATE_URL` (Settings → Secrets and variables → Actions → Variables)
-   pointing at your web folder, e.g. `https://updates.example.com/pos`.
+   if you ever move the folder; builds already default to `https://updatecms.luckycharmsdnbhd.com/pos-app/`.
 2. Bump `version` in `package.json`, commit, then push a matching tag:
 
    ```bash
@@ -104,7 +104,7 @@ so an update never de-registers the machine.
 4. Upload all three to your web folder, keeping the exact file names. The
    folder must be reachable over plain HTTPS with no login.
 5. Every till picks the update up within 6 hours (or immediately via
-   Settings → Display → App updates → Check for updates) and installs it on
+   Settings → Software updates → Check for updates) and installs it on
    the next restart. Only the very first install needs the `.exe` to be
    copied to the machine by hand.
 
@@ -138,4 +138,4 @@ never dead-ends on an error box.
 Recovery never touches `%APPDATA%\LovablePOS` — `terminal-config.json`,
 settings and the local SQL Server data survive, so the till comes back
 registered with no new activation code. The same rollback action is available
-while the app runs from Settings → Display → System health.
+while the app runs from Settings → Software updates → System health.
