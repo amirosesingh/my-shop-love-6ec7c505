@@ -16,6 +16,9 @@ const { app, BrowserWindow, net } = require("electron");
 
 const SIX_HOURS = 6 * 60 * 60 * 1000;
 
+/** Update folder used when nothing else is configured or baked in. */
+const DEFAULT_FEED_URL = "https://updatecms.luckycharmsdnbhd.com/pos-app/";
+
 let autoUpdater = null;
 let state = { status: "idle", version: app.getVersion(), percent: 0, error: null };
 let timer = null;
@@ -34,7 +37,7 @@ function set(patch) {
 
 function feed() {
   const configured = (process.env.POS_UPDATE_FEED || "").trim();
-  if (!configured) return bakedFeed();
+  if (!configured) return bakedFeed() || { provider: "generic", url: DEFAULT_FEED_URL };
   if (configured.toLowerCase() === "github") {
     const repo = (process.env.POS_UPDATE_REPO || "").trim();
     if (!repo.includes("/")) return null;
