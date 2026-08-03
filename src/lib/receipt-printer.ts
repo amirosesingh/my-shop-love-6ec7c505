@@ -11,7 +11,10 @@ const PRINTER_KEY = "pos-receipt-printer-v1";
 type PrintResult = { ok: boolean; error?: string };
 
 type PrintBridge = {
-  print?: (html: string, options?: { deviceName?: string }) => Promise<PrintResult>;
+  print?: (
+    html: string,
+    options?: { deviceName?: string; paper?: string },
+  ) => Promise<PrintResult>;
   printRaw?: (
     bytes: number[],
     options?: { deviceName?: string; share?: string },
@@ -29,9 +32,15 @@ export type PrinterPrefs = {
   share: string;
   /** Drawer connector pin the printer pulses: 2 (standard) or 5. */
   drawerPin?: 2 | 5;
+  /**
+   * How slips reach the printer on the desktop till.
+   * `thermal` = ESC/POS text through the RAW spooler (fast, no driver).
+   * `graphics` = HTML rendered by the printer driver.
+   */
+  printMode?: "thermal" | "graphics";
 };
 
-const EMPTY: PrinterPrefs = { deviceName: "", share: "", drawerPin: 2 };
+const EMPTY: PrinterPrefs = { deviceName: "", share: "", drawerPin: 2, printMode: "thermal" };
 
 export function printBridge(): PrintBridge | null {
   if (typeof window === "undefined") return null;
@@ -49,6 +58,7 @@ export function getPrinterPrefs(): PrinterPrefs {
       deviceName: parsed.deviceName ?? "",
       share: parsed.share ?? "",
       drawerPin: parsed.drawerPin === 5 ? 5 : 2,
+      printMode: parsed.printMode === "graphics" ? "graphics" : "thermal",
     };
   } catch {
     return EMPTY;
@@ -67,21 +77,29 @@ export async function listPrinters() {
   return res.ok ? res.printers : [];
 }
 
-/** Silent print through Electron. Returns false when no bridge is available. */
-export async function silentPrint(html: string): Promise<boolean> {
+export type PulseResult = { handled: boolean; ok: boolean; error?: string };
+
+/**
+ * Silent print through Electron.
+ * `handled: false` means there is no desktop bridge (plain browser).
+ */
+export async function silentPrint(html: string, paper?: string): Promise<PulseResult> {
   const bridge = printBridge();
-  if (!bridge?.print) return false;
+  if (!bridge?.print) return { handled: false, ok: false };
   const { deviceName } = getPrinterPrefs();
   try {
-    const res = await bridge.print(html, deviceName ? { deviceName } : undefined);
+    const res = await bridge.print(html, {
+      ...(deviceName ? { deviceName } : {}),
+      ...(paper ? { paper } : {}),
+    });
     if (!res?.ok) console.error("Silent print failed:", res?.error);
+    return { handled: true, ok: !!res?.ok, ...(res?.error ? { error: res.error } : {}) };
   } catch (err) {
-    console.error("Silent print failed:", err);
+    const error = err instanceof Error ? err.message : String(err);
+    console.error("Silent print failed:", error);
+    return { handled: true, ok: false, error };
   }
-  return true;
 }
-
-export type PulseResult = { handled: boolean; ok: boolean; error?: string };
 
 /**
  * Raw ESC/POS pulse for the cash drawer.
