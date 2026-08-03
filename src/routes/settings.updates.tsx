@@ -7,9 +7,16 @@ export const Route = createFileRoute("/settings/updates")({
   head: () => ({
     meta: [
       { title: "Software Updates — Northwind POS" },
-      { name: "description", content: "Check the installed till version, download new releases in the background, restart to install, and roll back to the last version that started cleanly." },
+      {
+        name: "description",
+        content:
+          "Check the installed till version, download new releases in the background, restart to install, and roll back to the last version that started cleanly.",
+      },
       { property: "og:title", content: "Software Updates — Northwind POS" },
-      { property: "og:description", content: "Background updates, version status and safe-mode rollback for the register." },
+      {
+        property: "og:description",
+        content: "Background updates, version status and safe-mode rollback for the register.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
