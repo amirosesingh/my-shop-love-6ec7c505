@@ -183,9 +183,13 @@ export function SidebarNav({
                   </button>
                 </PopoverTrigger>
                 <PopoverContent side="right" align="start" className="w-60 p-2">
-                  <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  <Link
+                    to={g.hubTo}
+                    onClick={onNavigate}
+                    className="block rounded-md px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+                  >
                     {g.label}
-                  </p>
+                  </Link>
                   <div className="space-y-0.5">
                     {g.items.map((i) => (
                       <ItemLink key={navItemKey(i)} item={i} dense />
@@ -198,24 +202,38 @@ export function SidebarNav({
 
           return (
             <div key={g.id}>
-              <button
-                type="button"
-                onClick={() => toggleGroup(g.id)}
-                aria-expanded={expanded}
+              <div
                 className={cn(
-                  "flex w-full items-center gap-2 rounded-md px-2 py-2 text-[11px] font-semibold uppercase tracking-wide transition-colors hover:bg-sidebar-accent",
+                  "flex w-full items-center rounded-md pr-1 transition-colors hover:bg-sidebar-accent",
                   activeGroupId === g.id ? "text-foreground" : "text-muted-foreground",
                 )}
               >
-                <g.icon className="size-4 shrink-0" />
-                <span className="min-w-0 truncate">{g.label}</span>
-                <ChevronDown
-                  className={cn(
-                    "ml-auto size-3.5 shrink-0 transition-transform duration-200",
-                    !expanded && "-rotate-90",
-                  )}
-                />
-              </button>
+                <Link
+                  to={g.hubTo}
+                  onClick={() => {
+                    setOpen((prev) => (prev.includes(g.id) ? prev : [...prev, g.id]));
+                    onNavigate?.();
+                  }}
+                  className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-2 text-[11px] font-semibold uppercase tracking-wide"
+                >
+                  <g.icon className="size-4 shrink-0" />
+                  <span className="min-w-0 truncate">{g.label}</span>
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(g.id)}
+                  aria-expanded={expanded}
+                  aria-label={expanded ? `Collapse ${g.label}` : `Expand ${g.label}`}
+                  className="rounded-md p-1 hover:text-foreground"
+                >
+                  <ChevronDown
+                    className={cn(
+                      "size-3.5 shrink-0 transition-transform duration-200",
+                      !expanded && "-rotate-90",
+                    )}
+                  />
+                </button>
+              </div>
               <div
                 className={cn(
                   "grid transition-[grid-template-rows] duration-200 ease-out",
