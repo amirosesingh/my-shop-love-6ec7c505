@@ -56,10 +56,16 @@ async function main() {
 
   const serverEntry = path.join(root, "dist", "server", "index.mjs");
   const clientDir = path.join(root, "dist", "client");
-  if (!fs.existsSync(serverEntry) || !fs.existsSync(clientDir)) {
+  if (!fs.existsSync(serverEntry)) {
     throw new Error(
-      "Expected dist/server/index.mjs and dist/client after the build. " +
-        "The phone build needs the Node server output (MOBILE_BUILD=1).",
+      "Phone server bundle is missing at dist/server/index.mjs. " +
+        "Confirm vite.config.ts gives MOBILE_BUILD=1 an explicit dist output.",
+    );
+  }
+  if (!fs.existsSync(clientDir)) {
+    throw new Error(
+      "Phone client assets are missing at dist/client. " +
+        "Confirm the mobile Nitro publicDir is configured as dist/client.",
     );
   }
 
@@ -68,6 +74,10 @@ async function main() {
     cwd: root,
     env: { ...process.env, PORT: String(PORT), HOST: "127.0.0.1", NITRO_PORT: String(PORT) },
     stdio: ["ignore", "inherit", "inherit"],
+  });
+
+  server.on("error", (error) => {
+    console.error(`Could not start the phone render server: ${error.message}`);
   });
 
   let html;

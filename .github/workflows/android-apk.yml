@@ -37,6 +37,10 @@ jobs:
         with:
           node-version: 22
 
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -45,7 +49,7 @@ jobs:
       - uses: android-actions/setup-android@v3
 
       - name: Install dependencies
-        run: npm install
+        run: bun install --frozen-lockfile
 
       - name: Read app version
         id: meta
@@ -53,7 +57,7 @@ jobs:
 
       - name: Build the offline app bundle
         if: ${{ !inputs.app_url }}
-        run: npm run mobile:build
+        run: bun run mobile:build
 
       - name: Add Android platform
         env:
