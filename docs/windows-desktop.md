@@ -79,7 +79,7 @@ set POS_UPDATE_REPO=your-org/your-repo
 ```
 
 The till checks on launch and every 6 hours, downloads in the background, and
-installs on restart (Settings → Display → App updates). The terminal
+installs on restart (Settings → Software updates). The terminal
 activation is mirrored to `terminal-config.json` in the app's user-data folder,
 so an update never de-registers the machine.
 
@@ -87,7 +87,7 @@ so an update never de-registers the machine.
 
 1. One-time: in the GitHub repository, add a repository variable
    `POS_UPDATE_URL` (Settings → Secrets and variables → Actions → Variables)
-   pointing at your web folder, e.g. `https://updatecms.luckycharmsdnbhd.com/pos-app/`.
+   if you ever move the folder; builds already default to `https://updatecms.luckycharmsdnbhd.com/pos-app/`.
 2. Bump `version` in `package.json`, commit, then push a matching tag:
 
    ```bash
