@@ -138,6 +138,12 @@ export function SidebarNav({
       )}
 
       <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-2 pb-2">
+        {!collapsed &&
+          !q &&
+          (() => {
+            const register = groups.flatMap((g) => g.items).find((i) => i.to === "/");
+            return register ? <ItemLink item={register} /> : null;
+          })()}
         {!collapsed && q
           ? filtered.flatMap((g) => g.items.map((i) => <ItemLink key={navItemKey(i)} item={i} />))
           : filtered.map((g) => {
