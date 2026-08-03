@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { ChevronDown, ChevronLeft, ChevronRight, Search, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { navGroups, navItemKey, type NavGroup, type NavItem } from "./nav-config";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
-const OPEN_KEY = "pos.nav.openGroups";
 const COLLAPSE_KEY = "pos.nav.collapsed";
 
 export function useSidebarCollapsed() {
@@ -46,7 +45,6 @@ export function SidebarNav({
   const hash = useRouterState({ select: (r) => r.location.hash });
   const search = useRouterState({ select: (r) => r.location.search as Record<string, unknown> });
   const [query, setQuery] = useState("");
-  const [open, setOpen] = useState<string[]>([]);
 
   const groups: NavGroup[] = useMemo(
     () =>
@@ -62,26 +60,6 @@ export function SidebarNav({
     );
     return match?.id;
   }, [groups, pathname]);
-
-  // restore saved accordion state
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(OPEN_KEY);
-      if (raw) setOpen(JSON.parse(raw) as string[]);
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  // keep the group of the current route expanded
-  useEffect(() => {
-    if (!activeGroupId) return;
-    setOpen((prev) => (prev.includes(activeGroupId) ? prev : [...prev, activeGroupId]));
-  }, [activeGroupId]);
-
-  useEffect(() => {
-    localStorage.setItem(OPEN_KEY, JSON.stringify(open));
-  }, [open]);
 
   const q = query.trim().toLowerCase();
   const filtered = q
@@ -110,9 +88,6 @@ export function SidebarNav({
     const activeSection = typeof search?.["section"] === "string" ? search["section"] : "";
     return (i.section ?? "") === activeSection;
   };
-
-  const toggleGroup = (id: string) =>
-    setOpen((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   const ItemLink = ({ item, dense }: { item: NavItem; dense?: boolean }) => (
     <Link
