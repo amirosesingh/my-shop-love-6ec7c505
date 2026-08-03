@@ -33,11 +33,6 @@ export default defineConfig({
     ? {
         nitro: {
           preset: "static" as const,
-          output: {
-            dir: "dist-mobile",
-            serverDir: "dist-mobile/server",
-            publicDir: "dist-mobile/public",
-          },
         },
       }
     : {}),
