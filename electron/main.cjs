@@ -233,12 +233,12 @@ function printSilent(html, deviceName) {
  * pulse reaches the printer untouched and is forwarded to the RJ11 drawer port.
  * Printing by *name* means the printer does not have to be shared.
  */
-const RAW_PS = `param([string]$File,[string]$Printer)
+const RAW_PS = `param([string]$Payload,[string]$PrinterName)
 $ErrorActionPreference = 'Stop'
-if (-not $Printer) {
-  $Printer = (Get-CimInstance Win32_Printer -Filter "Default=True" | Select-Object -First 1).Name
+if (-not $PrinterName) {
+  $PrinterName = (Get-CimInstance Win32_Printer -Filter "Default=True" | Select-Object -First 1).Name
 }
-if (-not $Printer) { throw 'No printer selected and no Windows default printer found.' }
+if (-not $PrinterName) { throw 'No printer selected and no Windows default printer found.' }
 Add-Type -TypeDefinition @"
 using System;
 using System.IO;
@@ -284,8 +284,8 @@ public static class PosRaw {
   }
 }
 "@
-[PosRaw]::Send($Printer, [System.IO.File]::ReadAllBytes($File))
-Write-Output ("sent:" + $Printer)
+[PosRaw]::Send($PrinterName, [System.IO.File]::ReadAllBytes($Payload))
+Write-Output ("sent:" + $PrinterName)
 `;
 
 function runProcess(cmd, args) {
@@ -338,21 +338,6 @@ async function printRaw(bytes, options = {}) {
     fs.writeFileSync(binFile, Buffer.from(bytes));
     fs.writeFileSync(psFile, RAW_PS, "utf8");
 
-    const args = [
-      "-NoProfile",
-      "-NonInteractive",
-      "-ExecutionPolicy",
-      "Bypass",
-      "-File",
-      psFile,
-      "-File2Unused",
-    ];
-    // -File passes named params positionally; build them explicitly instead.
-    args.splice(6, 1, psFile);
-    args.length = 6;
-    args.push(psFile, "-File", binFile, "-Printer", deviceName);
-    args.splice(5, 2); // drop the duplicated script path from the -File slot
-
     const primary = await runProcess("powershell.exe", [
       "-NoProfile",
       "-NonInteractive",
@@ -360,9 +345,9 @@ async function printRaw(bytes, options = {}) {
       "Bypass",
       "-File",
       psFile,
-      "-File",
+      "-Payload",
       binFile,
-      "-Printer",
+      "-PrinterName",
       deviceName,
     ]);
     if (primary.ok) {
