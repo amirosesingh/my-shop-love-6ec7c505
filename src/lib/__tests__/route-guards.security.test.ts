@@ -58,7 +58,10 @@ describe("route guards", () => {
   });
 
   it("every report screen requires the sales-reports permission in the sidebar", () => {
-    const reportLines = NAV.split("\n").filter((l) => l.includes('to: "/reports'));
+    const reportLines = NAV
+      .split("\n")
+      // hubTo is the section landing page, not a report screen entry.
+      .filter((l) => l.includes('to: "/reports') && !l.includes("hubTo:"));
     expect(reportLines.length).toBeGreaterThan(0);
     for (const line of reportLines) {
       expect(line, line).toContain('flag: "can_view_sales_reports"');
