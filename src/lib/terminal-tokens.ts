@@ -290,7 +290,7 @@ export async function fetchTokenStatus(
   const row = Array.isArray(data) ? data[0] : data;
   if (!row) return null;
   return {
-    status: row.status === "revoked" ? "revoked" : "active",
+    status: asStatus(row.status),
     locationName: row.location_name ?? "",
   };
 }
@@ -339,6 +339,25 @@ export async function activateTerminal(code: string): Promise<TerminalConfig> {
   if (!remote) throw new ActivationError("This activation code is not recognised.");
   if (remote.status === "revoked") {
     throw new ActivationError("This activation code has been revoked by management.");
+  }
+  if (remote.status === "used") {
+    throw new ActivationError(
+      "This activation code has already been used on another terminal. Ask an administrator to re-issue a code for this till.",
+    );
+  }
+
+  // One-time use: only the till that wins this atomic claim may register.
+  const deviceName =
+    typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 120) : null;
+  const { data: claimed, error: claimError } = await rpc("terminal_token_claim", {
+    p_token_id: payload.token_id,
+    p_device: deviceName,
+  });
+  if (claimError) throw new ActivationError(activationFailureMessage(claimError));
+  if (claimed !== true) {
+    throw new ActivationError(
+      "This activation code has already been used on another terminal. Ask an administrator to re-issue a code for this till.",
+    );
   }
 
   const config: TerminalConfig = {
