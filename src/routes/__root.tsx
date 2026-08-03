@@ -18,6 +18,8 @@ import { Toaster } from "../components/ui/sonner";
 import { AuditTracker } from "../components/pos/AuditTracker";
 import { FirstRunSetup } from "../components/pos/FirstRunSetup";
 import { ThemeProvider, themeBootScript } from "../lib/theme";
+import { NativeBoot } from "../components/pos/NativeBoot";
+import { AndroidUpdateBanner } from "../components/pos/AndroidUpdateBanner";
 
 function NotFoundComponent() {
   return (
@@ -140,6 +142,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
+      <NativeBoot>
       <AuthProvider>
         <PermissionsProvider>
         <PosProvider>
@@ -148,10 +151,12 @@ function RootComponent() {
           <FirstRunSetup>
             <Outlet />
           </FirstRunSetup>
+          <AndroidUpdateBanner />
           <Toaster position="top-center" />
         </PosProvider>
         </PermissionsProvider>
       </AuthProvider>
+      </NativeBoot>
       </ThemeProvider>
     </QueryClientProvider>
   );
