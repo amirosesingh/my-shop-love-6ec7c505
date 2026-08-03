@@ -17,7 +17,8 @@ import type {
 import { bookingBalance, lineUnitDiscount, whatsappLink } from "./pos-types";
 import { defaultReceiptSettings } from "./pos-seed";
 import qrcode from "qrcode-generator";
-import { rawPulse, silentPrint } from "./receipt-printer";
+import { toast } from "sonner";
+import { drawerPulseBytes, rawPulse, silentPrint } from "./receipt-printer";
 
 export const STORE = {
   name: "NORTHWIND & CO.",
