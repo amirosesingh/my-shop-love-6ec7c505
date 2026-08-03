@@ -19,5 +19,6 @@ const run = (cmd, args) => {
   if (r.status !== 0) process.exit(r.status ?? 1);
 };
 
+run("node", ["scripts/bump-version.cjs", "--write"]);
 run("vite", ["build"]);
 run("electron-builder", ["--win", "nsis", "--publish", "never"]);

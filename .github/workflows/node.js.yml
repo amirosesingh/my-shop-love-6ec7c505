@@ -2,36 +2,60 @@ name: Build & Deploy POS App to Cloudflare R2
 
 on:
   push:
-    # Triggers automatic build whenever you push a version tag like v1.0.1
+    branches:
+      - main
     tags:
       - 'v*'
-  # Allows you to click "Run workflow" manually from GitHub UI
   workflow_dispatch:
+
+# Never let two releases upload over each other.
+concurrency:
+  group: desktop-release
+  cancel-in-progress: false
 
 jobs:
   build-windows:
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
     runs-on: windows-latest
+    permissions:
+      contents: write
 
     steps:
-      # 1. Pull code from your repository
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      # 2. Set up Node.js environment
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
 
-      # 3. Install npm dependencies cleanly
       - name: Install Dependencies
         run: npm install
 
-      # 4. Compile React & package Electron into .exe
+      # Every push to main ships a new build, so the patch digit goes up first.
+      - name: Bump patch version
+        if: startsWith(github.ref, 'refs/heads/')
+        id: bump
+        shell: bash
+        run: |
+          version=$(node scripts/bump-version.cjs)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json src/version.ts
+          git commit -m "chore: release v$version [skip ci]"
+          git tag "v$version"
+          git push origin HEAD --tags
+
       - name: Build Electron (.exe)
+        env:
+          POS_UPDATE_URL: ${{ vars.POS_UPDATE_URL }}
         run: npm run desktop:release
-# 5. Upload files to Cloudflare R2 using pre-installed AWS CLI on Windows
+
       - name: Deploy to Cloudflare R2
         shell: powershell
         env:
@@ -40,4 +64,12 @@ jobs:
           AWS_DEFAULT_REGION: auto
         run: |
           aws s3 sync release s3://updatelccms/pos-app --endpoint-url ${{ secrets.R2_ENDPOINT }}
-      
+
+      - name: Attach installer to a GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.bump.outputs.version || github.ref_name }}
+          files: |
+            release/*.exe
+            release/latest.yml
+            release/*.blockmap
