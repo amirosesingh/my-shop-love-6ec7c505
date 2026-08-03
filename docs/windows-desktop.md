@@ -104,7 +104,7 @@ so an update never de-registers the machine.
 4. Upload all three to your web folder, keeping the exact file names. The
    folder must be reachable over plain HTTPS with no login.
 5. Every till picks the update up within 6 hours (or immediately via
-   Settings → Display → App updates → Check for updates) and installs it on
+   Settings → Software updates → Check for updates) and installs it on
    the next restart. Only the very first install needs the `.exe` to be
    copied to the machine by hand.
 
@@ -138,4 +138,4 @@ never dead-ends on an error box.
 Recovery never touches `%APPDATA%\LovablePOS` — `terminal-config.json`,
 settings and the local SQL Server data survive, so the till comes back
 registered with no new activation code. The same rollback action is available
-while the app runs from Settings → Display → System health.
+while the app runs from Settings → Software updates → System health.
