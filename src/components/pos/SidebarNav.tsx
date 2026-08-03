@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { ChevronDown, ChevronLeft, ChevronRight, Search, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { navGroups, navItemKey, type NavGroup, type NavItem } from "./nav-config";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
-const OPEN_KEY = "pos.nav.openGroups";
 const COLLAPSE_KEY = "pos.nav.collapsed";
 
 export function useSidebarCollapsed() {
@@ -46,7 +45,6 @@ export function SidebarNav({
   const hash = useRouterState({ select: (r) => r.location.hash });
   const search = useRouterState({ select: (r) => r.location.search as Record<string, unknown> });
   const [query, setQuery] = useState("");
-  const [open, setOpen] = useState<string[]>([]);
 
   const groups: NavGroup[] = useMemo(
     () =>
@@ -62,26 +60,6 @@ export function SidebarNav({
     );
     return match?.id;
   }, [groups, pathname]);
-
-  // restore saved accordion state
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(OPEN_KEY);
-      if (raw) setOpen(JSON.parse(raw) as string[]);
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  // keep the group of the current route expanded
-  useEffect(() => {
-    if (!activeGroupId) return;
-    setOpen((prev) => (prev.includes(activeGroupId) ? prev : [...prev, activeGroupId]));
-  }, [activeGroupId]);
-
-  useEffect(() => {
-    localStorage.setItem(OPEN_KEY, JSON.stringify(open));
-  }, [open]);
 
   const q = query.trim().toLowerCase();
   const filtered = q
@@ -110,9 +88,6 @@ export function SidebarNav({
     const activeSection = typeof search?.["section"] === "string" ? search["section"] : "";
     return (i.section ?? "") === activeSection;
   };
-
-  const toggleGroup = (id: string) =>
-    setOpen((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   const ItemLink = ({ item, dense }: { item: NavItem; dense?: boolean }) => (
     <Link
@@ -164,8 +139,6 @@ export function SidebarNav({
 
       <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-2 pb-2">
         {filtered.map((g) => {
-          const expanded = q ? true : open.includes(g.id);
-
           if (collapsed) {
             return (
               <Popover key={g.id}>
@@ -202,51 +175,21 @@ export function SidebarNav({
 
           return (
             <div key={g.id}>
-              <div
+              <Link
+                to={g.hubTo}
+                onClick={onNavigate}
                 className={cn(
-                  "flex w-full items-center rounded-md pr-1 transition-colors hover:bg-sidebar-accent",
+                  "flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-2 text-[11px] font-semibold uppercase tracking-wide transition-colors hover:bg-sidebar-accent",
                   activeGroupId === g.id ? "text-foreground" : "text-muted-foreground",
                 )}
               >
-                <Link
-                  to={g.hubTo}
-                  onClick={() => {
-                    setOpen((prev) => (prev.includes(g.id) ? prev : [...prev, g.id]));
-                    onNavigate?.();
-                  }}
-                  className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-2 text-[11px] font-semibold uppercase tracking-wide"
-                >
-                  <g.icon className="size-4 shrink-0" />
-                  <span className="min-w-0 truncate">{g.label}</span>
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => toggleGroup(g.id)}
-                  aria-expanded={expanded}
-                  aria-label={expanded ? `Collapse ${g.label}` : `Expand ${g.label}`}
-                  className="rounded-md p-1 hover:text-foreground"
-                >
-                  <ChevronDown
-                    className={cn(
-                      "size-3.5 shrink-0 transition-transform duration-200",
-                      !expanded && "-rotate-90",
-                    )}
-                  />
-                </button>
-              </div>
-              <div
-                className={cn(
-                  "grid transition-[grid-template-rows] duration-200 ease-out",
-                  expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
-                )}
-              >
-                <div className="overflow-hidden">
-                  <div className="ml-3 space-y-0.5 border-l border-border pl-2 pt-0.5">
-                    {g.items.map((i) => (
-                      <ItemLink key={navItemKey(i)} item={i} dense />
-                    ))}
-                  </div>
-                </div>
+                <g.icon className="size-4 shrink-0" />
+                <span className="min-w-0 truncate">{g.label}</span>
+              </Link>
+              <div className="ml-3 space-y-0.5 border-l border-border pl-2 pt-0.5">
+                {g.items.map((i) => (
+                  <ItemLink key={navItemKey(i)} item={i} dense />
+                ))}
               </div>
             </div>
           );
