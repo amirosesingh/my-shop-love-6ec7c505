@@ -300,4 +300,16 @@ export const navGroups: NavGroup[] = [
 ];
 
 export const navItemKey = (i: NavItem) => `${i.to}#${i.hash ?? ""}?${i.section ?? ""}`;
+
+/** Top-level entries pinned above the groups in the sidebar. */
+export const standaloneNavItems: NavItem[] = [
+  {
+    to: "/dashboard",
+    label: "Live Dashboard",
+    icon: Activity,
+    flag: "can_view_dashboard",
+    keywords: "revenue profit margin peak hours charts kpi review flags",
+    blurb: "Revenue, profit and peak hours as they happen.",
+  },
+];
 export { Store };
