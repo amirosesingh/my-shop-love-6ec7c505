@@ -2,8 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
 import { DisplayScalingSettings } from "@/components/pos/DisplayScalingSettings";
 import { ReceiptPrinterSettings } from "@/components/pos/ReceiptPrinterSettings";
-import { AppUpdateSettings } from "@/components/pos/AppUpdateSettings";
-import { SystemHealthCard } from "@/components/pos/SystemHealthCard";
 
 export const Route = createFileRoute("/settings/display")({
   head: () => ({
@@ -24,12 +22,6 @@ export const Route = createFileRoute("/settings/display")({
       <DisplayScalingSettings bare />
       <div className="mt-6">
         <ReceiptPrinterSettings />
-      </div>
-      <div className="mt-6">
-        <AppUpdateSettings />
-      </div>
-      <div className="mt-6">
-        <SystemHealthCard />
       </div>
     </SettingsFrame>
   ),

@@ -40,6 +40,7 @@ import { Route as SettingsSyncRouteImport } from './routes/settings.sync'
 import { Route as SettingsTaxRouteImport } from './routes/settings.tax'
 import { Route as SettingsTerminalsRouteImport } from './routes/settings.terminals'
 import { Route as SettingsTypeRouteImport } from './routes/settings.type'
+import { Route as SettingsUpdatesRouteImport } from './routes/settings.updates'
 import { Route as SettingsWhatsappRouteImport } from './routes/settings.whatsapp'
 
 const IndexRoute = IndexRouteImport.update({
@@ -197,6 +198,11 @@ const SettingsTypeRoute = SettingsTypeRouteImport.update({
   path: '/settings/type',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsUpdatesRoute = SettingsUpdatesRouteImport.update({
+  id: '/settings/updates',
+  path: '/settings/updates',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsWhatsappRoute = SettingsWhatsappRouteImport.update({
   id: '/settings/whatsapp',
   path: '/settings/whatsapp',
@@ -233,6 +239,7 @@ export interface FileRoutesByFullPath {
   '/settings/tax': typeof SettingsTaxRoute
   '/settings/terminals': typeof SettingsTerminalsRoute
   '/settings/type': typeof SettingsTypeRoute
+  '/settings/updates': typeof SettingsUpdatesRoute
   '/settings/whatsapp': typeof SettingsWhatsappRoute
   '/reports/': typeof ReportsIndexRoute
   '/settings/': typeof SettingsIndexRoute
@@ -267,6 +274,7 @@ export interface FileRoutesByTo {
   '/settings/tax': typeof SettingsTaxRoute
   '/settings/terminals': typeof SettingsTerminalsRoute
   '/settings/type': typeof SettingsTypeRoute
+  '/settings/updates': typeof SettingsUpdatesRoute
   '/settings/whatsapp': typeof SettingsWhatsappRoute
   '/reports': typeof ReportsIndexRoute
   '/settings': typeof SettingsIndexRoute
@@ -302,6 +310,7 @@ export interface FileRoutesById {
   '/settings/tax': typeof SettingsTaxRoute
   '/settings/terminals': typeof SettingsTerminalsRoute
   '/settings/type': typeof SettingsTypeRoute
+  '/settings/updates': typeof SettingsUpdatesRoute
   '/settings/whatsapp': typeof SettingsWhatsappRoute
   '/reports/': typeof ReportsIndexRoute
   '/settings/': typeof SettingsIndexRoute
@@ -338,6 +347,7 @@ export interface FileRouteTypes {
     | '/settings/tax'
     | '/settings/terminals'
     | '/settings/type'
+    | '/settings/updates'
     | '/settings/whatsapp'
     | '/reports/'
     | '/settings/'
@@ -372,6 +382,7 @@ export interface FileRouteTypes {
     | '/settings/tax'
     | '/settings/terminals'
     | '/settings/type'
+    | '/settings/updates'
     | '/settings/whatsapp'
     | '/reports'
     | '/settings'
@@ -406,6 +417,7 @@ export interface FileRouteTypes {
     | '/settings/tax'
     | '/settings/terminals'
     | '/settings/type'
+    | '/settings/updates'
     | '/settings/whatsapp'
     | '/reports/'
     | '/settings/'
@@ -441,6 +453,7 @@ export interface RootRouteChildren {
   SettingsTaxRoute: typeof SettingsTaxRoute
   SettingsTerminalsRoute: typeof SettingsTerminalsRoute
   SettingsTypeRoute: typeof SettingsTypeRoute
+  SettingsUpdatesRoute: typeof SettingsUpdatesRoute
   SettingsWhatsappRoute: typeof SettingsWhatsappRoute
   ReportsIndexRoute: typeof ReportsIndexRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
@@ -665,6 +678,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsTypeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/updates': {
+      id: '/settings/updates'
+      path: '/settings/updates'
+      fullPath: '/settings/updates'
+      preLoaderRoute: typeof SettingsUpdatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/whatsapp': {
       id: '/settings/whatsapp'
       path: '/settings/whatsapp'
@@ -705,6 +725,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsTaxRoute: SettingsTaxRoute,
   SettingsTerminalsRoute: SettingsTerminalsRoute,
   SettingsTypeRoute: SettingsTypeRoute,
+  SettingsUpdatesRoute: SettingsUpdatesRoute,
   SettingsWhatsappRoute: SettingsWhatsappRoute,
   ReportsIndexRoute: ReportsIndexRoute,
   SettingsIndexRoute: SettingsIndexRoute,
