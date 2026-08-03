@@ -310,8 +310,17 @@ function activationFailureMessage(e: unknown): string {
   const err = e as { code?: string; message?: string } | null;
   const code = err?.code ?? "";
   const message = err?.message ?? "";
-  if (code === "PGRST202" || /terminal_token_status/.test(message)) {
-    return "This database is missing the terminal activation setup. Run supabase/schema11.sql on the POS database, then try again.";
+  if (code === "PGRST202" && /terminal_token_claim/.test(message)) {
+    return "This POS database is missing the one-time terminal claim helper. Run supabase/schema15.sql on the POS database, then try again.";
+  }
+  if (code === "PGRST202" && /terminal_token_status/.test(message)) {
+    return "This POS database is missing the terminal status helper. Run supabase/schema15.sql on the POS database, then try again.";
+  }
+  if (code === "PGRST202" && /terminal_token_heartbeat/.test(message)) {
+    return "This POS database is missing the terminal heartbeat helper. Run supabase/schema15.sql on the POS database, then try again.";
+  }
+  if (code === "PGRST202") {
+    return "This POS database has an incomplete terminal activation setup. Run supabase/schema15.sql on the POS database, then try again.";
   }
   if (
     e instanceof TypeError ||
