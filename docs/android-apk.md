@@ -1,7 +1,10 @@
 # Building the Android app (step by step)
 
-The phone app is a Capacitor shell around the hosted POS — the same screens as
-the web app, no separate codebase. Follow either route below.
+The phone app now carries the **entire POS inside the APK**. It opens, signs
+staff in, opens shifts, sells, prints and queues everything with no internet at
+all; when a signal is back it syncs to the cloud like the Windows till. Only
+genuinely online jobs (cloud reports, terminal activation, WhatsApp sending)
+need a connection.
 
 ## What you need
 
@@ -12,8 +15,8 @@ the web app, no separate codebase. Follow either route below.
 
 1. Push your code to GitHub (already the case if the repository is synced).
 2. Open the repository → **Actions** → **Android APK** → **Run workflow**.
-3. Optionally type the *app URL* the phone should open. Leave blank to use the
-   repository variable `POS_MOBILE_URL`, or the default published site.
+3. Leave the *app URL* box **blank** — that produces the offline app. Type a
+   URL only if you deliberately want a thin shell that loads a hosted site.
 4. Wait for the run to finish (first run takes ~10 minutes).
 5. Download the APK in one of two places:
    - the run's **NorthwindPOS-android** artifact, or
@@ -28,12 +31,30 @@ files and on `v*` tags, so the bucket always holds the newest APK.
 
 ```bash
 npm install
-POS_MOBILE_URL="https://your-pos-url" npx cap add android   # first time only
-POS_MOBILE_URL="https://your-pos-url" npx cap sync android
+npm run mobile:build        # packages the whole POS into capacitor-shell/
+npx cap add android         # first time only
+npx cap sync android
 cd android && ./gradlew assembleDebug
 ```
 
 The APK lands in `android/app/build/outputs/apk/debug/`.
+
+## Updates on the phone
+
+The app checks `pos-app/android/latest.json` in the same update bucket the
+Windows till uses, on start-up and every six hours. When a newer version is
+there a strip appears at the bottom of the screen: tap **Update**, the APK
+downloads and Android's installer takes over. Allow "install unknown apps" for
+the POS once, and updates are one tap from then on.
+
+## Offline behaviour
+
+- Catalogue, members, prices, promotions and settings come from the on-device
+  snapshot, refreshed whenever the app is online.
+- Sales, bookings, drawer events, stock moves and audit logs queue in the sync
+  outbox and upload automatically once a connection returns.
+- All of it is stored in the phone's own app storage (Capacitor Preferences),
+  so Android cannot quietly clear it the way it can clear browser data.
 
 ## Install it on a phone
 
