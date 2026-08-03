@@ -19,6 +19,7 @@
     "desktop:release": "node scripts/desktop-release.cjs"
   },
   "dependencies": {
+    "@capacitor-mlkit/barcode-scanning": "^8.1.0",
     "@capacitor/android": "^8.5.0",
     "@capacitor/core": "^8.5.0",
     "@hookform/resolvers": "^5.2.2",
