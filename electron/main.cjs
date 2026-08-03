@@ -193,32 +193,45 @@ const fail = (err) => ({ ok: false, error: err instanceof Error ? err.message : 
 /* ----------------------------- printing ----------------------------- */
 
 /**
- * Renders receipt HTML offscreen and prints it without any dialog. When no
- * printer name is configured the system default is used.
+ * Renders receipt HTML in a hidden (but real) window and prints it without any
+ * dialog. Offscreen windows are deliberately NOT used: they hand a job to the
+ * spooler without a paint surface, so the printer reacts but nothing prints.
+ * When no printer name is configured the system default is used.
  */
-function printSilent(html, deviceName) {
+const PAGE_SIZES = {
+  "58mm": { width: 58000, height: 297000 },
+  "80mm": { width: 80000, height: 297000 },
+};
+
+function printSilent(html, deviceName, paper) {
   return new Promise((resolve) => {
     const win = new BrowserWindow({
       show: false,
-      webPreferences: { offscreen: true, contextIsolation: true, nodeIntegration: false },
+      width: 420,
+      height: 900,
+      webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: false },
     });
     const done = (result) => {
       if (!win.isDestroyed()) win.destroy();
       resolve(result);
     };
+    const pageSize =
+      PAGE_SIZES[paper] ?? (paper === "letter" ? "Letter" : paper === "a4" ? "A4" : undefined);
     win.webContents.once("did-finish-load", () => {
-      // Small settle delay so fonts/QR SVG are laid out before the snapshot.
+      // Settle delay so fonts/QR SVG are laid out before the page is rasterised.
       setTimeout(() => {
+        if (win.isDestroyed()) return;
         win.webContents.print(
           {
             silent: true,
             printBackground: true,
             margins: { marginType: "none" },
+            ...(pageSize ? { pageSize } : {}),
             ...(deviceName ? { deviceName } : {}),
           },
           (success, reason) => done(success ? { ok: true } : { ok: false, error: reason }),
         );
-      }, 120);
+      }, 350);
     });
     win.webContents.once("did-fail-load", (_e, code, description) =>
       done({ ok: false, error: `${description} (${code})` }),
