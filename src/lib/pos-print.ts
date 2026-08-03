@@ -17,7 +17,8 @@ import type {
 import { bookingBalance, lineUnitDiscount, whatsappLink } from "./pos-types";
 import { defaultReceiptSettings } from "./pos-seed";
 import qrcode from "qrcode-generator";
-import { rawPulse, silentPrint } from "./receipt-printer";
+import { toast } from "sonner";
+import { drawerPulseBytes, rawPulse, silentPrint } from "./receipt-printer";
 
 export const STORE = {
   name: "NORTHWIND & CO.",
@@ -583,11 +584,21 @@ export function printTransferNote(
  * installed it is used instead.
  */
 export function openCashDrawer() {
-  const kick = "\x1B\x70\x00\x19\xFA";
-  const bytes = Array.from(kick, (c) => c.charCodeAt(0));
-  void rawPulse(bytes).then((handled: boolean) => {
-    if (handled) return;
+  const bytes = drawerPulseBytes();
+  void rawPulse(bytes).then((res) => {
+    if (res.handled) {
+      // Desktop shell: never print a slip — that is the symptom, not a fallback.
+      if (!res.ok) {
+        toast.error("Drawer did not open", {
+          description:
+            res.error ||
+            "The printer refused the raw drawer pulse. Check the printer selection in Receipt printer settings.",
+        });
+      }
+      return;
+    }
     // Browser fallback: the pulse rides along on a tiny printed slip.
+    const kick = String.fromCharCode(...bytes);
     browserPrint(
       shell(
         "drawer",

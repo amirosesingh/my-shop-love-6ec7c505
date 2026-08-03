@@ -228,40 +228,148 @@ function printSilent(html, deviceName) {
 }
 
 /**
+ * PowerShell helper that pushes a file of bytes into the Windows spooler with
+ * the RAW datatype. RAW bypasses the driver entirely, so an ESC/POS drawer
+ * pulse reaches the printer untouched and is forwarded to the RJ11 drawer port.
+ * Printing by *name* means the printer does not have to be shared.
+ */
+const RAW_PS = `param([string]$Payload,[string]$PrinterName)
+$ErrorActionPreference = 'Stop'
+if (-not $PrinterName) {
+  $PrinterName = (Get-CimInstance Win32_Printer -Filter "Default=True" | Select-Object -First 1).Name
+}
+if (-not $PrinterName) { throw 'No printer selected and no Windows default printer found.' }
+Add-Type -TypeDefinition @"
+using System;
+using System.IO;
+using System.Runtime.InteropServices;
+public static class PosRaw {
+  [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Unicode)]
+  public class DOCINFO { [MarshalAs(UnmanagedType.LPWStr)] public string pDocName;
+    [MarshalAs(UnmanagedType.LPWStr)] public string pOutputFile;
+    [MarshalAs(UnmanagedType.LPWStr)] public string pDataType; }
+  [DllImport("winspool.drv", CharSet=CharSet.Unicode, SetLastError=true)]
+  public static extern bool OpenPrinter(string src, out IntPtr h, IntPtr pd);
+  [DllImport("winspool.drv", SetLastError=true)]
+  public static extern bool ClosePrinter(IntPtr h);
+  [DllImport("winspool.drv", CharSet=CharSet.Unicode, SetLastError=true)]
+  public static extern bool StartDocPrinter(IntPtr h, int level, [In, MarshalAs(UnmanagedType.LPStruct)] DOCINFO di);
+  [DllImport("winspool.drv", SetLastError=true)]
+  public static extern bool EndDocPrinter(IntPtr h);
+  [DllImport("winspool.drv", SetLastError=true)]
+  public static extern bool StartPagePrinter(IntPtr h);
+  [DllImport("winspool.drv", SetLastError=true)]
+  public static extern bool EndPagePrinter(IntPtr h);
+  [DllImport("winspool.drv", SetLastError=true)]
+  public static extern bool WritePrinter(IntPtr h, IntPtr buf, int count, out int written);
+  public static void Send(string printer, byte[] data) {
+    IntPtr h;
+    if (!OpenPrinter(printer, out h, IntPtr.Zero))
+      throw new Exception("OpenPrinter failed for '" + printer + "' (" + Marshal.GetLastWin32Error() + ")");
+    try {
+      DOCINFO di = new DOCINFO();
+      di.pDocName = "POS drawer pulse"; di.pDataType = "RAW";
+      if (!StartDocPrinter(h, 1, di)) throw new Exception("StartDocPrinter failed (" + Marshal.GetLastWin32Error() + ")");
+      try {
+        if (!StartPagePrinter(h)) throw new Exception("StartPagePrinter failed (" + Marshal.GetLastWin32Error() + ")");
+        IntPtr buf = Marshal.AllocCoTaskMem(data.Length);
+        try {
+          Marshal.Copy(data, 0, buf, data.Length);
+          int written;
+          if (!WritePrinter(h, buf, data.Length, out written))
+            throw new Exception("WritePrinter failed (" + Marshal.GetLastWin32Error() + ")");
+        } finally { Marshal.FreeCoTaskMem(buf); }
+      } finally { EndPagePrinter(h); EndDocPrinter(h); }
+    } finally { ClosePrinter(h); }
+  }
+}
+"@
+[PosRaw]::Send($PrinterName, [System.IO.File]::ReadAllBytes($Payload))
+Write-Output ("sent:" + $PrinterName)
+`;
+
+function runProcess(cmd, args) {
+  return new Promise((resolve) => {
+    const child = spawn(cmd, args, { windowsHide: true });
+    let stderr = "";
+    let stdout = "";
+    child.stdout.on("data", (d) => (stdout += String(d)));
+    child.stderr.on("data", (d) => (stderr += String(d)));
+    child.on("error", (err) => resolve({ ok: false, error: err.message }));
+    child.on("exit", (code) =>
+      resolve(
+        code === 0
+          ? { ok: true, stdout: stdout.trim() }
+          : { ok: false, error: stderr.trim() || stdout.trim() || `${cmd} exited ${code}` },
+      ),
+    );
+  });
+}
+
+/**
  * Writes raw ESC/POS bytes to the printer. Drawers are wired to the receipt
  * printer over RJ11, so the kick pulse has to reach the device unprocessed —
- * a driver-rendered page would swallow it.
+ * a driver-rendered page would swallow it (and spit out a slip instead).
+ *
+ * Primary path: RAW spooler write to the printer by name (no share needed).
+ * Secondary path: copy to a printer share, but only when one is configured.
  */
-function printRaw(bytes, share) {
-  return new Promise((resolve) => {
-    const buffer = Buffer.from(bytes);
-    const file = path.join(os.tmpdir(), `pos-raw-${Date.now()}.bin`);
-    fs.writeFileSync(file, buffer);
-    const cleanup = () => {
+async function printRaw(bytes, options = {}) {
+  const deviceName = options.deviceName || "";
+  const share = options.share || "";
+  if (process.platform !== "win32") {
+    return { ok: false, error: "Raw printing is only supported on Windows" };
+  }
+
+  const stamp = Date.now();
+  const binFile = path.join(os.tmpdir(), `pos-raw-${stamp}.bin`);
+  const psFile = path.join(os.tmpdir(), `pos-raw-${stamp}.ps1`);
+  const cleanup = () => {
+    for (const f of [binFile, psFile]) {
       try {
-        fs.unlinkSync(file);
+        fs.unlinkSync(f);
       } catch {
-        /* temp file already gone */
+        /* already gone */
       }
-    };
-    if (process.platform !== "win32") {
-      cleanup();
-      resolve({ ok: false, error: "Raw printing is only supported on Windows" });
-      return;
     }
-    const target = share && share.startsWith("\\\\") ? share : `\\\\localhost\\${share || "POS"}`;
-    const child = spawn("cmd", ["/c", "copy", "/b", file, target], { windowsHide: true });
-    let stderr = "";
-    child.stderr.on("data", (d) => (stderr += String(d)));
-    child.on("error", (err) => {
+  };
+
+  try {
+    fs.writeFileSync(binFile, Buffer.from(bytes));
+    fs.writeFileSync(psFile, RAW_PS, "utf8");
+
+    const primary = await runProcess("powershell.exe", [
+      "-NoProfile",
+      "-NonInteractive",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-File",
+      psFile,
+      "-Payload",
+      binFile,
+      "-PrinterName",
+      deviceName,
+    ]);
+    if (primary.ok) {
       cleanup();
-      resolve(fail(err));
-    });
-    child.on("exit", (code) => {
+      return { ok: true, via: "raw-spooler" };
+    }
+
+    if (share) {
+      const target = share.startsWith("\\\\") ? share : `\\\\localhost\\${share}`;
+      const copied = await runProcess("cmd", ["/c", "copy", "/b", binFile, target]);
       cleanup();
-      resolve(code === 0 ? { ok: true } : { ok: false, error: stderr.trim() || `copy exited ${code}` });
-    });
-  });
+      return copied.ok
+        ? { ok: true, via: "share" }
+        : { ok: false, error: `${primary.error}; share copy: ${copied.error}` };
+    }
+
+    cleanup();
+    return { ok: false, error: primary.error };
+  } catch (err) {
+    cleanup();
+    return fail(err);
+  }
 }
 
 function registerIpc() {
@@ -317,16 +425,14 @@ function registerIpc() {
 
   ipcMain.handle("print:raw", async (_e, bytes, options) => {
     try {
-      const result = await printRaw(bytes, options?.share || options?.deviceName);
-      if (result.ok) return result;
-      // Fall back to a silent one-line page carrying the same escape sequence,
-      // which still avoids any print dialog.
-      return await printSilent(
-        `<!doctype html><meta charset="utf-8"><body style="margin:0"><pre style="font-size:1px;line-height:1px">${Buffer.from(
-          bytes,
-        ).toString("binary")}</pre></body>`,
-        options?.deviceName || undefined,
-      );
+      const result = await printRaw(bytes, {
+        deviceName: options?.deviceName || "",
+        share: options?.share || "",
+      });
+      // No page fallback on purpose: rendering the escape sequence through the
+      // driver only produces a slip and never kicks the drawer.
+      if (!result.ok) console.error("[pos] raw drawer pulse failed:", result.error);
+      return result;
     } catch (err) {
       return fail(err);
     }
