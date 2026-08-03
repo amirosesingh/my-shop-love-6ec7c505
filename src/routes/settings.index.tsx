@@ -1,4 +1,5 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import {
   Building2,
   Landmark,
@@ -63,7 +64,9 @@ export const Route = createFileRoute("/settings/")({
 function SettingsHub() {
   const { isAdmin, can } = useAuth();
   const allowed = isAdmin || can("can_access_pos_settings");
-  const pages = PAGES.filter((p) => !("cloudOnly" in p && p.cloudOnly && isDesktop()));
+  const [desktop, setDesktop] = useState(false);
+  useEffect(() => setDesktop(isDesktop()), []);
+  const pages = PAGES.filter((p) => !("cloudOnly" in p && p.cloudOnly && desktop));
 
   return (
     <AppShell>
