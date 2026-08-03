@@ -68,10 +68,10 @@ till can still be pointed elsewhere with `POS_UPDATE_FEED`:
 
 ```bat
 :: plain web folder holding the installer + latest.yml (what we use)
-set POS_UPDATE_URL=https://updates.example.com/pos
+set POS_UPDATE_URL=https://updatecms.luckycharmsdnbhd.com/pos-app/
 
 :: runtime override, optional
-set POS_UPDATE_FEED=https://updates.example.com/pos
+set POS_UPDATE_FEED=https://updatecms.luckycharmsdnbhd.com/pos-app/
 
 :: GitHub releases
 set POS_UPDATE_FEED=github
@@ -87,7 +87,7 @@ so an update never de-registers the machine.
 
 1. One-time: in the GitHub repository, add a repository variable
    `POS_UPDATE_URL` (Settings → Secrets and variables → Actions → Variables)
-   pointing at your web folder, e.g. `https://updates.example.com/pos`.
+   pointing at your web folder, e.g. `https://updatecms.luckycharmsdnbhd.com/pos-app/`.
 2. Bump `version` in `package.json`, commit, then push a matching tag:
 
    ```bash
