@@ -1,4 +1,4 @@
-# Fix the phone app URL and add bucket-based APK updates
+# Point the phone app at lccms.luckycharmsdnbhd.com and add bucket-based APK updates
 
 ## What is wrong now
 
@@ -6,7 +6,10 @@ The Android shell is pointed at `https://updatecms.luckycharmsdnbhd.com` — tha
 
 ## 1. Point the app at the real POS
 
-- Default the phone app to the stable production address of this project (`https://project--c6fa1ce9-3791-4c8e-bfa3-c6ef2eb207c5.lovable.app`) instead of the bucket domain. The `POS_MOBILE_URL` repository variable still overrides it once you connect a custom domain for the POS itself.
+- The phone app defaults to `https://lccms.luckycharmsdnbhd.com/` — your own POS domain. The `POS_MOBILE_URL` repository variable still overrides it if you ever move the site.
+- That domain must be connected to this project in Project settings, Domains, and the project published, otherwise the phone (and any browser) will not reach the POS. If it is not connected yet, that is the one step to do outside the code.
+- Loading the live site means the phone gets every feature of the web app — register and scanning, shifts, inventory and transfers, members, bookings, purchasing, reports, dashboard, audit, settings, receipts, WhatsApp bills — nothing is stripped for mobile.
+- Camera, printing over the network, and file downloads are enabled in the Android shell so scanning and receipt actions work from the phone.
 - Add a safety net: if the app cannot reach the configured address (offline, wrong URL, DNS failure), the shell shows a small "Server address" screen where the address is typed once and remembered on the device, instead of a blank page or a bucket listing.
 - With the correct address loaded, the phone gets the full web application — register, shifts, inventory, reports, settings — the same build the browser and the Windows till run.
 
@@ -30,3 +33,4 @@ The Windows till checks `pos-app/` on the bucket. Android gets the equivalent ag
 - New `src/lib/android-updates.ts` polling `https://updatecms.luckycharmsdnbhd.com/pos-app/android/latest.json`; download and install via `@capacitor/filesystem` + a file-opener plugin, guarded so web/Electron bundles are untouched.
 - `AppUpdateSettings.tsx` gains an Android branch alongside the existing Electron branch; an update banner rendered once in `__root.tsx`, only when running inside Capacitor.
 - Android workflow keeps writing `latest.json` and `NorthwindPOS-latest.apk`; `versionCode`/`versionName` stamped from `package.json` so version comparison is reliable.
+- Android manifest permissions: internet, camera, `REQUEST_INSTALL_PACKAGES` (for self-update), and a FileProvider so the downloaded APK can be handed to the installer.
