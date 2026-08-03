@@ -20,6 +20,7 @@ import {
   Sparkles,
   History,
   CalendarClock,
+  ChevronUp,
   MonitorPlay,
   Landmark,
   MessageCircle,
@@ -153,6 +154,8 @@ function Register() {
   const [bookName, setBookName] = useState("");
   const [bookPhone, setBookPhone] = useState("");
   const [bookNote, setBookNote] = useState("");
+  /** Narrow windows: the action deck collapses so it can't cover the totals. */
+  const [deckOpen, setDeckOpen] = useState(false);
   /* Operation deck state */
   type HeldOrder = {
     id: string;
