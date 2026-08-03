@@ -138,7 +138,15 @@ export function SidebarNav({
       )}
 
       <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-2 pb-2">
-        {filtered.map((g) => {
+        {!collapsed &&
+          !q &&
+          (() => {
+            const register = groups.flatMap((g) => g.items).find((i) => i.to === "/");
+            return register ? <ItemLink item={register} /> : null;
+          })()}
+        {!collapsed && q
+          ? filtered.flatMap((g) => g.items.map((i) => <ItemLink key={navItemKey(i)} item={i} />))
+          : filtered.map((g) => {
           if (collapsed) {
             return (
               <Popover key={g.id}>
@@ -179,18 +187,20 @@ export function SidebarNav({
                 to={g.hubTo}
                 onClick={onNavigate}
                 className={cn(
-                  "flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-2 text-[11px] font-semibold uppercase tracking-wide transition-colors hover:bg-sidebar-accent",
-                  activeGroupId === g.id ? "text-foreground" : "text-muted-foreground",
+                  "flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-2 text-sm transition-colors hover:bg-sidebar-accent hover:text-foreground",
+                  activeGroupId === g.id
+                    ? "bg-sidebar-accent font-medium text-primary"
+                    : "text-muted-foreground",
                 )}
               >
                 <g.icon className="size-4 shrink-0" />
                 <span className="min-w-0 truncate">{g.label}</span>
+                {inbound > 0 && g.items.some((i) => i.to === "/transfers") && (
+                  <Badge className="ml-auto h-5 min-w-5 shrink-0 justify-center px-1 text-[10px]">
+                    {inbound}
+                  </Badge>
+                )}
               </Link>
-              <div className="ml-3 space-y-0.5 border-l border-border pl-2 pt-0.5">
-                {g.items.map((i) => (
-                  <ItemLink key={navItemKey(i)} item={i} dense />
-                ))}
-              </div>
             </div>
           );
         })}
