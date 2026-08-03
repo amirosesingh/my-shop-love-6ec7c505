@@ -57,7 +57,9 @@ jobs:
 
       - name: Add Android platform
         env:
-          POS_MOBILE_URL: ${{ inputs.app_url || vars.POS_MOBILE_URL }}
+          # Empty = fully offline APK (the app is baked in). Only a URL typed
+          # into the workflow input turns the build into a thin online shell.
+          POS_MOBILE_URL: ${{ inputs.app_url }}
         run: |
           npx cap add android || true
           npx cap sync android
