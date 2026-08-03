@@ -197,7 +197,7 @@ export async function restoreTerminalToken(id: string): Promise<void> {
  * can be deleted, so a live till is never cut off by a stray click.
  */
 export async function deleteTerminalToken(id: string): Promise<void> {
-  const { error } = await table().delete().eq("id", id).neq("status", "active");
+  const { error } = await table().delete().eq("id", id).eq("status", "revoked");
   if (error) throw error;
 }
 
