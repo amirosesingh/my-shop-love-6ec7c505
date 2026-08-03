@@ -31,6 +31,7 @@ import {
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
 import { CatalogPanel } from "@/components/pos/CatalogPanel";
+import { ScanBar } from "@/components/pos/ScanBar";
 import { setTicketDirty } from "@/lib/desktop-window";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -997,6 +998,10 @@ function Register() {
                 <Trash2 className="size-4" /> Clear
               </Button>
             </div>
+          </div>
+
+          <div className="border-b border-border px-4 py-2">
+            <ScanBar onScan={scanCode} />
           </div>
 
           <div className="border-b border-border px-4 py-3">
