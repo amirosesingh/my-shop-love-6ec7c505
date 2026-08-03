@@ -430,7 +430,11 @@ function registerIpc() {
 
   ipcMain.handle("print:silent", async (_e, html, options) => {
     try {
-      return await printSilent(String(html), options?.deviceName || undefined);
+      return await printSilent(
+        String(html),
+        options?.deviceName || undefined,
+        options?.paper || undefined,
+      );
     } catch (err) {
       return fail(err);
     }
@@ -442,9 +446,9 @@ function registerIpc() {
         deviceName: options?.deviceName || "",
         share: options?.share || "",
       });
-      // No page fallback on purpose: rendering the escape sequence through the
+      // No page fallback on purpose: rendering escape sequences through the
       // driver only produces a slip and never kicks the drawer.
-      if (!result.ok) console.error("[pos] raw drawer pulse failed:", result.error);
+      if (!result.ok) console.error("[pos] raw print failed:", result.error);
       return result;
     } catch (err) {
       return fail(err);
