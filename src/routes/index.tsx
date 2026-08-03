@@ -402,20 +402,34 @@ function Register() {
     toast.success(`Credits from ${billHit.receiptNo} added to the ticket`);
   }
 
-  function scanSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  /** Adds the product matching a scanned/typed code to the ticket. */
+  function scanCode(raw: string) {
+    const code = raw.trim();
+    if (!code) return;
     if (!activeShift) {
       toast.error("Open a shift before ringing up a sale");
       setOpenShiftOpen(true);
       return;
     }
     const hit = state.products.find(
-      (p) => p.barcode === query.trim() || p.sku.toLowerCase() === query.trim().toLowerCase(),
+      (p) => p.barcode === code || p.sku.toLowerCase() === code.toLowerCase(),
     );
-    if (hit) {
-      addLine(hit.id);
-      setQuery("");
+    if (!hit) {
+      toast.error(`No product matches “${code}”`);
+      return;
     }
+    addLine(hit.id);
+  }
+
+  function scanSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const code = query.trim();
+    if (!code) return;
+    const hit = state.products.find(
+      (p) => p.barcode === code || p.sku.toLowerCase() === code.toLowerCase(),
+    );
+    if (hit) setQuery("");
+    scanCode(code);
   }
 
   const displayBase = {
