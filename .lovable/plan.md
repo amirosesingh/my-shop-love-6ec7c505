@@ -1,53 +1,54 @@
-# Fix the GitHub build: "Dependencies lock file is not found"
+# Fix: receipts reach the printer but nothing comes out (Electron)
 
-## Cause
+## What is happening
 
-Two of the four workflows still install with npm, but this repo's lockfile is
-`bun.lock` — there is no `package-lock.json`:
+Silent printing renders the receipt HTML in an **offscreen** Electron window and
+calls `webContents.print({ silent: true })`. Offscreen windows have no real paint
+surface, so the job is created and handed to the spooler — the printer reacts —
+but the rendered page is empty or never rasterised. That matches exactly what you
+see: the printer responds, no receipt.
 
-- `.github/workflows/node.js.yml` (the R2 build/deploy) — `actions/setup-node` with
-  `cache: 'npm'`, then `npm install`. The cache step is what fails: it scans for
-  `package-lock.json` / `npm-shrinkwrap.json` / `yarn.lock`, finds none, and aborts
-  the job with the exact message you saw.
-- `.github/workflows/desktop-release.yml` — `npm ci`, which cannot run at all
-  without `package-lock.json`.
+The raw spooler path used for the cash drawer (`print:raw`, winspool RAW write)
+is a separate, working route.
 
-The other two (`android-apk.yml`, `security.yml`) already use
-`bun install --frozen-lockfile` and work.
+## The fix
 
-## Fix
+1. **Stop printing from an offscreen window.**
+   Render the receipt in a hidden but *real* `BrowserWindow` (`show: false`,
+   no `offscreen`), wait for `ready-to-show` plus a paint tick, then print with an
+   explicit `pageSize` derived from the configured paper (80mm / 58mm / A4 /
+   Letter) and zero margins. Destroy it after the callback.
 
-Make all four workflows install the same way as the working ones.
+2. **Add a true ESC/POS text mode for thermal slips (default on desktop).**
+   Receipts and X/Z reports are converted to ESC/POS bytes (init, alignment,
+   double-height title, 42/32-column body, cut) and pushed through the same RAW
+   spooler write that already drives the drawer. No driver, no rendering, so a
+   thermal printer prints instantly and correctly.
+   Full-page documents (A4/Letter reports, member statements, transfer notes)
+   keep the HTML route.
 
-1. **`node.js.yml`** — add `oven-sh/setup-bun@v2`, drop `cache: 'npm'` from
-   `setup-node` (Node still needed for `scripts/bump-version.cjs` and Electron
-   packaging), replace `npm install` with `bun install --frozen-lockfile`, and
-   `npm run desktop:release` with `bun run desktop:release`.
+3. **Print mode setting.**
+   Receipt printer settings gains "Receipt print mode": *Thermal text
+   (recommended)* or *Graphics / driver*, plus a **Test receipt** button that
+   prints a short sample through the selected route and reports the exact
+   Windows error on failure.
 
-2. **`desktop-release.yml`** — same treatment: add the Bun setup step, replace
-   `npm ci` with `bun install --frozen-lockfile` and `npm run desktop:release`
-   with `bun run desktop:release`.
+4. **Real failure reporting.** If a desktop print fails, toast "Printing failed:
+   <reason>" and log it, instead of silently doing nothing.
 
-3. **`.gitignore`** — add `package-lock.json` so a stray local `npm install` can
-   never commit a second lockfile that disagrees with `bun.lock`.
+5. Bump the app version one patch step so the update feed picks it up.
 
-4. **Docs** — `docs/run-locally.md` and `docs/android-apk.md`: switch the
-   `npm install` / `npm run ...` instructions to `bun install` / `bun run ...`, with
-   the Windows one-liner for installing Bun:
+## Technical notes
 
-   ```text
-   powershell -c "irm bun.sh/install.ps1 | iex"
-   ```
-
-5. **Version** — bump to 1.0.13 in `package.json` and `src/version.ts`.
-
-## Alternative, if you'd rather keep npm
-
-Commit a `package-lock.json` (run `npm install` once locally) and delete `bun.lock`.
-I don't recommend it: the Android APK workflow is built around Bun, and two
-lockfiles drifting apart is what caused this in the first place.
-
-## Not changed
-
-No dependency versions and no app code — only workflow install steps, gitignore,
-docs, and the version number.
+- `electron/main.cjs` — rewrite `printSilent` (no `offscreen`, `ready-to-show`
+  gate, `pageSize` from an options field, keep `deviceName`); reuse the existing
+  `printRaw` for text receipts.
+- `src/lib/escpos.ts` (new) — text/ESC-POS renderer: column layout, alignment,
+  bold/double-height title, barcode-free plain text, `GS V` cut.
+- `src/lib/pos-print.ts` — `printHtml` gains a document kind; slip-sized
+  documents go through ESC/POS when the mode is thermal and the bridge exists,
+  otherwise the HTML route, otherwise the browser iframe.
+- `src/lib/receipt-printer.ts` — carry `printMode` in the stored prefs, pass
+  paper size to `bridge.print`.
+- `src/components/pos/ReceiptPrinterSettings.tsx` — mode selector + test receipt.
+- No database or backend changes.
