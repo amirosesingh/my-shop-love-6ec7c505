@@ -18,7 +18,12 @@ describe("route guards", () => {
     const unguarded = routeFiles.filter((f) => {
       if (PUBLIC_ROUTES.has(f)) return false;
       const src = readFileSync(join(ROUTES_DIR, f), "utf8");
-      return !src.includes("AppShell") && !src.includes("SettingsFrame");
+      // SectionHub and SettingsFrame both render inside AppShell.
+      return (
+        !src.includes("AppShell") &&
+        !src.includes("SettingsFrame") &&
+        !src.includes("SectionHub")
+      );
     });
     expect(unguarded).toEqual([]);
   });
