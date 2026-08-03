@@ -6,8 +6,10 @@ import { Label } from "@/components/ui/label";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import {
   getPrinterPrefs,
+  drawerPulseBytes,
   listPrinters,
   printBridge,
+  rawPulse,
   setPrinterPrefs,
   type PrinterPrefs,
 } from "@/lib/receipt-printer";
@@ -16,8 +18,9 @@ import { toast } from "sonner";
 /** Terminal-local receipt printer choice used for silent printing and the
  *  raw cash-drawer pulse. Only meaningful inside the Windows desktop shell. */
 export function ReceiptPrinterSettings() {
-  const [prefs, setPrefs] = useState<PrinterPrefs>({ deviceName: "", share: "" });
+  const [prefs, setPrefs] = useState<PrinterPrefs>({ deviceName: "", share: "", drawerPin: 2 });
   const [printers, setPrinters] = useState<{ name: string; displayName: string }[]>([]);
+  const [testing, setTesting] = useState(false);
   const desktop = typeof window !== "undefined" && !!printBridge();
 
   useEffect(() => {
@@ -28,6 +31,22 @@ export function ReceiptPrinterSettings() {
   const update = (next: PrinterPrefs) => {
     setPrefs(next);
     setPrinterPrefs(next);
+  };
+
+  const testDrawer = async () => {
+    setTesting(true);
+    try {
+      const res = await rawPulse(drawerPulseBytes());
+      if (!res.handled) {
+        toast.info("Drawer kicks only work in the Windows desktop till");
+      } else if (res.ok) {
+        toast.success("Drawer pulse sent");
+      } else {
+        toast.error("Drawer did not open", { description: res.error });
+      }
+    } finally {
+      setTesting(false);
+    }
   };
 
   return (
@@ -55,6 +74,23 @@ export function ReceiptPrinterSettings() {
 
       <div className="mt-4 space-y-1">
         <Label className="text-xs text-muted-foreground">
+          Drawer connector pin
+        </Label>
+        <ThemedSelect
+          value={String(prefs.drawerPin ?? 2)}
+          onChange={(v: string) => update({ ...prefs, drawerPin: v === "5" ? 5 : 2 })}
+          options={[
+            { value: "2", label: "Pin 2 (standard)" },
+            { value: "5", label: "Pin 5 (alternative wiring)" },
+          ]}
+        />
+        <p className="text-[11px] text-muted-foreground">
+          Most RJ11 drawers answer on pin 2. Switch to pin 5 if the drawer stays shut.
+        </p>
+      </div>
+
+      <div className="mt-4 space-y-1">
+        <Label className="text-xs text-muted-foreground">
           Drawer share name (optional)
         </Label>
         <Input
@@ -64,8 +100,8 @@ export function ReceiptPrinterSettings() {
           className="h-9 text-sm"
         />
         <p className="text-[11px] text-muted-foreground">
-          The drawer pulse is sent as raw bytes to this Windows printer share. Leave blank to reuse
-          the printer name above.
+          Only needed as a backup route. The pulse is normally written straight to the printer
+          above through the Windows raw spooler, so no share is required.
         </p>
       </div>
 
@@ -83,6 +119,9 @@ export function ReceiptPrinterSettings() {
           }
         >
           <RefreshCw className="size-3.5" /> Refresh printers
+        </Button>
+        <Button variant="outline" size="sm" disabled={testing} onClick={() => void testDrawer()}>
+          <Printer className="size-3.5" /> {testing ? "Sending…" : "Test drawer kick"}
         </Button>
       </div>
     </section>

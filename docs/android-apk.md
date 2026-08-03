@@ -9,7 +9,8 @@ need a connection.
 ## What you need
 
 - **GitHub route:** nothing installed locally.
-- **Local route:** Node 22, JDK 21, Android SDK (Android Studio installs both).
+- **Local route:** Node 22, Bun, JDK 21, Android SDK (Android Studio installs
+  the Android SDK; install JDK 21 separately if it is not included).
 
 ## Route A — build it on GitHub (recommended)
 
@@ -30,14 +31,28 @@ files and on `v*` tags, so the bucket always holds the newest APK.
 ## Route B — build it on your own PC
 
 ```bash
-npm install
-npm run mobile:build        # packages the whole POS into capacitor-shell/
+bun install
+bun run mobile:build        # packages the whole POS into capacitor-shell/
 npx cap add android         # first time only
 npx cap sync android
-cd android && ./gradlew assembleDebug
+cd android
+gradlew.bat assembleDebug   # Windows
 ```
 
 The APK lands in `android/app/build/outputs/apk/debug/`.
+
+If this checkout was installed before the Capacitor storage plugins were
+added, close the development server and refresh dependencies before rebuilding:
+
+```bash
+rmdir /s /q node_modules
+bun install
+npx cap sync android
+```
+
+PowerShell users can replace the first command with
+`Remove-Item node_modules -Recurse -Force`. Do not add Capacitor plugins to
+Rolldown's `external` list: they must be included in the phone bundle.
 
 ## Updates on the phone
 
@@ -90,6 +105,12 @@ The upload step reuses the desktop release secrets: `R2_ACCESS_KEY_ID`,
   with a valid `https` URL.
 - **Gradle fails** — usually a missing JDK 21 or Android SDK locally; the GitHub
   route avoids both.
+- **Cannot resolve `@capacitor/preferences`** — the checkout has stale or
+  incomplete dependencies. Run the clean install commands above, then rebuild.
+- **Chunks larger than 500 kB** — this line is a performance warning, not a
+  failed build. Read the error printed after it to find the actual failure.
+- **Build succeeds but reports missing `dist/server`** — pull the latest
+  `vite.config.ts`; phone builds require the explicit `MOBILE_BUILD=1` output.
 - **Camera scanning asks nothing / does nothing** — allow the camera permission
   for the app in Android settings, then reopen the register.
 
