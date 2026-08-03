@@ -141,14 +141,12 @@ function createWindows() {
     height: 900,
     show: false,
     backgroundColor: "#0b0b0c",
-    // Frameless shell: Windows still draws the real minimise / maximise /
-    // close buttons through the overlay, so the app owns the whole surface.
+    // Frameless shell. On Windows the app paints its own minimise / maximise /
+    // close buttons inside the title strip so they follow the POS theme.
     titleBarStyle: "hidden",
     ...(process.platform === "darwin"
       ? { trafficLightPosition: { x: 12, y: 12 } }
-      : {
-          titleBarOverlay: { color: "#0b0b0c", symbolColor: "#e7e7ea", height: 34 },
-        }),
+      : { frame: false }),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
@@ -158,6 +156,12 @@ function createWindows() {
   instrument(mainWindow, "/");
   void load(mainWindow, "/");
   mainWindow.once("ready-to-show", () => mainWindow.show());
+
+  // Keep the in-app maximise icon in step with the real window state.
+  const sendWindowState = () =>
+    mainWindow?.webContents.send("window:state", { maximized: mainWindow.isMaximized() });
+  mainWindow.on("maximize", sendWindowState);
+  mainWindow.on("unmaximize", sendWindowState);
 
   // A second monitor becomes the customer-facing display automatically.
   const external = screen.getAllDisplays().find((d) => d.bounds.x !== 0 || d.bounds.y !== 0);
