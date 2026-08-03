@@ -1,43 +1,53 @@
-# Make installs work with a lockfile everywhere
+# Fix the GitHub build: "Dependencies lock file is not found"
 
-## What is actually there
+## Cause
 
-Both package files exist in this project and are tracked in git:
+Two of the four workflows still install with npm, but this repo's lockfile is
+`bun.lock` — there is no `package-lock.json`:
 
-- `package.json` (version 1.0.12 — Capacitor plugins, `mssql`, Electron toolchain all listed)
-- `bun.lock` — the lockfile
+- `.github/workflows/node.js.yml` (the R2 build/deploy) — `actions/setup-node` with
+  `cache: 'npm'`, then `npm install`. The cache step is what fails: it scans for
+  `package-lock.json` / `npm-shrinkwrap.json` / `yarn.lock`, finds none, and aborts
+  the job with the exact message you saw.
+- `.github/workflows/desktop-release.yml` — `npm ci`, which cannot run at all
+  without `package-lock.json`.
 
-What is missing is `package-lock.json`. It was deleted in an earlier fix, so a machine
-using **npm** has no lockfile at all, while GitHub Actions installs with
-`bun install --frozen-lockfile`. That is the mismatch: the docs tell you to run
-`npm install`, but the only lockfile in the repo is Bun's.
+The other two (`android-apk.yml`, `security.yml`) already use
+`bun install --frozen-lockfile` and work.
 
-## Fix: one install tool, everywhere
+## Fix
 
-Standardise on **Bun**, since the Android and desktop workflows already use it and
-`bun.lock` is the committed lockfile.
+Make all four workflows install the same way as the working ones.
 
-1. **Docs** — `docs/run-locally.md` and `docs/android-apk.md`: replace `npm install`
-   with `bun install`, and `npm run ...` with `bun run ...`
-   (`bun run dev`, `bun run desktop:build`, `bun run mobile:build`,
-   `bun run desktop:package`). Add a one-line Bun install for Windows:
+1. **`node.js.yml`** — add `oven-sh/setup-bun@v2`, drop `cache: 'npm'` from
+   `setup-node` (Node still needed for `scripts/bump-version.cjs` and Electron
+   packaging), replace `npm install` with `bun install --frozen-lockfile`, and
+   `npm run desktop:release` with `bun run desktop:release`.
+
+2. **`desktop-release.yml`** — same treatment: add the Bun setup step, replace
+   `npm ci` with `bun install --frozen-lockfile` and `npm run desktop:release`
+   with `bun run desktop:release`.
+
+3. **`.gitignore`** — add `package-lock.json` so a stray local `npm install` can
+   never commit a second lockfile that disagrees with `bun.lock`.
+
+4. **Docs** — `docs/run-locally.md` and `docs/android-apk.md`: switch the
+   `npm install` / `npm run ...` instructions to `bun install` / `bun run ...`, with
+   the Windows one-liner for installing Bun:
 
    ```text
    powershell -c "irm bun.sh/install.ps1 | iex"
    ```
 
-2. **Fallback for npm users** — note that `npm install` still works (it resolves
-   fresh instead of from a lockfile), and that `package-lock.json` must not be
-   committed so the two lockfiles never disagree.
-
-3. **`.gitignore`** — add `package-lock.json`, so a stray npm run cannot introduce a
-   second lockfile that breaks the frozen-lockfile CI step.
-
-4. **README** — a single "Getting started" block with the Bun commands, matching CI.
-
 5. **Version** — bump to 1.0.13 in `package.json` and `src/version.ts`.
+
+## Alternative, if you'd rather keep npm
+
+Commit a `package-lock.json` (run `npm install` once locally) and delete `bun.lock`.
+I don't recommend it: the Android APK workflow is built around Bun, and two
+lockfiles drifting apart is what caused this in the first place.
 
 ## Not changed
 
-No dependency versions, no app code, no workflow changes — the CI install step is
-already correct.
+No dependency versions and no app code — only workflow install steps, gitignore,
+docs, and the version number.
