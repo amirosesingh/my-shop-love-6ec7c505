@@ -12,6 +12,7 @@ import {
   RefreshCw,
   RotateCcw,
   ShieldX,
+  Trash2,
 } from "lucide-react";
 import qrcode from "qrcode-generator";
 import { toast } from "sonner";
@@ -42,6 +43,7 @@ import { usePos } from "@/lib/pos-store";
 import { logger } from "@/lib/audit-log";
 import {
   ensureLocations,
+  deleteTerminalToken,
   issueTerminalToken,
   listTerminalTokens,
   reissueTerminalToken,
@@ -72,6 +74,7 @@ export function TerminalTokens() {
   const [copied, setCopied] = useState(false);
   const [pendingRevoke, setPendingRevoke] = useState<TerminalToken | null>(null);
   const [pendingReissue, setPendingReissue] = useState<TerminalToken | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<TerminalToken | null>(null);
   const [reissuing, setReissuing] = useState("");
   const [reissued, setReissued] = useState<{ token: TerminalToken; code: string } | null>(null);
   const [reissueCopied, setReissueCopied] = useState(false);
