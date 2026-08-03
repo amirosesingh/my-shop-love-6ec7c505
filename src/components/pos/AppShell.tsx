@@ -11,6 +11,7 @@ import {
 import { clearRevocation, useRevocationCheck } from "@/lib/use-revocation-check";
 import { SidebarNav, useSidebarCollapsed } from "@/components/pos/SidebarNav";
 import { SyncStatus } from "@/components/pos/SyncStatus";
+import { WindowControls } from "@/components/pos/WindowControls";
 import { ThemeToggle } from "@/components/pos/ThemeToggle";
 import { startSyncEngine } from "@/lib/sync-engine";
 import type { NavItem } from "@/components/pos/nav-config";
