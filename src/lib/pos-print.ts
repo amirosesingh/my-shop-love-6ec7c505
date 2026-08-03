@@ -374,13 +374,39 @@ function memberBody(member: Member, sales: Sale[]) {
     <hr><div class="c muted">Present this slip to redeem points</div>`;
 }
 
-function printHtml(title: string, body: string) {
-  // Electron prints silently; the browser keeps the dialog-based iframe path.
+/**
+ * Route one document to the printer.
+ *
+ * Desktop + thermal slip  -> ESC/POS text through the RAW spooler (no driver).
+ * Desktop + full page     -> hidden-window silent print via the driver.
+ * Browser                 -> classic hidden iframe with the print dialog.
+ */
+function printHtml(title: string, body: string, slip = true) {
   const desktopHtml = shell(title, body, false);
-  void silentPrint(desktopHtml).then((handled: boolean) => {
-    if (handled) return;
-    browserPrint(shell(title, body));
-  });
+  const paper = receiptCfg.paper;
+  const thermal =
+    slip &&
+    (paper === "80mm" || paper === "58mm") &&
+    getPrinterPrefs().printMode !== "graphics";
+
+  const fallbackToBrowser = () => browserPrint(shell(title, body));
+
+  void (async () => {
+    if (thermal) {
+      const bytes = htmlToEscPos(desktopHtml, paper);
+      const res = await rawPulse(bytes);
+      if (res.handled) {
+        if (!res.ok) toast.error("Printing failed", { description: res.error });
+        return;
+      }
+    }
+    const printed = await silentPrint(desktopHtml, paper);
+    if (!printed.handled) {
+      fallbackToBrowser();
+      return;
+    }
+    if (!printed.ok) toast.error("Printing failed", { description: printed.error });
+  })();
 }
 
 function browserPrint(html: string) {
