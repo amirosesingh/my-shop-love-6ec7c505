@@ -425,16 +425,14 @@ function registerIpc() {
 
   ipcMain.handle("print:raw", async (_e, bytes, options) => {
     try {
-      const result = await printRaw(bytes, options?.share || options?.deviceName);
-      if (result.ok) return result;
-      // Fall back to a silent one-line page carrying the same escape sequence,
-      // which still avoids any print dialog.
-      return await printSilent(
-        `<!doctype html><meta charset="utf-8"><body style="margin:0"><pre style="font-size:1px;line-height:1px">${Buffer.from(
-          bytes,
-        ).toString("binary")}</pre></body>`,
-        options?.deviceName || undefined,
-      );
+      const result = await printRaw(bytes, {
+        deviceName: options?.deviceName || "",
+        share: options?.share || "",
+      });
+      // No page fallback on purpose: rendering the escape sequence through the
+      // driver only produces a slip and never kicks the drawer.
+      if (!result.ok) console.error("[pos] raw drawer pulse failed:", result.error);
+      return result;
     } catch (err) {
       return fail(err);
     }
