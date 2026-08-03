@@ -3,10 +3,10 @@
  * bridge, so the hook reports "unavailable" and the UI hides the card.
  */
 import { useCallback, useEffect, useState } from "react";
-import pkg from "../../package.json";
+import { APP_VERSION as GENERATED_VERSION } from "../version";
 
 /** Version baked in at build time — shown on web where there is no bridge. */
-export const APP_VERSION: string = (pkg as { version?: string }).version ?? "0.0.0";
+export const APP_VERSION: string = GENERATED_VERSION;
 
 export type UpdateStatus =
   | "idle"
