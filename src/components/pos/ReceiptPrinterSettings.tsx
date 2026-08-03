@@ -23,7 +23,7 @@ export function ReceiptPrinterSettings() {
     deviceName: "",
     share: "",
     drawerPin: 2,
-    printMode: "thermal",
+    printMode: "dialog",
   });
   const [printers, setPrinters] = useState<{ name: string; displayName: string }[]>([]);
   const [testing, setTesting] = useState(false);
@@ -81,19 +81,24 @@ export function ReceiptPrinterSettings() {
       <div className="mt-4 space-y-1">
         <Label className="text-xs text-muted-foreground">Receipt print mode</Label>
         <ThemedSelect
-          value={prefs.printMode ?? "thermal"}
+          value={prefs.printMode ?? "dialog"}
           onChange={(v: string) =>
-            update({ ...prefs, printMode: v === "graphics" ? "graphics" : "thermal" })
+            update({
+              ...prefs,
+              printMode: v === "thermal" ? "thermal" : v === "direct" ? "direct" : "dialog",
+            })
           }
           options={[
-            { value: "thermal", label: "Thermal text (recommended)" },
-            { value: "graphics", label: "Graphics / printer driver" },
+            { value: "dialog", label: "Windows print dialog (normal)" },
+            { value: "direct", label: "Direct to printer (no dialog)" },
+            { value: "thermal", label: "Thermal text (ESC/POS)" },
           ]}
         />
         <p className="text-[11px] text-muted-foreground">
-          Thermal text sends the slip straight to the printer as ESC/POS commands — fastest and
-          most reliable. Switch to graphics only if your printer needs the Windows driver (logos,
-          QR codes and barcodes only print in graphics mode).
+          The print dialog uses the normal Windows printing route — pick the printer and press
+          Print, exactly like any other document. Choose “Direct to printer” once printing works
+          to skip the dialog at the till. “Thermal text” sends raw ESC/POS commands instead, which
+          only some printers accept.
         </p>
       </div>
 

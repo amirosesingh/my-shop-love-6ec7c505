@@ -383,17 +383,17 @@ function memberBody(member: Member, sales: Sale[]) {
 /**
  * Route one document to the printer.
  *
- * Desktop + thermal slip  -> ESC/POS text through the RAW spooler (no driver).
- * Desktop + full page     -> hidden-window silent print via the driver.
- * Browser                 -> classic hidden iframe with the print dialog.
+ * Desktop `dialog` mode  -> normal Windows print dialog through the driver.
+ * Desktop `direct` mode  -> same driver rendering, no dialog.
+ * Desktop `thermal` mode -> ESC/POS text through the RAW spooler (slips only).
+ * Browser                -> classic hidden iframe with the print dialog.
  */
 function printHtml(title: string, body: string, slip = true) {
   const desktopHtml = shell(title, body, false);
   const paper = receiptCfg.paper;
+  const mode = getPrinterPrefs().printMode ?? "dialog";
   const thermal =
-    slip &&
-    (paper === "80mm" || paper === "58mm") &&
-    getPrinterPrefs().printMode !== "graphics";
+    slip && (paper === "80mm" || paper === "58mm") && mode === "thermal";
 
   const fallbackToBrowser = () => browserPrint(shell(title, body));
 
@@ -406,7 +406,7 @@ function printHtml(title: string, body: string, slip = true) {
         return;
       }
     }
-    const printed = await silentPrint(desktopHtml, paper);
+    const printed = await silentPrint(desktopHtml, paper, mode !== "direct");
     if (!printed.handled) {
       fallbackToBrowser();
       return;

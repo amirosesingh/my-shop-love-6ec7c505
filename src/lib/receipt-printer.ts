@@ -13,7 +13,7 @@ type PrintResult = { ok: boolean; error?: string };
 type PrintBridge = {
   print?: (
     html: string,
-    options?: { deviceName?: string; paper?: string },
+    options?: { deviceName?: string; paper?: string; dialog?: boolean },
   ) => Promise<PrintResult>;
   printRaw?: (
     bytes: number[],
@@ -34,13 +34,21 @@ export type PrinterPrefs = {
   drawerPin?: 2 | 5;
   /**
    * How slips reach the printer on the desktop till.
-   * `thermal` = ESC/POS text through the RAW spooler (fast, no driver).
-   * `graphics` = HTML rendered by the printer driver.
+   * `dialog` = normal Windows print dialog through the printer driver.
+   * `direct` = same driver rendering, sent straight to the printer, no dialog.
+   * `thermal` = ESC/POS text through the RAW spooler (no driver).
    */
-  printMode?: "thermal" | "graphics";
+  printMode?: "dialog" | "direct" | "thermal";
 };
 
-const EMPTY: PrinterPrefs = { deviceName: "", share: "", drawerPin: 2, printMode: "thermal" };
+const EMPTY: PrinterPrefs = { deviceName: "", share: "", drawerPin: 2, printMode: "dialog" };
+
+function normalizeMode(mode: unknown): "dialog" | "direct" | "thermal" {
+  if (mode === "thermal") return "thermal";
+  // Legacy value written by earlier versions.
+  if (mode === "direct" || mode === "graphics") return "direct";
+  return "dialog";
+}
 
 export function printBridge(): PrintBridge | null {
   if (typeof window === "undefined") return null;
@@ -58,7 +66,7 @@ export function getPrinterPrefs(): PrinterPrefs {
       deviceName: parsed.deviceName ?? "",
       share: parsed.share ?? "",
       drawerPin: parsed.drawerPin === 5 ? 5 : 2,
-      printMode: parsed.printMode === "graphics" ? "graphics" : "thermal",
+      printMode: normalizeMode(parsed.printMode),
     };
   } catch {
     return EMPTY;
@@ -83,7 +91,11 @@ export type PulseResult = { handled: boolean; ok: boolean; error?: string };
  * Silent print through Electron.
  * `handled: false` means there is no desktop bridge (plain browser).
  */
-export async function silentPrint(html: string, paper?: string): Promise<PulseResult> {
+export async function silentPrint(
+  html: string,
+  paper?: string,
+  dialog = false,
+): Promise<PulseResult> {
   const bridge = printBridge();
   if (!bridge?.print) return { handled: false, ok: false };
   const { deviceName } = getPrinterPrefs();
@@ -91,6 +103,7 @@ export async function silentPrint(html: string, paper?: string): Promise<PulseRe
     const res = await bridge.print(html, {
       ...(deviceName ? { deviceName } : {}),
       ...(paper ? { paper } : {}),
+      ...(dialog ? { dialog: true } : {}),
     });
     if (!res?.ok) console.error("Silent print failed:", res?.error);
     return { handled: true, ok: !!res?.ok, ...(res?.error ? { error: res.error } : {}) };
