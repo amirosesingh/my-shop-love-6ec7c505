@@ -35,6 +35,25 @@ what you test in the browser, and it has first-class raw-device support on Windo
 
 6. Wrap the packaged folder with Inno Setup or NSIS for a double-click installer.
 
+## 2b. Receipt printing
+
+Slips (80mm / 58mm) are sent to the printer as **ESC/POS text** through the
+Windows RAW spooler — the same route as the cash-drawer pulse. No driver
+rendering, so a thermal printer prints instantly.
+
+Settings -> Display & text size -> Receipt printer has a **Receipt print mode**
+switch:
+
+- *Thermal text (recommended)* — raw ESC/POS. Logos, QR codes and barcodes are
+  dropped because they are images.
+- *Graphics / printer driver* — the receipt HTML is rendered in a hidden window
+  and printed through the driver, so images print. Use this for label or
+  laser/inkjet printers.
+
+A4 / Letter documents always use the driver route. **Test receipt** prints a
+short sample through whichever mode is selected and reports the exact Windows
+error if it fails.
+
 ## 3. Sync rules on desktop
 
 - All writes hit the local outbox first — the till never blocks on the network.

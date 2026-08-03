@@ -95,7 +95,7 @@ export function htmlToSlip(html: string, cols: number): SlipLine[] {
           for (const l of columns(leftMain, right, cols))
             push({ text: l, bold: rowBold || rowBig });
           for (const n of notes.filter(Boolean))
-            for (const l of wrap(`  ${n}`, cols)) push({ text: l });
+            for (const l of wrap(n, cols - 2)) push({ text: `  ${l}` });
         }
         continue;
       }
