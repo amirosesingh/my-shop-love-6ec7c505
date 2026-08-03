@@ -32,7 +32,12 @@ export default defineConfig({
   ...(isMobile
     ? {
         nitro: {
-          preset: "static" as const,
+          preset: "node-server" as const,
+          output: {
+            dir: "dist-mobile",
+            serverDir: "dist-mobile/server",
+            publicDir: "dist-mobile/public",
+          },
         },
       }
     : {}),
@@ -43,6 +48,6 @@ export default defineConfig({
     // The phone build renders entirely on the device: prerender the shell once
     // and let the client router take every route from there (file:// has no
     // server to ask for HTML).
-    ...(isMobile ? { spa: { enabled: true }, prerender: { enabled: true } } : {}),
+    ...(isMobile ? { spa: { enabled: true } } : {}),
   },
 });
