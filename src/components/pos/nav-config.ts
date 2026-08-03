@@ -81,14 +81,6 @@ export const navGroups: NavGroup[] = [
         blurb: "Scan, discount and charge a ticket.",
       },
       {
-        to: "/dashboard",
-        label: "Live Dashboard",
-        icon: Activity,
-        flag: "can_view_dashboard",
-        keywords: "revenue profit margin peak hours charts kpi review flags",
-        blurb: "Revenue, profit and peak hours as they happen.",
-      },
-      {
         to: "/shifts",
         label: "Shift Management",
         icon: Clock,
