@@ -14,6 +14,16 @@ export type Branding = {
 const KEY = "pos.branding";
 const EVENT = "pos:branding-changed";
 
+type BrandingBridge = {
+  readBranding?: () => Promise<{ ok: boolean; branding: Branding | null }>;
+  writeBranding?: (b: Branding) => Promise<{ ok: boolean }>;
+};
+
+const bridge = (): BrandingBridge | null =>
+  typeof window === "undefined"
+    ? null
+    : ((window as unknown as { pos?: BrandingBridge }).pos ?? null);
+
 export const defaultBranding: Branding = {
   company: "My Store",
   terminal: "POS Terminal 01",
@@ -35,7 +45,33 @@ export function writeBranding(patch: Partial<Branding>) {
   if (typeof window === "undefined") return;
   const next = { ...readBranding(), ...patch };
   window.localStorage.setItem(KEY, JSON.stringify(next));
+  // Mirror to the desktop user-data folder so the one-time setup stays done.
+  void bridge()?.writeBranding?.(next);
   window.dispatchEvent(new CustomEvent(EVENT));
+}
+
+/**
+ * Desktop only: pull the on-disk branding mirror back into browser storage.
+ * Resolves to the effective branding once restored.
+ */
+export async function restoreBrandingFromDisk(): Promise<Branding> {
+  const api = bridge();
+  if (!api?.readBranding) return readBranding();
+  try {
+    const res = await api.readBranding();
+    const disk = res?.branding;
+    const local = readBranding();
+    if (disk?.configured && !local.configured) {
+      const merged = { ...local, ...disk };
+      window.localStorage.setItem(KEY, JSON.stringify(merged));
+      window.dispatchEvent(new CustomEvent(EVENT));
+      return merged;
+    }
+    if (local.configured && !disk?.configured) void api.writeBranding?.(local);
+    return local;
+  } catch {
+    return readBranding();
+  }
 }
 
 /** Hydration-safe read of the local branding record. */
