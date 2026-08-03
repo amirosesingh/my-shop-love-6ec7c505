@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       app_url:
-        description: "URL the phone app loads (defaults to the published site)"
+        description: "Optional: load a hosted site instead of the offline app baked into the APK"
         required: false
         default: ""
   push:
@@ -13,6 +13,9 @@ on:
     branches:
       - main
     paths:
+      - "src/**"
+      - "scripts/mobile-build.cjs"
+      - "vite.config.ts"
       - "capacitor.config.ts"
       - "capacitor-shell/**"
       - "package.json"
@@ -47,6 +50,10 @@ jobs:
       - name: Read app version
         id: meta
         run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Build the offline app bundle
+        if: ${{ !inputs.app_url }}
+        run: npm run mobile:build
 
       - name: Add Android platform
         env:
