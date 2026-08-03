@@ -20,6 +20,7 @@ import {
   Sparkles,
   History,
   CalendarClock,
+  ChevronUp,
   MonitorPlay,
   Landmark,
   MessageCircle,
@@ -30,6 +31,7 @@ import {
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
 import { CatalogPanel } from "@/components/pos/CatalogPanel";
+import { setTicketDirty } from "@/lib/desktop-window";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -153,6 +155,8 @@ function Register() {
   const [bookName, setBookName] = useState("");
   const [bookPhone, setBookPhone] = useState("");
   const [bookNote, setBookNote] = useState("");
+  /** Narrow windows: the action deck collapses so it can't cover the totals. */
+  const [deckOpen, setDeckOpen] = useState(false);
   /* Operation deck state */
   type HeldOrder = {
     id: string;
@@ -227,6 +231,11 @@ function Register() {
   // Keep the qualifying FOC freebie in sync with the open ticket.
   const focId = promo.foc ? `${promo.foc.promo.id}:${promo.foc.product.id}:${promo.foc.qty}` : "";
   const hasFoc = lines.some((l) => l.foc);
+  // The desktop close button warns when a ticket is still open.
+  useEffect(() => {
+    setTicketDirty(lines.length > 0);
+    return () => setTicketDirty(false);
+  }, [lines.length]);
   useEffect(() => {
     if (focId && !hasFoc) {
       const [, productId, qty] = focId.split(":");
@@ -1163,7 +1172,7 @@ function Register() {
             </div>
           </ScrollArea>
 
-          <div className="space-y-2 border-t border-border px-4 py-3 text-sm">
+          <div className="shrink-0 space-y-2 border-t border-border px-4 py-3 text-sm">
             {exchangeRef && (
               <div className="flex items-center justify-between rounded-md border border-accent/40 bg-accent/10 px-2 py-1.5 text-[11px]">
                 <span>Exchange against bill #{exchangeRef}</span>
@@ -1372,8 +1381,21 @@ function Register() {
           </div>
         </section>
 
-        {/* ── RIGHT: operation deck (fixed width) ─────────────────────── */}
-        <aside className="max-h-[45vh] w-full shrink-0 space-y-3 overflow-y-auto border-t border-border bg-background p-3 lg:max-h-none lg:w-[288px] lg:border-l lg:border-t-0">
+        {/* ── RIGHT: operation deck. Below lg it collapses into a bar under
+            the totals so it can never overlap the Charge buttons. ───────── */}
+        <aside className="flex w-full shrink-0 flex-col border-t border-border bg-background lg:w-[288px] lg:border-l lg:border-t-0">
+          <button
+            type="button"
+            onClick={() => setDeckOpen((v) => !v)}
+            aria-expanded={deckOpen}
+            className="flex shrink-0 items-center justify-between gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground lg:hidden"
+          >
+            <span>Register actions</span>
+            <ChevronUp className={`size-4 transition-transform ${deckOpen ? "" : "rotate-180"}`} />
+          </button>
+          <div
+            className={`${deckOpen ? "flex" : "hidden"} max-h-[45vh] min-h-0 flex-col gap-3 overflow-y-auto p-3 pt-0 lg:flex lg:max-h-none lg:pt-3`}
+          >
           {/* Card 1 · transaction actions */}
           <div className="rounded-lg border border-border bg-card p-3">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -1494,6 +1516,7 @@ function Register() {
                 onCheckedChange={setReceiptPreview}
               />
             </div>
+          </div>
           </div>
         </aside>
       </div>

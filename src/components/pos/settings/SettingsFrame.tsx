@@ -217,8 +217,9 @@ export function SettingsFrame({
     <AppShell>
       <SettingsCtx.Provider value={ctx}>
         <div className="mx-auto w-full max-w-4xl space-y-5 p-6">
-          <div>
-            <Button asChild variant="ghost" size="sm" className="-ml-2 h-8 text-xs">
+          {/* Stays visible while the page scrolls, so there is always a way back. */}
+          <div className="sticky top-0 z-20 -mx-6 -mt-6 border-b border-border bg-background/95 px-4 py-2 backdrop-blur">
+            <Button asChild variant="ghost" size="sm" className="h-8 text-xs">
               <Link to="/settings">
                 <ArrowLeft className="size-4" /> All settings
               </Link>

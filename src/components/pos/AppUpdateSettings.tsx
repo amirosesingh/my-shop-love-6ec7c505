@@ -1,7 +1,7 @@
 import { DownloadCloud, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { useAppUpdates } from "@/lib/app-updates";
+import { APP_VERSION, useAppUpdates } from "@/lib/app-updates";
 
 const LABELS: Record<string, string> = {
   idle: "Not checked yet",
@@ -13,10 +13,11 @@ const LABELS: Record<string, string> = {
   unavailable: "Automatic updates are not available in this build",
 };
 
-/** Desktop-only card: current version, manual check, and restart-to-install. */
+/** Current version, manual check, and restart-to-install. On the web build the
+ *  card still shows the running version, with checks disabled. */
 export function AppUpdateSettings() {
-  const { state, supported, check, install } = useAppUpdates();
-  if (!supported) return null;
+  const { state, supported, check, install, lastChecked } = useAppUpdates();
+  const version = state.version || APP_VERSION;
 
   return (
     <section className="rounded-lg border border-border bg-card p-5">
@@ -24,19 +25,33 @@ export function AppUpdateSettings() {
         <DownloadCloud className="size-4 text-primary" /> App updates
       </h2>
       <p className="mt-1 text-xs text-muted-foreground">
-        This till checks for new versions in the background. Updates never interrupt a shift — they
-        install when you restart. Your terminal registration is kept.
+        {supported
+          ? "This till checks for new versions in the background. Updates never interrupt a shift — they install when you restart. Your terminal registration is kept."
+          : "You are running the browser version, which is always up to date. Automatic updates apply to the Windows desktop till."}
       </p>
 
-      <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
-        <span className="numeric rounded-md border border-border px-2 py-1 text-xs">
-          v{state.version || "—"}
-        </span>
-        <span className="text-muted-foreground">{LABELS[state.status] ?? state.status}</span>
-        {state.available && state.status !== "current" && (
-          <span className="numeric text-xs text-primary">→ v{state.available}</span>
-        )}
-      </div>
+      <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-md border border-border px-3 py-2">
+          <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">
+            Installed version
+          </dt>
+          <dd className="numeric text-sm font-semibold">v{version}</dd>
+        </div>
+        <div className="rounded-md border border-border px-3 py-2">
+          <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">Status</dt>
+          <dd className="text-sm">
+            {supported ? (LABELS[state.status] ?? state.status) : LABELS["unavailable"]}
+            {state.available && state.status !== "current" && (
+              <span className="numeric ml-1 text-primary">→ v{state.available}</span>
+            )}
+          </dd>
+          {lastChecked && (
+            <dd className="text-[11px] text-muted-foreground">
+              Last checked {lastChecked.toLocaleString()}
+            </dd>
+          )}
+        </div>
+      </dl>
 
       {state.status === "downloading" && (
         <Progress value={state.percent} className="mt-3 h-2" aria-label="Update download progress" />
@@ -48,7 +63,7 @@ export function AppUpdateSettings() {
         <Button
           variant="outline"
           size="sm"
-          disabled={state.status === "checking" || state.status === "downloading"}
+          disabled={!supported || state.status === "checking" || state.status === "downloading"}
           onClick={() => void check()}
         >
           {state.status === "checking" ? (
@@ -56,7 +71,7 @@ export function AppUpdateSettings() {
           ) : (
             <RefreshCw className="size-3.5" />
           )}
-          Check for updates
+          Check for updates now
         </Button>
         {state.status === "ready" && (
           <Button size="sm" onClick={() => void install()}>

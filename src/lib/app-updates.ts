@@ -3,6 +3,10 @@
  * bridge, so the hook reports "unavailable" and the UI hides the card.
  */
 import { useCallback, useEffect, useState } from "react";
+import pkg from "../../package.json";
+
+/** Version baked in at build time — shown on web where there is no bridge. */
+export const APP_VERSION: string = (pkg as { version?: string }).version ?? "0.0.0";
 
 export type UpdateStatus =
   | "idle"
@@ -40,19 +44,25 @@ const INITIAL: UpdateState = { status: "idle", version: "", percent: 0, error: n
 export function useAppUpdates() {
   const [state, setState] = useState<UpdateState>(INITIAL);
   const [supported, setSupported] = useState(false);
+  const [lastChecked, setLastChecked] = useState<Date | null>(null);
 
   useEffect(() => {
     const bridge = updateBridge();
     if (!bridge) return;
     setSupported(true);
     void bridge.updateStatus().then((s) => s && setState(s));
-    return bridge.onUpdateStatus((s) => setState(s));
+    return bridge.onUpdateStatus((s) => {
+      setState(s);
+      if (s.status === "current" || s.status === "ready" || s.status === "error")
+        setLastChecked(new Date());
+    });
   }, []);
 
   const check = useCallback(async () => {
     const bridge = updateBridge();
     if (!bridge) return;
     const next = await bridge.checkForUpdates();
+    setLastChecked(new Date());
     if (next) setState(next);
   }, []);
 
@@ -60,5 +70,5 @@ export function useAppUpdates() {
     await updateBridge()?.installUpdate();
   }, []);
 
-  return { state, supported, check, install };
+  return { state, supported, check, install, lastChecked };
 }

@@ -11,6 +11,7 @@ import {
 import { clearRevocation, useRevocationCheck } from "@/lib/use-revocation-check";
 import { SidebarNav, useSidebarCollapsed } from "@/components/pos/SidebarNav";
 import { SyncStatus } from "@/components/pos/SyncStatus";
+import { WindowControls } from "@/components/pos/WindowControls";
 import { ThemeToggle } from "@/components/pos/ThemeToggle";
 import { startSyncEngine } from "@/lib/sync-engine";
 import type { NavItem } from "@/components/pos/nav-config";
@@ -238,11 +239,12 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="pos-scaled flex h-screen flex-col overflow-hidden bg-background text-foreground">
       {/* Frameless desktop shell: draggable strip under the native window buttons. */}
       {isDesktop() && (
-        <div className="app-drag flex h-[34px] shrink-0 items-center gap-2 border-b border-border bg-sidebar px-3">
+        <div className="app-drag flex h-[34px] shrink-0 items-center gap-2 border-b border-border bg-sidebar pl-3">
           <ReceiptText className="size-3.5 shrink-0 text-primary" />
           <span className="truncate text-[11px] font-semibold text-muted-foreground">
             {companyName}
           </span>
+          <WindowControls />
         </div>
       )}
       <div className="flex min-h-0 flex-1">
