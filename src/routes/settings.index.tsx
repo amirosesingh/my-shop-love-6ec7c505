@@ -5,6 +5,8 @@ import {
   ListPlus,
   MessageCircle,
   MonitorCog,
+  MonitorSmartphone,
+  DownloadCloud,
   Printer,
   QrCode,
   ReceiptText,
@@ -13,9 +15,11 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/pos/AppShell";
 import { useAuth } from "@/lib/pos-auth";
+import { isDesktop } from "@/lib/branding";
 
 const PAGES = [
   { to: "/settings/display", label: "Display & text size", icon: MonitorCog, blurb: "Interface scale, density and light / dark theme." },
+  { to: "/settings/updates", label: "Software updates", icon: DownloadCloud, blurb: "App version, background updates and system health." },
   { to: "/settings/tax", label: "Tax & pricing", icon: ReceiptText, blurb: "Global tax rate and inclusive or exclusive pricing." },
   { to: "/settings/identity", label: "Business identity", icon: Building2, blurb: "Company name, tax numbers, header and footer." },
   { to: "/settings/type", label: "Receipt typography", icon: Type, blurb: "Fonts, sizes and spacing for printed slips." },
@@ -25,6 +29,7 @@ const PAGES = [
   { to: "/settings/payment", label: "Bank transfer details", icon: Landmark, blurb: "Bank account and payment QR for the customer display." },
   { to: "/settings/whatsapp", label: "WhatsApp bills", icon: MessageCircle, blurb: "Send receipts over the WhatsApp Cloud API." },
   { to: "/settings/sync", label: "Sync & backup", icon: RefreshCw, blurb: "Branch identity, offline sync queue and backups." },
+  { to: "/settings/terminals", label: "Terminal activation", icon: MonitorSmartphone, blurb: "Register Windows tills, issue and revoke activation codes.", cloudOnly: true },
 ] as const;
 
 const LEGACY: Record<string, string> = Object.fromEntries(
@@ -58,6 +63,7 @@ export const Route = createFileRoute("/settings/")({
 function SettingsHub() {
   const { isAdmin, can } = useAuth();
   const allowed = isAdmin || can("can_access_pos_settings");
+  const pages = PAGES.filter((p) => !("cloudOnly" in p && p.cloudOnly && isDesktop()));
 
   return (
     <AppShell>
@@ -75,7 +81,7 @@ function SettingsHub() {
           </p>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
-            {PAGES.map((p) => (
+            {pages.map((p) => (
               <Link
                 key={p.to}
                 to={p.to}
