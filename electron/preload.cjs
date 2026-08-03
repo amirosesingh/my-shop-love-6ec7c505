@@ -37,6 +37,16 @@ contextBridge.exposeInMainWorld("pos", {
   /* branding mirror — survives updates and cleared browser storage */
   readBranding: () => invoke("branding:read"),
   writeBranding: (branding) => invoke("branding:write", branding),
+  /* in-window title bar buttons */
+  minimizeWindow: () => invoke("window:minimize"),
+  toggleMaximizeWindow: () => invoke("window:maximize"),
+  closeWindow: () => invoke("window:close"),
+  isWindowMaximized: () => invoke("window:is-maximized"),
+  onWindowState: (cb) => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on("window:state", handler);
+    return () => ipcRenderer.removeListener("window:state", handler);
+  },
   /* boot health / safe mode */
   reportReady: () => invoke("app:ready"),
   healthState: () => invoke("health:state"),
