@@ -203,12 +203,13 @@ const PAGE_SIZES = {
   "80mm": { width: 80000, height: 297000 },
 };
 
-function printSilent(html, deviceName, paper) {
+function printSilent(html, deviceName, paper, dialog = false) {
   return new Promise((resolve) => {
     const win = new BrowserWindow({
-      show: false,
+      show: !!dialog,
       width: 420,
       height: 900,
+      ...(dialog ? { title: "Print", autoHideMenuBar: true } : {}),
       webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: false },
     });
     const done = (result) => {
@@ -223,13 +224,20 @@ function printSilent(html, deviceName, paper) {
         if (win.isDestroyed()) return;
         win.webContents.print(
           {
-            silent: true,
+            silent: !dialog,
             printBackground: true,
             margins: { marginType: "none" },
             ...(pageSize ? { pageSize } : {}),
             ...(deviceName ? { deviceName } : {}),
           },
-          (success, reason) => done(success ? { ok: true } : { ok: false, error: reason }),
+          (success, reason) =>
+            done(
+              success
+                ? { ok: true }
+                : reason === "cancelled"
+                  ? { ok: true, cancelled: true }
+                  : { ok: false, error: reason },
+            ),
         );
       }, 350);
     });
@@ -434,6 +442,7 @@ function registerIpc() {
         String(html),
         options?.deviceName || undefined,
         options?.paper || undefined,
+        !!options?.dialog,
       );
     } catch (err) {
       return fail(err);
