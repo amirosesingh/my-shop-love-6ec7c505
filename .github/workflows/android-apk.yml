@@ -10,10 +10,23 @@ on:
   push:
     tags:
       - "v*"
+    branches:
+      - main
+    paths:
+      - "capacitor.config.ts"
+      - "capacitor-shell/**"
+      - "package.json"
+      - ".github/workflows/android-apk.yml"
+
+concurrency:
+  group: android-release
+  cancel-in-progress: false
 
 jobs:
   apk:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -31,6 +44,10 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Read app version
+        id: meta
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
       - name: Add Android platform
         env:
           POS_MOBILE_URL: ${{ inputs.app_url || vars.POS_MOBILE_URL }}
@@ -42,9 +59,41 @@ jobs:
         working-directory: android
         run: ./gradlew assembleDebug
 
-      - name: Upload APK
+      # For a store-ready build: add ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,
+      # ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD as repository secrets, then swap the
+      # step above for `./gradlew assembleRelease` with the signing config wired in.
+
+      - name: Stage APK for upload
+        id: stage
+        run: |
+          mkdir -p android-release
+          src=$(ls android/app/build/outputs/apk/debug/*.apk | head -n1)
+          v="${{ steps.meta.outputs.version }}"
+          cp "$src" "android-release/NorthwindPOS-$v.apk"
+          cp "$src" "android-release/NorthwindPOS-latest.apk"
+          printf '{"version":"%s","file":"NorthwindPOS-%s.apk","released":"%s"}\n' \
+            "$v" "$v" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > android-release/latest.json
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: NorthwindPOS-android
           if-no-files-found: error
-          path: android/app/build/outputs/apk/debug/*.apk
+          path: android-release/*.apk
+
+      - name: Deploy APK to Cloudflare R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          aws s3 sync android-release s3://updatelccms/pos-app/android \
+            --endpoint-url ${{ secrets.R2_ENDPOINT }}
+
+      - name: Attach APK to the GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: android-release/*.apk
