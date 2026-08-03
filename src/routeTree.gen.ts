@@ -10,15 +10,19 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuditRouteImport } from './routes/audit'
 import { Route as BookingsRouteImport } from './routes/bookings'
+import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as DisplayRouteImport } from './routes/display'
 import { Route as InventoryRouteImport } from './routes/inventory'
+import { Route as InventoryHubRouteImport } from './routes/inventory-hub'
 import { Route as MembersRouteImport } from './routes/members'
 import { Route as PromotionsRouteImport } from './routes/promotions'
 import { Route as PurchasingRouteImport } from './routes/purchasing'
 import { Route as ReceiptsRouteImport } from './routes/receipts'
+import { Route as SalesRouteImport } from './routes/sales'
 import { Route as ShiftsRouteImport } from './routes/shifts'
 import { Route as StaffRouteImport } from './routes/staff'
 import { Route as StoresRouteImport } from './routes/stores'
@@ -48,6 +52,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuditRoute = AuditRouteImport.update({
   id: '/audit',
   path: '/audit',
@@ -56,6 +65,11 @@ const AuditRoute = AuditRouteImport.update({
 const BookingsRoute = BookingsRouteImport.update({
   id: '/bookings',
   path: '/bookings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CustomersRoute = CustomersRouteImport.update({
+  id: '/customers',
+  path: '/customers',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -71,6 +85,11 @@ const DisplayRoute = DisplayRouteImport.update({
 const InventoryRoute = InventoryRouteImport.update({
   id: '/inventory',
   path: '/inventory',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InventoryHubRoute = InventoryHubRouteImport.update({
+  id: '/inventory-hub',
+  path: '/inventory-hub',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MembersRoute = MembersRouteImport.update({
@@ -91,6 +110,11 @@ const PurchasingRoute = PurchasingRouteImport.update({
 const ReceiptsRoute = ReceiptsRouteImport.update({
   id: '/receipts',
   path: '/receipts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SalesRoute = SalesRouteImport.update({
+  id: '/sales',
+  path: '/sales',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShiftsRoute = ShiftsRouteImport.update({
@@ -211,15 +235,19 @@ const SettingsWhatsappRoute = SettingsWhatsappRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/audit': typeof AuditRoute
   '/bookings': typeof BookingsRoute
+  '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
   '/display': typeof DisplayRoute
   '/inventory': typeof InventoryRoute
+  '/inventory-hub': typeof InventoryHubRoute
   '/members': typeof MembersRoute
   '/promotions': typeof PromotionsRoute
   '/purchasing': typeof PurchasingRoute
   '/receipts': typeof ReceiptsRoute
+  '/sales': typeof SalesRoute
   '/shifts': typeof ShiftsRoute
   '/staff': typeof StaffRoute
   '/stores': typeof StoresRoute
@@ -246,15 +274,19 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/audit': typeof AuditRoute
   '/bookings': typeof BookingsRoute
+  '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
   '/display': typeof DisplayRoute
   '/inventory': typeof InventoryRoute
+  '/inventory-hub': typeof InventoryHubRoute
   '/members': typeof MembersRoute
   '/promotions': typeof PromotionsRoute
   '/purchasing': typeof PurchasingRoute
   '/receipts': typeof ReceiptsRoute
+  '/sales': typeof SalesRoute
   '/shifts': typeof ShiftsRoute
   '/staff': typeof StaffRoute
   '/stores': typeof StoresRoute
@@ -282,15 +314,19 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/audit': typeof AuditRoute
   '/bookings': typeof BookingsRoute
+  '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
   '/display': typeof DisplayRoute
   '/inventory': typeof InventoryRoute
+  '/inventory-hub': typeof InventoryHubRoute
   '/members': typeof MembersRoute
   '/promotions': typeof PromotionsRoute
   '/purchasing': typeof PurchasingRoute
   '/receipts': typeof ReceiptsRoute
+  '/sales': typeof SalesRoute
   '/shifts': typeof ShiftsRoute
   '/staff': typeof StaffRoute
   '/stores': typeof StoresRoute
@@ -319,15 +355,19 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/audit'
     | '/bookings'
+    | '/customers'
     | '/dashboard'
     | '/display'
     | '/inventory'
+    | '/inventory-hub'
     | '/members'
     | '/promotions'
     | '/purchasing'
     | '/receipts'
+    | '/sales'
     | '/shifts'
     | '/staff'
     | '/stores'
@@ -354,15 +394,19 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
     | '/audit'
     | '/bookings'
+    | '/customers'
     | '/dashboard'
     | '/display'
     | '/inventory'
+    | '/inventory-hub'
     | '/members'
     | '/promotions'
     | '/purchasing'
     | '/receipts'
+    | '/sales'
     | '/shifts'
     | '/staff'
     | '/stores'
@@ -389,15 +433,19 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/audit'
     | '/bookings'
+    | '/customers'
     | '/dashboard'
     | '/display'
     | '/inventory'
+    | '/inventory-hub'
     | '/members'
     | '/promotions'
     | '/purchasing'
     | '/receipts'
+    | '/sales'
     | '/shifts'
     | '/staff'
     | '/stores'
@@ -425,15 +473,19 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
   AuditRoute: typeof AuditRoute
   BookingsRoute: typeof BookingsRoute
+  CustomersRoute: typeof CustomersRoute
   DashboardRoute: typeof DashboardRoute
   DisplayRoute: typeof DisplayRoute
   InventoryRoute: typeof InventoryRoute
+  InventoryHubRoute: typeof InventoryHubRoute
   MembersRoute: typeof MembersRoute
   PromotionsRoute: typeof PromotionsRoute
   PurchasingRoute: typeof PurchasingRoute
   ReceiptsRoute: typeof ReceiptsRoute
+  SalesRoute: typeof SalesRoute
   ShiftsRoute: typeof ShiftsRoute
   StaffRoute: typeof StaffRoute
   StoresRoute: typeof StoresRoute
@@ -468,6 +520,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/audit': {
       id: '/audit'
       path: '/audit'
@@ -480,6 +539,13 @@ declare module '@tanstack/react-router' {
       path: '/bookings'
       fullPath: '/bookings'
       preLoaderRoute: typeof BookingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/customers': {
+      id: '/customers'
+      path: '/customers'
+      fullPath: '/customers'
+      preLoaderRoute: typeof CustomersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -501,6 +567,13 @@ declare module '@tanstack/react-router' {
       path: '/inventory'
       fullPath: '/inventory'
       preLoaderRoute: typeof InventoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inventory-hub': {
+      id: '/inventory-hub'
+      path: '/inventory-hub'
+      fullPath: '/inventory-hub'
+      preLoaderRoute: typeof InventoryHubRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/members': {
@@ -529,6 +602,13 @@ declare module '@tanstack/react-router' {
       path: '/receipts'
       fullPath: '/receipts'
       preLoaderRoute: typeof ReceiptsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sales': {
+      id: '/sales'
+      path: '/sales'
+      fullPath: '/sales'
+      preLoaderRoute: typeof SalesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/shifts': {
@@ -697,15 +777,19 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
   AuditRoute: AuditRoute,
   BookingsRoute: BookingsRoute,
+  CustomersRoute: CustomersRoute,
   DashboardRoute: DashboardRoute,
   DisplayRoute: DisplayRoute,
   InventoryRoute: InventoryRoute,
+  InventoryHubRoute: InventoryHubRoute,
   MembersRoute: MembersRoute,
   PromotionsRoute: PromotionsRoute,
   PurchasingRoute: PurchasingRoute,
   ReceiptsRoute: ReceiptsRoute,
+  SalesRoute: SalesRoute,
   ShiftsRoute: ShiftsRoute,
   StaffRoute: StaffRoute,
   StoresRoute: StoresRoute,
@@ -733,13 +817,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

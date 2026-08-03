@@ -61,6 +61,11 @@ const ROUTE_PERMISSIONS: Record<string, PermissionFlag> = {
  *  an entry above — unknown paths are denied, never silently allowed. */
 const PUBLIC_ROUTES = new Set(["/", "/display"]);
 
+/** Section landing pages. They only list links, and every card is filtered by
+ *  the same permission as the sidebar entry, so the hub itself carries no
+ *  protected data. */
+const SECTION_HUBS = new Set(["/sales", "/inventory-hub", "/customers", "/admin"]);
+
 /** Cloud-only admin tools. The Windows till never manages accounts, branches,
  *  messaging credentials or device activation — those stay in the web console. */
 const DESKTOP_BLOCKED = ["/settings/terminals", "/settings/whatsapp", "/staff", "/stores"];
@@ -71,6 +76,7 @@ const isDesktopBlocked = (pathname: string) =>
 /** Longest matching prefix wins so a child page can tighten its parent gate. */
 function requiredPermission(pathname: string): PermissionFlag | null | "unknown" {
   if (PUBLIC_ROUTES.has(pathname)) return null;
+  if (SECTION_HUBS.has(pathname)) return null;
   const key =
     Object.keys(ROUTE_PERMISSIONS)
       .filter((p) => pathname === p || pathname.startsWith(`${p}/`))

@@ -16,7 +16,7 @@ export const POS_SUPABASE_KEY =
   (import.meta.env["VITE_SUPABASE_EXTERNAL_PUBLISHABLE_KEY"] as string | undefined) ??
   "sb_publishable_QwVvttLzDle_xTwP3L7Dyg_A6XM-cC-";
 
-export type TokenStatus = "active" | "revoked";
+export type TokenStatus = "active" | "used" | "revoked";
 
 export type TerminalToken = {
   id: string;
@@ -30,6 +30,8 @@ export type TerminalToken = {
   lastSeenAt: string | null;
   reissuedAt: string | null;
   replacedBy: string | null;
+  claimedByDevice: string | null;
+  claimedAt: string | null;
 };
 
 /** The table is not in the generated types, so queries go through a loose view. */
@@ -42,6 +44,7 @@ type LooseClient = {
       options?: { onConflict?: string },
     ) => PromiseLike<{ error: { message: string } | null }>;
     update: (values: unknown) => any;
+    delete: () => any;
   };
 };
 
@@ -83,18 +86,23 @@ export async function ensureLocations(locations: TokenLocation[]): Promise<void>
   if (error) throw error;
 }
 
+const asStatus = (value: unknown): TokenStatus =>
+  value === "revoked" ? "revoked" : value === "used" ? "used" : "active";
+
 const rowToToken = (r: Record<string, any>): TerminalToken => ({
   id: r.id,
   locationId: r.location_id ?? null,
   locationName: r.location_name ?? "",
   deviceName: r.device_name ?? "",
-  status: r.status === "revoked" ? "revoked" : "active",
+  status: asStatus(r.status),
   createdAt: r.created_at,
   activatedAt: r.activated_at ?? null,
   revokedAt: r.revoked_at ?? null,
   lastSeenAt: r.last_seen_at ?? null,
   reissuedAt: r.reissued_at ?? null,
   replacedBy: r.replaced_by ?? null,
+  claimedByDevice: r.claimed_by_device ?? null,
+  claimedAt: r.claimed_at ?? null,
 });
 
 /* ----------------------------- admin surface ---------------------------- */
@@ -181,6 +189,15 @@ export async function reissueTerminalToken(
 
 export async function restoreTerminalToken(id: string): Promise<void> {
   const { error } = await table().update({ status: "active", revoked_at: null }).eq("id", id);
+  if (error) throw error;
+}
+
+/**
+ * Remove a retired entry from the table. Only a revoked or already-spent code
+ * can be deleted, so a live till is never cut off by a stray click.
+ */
+export async function deleteTerminalToken(id: string): Promise<void> {
+  const { error } = await table().delete().eq("id", id).eq("status", "revoked");
   if (error) throw error;
 }
 
@@ -273,7 +290,7 @@ export async function fetchTokenStatus(
   const row = Array.isArray(data) ? data[0] : data;
   if (!row) return null;
   return {
-    status: row.status === "revoked" ? "revoked" : "active",
+    status: asStatus(row.status),
     locationName: row.location_name ?? "",
   };
 }
@@ -322,6 +339,25 @@ export async function activateTerminal(code: string): Promise<TerminalConfig> {
   if (!remote) throw new ActivationError("This activation code is not recognised.");
   if (remote.status === "revoked") {
     throw new ActivationError("This activation code has been revoked by management.");
+  }
+  if (remote.status === "used") {
+    throw new ActivationError(
+      "This activation code has already been used on another terminal. Ask an administrator to re-issue a code for this till.",
+    );
+  }
+
+  // One-time use: only the till that wins this atomic claim may register.
+  const deviceName =
+    typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 120) : null;
+  const { data: claimed, error: claimError } = await rpc("terminal_token_claim", {
+    p_token_id: payload.token_id,
+    p_device: deviceName,
+  });
+  if (claimError) throw new ActivationError(activationFailureMessage(claimError));
+  if (claimed !== true) {
+    throw new ActivationError(
+      "This activation code has already been used on another terminal. Ask an administrator to re-issue a code for this till.",
+    );
   }
 
   const config: TerminalConfig = {

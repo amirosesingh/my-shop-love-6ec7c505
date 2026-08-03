@@ -12,6 +12,7 @@ import {
   RefreshCw,
   RotateCcw,
   ShieldX,
+  Trash2,
 } from "lucide-react";
 import qrcode from "qrcode-generator";
 import { toast } from "sonner";
@@ -42,6 +43,7 @@ import { usePos } from "@/lib/pos-store";
 import { logger } from "@/lib/audit-log";
 import {
   ensureLocations,
+  deleteTerminalToken,
   issueTerminalToken,
   listTerminalTokens,
   reissueTerminalToken,
@@ -72,6 +74,7 @@ export function TerminalTokens() {
   const [copied, setCopied] = useState(false);
   const [pendingRevoke, setPendingRevoke] = useState<TerminalToken | null>(null);
   const [pendingReissue, setPendingReissue] = useState<TerminalToken | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<TerminalToken | null>(null);
   const [reissuing, setReissuing] = useState("");
   const [reissued, setReissued] = useState<{ token: TerminalToken; code: string } | null>(null);
   const [reissueCopied, setReissueCopied] = useState(false);
@@ -193,6 +196,22 @@ export function TerminalTokens() {
       await refresh();
     } catch (e) {
       toast.error("Could not restore the token", {
+        description: (e as { message?: string })?.message,
+      });
+    }
+  };
+
+  const remove = async (token: TerminalToken) => {
+    try {
+      await deleteTerminalToken(token.id);
+      logger.log("settings_change", "Terminal entry deleted", "terminals", {
+        device: token.deviceName,
+        location: token.locationName,
+      });
+      toast.success(`${token.deviceName} removed`);
+      await refresh();
+    } catch (e) {
+      toast.error("Could not delete the terminal", {
         description: (e as { message?: string })?.message,
       });
     }
@@ -358,6 +377,7 @@ export function TerminalTokens() {
                 <TableHead>Device name</TableHead>
                 <TableHead>Location / warehouse</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Claimed by</TableHead>
                 <TableHead>Date created</TableHead>
                 <TableHead>Last seen</TableHead>
                 <TableHead>Re-issued</TableHead>
@@ -375,11 +395,16 @@ export function TerminalTokens() {
                       className={
                         t.status === "active"
                           ? "border-success/40 bg-success/10 text-success"
-                          : "border-destructive/40 bg-destructive/10 text-destructive"
+                          : t.status === "used"
+                            ? "border-primary/40 bg-primary/10 text-primary"
+                            : "border-destructive/40 bg-destructive/10 text-destructive"
                       }
                     >
-                      {t.status === "active" ? "Active" : "Revoked"}
+                      {t.status === "active" ? "Active" : t.status === "used" ? "In use" : "Revoked"}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="max-w-[14rem] truncate text-xs text-muted-foreground">
+                    {t.claimedByDevice ? t.claimedByDevice : "—"}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
                     {formatDate(t.createdAt)}
@@ -416,14 +441,37 @@ export function TerminalTokens() {
                           <ShieldX className="size-3.5" /> Revoke authenticity
                         </Button>
                       ) : (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 text-xs"
-                          onClick={() => void restore(t)}
-                        >
-                          <RotateCcw className="size-3.5" /> Re-enable
-                        </Button>
+                        <>
+                          {t.status === "used" ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 border-destructive/40 text-xs text-destructive hover:bg-destructive/10"
+                              onClick={() => setPendingRevoke(t)}
+                            >
+                              <ShieldX className="size-3.5" /> Revoke authenticity
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 text-xs"
+                              onClick={() => void restore(t)}
+                            >
+                              <RotateCcw className="size-3.5" /> Re-enable
+                            </Button>
+                          )}
+                          {t.status === "revoked" && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 text-xs text-destructive hover:bg-destructive/10"
+                              onClick={() => setPendingDelete(t)}
+                            >
+                              <Trash2 className="size-3.5" /> Delete
+                            </Button>
+                          )}
+                        </>
                       )}
                     </div>
                   </TableCell>
@@ -479,6 +527,32 @@ export function TerminalTokens() {
               }}
             >
               Re-issue code
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!pendingDelete} onOpenChange={(o) => !o && setPendingDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Permanently remove this terminal entry?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDelete?.deviceName} at {pendingDelete?.locationName || "this location"} is
+              revoked, so nothing is cut off by deleting it. The row disappears from this list for
+              good — issue a new terminal if the counter comes back.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                const token = pendingDelete;
+                setPendingDelete(null);
+                if (token) void remove(token);
+              }}
+            >
+              Delete entry
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
