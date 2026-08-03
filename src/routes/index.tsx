@@ -31,6 +31,7 @@ import {
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
 import { CatalogPanel } from "@/components/pos/CatalogPanel";
+import { setTicketDirty } from "@/lib/desktop-window";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -230,6 +231,11 @@ function Register() {
   // Keep the qualifying FOC freebie in sync with the open ticket.
   const focId = promo.foc ? `${promo.foc.promo.id}:${promo.foc.product.id}:${promo.foc.qty}` : "";
   const hasFoc = lines.some((l) => l.foc);
+  // The desktop close button warns when a ticket is still open.
+  useEffect(() => {
+    setTicketDirty(lines.length > 0);
+    return () => setTicketDirty(false);
+  }, [lines.length]);
   useEffect(() => {
     if (focId && !hasFoc) {
       const [, productId, qty] = focId.split(":");
