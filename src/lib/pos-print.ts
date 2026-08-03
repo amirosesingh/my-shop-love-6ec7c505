@@ -18,7 +18,13 @@ import { bookingBalance, lineUnitDiscount, whatsappLink } from "./pos-types";
 import { defaultReceiptSettings } from "./pos-seed";
 import qrcode from "qrcode-generator";
 import { toast } from "sonner";
-import { drawerPulseBytes, rawPulse, silentPrint } from "./receipt-printer";
+import {
+  drawerPulseBytes,
+  getPrinterPrefs,
+  rawPulse,
+  silentPrint,
+} from "./receipt-printer";
+import { htmlToEscPos } from "./escpos";
 
 export const STORE = {
   name: "NORTHWIND & CO.",
