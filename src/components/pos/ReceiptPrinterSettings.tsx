@@ -14,11 +14,17 @@ import {
   type PrinterPrefs,
 } from "@/lib/receipt-printer";
 import { toast } from "sonner";
+import { printTestReceipt } from "@/lib/pos-print";
 
 /** Terminal-local receipt printer choice used for silent printing and the
  *  raw cash-drawer pulse. Only meaningful inside the Windows desktop shell. */
 export function ReceiptPrinterSettings() {
-  const [prefs, setPrefs] = useState<PrinterPrefs>({ deviceName: "", share: "", drawerPin: 2 });
+  const [prefs, setPrefs] = useState<PrinterPrefs>({
+    deviceName: "",
+    share: "",
+    drawerPin: 2,
+    printMode: "thermal",
+  });
   const [printers, setPrinters] = useState<{ name: string; displayName: string }[]>([]);
   const [testing, setTesting] = useState(false);
   const desktop = typeof window !== "undefined" && !!printBridge();
@@ -73,6 +79,25 @@ export function ReceiptPrinterSettings() {
       </div>
 
       <div className="mt-4 space-y-1">
+        <Label className="text-xs text-muted-foreground">Receipt print mode</Label>
+        <ThemedSelect
+          value={prefs.printMode ?? "thermal"}
+          onChange={(v: string) =>
+            update({ ...prefs, printMode: v === "graphics" ? "graphics" : "thermal" })
+          }
+          options={[
+            { value: "thermal", label: "Thermal text (recommended)" },
+            { value: "graphics", label: "Graphics / printer driver" },
+          ]}
+        />
+        <p className="text-[11px] text-muted-foreground">
+          Thermal text sends the slip straight to the printer as ESC/POS commands — fastest and
+          most reliable. Switch to graphics only if your printer needs the Windows driver (logos,
+          QR codes and barcodes only print in graphics mode).
+        </p>
+      </div>
+
+      <div className="mt-4 space-y-1">
         <Label className="text-xs text-muted-foreground">
           Drawer connector pin
         </Label>
@@ -122,6 +147,9 @@ export function ReceiptPrinterSettings() {
         </Button>
         <Button variant="outline" size="sm" disabled={testing} onClick={() => void testDrawer()}>
           <Printer className="size-3.5" /> {testing ? "Sending…" : "Test drawer kick"}
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => printTestReceipt()}>
+          <Printer className="size-3.5" /> Test receipt
         </Button>
       </div>
     </section>
