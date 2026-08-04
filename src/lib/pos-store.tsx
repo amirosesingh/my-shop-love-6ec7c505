@@ -738,26 +738,33 @@ export function PosProvider({ children }: { children: ReactNode }) {
 
   const upsertProduct = useCallback((product: Product) => {
     const prev = stateRef.current.products.find((p) => p.id === product.id);
+    // The catalog is shared by every branch: make sure the product exists at
+    // all stores (starting at zero) so it shows up everywhere after sync.
+    const stockByStore = { ...product.stockByStore };
+    for (const store of stateRef.current.stores) {
+      if (stockByStore[store.id] === undefined) stockByStore[store.id] = 0;
+    }
+    const record: Product = { ...product, stockByStore };
     logger.log("inventory_edit", prev ? "Product updated" : "Product created", "inventory", {
-      productId: product.id,
-      name: product.name,
-      barcode: product.barcode,
+      productId: record.id,
+      name: record.name,
+      barcode: record.barcode,
       previous: prev
         ? { name: prev.name, price: prev.price, cost: prev.cost, ecomPrice: prev.ecomPrice }
         : null,
       updated: {
-        name: product.name,
-        price: product.price,
-        cost: product.cost,
-        ecomPrice: product.ecomPrice,
+        name: record.name,
+        price: record.price,
+        cost: record.cost,
+        ecomPrice: record.ecomPrice,
       },
     });
-    void db.upsertProduct(product);
+    void db.upsertProduct(record);
     setState((s) => ({
       ...s,
-      products: s.products.some((p) => p.id === product.id)
-        ? s.products.map((p) => (p.id === product.id ? product : p))
-        : [product, ...s.products],
+      products: s.products.some((p) => p.id === record.id)
+        ? s.products.map((p) => (p.id === record.id ? record : p))
+        : [record, ...s.products],
     }));
   }, []);
 

@@ -109,6 +109,12 @@ const GROUPS = [
         icon: Clock,
         blurb: "Day start and end, shift length limit and close reminders.",
       },
+      {
+        to: "/settings/sku",
+        label: "SKU numbering",
+        icon: ScanBarcode,
+        blurb: "Automatic running-number product codes, or manual entry.",
+      },
     ],
   },
   {

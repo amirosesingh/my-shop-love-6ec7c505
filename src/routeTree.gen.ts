@@ -42,6 +42,7 @@ import { Route as SettingsLinesRouteImport } from './routes/settings.lines'
 import { Route as SettingsPaymentRouteImport } from './routes/settings.payment'
 import { Route as SettingsPrinterRouteImport } from './routes/settings.printer'
 import { Route as SettingsQrRouteImport } from './routes/settings.qr'
+import { Route as SettingsSkuRouteImport } from './routes/settings.sku'
 import { Route as SettingsSyncRouteImport } from './routes/settings.sync'
 import { Route as SettingsTaxRouteImport } from './routes/settings.tax'
 import { Route as SettingsTerminalsRouteImport } from './routes/settings.terminals'
@@ -214,6 +215,11 @@ const SettingsQrRoute = SettingsQrRouteImport.update({
   path: '/settings/qr',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsSkuRoute = SettingsSkuRouteImport.update({
+  id: '/settings/sku',
+  path: '/settings/sku',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsSyncRoute = SettingsSyncRouteImport.update({
   id: '/settings/sync',
   path: '/settings/sync',
@@ -277,6 +283,7 @@ export interface FileRoutesByFullPath {
   '/settings/payment': typeof SettingsPaymentRoute
   '/settings/printer': typeof SettingsPrinterRoute
   '/settings/qr': typeof SettingsQrRoute
+  '/settings/sku': typeof SettingsSkuRoute
   '/settings/sync': typeof SettingsSyncRoute
   '/settings/tax': typeof SettingsTaxRoute
   '/settings/terminals': typeof SettingsTerminalsRoute
@@ -318,6 +325,7 @@ export interface FileRoutesByTo {
   '/settings/payment': typeof SettingsPaymentRoute
   '/settings/printer': typeof SettingsPrinterRoute
   '/settings/qr': typeof SettingsQrRoute
+  '/settings/sku': typeof SettingsSkuRoute
   '/settings/sync': typeof SettingsSyncRoute
   '/settings/tax': typeof SettingsTaxRoute
   '/settings/terminals': typeof SettingsTerminalsRoute
@@ -360,6 +368,7 @@ export interface FileRoutesById {
   '/settings/payment': typeof SettingsPaymentRoute
   '/settings/printer': typeof SettingsPrinterRoute
   '/settings/qr': typeof SettingsQrRoute
+  '/settings/sku': typeof SettingsSkuRoute
   '/settings/sync': typeof SettingsSyncRoute
   '/settings/tax': typeof SettingsTaxRoute
   '/settings/terminals': typeof SettingsTerminalsRoute
@@ -403,6 +412,7 @@ export interface FileRouteTypes {
     | '/settings/payment'
     | '/settings/printer'
     | '/settings/qr'
+    | '/settings/sku'
     | '/settings/sync'
     | '/settings/tax'
     | '/settings/terminals'
@@ -444,6 +454,7 @@ export interface FileRouteTypes {
     | '/settings/payment'
     | '/settings/printer'
     | '/settings/qr'
+    | '/settings/sku'
     | '/settings/sync'
     | '/settings/tax'
     | '/settings/terminals'
@@ -485,6 +496,7 @@ export interface FileRouteTypes {
     | '/settings/payment'
     | '/settings/printer'
     | '/settings/qr'
+    | '/settings/sku'
     | '/settings/sync'
     | '/settings/tax'
     | '/settings/terminals'
@@ -527,6 +539,7 @@ export interface RootRouteChildren {
   SettingsPaymentRoute: typeof SettingsPaymentRoute
   SettingsPrinterRoute: typeof SettingsPrinterRoute
   SettingsQrRoute: typeof SettingsQrRoute
+  SettingsSkuRoute: typeof SettingsSkuRoute
   SettingsSyncRoute: typeof SettingsSyncRoute
   SettingsTaxRoute: typeof SettingsTaxRoute
   SettingsTerminalsRoute: typeof SettingsTerminalsRoute
@@ -770,6 +783,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsQrRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/sku': {
+      id: '/settings/sku'
+      path: '/settings/sku'
+      fullPath: '/settings/sku'
+      preLoaderRoute: typeof SettingsSkuRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/sync': {
       id: '/settings/sync'
       path: '/settings/sync'
@@ -847,6 +867,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsPaymentRoute: SettingsPaymentRoute,
   SettingsPrinterRoute: SettingsPrinterRoute,
   SettingsQrRoute: SettingsQrRoute,
+  SettingsSkuRoute: SettingsSkuRoute,
   SettingsSyncRoute: SettingsSyncRoute,
   SettingsTaxRoute: SettingsTaxRoute,
   SettingsTerminalsRoute: SettingsTerminalsRoute,
