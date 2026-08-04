@@ -987,15 +987,31 @@ function Register() {
               <Button size="sm" className="lg:hidden" onClick={() => setCatalogOpen(true)}>
                 <Search className="size-4" /> Add product
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                  if (await requirePermission("can_process_exchange")) setExchangeOpen(true);
-                }}
-              >
-                <Repeat className="size-4" /> Exchange
-              </Button>
+              {visible("register.exchange") && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    if (await requirePermission("can_process_exchange")) setExchangeOpen(true);
+                  }}
+                >
+                  <Repeat className="size-4" /> Exchange
+                </Button>
+              )}
+              {activeShift && visible("register.closeShift") && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    if (!(await requirePermission("can_close_shift"))) return;
+                    setCountedCash("");
+                    setCloseNote("");
+                    setCloseShiftOpen(true);
+                  }}
+                >
+                  <Lock className="size-4" /> Close shift
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="sm"
