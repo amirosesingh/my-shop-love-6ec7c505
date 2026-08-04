@@ -26,6 +26,7 @@ export function ReceiptPrinterSettings() {
     printMode: "dialog",
     encoding: "cp437",
     lineEnding: "lf",
+    margins: { top: 4, right: 4, bottom: 4, left: 4 },
   });
   const [printers, setPrinters] = useState<{ name: string; displayName: string }[]>([]);
   const [testing, setTesting] = useState(false);
@@ -39,6 +40,15 @@ export function ReceiptPrinterSettings() {
   const update = (next: PrinterPrefs) => {
     setPrefs(next);
     setPrinterPrefs(next);
+  };
+
+  const margins = prefs.margins ?? { top: 4, right: 4, bottom: 4, left: 4 };
+  const setMargin = (side: keyof typeof margins, raw: string) => {
+    const n = Number(raw);
+    update({
+      ...prefs,
+      margins: { ...margins, [side]: Number.isFinite(n) ? Math.min(30, Math.max(0, n)) : 0 },
+    });
   };
 
   const testDrawer = async () => {
@@ -143,6 +153,34 @@ export function ReceiptPrinterSettings() {
 
       <div className="mt-4 space-y-1">
         <Label className="text-xs text-muted-foreground">Drawer connector pin</Label>
+      </div>
+
+      <div className="mt-4 space-y-2">
+        <Label className="text-xs text-muted-foreground">Print margins (mm)</Label>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {(["top", "right", "bottom", "left"] as const).map((side) => (
+            <div key={side} className="space-y-1">
+              <Label className="text-[11px] capitalize text-muted-foreground">{side}</Label>
+              <Input
+                type="number"
+                min={0}
+                max={30}
+                step={0.5}
+                value={margins[side]}
+                onChange={(e) => setMargin(side, e.target.value)}
+                className="h-9 text-sm"
+              />
+            </div>
+          ))}
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          Applies to every printed document — receipts, reports and slips — on all paper sizes.
+          Increase the right margin if words are cut off at the edge, then use “Test receipt” to
+          check the alignment.
+        </p>
+      </div>
+
+      <div className="mt-4 space-y-1">
         <ThemedSelect
           value={String(prefs.drawerPin ?? 2)}
           onChange={(v: string) => update({ ...prefs, drawerPin: v === "5" ? 5 : 2 })}
