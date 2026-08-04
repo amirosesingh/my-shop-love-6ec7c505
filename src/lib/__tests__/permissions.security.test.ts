@@ -74,6 +74,12 @@ describe("permission presets", () => {
     }
   });
 
+  it("limited roles cannot bypass the shift lock", () => {
+    expect(CASHIER_PERMISSIONS["can_bypass_shift_lock"]).toBe(false);
+    expect(WAREHOUSE_PERMISSIONS["can_bypass_shift_lock"]).toBe(false);
+    expect(FULL_PERMISSIONS["can_bypass_shift_lock"]).toBe(true);
+  });
+
   it("never grants warehouse users money or staff control", () => {
     for (const key of [
       "can_view_sales_reports",
