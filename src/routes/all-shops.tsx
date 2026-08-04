@@ -71,6 +71,28 @@ function AllShops() {
     };
   });
 
+  /** Group-wide live performance — administrators only. */
+  const live = useMemo(() => {
+    const todays = state.sales.filter((s) => isToday(s.createdAt));
+    const revenue = todays.reduce((a, s) => a + s.total, 0);
+    const cost = todays.reduce(
+      (a, s) =>
+        a +
+        s.lines.reduce((la, l) => {
+          const p = state.products.find((x) => x.id === l.productId);
+          return la + (p?.cost ?? 0) * l.qty;
+        }, 0),
+      0,
+    );
+    return {
+      revenue,
+      profit: revenue - cost,
+      bills: todays.length,
+      basket: todays.length ? revenue / todays.length : 0,
+      feed: [...todays].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 12),
+    };
+  }, [state.sales, state.products]);
+
   const rows = state.products.filter((p) => {
     if (category !== "all" && p.category !== category) return false;
     if (
