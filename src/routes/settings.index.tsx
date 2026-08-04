@@ -39,6 +39,12 @@ const PAGES = [
     blurb: "Global tax rate and inclusive or exclusive pricing.",
   },
   {
+    to: "/settings/hours",
+    label: "Trading hours & shifts",
+    icon: Clock,
+    blurb: "Day start and end, shift length limit and close reminders.",
+  },
+  {
     to: "/settings/identity",
     label: "Business identity",
     icon: Building2,
