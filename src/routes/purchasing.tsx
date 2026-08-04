@@ -380,11 +380,28 @@ function Purchasing() {
             </div>
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Supplier name *</Label>
+              <div className="flex gap-2">
+                <select
+                  value={suppliers.some((s) => s.name === supplier) ? supplier : ""}
+                  onChange={(e) => setSupplier(e.target.value)}
+                  aria-label="Supplier"
+                  className="h-11 min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-sm"
+                >
+                  <option value="">Pick a supplier…</option>
+                  {suppliers
+                    .filter((s) => s.active)
+                    .map((s) => (
+                      <option key={s.id} value={s.name}>
+                        {s.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
               <Input
                 value={supplier}
                 onChange={(e) => setSupplier(e.target.value)}
-                placeholder="e.g. Harbour Foods Ltd"
-                className="h-11"
+                placeholder="or type a supplier name"
+                className="h-9"
               />
             </div>
             <div className="space-y-1">
@@ -415,6 +432,31 @@ function Purchasing() {
                 <ScanBarcode className="size-4" /> Add to invoice
               </Button>
             </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed border-border p-3">
+            <FileSpreadsheet className="size-4 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">
+              Received a supplier spreadsheet? Import the purchased products straight into this
+              invoice.
+            </span>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void importWorkbook(file);
+                e.target.value = "";
+              }}
+            />
+            <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+              <FileSpreadsheet className="size-4" /> Import Excel / CSV
+            </Button>
+            <Button variant="ghost" size="sm" onClick={downloadTemplate}>
+              <Download className="size-4" /> Template
+            </Button>
           </div>
 
           <Table>
