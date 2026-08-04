@@ -27,6 +27,8 @@ export type Campaign = {
   scopeValue?: string | null;
   /** null / undefined means unlimited */
   maxClaims?: number | null;
+  /** how many vouchers one member may hold for this campaign; null = unlimited */
+  maxPerMember?: number | null;
   claimsCount: number;
   startsAt?: string | null;
   expiresAt?: string | null;
@@ -45,6 +47,30 @@ export type Voucher = {
   redeemedAt?: string | null;
   redeemedBy?: string | null;
   storeId?: string | null;
+  /** voucher-level expiry, overrides the campaign window when set */
+  expiresAt?: string | null;
+  issuedBy?: string | null;
+  issuedSource?: "PUBLIC" | "MANUAL" | string | null;
+  redeemedSaleId?: string | null;
+};
+
+export type CouponEventType = "CLAIMED" | "ISSUED_MANUAL" | "REDEEMED" | "BLOCKED";
+
+export type CouponEvent = {
+  id: string;
+  type: CouponEventType;
+  campaignId: string | null;
+  campaignName: string;
+  token: string | null;
+  memberId: string | null;
+  memberPhone: string | null;
+  storeId: string | null;
+  terminalId: string | null;
+  staffName: string | null;
+  staffRole: string | null;
+  saleId: string | null;
+  note: string | null;
+  createdAt: string;
 };
 
 type Row = Record<string, any>;
@@ -58,6 +84,7 @@ const toCampaign = (r: Row): Campaign => ({
   scope: (r.scope as CampaignScope) ?? "BILL",
   scopeValue: r.scope_value ?? null,
   maxClaims: r.max_claims ?? null,
+  maxPerMember: r.max_per_member ?? null,
   claimsCount: Number(r.claims_count ?? 0),
   startsAt: r.starts_at ?? null,
   expiresAt: r.expires_at ?? null,
@@ -75,6 +102,7 @@ const toRow = (c: Campaign): Row => ({
   scope: c.scope,
   scope_value: c.scopeValue || null,
   max_claims: c.maxClaims ?? null,
+  max_per_member: c.maxPerMember ?? null,
   starts_at: c.startsAt || null,
   expires_at: c.expiresAt || null,
   is_active: c.isActive,
@@ -91,6 +119,27 @@ const toVoucher = (r: Row): Voucher => ({
   redeemedAt: r.redeemed_at ?? null,
   redeemedBy: r.redeemed_by ?? null,
   storeId: r.store_id ?? null,
+  expiresAt: r.expires_at ?? null,
+  issuedBy: r.issued_by ?? null,
+  issuedSource: r.issued_source ?? null,
+  redeemedSaleId: r.redeemed_sale_id ?? null,
+});
+
+const toEvent = (r: Row): CouponEvent => ({
+  id: r.id,
+  type: (r.event_type as CouponEventType) ?? "CLAIMED",
+  campaignId: r.campaign_id ?? null,
+  campaignName: r.campaign_name ?? "",
+  token: r.voucher_token ?? null,
+  memberId: r.member_id ?? null,
+  memberPhone: r.member_phone ?? null,
+  storeId: r.store_id ?? null,
+  terminalId: r.terminal_id ?? null,
+  staffName: r.staff_name ?? null,
+  staffRole: r.staff_role ?? null,
+  saleId: r.sale_id ?? null,
+  note: r.note ?? null,
+  createdAt: r.created_at,
 });
 
 export const blankCampaign = (): Campaign => ({
@@ -102,6 +151,7 @@ export const blankCampaign = (): Campaign => ({
   scope: "BILL",
   scopeValue: null,
   maxClaims: null,
+  maxPerMember: 1,
   claimsCount: 0,
   startsAt: null,
   expiresAt: null,
