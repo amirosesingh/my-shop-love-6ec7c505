@@ -13,7 +13,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { issueVoucherManually, type Campaign } from "@/lib/coupons";
 import { voucherUrl } from "@/lib/coupon-hosts";
 
