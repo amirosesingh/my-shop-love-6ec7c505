@@ -4,12 +4,14 @@
 
 Opening and closing a shift already writes to the backend `shifts` table (opened at, closed at, opening float, counted cash, who opened / closed). What is only stored on this PC today is **who signed in during the shift** — that log lives in local storage and disappears when the cache is cleared.
 
-New `shift_sessions` table so every sign-in and sign-out is recorded centrally:
+Who opened and who closed the shift is stored on the shift row itself: name, staff id and role for both the opener and the closer, alongside the exact opened-at and closed-at timestamps. Those columns exist on the `shifts` table already; the plan makes sure they are always written (including offline closes) and shown on the Shifts page and printed on the Z-report.
+
+New `shift_sessions` table so every sign-in and sign-out during the shift is also recorded centrally:
 
 - Shift, store, terminal, staff id, staff name, role, signed in at, signed out at.
 - A row is written the moment a cashier signs in while a shift is open, and stamped with the sign-out time when they lock or sign out (or when the shift closes).
 - Works offline: the write goes through the existing outbox and syncs when the connection returns.
-- The Shifts page shows, per shift, the exact open time, close time, duration, and the list of people who signed in with their times.
+- The Shifts page shows, per shift, the exact open time and by whom, the close time and by whom, the duration, and the list of everyone who signed in with their times.
 
 Also shipped: `supabase/schema16.sql` — a standalone script containing the `shifts` and `shift_sessions` tables (plus grants, access rules and the updated-at trigger) so a self-hosted or fresh install can create the shift tables in one run. The matching tables are added to the local Windows SQL Server script (`electron/db/schema.sql`) too.
 
