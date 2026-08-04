@@ -95,6 +95,8 @@ function Purchasing() {
   const [draft, setDraft] = useState<Product | null>(null);
   const [draftQty, setDraftQty] = useState("1");
   const scanRef = useRef<HTMLInputElement>(null);
+  const [suppliers, setSuppliers] = useState<Supplier[]>(cachedSuppliers());
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const totals = useMemo(
     () => ({
@@ -106,6 +108,10 @@ function Purchasing() {
 
   useEffect(() => {
     scanRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    void loadSuppliers().then(setSuppliers);
   }, []);
 
   if (!can("can_receive_purchase_order")) {
