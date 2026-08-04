@@ -195,6 +195,17 @@ export type Shift = {
   note: string;
 };
 
+/** Trading-day window used to flag shifts left open and drive reminders. */
+export type TradingHours = {
+  /** "HH:MM" — blank means the store trades around the clock. */
+  dayStart: string;
+  dayEnd: string;
+  /** hard ceiling for a single shift, in hours */
+  maxShiftHours: number;
+  /** minutes before day end that the "close the shift" reminder appears */
+  reminderMinutes: number;
+};
+
 export type TransferKind = "transfer" | "request";
 export type TransferStatus = "requested" | "in_transit" | "received" | "rejected" | "cancelled";
 
@@ -462,6 +473,7 @@ export type AppSettings = {
   payment: PaymentDetails;
   whatsapp: WhatsAppSettings;
   review: ReviewThresholds;
+  hours: TradingHours;
 };
 
 /** Daily limits that flag a cashier for review on the dashboard. */
