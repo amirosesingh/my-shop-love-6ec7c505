@@ -394,7 +394,7 @@ function Shifts() {
                   </TableCell>
                   <TableCell className="numeric text-right">{money(sh.openingFloat)}</TableCell>
                   <TableCell className="numeric text-right">
-                    {sh.closingFloat ?? sh.countedCash) === null
+                    {(sh.closingFloat ?? sh.countedCash) == null
                       ? "—"
                       : money((sh.closingFloat ?? sh.countedCash) as number)}
                   </TableCell>
