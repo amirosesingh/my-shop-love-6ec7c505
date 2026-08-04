@@ -151,10 +151,6 @@ export function ReceiptPrinterSettings() {
         </div>
       </div>
 
-      <div className="mt-4 space-y-1">
-        <Label className="text-xs text-muted-foreground">Drawer connector pin</Label>
-      </div>
-
       <div className="mt-4 space-y-2">
         <Label className="text-xs text-muted-foreground">Print margins (mm)</Label>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
