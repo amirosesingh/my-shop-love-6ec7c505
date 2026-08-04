@@ -501,7 +501,16 @@ export function printSaleReceipt(
   member: Member | null,
   kind: ReceiptKind = "sale",
 ) {
-  printHtml(`${sale.receiptNo} ${kind}`, saleBody(sale, member, kind));
+  printHtml(
+    `${sale.receiptNo} ${kind}`,
+    saleBody(sale, member, kind),
+    true,
+    receiptCfg.showBarcode && kind !== "kitchen"
+      ? kind === "gift"
+        ? `GIFT-${sale.receiptNo}`
+        : sale.receiptNo
+      : undefined,
+  );
 }
 
 export function printShiftReport(shift: Shift, sales: Sale[], kind: "xreport" | "zreport") {
@@ -617,7 +626,12 @@ export function printBookingSlip(
   member: Member | null,
   pay: PaymentDetails | null,
 ) {
-  printHtml(`${booking.ref} booking`, bookingBody(booking, member, pay));
+  printHtml(
+    `${booking.ref} booking`,
+    bookingBody(booking, member, pay),
+    true,
+    receiptCfg.showBarcode ? booking.ref : undefined,
+  );
 }
 
 export function printBookingPayment(booking: Booking, payment: BookingPayment) {
