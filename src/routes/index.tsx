@@ -195,6 +195,9 @@ function Register() {
   } | null>(null);
   /** Digital voucher token locked at the end of the sale, when one is on the bill. */
   const [voucherToken, setVoucherToken] = useState<string | null>(null);
+  /** Live vouchers held by the attached member, for the picker. */
+  const [memberVouchers, setMemberVouchers] = useState<VoucherView[]>([]);
+  const [voucherPickerOpen, setVoucherPickerOpen] = useState(false);
   const [splitOpen, setSplitOpen] = useState(false);
   const [splitWays, setSplitWays] = useState(2);
   /* Split tenders + card machine capture */
