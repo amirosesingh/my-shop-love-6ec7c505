@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import {
   Building2,
   Landmark,
+  Clock,
   ListPlus,
   MessageCircle,
   MonitorCog,
@@ -37,6 +38,12 @@ const PAGES = [
     label: "Tax & pricing",
     icon: ReceiptText,
     blurb: "Global tax rate and inclusive or exclusive pricing.",
+  },
+  {
+    to: "/settings/hours",
+    label: "Trading hours & shifts",
+    icon: Clock,
+    blurb: "Day start and end, shift length limit and close reminders.",
   },
   {
     to: "/settings/identity",

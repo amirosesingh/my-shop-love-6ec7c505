@@ -12,6 +12,7 @@ import type {
   Product,
   Promotion,
   Sale,
+  Shift,
   Store,
   PaperSize,
   PaymentMethod,
@@ -23,7 +24,7 @@ import type {
 export type CloudSlice = Pick<
   PosState,
   "products" | "members" | "sales" | "promotions" | "settings"
-> & { stores: Store[] };
+> & { stores: Store[]; shifts: Shift[] };
 
 type Row = Record<string, any>;
 
@@ -198,6 +199,15 @@ const rowToSettings = (r: Row | null): AppSettings =>
             defaultSettings.review.maxDiscountPct,
           ),
         },
+        hours: {
+          dayStart: r.day_start_time ?? defaultSettings.hours.dayStart,
+          dayEnd: r.day_end_time ?? defaultSettings.hours.dayEnd,
+          maxShiftHours: num(r.max_shift_hours, defaultSettings.hours.maxShiftHours),
+          reminderMinutes: num(
+            r.shift_reminder_minutes,
+            defaultSettings.hours.reminderMinutes,
+          ),
+        },
       }
     : defaultSettings;
 
@@ -228,6 +238,51 @@ const settingsToRow = (s: AppSettings): Row => ({
   review_max_refund_value: s.review.maxRefundValue,
   review_max_nosale: s.review.maxNoSaleOpens,
   review_max_discount_pct: s.review.maxDiscountPct,
+  day_start_time: s.hours.dayStart,
+  day_end_time: s.hours.dayEnd,
+  max_shift_hours: s.hours.maxShiftHours,
+  shift_reminder_minutes: s.hours.reminderMinutes,
+  updated_at: new Date().toISOString(),
+});
+
+const rowToShift = (r: Row): Shift => ({
+  id: r.id,
+  storeId: r.store_id ?? "",
+  cashier: r.opened_by_name ?? "",
+  openedAt: r.opened_at,
+  closedAt: r.closed_at ?? null,
+  openingFloat: Number(r.opening_float ?? 0),
+  countedCash: r.counted_cash == null ? null : Number(r.counted_cash),
+  note: r.note ?? "",
+  terminalId: r.terminal_id ?? undefined,
+  terminalName: r.terminal_name ?? undefined,
+  openedByStaffId: r.opened_by_staff_id ?? undefined,
+  openedByRole: r.opened_by_role ?? undefined,
+  closedBy: r.closed_by_name ?? undefined,
+  closedByStaffId: r.closed_by_staff_id ?? undefined,
+  closedByRole: r.closed_by_role ?? undefined,
+  expectedCash: r.expected_cash == null ? null : Number(r.expected_cash),
+  overdue: Boolean(r.overdue),
+});
+
+const shiftToRow = (s: Shift): Row => ({
+  id: s.id,
+  store_id: s.storeId,
+  terminal_id: s.terminalId ?? null,
+  terminal_name: s.terminalName ?? null,
+  opened_by_name: s.cashier,
+  opened_by_staff_id: s.openedByStaffId ?? null,
+  opened_by_role: s.openedByRole ?? null,
+  closed_by_name: s.closedBy ?? null,
+  closed_by_staff_id: s.closedByStaffId ?? null,
+  closed_by_role: s.closedByRole ?? null,
+  opened_at: s.openedAt,
+  closed_at: s.closedAt,
+  opening_float: s.openingFloat,
+  counted_cash: s.countedCash,
+  expected_cash: s.expectedCash ?? null,
+  note: s.note,
+  overdue: s.overdue ?? false,
   updated_at: new Date().toISOString(),
 });
 
@@ -367,7 +422,7 @@ export async function loadCloudState(): Promise<CloudSlice> {
   if (first.error) throw first.error;
   if (!first.data?.length) await seedCloud();
 
-  const [products, members, sales, promotions, settings, stores] = await Promise.all([
+  const [products, members, sales, promotions, settings, stores, shifts] = await Promise.all([
     supabase.from("products").select("*").order("name"),
     supabase.from("members").select("*").order("created_at"),
     supabase
@@ -388,6 +443,18 @@ export async function loadCloudState(): Promise<CloudSlice> {
         return { data: null };
       }
     })(),
+    (async (): Promise<{ data: Row[] | null }> => {
+      try {
+        const res = await supabase
+          .from("shifts" as never)
+          .select("*")
+          .order("opened_at", { ascending: false })
+          .limit(300);
+        return { data: (res.data as Row[] | null) ?? null };
+      } catch {
+        return { data: null };
+      }
+    })(),
   ]);
 
   const err = products.error || members.error || sales.error || promotions.error || settings.error;
@@ -400,6 +467,7 @@ export async function loadCloudState(): Promise<CloudSlice> {
     promotions: (promotions.data ?? []).map(rowToPromotion),
     settings: rowToSettings(settings.data as Row | null),
     stores: ((stores.data as Row[] | null) ?? []).map(rowToStore),
+    shifts: ((shifts.data as Row[] | null) ?? []).map(rowToShift),
   };
 }
 
@@ -453,6 +521,9 @@ export const db = {
     queue("Saving promotion", { kind: "upsert", table: "promotions", rows: [promotionToRow(p)] }),
   deletePromotion: (id: string) =>
     queue("Deleting promotion", { kind: "delete", table: "promotions", match: { id } }),
+
+  upsertShift: (s: Shift) =>
+    queue("Saving shift", { kind: "upsert", table: "shifts", rows: [shiftToRow(s)] }),
 
   saveSettings: (s: AppSettings) =>
     queue("Saving settings", {

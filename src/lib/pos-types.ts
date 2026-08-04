@@ -193,6 +193,28 @@ export type Shift = {
   openingFloat: number;
   countedCash: number | null;
   note: string;
+  /** terminal the shift was opened on — only that PC (or a manager) may close it */
+  terminalId?: string;
+  terminalName?: string;
+  openedByStaffId?: string;
+  openedByRole?: string;
+  closedBy?: string;
+  closedByStaffId?: string;
+  closedByRole?: string;
+  expectedCash?: number | null;
+  /** set when the shift ran past the trading-day window */
+  overdue?: boolean;
+};
+
+/** Trading-day window used to flag shifts left open and drive reminders. */
+export type TradingHours = {
+  /** "HH:MM" — blank means the store trades around the clock. */
+  dayStart: string;
+  dayEnd: string;
+  /** hard ceiling for a single shift, in hours */
+  maxShiftHours: number;
+  /** minutes before day end that the "close the shift" reminder appears */
+  reminderMinutes: number;
 };
 
 export type TransferKind = "transfer" | "request";
@@ -462,6 +484,7 @@ export type AppSettings = {
   payment: PaymentDetails;
   whatsapp: WhatsAppSettings;
   review: ReviewThresholds;
+  hours: TradingHours;
 };
 
 /** Daily limits that flag a cashier for review on the dashboard. */

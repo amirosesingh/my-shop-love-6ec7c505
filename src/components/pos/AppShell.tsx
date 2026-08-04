@@ -12,6 +12,7 @@ import { clearRevocation, useRevocationCheck } from "@/lib/use-revocation-check"
 import { SidebarNav, useSidebarCollapsed } from "@/components/pos/SidebarNav";
 import { SyncStatus } from "@/components/pos/SyncStatus";
 import { WindowControls } from "@/components/pos/WindowControls";
+import { ShiftReminder } from "@/components/pos/ShiftReminder";
 import { ThemeToggle } from "@/components/pos/ThemeToggle";
 import { startSyncEngine } from "@/lib/sync-engine";
 import type { NavItem } from "@/components/pos/nav-config";
@@ -353,6 +354,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Lock className="size-3.5" /> Lock / Switch user
           </Button>
         </header>
+
+        <ShiftReminder />
 
         <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
           {(() => {

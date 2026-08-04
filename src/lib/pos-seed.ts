@@ -6,6 +6,7 @@ import type {
   ReceiptSettings,
   ReviewThresholds,
   Store,
+  TradingHours,
   WhatsAppSettings,
 } from "./pos-types";
 import { defaultPaymentQr } from "./pos-types";
@@ -62,12 +63,21 @@ export const defaultReviewThresholds: ReviewThresholds = {
   maxDiscountPct: 15,
 };
 
+/** Default trading window: 9am to 10pm, 12h shift ceiling, 30min warning. */
+export const defaultTradingHours: TradingHours = {
+  dayStart: "09:00",
+  dayEnd: "22:00",
+  maxShiftHours: 12,
+  reminderMinutes: 30,
+};
+
 export const defaultSettings: AppSettings = {
   tax: { enabled: true, rate: 5, mode: "exclusive" },
   receipt: defaultReceiptSettings,
   payment: defaultPaymentDetails,
   whatsapp: defaultWhatsApp,
   review: defaultReviewThresholds,
+  hours: defaultTradingHours,
 };
 
 export const seedPromotions: Promotion[] = [

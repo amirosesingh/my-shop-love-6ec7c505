@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { X } from "lucide-react";
 
 import {
   readDisplaySnapshot,
@@ -35,6 +36,21 @@ const money = (n: number) => n.toLocaleString(undefined, { style: "currency", cu
 
 function CustomerDisplay() {
   const [snap, setSnap] = useState<DisplaySnapshot | null>(null);
+  const router = useRouter();
+
+  // The display is often launched from the sidebar in the same window, so it
+  // needs its own way back to the till.
+  const exit = () => {
+    if (typeof window !== "undefined" && window.opener) {
+      window.close();
+      return;
+    }
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.history.back();
+      return;
+    }
+    void router.navigate({ to: "/" });
+  };
 
   useEffect(() => {
     setSnap(readDisplaySnapshot());
@@ -63,6 +79,15 @@ function CustomerDisplay() {
             <p className="numeric text-xs text-muted-foreground">{snap.memberPoints ?? 0} points</p>
           </div>
         )}
+        <button
+          type="button"
+          onClick={exit}
+          aria-label="Close customer display"
+          className="ml-4 flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <X className="size-4" />
+          Back to till
+        </button>
       </header>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 p-8 lg:grid-cols-[1.4fr_1fr]">

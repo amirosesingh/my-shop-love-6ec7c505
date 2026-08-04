@@ -33,6 +33,8 @@ import { db, dbError, loadCloudState } from "./pos-db";
 import type { CloudSlice } from "./pos-db";
 import { readSnapshot, writeSnapshot } from "./offline-snapshot";
 import { useAuth } from "./pos-auth";
+import { readTerminalConfig } from "./terminal-tokens";
+import { isShiftOverdue, localTerminalId } from "./shift-hours";
 
 const KEY = "pos-state-v2";
 
@@ -148,6 +150,8 @@ function applyCloud(s: PosState, cloud: CloudSlice): PosState {
     products: cloud.products,
     members: cloud.members,
     sales: cloud.sales,
+    // Shifts are central now so every terminal agrees on what is open.
+    shifts: cloud.shifts.length ? cloud.shifts : s.shifts,
     promotions: cloud.promotions.length ? cloud.promotions : s.promotions,
     // Locations are central now; the local list is the fallback until
     // the directory has been populated (and gets pushed up below).
@@ -161,6 +165,7 @@ function applyCloud(s: PosState, cloud: CloudSlice): PosState {
       payment: { ...defaultSettings.payment, ...cloud.settings.payment },
       whatsapp: { ...defaultSettings.whatsapp, ...cloud.settings.whatsapp },
       review: { ...defaultSettings.review, ...cloud.settings.review },
+      hours: { ...defaultSettings.hours, ...cloud.settings.hours },
     },
     // Keep the bill counter ahead of every receipt already in the cloud.
     counter: cloud.sales.reduce(
@@ -173,7 +178,7 @@ function applyCloud(s: PosState, cloud: CloudSlice): PosState {
 export function PosProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<PosState>(seedState);
   const [ready, setReady] = useState(false);
-  const { authUserId, terminalUser, ready: authReady } = useAuth();
+  const { authUserId, terminalUser, user, isAdmin, isSupervisor, ready: authReady } = useAuth();
   // Nothing is fetched from the cloud until a cashier or supervisor session
   // exists — visitors never receive catalogue, member or sales data.
   const signedIn = Boolean(authUserId || terminalUser);
@@ -301,40 +306,53 @@ export function PosProvider({ children }: { children: ReactNode }) {
 
   const openShift = useCallback(
     (cashier: string, openingFloat: number) => {
+      const terminal = readTerminalConfig();
       logger.log("sale_event", "Shift opened", "shifts", {
         cashier,
         openingFloat,
         storeId: stateRef.current.currentStoreId,
+        terminal: terminal?.locationName ?? "This PC",
       });
-      setState((s) => ({
-        ...s,
-        shifts: [
-          {
-            id: crypto.randomUUID(),
-            storeId: s.currentStoreId,
-            cashier,
-            openedAt: new Date().toISOString(),
-            closedAt: null,
-            openingFloat,
-            countedCash: null,
-            note: "",
-          },
-          ...s.shifts,
-        ],
-      }));
+      const shift: Shift = {
+        id: crypto.randomUUID(),
+        storeId: stateRef.current.currentStoreId,
+        cashier,
+        openedAt: new Date().toISOString(),
+        closedAt: null,
+        openingFloat,
+        countedCash: null,
+        note: "",
+        terminalId: terminal?.tokenId ?? localTerminalId(),
+        terminalName: terminal?.locationName ?? "This PC",
+        openedByStaffId: user?.staffId ?? terminalUser?.userCode,
+        openedByRole: user?.role ?? terminalUser?.role,
+        overdue: false,
+      };
+      db.upsertShift(shift);
+      setState((s) => ({ ...s, shifts: [shift, ...s.shifts] }));
     },
-    [],
+    [user, terminalUser],
   );
 
   const closeShift = useCallback(
     (countedCash: number, note: string) => {
       if (!activeShift) return null;
+      // Only the PC that opened the shift may close it — unless a manager or
+      // admin is signed in, who can close from anywhere.
+      const here = readTerminalConfig()?.tokenId ?? localTerminalId();
+      const sameTerminal = !activeShift.terminalId || activeShift.terminalId === here;
+      if (!sameTerminal && !isAdmin && !isSupervisor) return null;
       const closed: Shift = {
         ...activeShift,
         closedAt: new Date().toISOString(),
         countedCash,
         note,
+        closedBy: user?.name ?? terminalUser?.name ?? activeShift.cashier,
+        closedByStaffId: user?.staffId ?? terminalUser?.userCode,
+        closedByRole: user?.role ?? terminalUser?.role,
+        overdue: isShiftOverdue(activeShift, stateRef.current.settings.hours),
       };
+      db.upsertShift(closed);
       setState((s) => ({
         ...s,
         shifts: s.shifts.map((x) => (x.id === closed.id ? closed : x)),
@@ -345,10 +363,12 @@ export function PosProvider({ children }: { children: ReactNode }) {
         openingFloat: closed.openingFloat,
         countedCash: countedCash,
         note,
+        closedBy: closed.closedBy,
+        overdue: closed.overdue,
       });
       return closed;
     },
-    [activeShift],
+    [activeShift, user, terminalUser, isAdmin, isSupervisor],
   );
 
   const recordSale = useCallback((input: Omit<Sale, "id" | "receiptNo" | "createdAt">) => {
@@ -801,6 +821,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
         payment: { ...prev.payment, ...(patch.payment ?? {}) },
         whatsapp: { ...prev.whatsapp, ...(patch.whatsapp ?? {}) },
         review: { ...prev.review, ...(patch.review ?? {}) },
+        hours: { ...prev.hours, ...(patch.hours ?? {}) },
       });
     }
     setState((s) => ({
@@ -811,6 +832,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
         payment: { ...s.settings.payment, ...(patch.payment ?? {}) },
         whatsapp: { ...s.settings.whatsapp, ...(patch.whatsapp ?? {}) },
         review: { ...s.settings.review, ...(patch.review ?? {}) },
+        hours: { ...s.settings.hours, ...(patch.hours ?? {}) },
       },
     }));
   }, []);

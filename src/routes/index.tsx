@@ -931,6 +931,7 @@ function Register() {
             onDetail={setDetailId}
             onOpenCustomerDisplay={openCustomerDisplay}
             onOpenShift={() => setOpenShiftOpen(true)}
+            showSearch={false}
           />
         </section>
 
