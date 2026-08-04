@@ -233,7 +233,17 @@ function AllShops() {
             </TableBody>
           </Table>
         </div>
-        <TablePagination pager={pager} />
+        <TablePagination
+          page={pager.page}
+          pageCount={pager.pageCount}
+          pageSize={pager.pageSize}
+          total={pager.total}
+          from={pager.from}
+          to={pager.to}
+          label="products"
+          onPage={pager.setPage}
+          onPageSize={pager.setPageSize}
+        />
       </div>
     </AppShell>
   );
