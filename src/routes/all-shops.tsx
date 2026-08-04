@@ -1,0 +1,240 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
+import { Download, Search } from "lucide-react";
+import { AppShell } from "@/components/pos/AppShell";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { TablePagination, usePagination } from "@/components/pos/TablePagination";
+import { money, stockAt, usePos } from "@/lib/pos-store";
+import { useAuth } from "@/lib/pos-auth";
+
+export const Route = createFileRoute("/all-shops")({
+  head: () => ({
+    meta: [
+      { title: "All Shops — Northwind POS" },
+      {
+        name: "description",
+        content:
+          "Live takings and shift status for every branch, plus one stock table showing each product's inventory across all shops.",
+      },
+      { property: "og:title", content: "All Shops — Northwind POS" },
+      {
+        property: "og:description",
+        content: "Group-wide sales and inventory in a single panel.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
+  component: AllShops,
+});
+
+const isToday = (iso: string) => new Date(iso).toDateString() === new Date().toDateString();
+
+function AllShops() {
+  const { state, stores } = usePos();
+  const { can, isAdmin } = useAuth();
+  const allowed = isAdmin || can("can_view_inventory");
+  const showMoney = isAdmin || can("can_view_sales_reports");
+  const [query, setQuery] = useState("");
+  const [lowOnly, setLowOnly] = useState(false);
+  const [category, setCategory] = useState("all");
+
+  const categories = useMemo(
+    () => ["all", ...Array.from(new Set(state.products.map((p) => p.category))).sort()],
+    [state.products],
+  );
+
+  const perStore = stores.map((store) => {
+    const sales = state.sales.filter((s) => s.storeId === store.id && isToday(s.createdAt));
+    const shift = state.shifts.find(
+      (s) => s.storeId === store.id && s.status !== "CLOSED" && !s.closedAt,
+    );
+    const stockValue = state.products.reduce((a, p) => a + p.cost * stockAt(p, store.id), 0);
+    const low = state.products.filter((p) => stockAt(p, store.id) <= p.reorderLevel).length;
+    return {
+      store,
+      revenue: sales.reduce((a, s) => a + s.total, 0),
+      count: sales.length,
+      shift,
+      stockValue,
+      low,
+    };
+  });
+
+  const rows = state.products.filter((p) => {
+    if (category !== "all" && p.category !== category) return false;
+    if (
+      query &&
+      !`${p.name} ${p.sku} ${p.barcode} ${p.category}`.toLowerCase().includes(query.toLowerCase())
+    )
+      return false;
+    if (lowOnly && !stores.some((s) => stockAt(p, s.id) <= p.reorderLevel)) return false;
+    return true;
+  });
+  const pager = usePagination(rows, 25);
+
+  function exportCsv() {
+    const header = ["Product", "SKU", "Category", ...stores.map((s) => s.code), "Total"];
+    const lines = rows.map((p) => {
+      const per = stores.map((s) => stockAt(p, s.id));
+      return [
+        `"${p.name.replace(/"/g, '""')}"`,
+        p.sku,
+        p.category,
+        ...per,
+        per.reduce((a, b) => a + b, 0),
+      ].join(",");
+    });
+    const blob = new Blob([[header.join(","), ...lines].join("\n")], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `all-shops-stock-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  if (!allowed)
+    return (
+      <AppShell>
+        <div className="p-6 text-sm text-muted-foreground">
+          You do not have permission to view group inventory.
+        </div>
+      </AppShell>
+    );
+
+  return (
+    <AppShell>
+      <div className="space-y-5 p-6">
+        <header>
+          <h1 className="text-2xl font-semibold">All shops</h1>
+          <p className="text-sm text-muted-foreground">
+            Today&apos;s trading and live stock for every branch. Product details are shared across
+            shops; stock counts stay per branch.
+          </p>
+        </header>
+
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {perStore.map((s) => (
+            <div key={s.store.id} className="rounded-lg border border-border bg-card p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{s.store.name}</p>
+                  <p className="text-xs text-muted-foreground">{s.store.code}</p>
+                </div>
+                <Badge variant={s.shift ? "secondary" : "destructive"}>
+                  {s.shift ? "Shift open" : "Closed"}
+                </Badge>
+              </div>
+              <p className="numeric mt-3 text-xl font-semibold">
+                {showMoney ? money(s.revenue) : "—"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {s.count} bill{s.count === 1 ? "" : "s"} today
+                {showMoney && <> · stock {money(s.stockValue)}</>}
+              </p>
+              <p className="mt-1 text-xs text-warning">{s.low} below reorder level</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search products"
+              className="w-56 pl-9"
+            />
+          </div>
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="h-9 rounded-md border border-border bg-background px-2 text-sm"
+            aria-label="Category"
+          >
+            {categories.map((c) => (
+              <option key={c} value={c}>
+                {c === "all" ? "All categories" : c}
+              </option>
+            ))}
+          </select>
+          <Button
+            variant={lowOnly ? "default" : "outline"}
+            size="sm"
+            onClick={() => setLowOnly((v) => !v)}
+          >
+            Below reorder level
+          </Button>
+          <Button variant="outline" size="sm" onClick={exportCsv}>
+            <Download className="size-4" /> Export CSV
+          </Button>
+        </div>
+
+        <div className="overflow-auto rounded-lg border border-border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Product</TableHead>
+                <TableHead>SKU</TableHead>
+                {stores.map((s) => (
+                  <TableHead key={s.id} className="text-right">
+                    {s.code}
+                  </TableHead>
+                ))}
+                <TableHead className="text-right">Total</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {pager.pageItems.map((p) => {
+                const per = stores.map((s) => ({ store: s, qty: stockAt(p, s.id) }));
+                return (
+                  <TableRow key={p.id}>
+                    <TableCell>
+                      <span className="block text-sm">{p.name}</span>
+                      <span className="block text-xs text-muted-foreground">{p.category}</span>
+                    </TableCell>
+                    <TableCell className="numeric text-xs text-muted-foreground">{p.sku}</TableCell>
+                    {per.map(({ store, qty }) => (
+                      <TableCell
+                        key={store.id}
+                        className={`numeric text-right ${qty <= p.reorderLevel ? "text-warning" : ""}`}
+                      >
+                        {qty}
+                      </TableCell>
+                    ))}
+                    <TableCell className="numeric text-right font-medium">
+                      {per.reduce((a, b) => a + b.qty, 0)}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+              {rows.length === 0 && (
+                <TableRow>
+                  <TableCell
+                    colSpan={stores.length + 3}
+                    className="py-8 text-center text-sm text-muted-foreground"
+                  >
+                    No products match this filter.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        <TablePagination pager={pager} />
+      </div>
+    </AppShell>
+  );
+}
