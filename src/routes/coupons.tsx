@@ -207,6 +207,14 @@ function CouponsPage() {
           </p>
         ) : null}
 
+        <Tabs defaultValue="campaigns">
+          <TabsList>
+            <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
+            <TabsTrigger value="performance">Performance</TabsTrigger>
+            <TabsTrigger value="audit">Audit log</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="campaigns" className="mt-4">
         <div className="rounded-xl border border-border bg-card">
           {loading ? (
             <div className="flex justify-center py-12">
@@ -277,6 +285,14 @@ function CouponsPage() {
                           <Button
                             size="icon"
                             variant="ghost"
+                            title="Issue a voucher to a member"
+                            onClick={() => setIssueFor(c)}
+                          >
+                            <Send className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
                             title="Edit campaign"
                             onClick={() => setDraft(c)}
                           >
@@ -299,7 +315,31 @@ function CouponsPage() {
             </Table>
           )}
         </div>
+          </TabsContent>
+
+          <TabsContent value="performance" className="mt-4">
+            <CouponAnalytics />
+          </TabsContent>
+
+          <TabsContent value="audit" className="mt-4">
+            <CouponAuditLog
+              events={events}
+              campaigns={campaigns}
+              stores={state.stores.map((s) => ({ id: s.id, name: s.name }))}
+            />
+          </TabsContent>
+        </Tabs>
       </div>
+
+      <IssueVoucherDialog
+        campaign={issueFor}
+        members={state.members.map((m) => ({ id: m.id, name: m.name, phone: m.phone }))}
+        staffName={user?.name}
+        staffRole={user?.role}
+        storeId={state.currentStoreId}
+        onClose={() => setIssueFor(null)}
+        onIssued={() => void refresh()}
+      />
 
       <Dialog open={Boolean(draft)} onOpenChange={(o) => !o && setDraft(null)}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
