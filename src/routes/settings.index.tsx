@@ -145,7 +145,15 @@ const GROUPS = [
   },
 ] as const;
 
-const PAGES = GROUPS.flatMap((g) => g.pages);
+type SettingsPage = {
+  to: string;
+  label: string;
+  icon: typeof MonitorCog;
+  blurb: string;
+  cloudOnly?: boolean;
+};
+
+const PAGES: SettingsPage[] = GROUPS.flatMap((g) => g.pages as readonly SettingsPage[]);
 
 const LEGACY: Record<string, string> = Object.fromEntries(
   PAGES.map((p) => [p.to.split("/").pop() as string, p.to]),
@@ -187,7 +195,10 @@ function SettingsHub() {
   const allowed = isAdmin || can("can_access_pos_settings");
   const [desktop, setDesktop] = useState(false);
   useEffect(() => setDesktop(isDesktop()), []);
-  const pages = PAGES.filter((p) => !("cloudOnly" in p && p.cloudOnly && desktop));
+  const groups = GROUPS.map((g) => ({
+    ...g,
+    pages: (g.pages as readonly SettingsPage[]).filter((p) => !(p.cloudOnly && desktop)),
+  })).filter((g) => g.pages.length > 0);
 
   return (
     <AppShell>
@@ -223,7 +234,7 @@ function SettingsHub() {
                   {g.pages.map((p) => (
                     <Link
                       key={p.to}
-                      to={p.to}
+                      to={p.to as never}
                       className="flex items-start gap-3 rounded-lg border border-border bg-card p-4 transition-colors hover:border-primary/60"
                     >
                       <p.icon className="mt-0.5 size-5 shrink-0 text-primary" />
