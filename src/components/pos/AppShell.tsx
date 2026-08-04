@@ -354,6 +354,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Button>
         </header>
 
+        <ShiftReminder />
+
         <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
           {(() => {
             // Decided before the page body renders: no flash of protected data.
