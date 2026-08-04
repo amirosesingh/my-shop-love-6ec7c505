@@ -64,6 +64,7 @@ import {
   redeemVoucher,
   voucherValue,
 } from "@/lib/coupons";
+import type { Campaign, VoucherView } from "@/lib/coupons";
 import type { CartLine, DiscountType, PaymentMethod, Sale } from "@/lib/pos-types";
 import type { Payment } from "@/lib/pos-types";
 import { TenderSplit, rememberBanks } from "@/components/pos/TenderSplit";
@@ -224,6 +225,21 @@ function Register() {
   });
 
   const member = state.members.find((m) => m.id === memberId) ?? null;
+
+  // Keep the attached member's live vouchers loaded for the picker.
+  useEffect(() => {
+    if (!memberId) {
+      setMemberVouchers([]);
+      return;
+    }
+    let live = true;
+    void loadMemberVouchers(memberId)
+      .then((vs) => live && setMemberVouchers(vs))
+      .catch(() => live && setMemberVouchers([]));
+    return () => {
+      live = false;
+    };
+  }, [memberId]);
 
   const taxSettings = state.settings.tax;
   // Promotions run against the subtotal after line-level discounts.
