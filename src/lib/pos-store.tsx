@@ -388,11 +388,16 @@ export function PosProvider({ children }: { children: ReactNode }) {
         openedByStaffId: user?.staffId ?? terminalUser?.userCode,
         openedByRole: user?.role ?? terminalUser?.role,
         overdue: false,
+        status: "OPEN",
+        closingFloat: null,
+        userId: authUserId ?? null,
       };
       db.upsertShift(shift);
       setState((s) => ({ ...s, shifts: [shift, ...s.shifts] }));
+      setDbShift(shift);
+      setShiftChecked(true);
     },
-    [user, terminalUser],
+    [user, terminalUser, authUserId],
   );
 
   const closeShift = useCallback(
@@ -407,6 +412,8 @@ export function PosProvider({ children }: { children: ReactNode }) {
         ...activeShift,
         closedAt: new Date().toISOString(),
         countedCash,
+        closingFloat: countedCash,
+        status: "CLOSED",
         note,
         closedBy: user?.name ?? terminalUser?.name ?? activeShift.cashier,
         closedByStaffId: user?.staffId ?? terminalUser?.userCode,
@@ -418,6 +425,8 @@ export function PosProvider({ children }: { children: ReactNode }) {
         ...s,
         shifts: s.shifts.map((x) => (x.id === closed.id ? closed : x)),
       }));
+      setDbShift(null);
+      setShiftChecked(true);
       logger.log("sale_event", "Shift closed", "shifts", {
         shiftId: closed.id,
         storeId: closed.storeId,
