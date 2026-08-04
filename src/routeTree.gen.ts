@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as AllShopsRouteImport } from './routes/all-shops'
 import { Route as AuditRouteImport } from './routes/audit'
 import { Route as BookingsRouteImport } from './routes/bookings'
 import { Route as CustomersRouteImport } from './routes/customers'
@@ -58,6 +59,11 @@ const IndexRoute = IndexRouteImport.update({
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AllShopsRoute = AllShopsRouteImport.update({
+  id: '/all-shops',
+  path: '/all-shops',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuditRoute = AuditRouteImport.update({
@@ -254,6 +260,7 @@ const SettingsWhatsappRoute = SettingsWhatsappRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/all-shops': typeof AllShopsRoute
   '/audit': typeof AuditRoute
   '/bookings': typeof BookingsRoute
   '/customers': typeof CustomersRoute
@@ -296,6 +303,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/all-shops': typeof AllShopsRoute
   '/audit': typeof AuditRoute
   '/bookings': typeof BookingsRoute
   '/customers': typeof CustomersRoute
@@ -339,6 +347,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/all-shops': typeof AllShopsRoute
   '/audit': typeof AuditRoute
   '/bookings': typeof BookingsRoute
   '/customers': typeof CustomersRoute
@@ -383,6 +392,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/all-shops'
     | '/audit'
     | '/bookings'
     | '/customers'
@@ -425,6 +435,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin'
+    | '/all-shops'
     | '/audit'
     | '/bookings'
     | '/customers'
@@ -467,6 +478,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
+    | '/all-shops'
     | '/audit'
     | '/bookings'
     | '/customers'
@@ -510,6 +522,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  AllShopsRoute: typeof AllShopsRoute
   AuditRoute: typeof AuditRoute
   BookingsRoute: typeof BookingsRoute
   CustomersRoute: typeof CustomersRoute
@@ -564,6 +577,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/all-shops': {
+      id: '/all-shops'
+      path: '/all-shops'
+      fullPath: '/all-shops'
+      preLoaderRoute: typeof AllShopsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/audit': {
@@ -838,6 +858,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  AllShopsRoute: AllShopsRoute,
   AuditRoute: AuditRoute,
   BookingsRoute: BookingsRoute,
   CustomersRoute: CustomersRoute,
