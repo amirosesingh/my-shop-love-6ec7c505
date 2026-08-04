@@ -145,30 +145,37 @@ const PosContext = createContext<Ctx | null>(null);
 
 /** Merge a cloud (or cached snapshot) slice into local state. */
 function applyCloud(s: PosState, cloud: CloudSlice): PosState {
+  const cloudShifts = cloud.shifts ?? [];
+  const cloudProducts = cloud.products ?? [];
+  const cloudMembers = cloud.members ?? [];
+  const cloudSales = cloud.sales ?? [];
+  const cloudPromotions = cloud.promotions ?? [];
+  const cloudStores = cloud.stores ?? [];
+  const cloudSettings = cloud.settings ?? ({} as CloudSlice["settings"]);
   return {
     ...s,
-    products: cloud.products,
-    members: cloud.members,
-    sales: cloud.sales,
+    products: cloudProducts,
+    members: cloudMembers,
+    sales: cloudSales,
     // Shifts are central now so every terminal agrees on what is open.
-    shifts: cloud.shifts.length ? cloud.shifts : s.shifts,
-    promotions: cloud.promotions.length ? cloud.promotions : s.promotions,
+    shifts: cloudShifts.length ? cloudShifts : s.shifts,
+    promotions: cloudPromotions.length ? cloudPromotions : s.promotions,
     // Locations are central now; the local list is the fallback until
     // the directory has been populated (and gets pushed up below).
-    stores: cloud.stores.length ? cloud.stores : s.stores,
-    currentStoreId: cloud.stores.length
-      ? (cloud.stores.find((x) => x.id === s.currentStoreId)?.id ?? cloud.stores[0].id)
+    stores: cloudStores.length ? cloudStores : s.stores,
+    currentStoreId: cloudStores.length
+      ? (cloudStores.find((x) => x.id === s.currentStoreId)?.id ?? cloudStores[0].id)
       : s.currentStoreId,
     settings: {
-      tax: { ...defaultSettings.tax, ...cloud.settings.tax },
-      receipt: { ...defaultSettings.receipt, ...cloud.settings.receipt },
-      payment: { ...defaultSettings.payment, ...cloud.settings.payment },
-      whatsapp: { ...defaultSettings.whatsapp, ...cloud.settings.whatsapp },
-      review: { ...defaultSettings.review, ...cloud.settings.review },
-      hours: { ...defaultSettings.hours, ...cloud.settings.hours },
+      tax: { ...defaultSettings.tax, ...cloudSettings?.tax },
+      receipt: { ...defaultSettings.receipt, ...cloudSettings?.receipt },
+      payment: { ...defaultSettings.payment, ...cloudSettings?.payment },
+      whatsapp: { ...defaultSettings.whatsapp, ...cloudSettings?.whatsapp },
+      review: { ...defaultSettings.review, ...cloudSettings?.review },
+      hours: { ...defaultSettings.hours, ...cloudSettings?.hours },
     },
     // Keep the bill counter ahead of every receipt already in the cloud.
-    counter: cloud.sales.reduce(
+    counter: cloudSales.reduce(
       (max, sale) => Math.max(max, Number(sale.receiptNo.split("-").pop()) || 0),
       s.counter,
     ),
