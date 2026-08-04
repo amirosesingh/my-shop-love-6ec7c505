@@ -245,6 +245,47 @@ const settingsToRow = (s: AppSettings): Row => ({
   updated_at: new Date().toISOString(),
 });
 
+const rowToShift = (r: Row): Shift => ({
+  id: r.id,
+  storeId: r.store_id ?? "",
+  cashier: r.opened_by_name ?? "",
+  openedAt: r.opened_at,
+  closedAt: r.closed_at ?? null,
+  openingFloat: Number(r.opening_float ?? 0),
+  countedCash: r.counted_cash == null ? null : Number(r.counted_cash),
+  note: r.note ?? "",
+  terminalId: r.terminal_id ?? undefined,
+  terminalName: r.terminal_name ?? undefined,
+  openedByStaffId: r.opened_by_staff_id ?? undefined,
+  openedByRole: r.opened_by_role ?? undefined,
+  closedBy: r.closed_by_name ?? undefined,
+  closedByStaffId: r.closed_by_staff_id ?? undefined,
+  closedByRole: r.closed_by_role ?? undefined,
+  expectedCash: r.expected_cash == null ? null : Number(r.expected_cash),
+  overdue: Boolean(r.overdue),
+});
+
+const shiftToRow = (s: Shift): Row => ({
+  id: s.id,
+  store_id: s.storeId,
+  terminal_id: s.terminalId ?? null,
+  terminal_name: s.terminalName ?? null,
+  opened_by_name: s.cashier,
+  opened_by_staff_id: s.openedByStaffId ?? null,
+  opened_by_role: s.openedByRole ?? null,
+  closed_by_name: s.closedBy ?? null,
+  closed_by_staff_id: s.closedByStaffId ?? null,
+  closed_by_role: s.closedByRole ?? null,
+  opened_at: s.openedAt,
+  closed_at: s.closedAt,
+  opening_float: s.openingFloat,
+  counted_cash: s.countedCash,
+  expected_cash: s.expectedCash ?? null,
+  note: s.note,
+  overdue: s.overdue ?? false,
+  updated_at: new Date().toISOString(),
+});
+
 const rowToSale = (r: Row): Sale => ({
   id: r.id,
   receiptNo: r.bill_number,
