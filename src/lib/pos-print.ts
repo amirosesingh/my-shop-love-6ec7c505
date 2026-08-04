@@ -444,7 +444,7 @@ function memberBody(member: Member, sales: Sale[]) {
  * Desktop `thermal` mode -> ESC/POS text through the RAW spooler (slips only).
  * Browser                -> classic hidden iframe with the print dialog.
  */
-function printHtml(title: string, body: string, slip = true) {
+function printHtml(title: string, body: string, slip = true, barcode?: string) {
   const desktopHtml = shell(title, body, false);
   const paper = receiptCfg.paper;
   const mode = getPrinterPrefs().printMode ?? "dialog";
@@ -456,9 +456,18 @@ function printHtml(title: string, body: string, slip = true) {
   void (async () => {
     if (thermal) {
       const prefs = getPrinterPrefs();
+      const m = printMargins();
+      const ref = paper === "58mm" ? 50 : 72;
+      const printable = Math.max(20, (PAPER_MM[paper] ?? 80) - m.left - m.right);
+      const cols = Math.max(
+        16,
+        Math.floor(columnsForPaper(paper) * Math.min(1, printable / ref)),
+      );
       const bytes = htmlToEscPos(desktopHtml, paper, {
         encoding: prefs.encoding ?? "cp437",
         lineEnding: prefs.lineEnding ?? "lf",
+        cols,
+        ...(barcode ? { barcode: code39Text(barcode) } : {}),
       });
       const res = await rawPulse(bytes);
       if (res.handled) {
