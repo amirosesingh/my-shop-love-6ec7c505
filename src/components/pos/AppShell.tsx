@@ -13,6 +13,7 @@ import { SidebarNav, useSidebarCollapsed } from "@/components/pos/SidebarNav";
 import { SyncStatus } from "@/components/pos/SyncStatus";
 import { WindowControls } from "@/components/pos/WindowControls";
 import { ShiftReminder } from "@/components/pos/ShiftReminder";
+import { ShiftGuard } from "@/components/pos/ShiftGuard";
 import { ThemeToggle } from "@/components/pos/ThemeToggle";
 import { startSyncEngine } from "@/lib/sync-engine";
 import type { NavItem } from "@/components/pos/nav-config";
@@ -377,7 +378,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             const required = requiredPermission(location.pathname);
             const allowed =
               required === null ? true : required === "unknown" ? isAdmin : can(required);
-            if (allowed) return children;
+            if (allowed) return <ShiftGuard>{children}</ShiftGuard>;
             return (
               <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 p-8 text-center">
                 <Lock className="size-8 text-muted-foreground" />
