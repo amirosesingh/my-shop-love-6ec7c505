@@ -14,11 +14,13 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AllShopsRouteImport } from './routes/all-shops'
 import { Route as AuditRouteImport } from './routes/audit'
 import { Route as BookingsRouteImport } from './routes/bookings'
+import { Route as CouponsRouteImport } from './routes/coupons'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as DisplayRouteImport } from './routes/display'
 import { Route as InventoryRouteImport } from './routes/inventory'
 import { Route as InventoryHubRouteImport } from './routes/inventory-hub'
+import { Route as JoinRouteImport } from './routes/join'
 import { Route as MembersRouteImport } from './routes/members'
 import { Route as PromotionsRouteImport } from './routes/promotions'
 import { Route as PurchasingRouteImport } from './routes/purchasing'
@@ -29,6 +31,8 @@ import { Route as StaffRouteImport } from './routes/staff'
 import { Route as StoresRouteImport } from './routes/stores'
 import { Route as SuppliersRouteImport } from './routes/suppliers'
 import { Route as TransfersRouteImport } from './routes/transfers'
+import { Route as CTokenSlugRouteImport } from './routes/c.$tokenSlug'
+import { Route as ClaimCampaignSlugRouteImport } from './routes/claim.$campaignSlug'
 import { Route as ReportsIndexRouteImport } from './routes/reports.index'
 import { Route as ReportsActivityRouteImport } from './routes/reports.activity'
 import { Route as ReportsCatalogRouteImport } from './routes/reports.catalog'
@@ -77,6 +81,11 @@ const BookingsRoute = BookingsRouteImport.update({
   path: '/bookings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CouponsRoute = CouponsRouteImport.update({
+  id: '/coupons',
+  path: '/coupons',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CustomersRoute = CustomersRouteImport.update({
   id: '/customers',
   path: '/customers',
@@ -100,6 +109,11 @@ const InventoryRoute = InventoryRouteImport.update({
 const InventoryHubRoute = InventoryHubRouteImport.update({
   id: '/inventory-hub',
   path: '/inventory-hub',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const JoinRoute = JoinRouteImport.update({
+  id: '/join',
+  path: '/join',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MembersRoute = MembersRouteImport.update({
@@ -150,6 +164,16 @@ const SuppliersRoute = SuppliersRouteImport.update({
 const TransfersRoute = TransfersRouteImport.update({
   id: '/transfers',
   path: '/transfers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CTokenSlugRoute = CTokenSlugRouteImport.update({
+  id: '/c/$tokenSlug',
+  path: '/c/$tokenSlug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClaimCampaignSlugRoute = ClaimCampaignSlugRouteImport.update({
+  id: '/claim/$campaignSlug',
+  path: '/claim/$campaignSlug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReportsIndexRoute = ReportsIndexRouteImport.update({
@@ -269,11 +293,13 @@ export interface FileRoutesByFullPath {
   '/all-shops': typeof AllShopsRoute
   '/audit': typeof AuditRoute
   '/bookings': typeof BookingsRoute
+  '/coupons': typeof CouponsRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
   '/display': typeof DisplayRoute
   '/inventory': typeof InventoryRoute
   '/inventory-hub': typeof InventoryHubRoute
+  '/join': typeof JoinRoute
   '/members': typeof MembersRoute
   '/promotions': typeof PromotionsRoute
   '/purchasing': typeof PurchasingRoute
@@ -284,6 +310,8 @@ export interface FileRoutesByFullPath {
   '/stores': typeof StoresRoute
   '/suppliers': typeof SuppliersRoute
   '/transfers': typeof TransfersRoute
+  '/c/$tokenSlug': typeof CTokenSlugRoute
+  '/claim/$campaignSlug': typeof ClaimCampaignSlugRoute
   '/reports/activity': typeof ReportsActivityRoute
   '/reports/catalog': typeof ReportsCatalogRoute
   '/reports/coupons': typeof ReportsCouponsRoute
@@ -313,11 +341,13 @@ export interface FileRoutesByTo {
   '/all-shops': typeof AllShopsRoute
   '/audit': typeof AuditRoute
   '/bookings': typeof BookingsRoute
+  '/coupons': typeof CouponsRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
   '/display': typeof DisplayRoute
   '/inventory': typeof InventoryRoute
   '/inventory-hub': typeof InventoryHubRoute
+  '/join': typeof JoinRoute
   '/members': typeof MembersRoute
   '/promotions': typeof PromotionsRoute
   '/purchasing': typeof PurchasingRoute
@@ -328,6 +358,8 @@ export interface FileRoutesByTo {
   '/stores': typeof StoresRoute
   '/suppliers': typeof SuppliersRoute
   '/transfers': typeof TransfersRoute
+  '/c/$tokenSlug': typeof CTokenSlugRoute
+  '/claim/$campaignSlug': typeof ClaimCampaignSlugRoute
   '/reports/activity': typeof ReportsActivityRoute
   '/reports/catalog': typeof ReportsCatalogRoute
   '/reports/coupons': typeof ReportsCouponsRoute
@@ -358,11 +390,13 @@ export interface FileRoutesById {
   '/all-shops': typeof AllShopsRoute
   '/audit': typeof AuditRoute
   '/bookings': typeof BookingsRoute
+  '/coupons': typeof CouponsRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
   '/display': typeof DisplayRoute
   '/inventory': typeof InventoryRoute
   '/inventory-hub': typeof InventoryHubRoute
+  '/join': typeof JoinRoute
   '/members': typeof MembersRoute
   '/promotions': typeof PromotionsRoute
   '/purchasing': typeof PurchasingRoute
@@ -373,6 +407,8 @@ export interface FileRoutesById {
   '/stores': typeof StoresRoute
   '/suppliers': typeof SuppliersRoute
   '/transfers': typeof TransfersRoute
+  '/c/$tokenSlug': typeof CTokenSlugRoute
+  '/claim/$campaignSlug': typeof ClaimCampaignSlugRoute
   '/reports/activity': typeof ReportsActivityRoute
   '/reports/catalog': typeof ReportsCatalogRoute
   '/reports/coupons': typeof ReportsCouponsRoute
@@ -404,11 +440,13 @@ export interface FileRouteTypes {
     | '/all-shops'
     | '/audit'
     | '/bookings'
+    | '/coupons'
     | '/customers'
     | '/dashboard'
     | '/display'
     | '/inventory'
     | '/inventory-hub'
+    | '/join'
     | '/members'
     | '/promotions'
     | '/purchasing'
@@ -419,6 +457,8 @@ export interface FileRouteTypes {
     | '/stores'
     | '/suppliers'
     | '/transfers'
+    | '/c/$tokenSlug'
+    | '/claim/$campaignSlug'
     | '/reports/activity'
     | '/reports/catalog'
     | '/reports/coupons'
@@ -448,11 +488,13 @@ export interface FileRouteTypes {
     | '/all-shops'
     | '/audit'
     | '/bookings'
+    | '/coupons'
     | '/customers'
     | '/dashboard'
     | '/display'
     | '/inventory'
     | '/inventory-hub'
+    | '/join'
     | '/members'
     | '/promotions'
     | '/purchasing'
@@ -463,6 +505,8 @@ export interface FileRouteTypes {
     | '/stores'
     | '/suppliers'
     | '/transfers'
+    | '/c/$tokenSlug'
+    | '/claim/$campaignSlug'
     | '/reports/activity'
     | '/reports/catalog'
     | '/reports/coupons'
@@ -492,11 +536,13 @@ export interface FileRouteTypes {
     | '/all-shops'
     | '/audit'
     | '/bookings'
+    | '/coupons'
     | '/customers'
     | '/dashboard'
     | '/display'
     | '/inventory'
     | '/inventory-hub'
+    | '/join'
     | '/members'
     | '/promotions'
     | '/purchasing'
@@ -507,6 +553,8 @@ export interface FileRouteTypes {
     | '/stores'
     | '/suppliers'
     | '/transfers'
+    | '/c/$tokenSlug'
+    | '/claim/$campaignSlug'
     | '/reports/activity'
     | '/reports/catalog'
     | '/reports/coupons'
@@ -537,11 +585,13 @@ export interface RootRouteChildren {
   AllShopsRoute: typeof AllShopsRoute
   AuditRoute: typeof AuditRoute
   BookingsRoute: typeof BookingsRoute
+  CouponsRoute: typeof CouponsRoute
   CustomersRoute: typeof CustomersRoute
   DashboardRoute: typeof DashboardRoute
   DisplayRoute: typeof DisplayRoute
   InventoryRoute: typeof InventoryRoute
   InventoryHubRoute: typeof InventoryHubRoute
+  JoinRoute: typeof JoinRoute
   MembersRoute: typeof MembersRoute
   PromotionsRoute: typeof PromotionsRoute
   PurchasingRoute: typeof PurchasingRoute
@@ -552,6 +602,8 @@ export interface RootRouteChildren {
   StoresRoute: typeof StoresRoute
   SuppliersRoute: typeof SuppliersRoute
   TransfersRoute: typeof TransfersRoute
+  CTokenSlugRoute: typeof CTokenSlugRoute
+  ClaimCampaignSlugRoute: typeof ClaimCampaignSlugRoute
   ReportsActivityRoute: typeof ReportsActivityRoute
   ReportsCatalogRoute: typeof ReportsCatalogRoute
   ReportsCouponsRoute: typeof ReportsCouponsRoute
@@ -613,6 +665,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BookingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/coupons': {
+      id: '/coupons'
+      path: '/coupons'
+      fullPath: '/coupons'
+      preLoaderRoute: typeof CouponsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/customers': {
       id: '/customers'
       path: '/customers'
@@ -646,6 +705,13 @@ declare module '@tanstack/react-router' {
       path: '/inventory-hub'
       fullPath: '/inventory-hub'
       preLoaderRoute: typeof InventoryHubRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/join': {
+      id: '/join'
+      path: '/join'
+      fullPath: '/join'
+      preLoaderRoute: typeof JoinRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/members': {
@@ -716,6 +782,20 @@ declare module '@tanstack/react-router' {
       path: '/transfers'
       fullPath: '/transfers'
       preLoaderRoute: typeof TransfersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/c/$tokenSlug': {
+      id: '/c/$tokenSlug'
+      path: '/c/$tokenSlug'
+      fullPath: '/c/$tokenSlug'
+      preLoaderRoute: typeof CTokenSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/claim/$campaignSlug': {
+      id: '/claim/$campaignSlug'
+      path: '/claim/$campaignSlug'
+      fullPath: '/claim/$campaignSlug'
+      preLoaderRoute: typeof ClaimCampaignSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reports/': {
@@ -881,11 +961,13 @@ const rootRouteChildren: RootRouteChildren = {
   AllShopsRoute: AllShopsRoute,
   AuditRoute: AuditRoute,
   BookingsRoute: BookingsRoute,
+  CouponsRoute: CouponsRoute,
   CustomersRoute: CustomersRoute,
   DashboardRoute: DashboardRoute,
   DisplayRoute: DisplayRoute,
   InventoryRoute: InventoryRoute,
   InventoryHubRoute: InventoryHubRoute,
+  JoinRoute: JoinRoute,
   MembersRoute: MembersRoute,
   PromotionsRoute: PromotionsRoute,
   PurchasingRoute: PurchasingRoute,
@@ -896,6 +978,8 @@ const rootRouteChildren: RootRouteChildren = {
   StoresRoute: StoresRoute,
   SuppliersRoute: SuppliersRoute,
   TransfersRoute: TransfersRoute,
+  CTokenSlugRoute: CTokenSlugRoute,
+  ClaimCampaignSlugRoute: ClaimCampaignSlugRoute,
   ReportsActivityRoute: ReportsActivityRoute,
   ReportsCatalogRoute: ReportsCatalogRoute,
   ReportsCouponsRoute: ReportsCouponsRoute,
@@ -922,13 +1006,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
