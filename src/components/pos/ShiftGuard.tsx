@@ -67,7 +67,7 @@ export function ShiftGuard({ children }: { children: ReactNode }) {
       {/* The real UI stays visible so the terminal looks normal — but frozen. */}
       <div
         // `inert` keeps keyboard, focus and scanner-wedge input out of the tree.
-        {...({ inert: "" } as Record<string, string>)}
+        {...({ inert: true } as unknown as Record<string, boolean>)}
         aria-hidden
         className="pointer-events-none flex min-h-0 flex-1 select-none opacity-40 blur-[1px] saturate-50"
       >
