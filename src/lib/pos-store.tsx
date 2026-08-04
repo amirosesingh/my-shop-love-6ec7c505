@@ -33,6 +33,8 @@ import { db, dbError, loadCloudState } from "./pos-db";
 import type { CloudSlice } from "./pos-db";
 import { readSnapshot, writeSnapshot } from "./offline-snapshot";
 import { useAuth } from "./pos-auth";
+import { readTerminalConfig } from "./terminal-tokens";
+import { isShiftOverdue, localTerminalId } from "./shift-hours";
 
 const KEY = "pos-state-v2";
 
