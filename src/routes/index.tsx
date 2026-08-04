@@ -193,6 +193,8 @@ function Register() {
     productName?: string;
     appliedAt: string;
   } | null>(null);
+  /** Digital voucher token locked at the end of the sale, when one is on the bill. */
+  const [voucherToken, setVoucherToken] = useState<string | null>(null);
   const [splitOpen, setSplitOpen] = useState(false);
   const [splitWays, setSplitWays] = useState(2);
   /* Split tenders + card machine capture */
