@@ -445,6 +445,11 @@ function Register() {
     e.preventDefault();
     const code = query.trim();
     if (!code) return;
+    if (/(^|\/)vch_[a-z0-9]+$/i.test(code)) {
+      setQuery("");
+      void applyVoucher(code);
+      return;
+    }
     const hit = state.products.find(
       (p) => p.barcode === code || p.sku.toLowerCase() === code.toLowerCase(),
     );
