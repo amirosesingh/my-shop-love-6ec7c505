@@ -24,7 +24,7 @@ import {
   rawPulse,
   silentPrint,
 } from "./receipt-printer";
-import { htmlToEscPos } from "./escpos";
+import { columnsForPaper, htmlToEscPos } from "./escpos";
 
 export const STORE = {
   name: "NORTHWIND & CO.",
