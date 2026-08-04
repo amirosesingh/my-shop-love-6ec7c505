@@ -174,6 +174,7 @@ function applyCloud(s: PosState, cloud: CloudSlice): PosState {
       whatsapp: { ...defaultSettings.whatsapp, ...cloudSettings?.whatsapp },
       review: { ...defaultSettings.review, ...cloudSettings?.review },
       hours: { ...defaultSettings.hours, ...cloudSettings?.hours },
+      visibility: { ...defaultSettings.visibility, ...cloudSettings?.visibility },
     },
     // Keep the bill counter ahead of every receipt already in the cloud.
     counter: cloudSales.reduce(
@@ -919,6 +920,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
         whatsapp: { ...prev.whatsapp, ...(patch.whatsapp ?? {}) },
         review: { ...prev.review, ...(patch.review ?? {}) },
         hours: { ...prev.hours, ...(patch.hours ?? {}) },
+        visibility: { ...prev.visibility, ...(patch.visibility ?? {}) },
       });
     }
     setState((s) => ({
