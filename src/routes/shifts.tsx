@@ -347,13 +347,14 @@ function Shifts() {
             <TableHeader>
               <TableRow>
                 <TableHead>Cashier</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead>Opened</TableHead>
                 <TableHead>Closed</TableHead>
                 <TableHead>Closed by</TableHead>
                 <TableHead>Terminal</TableHead>
                 <TableHead>Duration</TableHead>
                 <TableHead className="text-right">Float</TableHead>
-                <TableHead className="text-right">Counted</TableHead>
+                <TableHead className="text-right">Closing float</TableHead>
                 <TableHead className="text-right">Z report</TableHead>
               </TableRow>
             </TableHeader>
@@ -361,6 +362,18 @@ function Shifts() {
               {storeShifts.map((sh) => (
                 <TableRow key={sh.id}>
                   <TableCell>{sh.cashier}</TableCell>
+                  <TableCell>
+                    <Badge
+                      variant="outline"
+                      className={
+                        sh.closedAt
+                          ? "text-[10px]"
+                          : "border-success/40 bg-success/10 text-[10px] text-success"
+                      }
+                    >
+                      {sh.closedAt ? "CLOSED" : "OPEN"}
+                    </Badge>
+                  </TableCell>
                   <TableCell className="text-muted-foreground">
                     {new Date(sh.openedAt).toLocaleString()}
                   </TableCell>
@@ -381,7 +394,9 @@ function Shifts() {
                   </TableCell>
                   <TableCell className="numeric text-right">{money(sh.openingFloat)}</TableCell>
                   <TableCell className="numeric text-right">
-                    {sh.countedCash === null ? "—" : money(sh.countedCash)}
+                    {sh.closingFloat ?? sh.countedCash) === null
+                      ? "—"
+                      : money((sh.closingFloat ?? sh.countedCash) as number)}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button
