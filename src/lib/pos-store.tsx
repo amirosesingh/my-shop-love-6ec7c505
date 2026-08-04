@@ -304,40 +304,53 @@ export function PosProvider({ children }: { children: ReactNode }) {
 
   const openShift = useCallback(
     (cashier: string, openingFloat: number) => {
+      const terminal = readTerminalConfig();
       logger.log("sale_event", "Shift opened", "shifts", {
         cashier,
         openingFloat,
         storeId: stateRef.current.currentStoreId,
+        terminal: terminal?.locationName ?? "This PC",
       });
-      setState((s) => ({
-        ...s,
-        shifts: [
-          {
-            id: crypto.randomUUID(),
-            storeId: s.currentStoreId,
-            cashier,
-            openedAt: new Date().toISOString(),
-            closedAt: null,
-            openingFloat,
-            countedCash: null,
-            note: "",
-          },
-          ...s.shifts,
-        ],
-      }));
+      const shift: Shift = {
+        id: crypto.randomUUID(),
+        storeId: stateRef.current.currentStoreId,
+        cashier,
+        openedAt: new Date().toISOString(),
+        closedAt: null,
+        openingFloat,
+        countedCash: null,
+        note: "",
+        terminalId: terminal?.tokenId ?? localTerminalId(),
+        terminalName: terminal?.locationName ?? "This PC",
+        openedByStaffId: user?.staffId ?? terminalUser?.userCode,
+        openedByRole: user?.role ?? terminalUser?.role,
+        overdue: false,
+      };
+      db.upsertShift(shift);
+      setState((s) => ({ ...s, shifts: [shift, ...s.shifts] }));
     },
-    [],
+    [user, terminalUser],
   );
 
   const closeShift = useCallback(
     (countedCash: number, note: string) => {
       if (!activeShift) return null;
+      // Only the PC that opened the shift may close it — unless a manager or
+      // admin is signed in, who can close from anywhere.
+      const here = readTerminalConfig()?.tokenId ?? localTerminalId();
+      const sameTerminal = !activeShift.terminalId || activeShift.terminalId === here;
+      if (!sameTerminal && !isAdmin && !isSupervisor) return null;
       const closed: Shift = {
         ...activeShift,
         closedAt: new Date().toISOString(),
         countedCash,
         note,
+        closedBy: user?.name ?? terminalUser?.name ?? activeShift.cashier,
+        closedByStaffId: user?.staffId ?? terminalUser?.userCode,
+        closedByRole: user?.role ?? terminalUser?.role,
+        overdue: isShiftOverdue(activeShift, stateRef.current.settings.hours),
       };
+      db.upsertShift(closed);
       setState((s) => ({
         ...s,
         shifts: s.shifts.map((x) => (x.id === closed.id ? closed : x)),
@@ -348,10 +361,12 @@ export function PosProvider({ children }: { children: ReactNode }) {
         openingFloat: closed.openingFloat,
         countedCash: countedCash,
         note,
+        closedBy: closed.closedBy,
+        overdue: closed.overdue,
       });
       return closed;
     },
-    [activeShift],
+    [activeShift, user, terminalUser, isAdmin, isSupervisor],
   );
 
   const recordSale = useCallback((input: Omit<Sale, "id" | "receiptNo" | "createdAt">) => {
