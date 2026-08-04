@@ -267,6 +267,7 @@ const friendly: Record<string, string> = {
   VOUCHER_NOT_FOUND: "That voucher code is not recognised.",
   VOUCHER_ALREADY_REDEEMED: "This voucher has already been used.",
   VOUCHER_EXPIRED: "This voucher has expired.",
+  MEMBER_LIMIT_REACHED: "This member has already claimed the maximum for this campaign.",
 };
 
 const explain = (message: string) => {
@@ -322,10 +323,43 @@ export async function redeemVoucher(input: {
   if (res.error) throw new Error(explain(res.error.message));
 }
 
+/** Backoffice: hand a voucher to a specific member, with an optional custom expiry. */
+export async function issueVoucherManually(input: {
+  slug: string;
+  phone: string;
+  fullName?: string;
+  expiresAt?: string | null;
+  staff?: string;
+  role?: string;
+  storeId?: string;
+  ignoreLimit?: boolean;
+}): Promise<string> {
+  const res = await sb.rpc("coupon_issue_manual", {
+    _slug: input.slug,
+    _phone: input.phone,
+    _full_name: input.fullName ?? null,
+    _expires_at: input.expiresAt ?? null,
+    _staff: input.staff ?? null,
+    _role: input.role ?? null,
+    _store: input.storeId ?? null,
+    _ignore_limit: input.ignoreLimit ?? false,
+  });
+  if (res.error) throw new Error(explain(res.error.message));
+  return res.data as string;
+}
+
 /* ------------------------------ status helpers ---------------------------- */
 
 export const isExpired = (c: Campaign, now = new Date()) =>
   Boolean(c.expiresAt && now > new Date(c.expiresAt));
+
+/** A voucher's own expiry wins over the campaign window when it is set. */
+export const voucherDeadline = (v: Voucher, c: Campaign) => v.expiresAt ?? c.expiresAt ?? null;
+
+export const isVoucherExpired = (v: Voucher, c: Campaign, now = new Date()) => {
+  const deadline = voucherDeadline(v, c);
+  return Boolean(deadline && now > new Date(deadline));
+};
 
 export const isScheduled = (c: Campaign, now = new Date()) =>
   Boolean(c.startsAt && now < new Date(c.startsAt));
