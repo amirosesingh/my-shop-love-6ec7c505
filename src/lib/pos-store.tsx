@@ -804,6 +804,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
         payment: { ...prev.payment, ...(patch.payment ?? {}) },
         whatsapp: { ...prev.whatsapp, ...(patch.whatsapp ?? {}) },
         review: { ...prev.review, ...(patch.review ?? {}) },
+        hours: { ...prev.hours, ...(patch.hours ?? {}) },
       });
     }
     setState((s) => ({
@@ -814,6 +815,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
         payment: { ...s.settings.payment, ...(patch.payment ?? {}) },
         whatsapp: { ...s.settings.whatsapp, ...(patch.whatsapp ?? {}) },
         review: { ...s.settings.review, ...(patch.review ?? {}) },
+        hours: { ...s.settings.hours, ...(patch.hours ?? {}) },
       },
     }));
   }, []);
