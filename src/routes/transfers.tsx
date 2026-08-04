@@ -539,7 +539,11 @@ function Transfers() {
               Cancel
             </Button>
             <Button onClick={submit}>
-              {kind === "transfer" ? "Dispatch & print note" : "Send request"}
+              {kind === "transfer"
+                ? requireApproval
+                  ? "Send for approval"
+                  : "Dispatch & print note"
+                : "Send request"}
             </Button>
           </DialogFooter>
         </DialogContent>
