@@ -49,6 +49,7 @@ import { Route as SettingsPrinterRouteImport } from './routes/settings.printer'
 import { Route as SettingsQrRouteImport } from './routes/settings.qr'
 import { Route as SettingsSkuRouteImport } from './routes/settings.sku'
 import { Route as SettingsSyncRouteImport } from './routes/settings.sync'
+import { Route as SettingsSystemRouteImport } from './routes/settings.system'
 import { Route as SettingsTaxRouteImport } from './routes/settings.tax'
 import { Route as SettingsTerminalsRouteImport } from './routes/settings.terminals'
 import { Route as SettingsTypeRouteImport } from './routes/settings.type'
@@ -256,6 +257,11 @@ const SettingsSyncRoute = SettingsSyncRouteImport.update({
   path: '/settings/sync',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsSystemRoute = SettingsSystemRouteImport.update({
+  id: '/settings/system',
+  path: '/settings/system',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsTaxRoute = SettingsTaxRouteImport.update({
   id: '/settings/tax',
   path: '/settings/tax',
@@ -326,6 +332,7 @@ export interface FileRoutesByFullPath {
   '/settings/qr': typeof SettingsQrRoute
   '/settings/sku': typeof SettingsSkuRoute
   '/settings/sync': typeof SettingsSyncRoute
+  '/settings/system': typeof SettingsSystemRoute
   '/settings/tax': typeof SettingsTaxRoute
   '/settings/terminals': typeof SettingsTerminalsRoute
   '/settings/type': typeof SettingsTypeRoute
@@ -374,6 +381,7 @@ export interface FileRoutesByTo {
   '/settings/qr': typeof SettingsQrRoute
   '/settings/sku': typeof SettingsSkuRoute
   '/settings/sync': typeof SettingsSyncRoute
+  '/settings/system': typeof SettingsSystemRoute
   '/settings/tax': typeof SettingsTaxRoute
   '/settings/terminals': typeof SettingsTerminalsRoute
   '/settings/type': typeof SettingsTypeRoute
@@ -423,6 +431,7 @@ export interface FileRoutesById {
   '/settings/qr': typeof SettingsQrRoute
   '/settings/sku': typeof SettingsSkuRoute
   '/settings/sync': typeof SettingsSyncRoute
+  '/settings/system': typeof SettingsSystemRoute
   '/settings/tax': typeof SettingsTaxRoute
   '/settings/terminals': typeof SettingsTerminalsRoute
   '/settings/type': typeof SettingsTypeRoute
@@ -473,6 +482,7 @@ export interface FileRouteTypes {
     | '/settings/qr'
     | '/settings/sku'
     | '/settings/sync'
+    | '/settings/system'
     | '/settings/tax'
     | '/settings/terminals'
     | '/settings/type'
@@ -521,6 +531,7 @@ export interface FileRouteTypes {
     | '/settings/qr'
     | '/settings/sku'
     | '/settings/sync'
+    | '/settings/system'
     | '/settings/tax'
     | '/settings/terminals'
     | '/settings/type'
@@ -569,6 +580,7 @@ export interface FileRouteTypes {
     | '/settings/qr'
     | '/settings/sku'
     | '/settings/sync'
+    | '/settings/system'
     | '/settings/tax'
     | '/settings/terminals'
     | '/settings/type'
@@ -618,6 +630,7 @@ export interface RootRouteChildren {
   SettingsQrRoute: typeof SettingsQrRoute
   SettingsSkuRoute: typeof SettingsSkuRoute
   SettingsSyncRoute: typeof SettingsSyncRoute
+  SettingsSystemRoute: typeof SettingsSystemRoute
   SettingsTaxRoute: typeof SettingsTaxRoute
   SettingsTerminalsRoute: typeof SettingsTerminalsRoute
   SettingsTypeRoute: typeof SettingsTypeRoute
@@ -910,6 +923,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsSyncRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/system': {
+      id: '/settings/system'
+      path: '/settings/system'
+      fullPath: '/settings/system'
+      preLoaderRoute: typeof SettingsSystemRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/tax': {
       id: '/settings/tax'
       path: '/settings/tax'
@@ -994,6 +1014,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsQrRoute: SettingsQrRoute,
   SettingsSkuRoute: SettingsSkuRoute,
   SettingsSyncRoute: SettingsSyncRoute,
+  SettingsSystemRoute: SettingsSystemRoute,
   SettingsTaxRoute: SettingsTaxRoute,
   SettingsTerminalsRoute: SettingsTerminalsRoute,
   SettingsTypeRoute: SettingsTypeRoute,
@@ -1006,13 +1027,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

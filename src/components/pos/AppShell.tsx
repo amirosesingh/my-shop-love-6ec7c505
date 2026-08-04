@@ -12,7 +12,7 @@ import { clearRevocation, useRevocationCheck } from "@/lib/use-revocation-check"
 import { SidebarNav, useSidebarCollapsed } from "@/components/pos/SidebarNav";
 import { SyncStatus } from "@/components/pos/SyncStatus";
 import { WindowControls } from "@/components/pos/WindowControls";
-import { ShiftReminder } from "@/components/pos/ShiftReminder";
+import { SystemStatusPill } from "@/components/pos/SystemStatusPill";
 import { ShiftGuard } from "@/components/pos/ShiftGuard";
 import { LiveClock } from "@/components/pos/LiveClock";
 import { ThemeToggle } from "@/components/pos/ThemeToggle";
@@ -325,6 +325,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Badge>
           <LiveClock compact />
           <SyncStatus />
+          <SystemStatusPill compact />
           <ThemeToggle />
           <Button
             variant="outline"
@@ -346,6 +347,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
           <SyncStatus className="ml-auto" />
           <LiveClock />
+          <SystemStatusPill />
           {terminal.config && (
             <Badge
               variant="outline"
@@ -360,8 +362,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Lock className="size-3.5" /> Lock / Switch user
           </Button>
         </header>
-
-        <ShiftReminder />
 
         <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
           {(() => {

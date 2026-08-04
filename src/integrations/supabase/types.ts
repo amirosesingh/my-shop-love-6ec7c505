@@ -171,6 +171,7 @@ export type Database = {
           footer_text: string | null
           header_text: string | null
           id: number
+          integration_settings: Json
           max_shift_hours: number
           paper_size: string
           phone: string | null
@@ -203,6 +204,7 @@ export type Database = {
           footer_text?: string | null
           header_text?: string | null
           id?: number
+          integration_settings?: Json
           max_shift_hours?: number
           paper_size?: string
           phone?: string | null
@@ -235,6 +237,7 @@ export type Database = {
           footer_text?: string | null
           header_text?: string | null
           id?: number
+          integration_settings?: Json
           max_shift_hours?: number
           paper_size?: string
           phone?: string | null
@@ -908,6 +911,10 @@ export type Database = {
         Returns: boolean
       }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
+      member_welcome_claim: {
+        Args: { _email?: string; _full_name: string; _phone: string }
+        Returns: string
+      }
     }
     Enums: {
       app_role: "admin" | "manager" | "staff"

@@ -213,6 +213,10 @@ const rowToSettings = (r: Row | null): AppSettings =>
           hidden: ((r.ui_visibility as { hidden?: Record<string, string[]> } | null)?.hidden ??
             {}) as Record<string, string[]>,
         },
+        integrations: {
+          ...defaultSettings.integrations,
+          ...((r.integration_settings ?? {}) as object),
+        },
       }
     : defaultSettings;
 
@@ -248,6 +252,7 @@ const settingsToRow = (s: AppSettings): Row => ({
   max_shift_hours: s.hours.maxShiftHours,
   shift_reminder_minutes: s.hours.reminderMinutes,
   ui_visibility: s.visibility ?? { hidden: {} },
+  integration_settings: s.integrations ?? {},
   updated_at: new Date().toISOString(),
 });
 

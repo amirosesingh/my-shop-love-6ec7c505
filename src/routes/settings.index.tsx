@@ -1,6 +1,7 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
+  Activity,
   Building2,
   Landmark,
   ListPlus,
@@ -154,6 +155,12 @@ const GROUPS = [
         label: "Sync & backup",
         icon: RefreshCw,
         blurb: "Branch identity, offline sync queue and backups.",
+      },
+      {
+        to: "/settings/system",
+        label: "System status & integrations",
+        icon: Activity,
+        blurb: "Connection health, recovery tools, public domains and approval rules.",
       },
     ],
   },

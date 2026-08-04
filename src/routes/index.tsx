@@ -195,6 +195,10 @@ function Register() {
     productId?: string;
     productName?: string;
     appliedAt: string;
+    /** campaign title, printed on the slip */
+    name?: string;
+    /** unused value left on a fixed-amount voucher */
+    remaining?: number;
   } | null>(null);
   /** Digital voucher token locked at the end of the sale, when one is on the bill. */
   const [voucherToken, setVoucherToken] = useState<string | null>(null);
@@ -698,6 +702,8 @@ function Register() {
             couponPromoId: coupon.promoId,
             couponScope: coupon.scope,
             couponDiscount: coupon.discount,
+            couponName: coupon.name,
+            couponRemaining: coupon.remaining,
           }
         : {}),
     });
@@ -961,6 +967,11 @@ function Register() {
           productId: line.productId,
           productName: line.name,
           appliedAt: at,
+          name: campaign.name,
+          remaining:
+            campaign.discountType === "FIXED_AMOUNT"
+              ? Math.max(0, r2(campaign.discountValue - value))
+              : 0,
         });
       } else {
         const base =
@@ -988,6 +999,11 @@ function Register() {
           scope: "bill",
           discount: value,
           appliedAt: at,
+          name: campaign.name,
+          remaining:
+            campaign.discountType === "FIXED_AMOUNT"
+              ? Math.max(0, r2(campaign.discountValue - value))
+              : 0,
         });
       }
 

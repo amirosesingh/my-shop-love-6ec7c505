@@ -1,0 +1,317 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import {
+  Activity,
+  ClipboardCopy,
+  Copy,
+  Eraser,
+  PlugZap,
+  RefreshCw,
+  WifiOff,
+} from "lucide-react";
+import { toast } from "sonner";
+import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { usePos } from "@/lib/pos-store";
+import { cn } from "@/lib/utils";
+import {
+  clearHealthErrors,
+  listHealthErrors,
+  overallState,
+  runDiagnostics,
+  retryQuarantined,
+  STATE_LABEL,
+  type HealthError,
+  type ServiceCheck,
+  type ServiceState,
+} from "@/lib/system-health";
+
+export const Route = createFileRoute("/settings/system")({
+  head: () => ({
+    meta: [
+      { title: "System Status & Integrations — Northwind POS" },
+      {
+        name: "description",
+        content:
+          "Live connection health for the POS database, realtime listener and public member domains, with recovery tools and domain settings.",
+      },
+      { property: "og:title", content: "System Status & Integrations — Northwind POS" },
+      {
+        property: "og:description",
+        content: "Diagnose, reconnect and configure the services this till depends on.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
+  component: SystemSettingsPage,
+});
+
+const dot: Record<ServiceState, string> = {
+  ok: "bg-success",
+  degraded: "bg-warning",
+  down: "bg-destructive",
+  checking: "bg-muted-foreground",
+};
+
+function SystemSettingsPage() {
+  const { state, updateSettings } = usePos();
+  const integrations = state.settings.integrations;
+  const [checks, setChecks] = useState<ServiceCheck[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [errors, setErrors] = useState<HealthError[]>([]);
+  const [showErrors, setShowErrors] = useState(false);
+  const [dnsOpen, setDnsOpen] = useState(false);
+  const [memberDomain, setMemberDomain] = useState(integrations.memberDomain);
+  const [redeemDomain, setRedeemDomain] = useState(integrations.redeemDomain);
+
+  const refresh = () => setErrors(listHealthErrors());
+
+  const diagnose = () => {
+    setBusy(true);
+    void runDiagnostics([integrations.memberDomain, integrations.redeemDomain])
+      .then((r) => {
+        setChecks(r);
+        refresh();
+      })
+      .finally(() => setBusy(false));
+  };
+
+  useEffect(() => {
+    diagnose();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const overall = busy && !checks.length ? "checking" : overallState(checks);
+  const unhealthy = overall === "down" || overall === "degraded";
+
+  const forceReconnect = () => {
+    retryQuarantined();
+    toast.success("Reconnecting — queued changes will retry now");
+    diagnose();
+  };
+
+  const clearCache = () => {
+    try {
+      for (const key of Object.keys(window.localStorage)) {
+        if (key.startsWith("pos.") && key !== "pos.terminal") window.localStorage.removeItem(key);
+      }
+    } catch {
+      /* nothing else to do */
+    }
+    toast.success("Local cache cleared — reloading");
+    window.setTimeout(() => window.location.reload(), 600);
+  };
+
+  const dnsInstructions = `Cloudflare DNS
+CNAME  member   -> your Pages deployment
+CNAME  redeem   -> your Pages deployment
+
+Member signup URL: ${integrations.memberDomain}/join
+Voucher redemption URL: ${integrations.redeemDomain}/c/<token>
+
+Both subdomains serve the same build; only the landing path differs.`;
+
+  return (
+    <SettingsFrame
+      title="System status & integrations"
+      description="Live health of the services this till depends on, with recovery tools."
+    >
+      <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Activity className="size-4 text-primary" />
+          <h2 className="text-sm font-semibold">Status dashboard</h2>
+          <span className="ml-auto text-xs text-muted-foreground">{STATE_LABEL[overall]}</span>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {checks.map((c) => (
+            <div key={c.id} className="rounded-md border border-border px-3 py-2">
+              <div className="flex items-center gap-2">
+                <span className={cn("size-2 rounded-full", dot[c.state])} />
+                <p className="text-sm font-medium">{c.label}</p>
+                {c.latency != null && (
+                  <span className="numeric ml-auto text-[11px] text-muted-foreground">
+                    {c.latency} ms
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 text-[11px] text-muted-foreground">{c.detail}</p>
+            </div>
+          ))}
+          {!checks.length && (
+            <p className="text-sm text-muted-foreground">Running the first check…</p>
+          )}
+        </div>
+        <Button onClick={diagnose} disabled={busy} variant="outline" size="sm">
+          <RefreshCw className={cn("size-4", busy && "animate-spin")} />
+          {busy ? "Testing services…" : "Run diagnostics / test connection"}
+        </Button>
+      </section>
+
+      {unhealthy && (
+        <section className="space-y-3 rounded-md border border-warning/40 bg-warning/5 p-4">
+          <h2 className="text-sm font-semibold">Troubleshooting & recovery</h2>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={forceReconnect}>
+              <PlugZap className="size-4" /> Force reconnect
+            </Button>
+            <Button size="sm" variant="outline" onClick={clearCache}>
+              <Eraser className="size-4" /> Clear app cache & resync
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setShowErrors((v) => !v)}>
+              {showErrors ? "Hide" : "View"} error logs ({errors.length})
+            </Button>
+          </div>
+          <div className="flex items-center justify-between rounded-md border border-border bg-card px-3 py-2">
+            <div className="flex items-center gap-2">
+              <WifiOff className="size-4 text-muted-foreground" />
+              <div>
+                <p className="text-sm font-medium">Offline mode</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Keep selling and looking up members from the local cache.
+                </p>
+              </div>
+            </div>
+            <Switch
+              aria-label="Offline mode"
+              checked={integrations.offlineMode}
+              onCheckedChange={(v) =>
+                updateSettings({ integrations: { ...integrations, offlineMode: v } })
+              }
+            />
+          </div>
+          {showErrors && (
+            <div className="max-h-64 space-y-2 overflow-auto rounded-md border border-border bg-card p-3">
+              {errors.map((e) => (
+                <div key={e.id} className="text-[11px]">
+                  <p className="font-mono">
+                    {new Date(e.at).toLocaleString()} · {e.service} · {e.code}
+                  </p>
+                  <p className="text-muted-foreground">{e.detail}</p>
+                </div>
+              ))}
+              {!errors.length && (
+                <p className="text-[11px] text-muted-foreground">No errors recorded.</p>
+              )}
+              {errors.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    clearHealthErrors();
+                    refresh();
+                  }}
+                >
+                  Clear log
+                </Button>
+              )}
+            </div>
+          )}
+        </section>
+      )}
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold">Subdomains & API configuration</h2>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Member domain</Label>
+            <Input value={memberDomain} onChange={(e) => setMemberDomain(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Redeem domain</Label>
+            <Input value={redeemDomain} onChange={(e) => setRedeemDomain(e.target.value)} />
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            onClick={() => {
+              updateSettings({
+                integrations: {
+                  ...integrations,
+                  memberDomain: memberDomain.trim(),
+                  redeemDomain: redeemDomain.trim(),
+                },
+              });
+              toast.success("Domains saved");
+            }}
+          >
+            Save domains
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setDnsOpen(true)}>
+            <ClipboardCopy className="size-4" /> Copy webhook & DNS instructions
+          </Button>
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          Database key status:{" "}
+          {checks.find((c) => c.id === "database")?.state === "ok"
+            ? "valid and accepted"
+            : "not confirmed — run diagnostics"}
+        </p>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold">Operational rules</h2>
+        <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+          <div>
+            <p className="text-sm font-medium">Stock transfers need approval</p>
+            <p className="text-[11px] text-muted-foreground">
+              Nothing leaves a branch until a supervisor, warehouse user or admin authorises it.
+            </p>
+          </div>
+          <Switch
+            aria-label="Stock transfers need approval"
+            checked={integrations.requireTransferApproval}
+            onCheckedChange={(v) =>
+              updateSettings({ integrations: { ...integrations, requireTransferApproval: v } })
+            }
+          />
+        </div>
+        <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+          <div>
+            <p className="text-sm font-medium">Issue the welcome coupon automatically</p>
+            <p className="text-[11px] text-muted-foreground">
+              Off means new members get no coupon until you issue one by hand.
+            </p>
+          </div>
+          <Switch
+            aria-label="Issue the welcome coupon automatically"
+            checked={integrations.autoIssueWelcome}
+            onCheckedChange={(v) =>
+              updateSettings({ integrations: { ...integrations, autoIssueWelcome: v } })
+            }
+          />
+        </div>
+      </section>
+
+      <Dialog open={dnsOpen} onOpenChange={setDnsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Webhook & DNS instructions</DialogTitle>
+          </DialogHeader>
+          <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-surface-2 p-3 text-[11px]">
+            {dnsInstructions}
+          </pre>
+          <Button
+            size="sm"
+            onClick={() => {
+              void navigator.clipboard.writeText(dnsInstructions);
+              toast.success("Instructions copied");
+            }}
+          >
+            <Copy className="size-4" /> Copy to clipboard
+          </Button>
+        </DialogContent>
+      </Dialog>
+    </SettingsFrame>
+  );
+}

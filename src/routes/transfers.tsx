@@ -1,7 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeftRight, Check, Plus, Printer, Send, Trash2, Truck, X } from "lucide-react";
+import {
+  ArrowLeftRight,
+  Check,
+  FileSpreadsheet,
+  Plus,
+  Printer,
+  Send,
+  Trash2,
+  Truck,
+  Upload,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
+import * as XLSX from "xlsx";
 import { AppShell } from "@/components/pos/AppShell";
 import { useAuth } from "@/lib/pos-auth";
 import { Button } from "@/components/ui/button";
@@ -81,6 +93,8 @@ function Transfers() {
   } = usePos();
   const { can } = useAuth();
   const search = Route.useSearch();
+  const requireApproval = state.settings.integrations.requireTransferApproval;
+  const canApprove = can("can_approve_transfer") || can("can_receive_transfer");
 
   const others = stores.filter((s) => s.id !== currentStore.id);
   const [open, setOpen] = useState(false);
@@ -110,6 +124,75 @@ function Transfers() {
         ? prev.map((i) => (i.productId === productId ? { ...i, qty: i.qty + 1 } : i))
         : [...prev, { productId, qty: 1 }],
     );
+  }
+
+  /** Bulk basket from a spreadsheet: barcode / SKU / name + quantity. */
+  async function importSheet(file: File) {
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const sheetName = wb.SheetNames[0];
+      const sheet = sheetName ? wb.Sheets[sheetName] : undefined;
+      if (!sheet) throw new Error("empty workbook");
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
+      const pick = (r: Record<string, unknown>, keys: string[]) => {
+        for (const [k, v] of Object.entries(r)) {
+          if (keys.includes(k.trim().toLowerCase())) return String(v).trim();
+        }
+        return "";
+      };
+      const next: TransferItem[] = [];
+      const missing: string[] = [];
+      for (const r of rows) {
+        const key = pick(r, ["barcode", "sku", "code", "product", "name", "item"]);
+        const qty = Math.floor(Number(pick(r, ["qty", "quantity", "units"])) || 0);
+        if (!key || qty <= 0) continue;
+        const needle = key.toLowerCase();
+        const p = state.products.find(
+          (x) =>
+            x.barcode?.toLowerCase() === needle ||
+            x.sku?.toLowerCase() === needle ||
+            x.name.toLowerCase() === needle,
+        );
+        if (!p) {
+          missing.push(key);
+          continue;
+        }
+        const found = next.find((i) => i.productId === p.id);
+        if (found) found.qty += qty;
+        else next.push({ productId: p.id, qty });
+      }
+      if (!next.length) {
+        toast.error("Nothing matched — use columns Barcode / SKU / Name and Qty");
+        return;
+      }
+      setItems((prev) => {
+        const merged = [...prev];
+        for (const i of next) {
+          const hit = merged.find((x) => x.productId === i.productId);
+          if (hit) hit.qty += i.qty;
+          else merged.push(i);
+        }
+        return merged;
+      });
+      toast.success(
+        `${next.length} line${next.length > 1 ? "s" : ""} imported${
+          missing.length ? ` · ${missing.length} unknown item(s) skipped` : ""
+        }`,
+      );
+    } catch {
+      toast.error("Could not read that file — use a .xlsx or .csv sheet");
+    }
+  }
+
+  function downloadTemplate() {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ["Barcode", "Qty"],
+      ...state.products.slice(0, 3).map((p) => [p.barcode ?? p.sku ?? p.name, 1]),
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Transfer");
+    XLSX.writeFile(wb, "stock-transfer-template.xlsx");
   }
 
   const mine = useMemo(
@@ -160,14 +243,17 @@ function Transfers() {
       items: clean,
       note,
       createdBy: activeShift?.cashier ?? "Manager",
+      needsApproval: kind === "transfer" && requireApproval,
     });
-    print({ ...t });
+    if (t.status === "in_transit") print({ ...t });
     setOpen(false);
     setNote("");
     setItems([]);
     toast.success(
       kind === "transfer"
-        ? `${t.ref} dispatched · ${clean.length} item${clean.length > 1 ? "s" : ""}`
+        ? requireApproval
+          ? `${t.ref} sent for approval · ${clean.length} item${clean.length > 1 ? "s" : ""}`
+          : `${t.ref} dispatched · ${clean.length} item${clean.length > 1 ? "s" : ""}`
         : `${t.ref} requested from ${storeOf(otherStoreId)?.name}`,
     );
   }
@@ -229,10 +315,10 @@ function Transfers() {
             </TableHeader>
             <TableBody>
               {mine.map((t) => {
-                const canApprove =
+                const showApprove =
                   t.status === "requested" &&
                   t.fromStoreId === currentStore.id &&
-                  can("can_receive_transfer");
+                  canApprove;
                 const canReceive =
                   t.status === "in_transit" &&
                   t.toStoreId === currentStore.id &&
@@ -271,18 +357,23 @@ function Transfers() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
-                        {canApprove && (
+                        {showApprove && (
                           <Button
                             size="sm"
                             variant="ghost"
                             onClick={() => {
                               approveTransfer(t.id);
                               print(t);
-                              toast.success(`${t.ref} approved and dispatched`);
+                              toast.success(`${t.ref} authorised and dispatched`);
                             }}
                           >
                             <Check className="size-4" /> Approve
                           </Button>
+                        )}
+                        {t.status === "requested" && !showApprove && (
+                          <span className="text-[11px] text-muted-foreground">
+                            Waiting for approval
+                          </span>
                         )}
                         {canReceive && (
                           <Button
@@ -353,6 +444,26 @@ function Transfers() {
                 </Select>
                 <Button variant="outline" onClick={() => addItem(pickId)}>
                   <Plus className="size-4" /> Add
+                </Button>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <Button asChild variant="outline" size="sm">
+                  <label className="cursor-pointer">
+                    <Upload className="size-3.5" /> Import from Excel / CSV
+                    <input
+                      type="file"
+                      accept=".csv,.xlsx,.xls"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) void importSheet(f);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                </Button>
+                <Button variant="ghost" size="sm" onClick={downloadTemplate}>
+                  <FileSpreadsheet className="size-3.5" /> Template
                 </Button>
               </div>
             </div>
@@ -428,7 +539,11 @@ function Transfers() {
               Cancel
             </Button>
             <Button onClick={submit}>
-              {kind === "transfer" ? "Dispatch & print note" : "Send request"}
+              {kind === "transfer"
+                ? requireApproval
+                  ? "Send for approval"
+                  : "Dispatch & print note"
+                : "Send request"}
             </Button>
           </DialogFooter>
         </DialogContent>
