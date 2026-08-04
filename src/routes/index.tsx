@@ -865,9 +865,107 @@ function Register() {
     toast.success(`Coupon ${rule.name} applied`);
   }
 
+  /**
+   * Apply a digital voucher (scanned QR or typed token). The voucher is only
+   * locked in the database once the sale actually completes.
+   */
+  async function applyVoucher(rawToken: string) {
+    const token = rawToken.trim().split("/").pop() ?? "";
+    if (!token) return;
+    if (!lines.length) {
+      toast.error("Ring the items up before applying a voucher");
+      return;
+    }
+    try {
+      const view = await loadVoucherByToken(token);
+      if (!view) {
+        toast.error("That voucher code is not recognised");
+        return;
+      }
+      if (view.voucher.status === "REDEEMED") {
+        toast.error("This voucher has already been used");
+        return;
+      }
+      const campaign = view.campaign;
+      if (campaign.expiresAt && new Date() > new Date(campaign.expiresAt)) {
+        toast.error("This voucher has expired");
+        return;
+      }
+      if (view.voucher.memberId && state.members.some((m) => m.id === view.voucher.memberId)) {
+        setMemberId(view.voucher.memberId);
+      }
+
+      const at = new Date().toISOString();
+      if (campaign.scope === "PRODUCT") {
+        const index = lines.findIndex((l) => l.productId === campaign.scopeValue);
+        if (index < 0) {
+          toast.error("The product this voucher covers is not on this bill");
+          return;
+        }
+        const line = lines[index]!;
+        const value = voucherValue(campaign, r2(line.price * line.qty));
+        patchLine(index, {
+          discount: r2(value / Math.max(1, line.qty)),
+          discountType: "amount",
+          couponCode: token,
+          couponDiscount: value,
+        });
+        setCoupon({
+          code: token,
+          promoId: campaign.id,
+          scope: "item",
+          discount: value,
+          productId: line.productId,
+          productName: line.name,
+          appliedAt: at,
+        });
+      } else {
+        const base =
+          campaign.scope === "CATEGORY"
+            ? r2(
+                lines
+                  .filter(
+                    (l) =>
+                      state.products.find((p) => p.id === l.productId)?.category ===
+                      campaign.scopeValue,
+                  )
+                  .reduce((a, l) => a + l.price * l.qty, 0),
+              )
+            : promoBase;
+        if (base <= 0) {
+          toast.error("Nothing on this bill qualifies for that voucher");
+          return;
+        }
+        const value = voucherValue(campaign, base);
+        setCartDiscountType("amount");
+        setCartDiscount(value);
+        setCoupon({
+          code: token,
+          promoId: campaign.id,
+          scope: "bill",
+          discount: value,
+          appliedAt: at,
+        });
+      }
+
+      setVoucherToken(token);
+      logger.log("promotion", "Digital voucher applied", "register", {
+        voucher: token,
+        campaign: campaign.name,
+        campaignId: campaign.id,
+        scope: campaign.scope,
+        memberId: view.voucher.memberId,
+        storeId: currentStore.id,
+        appliedAt: at,
+      });
+      toast.success(`${campaign.name} applied`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not read that voucher");
+    }
+  }
+
   /** Take the coupon off the ticket and record who removed it. */
   function removeCoupon() {
-    void 0;
     if (!coupon) return;
     if (coupon.scope === "item") {
       const i = lines.findIndex((l) => l.couponCode === coupon.code);
