@@ -1,7 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FilePlus2, PackagePlus, ScanBarcode, ShieldAlert, Trash2 } from "lucide-react";
+import {
+  FilePlus2,
+  FileSpreadsheet,
+  Download,
+  PackagePlus,
+  ScanBarcode,
+  ShieldAlert,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
+import * as XLSX from "xlsx";
 import { AppShell } from "@/components/pos/AppShell";
 import { db } from "@/lib/pos-db";
 import { Button } from "@/components/ui/button";
@@ -27,6 +36,7 @@ import {
 import { money, stockAt, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
 import { logger } from "@/lib/audit-log";
+import { cachedSuppliers, loadSuppliers, type Supplier } from "@/lib/suppliers";
 import type { Product } from "@/lib/pos-types";
 
 export const Route = createFileRoute("/purchasing")({
