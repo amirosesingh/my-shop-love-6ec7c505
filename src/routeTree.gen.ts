@@ -37,7 +37,6 @@ import { Route as ReportsStockRouteImport } from './routes/reports.stock'
 import { Route as SettingsIndexRouteImport } from './routes/settings.index'
 import { Route as SettingsDisplayRouteImport } from './routes/settings.display'
 import { Route as SettingsElementsRouteImport } from './routes/settings.elements'
-import { Route as SettingsHoursRouteImport } from './routes/settings.hours'
 import { Route as SettingsIdentityRouteImport } from './routes/settings.identity'
 import { Route as SettingsLinesRouteImport } from './routes/settings.lines'
 import { Route as SettingsPaymentRouteImport } from './routes/settings.payment'
@@ -49,6 +48,7 @@ import { Route as SettingsTaxRouteImport } from './routes/settings.tax'
 import { Route as SettingsTerminalsRouteImport } from './routes/settings.terminals'
 import { Route as SettingsTypeRouteImport } from './routes/settings.type'
 import { Route as SettingsUpdatesRouteImport } from './routes/settings.updates'
+import { Route as SettingsVisibilityRouteImport } from './routes/settings.visibility'
 import { Route as SettingsWhatsappRouteImport } from './routes/settings.whatsapp'
 
 const IndexRoute = IndexRouteImport.update({
@@ -191,11 +191,6 @@ const SettingsElementsRoute = SettingsElementsRouteImport.update({
   path: '/settings/elements',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SettingsHoursRoute = SettingsHoursRouteImport.update({
-  id: '/settings/hours',
-  path: '/settings/hours',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SettingsIdentityRoute = SettingsIdentityRouteImport.update({
   id: '/settings/identity',
   path: '/settings/identity',
@@ -251,6 +246,11 @@ const SettingsUpdatesRoute = SettingsUpdatesRouteImport.update({
   path: '/settings/updates',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsVisibilityRoute = SettingsVisibilityRouteImport.update({
+  id: '/settings/visibility',
+  path: '/settings/visibility',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsWhatsappRoute = SettingsWhatsappRouteImport.update({
   id: '/settings/whatsapp',
   path: '/settings/whatsapp',
@@ -284,7 +284,6 @@ export interface FileRoutesByFullPath {
   '/reports/stock': typeof ReportsStockRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
-  '/settings/hours': typeof SettingsHoursRoute
   '/settings/identity': typeof SettingsIdentityRoute
   '/settings/lines': typeof SettingsLinesRoute
   '/settings/payment': typeof SettingsPaymentRoute
@@ -296,6 +295,7 @@ export interface FileRoutesByFullPath {
   '/settings/terminals': typeof SettingsTerminalsRoute
   '/settings/type': typeof SettingsTypeRoute
   '/settings/updates': typeof SettingsUpdatesRoute
+  '/settings/visibility': typeof SettingsVisibilityRoute
   '/settings/whatsapp': typeof SettingsWhatsappRoute
   '/reports/': typeof ReportsIndexRoute
   '/settings/': typeof SettingsIndexRoute
@@ -327,7 +327,6 @@ export interface FileRoutesByTo {
   '/reports/stock': typeof ReportsStockRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
-  '/settings/hours': typeof SettingsHoursRoute
   '/settings/identity': typeof SettingsIdentityRoute
   '/settings/lines': typeof SettingsLinesRoute
   '/settings/payment': typeof SettingsPaymentRoute
@@ -339,6 +338,7 @@ export interface FileRoutesByTo {
   '/settings/terminals': typeof SettingsTerminalsRoute
   '/settings/type': typeof SettingsTypeRoute
   '/settings/updates': typeof SettingsUpdatesRoute
+  '/settings/visibility': typeof SettingsVisibilityRoute
   '/settings/whatsapp': typeof SettingsWhatsappRoute
   '/reports': typeof ReportsIndexRoute
   '/settings': typeof SettingsIndexRoute
@@ -371,7 +371,6 @@ export interface FileRoutesById {
   '/reports/stock': typeof ReportsStockRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
-  '/settings/hours': typeof SettingsHoursRoute
   '/settings/identity': typeof SettingsIdentityRoute
   '/settings/lines': typeof SettingsLinesRoute
   '/settings/payment': typeof SettingsPaymentRoute
@@ -383,6 +382,7 @@ export interface FileRoutesById {
   '/settings/terminals': typeof SettingsTerminalsRoute
   '/settings/type': typeof SettingsTypeRoute
   '/settings/updates': typeof SettingsUpdatesRoute
+  '/settings/visibility': typeof SettingsVisibilityRoute
   '/settings/whatsapp': typeof SettingsWhatsappRoute
   '/reports/': typeof ReportsIndexRoute
   '/settings/': typeof SettingsIndexRoute
@@ -416,7 +416,6 @@ export interface FileRouteTypes {
     | '/reports/stock'
     | '/settings/display'
     | '/settings/elements'
-    | '/settings/hours'
     | '/settings/identity'
     | '/settings/lines'
     | '/settings/payment'
@@ -428,6 +427,7 @@ export interface FileRouteTypes {
     | '/settings/terminals'
     | '/settings/type'
     | '/settings/updates'
+    | '/settings/visibility'
     | '/settings/whatsapp'
     | '/reports/'
     | '/settings/'
@@ -459,7 +459,6 @@ export interface FileRouteTypes {
     | '/reports/stock'
     | '/settings/display'
     | '/settings/elements'
-    | '/settings/hours'
     | '/settings/identity'
     | '/settings/lines'
     | '/settings/payment'
@@ -471,6 +470,7 @@ export interface FileRouteTypes {
     | '/settings/terminals'
     | '/settings/type'
     | '/settings/updates'
+    | '/settings/visibility'
     | '/settings/whatsapp'
     | '/reports'
     | '/settings'
@@ -502,7 +502,6 @@ export interface FileRouteTypes {
     | '/reports/stock'
     | '/settings/display'
     | '/settings/elements'
-    | '/settings/hours'
     | '/settings/identity'
     | '/settings/lines'
     | '/settings/payment'
@@ -514,6 +513,7 @@ export interface FileRouteTypes {
     | '/settings/terminals'
     | '/settings/type'
     | '/settings/updates'
+    | '/settings/visibility'
     | '/settings/whatsapp'
     | '/reports/'
     | '/settings/'
@@ -546,7 +546,6 @@ export interface RootRouteChildren {
   ReportsStockRoute: typeof ReportsStockRoute
   SettingsDisplayRoute: typeof SettingsDisplayRoute
   SettingsElementsRoute: typeof SettingsElementsRoute
-  SettingsHoursRoute: typeof SettingsHoursRoute
   SettingsIdentityRoute: typeof SettingsIdentityRoute
   SettingsLinesRoute: typeof SettingsLinesRoute
   SettingsPaymentRoute: typeof SettingsPaymentRoute
@@ -558,6 +557,7 @@ export interface RootRouteChildren {
   SettingsTerminalsRoute: typeof SettingsTerminalsRoute
   SettingsTypeRoute: typeof SettingsTypeRoute
   SettingsUpdatesRoute: typeof SettingsUpdatesRoute
+  SettingsVisibilityRoute: typeof SettingsVisibilityRoute
   SettingsWhatsappRoute: typeof SettingsWhatsappRoute
   ReportsIndexRoute: typeof ReportsIndexRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
@@ -761,13 +761,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsElementsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/settings/hours': {
-      id: '/settings/hours'
-      path: '/settings/hours'
-      fullPath: '/settings/hours'
-      preLoaderRoute: typeof SettingsHoursRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/settings/identity': {
       id: '/settings/identity'
       path: '/settings/identity'
@@ -845,6 +838,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsUpdatesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/visibility': {
+      id: '/settings/visibility'
+      path: '/settings/visibility'
+      fullPath: '/settings/visibility'
+      preLoaderRoute: typeof SettingsVisibilityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/whatsapp': {
       id: '/settings/whatsapp'
       path: '/settings/whatsapp'
@@ -882,7 +882,6 @@ const rootRouteChildren: RootRouteChildren = {
   ReportsStockRoute: ReportsStockRoute,
   SettingsDisplayRoute: SettingsDisplayRoute,
   SettingsElementsRoute: SettingsElementsRoute,
-  SettingsHoursRoute: SettingsHoursRoute,
   SettingsIdentityRoute: SettingsIdentityRoute,
   SettingsLinesRoute: SettingsLinesRoute,
   SettingsPaymentRoute: SettingsPaymentRoute,
@@ -894,6 +893,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsTerminalsRoute: SettingsTerminalsRoute,
   SettingsTypeRoute: SettingsTypeRoute,
   SettingsUpdatesRoute: SettingsUpdatesRoute,
+  SettingsVisibilityRoute: SettingsVisibilityRoute,
   SettingsWhatsappRoute: SettingsWhatsappRoute,
   ReportsIndexRoute: ReportsIndexRoute,
   SettingsIndexRoute: SettingsIndexRoute,

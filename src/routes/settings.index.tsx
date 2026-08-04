@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 import {
   Building2,
   Landmark,
-  Clock,
   ListPlus,
+  EyeOff,
   MessageCircle,
   MonitorCog,
   MonitorSmartphone,
@@ -105,16 +105,23 @@ const GROUPS = [
         blurb: "Global tax rate and inclusive or exclusive pricing.",
       },
       {
-        to: "/settings/hours",
-        label: "Trading hours & shifts",
-        icon: Clock,
-        blurb: "Day start and end, shift length limit and close reminders.",
-      },
-      {
         to: "/settings/sku",
         label: "SKU numbering",
         icon: ScanBarcode,
         blurb: "Automatic running-number product codes, or manual entry.",
+      },
+    ],
+  },
+  {
+    id: "access",
+    label: "Access & visibility",
+    blurb: "What each role can see on the busiest screens.",
+    pages: [
+      {
+        to: "/settings/visibility",
+        label: "Screen visibility",
+        icon: EyeOff,
+        blurb: "Hide register actions, payments or cost columns per role.",
       },
     ],
   },
