@@ -25,13 +25,26 @@ const OPTIONAL_COLUMNS: Record<string, string[]> = {
     "custom_lines",
     "qr",
     "whatsapp_settings",
+    "day_start_time",
+    "day_end_time",
+    "max_shift_hours",
+    "shift_reminder_minutes",
+    "ui_visibility",
   ],
 };
 
-const strip = (table: string, rows: Record<string, unknown>[]) =>
+/**
+ * PostgREST reports an unknown column as
+ * `Could not find the 'day_end_time' column of 'pos_settings' in the schema cache`.
+ * Pull the column name out so the row can be retried without it.
+ */
+const missingColumn = (message: string): string | null =>
+  /Could not find the '([^']+)' column/i.exec(message)?.[1] ?? null;
+
+const strip = (rows: Record<string, unknown>[], columns: string[]) =>
   rows.map((r) => {
     const copy = { ...r };
-    for (const c of OPTIONAL_COLUMNS[table] ?? []) delete copy[c];
+    for (const c of columns) delete copy[c];
     return copy;
   });
 
@@ -69,14 +82,22 @@ async function execute(op: SyncOp): Promise<QueryResult> {
 
 async function runOne(entry: QueuedOp): Promise<boolean> {
   let res = await execute(entry.op);
-  // PGRST204 = column missing from the schema cache. Retry without the
-  // optional branding columns so the core row still saves.
-  if (
-    res.error?.code === "PGRST204" &&
-    (entry.op.kind === "upsert" || entry.op.kind === "insert")
-  ) {
-    const rows = strip(entry.op.table, entry.op.rows);
-    res = await execute({ ...entry.op, rows } as SyncOp);
+  // PGRST204 = column missing from the schema cache. Older databases simply do
+  // not have the newer columns yet, so drop whichever column the error names
+  // (falling back to the known-optional list) and retry until the core row saves.
+  if (entry.op.kind === "upsert" || entry.op.kind === "insert") {
+    const dropped: string[] = [];
+    let guard = 0;
+    while (res.error?.code === "PGRST204" && guard++ < 12) {
+      const named = missingColumn(res.error.message);
+      const next = named ? [named] : (OPTIONAL_COLUMNS[entry.op.table] ?? []);
+      if (!next.length || next.every((c) => dropped.includes(c))) break;
+      dropped.push(...next);
+      res = await execute({
+        ...entry.op,
+        rows: strip(entry.op.rows, dropped),
+      } as SyncOp);
+    }
   }
   if (res.error) {
     const message =
