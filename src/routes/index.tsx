@@ -935,7 +935,9 @@ function Register() {
             shiftOpen={!!activeShift}
             onAdd={addLine}
             onDetail={setDetailId}
-            onOpenCustomerDisplay={openCustomerDisplay}
+            onOpenCustomerDisplay={
+              visible("register.customerDisplay") ? openCustomerDisplay : undefined
+            }
             onOpenShift={() => setOpenShiftOpen(true)}
             showSearch={false}
           />
