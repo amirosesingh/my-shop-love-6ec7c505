@@ -70,6 +70,8 @@ type NewTransfer = {
   items: { productId: string; qty: number }[];
   note: string;
   createdBy: string;
+  /** hold the note as "requested" until somebody authorises it */
+  needsApproval?: boolean;
 };
 
 export type NewBooking = {
@@ -174,6 +176,7 @@ function applyCloud(s: PosState, cloud: CloudSlice): PosState {
       whatsapp: { ...defaultSettings.whatsapp, ...cloudSettings?.whatsapp },
       review: { ...defaultSettings.review, ...cloudSettings?.review },
       hours: { ...defaultSettings.hours, ...cloudSettings?.hours },
+      integrations: { ...defaultSettings.integrations, ...cloudSettings?.integrations },
       visibility: { ...defaultSettings.visibility, ...cloudSettings?.visibility },
     },
     // Keep the bill counter ahead of every receipt already in the cloud.
@@ -920,6 +923,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
         whatsapp: { ...prev.whatsapp, ...(patch.whatsapp ?? {}) },
         review: { ...prev.review, ...(patch.review ?? {}) },
         hours: { ...prev.hours, ...(patch.hours ?? {}) },
+        integrations: { ...prev.integrations, ...(patch.integrations ?? {}) },
         visibility: { ...prev.visibility, ...(patch.visibility ?? {}) },
       });
     }
@@ -932,6 +936,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
         whatsapp: { ...s.settings.whatsapp, ...(patch.whatsapp ?? {}) },
         review: { ...s.settings.review, ...(patch.review ?? {}) },
         hours: { ...s.settings.hours, ...(patch.hours ?? {}) },
+        integrations: { ...s.settings.integrations, ...(patch.integrations ?? {}) },
         visibility: { ...s.settings.visibility, ...(patch.visibility ?? {}) },
       },
     }));
@@ -939,11 +944,12 @@ export function PosProvider({ children }: { children: ReactNode }) {
 
   const createTransfer = useCallback((input: NewTransfer) => {
     const now = new Date().toISOString();
+    const { needsApproval, ...rest } = input;
     const transfer: Transfer = {
-      ...input,
+      ...rest,
       id: crypto.randomUUID(),
       ref: "",
-      status: input.kind === "transfer" ? "in_transit" : "requested",
+      status: input.kind === "transfer" && !needsApproval ? "in_transit" : "requested",
       createdAt: now,
       updatedAt: now,
     };

@@ -319,6 +319,17 @@ function saleBody(sale: Sale, member: Member | null, kind: ReceiptKind) {
       <tr><td>Subtotal</td><td class="r">${fmt(sign * sale.subtotal)}</td></tr>
       <tr><td>Discount</td><td class="r">-${fmt(sale.discount)}</td></tr>
       ${
+        sale.couponCode
+          ? `<tr><td>Voucher ${esc(sale.couponCode)}${
+              sale.couponName ? `<div class="muted">${esc(sale.couponName)}</div>` : ""
+            }</td><td class="r">-${fmt(sale.couponDiscount ?? 0)}</td></tr>${
+              sale.couponRemaining && sale.couponRemaining > 0
+                ? `<tr><td class="muted">Voucher balance left</td><td class="r muted">${fmt(sale.couponRemaining)}</td></tr>`
+                : ""
+            }`
+          : ""
+      }
+      ${
         sale.exchangeOfReceiptNo
           ? `<tr><td>Store Credit from Bill #${esc(sale.exchangeOfReceiptNo)}</td><td class="r">-${fmt(sale.exchangeCredit ?? 0)}</td></tr>`
           : ""

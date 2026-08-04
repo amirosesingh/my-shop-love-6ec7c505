@@ -54,6 +54,7 @@ export const PERMISSION_GROUPS = [
       "can_adjust_stock",
       "can_create_transfer",
       "can_receive_transfer",
+      "can_approve_transfer",
       "can_manage_locations",
     ],
   },
@@ -121,6 +122,7 @@ export type PermissionKey =
   | "can_adjust_stock"
   | "can_create_transfer"
   | "can_receive_transfer"
+  | "can_approve_transfer"
   | "can_manage_locations"
   | "can_add_member"
   | "can_edit_member_points"
@@ -167,6 +169,7 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   can_adjust_stock: "Adjust / recount stock",
   can_create_transfer: "Create stock transfer requests",
   can_receive_transfer: "Approve / receive transfers",
+  can_approve_transfer: "Authorise transfers before stock moves",
   can_manage_locations: "Manage locations & warehouses",
   can_add_member: "Add members",
   can_edit_member_points: "Edit member points",
@@ -225,6 +228,7 @@ export const WAREHOUSE_PERMISSIONS: StaffPermissions = build([
   "can_adjust_stock",
   "can_create_transfer",
   "can_receive_transfer",
+  "can_approve_transfer",
   "can_manage_locations",
 ]);
 

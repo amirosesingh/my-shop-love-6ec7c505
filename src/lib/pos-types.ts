@@ -182,7 +182,12 @@ export type Sale = {
   couponScope?: "bill" | "item";
   /** currency value the coupon took off */
   couponDiscount?: number;
+  /** unused value left on a fixed-amount voucher after this bill */
+  couponRemaining?: number;
+  /** campaign the voucher belongs to, printed on the slip */
+  couponName?: string;
 };
+
 
 export type Shift = {
   id: string;
@@ -491,8 +496,24 @@ export type AppSettings = {
   whatsapp: WhatsAppSettings;
   review: ReviewThresholds;
   hours: TradingHours;
+  /** Domains, approval rules and other operational switches. */
+  integrations: IntegrationSettings;
   /** Admin-controlled screen elements hidden from chosen roles. */
   visibility: UiVisibility;
+};
+
+/** Operational switches an admin can change from System & Integrations. */
+export type IntegrationSettings = {
+  /** public member signup domain */
+  memberDomain: string;
+  /** public voucher redemption domain */
+  redeemDomain: string;
+  /** transfers must be approved before stock moves */
+  requireTransferApproval: boolean;
+  /** hand out the welcome voucher automatically on member signup */
+  autoIssueWelcome: boolean;
+  /** keep working from the local cache even when the cloud is reachable */
+  offlineMode: boolean;
 };
 
 /**

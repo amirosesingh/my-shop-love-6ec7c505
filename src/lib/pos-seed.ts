@@ -71,6 +71,15 @@ export const defaultTradingHours: TradingHours = {
   reminderMinutes: 30,
 };
 
+/** Public domains and operational switches, editable in System & Integrations. */
+export const defaultIntegrations: AppSettings["integrations"] = {
+  memberDomain: "https://member.luckycharmsdnbhd.com",
+  redeemDomain: "https://redeem.luckycharmsdnbhd.com",
+  requireTransferApproval: true,
+  autoIssueWelcome: false,
+  offlineMode: false,
+};
+
 export const defaultSettings: AppSettings = {
   tax: { enabled: true, rate: 5, mode: "exclusive" },
   receipt: defaultReceiptSettings,
@@ -78,6 +87,7 @@ export const defaultSettings: AppSettings = {
   whatsapp: defaultWhatsApp,
   review: defaultReviewThresholds,
   hours: defaultTradingHours,
+  integrations: defaultIntegrations,
   visibility: { hidden: {} },
 };
 

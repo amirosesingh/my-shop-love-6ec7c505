@@ -45,8 +45,15 @@ export function CouponAuditLog({
   const [campaignId, setCampaignId] = useState("all");
   const [type, setType] = useState("all");
   const [storeId, setStoreId] = useState("all");
+  const [cashier, setCashier] = useState("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+
+  const cashiers = useMemo(
+    () =>
+      Array.from(new Set(events.map((e) => e.staffName).filter(Boolean) as string[])).sort(),
+    [events],
+  );
 
   const rows = useMemo(
     () =>
@@ -54,12 +61,13 @@ export function CouponAuditLog({
         if (campaignId !== "all" && e.campaignId !== campaignId) return false;
         if (type !== "all" && e.type !== type) return false;
         if (storeId !== "all" && (e.storeId ?? "") !== storeId) return false;
+        if (cashier !== "all" && (e.staffName ?? "") !== cashier) return false;
         const at = new Date(e.createdAt);
         if (from && at < new Date(from)) return false;
         if (to && at > new Date(`${to}T23:59:59`)) return false;
         return true;
       }),
-    [events, campaignId, type, storeId, from, to],
+    [events, campaignId, type, storeId, cashier, from, to],
   );
 
   const storeName = (id: string | null) =>
@@ -85,7 +93,7 @@ export function CouponAuditLog({
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
         <div className="space-y-1.5">
           <Label>Campaign</Label>
           <ThemedSelect
@@ -119,6 +127,17 @@ export function CouponAuditLog({
             options={[
               { value: "all", label: "All shops" },
               ...stores.map((s) => ({ value: s.id, label: s.name })),
+            ]}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Cashier</Label>
+          <ThemedSelect
+            value={cashier}
+            onChange={setCashier}
+            options={[
+              { value: "all", label: "All cashiers" },
+              ...cashiers.map((c) => ({ value: c, label: c })),
             ]}
           />
         </div>
