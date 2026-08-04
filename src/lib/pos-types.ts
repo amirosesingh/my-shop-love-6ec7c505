@@ -4,6 +4,8 @@ export type Store = {
   name: string;
   address: string;
   phone: string;
+  /** prefix stamped on every receipt number raised at this branch */
+  receiptPrefix?: string;
   /** optional branch-level receipt branding overrides */
   receiptOverrides?: ReceiptOverride;
 };

@@ -24,7 +24,7 @@ import {
   rawPulse,
   silentPrint,
 } from "./receipt-printer";
-import { htmlToEscPos } from "./escpos";
+import { columnsForPaper, htmlToEscPos } from "./escpos";
 
 export const STORE = {
   name: "NORTHWIND & CO.",
@@ -143,30 +143,86 @@ const qrBlock = (placement: "header" | "footer") =>
     ? qrSvg(receiptCfg.qr.value, receiptCfg.qr.size || 96)
     : "";
 
-/** Deterministic Code39-style bar pattern rendered from any reference string. */
-export function barcodeSvg(value: string) {
-  const chars = `*${value.toUpperCase()}*`.split("");
-  let bars = "";
-  chars.forEach((ch, i) => {
-    const code = ch.charCodeAt(0) + i;
-    for (let b = 0; b < 5; b++) {
-      const wide = (code >> b) & 1;
-      bars += `<i style="width:${wide ? 3 : 1}px"></i>`;
-      bars += `<i style="width:${wide ? 1 : 2}px;background:transparent"></i>`;
+/**
+ * Real Code 39 barcode drawn as inline SVG.
+ *
+ * SVG shapes print through every driver, unlike CSS background colours which
+ * Windows and browsers drop from printouts by default — that is why the bars
+ * used to vanish and only the number came out.
+ */
+export function barcodeSvg(value: string, height = 44) {
+  const clean = code39Text(value);
+  if (!clean) return "";
+  const NARROW = 2;
+  const WIDE = 5;
+  let x = 0;
+  let rects = "";
+  const chars = `*${clean}*`.split("");
+  chars.forEach((ch, idx) => {
+    const pattern = CODE39[ch];
+    if (!pattern) return;
+    for (let i = 0; i < pattern.length; i++) {
+      const w = pattern[i] === "1" ? WIDE : NARROW;
+      if (i % 2 === 0) rects += `<rect x="${x}" y="0" width="${w}" height="${height}" fill="#000"/>`;
+      x += w;
     }
+    if (idx < chars.length - 1) x += NARROW; // inter-character gap
   });
-  return `<div class="barcode">${bars}</div><div class="bc-text">${esc(value)}</div>`;
+  return `<div class="barcode"><svg width="100%" height="${height}" viewBox="0 0 ${x} ${height}" preserveAspectRatio="none" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg"><rect width="${x}" height="${height}" fill="#fff"/>${rects}</svg></div><div class="bc-text">${esc(
+    clean,
+  )}</div>`;
+}
+
+/** Code 39 patterns: 9 elements per character, 1 = wide, 0 = narrow. */
+const CODE39: Record<string, string> = {
+  "0": "000110100", "1": "100100001", "2": "001100001", "3": "101100000",
+  "4": "000110001", "5": "100110000", "6": "001110000", "7": "000100101",
+  "8": "100100100", "9": "001100100", A: "100001001", B: "001001001",
+  C: "101001000", D: "000011001", E: "100011000", F: "001011000",
+  G: "000001101", H: "100001100", I: "001001100", J: "000011100",
+  K: "100000011", L: "001000011", M: "101000010", N: "000010011",
+  O: "100010010", P: "001010010", Q: "000000111", R: "100000110",
+  S: "001000110", T: "000010110", U: "110000001", V: "011000001",
+  W: "111000000", X: "010010001", Y: "110010000", Z: "011010000",
+  "-": "010000101", ".": "110000100", " ": "011000100", $: "010101000",
+  "/": "010100010", "+": "010001010", "%": "000101010",
+};
+
+/** Strip anything Code 39 cannot represent. */
+export function code39Text(value: string) {
+  return value
+    .toUpperCase()
+    .split("")
+    .filter((c) => c !== "*" && CODE39[c])
+    .join("");
+}
+
+const PAPER_MM: Record<PaperSize, number> = {
+  "58mm": 58,
+  "80mm": 80,
+  a4: 210,
+  letter: 216,
+};
+
+/** Terminal-configured page margins, in millimetres. */
+function printMargins() {
+  const m = getPrinterPrefs().margins ?? { top: 4, right: 4, bottom: 4, left: 4 };
+  return m;
 }
 
 const shell = (title: string, body: string, autoPrint = true) => {
   const p = paperCss(receiptCfg.paper);
   const f = receiptCfg.fonts ?? defaultReceiptSettings.fonts;
+  const m = printMargins();
+  const width = Math.max(20, (PAPER_MM[receiptCfg.paper] ?? 80) - m.left - m.right);
+  const bodyWidth = `${width}mm`;
   return `<!doctype html><html><head>
 <meta charset="utf-8"><title>${esc(title)}</title>
 <style>
-  @page { size: ${p.page}; margin: ${receiptCfg.paper === "58mm" ? "3mm" : receiptCfg.paper === "80mm" ? "4mm" : "12mm"}; }
+  @page { size: ${p.page}; margin: ${m.top}mm ${m.right}mm ${m.bottom}mm ${m.left}mm; }
   * { box-sizing: border-box; }
-  body { ${fontCss(f.body)} color: #000; margin: 0 auto; width: ${p.width}; }
+  html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { ${fontCss(f.body)} color: #000; margin: 0 auto; width: ${bodyWidth}; max-width: 100%; overflow-wrap: anywhere; }
   .rcpt-head { ${fontCss(f.header)} }
   .rcpt-foot { ${fontCss(f.footer)} }
   h1 { ${fontCss(f.header)} font-size: ${Math.round(f.header.size * 1.25)}px; text-align: center; margin: 0 0 2px; }
@@ -181,11 +237,11 @@ const shell = (title: string, body: string, autoPrint = true) => {
   .b { font-weight: 700; }
   .big { font-size: 1.2em; }
   .tag { border: 1px solid #000; padding: 2px 4px; display: inline-block; margin-top: 4px; font-size: 0.8em; letter-spacing: 1px; }
-  .barcode { display: flex; align-items: flex-end; justify-content: center; height: 38px; gap: 1px; margin-top: 6px; }
-  .barcode i { display: block; background: #000; height: 100%; }
+  .barcode { margin-top: 6px; width: 100%; }
+  .barcode svg { display: block; width: 100%; }
   .bc-text { text-align: center; font-size: 0.85em; letter-spacing: 3px; margin-top: 2px; }
   @media print {
-    html, body { width: ${p.width}; margin: 0 auto; }
+    html, body { width: ${bodyWidth}; margin: 0 auto; }
     .no-print { display: none !important; }
   }
 </style></head><body>${body}
@@ -388,7 +444,7 @@ function memberBody(member: Member, sales: Sale[]) {
  * Desktop `thermal` mode -> ESC/POS text through the RAW spooler (slips only).
  * Browser                -> classic hidden iframe with the print dialog.
  */
-function printHtml(title: string, body: string, slip = true) {
+function printHtml(title: string, body: string, slip = true, barcode?: string) {
   const desktopHtml = shell(title, body, false);
   const paper = receiptCfg.paper;
   const mode = getPrinterPrefs().printMode ?? "dialog";
@@ -400,9 +456,18 @@ function printHtml(title: string, body: string, slip = true) {
   void (async () => {
     if (thermal) {
       const prefs = getPrinterPrefs();
+      const m = printMargins();
+      const ref = paper === "58mm" ? 50 : 72;
+      const printable = Math.max(20, (PAPER_MM[paper] ?? 80) - m.left - m.right);
+      const cols = Math.max(
+        16,
+        Math.floor(columnsForPaper(paper) * Math.min(1, printable / ref)),
+      );
       const bytes = htmlToEscPos(desktopHtml, paper, {
         encoding: prefs.encoding ?? "cp437",
         lineEnding: prefs.lineEnding ?? "lf",
+        cols,
+        ...(barcode ? { barcode: code39Text(barcode) } : {}),
       });
       const res = await rawPulse(bytes);
       if (res.handled) {
@@ -436,7 +501,16 @@ export function printSaleReceipt(
   member: Member | null,
   kind: ReceiptKind = "sale",
 ) {
-  printHtml(`${sale.receiptNo} ${kind}`, saleBody(sale, member, kind));
+  printHtml(
+    `${sale.receiptNo} ${kind}`,
+    saleBody(sale, member, kind),
+    true,
+    receiptCfg.showBarcode && kind !== "kitchen"
+      ? kind === "gift"
+        ? `GIFT-${sale.receiptNo}`
+        : sale.receiptNo
+      : undefined,
+  );
 }
 
 export function printShiftReport(shift: Shift, sales: Sale[], kind: "xreport" | "zreport") {
@@ -552,7 +626,12 @@ export function printBookingSlip(
   member: Member | null,
   pay: PaymentDetails | null,
 ) {
-  printHtml(`${booking.ref} booking`, bookingBody(booking, member, pay));
+  printHtml(
+    `${booking.ref} booking`,
+    bookingBody(booking, member, pay),
+    true,
+    receiptCfg.showBarcode ? booking.ref : undefined,
+  );
 }
 
 export function printBookingPayment(booking: Booking, payment: BookingPayment) {

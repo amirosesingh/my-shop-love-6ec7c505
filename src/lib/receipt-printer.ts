@@ -45,6 +45,8 @@ export type PrinterPrefs = {
   encoding?: SlipEncoding;
   /** Line terminator this printer expects: LF or CRLF. */
   lineEnding?: SlipLineEnding;
+  /** Page margins in millimetres applied to every printed document. */
+  margins?: { top: number; right: number; bottom: number; left: number };
 };
 
 const EMPTY: PrinterPrefs = {
@@ -54,7 +56,24 @@ const EMPTY: PrinterPrefs = {
   printMode: "dialog",
   encoding: "cp437",
   lineEnding: "lf",
+  margins: { top: 4, right: 4, bottom: 4, left: 4 },
 };
+
+const mm = (v: unknown, fallback: number) => {
+  const n = typeof v === "number" ? v : Number(v);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(30, Math.max(0, Math.round(n * 10) / 10));
+};
+
+function normalizeMargins(v: unknown): NonNullable<PrinterPrefs["margins"]> {
+  const m = (v ?? {}) as Partial<NonNullable<PrinterPrefs["margins"]>>;
+  return {
+    top: mm(m.top, 4),
+    right: mm(m.right, 4),
+    bottom: mm(m.bottom, 4),
+    left: mm(m.left, 4),
+  };
+}
 
 const ENCODINGS: SlipEncoding[] = ["ascii", "cp437", "cp850", "cp858", "utf8"];
 
@@ -92,6 +111,7 @@ export function getPrinterPrefs(): PrinterPrefs {
       printMode: normalizeMode(parsed.printMode),
       encoding: normalizeEncoding(parsed.encoding),
       lineEnding: normalizeLineEnding(parsed.lineEnding),
+      margins: normalizeMargins(parsed.margins),
     };
   } catch {
     return EMPTY;

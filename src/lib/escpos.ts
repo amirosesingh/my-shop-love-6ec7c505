@@ -180,13 +180,22 @@ export function htmlToSlip(html: string, cols: number): SlipLine[] {
 /** Encode slip lines as ESC/POS bytes (init, styling, feed, cut). */
 export function slipToBytes(
   lines: SlipLine[],
-  opts: { cut?: boolean; encoding?: SlipEncoding; lineEnding?: SlipLineEnding } = {},
+  opts: {
+    cut?: boolean;
+    encoding?: SlipEncoding;
+    lineEnding?: SlipLineEnding;
+    /** Code 39 value printed as a real barcode at the end of the slip. */
+    barcode?: string;
+    /** Blank columns inserted at the start of every line (left margin). */
+    indent?: number;
+  } = {},
 ): number[] {
   const encoding = opts.encoding ?? "cp437";
   const eol = opts.lineEnding === "crlf" ? [0x0d, 0x0a] : [0x0a];
   const bytes: number[] = [ESC, 0x40]; // initialise
   const page = CODE_PAGE[encoding];
   if (page !== undefined) bytes.push(ESC, 0x74, page); // select character code table
+  const pad = " ".repeat(Math.max(0, Math.min(8, opts.indent ?? 0)));
   const text = (s: string) => {
     for (const b of encodeText(s, encoding)) bytes.push(b);
   };
@@ -195,11 +204,23 @@ export function slipToBytes(
     bytes.push(ESC, 0x61, line.align === "center" ? 1 : 0);
     bytes.push(ESC, 0x45, line.bold ? 1 : 0);
     bytes.push(GS, 0x21, line.big ? 0x11 : 0x00);
-    text(line.text);
+    text(line.align === "center" ? line.text : pad + line.text);
     bytes.push(...eol);
   }
 
   bytes.push(ESC, 0x61, 0, ESC, 0x45, 0, GS, 0x21, 0x00);
+  const bc = (opts.barcode ?? "").toUpperCase().replace(/[^0-9A-Z\-.$/+% ]/g, "");
+  if (bc) {
+    bytes.push(ESC, 0x61, 1); // centre
+    bytes.push(GS, 0x68, 60); // barcode height
+    bytes.push(GS, 0x77, 2); // module width
+    bytes.push(GS, 0x48, 2); // print the number below the bars
+    bytes.push(GS, 0x6b, 4); // Code 39, NUL-terminated
+    for (const b of encodeText(bc, "ascii")) bytes.push(b);
+    bytes.push(0x00);
+    bytes.push(...eol);
+    bytes.push(ESC, 0x61, 0);
+  }
   for (let i = 0; i < 4; i++) bytes.push(...eol);
   if (opts.cut !== false) bytes.push(GS, 0x56, 66, 0x00); // partial cut with feed
   return bytes;
@@ -213,7 +234,15 @@ export function columnsForPaper(paper: string): number {
 export function htmlToEscPos(
   html: string,
   paper: string,
-  opts: { encoding?: SlipEncoding; lineEnding?: SlipLineEnding } = {},
+  opts: {
+    encoding?: SlipEncoding;
+    lineEnding?: SlipLineEnding;
+    barcode?: string;
+    indent?: number;
+    /** Override the printable column count (narrower paper / wider margins). */
+    cols?: number;
+  } = {},
 ): number[] {
-  return slipToBytes(htmlToSlip(html, columnsForPaper(paper)), opts);
+  const cols = Math.max(16, (opts.cols ?? columnsForPaper(paper)) - Math.max(0, opts.indent ?? 0));
+  return slipToBytes(htmlToSlip(html, cols), opts);
 }

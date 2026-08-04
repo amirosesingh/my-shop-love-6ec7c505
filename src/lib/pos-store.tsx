@@ -358,7 +358,9 @@ export function PosProvider({ children }: { children: ReactNode }) {
     const sale: Sale = {
       ...input,
       id: crypto.randomUUID(),
-      receiptNo: `${store?.code ?? "R"}-${String(counter).padStart(6, "0")}`,
+      receiptNo: `${(store?.receiptPrefix?.trim() || store?.code || "R").toUpperCase()}-${String(
+        counter,
+      ).padStart(6, "0")}`,
       createdAt: new Date().toISOString(),
     };
 
