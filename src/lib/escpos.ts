@@ -17,6 +17,62 @@ export type SlipLine = {
   big?: boolean;
 };
 
+/** Character encoding used for the bytes sent to the printer. */
+export type SlipEncoding = "ascii" | "cp437" | "cp850" | "cp858" | "utf8";
+/** Byte sequence that terminates each printed line. */
+export type SlipLineEnding = "lf" | "crlf";
+
+/** ESC t code-page selector for each supported encoding (utf8/ascii: none). */
+const CODE_PAGE: Partial<Record<SlipEncoding, number>> = {
+  cp437: 0,
+  cp850: 2,
+  cp858: 19,
+};
+
+/**
+ * High-range characters shared by CP437/CP850/CP858. Only the symbols that
+ * realistically appear on a receipt (currency, accents, box rules) are mapped;
+ * anything else degrades to '?'.
+ */
+const CP437_HIGH: Record<string, number> = {
+  "Ç": 0x80, "ü": 0x81, "é": 0x82, "â": 0x83, "ä": 0x84, "à": 0x85, "å": 0x86,
+  "ç": 0x87, "ê": 0x88, "ë": 0x89, "è": 0x8a, "ï": 0x8b, "î": 0x8c, "ì": 0x8d,
+  "Ä": 0x8e, "Å": 0x8f, "É": 0x90, "æ": 0x91, "Æ": 0x92, "ô": 0x93, "ö": 0x94,
+  "ò": 0x95, "û": 0x96, "ù": 0x97, "ÿ": 0x98, "Ö": 0x99, "Ü": 0x9a, "¢": 0x9b,
+  "£": 0x9c, "¥": 0x9d, "ƒ": 0x9f, "á": 0xa0, "í": 0xa1, "ó": 0xa2, "ú": 0xa3,
+  "ñ": 0xa4, "Ñ": 0xa5, "ª": 0xa6, "º": 0xa7, "¿": 0xa8, "½": 0xab, "¼": 0xac,
+  "¡": 0xad, "«": 0xae, "»": 0xaf, "░": 0xb0, "─": 0xc4, "═": 0xcd, "°": 0xf8,
+  "·": 0xfa, "²": 0xfd, "■": 0xfe,
+};
+
+const CP850_EXTRA: Record<string, number> = {
+  "ø": 0x9b, "Ø": 0x9d, "×": 0x9e, "®": 0xa9, "©": 0xb8, "¤": 0xcf, "ð": 0xd0,
+  "Ð": 0xd1, "þ": 0xe7, "Þ": 0xe8, "µ": 0xe6, "±": 0xf1, "¾": 0xf3, "¶": 0xf4,
+  "§": 0xf5, "÷": 0xf6, "¹": 0xfb, "³": 0xfc,
+};
+
+// CP858 is CP850 with the euro sign at 0xD5.
+const CP858_EXTRA: Record<string, number> = { ...CP850_EXTRA, "€": 0xd5 };
+
+function highMap(encoding: SlipEncoding): Record<string, number> {
+  if (encoding === "cp850") return { ...CP437_HIGH, ...CP850_EXTRA };
+  if (encoding === "cp858") return { ...CP437_HIGH, ...CP858_EXTRA };
+  return CP437_HIGH;
+}
+
+/** Encode one string into printer bytes for the chosen encoding. */
+export function encodeText(s: string, encoding: SlipEncoding): number[] {
+  if (encoding === "utf8") return Array.from(new TextEncoder().encode(s));
+  const map = encoding === "ascii" ? {} : highMap(encoding);
+  const out: number[] = [];
+  for (const ch of s) {
+    const code = ch.codePointAt(0) ?? 0x3f;
+    if (code < 0x80) out.push(code);
+    else out.push(map[ch] ?? 0x3f);
+  }
+  return out;
+}
+
 const collapse = (s: string) => s.replace(/\s+/g, " ").trim();
 
 /** Fold a long string onto `cols` characters. */
@@ -122,13 +178,17 @@ export function htmlToSlip(html: string, cols: number): SlipLine[] {
 }
 
 /** Encode slip lines as ESC/POS bytes (init, styling, feed, cut). */
-export function slipToBytes(lines: SlipLine[], opts: { cut?: boolean } = {}): number[] {
+export function slipToBytes(
+  lines: SlipLine[],
+  opts: { cut?: boolean; encoding?: SlipEncoding; lineEnding?: SlipLineEnding } = {},
+): number[] {
+  const encoding = opts.encoding ?? "cp437";
+  const eol = opts.lineEnding === "crlf" ? [0x0d, 0x0a] : [0x0a];
   const bytes: number[] = [ESC, 0x40]; // initialise
+  const page = CODE_PAGE[encoding];
+  if (page !== undefined) bytes.push(ESC, 0x74, page); // select character code table
   const text = (s: string) => {
-    for (const ch of s) {
-      const code = ch.charCodeAt(0);
-      bytes.push(code < 0x80 ? code : 0x3f); // '?' for anything outside ASCII
-    }
+    for (const b of encodeText(s, encoding)) bytes.push(b);
   };
 
   for (const line of lines) {
@@ -136,11 +196,11 @@ export function slipToBytes(lines: SlipLine[], opts: { cut?: boolean } = {}): nu
     bytes.push(ESC, 0x45, line.bold ? 1 : 0);
     bytes.push(GS, 0x21, line.big ? 0x11 : 0x00);
     text(line.text);
-    bytes.push(0x0a);
+    bytes.push(...eol);
   }
 
   bytes.push(ESC, 0x61, 0, ESC, 0x45, 0, GS, 0x21, 0x00);
-  bytes.push(0x0a, 0x0a, 0x0a, 0x0a);
+  for (let i = 0; i < 4; i++) bytes.push(...eol);
   if (opts.cut !== false) bytes.push(GS, 0x56, 66, 0x00); // partial cut with feed
   return bytes;
 }
@@ -150,6 +210,10 @@ export function columnsForPaper(paper: string): number {
   return paper === "58mm" ? 32 : 42;
 }
 
-export function htmlToEscPos(html: string, paper: string): number[] {
-  return slipToBytes(htmlToSlip(html, columnsForPaper(paper)));
+export function htmlToEscPos(
+  html: string,
+  paper: string,
+  opts: { encoding?: SlipEncoding; lineEnding?: SlipLineEnding } = {},
+): number[] {
+  return slipToBytes(htmlToSlip(html, columnsForPaper(paper)), opts);
 }
