@@ -292,9 +292,34 @@ const shiftToRow = (s: Shift): Row => ({
   updated_at: new Date().toISOString(),
 });
 
-const rowToSale = (r: Row): Sale => ({
+const rowToShiftSession = (r: Row): ShiftSession => ({
   id: r.id,
-  receiptNo: r.bill_number,
+  shiftId: r.shift_id ?? "",
+  storeId: r.store_id ?? "",
+  terminalId: r.terminal_id ?? null,
+  terminalName: r.terminal_name ?? null,
+  staffId: r.staff_id ?? null,
+  staffName: r.staff_name ?? "",
+  role: r.role ?? null,
+  signedInAt: r.signed_in_at,
+  signedOutAt: r.signed_out_at ?? null,
+});
+
+const shiftSessionToRow = (s: ShiftSession): Row => ({
+  id: s.id,
+  shift_id: s.shiftId,
+  store_id: s.storeId,
+  terminal_id: s.terminalId ?? null,
+  terminal_name: s.terminalName ?? null,
+  staff_id: s.staffId ?? null,
+  staff_name: s.staffName,
+  role: s.role ?? null,
+  signed_in_at: s.signedInAt,
+  signed_out_at: s.signedOutAt ?? null,
+  updated_at: new Date().toISOString(),
+});
+
+const rowToSale = (r: Row): Sale => ({
   id: r.id,
   receiptNo: r.bill_number,
   storeId: r.store_id ?? "",
