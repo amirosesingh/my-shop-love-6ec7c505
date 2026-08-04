@@ -255,6 +255,99 @@ export async function loadCouponEvents(campaignId?: string): Promise<CouponEvent
   return ((res.data as Row[] | null) ?? []).map(toEvent);
 }
 
+/* ------------------------------ analytics -------------------------------- */
+
+export type CampaignStats = {
+  campaign: Campaign;
+  issued: number;
+  claimedPublic: number;
+  issuedManual: number;
+  redeemed: number;
+  redemptionRate: number;
+  /** total value of bills that used one of this campaign's vouchers */
+  revenue: number;
+  /** discount given away on those bills */
+  discount: number;
+};
+
+/**
+ * Per-campaign performance over a date range. Revenue impact is read from the
+ * real bills the redeemed vouchers were attached to, not estimated.
+ */
+export async function loadCampaignStats(range?: {
+  from?: string;
+  to?: string;
+}): Promise<CampaignStats[]> {
+  const [campaigns, vouchers] = await Promise.all([loadCampaigns(), loadVouchers()]);
+  const from = range?.from ? new Date(range.from) : null;
+  const to = range?.to ? new Date(range.to) : null;
+  const inRange = (iso?: string | null) => {
+    if (!iso) return false;
+    const d = new Date(iso);
+    if (from && d < from) return false;
+    if (to && d > to) return false;
+    return true;
+  };
+
+  const live = vouchers.filter((v) => inRange(v.issuedAt) || inRange(v.redeemedAt));
+  const saleIds = live
+    .map((v) => v.redeemedSaleId)
+    .filter((s): s is string => Boolean(s));
+
+  const bills = new Map<string, { total: number; discount: number }>();
+  if (saleIds.length) {
+    const res = await sb
+      .from("sales")
+      .select("bill_number, total_amount, discount_amount, coupon_discount")
+      .in("bill_number", saleIds);
+    for (const r of ((res.data as Row[] | null) ?? [])) {
+      bills.set(r.bill_number, {
+        total: Number(r.total_amount ?? 0),
+        discount: Number(r.coupon_discount ?? r.discount_amount ?? 0),
+      });
+    }
+  }
+
+  return campaigns.map((campaign) => {
+    const mine = live.filter((v) => v.campaignId === campaign.id);
+    const redeemed = mine.filter((v) => v.status === "REDEEMED");
+    let revenue = 0;
+    let discount = 0;
+    for (const v of redeemed) {
+      const bill = v.redeemedSaleId ? bills.get(v.redeemedSaleId) : undefined;
+      if (!bill) continue;
+      revenue += bill.total;
+      discount += bill.discount;
+    }
+    return {
+      campaign,
+      issued: mine.length,
+      claimedPublic: mine.filter((v) => v.issuedSource !== "MANUAL").length,
+      issuedManual: mine.filter((v) => v.issuedSource === "MANUAL").length,
+      redeemed: redeemed.length,
+      redemptionRate: mine.length ? (redeemed.length / mine.length) * 100 : 0,
+      revenue: r2(revenue),
+      discount: r2(discount),
+    };
+  });
+}
+
+const csvCell = (v: unknown) => {
+  const s = v == null ? "" : String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+};
+
+/** Turn rows into a CSV string and hand it to the browser as a download. */
+export function downloadCsv(filename: string, rows: (string | number | null)[][]) {
+  const csv = rows.map((r) => r.map(csvCell).join(",")).join("\n");
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 /* ------------------------------- rpc calls ------------------------------- */
 
 const friendly: Record<string, string> = {
