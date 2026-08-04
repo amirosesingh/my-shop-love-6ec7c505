@@ -653,6 +653,7 @@ export type Database = {
           closed_by_name: string | null
           closed_by_role: string | null
           closed_by_staff_id: string | null
+          closing_float: number | null
           counted_cash: number | null
           created_at: string
           expected_cash: number | null
@@ -664,16 +665,19 @@ export type Database = {
           opened_by_staff_id: string | null
           opening_float: number
           overdue: boolean
+          status: string
           store_id: string
           terminal_id: string | null
           terminal_name: string | null
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           closed_at?: string | null
           closed_by_name?: string | null
           closed_by_role?: string | null
           closed_by_staff_id?: string | null
+          closing_float?: number | null
           counted_cash?: number | null
           created_at?: string
           expected_cash?: number | null
@@ -685,16 +689,19 @@ export type Database = {
           opened_by_staff_id?: string | null
           opening_float?: number
           overdue?: boolean
+          status?: string
           store_id: string
           terminal_id?: string | null
           terminal_name?: string | null
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           closed_at?: string | null
           closed_by_name?: string | null
           closed_by_role?: string | null
           closed_by_staff_id?: string | null
+          closing_float?: number | null
           counted_cash?: number | null
           created_at?: string
           expected_cash?: number | null
@@ -706,10 +713,12 @@ export type Database = {
           opened_by_staff_id?: string | null
           opening_float?: number
           overdue?: boolean
+          status?: string
           store_id?: string
           terminal_id?: string | null
           terminal_name?: string | null
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
