@@ -156,6 +156,7 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  usePublicHostLanding();
 
   return (
     <QueryClientProvider client={queryClient}>
