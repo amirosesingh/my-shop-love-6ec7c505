@@ -104,12 +104,6 @@ export function ReceiptPrinterSettings() {
         </p>
       </div>
 
-      <div className="mt-4 space-y-1">
-        <Label className="text-xs text-muted-foreground">
-          Drawer connector pin
-        </Label>
-      </div>
-
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Character encoding</Label>
@@ -148,6 +142,7 @@ export function ReceiptPrinterSettings() {
       </div>
 
       <div className="mt-4 space-y-1">
+        <Label className="text-xs text-muted-foreground">Drawer connector pin</Label>
         <ThemedSelect
           value={String(prefs.drawerPin ?? 2)}
           onChange={(v: string) => update({ ...prefs, drawerPin: v === "5" ? 5 : 2 })}
