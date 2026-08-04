@@ -2225,6 +2225,57 @@ function Register() {
         member={state.members.find((m) => m.id === historyMemberId) ?? null}
         onOpenChange={(o) => !o && setHistoryMemberId(null)}
       />
+
+      {/* Close shift — straight from the register header */}
+      <Dialog open={closeShiftOpen} onOpenChange={setCloseShiftOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Close shift</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Opened by {activeShift?.cashier} · float{" "}
+              {money(activeShift?.openingFloat ?? 0)}
+            </p>
+            <div className="space-y-1">
+              <Label>Counted cash in drawer</Label>
+              <Input
+                className="numeric"
+                inputMode="decimal"
+                value={countedCash}
+                onChange={(e) => setCountedCash(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Note (optional)</Label>
+              <Input value={closeNote} onChange={(e) => setCloseNote(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCloseShiftOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                const amount = Number(countedCash);
+                if (!Number.isFinite(amount) || amount < 0) {
+                  toast.error("Enter the counted cash amount");
+                  return;
+                }
+                const closed = closeShift(amount, closeNote.trim());
+                if (!closed) {
+                  toast.error("This shift was opened on another terminal");
+                  return;
+                }
+                setCloseShiftOpen(false);
+                toast.success("Shift closed");
+              }}
+            >
+              Close shift
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
 }
