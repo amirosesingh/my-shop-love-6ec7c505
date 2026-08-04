@@ -322,6 +322,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           >
             {currentStore.code}
           </Badge>
+          <LiveClock compact />
           <SyncStatus />
           <ThemeToggle />
           <Button

@@ -74,13 +74,6 @@ export const navGroups: NavGroup[] = [
     blurb: "Selling, shifts, bookings and bill history.",
     items: [
       {
-        to: "/",
-        label: "Register POS",
-        icon: LayoutGrid,
-        keywords: "checkout cart sale",
-        blurb: "Scan, discount and charge a ticket.",
-      },
-      {
         to: "/shifts",
         label: "Shift Management",
         icon: Clock,
@@ -310,6 +303,13 @@ export const standaloneNavItems: NavItem[] = [
     flag: "can_view_dashboard",
     keywords: "revenue profit margin peak hours charts kpi review flags",
     blurb: "Revenue, profit and peak hours as they happen.",
+  },
+  {
+    to: "/",
+    label: "Register POS",
+    icon: LayoutGrid,
+    keywords: "checkout cart sale",
+    blurb: "Scan, discount and charge a ticket.",
   },
 ];
 export { Store };
