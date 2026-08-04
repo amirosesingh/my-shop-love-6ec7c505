@@ -180,7 +180,10 @@ export function BulkImportDialog({
         const product: Product = {
           id: crypto.randomUUID(),
           name: r.name,
-          sku: r.barcode,
+          sku:
+            readSkuSettings().mode === "auto"
+              ? nextSku(state.products.map((p) => p.sku))
+              : r.barcode,
           barcode: r.barcode,
           category: r.category,
           price: r.price,
