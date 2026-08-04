@@ -932,6 +932,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
         whatsapp: { ...s.settings.whatsapp, ...(patch.whatsapp ?? {}) },
         review: { ...s.settings.review, ...(patch.review ?? {}) },
         hours: { ...s.settings.hours, ...(patch.hours ?? {}) },
+        visibility: { ...s.settings.visibility, ...(patch.visibility ?? {}) },
       },
     }));
   }, []);
