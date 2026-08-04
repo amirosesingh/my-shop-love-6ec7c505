@@ -480,6 +480,25 @@ export async function loadCloudState(): Promise<CloudSlice> {
 /* ------------------------------- writers ------------------------------- */
 
 /**
+ * The one authoritative "is the till open?" question.
+ *
+ * Strictly status-driven: a shift opened on any past date stays active until
+ * something explicitly closes it. No date or time filtering here, ever.
+ */
+export async function loadActiveShift(storeId: string): Promise<Shift | null> {
+  const res = await supabase
+    .from("shifts" as never)
+    .select("*")
+    .eq("store_id", storeId)
+    .eq("status", "OPEN")
+    .order("opened_at", { ascending: false })
+    .limit(1);
+  if (res.error) throw res.error;
+  const rows = (res.data as Row[] | null) ?? [];
+  return rows.length ? rowToShift(rows[0]) : null;
+}
+
+/**
  * Writes never hit the network directly.
  *
  * On the Windows desktop shell they are committed to the local Microsoft SQL
