@@ -27,6 +27,7 @@ import { Route as SalesRouteImport } from './routes/sales'
 import { Route as ShiftsRouteImport } from './routes/shifts'
 import { Route as StaffRouteImport } from './routes/staff'
 import { Route as StoresRouteImport } from './routes/stores'
+import { Route as SuppliersRouteImport } from './routes/suppliers'
 import { Route as TransfersRouteImport } from './routes/transfers'
 import { Route as ReportsIndexRouteImport } from './routes/reports.index'
 import { Route as ReportsActivityRouteImport } from './routes/reports.activity'
@@ -139,6 +140,11 @@ const StaffRoute = StaffRouteImport.update({
 const StoresRoute = StoresRouteImport.update({
   id: '/stores',
   path: '/stores',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SuppliersRoute = SuppliersRouteImport.update({
+  id: '/suppliers',
+  path: '/suppliers',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TransfersRoute = TransfersRouteImport.update({
@@ -276,6 +282,7 @@ export interface FileRoutesByFullPath {
   '/shifts': typeof ShiftsRoute
   '/staff': typeof StaffRoute
   '/stores': typeof StoresRoute
+  '/suppliers': typeof SuppliersRoute
   '/transfers': typeof TransfersRoute
   '/reports/activity': typeof ReportsActivityRoute
   '/reports/catalog': typeof ReportsCatalogRoute
@@ -319,6 +326,7 @@ export interface FileRoutesByTo {
   '/shifts': typeof ShiftsRoute
   '/staff': typeof StaffRoute
   '/stores': typeof StoresRoute
+  '/suppliers': typeof SuppliersRoute
   '/transfers': typeof TransfersRoute
   '/reports/activity': typeof ReportsActivityRoute
   '/reports/catalog': typeof ReportsCatalogRoute
@@ -363,6 +371,7 @@ export interface FileRoutesById {
   '/shifts': typeof ShiftsRoute
   '/staff': typeof StaffRoute
   '/stores': typeof StoresRoute
+  '/suppliers': typeof SuppliersRoute
   '/transfers': typeof TransfersRoute
   '/reports/activity': typeof ReportsActivityRoute
   '/reports/catalog': typeof ReportsCatalogRoute
@@ -408,6 +417,7 @@ export interface FileRouteTypes {
     | '/shifts'
     | '/staff'
     | '/stores'
+    | '/suppliers'
     | '/transfers'
     | '/reports/activity'
     | '/reports/catalog'
@@ -451,6 +461,7 @@ export interface FileRouteTypes {
     | '/shifts'
     | '/staff'
     | '/stores'
+    | '/suppliers'
     | '/transfers'
     | '/reports/activity'
     | '/reports/catalog'
@@ -494,6 +505,7 @@ export interface FileRouteTypes {
     | '/shifts'
     | '/staff'
     | '/stores'
+    | '/suppliers'
     | '/transfers'
     | '/reports/activity'
     | '/reports/catalog'
@@ -538,6 +550,7 @@ export interface RootRouteChildren {
   ShiftsRoute: typeof ShiftsRoute
   StaffRoute: typeof StaffRoute
   StoresRoute: typeof StoresRoute
+  SuppliersRoute: typeof SuppliersRoute
   TransfersRoute: typeof TransfersRoute
   ReportsActivityRoute: typeof ReportsActivityRoute
   ReportsCatalogRoute: typeof ReportsCatalogRoute
@@ -689,6 +702,13 @@ declare module '@tanstack/react-router' {
       path: '/stores'
       fullPath: '/stores'
       preLoaderRoute: typeof StoresRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/suppliers': {
+      id: '/suppliers'
+      path: '/suppliers'
+      fullPath: '/suppliers'
+      preLoaderRoute: typeof SuppliersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/transfers': {
@@ -874,6 +894,7 @@ const rootRouteChildren: RootRouteChildren = {
   ShiftsRoute: ShiftsRoute,
   StaffRoute: StaffRoute,
   StoresRoute: StoresRoute,
+  SuppliersRoute: SuppliersRoute,
   TransfersRoute: TransfersRoute,
   ReportsActivityRoute: ReportsActivityRoute,
   ReportsCatalogRoute: ReportsCatalogRoute,
