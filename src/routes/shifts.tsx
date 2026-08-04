@@ -30,6 +30,9 @@ import { useAuth } from "@/lib/pos-auth";
 import { useUserPermissions } from "@/lib/pos-permissions";
 import { openCashDrawer, printSaleReceipt, printShiftReport } from "@/lib/pos-print";
 import { signInsForDay, type SignInEntry } from "@/lib/shift-attendance";
+import { localShiftSessions, mergeSessions } from "@/lib/shift-sessions";
+import { loadShiftSessions } from "@/lib/pos-db";
+import type { ShiftSession } from "@/lib/pos-types";
 
 export const Route = createFileRoute("/shifts")({
   head: () => ({
@@ -57,6 +60,7 @@ function Shifts() {
   const [note, setNote] = useState("");
   const [closeOpen, setCloseOpen] = useState(false);
   const [signIns, setSignIns] = useState<SignInEntry[]>([]);
+  const [sessions, setSessions] = useState<ShiftSession[]>([]);
 
   // Local per-terminal log — read after mount so SSR and hydration match.
   useEffect(() => {
@@ -65,6 +69,27 @@ function Shifts() {
     const t = window.setInterval(refresh, 30_000);
     return () => window.clearInterval(t);
   }, [user?.staffId]);
+
+  // Central record of every sign-in against a shift, with the local cache as
+  // the offline fallback.
+  useEffect(() => {
+    let alive = true;
+    const refresh = async () => {
+      const local = localShiftSessions();
+      try {
+        const remote = await loadShiftSessions(currentStore.id);
+        if (alive) setSessions(mergeSessions(remote, local));
+      } catch {
+        if (alive) setSessions(local);
+      }
+    };
+    void refresh();
+    const t = window.setInterval(() => void refresh(), 60_000);
+    return () => {
+      alive = false;
+      window.clearInterval(t);
+    };
+  }, [currentStore.id, activeShift?.id]);
 
   const storeSales = state.sales.filter((s) => s.storeId === currentStore.id);
   const storeShifts = state.shifts.filter((s) => s.storeId === currentStore.id);
