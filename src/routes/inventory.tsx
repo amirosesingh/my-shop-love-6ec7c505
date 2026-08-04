@@ -31,6 +31,7 @@ import { Switch } from "@/components/ui/switch";
 import { BulkImportDialog } from "@/components/pos/BulkImportDialog";
 import { StockAdjustDialog, StockCountDialog } from "@/components/pos/StockAdjust";
 import type { Product } from "@/lib/pos-types";
+import { nextSku, peekSku, readSkuSettings } from "@/lib/sku";
 
 export const Route = createFileRoute("/inventory")({
   head: () => ({
@@ -77,6 +78,8 @@ function Inventory() {
   const [importOpen, setImportOpen] = useState(false);
   const [adjustTarget, setAdjustTarget] = useState<Product | null>(null);
   const [countOpen, setCountOpen] = useState(false);
+  const [skuOverride, setSkuOverride] = useState(false);
+  const autoSku = readSkuSettings().mode === "auto";
 
   const rows = state.products.filter((p) =>
     `${p.name} ${p.sku} ${p.barcode} ${p.category}`.toLowerCase().includes(query.toLowerCase()),
@@ -167,8 +170,19 @@ function Inventory() {
                     <Field label="SKU">
                       <Input
                         value={draft.sku}
+                        readOnly={autoSku && !skuOverride}
+                        placeholder={autoSku ? peekSku(state.products.map((p) => p.sku)) : ""}
                         onChange={(e) => setDraft({ ...draft, sku: e.target.value })}
                       />
+                      {autoSku && (
+                        <button
+                          type="button"
+                          className="mt-1 text-[11px] text-muted-foreground underline"
+                          onClick={() => setSkuOverride((v) => !v)}
+                        >
+                          {skuOverride ? "Use automatic number" : "Override this code"}
+                        </button>
+                      )}
                     </Field>
                     <Field label="Barcode">
                       <Input
@@ -250,8 +264,12 @@ function Inventory() {
                         toast.error("Product name is required");
                         return;
                       }
-                      upsertProduct(draft);
+                      const sku =
+                        draft.sku.trim() ||
+                        (autoSku ? nextSku(state.products.map((p) => p.sku)) : "");
+                      upsertProduct({ ...draft, sku });
                       setDraft(null);
+                      setSkuOverride(false);
                       toast.success("Product saved");
                     }}
                   >
