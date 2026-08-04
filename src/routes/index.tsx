@@ -1439,11 +1439,13 @@ function Register() {
             className={`${deckOpen ? "flex" : "hidden"} max-h-[45vh] min-h-0 flex-col gap-3 overflow-y-auto p-3 pt-0 lg:flex lg:max-h-none lg:pt-3`}
           >
           {/* Card 1 · transaction actions */}
+          {visible("register.transactionActions") && (
           <div className="rounded-lg border border-border bg-card p-3">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Transaction actions
             </p>
             <div className="grid grid-cols-2 gap-2">
+              {visible("register.holdOrder") && (
               <Button
                 variant="outline"
                 className="h-16 flex-col gap-1 text-xs"
@@ -1452,6 +1454,7 @@ function Register() {
               >
                 <PauseCircle className="size-4" /> Hold order
               </Button>
+              )}
               <Button
                 variant="outline"
                 className="h-16 flex-col gap-1 text-xs text-destructive hover:text-destructive"
@@ -1460,6 +1463,7 @@ function Register() {
               >
                 <Trash2 className="size-4" /> Void cart
               </Button>
+              {visible("register.coupon") && (
               <Button
                 variant="outline"
                 className="h-16 flex-col gap-1 text-xs"
@@ -1467,6 +1471,8 @@ function Register() {
               >
                 <TicketPercent className="size-4" /> Apply coupon
               </Button>
+              )}
+              {visible("register.splitBill") && (
               <Button
                 variant="outline"
                 className="h-16 flex-col gap-1 text-xs"
@@ -1475,6 +1481,7 @@ function Register() {
               >
                 <Split className="size-4" /> Split bill
               </Button>
+              )}
             </div>
             {held.length > 0 && (
               <div className="mt-2 space-y-1">
@@ -1492,8 +1499,10 @@ function Register() {
               </div>
             )}
           </div>
+          )}
 
           {/* Card 2 · payment execution */}
+          {visible("register.paymentExecution") && (
           <div className="rounded-lg border border-border bg-card p-3">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Payment execution
@@ -1527,6 +1536,7 @@ function Register() {
               Due {money(refundDue > 0 ? refundDue : balanceDue)}
             </p>
           </div>
+          )}
 
           {/* Card 3 · device & printing */}
           <div className="rounded-lg border border-border bg-card p-3">
