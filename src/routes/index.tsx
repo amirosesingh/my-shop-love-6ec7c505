@@ -421,6 +421,11 @@ function Register() {
   function scanCode(raw: string) {
     const code = raw.trim();
     if (!code) return;
+    // Customer vouchers arrive as a token or as the full redeem.* URL.
+    if (/(^|\/)vch_[a-z0-9]+$/i.test(code)) {
+      void applyVoucher(code);
+      return;
+    }
     if (!activeShift) {
       toast.error("Open a shift before ringing up a sale");
       setOpenShiftOpen(true);
