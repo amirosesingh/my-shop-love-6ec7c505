@@ -503,6 +503,19 @@ export type ReviewThresholds = {
   maxDiscountPct: number;
 };
 
+export type ShiftSession = {
+  id: string;
+  shiftId: string;
+  storeId: string;
+  terminalId?: string | null;
+  terminalName?: string | null;
+  staffId?: string | null;
+  staffName: string;
+  role?: string | null;
+  signedInAt: string;
+  signedOutAt?: string | null;
+};
+
 export type Promotion = {
   id: string;
   name: string;

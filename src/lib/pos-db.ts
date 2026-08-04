@@ -295,6 +295,8 @@ const shiftToRow = (s: Shift): Row => ({
 const rowToSale = (r: Row): Sale => ({
   id: r.id,
   receiptNo: r.bill_number,
+  id: r.id,
+  receiptNo: r.bill_number,
   storeId: r.store_id ?? "",
   shiftId: r.shift_id ?? "",
   lines: ((r.sale_items ?? []) as Row[]).map((l) => ({
