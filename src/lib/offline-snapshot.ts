@@ -13,6 +13,23 @@ const isBrowser = () => typeof window !== "undefined";
 
 export type Snapshot = CloudSlice & { savedAt: string };
 
+const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
+
+/** Snapshots written by older builds can be missing whole slices. */
+function normalise(raw: Partial<Snapshot>): Snapshot {
+  return {
+    ...raw,
+    products: arr(raw.products),
+    members: arr(raw.members),
+    sales: arr(raw.sales),
+    shifts: arr(raw.shifts),
+    promotions: arr(raw.promotions),
+    stores: arr(raw.stores),
+    settings: (raw.settings ?? {}) as Snapshot["settings"],
+    savedAt: raw.savedAt ?? new Date(0).toISOString(),
+  } as Snapshot;
+}
+
 export function writeSnapshot(slice: CloudSlice) {
   if (!isBrowser()) return;
   try {
@@ -29,8 +46,10 @@ export function readSnapshot(): Snapshot | null {
   if (!isBrowser()) return null;
   try {
     const raw = window.localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as Snapshot) : null;
+    if (!raw) return null;
+    return normalise(JSON.parse(raw) as Partial<Snapshot>);
   } catch {
+    clearSnapshot();
     return null;
   }
 }
