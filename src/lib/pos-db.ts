@@ -526,6 +526,18 @@ export async function loadActiveShift(storeId: string): Promise<Shift | null> {
   return rows.length ? rowToShift(rows[0]) : null;
 }
 
+/** Recent sign-in sessions for a branch, newest first. */
+export async function loadShiftSessions(storeId: string, limit = 200): Promise<ShiftSession[]> {
+  const res = await supabase
+    .from("shift_sessions" as never)
+    .select("*")
+    .eq("store_id", storeId)
+    .order("signed_in_at", { ascending: false })
+    .limit(limit);
+  if (res.error) throw res.error;
+  return ((res.data as Row[] | null) ?? []).map(rowToShiftSession);
+}
+
 /**
  * Writes never hit the network directly.
  *

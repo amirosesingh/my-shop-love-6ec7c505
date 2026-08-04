@@ -35,6 +35,7 @@ import { clearSnapshot, readSnapshot, writeSnapshot } from "./offline-snapshot";
 import { useAuth } from "./pos-auth";
 import { readTerminalConfig } from "./terminal-tokens";
 import { isShiftOverdue, localTerminalId } from "./shift-hours";
+import { beginShiftSession, endShiftSessions } from "./shift-sessions";
 
 const KEY = "pos-state-v2";
 
@@ -421,6 +422,8 @@ export function PosProvider({ children }: { children: ReactNode }) {
         overdue: isShiftOverdue(activeShift, stateRef.current.settings.hours),
       };
       db.upsertShift(closed);
+      // Everyone who was signed in on this shift is signed out with it.
+      endShiftSessions({ shiftId: closed.id });
       setState((s) => ({
         ...s,
         shifts: s.shifts.map((x) => (x.id === closed.id ? closed : x)),
