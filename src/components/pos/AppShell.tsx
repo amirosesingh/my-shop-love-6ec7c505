@@ -255,7 +255,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           <WindowControls />
         </div>
       )}
-      <div className="flex min-h-0 flex-1">
+      <ShiftGuard>
+      <div className="flex min-h-0 min-w-0 flex-1">
       {/* Desktop / tablet sidebar */}
       <aside
         className={cn(
