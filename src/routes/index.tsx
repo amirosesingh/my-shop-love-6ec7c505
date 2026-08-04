@@ -1218,6 +1218,23 @@ function Register() {
                           setMemberId(m.id);
                           setMemberQuery("");
                           toast.success(`${m.name} attached to receipt`);
+                          // Surface any digital vouchers this member is holding.
+                          void loadMemberVouchers(m.id)
+                            .then((vs) => {
+                              if (!vs.length) return;
+                              toast.info(
+                                vs.length === 1
+                                  ? `${m.name} has a voucher: ${vs[0]!.campaign.name}`
+                                  : `${m.name} has ${vs.length} vouchers available`,
+                                {
+                                  action: {
+                                    label: "Apply",
+                                    onClick: () => void applyVoucher(vs[0]!.voucher.tokenSlug),
+                                  },
+                                },
+                              );
+                            })
+                            .catch(() => undefined);
                         }}
                       >
                         <UserPlus className="size-3" /> Attach
