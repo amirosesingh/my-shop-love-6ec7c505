@@ -47,7 +47,7 @@ export const Route = createFileRoute("/shifts")({
 
 function Shifts() {
   const { state, activeShift, openShift, closeShift, refundSale, currentStore, stores } = usePos();
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, isSupervisor } = useAuth();
   const { requirePermission } = useUserPermissions();
   const [cashier, setCashier] = useState(user?.name ?? "Cashier");
   const [float, setFloat] = useState("150");
@@ -71,6 +71,18 @@ function Shifts() {
     : [];
   const cashTaken = shiftSales.filter((s) => s.method === "cash").reduce((a, s) => a + s.total, 0);
   const expected = (activeShift?.openingFloat ?? 0) + cashTaken;
+
+  // Terminal-bound close: the PC that opened it, or any manager / admin.
+  const hereId = readTerminalConfig()?.tokenId ?? localTerminalId();
+  const canCloseHere =
+    !activeShift ||
+    !activeShift.terminalId ||
+    activeShift.terminalId === hereId ||
+    isAdmin ||
+    isSupervisor;
+  const overdueNow = activeShift
+    ? isShiftOverdue(activeShift, state.settings.hours)
+    : false;
 
   const storeIndex = stores.findIndex((s) => s.id === currentStore.id);
   const storeLabel = `Store ${storeIndex + 1}`;
