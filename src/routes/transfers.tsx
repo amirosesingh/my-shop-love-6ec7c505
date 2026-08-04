@@ -446,6 +446,26 @@ function Transfers() {
                   <Plus className="size-4" /> Add
                 </Button>
               </div>
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <Button asChild variant="outline" size="sm">
+                  <label className="cursor-pointer">
+                    <Upload className="size-3.5" /> Import from Excel / CSV
+                    <input
+                      type="file"
+                      accept=".csv,.xlsx,.xls"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) void importSheet(f);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                </Button>
+                <Button variant="ghost" size="sm" onClick={downloadTemplate}>
+                  <FileSpreadsheet className="size-3.5" /> Template
+                </Button>
+              </div>
             </div>
 
             <div className="max-h-56 space-y-2 overflow-y-auto rounded-md border border-border p-2">
