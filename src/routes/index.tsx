@@ -867,6 +867,7 @@ function Register() {
 
   /** Take the coupon off the ticket and record who removed it. */
   function removeCoupon() {
+    void 0;
     if (!coupon) return;
     if (coupon.scope === "item") {
       const i = lines.findIndex((l) => l.couponCode === coupon.code);
