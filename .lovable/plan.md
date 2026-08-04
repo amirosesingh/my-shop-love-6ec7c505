@@ -23,8 +23,9 @@ Worth flagging: `store_id` stays `text`. Branch ids in this app are terminal-gen
 
 - `src/lib/pos-db.ts`: map the new columns; add `loadActiveShift(storeId)` running exactly `where store_id = $1 and status = 'OPEN' order by opened_at desc limit 1`. Open writes a new row with `status = 'OPEN'` and `opened_at = now()`; close updates that row with `status = 'CLOSED'`, `closed_at = now()` and the closing float. No date filtering anywhere.
 - `src/lib/pos-store.tsx`: `activeShift` comes from that database lookup for the current branch (falling back to the cached snapshot only when offline) instead of scanning local state for a row without `closed_at`.
-- New `src/components/pos/ShiftGuard.tsx`: fetches the active shift on login and branch change, renders children when one exists, otherwise an un-dismissable overlay with cashier name and opening float plus an "Open Shift" action. Mounted inside `AppShell` so sidebar and register are both covered.
+- New `src/components/pos/ShiftGuard.tsx`: fetches the active shift on login and branch change. When one exists it shows the open date, time and float in the header strip and unlocks the register; when none exists it renders an un-dismissable overlay with cashier name and opening cash float plus an "Open Shift" action. Mounted inside `AppShell` so sidebar and register are both covered.
 - `src/routes/index.tsx` and `src/routes/shifts.tsx`: reuse the guard's open/close actions and drop the ad-hoc "no shift" inline states the overlay replaces.
+- Shift history on `src/routes/shifts.tsx`: one row per shift showing exact `opened_at` and `closed_at` date/time, duration, opening and closing float, who opened it and who closed it, plus the existing overdue badge.
 
 ## Safe boot and error handling
 
