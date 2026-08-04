@@ -176,7 +176,7 @@ function applyCloud(s: PosState, cloud: CloudSlice): PosState {
 export function PosProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<PosState>(seedState);
   const [ready, setReady] = useState(false);
-  const { authUserId, terminalUser, ready: authReady } = useAuth();
+  const { authUserId, terminalUser, user, isAdmin, isSupervisor, ready: authReady } = useAuth();
   // Nothing is fetched from the cloud until a cashier or supervisor session
   // exists — visitors never receive catalogue, member or sales data.
   const signedIn = Boolean(authUserId || terminalUser);
