@@ -193,6 +193,17 @@ export type Shift = {
   openingFloat: number;
   countedCash: number | null;
   note: string;
+  /** terminal the shift was opened on — only that PC (or a manager) may close it */
+  terminalId?: string;
+  terminalName?: string;
+  openedByStaffId?: string;
+  openedByRole?: string;
+  closedBy?: string;
+  closedByStaffId?: string;
+  closedByRole?: string;
+  expectedCash?: number | null;
+  /** set when the shift ran past the trading-day window */
+  overdue?: boolean;
 };
 
 /** Trading-day window used to flag shifts left open and drive reminders. */
