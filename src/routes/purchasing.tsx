@@ -195,6 +195,87 @@ function Purchasing() {
   }
 
   function saveDraft() {
+    return saveDraftInner();
+  }
+
+  /** Download a receiving template the buyer can fill in and upload back. */
+  function downloadTemplate() {
+    const sheet = XLSX.utils.json_to_sheet([
+      { Barcode: "8901234567890", Name: "Sample item", Cost: 4.5, Price: 7.9, Qty: 12 },
+    ]);
+    const book = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(book, sheet, "Receiving");
+    XLSX.writeFile(book, "receiving-template.xlsx");
+  }
+
+  /**
+   * Bulk receiving: an Excel or CSV file of purchased products becomes invoice
+   * lines. Known barcodes match the catalog; unknown ones are created as new
+   * products so the stock post below still balances.
+   */
+  async function importWorkbook(file: File) {
+    try {
+      const book = XLSX.read(await file.arrayBuffer(), { type: "array" });
+      const first = book.SheetNames[0];
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(book.Sheets[first] ?? {});
+      if (!rows.length) return toast.error("That file has no rows");
+
+      const pick = (r: Record<string, unknown>, keys: string[]) => {
+        for (const k of Object.keys(r)) {
+          if (keys.includes(k.trim().toLowerCase())) return r[k];
+        }
+        return undefined;
+      };
+
+      let matched = 0;
+      let created = 0;
+      for (const r of rows) {
+        const barcode = String(pick(r, ["barcode", "sku", "code"]) ?? "").trim();
+        const name = String(pick(r, ["name", "product", "description"]) ?? "").trim();
+        const qty = Math.max(1, Number(pick(r, ["qty", "quantity", "received"])) || 1);
+        const cost = Number(pick(r, ["cost", "cost price", "unit cost"])) || 0;
+        const price = Number(pick(r, ["price", "selling price", "retail"])) || 0;
+        if (!barcode && !name) continue;
+
+        const hit = barcode ? findProduct(barcode) : undefined;
+        if (hit) {
+          matched++;
+          addLine({ ...hit, cost: cost || hit.cost }, qty);
+          continue;
+        }
+        const product: Product = {
+          id: crypto.randomUUID(),
+          name: name || barcode,
+          sku: barcode,
+          barcode: barcode || crypto.randomUUID().slice(0, 12),
+          category: String(pick(r, ["category"]) ?? "General"),
+          price: price || cost,
+          cost,
+          ecomPrice: price || cost,
+          ecomVisible: false,
+          stockByStore: Object.fromEntries(state.stores.map((s) => [s.id, 0])),
+          reorderLevel: 10,
+          taxRate: 0.05,
+        };
+        upsertProduct(product);
+        addLine(product, qty);
+        created++;
+      }
+      logger.log("inventory_edit", "Receiving lines imported from file", "purchasing", {
+        file: file.name,
+        rows: rows.length,
+        matched,
+        created,
+      });
+      toast.success(`${matched + created} lines imported · ${created} new products`);
+    } catch (err) {
+      toast.error("Could not read that file", {
+        description: (err as Error)?.message ?? "Use the template as a starting point.",
+      });
+    }
+  }
+
+  function saveDraftInner() {
     if (!draft) return;
     if (!draft.name.trim()) return toast.error("Item name is required");
     if (!draft.price) return toast.error("Selling price is required");
