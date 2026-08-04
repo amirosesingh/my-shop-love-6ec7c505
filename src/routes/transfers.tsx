@@ -315,7 +315,7 @@ function Transfers() {
             </TableHeader>
             <TableBody>
               {mine.map((t) => {
-                const canApprove =
+                const showApprove =
                   t.status === "requested" &&
                   t.fromStoreId === currentStore.id &&
                   canApprove;
