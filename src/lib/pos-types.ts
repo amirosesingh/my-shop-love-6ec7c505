@@ -193,6 +193,12 @@ export type Shift = {
   openingFloat: number;
   countedCash: number | null;
   note: string;
+  /** Authoritative lifecycle flag stored in the database. */
+  status?: "OPEN" | "CLOSED";
+  /** Cash counted back into the drawer at close. */
+  closingFloat?: number | null;
+  /** Signed-in account that opened the shift, when there is one. */
+  userId?: string | null;
   /** terminal the shift was opened on — only that PC (or a manager) may close it */
   terminalId?: string;
   terminalName?: string;
