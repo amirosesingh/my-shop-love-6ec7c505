@@ -131,6 +131,23 @@ function Locations() {
                 onChange={(e) => upsertStore({ ...s, code: e.target.value.toUpperCase() })}
                 className="numeric h-9"
               />
+              <div className="space-y-1">
+                <Label className="text-[11px] text-muted-foreground">
+                  Receipt number prefix
+                </Label>
+                <Input
+                  value={s.receiptPrefix ?? ""}
+                  onChange={(e) =>
+                    upsertStore({ ...s, receiptPrefix: e.target.value.toUpperCase() })
+                  }
+                  placeholder={s.code}
+                  className="numeric h-9"
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Receipts raised here are numbered {(s.receiptPrefix?.trim() || s.code || "R")}
+                  -000123, keeping every branch unique. Leave blank to use the store code.
+                </p>
+              </div>
               <Input
                 value={s.address}
                 onChange={(e) => upsertStore({ ...s, address: e.target.value })}
