@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet, UploadCloud } f
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
+import { nextSku, readSkuSettings } from "@/lib/sku";
 import { Progress } from "@/components/ui/progress";
 import {
   Dialog,
