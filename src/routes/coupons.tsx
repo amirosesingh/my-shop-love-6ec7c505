@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Copy, Link2, Loader2, Plus, TicketPercent, Trash2 } from "lucide-react";
+import { Copy, Link2, Loader2, Plus, Send, TicketPercent, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
@@ -24,6 +24,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CouponAuditLog } from "@/components/pos/CouponAuditLog";
+import { CouponAnalytics } from "@/components/pos/CouponAnalytics";
+import { IssueVoucherDialog } from "@/components/pos/IssueVoucherDialog";
 import { useAuth } from "@/lib/pos-auth";
 import { usePos } from "@/lib/pos-store";
 import { claimUrl } from "@/lib/coupon-hosts";
@@ -33,11 +37,13 @@ import {
   deleteCampaign,
   discountLabel,
   loadCampaigns,
+  loadCouponEvents,
   loadVouchers,
   saveCampaign,
   scopeLabel,
   slugify,
   type Campaign,
+  type CouponEvent,
   type Voucher,
 } from "@/lib/coupons";
 
@@ -76,26 +82,33 @@ const toLocalInput = (iso?: string | null) =>
 const fromLocalInput = (v: string) => (v ? new Date(v).toISOString() : null);
 
 function CouponsPage() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const { state } = usePos();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
+  const [events, setEvents] = useState<CouponEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [draft, setDraft] = useState<Campaign | null>(null);
+  const [issueFor, setIssueFor] = useState<Campaign | null>(null);
   const [saving, setSaving] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [cs, vs] = await Promise.all([loadCampaigns(), loadVouchers()]);
+      const [cs, vs, es] = await Promise.all([
+        loadCampaigns(),
+        loadVouchers(),
+        loadCouponEvents().catch(() => [] as CouponEvent[]),
+      ]);
       setCampaigns(cs);
       setVouchers(vs);
+      setEvents(es);
       setError("");
     } catch (e) {
       setError(
         e instanceof Error
-          ? `${e.message} — run supabase/schema19.sql on the POS database if the tables are missing.`
+          ? `${e.message} — run supabase/schema19.sql and schema20.sql on the POS database if the tables are missing.`
           : "Could not load campaigns.",
       );
     } finally {
