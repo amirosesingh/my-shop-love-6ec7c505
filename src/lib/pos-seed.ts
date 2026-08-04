@@ -6,6 +6,7 @@ import type {
   ReceiptSettings,
   ReviewThresholds,
   Store,
+  TradingHours,
   WhatsAppSettings,
 } from "./pos-types";
 import { defaultPaymentQr } from "./pos-types";
