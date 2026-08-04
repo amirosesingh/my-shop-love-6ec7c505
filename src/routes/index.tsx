@@ -58,6 +58,12 @@ import { useAuth } from "@/lib/pos-auth";
 import { useUserPermissions } from "@/lib/pos-permissions";
 import { useVisibility } from "@/lib/ui-visibility";
 import { useUiScale } from "@/lib/use-ui-scale";
+import {
+  loadMemberVouchers,
+  loadVoucherByToken,
+  redeemVoucher,
+  voucherValue,
+} from "@/lib/coupons";
 import type { CartLine, DiscountType, PaymentMethod, Sale } from "@/lib/pos-types";
 import type { Payment } from "@/lib/pos-types";
 import { TenderSplit, rememberBanks } from "@/components/pos/TenderSplit";
