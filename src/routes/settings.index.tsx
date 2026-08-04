@@ -14,6 +14,7 @@ import {
   QrCode,
   ReceiptText,
   RefreshCw,
+  ScanBarcode,
   Type,
 } from "lucide-react";
 import { AppShell } from "@/components/pos/AppShell";
