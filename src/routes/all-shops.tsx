@@ -146,6 +146,60 @@ function AllShops() {
           </p>
         </header>
 
+        {isAdmin && (
+          <section className="space-y-3 rounded-lg border border-primary/30 bg-primary/5 p-4">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="text-sm font-semibold">Live performance · all branches</h2>
+              <span className="text-[11px] text-muted-foreground">
+                Visible to administrators only
+              </span>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <Kpi label="Revenue today" value={money(live.revenue)} />
+              <Kpi label="Gross profit" value={money(live.profit)} />
+              <Kpi label="Bills" value={String(live.bills)} />
+              <Kpi label="Average basket" value={money(live.basket)} />
+            </div>
+            <div className="overflow-auto rounded-md border border-border bg-card">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Time</TableHead>
+                    <TableHead>Branch</TableHead>
+                    <TableHead>Bill</TableHead>
+                    <TableHead>Cashier</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {live.feed.map((s) => (
+                    <TableRow key={s.id}>
+                      <TableCell className="numeric text-xs">
+                        {new Date(s.createdAt).toLocaleTimeString()}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {stores.find((x) => x.id === s.storeId)?.name ?? "—"}
+                      </TableCell>
+                      <TableCell className="numeric text-xs">{s.receiptNo}</TableCell>
+                      <TableCell className="text-xs">{s.cashier}</TableCell>
+                      <TableCell className="numeric text-right font-medium">
+                        {money(s.total)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {!live.feed.length && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">
+                        No bills yet today.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </section>
+        )}
+
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {perStore.map((s) => (
             <div key={s.store.id} className="rounded-lg border border-border bg-card p-4">
