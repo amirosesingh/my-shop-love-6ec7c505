@@ -29,7 +29,7 @@ import type {
 } from "./pos-types";
 import { bookingBalance, lineUnitDiscount, r2, type DiscountType } from "./pos-types";
 import { logger } from "./audit-log";
-import { db, dbError, loadCloudState } from "./pos-db";
+import { db, dbError, loadActiveShift, loadCloudState } from "./pos-db";
 import type { CloudSlice } from "./pos-db";
 import { clearSnapshot, readSnapshot, writeSnapshot } from "./offline-snapshot";
 import { useAuth } from "./pos-auth";
