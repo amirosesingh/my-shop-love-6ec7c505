@@ -647,6 +647,51 @@ export type Database = {
         }
         Relationships: []
       }
+      shift_sessions: {
+        Row: {
+          created_at: string
+          id: string
+          role: string | null
+          shift_id: string | null
+          signed_in_at: string
+          signed_out_at: string | null
+          staff_id: string | null
+          staff_name: string
+          store_id: string
+          terminal_id: string | null
+          terminal_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: string | null
+          shift_id?: string | null
+          signed_in_at?: string
+          signed_out_at?: string | null
+          staff_id?: string | null
+          staff_name: string
+          store_id: string
+          terminal_id?: string | null
+          terminal_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: string | null
+          shift_id?: string | null
+          signed_in_at?: string
+          signed_out_at?: string | null
+          staff_id?: string | null
+          staff_name?: string
+          store_id?: string
+          terminal_id?: string | null
+          terminal_name?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       shifts: {
         Row: {
           closed_at: string | null
