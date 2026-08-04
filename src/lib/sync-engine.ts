@@ -82,7 +82,9 @@ async function runOne(entry: QueuedOp): Promise<boolean> {
     const message =
       res.error.code === "PGRST205"
         ? `The "${entry.op.table}" table is missing on the database — run supabase/schema14.sql once, then this will sync automatically.`
-        : res.error.message;
+        : res.error.code === "42501" || /row-level security/i.test(res.error.message)
+          ? `This terminal is not allowed to write "${entry.op.table}" on the central database — run supabase/schema17.sql once, then this will sync automatically.`
+          : res.error.message;
     failOp(entry.id, message);
     logSync("push", entry.op.table, false, `${entry.context}: ${message}`);
     return false;

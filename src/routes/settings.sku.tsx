@@ -1,0 +1,106 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
+import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { usePos } from "@/lib/pos-store";
+import {
+  peekSku,
+  readSkuSettings,
+  writeSkuSettings,
+  type SkuMode,
+} from "@/lib/sku";
+
+export const Route = createFileRoute("/settings/sku")({
+  head: () => ({
+    meta: [
+      { title: "SKU Numbering — Northwind POS" },
+      {
+        name: "description",
+        content:
+          "Choose automatic running-number SKUs or manual codes for new products, and set the prefix and next number.",
+      },
+      { property: "og:title", content: "SKU Numbering — Northwind POS" },
+      { property: "og:description", content: "Automatic or manual product code numbering." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
+  component: SkuSettingsPage,
+});
+
+function SkuSettingsPage() {
+  return (
+    <SettingsFrame
+      title="SKU numbering"
+      description="New products can take a running number automatically, so no one has to invent a code at the counter."
+    >
+      <SkuForm />
+    </SettingsFrame>
+  );
+}
+
+function SkuForm() {
+  const { state } = usePos();
+  const [cfg, setCfg] = useState(() => readSkuSettings());
+  const save = (patch: Partial<typeof cfg>) => {
+    const merged = { ...cfg, ...patch };
+    setCfg(merged);
+    writeSkuSettings(patch);
+  };
+  const preview = peekSku(state.products.map((p) => p.sku));
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2">
+        {(
+          [
+            ["auto", "Automatic", "The till fills the SKU with the next running number."],
+            ["manual", "Manual", "Staff type their own product code."],
+          ] as [SkuMode, string, string][]
+        ).map(([mode, label, blurb]) => (
+          <button
+            key={mode}
+            type="button"
+            onClick={() => save({ mode })}
+            className={`rounded-lg border p-4 text-left transition-colors ${
+              cfg.mode === mode ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+            }`}
+          >
+            <p className="text-sm font-medium">{label}</p>
+            <p className="text-xs text-muted-foreground">{blurb}</p>
+          </button>
+        ))}
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Prefix</Label>
+          <Input value={cfg.prefix} onChange={(e) => save({ prefix: e.target.value })} />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Next number</Label>
+          <Input
+            className="numeric"
+            value={cfg.next}
+            onChange={(e) => save({ next: Math.max(1, Number(e.target.value) || 1) })}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Digits</Label>
+          <Input
+            className="numeric"
+            value={cfg.pad}
+            onChange={(e) => save({ pad: Math.min(12, Math.max(1, Number(e.target.value) || 1)) })}
+          />
+        </div>
+      </div>
+
+      <p className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+        Next product will be created as{" "}
+        <span className="numeric font-medium text-foreground">{preview}</span>. Codes already used
+        in the catalog are always skipped, so two branches can add products at the same time.
+      </p>
+    </div>
+  );
+}
