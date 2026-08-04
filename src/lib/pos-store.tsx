@@ -234,7 +234,12 @@ export function PosProvider({ children }: { children: ReactNode }) {
       // the till is usable with no connection, then refresh in the background.
       const snap = readSnapshot();
       if (snap && !cancelled) {
-        setState((s) => applyCloud(s, snap));
+        try {
+          setState((s) => applyCloud(s, snap));
+        } catch {
+          // A snapshot written by an older build must never brick the till.
+          clearSnapshot();
+        }
         setReady(true);
       }
       if (typeof navigator !== "undefined" && !navigator.onLine) {
