@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { downloadCsv, loadCampaignStats, type CampaignStats } from "@/lib/coupons";
-import { money } from "@/lib/pos-types";
+import { money } from "@/lib/pos-store";
 
 export function CouponAnalytics() {
   const [from, setFrom] = useState("");
