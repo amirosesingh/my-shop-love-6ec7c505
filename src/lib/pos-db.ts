@@ -13,6 +13,7 @@ import type {
   Promotion,
   Sale,
   Shift,
+  ShiftSession,
   Store,
   PaperSize,
   PaymentMethod,
@@ -576,6 +577,13 @@ export const db = {
 
   upsertShift: (s: Shift) =>
     queue("Saving shift", { kind: "upsert", table: "shifts", rows: [shiftToRow(s)] }),
+
+  upsertShiftSession: (s: ShiftSession) =>
+    queue("Saving shift sign-in", {
+      kind: "upsert",
+      table: "shift_sessions",
+      rows: [shiftSessionToRow(s)],
+    }),
 
   saveSettings: (s: AppSettings) =>
     queue("Saving settings", {
