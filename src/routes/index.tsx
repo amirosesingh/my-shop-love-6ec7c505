@@ -2442,6 +2442,75 @@ function Register() {
         onOpenChange={(o) => !o && setHistoryMemberId(null)}
       />
 
+      {/* Pick which of the member's vouchers goes on this bill */}
+      <Dialog open={voucherPickerOpen} onOpenChange={setVoucherPickerOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Member vouchers</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            {[...memberVouchers]
+              .map((v) => ({ v, preview: voucherPreview(v.campaign) }))
+              .sort((a, b) => b.preview.value - a.preview.value)
+              .map(({ v, preview }) => {
+                const active = voucherToken === v.voucher.tokenSlug;
+                const usable = preview.value > 0;
+                return (
+                  <button
+                    key={v.voucher.id}
+                    type="button"
+                    disabled={!usable}
+                    onClick={() => {
+                      void applyVoucher(v.voucher.tokenSlug);
+                      setVoucherPickerOpen(false);
+                    }}
+                    className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left ${
+                      active ? "border-accent bg-accent/10" : "border-border"
+                    } ${usable ? "hover:bg-muted" : "opacity-50"}`}
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{v.campaign.name}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {discountLabel(v.campaign)} · {scopeLabel(v.campaign)}
+                        {v.voucher.expiresAt || v.campaign.expiresAt
+                          ? ` · until ${new Date(
+                              v.voucher.expiresAt ?? v.campaign.expiresAt!,
+                            ).toLocaleDateString()}`
+                          : ""}
+                      </p>
+                      {usable ? null : (
+                        <p className="text-[11px] text-destructive">{preview.reason}</p>
+                      )}
+                    </div>
+                    <span className="numeric shrink-0 text-sm font-semibold">
+                      −{money(preview.value)}
+                    </span>
+                  </button>
+                );
+              })}
+            {!memberVouchers.length ? (
+              <p className="py-4 text-center text-sm text-muted-foreground">
+                This member has no live vouchers.
+              </p>
+            ) : null}
+          </div>
+          <DialogFooter>
+            {voucherToken ? (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  removeCoupon();
+                  setVoucherPickerOpen(false);
+                }}
+              >
+                Remove applied voucher
+              </Button>
+            ) : null}
+            <Button onClick={() => setVoucherPickerOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Close shift — straight from the register header */}
       <Dialog open={closeShiftOpen} onOpenChange={setCloseShiftOpen}>
         <DialogContent>
