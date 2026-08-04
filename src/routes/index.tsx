@@ -1237,6 +1237,18 @@ function Register() {
                   <X className="size-3.5" />
                 </Button>
               </div>
+            ) : null}
+            {member && memberVouchers.length ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2 h-8 w-full text-xs"
+                onClick={() => setVoucherPickerOpen(true)}
+              >
+                <TicketPercent className="size-3.5" /> Vouchers ({memberVouchers.length})
+              </Button>
+            ) : null}
+            {member ? null : (
             ) : (
               <>
                 <div className="relative mt-2 max-w-md">
