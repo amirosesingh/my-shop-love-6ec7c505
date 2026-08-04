@@ -66,3 +66,21 @@ Reprint must never kick the drawer:
 - Propagation: Supabase realtime channel for `products` plus the existing outbox in `src/lib/sync-outbox.ts`; conflict rules live in `src/utils/syncResolver.ts`.
 - Sync status derives per-shop/per-direction stats from the outbox and `src/lib/sync-log.ts`; background worker extends `startSyncEngine` in `src/lib/sync-engine.ts`.
 - Drawer: `openCashDrawer` in `src/lib/pos-print.ts` gains policy checks; `printHtml` gets an explicit no-pulse flag used by reprint and test print.
+
+## 10. Android: updating without uninstalling
+
+Confirmed cause: the workflow builds a **debug** APK (`./gradlew assembleDebug`). CI generates a throwaway debug signing key on every run, so each new APK has a different signature and Android refuses to install it over the old one — hence the delete-then-install dance.
+
+Fix:
+- Add a fixed release keystore (stored as repository secrets) and switch the build to a signed release APK, so every future build installs straight over the previous one.
+- Derive the Android version code from the app version so newer builds are always seen as an upgrade.
+- Document the one-time keystore creation and secret setup in the Android guide, and note that the *current* installed app must be removed once more before the first signed build (unavoidable, signature change).
+
+## 11. Android: stuck on "Starting the till…"
+
+The start-up gate waits for the phone's offline storage to be pulled into memory and shows that message until it finishes. It can wait forever if the storage call never returns.
+
+Fix:
+- Give the hydration step a hard time limit; on timeout the till starts anyway with whatever is already cached, instead of hanging.
+- Show progress and, if it fails, a plain-English message with **Retry** and **Start anyway** buttons rather than a frozen line of text.
+- Add start-up logging that is visible in the app's diagnostics so the real cause can be confirmed on your device if it recurs.
