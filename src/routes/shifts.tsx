@@ -138,7 +138,20 @@ function Shifts() {
                 value={new Date(activeShift.openedAt).toLocaleTimeString()}
               />
               <Metric label="Transactions" value={String(shiftSales.length)} />
+              <Metric label="Terminal" value={activeShift.terminalName ?? "This PC"} />
+              <Metric label="Running for" value={shiftDuration(activeShift)} />
               <Metric label="Expected drawer" value={money(expected)} highlight />
+              {overdueNow && (
+                <p className="md:col-span-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                  This shift is past the trading-day window and is flagged as overdue.
+                </p>
+              )}
+              {!canCloseHere && (
+                <p className="md:col-span-4 rounded-md border border-border px-3 py-2 text-xs text-muted-foreground">
+                  This shift was opened on {activeShift.terminalName ?? "another terminal"}. Close it
+                  from that PC, or ask a manager or admin to close it.
+                </p>
+              )}
               <p className="md:col-span-4 text-xs text-muted-foreground">
                 Another user can lock the till and sign in without closing this shift — each sale is
                 recorded under whoever is signed in at the time.
@@ -151,6 +164,7 @@ function Shifts() {
                   <Printer className="size-4" /> Print X report
                 </Button>
                 <Button
+                  disabled={!canCloseHere}
                   onClick={async () => {
                     if (!(await requirePermission("can_close_drawer"))) return;
                     setCounted(expected.toFixed(2));
@@ -321,6 +335,9 @@ function Shifts() {
                 <TableHead>Cashier</TableHead>
                 <TableHead>Opened</TableHead>
                 <TableHead>Closed</TableHead>
+                <TableHead>Closed by</TableHead>
+                <TableHead>Terminal</TableHead>
+                <TableHead>Duration</TableHead>
                 <TableHead className="text-right">Float</TableHead>
                 <TableHead className="text-right">Counted</TableHead>
                 <TableHead className="text-right">Z report</TableHead>
@@ -335,6 +352,18 @@ function Shifts() {
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {sh.closedAt ? new Date(sh.closedAt).toLocaleString() : "open"}
+                    {sh.overdue && (
+                      <span className="ml-2 rounded bg-destructive/15 px-1.5 py-0.5 text-[10px] text-destructive">
+                        OVERDUE
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{sh.closedBy ?? "—"}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {sh.terminalName ?? "—"}
+                  </TableCell>
+                  <TableCell className="numeric text-muted-foreground">
+                    {shiftDuration(sh)}
                   </TableCell>
                   <TableCell className="numeric text-right">{money(sh.openingFloat)}</TableCell>
                   <TableCell className="numeric text-right">
