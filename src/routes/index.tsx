@@ -1005,9 +1005,35 @@ function Register() {
     }
   }
 
+  /**
+   * What a voucher would take off the ticket as it stands, so the cashier can
+   * compare before committing. Returns 0 with a reason when it doesn't apply.
+   */
+  function voucherPreview(campaign: Campaign): { value: number; reason: string } {
+    if (!lines.length) return { value: 0, reason: "Ring up items first" };
+    if (campaign.scope === "PRODUCT") {
+      const line = lines.find((l) => l.productId === campaign.scopeValue);
+      if (!line) return { value: 0, reason: "That product is not on this bill" };
+      return { value: voucherValue(campaign, r2(line.price * line.qty)), reason: "" };
+    }
+    const base =
+      campaign.scope === "CATEGORY"
+        ? r2(
+            lines
+              .filter(
+                (l) =>
+                  state.products.find((p) => p.id === l.productId)?.category ===
+                  campaign.scopeValue,
+              )
+              .reduce((a, l) => a + l.price * l.qty, 0),
+          )
+        : promoBase;
+    if (base <= 0) return { value: 0, reason: "Nothing on this bill qualifies" };
+    return { value: voucherValue(campaign, base), reason: "" };
+  }
+
   /** Take the coupon off the ticket and record who removed it. */
   function removeCoupon() {
-
     if (!coupon) return;
     if (coupon.scope === "item") {
       const i = lines.findIndex((l) => l.couponCode === coupon.code);
