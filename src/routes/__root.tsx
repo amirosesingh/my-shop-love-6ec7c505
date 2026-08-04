@@ -20,6 +20,7 @@ import { FirstRunSetup } from "../components/pos/FirstRunSetup";
 import { ThemeProvider, themeBootScript } from "../lib/theme";
 import { NativeBoot } from "../components/pos/NativeBoot";
 import { AndroidUpdateBanner } from "../components/pos/AndroidUpdateBanner";
+import { usePublicHostLanding } from "../lib/coupon-hosts";
 
 function NotFoundComponent() {
   return (
