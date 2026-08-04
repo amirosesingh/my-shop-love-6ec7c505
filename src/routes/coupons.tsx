@@ -486,6 +486,26 @@ function CouponsPage() {
                 />
               </div>
 
+              <div className="space-y-1.5">
+                <Label htmlFor="c-per-member">Maximum per member (blank = unlimited)</Label>
+                <Input
+                  id="c-per-member"
+                  type="number"
+                  min={1}
+                  value={draft.maxPerMember ?? ""}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      maxPerMember: e.target.value ? Number(e.target.value) : null,
+                    })
+                  }
+                  placeholder="1"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Claiming the same campaign again is blocked once a member hits this number.
+                </p>
+              </div>
+
               <div className="flex items-center justify-between rounded-lg border border-border p-3">
                 <div>
                   <p className="text-sm font-medium">Active</p>
