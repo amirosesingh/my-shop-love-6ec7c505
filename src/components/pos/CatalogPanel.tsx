@@ -25,6 +25,7 @@ export function CatalogPanel({
   onOpenShift,
   showHeaderActions = true,
   autoFocus = true,
+  showSearch = true,
 }: {
   query: string;
   onQueryChange: (v: string) => void;
@@ -42,20 +43,30 @@ export function CatalogPanel({
   onOpenShift?: () => void;
   showHeaderActions?: boolean;
   autoFocus?: boolean;
+  /** hidden on the till, where the dedicated scan bar above the cart is used */
+  showSearch?: boolean;
 }) {
   return (
     <>
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-        <form onSubmit={onScanSubmit} className="relative min-w-0">
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            autoFocus={autoFocus}
-            value={query}
-            onChange={(e) => onQueryChange(e.target.value)}
-            placeholder="Scan barcode or search products…"
-            className="numeric h-11 pl-9"
-          />
-        </form>
+      <div
+        className={
+          showSearch
+            ? "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2"
+            : "flex items-center justify-end gap-2"
+        }
+      >
+        {showSearch && (
+          <form onSubmit={onScanSubmit} className="relative min-w-0">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              autoFocus={autoFocus}
+              value={query}
+              onChange={(e) => onQueryChange(e.target.value)}
+              placeholder="Scan barcode or search products…"
+              className="numeric h-11 pl-9"
+            />
+          </form>
+        )}
         {showHeaderActions && (
           <div className="flex shrink-0 gap-2">
             {onOpenCustomerDisplay && (
