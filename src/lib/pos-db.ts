@@ -422,7 +422,7 @@ export async function loadCloudState(): Promise<CloudSlice> {
   if (first.error) throw first.error;
   if (!first.data?.length) await seedCloud();
 
-  const [products, members, sales, promotions, settings, stores] = await Promise.all([
+  const [products, members, sales, promotions, settings, stores, shifts] = await Promise.all([
     supabase.from("products").select("*").order("name"),
     supabase.from("members").select("*").order("created_at"),
     supabase
@@ -443,6 +443,18 @@ export async function loadCloudState(): Promise<CloudSlice> {
         return { data: null };
       }
     })(),
+    (async (): Promise<{ data: Row[] | null }> => {
+      try {
+        const res = await supabase
+          .from("shifts" as never)
+          .select("*")
+          .order("opened_at", { ascending: false })
+          .limit(300);
+        return { data: (res.data as Row[] | null) ?? null };
+      } catch {
+        return { data: null };
+      }
+    })(),
   ]);
 
   const err = products.error || members.error || sales.error || promotions.error || settings.error;
@@ -455,6 +467,7 @@ export async function loadCloudState(): Promise<CloudSlice> {
     promotions: (promotions.data ?? []).map(rowToPromotion),
     settings: rowToSettings(settings.data as Row | null),
     stores: ((stores.data as Row[] | null) ?? []).map(rowToStore),
+    shifts: ((shifts.data as Row[] | null) ?? []).map(rowToShift),
   };
 }
 
@@ -508,6 +521,9 @@ export const db = {
     queue("Saving promotion", { kind: "upsert", table: "promotions", rows: [promotionToRow(p)] }),
   deletePromotion: (id: string) =>
     queue("Deleting promotion", { kind: "delete", table: "promotions", match: { id } }),
+
+  upsertShift: (s: Shift) =>
+    queue("Saving shift", { kind: "upsert", table: "shifts", rows: [shiftToRow(s)] }),
 
   saveSettings: (s: AppSettings) =>
     queue("Saving settings", {
