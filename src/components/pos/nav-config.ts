@@ -138,6 +138,14 @@ export const navGroups: NavGroup[] = [
         blurb: "Purchase orders and goods receiving.",
       },
       {
+        to: "/suppliers",
+        label: "Suppliers",
+        icon: Truck,
+        flag: "can_receive_purchase_order",
+        keywords: "vendor supplier contact directory purchasing",
+        blurb: "Central supplier directory used when receiving goods.",
+      },
+      {
         to: "/transfers",
         label: "Stock Transfers",
         icon: ArrowLeftRight,
