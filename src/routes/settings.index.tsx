@@ -20,87 +20,132 @@ import { AppShell } from "@/components/pos/AppShell";
 import { useAuth } from "@/lib/pos-auth";
 import { isDesktop } from "@/lib/branding";
 
-const PAGES = [
+/** Settings live in categories: printer options with printing, messaging with
+ *  messaging, and so on — nothing sits in an unrelated page any more. */
+const GROUPS = [
   {
-    to: "/settings/display",
-    label: "Display & text size",
-    icon: MonitorCog,
-    blurb: "Interface scale, density and light / dark theme.",
+    id: "terminal",
+    label: "Terminal & display",
+    blurb: "How this till looks and stays up to date.",
+    pages: [
+      {
+        to: "/settings/display",
+        label: "Display & text size",
+        icon: MonitorCog,
+        blurb: "Interface scale, density and light / dark theme.",
+      },
+      {
+        to: "/settings/updates",
+        label: "Software updates",
+        icon: DownloadCloud,
+        blurb: "App version, background updates and system health.",
+      },
+      {
+        to: "/settings/terminals",
+        label: "Terminal activation",
+        icon: MonitorSmartphone,
+        blurb: "Register Windows tills, issue and revoke activation codes.",
+        cloudOnly: true,
+      },
+    ],
   },
   {
-    to: "/settings/updates",
-    label: "Software updates",
-    icon: DownloadCloud,
-    blurb: "App version, background updates and system health.",
+    id: "printing",
+    label: "Printing & receipts",
+    blurb: "The printer itself and everything that prints on the slip.",
+    pages: [
+      {
+        to: "/settings/printer",
+        label: "Receipt printer",
+        icon: Printer,
+        blurb: "Device, encoding, margins, drawer pin and a test print.",
+      },
+      {
+        to: "/settings/elements",
+        label: "Receipt elements",
+        icon: ReceiptText,
+        blurb: "Paper size, logo, points, barcode and tax blocks.",
+      },
+      {
+        to: "/settings/type",
+        label: "Receipt typography",
+        icon: Type,
+        blurb: "Fonts, sizes and spacing for printed slips.",
+      },
+      {
+        to: "/settings/lines",
+        label: "Receipt extra lines",
+        icon: ListPlus,
+        blurb: "Policy notes, promotions and opening hours.",
+      },
+      {
+        to: "/settings/qr",
+        label: "Receipt QR code",
+        icon: QrCode,
+        blurb: "QR payload, size and placement on the slip.",
+      },
+    ],
   },
   {
-    to: "/settings/tax",
-    label: "Tax & pricing",
-    icon: ReceiptText,
-    blurb: "Global tax rate and inclusive or exclusive pricing.",
+    id: "business",
+    label: "Business & pricing",
+    blurb: "Who you are, what you charge and when you trade.",
+    pages: [
+      {
+        to: "/settings/identity",
+        label: "Business identity",
+        icon: Building2,
+        blurb: "Company name, tax numbers, header and footer.",
+      },
+      {
+        to: "/settings/tax",
+        label: "Tax & pricing",
+        icon: ReceiptText,
+        blurb: "Global tax rate and inclusive or exclusive pricing.",
+      },
+      {
+        to: "/settings/hours",
+        label: "Trading hours & shifts",
+        icon: Clock,
+        blurb: "Day start and end, shift length limit and close reminders.",
+      },
+    ],
   },
   {
-    to: "/settings/hours",
-    label: "Trading hours & shifts",
-    icon: Clock,
-    blurb: "Day start and end, shift length limit and close reminders.",
+    id: "payments",
+    label: "Payments & messaging",
+    blurb: "How customers pay and how bills reach them.",
+    pages: [
+      {
+        to: "/settings/payment",
+        label: "Bank transfer details",
+        icon: Landmark,
+        blurb: "Bank account and payment QR for the customer display.",
+      },
+      {
+        to: "/settings/whatsapp",
+        label: "WhatsApp bills",
+        icon: MessageCircle,
+        blurb: "Send receipts over the WhatsApp Cloud API.",
+      },
+    ],
   },
   {
-    to: "/settings/identity",
-    label: "Business identity",
-    icon: Building2,
-    blurb: "Company name, tax numbers, header and footer.",
-  },
-  {
-    to: "/settings/type",
-    label: "Receipt typography",
-    icon: Type,
-    blurb: "Fonts, sizes and spacing for printed slips.",
-  },
-  {
-    to: "/settings/lines",
-    label: "Receipt extra lines",
-    icon: ListPlus,
-    blurb: "Policy notes, promotions and opening hours.",
-  },
-  {
-    to: "/settings/qr",
-    label: "Receipt QR code",
-    icon: QrCode,
-    blurb: "QR payload, size and placement on the slip.",
-  },
-  {
-    to: "/settings/elements",
-    label: "Receipt elements",
-    icon: Printer,
-    blurb: "Paper size, logo, points, barcode and tax blocks.",
-  },
-  {
-    to: "/settings/payment",
-    label: "Bank transfer details",
-    icon: Landmark,
-    blurb: "Bank account and payment QR for the customer display.",
-  },
-  {
-    to: "/settings/whatsapp",
-    label: "WhatsApp bills",
-    icon: MessageCircle,
-    blurb: "Send receipts over the WhatsApp Cloud API.",
-  },
-  {
-    to: "/settings/sync",
-    label: "Sync & backup",
-    icon: RefreshCw,
-    blurb: "Branch identity, offline sync queue and backups.",
-  },
-  {
-    to: "/settings/terminals",
-    label: "Terminal activation",
-    icon: MonitorSmartphone,
-    blurb: "Register Windows tills, issue and revoke activation codes.",
-    cloudOnly: true,
+    id: "data",
+    label: "Data & sync",
+    blurb: "Keeping this till in step with the cloud.",
+    pages: [
+      {
+        to: "/settings/sync",
+        label: "Sync & backup",
+        icon: RefreshCw,
+        blurb: "Branch identity, offline sync queue and backups.",
+      },
+    ],
   },
 ] as const;
+
+const PAGES = GROUPS.flatMap((g) => g.pages);
 
 const LEGACY: Record<string, string> = Object.fromEntries(
   PAGES.map((p) => [p.to.split("/").pop() as string, p.to]),
@@ -167,19 +212,29 @@ function SettingsHub() {
             Configuration is managed by an administrator.
           </p>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
-            {pages.map((p) => (
-              <Link
-                key={p.to}
-                to={p.to}
-                className="flex items-start gap-3 rounded-lg border border-border bg-card p-4 transition-colors hover:border-primary/60"
-              >
-                <p.icon className="mt-0.5 size-5 shrink-0 text-primary" />
-                <span className="min-w-0">
-                  <span className="block text-sm font-medium">{p.label}</span>
-                  <span className="block text-xs text-muted-foreground">{p.blurb}</span>
-                </span>
-              </Link>
+          <div className="space-y-6">
+            {groups.map((g) => (
+              <section key={g.id} className="space-y-3">
+                <div>
+                  <h2 className="text-sm font-semibold">{g.label}</h2>
+                  <p className="text-xs text-muted-foreground">{g.blurb}</p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {g.pages.map((p) => (
+                    <Link
+                      key={p.to}
+                      to={p.to}
+                      className="flex items-start gap-3 rounded-lg border border-border bg-card p-4 transition-colors hover:border-primary/60"
+                    >
+                      <p.icon className="mt-0.5 size-5 shrink-0 text-primary" />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-medium">{p.label}</span>
+                        <span className="block text-xs text-muted-foreground">{p.blurb}</span>
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
         )}
