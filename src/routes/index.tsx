@@ -885,6 +885,7 @@ function Register() {
       storeId: currentStore.id,
     });
     setCoupon(null);
+    setVoucherToken(null);
   }
 
   const splitShares = useMemo(() => {
