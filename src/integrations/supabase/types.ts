@@ -266,6 +266,7 @@ export type Database = {
           ecom_price: number | null
           ecom_visible: boolean
           id: string
+          landing_pct: number | null
           name: string
           point_multiplier: number
           reorder_level: number
@@ -285,6 +286,7 @@ export type Database = {
           ecom_price?: number | null
           ecom_visible?: boolean
           id?: string
+          landing_pct?: number | null
           name: string
           point_multiplier?: number
           reorder_level?: number
@@ -304,6 +306,7 @@ export type Database = {
           ecom_price?: number | null
           ecom_visible?: boolean
           id?: string
+          landing_pct?: number | null
           name?: string
           point_multiplier?: number
           reorder_level?: number
@@ -764,6 +767,54 @@ export type Database = {
           terminal_name?: string | null
           updated_at?: string
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      sku_audit: {
+        Row: {
+          created_at: string
+          id: string
+          previous_sku: string | null
+          product_id: string | null
+          product_name: string | null
+          role: string | null
+          sku: string
+          source: string
+          staff_id: string | null
+          staff_name: string | null
+          store_id: string | null
+          store_name: string | null
+          terminal_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          previous_sku?: string | null
+          product_id?: string | null
+          product_name?: string | null
+          role?: string | null
+          sku: string
+          source?: string
+          staff_id?: string | null
+          staff_name?: string | null
+          store_id?: string | null
+          store_name?: string | null
+          terminal_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          previous_sku?: string | null
+          product_id?: string | null
+          product_name?: string | null
+          role?: string | null
+          sku?: string
+          source?: string
+          staff_id?: string | null
+          staff_name?: string | null
+          store_id?: string | null
+          store_name?: string | null
+          terminal_id?: string | null
         }
         Relationships: []
       }
