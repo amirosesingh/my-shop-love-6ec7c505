@@ -324,3 +324,12 @@ function AllShops() {
     </AppShell>
   );
 }
+
+function Kpi({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-border bg-card p-4">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="numeric mt-1 text-xl font-semibold">{value}</p>
+    </div>
+  );
+}
