@@ -442,6 +442,8 @@ function Shifts() {
                   printShiftReport(closed, storeSales, "zreport");
                   openCashDrawer();
                   toast.success("Shift closed · Z report printed");
+                } else {
+                  toast.error("This shift can only be closed on the terminal that opened it.");
                 }
                 setCloseOpen(false);
                 setNote("");
