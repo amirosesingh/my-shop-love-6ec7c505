@@ -35,6 +35,7 @@ import { clearSnapshot, readSnapshot, writeSnapshot } from "./offline-snapshot";
 import { useAuth } from "./pos-auth";
 import { readTerminalConfig } from "./terminal-tokens";
 import { isShiftOverdue, localTerminalId } from "./shift-hours";
+import { beginShiftSession, endShiftSessions } from "./shift-sessions";
 
 const KEY = "pos-state-v2";
 
@@ -332,6 +333,23 @@ export function PosProvider({ children }: { children: ReactNode }) {
     );
   }, [dbShift, shiftChecked, state.shifts, currentStore.id]);
 
+  // Record the exact moment this user joined the open shift. Runs whenever the
+  // signed-in account or the open shift changes, and is safe to repeat.
+  useEffect(() => {
+    const name = user?.name ?? terminalUser?.name;
+    if (!activeShift || !name) return;
+    const terminal = readTerminalConfig();
+    beginShiftSession({
+      shiftId: activeShift.id,
+      storeId: activeShift.storeId,
+      terminalId: activeShift.terminalId ?? terminal?.tokenId ?? localTerminalId(),
+      terminalName: activeShift.terminalName ?? terminal?.locationName ?? "This PC",
+      staffId: user?.staffId ?? terminalUser?.userCode ?? null,
+      staffName: name,
+      role: user?.role ?? terminalUser?.role ?? null,
+    });
+  }, [activeShift?.id, user?.staffId, user?.name, terminalUser?.userCode]);
+
   const setCurrentStore = useCallback(
     (id: string) => setState((s) => ({ ...s, currentStoreId: id })),
     [],
@@ -421,6 +439,8 @@ export function PosProvider({ children }: { children: ReactNode }) {
         overdue: isShiftOverdue(activeShift, stateRef.current.settings.hours),
       };
       db.upsertShift(closed);
+      // Everyone who was signed in on this shift is signed out with it.
+      endShiftSessions({ shiftId: closed.id });
       setState((s) => ({
         ...s,
         shifts: s.shifts.map((x) => (x.id === closed.id ? closed : x)),

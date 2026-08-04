@@ -13,6 +13,7 @@ import type {
   Promotion,
   Sale,
   Shift,
+  ShiftSession,
   Store,
   PaperSize,
   PaymentMethod,
@@ -292,6 +293,33 @@ const shiftToRow = (s: Shift): Row => ({
   updated_at: new Date().toISOString(),
 });
 
+const rowToShiftSession = (r: Row): ShiftSession => ({
+  id: r.id,
+  shiftId: r.shift_id ?? "",
+  storeId: r.store_id ?? "",
+  terminalId: r.terminal_id ?? null,
+  terminalName: r.terminal_name ?? null,
+  staffId: r.staff_id ?? null,
+  staffName: r.staff_name ?? "",
+  role: r.role ?? null,
+  signedInAt: r.signed_in_at,
+  signedOutAt: r.signed_out_at ?? null,
+});
+
+const shiftSessionToRow = (s: ShiftSession): Row => ({
+  id: s.id,
+  shift_id: s.shiftId,
+  store_id: s.storeId,
+  terminal_id: s.terminalId ?? null,
+  terminal_name: s.terminalName ?? null,
+  staff_id: s.staffId ?? null,
+  staff_name: s.staffName,
+  role: s.role ?? null,
+  signed_in_at: s.signedInAt,
+  signed_out_at: s.signedOutAt ?? null,
+  updated_at: new Date().toISOString(),
+});
+
 const rowToSale = (r: Row): Sale => ({
   id: r.id,
   receiptNo: r.bill_number,
@@ -498,6 +526,18 @@ export async function loadActiveShift(storeId: string): Promise<Shift | null> {
   return rows.length ? rowToShift(rows[0]) : null;
 }
 
+/** Recent sign-in sessions for a branch, newest first. */
+export async function loadShiftSessions(storeId: string, limit = 200): Promise<ShiftSession[]> {
+  const res = await supabase
+    .from("shift_sessions" as never)
+    .select("*")
+    .eq("store_id", storeId)
+    .order("signed_in_at", { ascending: false })
+    .limit(limit);
+  if (res.error) throw res.error;
+  return ((res.data as Row[] | null) ?? []).map(rowToShiftSession);
+}
+
 /**
  * Writes never hit the network directly.
  *
@@ -549,6 +589,13 @@ export const db = {
 
   upsertShift: (s: Shift) =>
     queue("Saving shift", { kind: "upsert", table: "shifts", rows: [shiftToRow(s)] }),
+
+  upsertShiftSession: (s: ShiftSession) =>
+    queue("Saving shift sign-in", {
+      kind: "upsert",
+      table: "shift_sessions",
+      rows: [shiftSessionToRow(s)],
+    }),
 
   saveSettings: (s: AppSettings) =>
     queue("Saving settings", {

@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
 import { DisplayScalingSettings } from "@/components/pos/DisplayScalingSettings";
-import { ReceiptPrinterSettings } from "@/components/pos/ReceiptPrinterSettings";
 
 export const Route = createFileRoute("/settings/display")({
   head: () => ({
@@ -20,9 +19,6 @@ export const Route = createFileRoute("/settings/display")({
       description="Scale the interface for the screen this till runs on, and pick a light or dark theme."
     >
       <DisplayScalingSettings bare />
-      <div className="mt-6">
-        <ReceiptPrinterSettings />
-      </div>
     </SettingsFrame>
   ),
 });

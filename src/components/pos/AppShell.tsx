@@ -14,6 +14,7 @@ import { SyncStatus } from "@/components/pos/SyncStatus";
 import { WindowControls } from "@/components/pos/WindowControls";
 import { ShiftReminder } from "@/components/pos/ShiftReminder";
 import { ShiftGuard } from "@/components/pos/ShiftGuard";
+import { LiveClock } from "@/components/pos/LiveClock";
 import { ThemeToggle } from "@/components/pos/ThemeToggle";
 import { startSyncEngine } from "@/lib/sync-engine";
 import type { NavItem } from "@/components/pos/nav-config";
@@ -321,6 +322,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           >
             {currentStore.code}
           </Badge>
+          <LiveClock compact />
           <SyncStatus />
           <ThemeToggle />
           <Button
@@ -342,6 +344,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </p>
           </div>
           <SyncStatus className="ml-auto" />
+          <LiveClock />
           {terminal.config && (
             <Badge
               variant="outline"

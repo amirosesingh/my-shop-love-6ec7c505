@@ -30,6 +30,9 @@ import { useAuth } from "@/lib/pos-auth";
 import { useUserPermissions } from "@/lib/pos-permissions";
 import { openCashDrawer, printSaleReceipt, printShiftReport } from "@/lib/pos-print";
 import { signInsForDay, type SignInEntry } from "@/lib/shift-attendance";
+import { localShiftSessions, mergeSessions } from "@/lib/shift-sessions";
+import { loadShiftSessions } from "@/lib/pos-db";
+import type { ShiftSession } from "@/lib/pos-types";
 
 export const Route = createFileRoute("/shifts")({
   head: () => ({
@@ -57,6 +60,7 @@ function Shifts() {
   const [note, setNote] = useState("");
   const [closeOpen, setCloseOpen] = useState(false);
   const [signIns, setSignIns] = useState<SignInEntry[]>([]);
+  const [sessions, setSessions] = useState<ShiftSession[]>([]);
 
   // Local per-terminal log — read after mount so SSR and hydration match.
   useEffect(() => {
@@ -65,6 +69,27 @@ function Shifts() {
     const t = window.setInterval(refresh, 30_000);
     return () => window.clearInterval(t);
   }, [user?.staffId]);
+
+  // Central record of every sign-in against a shift, with the local cache as
+  // the offline fallback.
+  useEffect(() => {
+    let alive = true;
+    const refresh = async () => {
+      const local = localShiftSessions();
+      try {
+        const remote = await loadShiftSessions(currentStore.id);
+        if (alive) setSessions(mergeSessions(remote, local));
+      } catch {
+        if (alive) setSessions(local);
+      }
+    };
+    void refresh();
+    const t = window.setInterval(() => void refresh(), 60_000);
+    return () => {
+      alive = false;
+      window.clearInterval(t);
+    };
+  }, [currentStore.id, activeShift?.id]);
 
   const storeSales = state.sales.filter((s) => s.storeId === currentStore.id);
   const storeShifts = state.shifts.filter((s) => s.storeId === currentStore.id);
@@ -253,6 +278,52 @@ function Shifts() {
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {new Date(e.lastSeen).toLocaleTimeString()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </section>
+
+        <section className="rounded-lg border border-border bg-card">
+          <h2 className="flex items-center gap-2 px-5 py-3 text-sm font-semibold">
+            <Users className="size-4" /> Shift sign-in history (all terminals)
+          </h2>
+          <Separator />
+          {sessions.length === 0 ? (
+            <p className="px-5 py-4 text-sm text-muted-foreground">
+              No shift sessions recorded for this branch yet.
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>User</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Terminal</TableHead>
+                  <TableHead>Signed in</TableHead>
+                  <TableHead>Signed out</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sessions.slice(0, 50).map((s) => (
+                  <TableRow key={s.id}>
+                    <TableCell className="font-medium">
+                      {s.staffName}
+                      {s.shiftId === activeShift?.id && !s.signedOutAt && (
+                        <Badge variant="outline" className="ml-2">
+                          on shift
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="capitalize text-muted-foreground">{s.role ?? "—"}</TableCell>
+                    <TableCell className="text-muted-foreground">{s.terminalName ?? "—"}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {new Date(s.signedInAt).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {s.signedOutAt ? new Date(s.signedOutAt).toLocaleString() : "Still signed in"}
                     </TableCell>
                   </TableRow>
                 ))}

@@ -15,6 +15,7 @@ import { issueCashierSession } from "@/lib/pos-session.functions";
 import { verifyCashierPin } from "@/lib/pos-cashiers";
 import { cacheCredential, verifyCachedPin } from "@/lib/offline-credentials";
 import { recordSignIn } from "@/lib/shift-attendance";
+import { endShiftSessions } from "@/lib/shift-sessions";
 import {
   CASHIER_PERMISSIONS,
   FULL_PERMISSIONS,
@@ -385,6 +386,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    // Stamp the sign-out time on this user's open shift sessions first.
+    endShiftSessions({});
     await supabase.auth.signOut();
     setSession(null);
     setRoles([]);
