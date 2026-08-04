@@ -59,9 +59,11 @@ import { useUserPermissions } from "@/lib/pos-permissions";
 import { useVisibility } from "@/lib/ui-visibility";
 import { useUiScale } from "@/lib/use-ui-scale";
 import {
+  discountLabel,
   loadMemberVouchers,
   loadVoucherByToken,
   redeemVoucher,
+  scopeLabel,
   voucherValue,
 } from "@/lib/coupons";
 import type { Campaign, VoucherView } from "@/lib/coupons";
