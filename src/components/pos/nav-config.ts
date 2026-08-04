@@ -122,6 +122,14 @@ export const navGroups: NavGroup[] = [
         blurb: "Products, prices, stock counts and bulk import.",
       },
       {
+        to: "/all-shops",
+        label: "All Shops Panel",
+        icon: PackageSearch,
+        flag: "can_view_inventory",
+        keywords: "group branches multi store stock overview live",
+        blurb: "Live takings and stock for every branch in one table.",
+      },
+      {
         to: "/purchasing",
         label: "Purchasing",
         icon: ScanBarcode,
