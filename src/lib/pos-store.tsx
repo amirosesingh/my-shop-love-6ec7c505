@@ -148,6 +148,8 @@ function applyCloud(s: PosState, cloud: CloudSlice): PosState {
     products: cloud.products,
     members: cloud.members,
     sales: cloud.sales,
+    // Shifts are central now so every terminal agrees on what is open.
+    shifts: cloud.shifts.length ? cloud.shifts : s.shifts,
     promotions: cloud.promotions.length ? cloud.promotions : s.promotions,
     // Locations are central now; the local list is the fallback until
     // the directory has been populated (and gets pushed up below).
@@ -161,6 +163,7 @@ function applyCloud(s: PosState, cloud: CloudSlice): PosState {
       payment: { ...defaultSettings.payment, ...cloud.settings.payment },
       whatsapp: { ...defaultSettings.whatsapp, ...cloud.settings.whatsapp },
       review: { ...defaultSettings.review, ...cloud.settings.review },
+      hours: { ...defaultSettings.hours, ...cloud.settings.hours },
     },
     // Keep the bill counter ahead of every receipt already in the cloud.
     counter: cloud.sales.reduce(
