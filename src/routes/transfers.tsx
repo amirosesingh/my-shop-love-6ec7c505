@@ -357,18 +357,23 @@ function Transfers() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
-                        {canApprove && (
+                        {showApprove && (
                           <Button
                             size="sm"
                             variant="ghost"
                             onClick={() => {
                               approveTransfer(t.id);
                               print(t);
-                              toast.success(`${t.ref} approved and dispatched`);
+                              toast.success(`${t.ref} authorised and dispatched`);
                             }}
                           >
                             <Check className="size-4" /> Approve
                           </Button>
+                        )}
+                        {t.status === "requested" && !showApprove && (
+                          <span className="text-[11px] text-muted-foreground">
+                            Waiting for approval
+                          </span>
                         )}
                         {canReceive && (
                           <Button
