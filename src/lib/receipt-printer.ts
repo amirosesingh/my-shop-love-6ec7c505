@@ -6,6 +6,8 @@
  * neither exists, so callers fall back to the classic hidden-iframe print.
  */
 
+import type { SlipEncoding, SlipLineEnding } from "./escpos";
+
 const PRINTER_KEY = "pos-receipt-printer-v1";
 
 type PrintResult = { ok: boolean; error?: string };
@@ -39,9 +41,30 @@ export type PrinterPrefs = {
    * `thermal` = ESC/POS text through the RAW spooler (no driver).
    */
   printMode?: "dialog" | "direct" | "thermal";
+  /** Character encoding used for raw ESC/POS text on this printer. */
+  encoding?: SlipEncoding;
+  /** Line terminator this printer expects: LF or CRLF. */
+  lineEnding?: SlipLineEnding;
 };
 
-const EMPTY: PrinterPrefs = { deviceName: "", share: "", drawerPin: 2, printMode: "dialog" };
+const EMPTY: PrinterPrefs = {
+  deviceName: "",
+  share: "",
+  drawerPin: 2,
+  printMode: "dialog",
+  encoding: "cp437",
+  lineEnding: "lf",
+};
+
+const ENCODINGS: SlipEncoding[] = ["ascii", "cp437", "cp850", "cp858", "utf8"];
+
+function normalizeEncoding(v: unknown): SlipEncoding {
+  return ENCODINGS.includes(v as SlipEncoding) ? (v as SlipEncoding) : "cp437";
+}
+
+function normalizeLineEnding(v: unknown): SlipLineEnding {
+  return v === "crlf" ? "crlf" : "lf";
+}
 
 function normalizeMode(mode: unknown): "dialog" | "direct" | "thermal" {
   if (mode === "thermal") return "thermal";
@@ -67,6 +90,8 @@ export function getPrinterPrefs(): PrinterPrefs {
       share: parsed.share ?? "",
       drawerPin: parsed.drawerPin === 5 ? 5 : 2,
       printMode: normalizeMode(parsed.printMode),
+      encoding: normalizeEncoding(parsed.encoding),
+      lineEnding: normalizeLineEnding(parsed.lineEnding),
     };
   } catch {
     return EMPTY;

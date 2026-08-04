@@ -399,7 +399,11 @@ function printHtml(title: string, body: string, slip = true) {
 
   void (async () => {
     if (thermal) {
-      const bytes = htmlToEscPos(desktopHtml, paper);
+      const prefs = getPrinterPrefs();
+      const bytes = htmlToEscPos(desktopHtml, paper, {
+        encoding: prefs.encoding ?? "cp437",
+        lineEnding: prefs.lineEnding ?? "lf",
+      });
       const res = await rawPulse(bytes);
       if (res.handled) {
         if (!res.ok) toast.error("Printing failed", { description: res.error });

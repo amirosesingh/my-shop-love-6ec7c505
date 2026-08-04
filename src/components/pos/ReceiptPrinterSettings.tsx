@@ -24,6 +24,8 @@ export function ReceiptPrinterSettings() {
     share: "",
     drawerPin: 2,
     printMode: "dialog",
+    encoding: "cp437",
+    lineEnding: "lf",
   });
   const [printers, setPrinters] = useState<{ name: string; displayName: string }[]>([]);
   const [testing, setTesting] = useState(false);
@@ -102,10 +104,45 @@ export function ReceiptPrinterSettings() {
         </p>
       </div>
 
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Character encoding</Label>
+          <ThemedSelect
+            value={prefs.encoding ?? "cp437"}
+            onChange={(v: string) =>
+              update({ ...prefs, encoding: v as NonNullable<PrinterPrefs["encoding"]> })
+            }
+            options={[
+              { value: "cp437", label: "CP437 (default thermal)" },
+              { value: "cp850", label: "CP850 (Latin-1)" },
+              { value: "cp858", label: "CP858 (Latin-1 + €)" },
+              { value: "ascii", label: "Plain ASCII" },
+              { value: "utf8", label: "UTF-8" },
+            ]}
+          />
+          <p className="text-[11px] text-muted-foreground">
+            Applies to thermal (ESC/POS) printing. If accents or currency symbols come out as
+            garbled characters, try CP850, CP858 or UTF-8.
+          </p>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Line endings</Label>
+          <ThemedSelect
+            value={prefs.lineEnding ?? "lf"}
+            onChange={(v: string) => update({ ...prefs, lineEnding: v === "crlf" ? "crlf" : "lf" })}
+            options={[
+              { value: "lf", label: "LF (standard)" },
+              { value: "crlf", label: "CRLF (Windows-style)" },
+            ]}
+          />
+          <p className="text-[11px] text-muted-foreground">
+            Switch to CRLF if the slip prints as one long line or lines overlap.
+          </p>
+        </div>
+      </div>
+
       <div className="mt-4 space-y-1">
-        <Label className="text-xs text-muted-foreground">
-          Drawer connector pin
-        </Label>
+        <Label className="text-xs text-muted-foreground">Drawer connector pin</Label>
         <ThemedSelect
           value={String(prefs.drawerPin ?? 2)}
           onChange={(v: string) => update({ ...prefs, drawerPin: v === "5" ? 5 : 2 })}
