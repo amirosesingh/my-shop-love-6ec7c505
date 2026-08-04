@@ -189,6 +189,15 @@ export const navGroups: NavGroup[] = [
         keywords: "foc birthday tier threshold",
         blurb: "FOC items, birthday and threshold offers.",
       },
+      {
+        to: "/coupons",
+        label: "Coupon Campaigns",
+        icon: Percent,
+        adminOnly: true,
+        flag: "can_manage_promotions",
+        keywords: "coupon voucher campaign claim link qr welcome member signup",
+        blurb: "Digital coupon campaigns, claim links and voucher tracking.",
+      },
     ],
   },
   {
