@@ -278,10 +278,59 @@ export function PosProvider({ children }: { children: ReactNode }) {
     [state.stores, state.currentStoreId],
   );
 
-  const activeShift = useMemo(
-    () => state.shifts.find((s) => !s.closedAt && s.storeId === currentStore.id) ?? null,
-    [state.shifts, currentStore.id],
-  );
+  // Authoritative open shift for this branch, straight from the database.
+  // Falls back to the cached list when the terminal is offline. Purely
+  // status-driven: a shift opened days ago stays active until it is closed.
+  const [dbShift, setDbShift] = useState<Shift | null>(null);
+  const [shiftChecked, setShiftChecked] = useState(false);
+
+  const refreshActiveShift = useCallback(async () => {
+    const storeId = stateRef.current.currentStoreId;
+    try {
+      const found = await loadActiveShift(storeId);
+      setDbShift(found);
+      setState((s) => ({
+        ...s,
+        shifts: found
+          ? s.shifts.some((x) => x.id === found.id)
+            ? s.shifts.map((x) => (x.id === found.id ? found : x))
+            : [found, ...s.shifts]
+          : s.shifts.map((x) =>
+              x.storeId === storeId && !x.closedAt
+                ? { ...x, status: "CLOSED" as const, closedAt: x.closedAt ?? new Date().toISOString() }
+                : x,
+            ),
+      }));
+    } catch {
+      // Offline or unreachable: keep whatever the cached list knows.
+      setDbShift(
+        stateRef.current.shifts.find(
+          (s) => s.storeId === storeId && s.status !== "CLOSED" && !s.closedAt,
+        ) ?? null,
+      );
+    } finally {
+      setShiftChecked(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!signedIn) {
+      setDbShift(null);
+      setShiftChecked(false);
+      return;
+    }
+    void refreshActiveShift();
+  }, [signedIn, currentStore.id, refreshActiveShift]);
+
+  const activeShift = useMemo(() => {
+    if (dbShift && dbShift.storeId === currentStore.id && !dbShift.closedAt) return dbShift;
+    if (shiftChecked) return null;
+    return (
+      state.shifts.find(
+        (s) => s.storeId === currentStore.id && s.status !== "CLOSED" && !s.closedAt,
+      ) ?? null
+    );
+  }, [dbShift, shiftChecked, state.shifts, currentStore.id]);
 
   const setCurrentStore = useCallback(
     (id: string) => setState((s) => ({ ...s, currentStoreId: id })),
