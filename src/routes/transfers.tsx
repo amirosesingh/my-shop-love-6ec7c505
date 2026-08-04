@@ -1,7 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeftRight, Check, Plus, Printer, Send, Trash2, Truck, X } from "lucide-react";
+import {
+  ArrowLeftRight,
+  Check,
+  FileSpreadsheet,
+  Plus,
+  Printer,
+  Send,
+  Trash2,
+  Truck,
+  Upload,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
+import * as XLSX from "xlsx";
 import { AppShell } from "@/components/pos/AppShell";
 import { useAuth } from "@/lib/pos-auth";
 import { Button } from "@/components/ui/button";
@@ -81,6 +93,8 @@ function Transfers() {
   } = usePos();
   const { can } = useAuth();
   const search = Route.useSearch();
+  const requireApproval = state.settings.integrations.requireTransferApproval;
+  const canApprove = can("can_approve_transfer") || can("can_receive_transfer");
 
   const others = stores.filter((s) => s.id !== currentStore.id);
   const [open, setOpen] = useState(false);
@@ -110,6 +124,75 @@ function Transfers() {
         ? prev.map((i) => (i.productId === productId ? { ...i, qty: i.qty + 1 } : i))
         : [...prev, { productId, qty: 1 }],
     );
+  }
+
+  /** Bulk basket from a spreadsheet: barcode / SKU / name + quantity. */
+  async function importSheet(file: File) {
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const sheetName = wb.SheetNames[0];
+      const sheet = sheetName ? wb.Sheets[sheetName] : undefined;
+      if (!sheet) throw new Error("empty workbook");
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
+      const pick = (r: Record<string, unknown>, keys: string[]) => {
+        for (const [k, v] of Object.entries(r)) {
+          if (keys.includes(k.trim().toLowerCase())) return String(v).trim();
+        }
+        return "";
+      };
+      const next: TransferItem[] = [];
+      const missing: string[] = [];
+      for (const r of rows) {
+        const key = pick(r, ["barcode", "sku", "code", "product", "name", "item"]);
+        const qty = Math.floor(Number(pick(r, ["qty", "quantity", "units"])) || 0);
+        if (!key || qty <= 0) continue;
+        const needle = key.toLowerCase();
+        const p = state.products.find(
+          (x) =>
+            x.barcode?.toLowerCase() === needle ||
+            x.sku?.toLowerCase() === needle ||
+            x.name.toLowerCase() === needle,
+        );
+        if (!p) {
+          missing.push(key);
+          continue;
+        }
+        const found = next.find((i) => i.productId === p.id);
+        if (found) found.qty += qty;
+        else next.push({ productId: p.id, qty });
+      }
+      if (!next.length) {
+        toast.error("Nothing matched — use columns Barcode / SKU / Name and Qty");
+        return;
+      }
+      setItems((prev) => {
+        const merged = [...prev];
+        for (const i of next) {
+          const hit = merged.find((x) => x.productId === i.productId);
+          if (hit) hit.qty += i.qty;
+          else merged.push(i);
+        }
+        return merged;
+      });
+      toast.success(
+        `${next.length} line${next.length > 1 ? "s" : ""} imported${
+          missing.length ? ` · ${missing.length} unknown item(s) skipped` : ""
+        }`,
+      );
+    } catch {
+      toast.error("Could not read that file — use a .xlsx or .csv sheet");
+    }
+  }
+
+  function downloadTemplate() {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ["Barcode", "Qty"],
+      ...state.products.slice(0, 3).map((p) => [p.barcode ?? p.sku ?? p.name, 1]),
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Transfer");
+    XLSX.writeFile(wb, "stock-transfer-template.xlsx");
   }
 
   const mine = useMemo(
@@ -160,14 +243,17 @@ function Transfers() {
       items: clean,
       note,
       createdBy: activeShift?.cashier ?? "Manager",
+      needsApproval: kind === "transfer" && requireApproval,
     });
-    print({ ...t });
+    if (t.status === "in_transit") print({ ...t });
     setOpen(false);
     setNote("");
     setItems([]);
     toast.success(
       kind === "transfer"
-        ? `${t.ref} dispatched · ${clean.length} item${clean.length > 1 ? "s" : ""}`
+        ? requireApproval
+          ? `${t.ref} sent for approval · ${clean.length} item${clean.length > 1 ? "s" : ""}`
+          : `${t.ref} dispatched · ${clean.length} item${clean.length > 1 ? "s" : ""}`
         : `${t.ref} requested from ${storeOf(otherStoreId)?.name}`,
     );
   }
