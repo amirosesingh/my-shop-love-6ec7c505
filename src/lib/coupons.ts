@@ -239,7 +239,20 @@ export async function loadMemberVouchers(memberId: string): Promise<VoucherView[
       memberName: r.members?.full_name ?? "",
       memberCode: r.members?.member_code ?? "",
     }))
-    .filter((v) => !isExpired(v.campaign));
+    .filter((v) => !isVoucherExpired(v.voucher, v.campaign));
+}
+
+/** Audit trail: claims, manual issues, redemptions and blocked attempts. */
+export async function loadCouponEvents(campaignId?: string): Promise<CouponEvent[]> {
+  let q = sb
+    .from("coupon_events")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(2000);
+  if (campaignId) q = q.eq("campaign_id", campaignId);
+  const res = await q;
+  if (res.error) throw new Error(res.error.message);
+  return ((res.data as Row[] | null) ?? []).map(toEvent);
 }
 
 /* ------------------------------- rpc calls ------------------------------- */
