@@ -693,6 +693,18 @@ function Register() {
       });
     }
     if (payments.some((p) => p.method === "cash")) openCashDrawer();
+    if (voucherToken) {
+      // Single-use lock lives in the database, so a second scan cannot reuse it.
+      void redeemVoucher({
+        token: voucherToken,
+        saleId: sale.receiptNo,
+        storeId: sale.storeId,
+        staff: activeCashier,
+      }).catch((e: unknown) =>
+        toast.error(e instanceof Error ? e.message : "Could not lock the voucher"),
+      );
+      setVoucherToken(null);
+    }
     if (splitting || payments.some((p) => p.bankName)) {
       logger.log("sale", "Split payment recorded", "register", {
         receiptNo: sale.receiptNo,
