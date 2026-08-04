@@ -189,6 +189,7 @@ export type Database = {
           tax_mode: string
           tax_number: string | null
           tax_percentage: number
+          ui_visibility: Json
           updated_at: string
           website: string | null
         }
@@ -220,6 +221,7 @@ export type Database = {
           tax_mode?: string
           tax_number?: string | null
           tax_percentage?: number
+          ui_visibility?: Json
           updated_at?: string
           website?: string | null
         }
@@ -251,6 +253,7 @@ export type Database = {
           tax_mode?: string
           tax_number?: string | null
           tax_percentage?: number
+          ui_visibility?: Json
           updated_at?: string
           website?: string | null
         }
@@ -435,6 +438,7 @@ export type Database = {
           id: string
           operator_name: string | null
           po_number: string
+          supplier_id: string | null
           supplier_name: string | null
           total_cost: number
           total_items_count: number
@@ -444,6 +448,7 @@ export type Database = {
           id?: string
           operator_name?: string | null
           po_number: string
+          supplier_id?: string | null
           supplier_name?: string | null
           total_cost?: number
           total_items_count?: number
@@ -453,11 +458,20 @@ export type Database = {
           id?: string
           operator_name?: string | null
           po_number?: string
+          supplier_id?: string | null
           supplier_name?: string | null
           total_cost?: number
           total_items_count?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "purchase_orders_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sale_items: {
         Row: {
@@ -815,6 +829,48 @@ export type Database = {
           store_id?: string | null
           store_name?: string | null
           terminal_id?: string | null
+        }
+        Relationships: []
+      }
+      suppliers: {
+        Row: {
+          address: string | null
+          contact_name: string | null
+          created_at: string
+          email: string | null
+          id: string
+          is_active: boolean
+          name: string
+          notes: string | null
+          phone: string | null
+          tax_number: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          contact_name?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          notes?: string | null
+          phone?: string | null
+          tax_number?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          contact_name?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          tax_number?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
