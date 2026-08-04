@@ -198,6 +198,15 @@ const rowToSettings = (r: Row | null): AppSettings =>
             defaultSettings.review.maxDiscountPct,
           ),
         },
+        hours: {
+          dayStart: r.day_start_time ?? defaultSettings.hours.dayStart,
+          dayEnd: r.day_end_time ?? defaultSettings.hours.dayEnd,
+          maxShiftHours: num(r.max_shift_hours, defaultSettings.hours.maxShiftHours),
+          reminderMinutes: num(
+            r.shift_reminder_minutes,
+            defaultSettings.hours.reminderMinutes,
+          ),
+        },
       }
     : defaultSettings;
 
@@ -228,6 +237,10 @@ const settingsToRow = (s: AppSettings): Row => ({
   review_max_refund_value: s.review.maxRefundValue,
   review_max_nosale: s.review.maxNoSaleOpens,
   review_max_discount_pct: s.review.maxDiscountPct,
+  day_start_time: s.hours.dayStart,
+  day_end_time: s.hours.dayEnd,
+  max_shift_hours: s.hours.maxShiftHours,
+  shift_reminder_minutes: s.hours.reminderMinutes,
   updated_at: new Date().toISOString(),
 });
 
