@@ -379,7 +379,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             const required = requiredPermission(location.pathname);
             const allowed =
               required === null ? true : required === "unknown" ? isAdmin : can(required);
-            if (allowed) return <ShiftGuard>{children}</ShiftGuard>;
+            if (allowed) return children;
             return (
               <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 p-8 text-center">
                 <Lock className="size-8 text-muted-foreground" />
@@ -397,6 +397,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </main>
       </div>
       </div>
+      </ShiftGuard>
     </div>
   );
 }
