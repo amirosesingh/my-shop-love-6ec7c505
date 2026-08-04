@@ -112,7 +112,7 @@
     "vite": "^8.1.5",
     "vitest": "^4.1.10"
   },
-  "version": "1.0.36",
+  "version": "1.0.37",
   "build": {
     "appId": "app.lovable.pos",
     "productName": "LovablePOS",
