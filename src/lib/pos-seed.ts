@@ -68,6 +68,7 @@ export const defaultSettings: AppSettings = {
   payment: defaultPaymentDetails,
   whatsapp: defaultWhatsApp,
   review: defaultReviewThresholds,
+  hours: defaultTradingHours,
 };
 
 export const seedPromotions: Promotion[] = [
