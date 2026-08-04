@@ -56,6 +56,7 @@ import {
 import { availableAt, cartTotals, money, stockAt, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
 import { useUserPermissions } from "@/lib/pos-permissions";
+import { useVisibility } from "@/lib/ui-visibility";
 import { useUiScale } from "@/lib/use-ui-scale";
 import type { CartLine, DiscountType, PaymentMethod, Sale } from "@/lib/pos-types";
 import type { Payment } from "@/lib/pos-types";
@@ -106,10 +107,15 @@ export const Route = createFileRoute("/")({
 });
 
 function Register() {
-  const { state, activeShift, recordSale, createBooking, openShift, currentStore } = usePos();
+  const { state, activeShift, recordSale, createBooking, openShift, closeShift, currentStore } =
+    usePos();
   useUiScale();
   const { user, can } = useAuth();
   const { requirePermission } = useUserPermissions();
+  const { visible } = useVisibility();
+  const [closeShiftOpen, setCloseShiftOpen] = useState(false);
+  const [countedCash, setCountedCash] = useState("");
+  const [closeNote, setCloseNote] = useState("");
   const canDiscount = can("can_give_discount");
   const [discountOverride, setDiscountOverride] = useState(false);
   const discountAllowed = canDiscount || discountOverride;
