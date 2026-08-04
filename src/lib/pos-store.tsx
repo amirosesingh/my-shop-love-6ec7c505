@@ -333,6 +333,23 @@ export function PosProvider({ children }: { children: ReactNode }) {
     );
   }, [dbShift, shiftChecked, state.shifts, currentStore.id]);
 
+  // Record the exact moment this user joined the open shift. Runs whenever the
+  // signed-in account or the open shift changes, and is safe to repeat.
+  useEffect(() => {
+    const name = user?.name ?? terminalUser?.name;
+    if (!activeShift || !name) return;
+    const terminal = readTerminalConfig();
+    beginShiftSession({
+      shiftId: activeShift.id,
+      storeId: activeShift.storeId,
+      terminalId: activeShift.terminalId ?? terminal?.tokenId ?? localTerminalId(),
+      terminalName: activeShift.terminalName ?? terminal?.locationName ?? "This PC",
+      staffId: user?.staffId ?? terminalUser?.userCode ?? null,
+      staffName: name,
+      role: user?.role ?? terminalUser?.role ?? null,
+    });
+  }, [activeShift?.id, user?.staffId, user?.name, terminalUser?.userCode]);
+
   const setCurrentStore = useCallback(
     (id: string) => setState((s) => ({ ...s, currentStoreId: id })),
     [],
