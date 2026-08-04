@@ -12,6 +12,7 @@ export const PERMISSION_GROUPS = [
       "can_view_drawer_balance",
       "can_open_shift",
       "can_close_shift",
+      "can_bypass_shift_lock",
     ],
   },
   {
@@ -96,6 +97,7 @@ export type PermissionKey =
   | "can_view_drawer_balance"
   | "can_open_shift"
   | "can_close_shift"
+  | "can_bypass_shift_lock"
   | "can_delete_line"
   | "can_reduce_qty"
   | "can_discount_bill"
@@ -141,6 +143,7 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   can_view_drawer_balance: "View drawer balance",
   can_open_shift: "Open a shift",
   can_close_shift: "Close a shift / run Z-report",
+  can_bypass_shift_lock: "Use the terminal without an open shift",
   can_delete_line: "Delete a line from the cart",
   can_reduce_qty: "Reduce an item quantity",
   can_discount_bill: "Apply a bill-level discount",
