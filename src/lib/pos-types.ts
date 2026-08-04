@@ -491,7 +491,15 @@ export type AppSettings = {
   whatsapp: WhatsAppSettings;
   review: ReviewThresholds;
   hours: TradingHours;
+  /** Admin-controlled screen elements hidden from chosen roles. */
+  visibility: UiVisibility;
 };
+
+/**
+ * Element key → list of roles that must NOT see it. Admins always see
+ * everything, so they can never lock themselves out of the register.
+ */
+export type UiVisibility = { hidden: Record<string, string[]> };
 
 /** Daily limits that flag a cashier for review on the dashboard. */
 export type ReviewThresholds = {

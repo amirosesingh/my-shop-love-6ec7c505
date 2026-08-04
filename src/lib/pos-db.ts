@@ -209,6 +209,10 @@ const rowToSettings = (r: Row | null): AppSettings =>
             defaultSettings.hours.reminderMinutes,
           ),
         },
+        visibility: {
+          hidden: ((r.ui_visibility as { hidden?: Record<string, string[]> } | null)?.hidden ??
+            {}) as Record<string, string[]>,
+        },
       }
     : defaultSettings;
 
@@ -243,6 +247,7 @@ const settingsToRow = (s: AppSettings): Row => ({
   day_end_time: s.hours.dayEnd,
   max_shift_hours: s.hours.maxShiftHours,
   shift_reminder_minutes: s.hours.reminderMinutes,
+  ui_visibility: s.visibility ?? { hidden: {} },
   updated_at: new Date().toISOString(),
 });
 

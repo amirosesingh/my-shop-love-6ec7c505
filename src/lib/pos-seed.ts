@@ -78,6 +78,7 @@ export const defaultSettings: AppSettings = {
   whatsapp: defaultWhatsApp,
   review: defaultReviewThresholds,
   hours: defaultTradingHours,
+  visibility: { hidden: {} },
 };
 
 export const seedPromotions: Promotion[] = [
