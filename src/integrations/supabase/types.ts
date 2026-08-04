@@ -164,11 +164,14 @@ export type Database = {
         Row: {
           company_name: string
           custom_lines: Json
+          day_end_time: string
+          day_start_time: string
           enable_tax: boolean
           fonts: Json
           footer_text: string | null
           header_text: string | null
           id: number
+          max_shift_hours: number
           paper_size: string
           phone: string | null
           qr: Json
@@ -178,6 +181,7 @@ export type Database = {
           review_max_refund_value: number
           review_max_refunds: number
           review_max_voids: number
+          shift_reminder_minutes: number
           show_barcode: boolean
           show_logo: boolean
           show_points: boolean
@@ -191,11 +195,14 @@ export type Database = {
         Insert: {
           company_name?: string
           custom_lines?: Json
+          day_end_time?: string
+          day_start_time?: string
           enable_tax?: boolean
           fonts?: Json
           footer_text?: string | null
           header_text?: string | null
           id?: number
+          max_shift_hours?: number
           paper_size?: string
           phone?: string | null
           qr?: Json
@@ -205,6 +212,7 @@ export type Database = {
           review_max_refund_value?: number
           review_max_refunds?: number
           review_max_voids?: number
+          shift_reminder_minutes?: number
           show_barcode?: boolean
           show_logo?: boolean
           show_points?: boolean
@@ -218,11 +226,14 @@ export type Database = {
         Update: {
           company_name?: string
           custom_lines?: Json
+          day_end_time?: string
+          day_start_time?: string
           enable_tax?: boolean
           fonts?: Json
           footer_text?: string | null
           header_text?: string | null
           id?: number
+          max_shift_hours?: number
           paper_size?: string
           phone?: string | null
           qr?: Json
@@ -232,6 +243,7 @@ export type Database = {
           review_max_refund_value?: number
           review_max_refunds?: number
           review_max_voids?: number
+          shift_reminder_minutes?: number
           show_barcode?: boolean
           show_logo?: boolean
           show_points?: boolean
@@ -632,6 +644,72 @@ export type Database = {
           key?: string
           updated_at?: string
           updated_by?: string | null
+        }
+        Relationships: []
+      }
+      shifts: {
+        Row: {
+          closed_at: string | null
+          closed_by_name: string | null
+          closed_by_role: string | null
+          closed_by_staff_id: string | null
+          counted_cash: number | null
+          created_at: string
+          expected_cash: number | null
+          id: string
+          note: string
+          opened_at: string
+          opened_by_name: string
+          opened_by_role: string | null
+          opened_by_staff_id: string | null
+          opening_float: number
+          overdue: boolean
+          store_id: string
+          terminal_id: string | null
+          terminal_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          closed_at?: string | null
+          closed_by_name?: string | null
+          closed_by_role?: string | null
+          closed_by_staff_id?: string | null
+          counted_cash?: number | null
+          created_at?: string
+          expected_cash?: number | null
+          id?: string
+          note?: string
+          opened_at?: string
+          opened_by_name?: string
+          opened_by_role?: string | null
+          opened_by_staff_id?: string | null
+          opening_float?: number
+          overdue?: boolean
+          store_id: string
+          terminal_id?: string | null
+          terminal_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          closed_at?: string | null
+          closed_by_name?: string | null
+          closed_by_role?: string | null
+          closed_by_staff_id?: string | null
+          counted_cash?: number | null
+          created_at?: string
+          expected_cash?: number | null
+          id?: string
+          note?: string
+          opened_at?: string
+          opened_by_name?: string
+          opened_by_role?: string | null
+          opened_by_staff_id?: string | null
+          opening_float?: number
+          overdue?: boolean
+          store_id?: string
+          terminal_id?: string | null
+          terminal_name?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
