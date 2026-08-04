@@ -246,7 +246,6 @@ const settingsToRow = (s: AppSettings): Row => ({
 });
 
 const rowToSale = (r: Row): Sale => ({
-  ...({} as Record<string, never>),
   id: r.id,
   receiptNo: r.bill_number,
   storeId: r.store_id ?? "",
