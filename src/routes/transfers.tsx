@@ -318,7 +318,7 @@ function Transfers() {
                 const canApprove =
                   t.status === "requested" &&
                   t.fromStoreId === currentStore.id &&
-                  can("can_receive_transfer");
+                  canApprove;
                 const canReceive =
                   t.status === "in_transit" &&
                   t.toStoreId === currentStore.id &&
