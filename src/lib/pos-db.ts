@@ -12,6 +12,7 @@ import type {
   Product,
   Promotion,
   Sale,
+  Shift,
   Store,
   PaperSize,
   PaymentMethod,
@@ -23,7 +24,7 @@ import type {
 export type CloudSlice = Pick<
   PosState,
   "products" | "members" | "sales" | "promotions" | "settings"
-> & { stores: Store[] };
+> & { stores: Store[]; shifts: Shift[] };
 
 type Row = Record<string, any>;
 
