@@ -2673,6 +2673,31 @@ function Register() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <DiscountPad
+        open={padTarget !== null}
+        onOpenChange={(o) => !o && setPadTarget(null)}
+        title={padTarget === "bill" ? "Bill discount" : "Line discount"}
+        value={
+          padTarget === "bill" ? cartDiscount : typeof padTarget === "number"
+            ? (lines[padTarget]?.discount ?? 0)
+            : 0
+        }
+        type={
+          padTarget === "bill"
+            ? cartDiscountType
+            : typeof padTarget === "number"
+              ? (lines[padTarget]?.discountType ?? "amount")
+              : "amount"
+        }
+        onApply={(v, t) => {
+          if (padTarget === "bill") {
+            setCartDiscount(v);
+            setCartDiscountType(t);
+          } else if (typeof padTarget === "number") {
+            patchLine(padTarget, { discount: v, discountType: t });
+          }
+        }}
+      />
     </AppShell>
   );
 }
