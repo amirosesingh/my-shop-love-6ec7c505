@@ -36,6 +36,9 @@ import { useAuth } from "./pos-auth";
 import { readTerminalConfig } from "./terminal-tokens";
 import { isShiftOverdue, localTerminalId } from "./shift-hours";
 import { beginShiftSession, endShiftSessions } from "./shift-sessions";
+import { branchPolicy } from "./branch-policy";
+import { setActiveBranchSyncPolicy } from "./sync-policy";
+import { setPosTimeZone } from "./time-zone";
 
 const KEY = "pos-state-v2";
 
