@@ -200,6 +200,8 @@ export function PosProvider({ children }: { children: ReactNode }) {
   // Latest snapshot for audit logging without re-creating every callback.
   const stateRef = useRef(state);
   stateRef.current = state;
+  // Lets earlier callbacks reach the settings writer defined further down.
+  const updateSettingsRef = useRef<((patch: Partial<AppSettings>) => void) | null>(null);
 
   useEffect(() => {
     let cancelled = false;
