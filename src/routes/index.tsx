@@ -669,7 +669,8 @@ function Register() {
     setBookOpen(true);
   }
   const serviceLabel = pickedService?.name ?? customService.trim();
-  const serviceCharge = useServices ? r2(Math.max(0, Number(serviceFee || 0))) : 0;
+  const serviceCharge =
+    useServices || racketMode ? r2(Math.max(0, Number(serviceFee || 0))) : 0;
   const bookingTotal = r2(totals.total + serviceCharge);
 
   async function bookAndPayLater() {
