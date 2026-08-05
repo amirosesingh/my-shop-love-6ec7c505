@@ -499,9 +499,8 @@ function printHtml(title: string, body: string, slip = true, barcode?: string) {
   void (async () => {
     if (thermal) {
       const prefs = getPrinterPrefs();
-      const m = printMargins();
       const ref = paper === "58mm" ? 50 : 72;
-      const printable = Math.max(20, (PAPER_MM[paper] ?? 80) - m.left - m.right);
+      const printable = printableWidthMm(paper);
       const cols = Math.max(
         16,
         Math.floor(columnsForPaper(paper) * Math.min(1, printable / ref)),
