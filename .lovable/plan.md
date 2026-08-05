@@ -7,8 +7,7 @@ Move the release to 1.1.1, and keep the bump script stepping 1.1.2, 1.1.3, … o
 Today the update card only knows about the Windows updater, so on Android it reports "automatic updates are not supported in this version". The Android feed reader already exists but is not wired into that card.
 - Make the update settings card detect the platform and, on Android, show installed version, latest version from the update feed, download progress and an Install button.
 - Show a real error message when the feed can't be reached instead of "not supported".
-- Keep Windows and browser behaviour unchanged.
-- The Android feed lives at https://updatecms.luckycharmsdnbhd.com/pos-app/android/ and stays the source for version checks and downloads.
+- Keep Windows and browser behaviour unchanged. Feed source: https://updatecms.luckycharmsdnbhd.com/pos-app/android/
 
 ## 3. Cash drawer reason
 - Replace the reason dropdown on manual drawer opens with a required free-text field (trimmed, minimum a few characters).
