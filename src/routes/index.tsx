@@ -1749,12 +1749,14 @@ function Register() {
                   className="h-11 w-full"
                   label="Book & pay later"
                   icon={<CalendarClock className="size-4" />}
-                  disabled={tillLocked || refundDue > 0 || (!lines.length && !bookingNeedsNoCart)}
+                  disabled={tillLocked || refundDue > 0 || !lines.length}
                   disabledReason={tillLocked ? lockedReason : undefined}
                   onClick={() => {
                     setDeposit("");
                     setBookName(member?.name ?? "");
                     setBookPhone(member?.phone ?? "");
+                    setBookMode("cart");
+                    resetJobCard();
                     setBookOpen(true);
                   }}
                 />
