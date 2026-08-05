@@ -275,6 +275,15 @@ export type PosState = {
 
 export type BookingStatus = "active" | "collected" | "cancelled";
 
+/** When the customer settles a booking. */
+export type BookingPaymentTiming = "now" | "deposit" | "collection";
+
+export const BOOKING_TIMING_LABELS: Record<BookingPaymentTiming, string> = {
+  now: "Paid in full now",
+  deposit: "Deposit now",
+  collection: "Pay on collection",
+};
+
 export type BookingPayment = {
   id: string;
   amount: number;
