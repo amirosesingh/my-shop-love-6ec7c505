@@ -126,6 +126,7 @@ function Suppliers() {
                 <TableHead>Phone</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Tax no.</TableHead>
+                <TableHead>Active</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -143,6 +144,18 @@ function Suppliers() {
                   <TableCell className="numeric">{s.phone}</TableCell>
                   <TableCell>{s.email}</TableCell>
                   <TableCell className="numeric">{s.taxNumber}</TableCell>
+                  <TableCell>
+                    <Switch
+                      aria-label={`${s.name} active`}
+                      checked={s.active}
+                      onCheckedChange={(v) => {
+                        const next = { ...s, active: v };
+                        saveSupplier(next);
+                        setList((l) => l.map((x) => (x.id === s.id ? next : x)));
+                        toast.success(`${s.name} ${v ? "switched on" : "switched off"}`);
+                      }}
+                    />
+                  </TableCell>
                   <TableCell className="text-right">
                     <Button
                       variant="ghost"
@@ -169,7 +182,7 @@ function Suppliers() {
               ))}
               {!rows.length && (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
                     No suppliers yet — add your first one.
                   </TableCell>
                 </TableRow>
