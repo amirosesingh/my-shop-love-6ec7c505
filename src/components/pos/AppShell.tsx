@@ -32,6 +32,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useUiScale } from "@/lib/use-ui-scale";
 import { useBranding, isDesktop } from "@/lib/branding";
+import { isNative } from "@/lib/native";
 import { setBranchId } from "@/lib/activity-journal";
 import { flushWhatsAppQueue } from "@/lib/whatsapp";
 import { reportAppReady } from "@/lib/app-health";
@@ -139,7 +140,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [user, canSwitchStores, currentStore.id, setCurrentStore]);
 
   if (!ready) return null;
-  if (isDesktop()) {
+  // Desktop tills and Android terminals both have to register before use.
+  if (isDesktop() || isNative()) {
     if (terminal.revoked) return <TerminalRevokedScreen onReactivate={clearRevocation} />;
     if (!terminal.config) return <TerminalActivation onActivated={() => clearRevocation()} />;
   }
