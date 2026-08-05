@@ -688,6 +688,16 @@ export const db = {
     if (products.length) db.upsertProducts(products);
   },
 
+  /** Correct the tender recorded against a completed bill (e.g. card -> cash). */
+  updateSalePayment(saleId: string, method: PaymentMethod) {
+    queue("Correcting bill payment", {
+      kind: "update",
+      table: "sales",
+      values: { payment_type: method },
+      match: { id: saleId },
+    });
+  },
+
   /** Batch-push pending audit rows; returns the ids that landed in the cloud. */
   async pushAuditLogs(
     rows: {
