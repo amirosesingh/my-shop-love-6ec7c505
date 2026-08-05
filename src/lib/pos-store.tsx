@@ -44,7 +44,7 @@ import { branchPolicy } from "./branch-policy";
 import { setActiveBranchSyncPolicy } from "./sync-policy";
 import { setPosFormats, setPosTimeZone } from "./time-zone";
 import { receiveTransferInDb, saveTransfer, setTransferStatus } from "./stock-transfers";
-import { loadBookings, saveBookingQuietly } from "./bookings-db";
+import { commitBooking, loadBookings, saveBookingQuietly } from "./bookings-db";
 
 const KEY = "pos-state-v2";
 
@@ -133,16 +133,25 @@ type Ctx = {
   setCurrentStore: (id: string) => void;
   upsertStore: (store: Store) => void;
   removeStore: (id: string) => void;
-  openShift: (cashier: string, openingFloat: number) => void;
-  closeShift: (countedCash: number, note: string) => Shift | null;
+  openShift: (cashier: string, openingFloat: number) => Promise<void>;
+  closeShift: (countedCash: number, note: string) => Promise<Shift | null>;
   activeShift: Shift | null;
-  recordSale: (sale: Omit<Sale, "id" | "receiptNo" | "createdAt">) => Sale;
+  recordSale: (sale: Omit<Sale, "id" | "receiptNo" | "createdAt">) => Promise<Sale>;
   refundSale: (saleId: string) => void;
   changeSalePayment: (saleId: string, method: PaymentMethod, reason?: string) => void;
-  createBooking: (input: NewBooking) => Booking;
+  createBooking: (input: NewBooking) => Promise<Booking>;
   setBookingJobStatus: (id: string, status: JobStatus, who: string) => Booking | null;
-  addBookingPayment: (id: string, amount: number, method: PaymentMethod, cashier: string) => Booking | null;
-  collectBooking: (id: string, amount: number, method: PaymentMethod) => { booking: Booking; sale: Sale } | null;
+  addBookingPayment: (
+    id: string,
+    amount: number,
+    method: PaymentMethod,
+    cashier: string,
+  ) => Promise<Booking | null>;
+  collectBooking: (
+    id: string,
+    amount: number,
+    method: PaymentMethod,
+  ) => Promise<{ booking: Booking; sale: Sale } | null>;
   cancelBooking: (id: string, reason: string) => void;
   upsertProduct: (product: Product) => void;
   removeProduct: (id: string) => void;
@@ -469,14 +478,8 @@ export function PosProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const openShift = useCallback(
-    (cashier: string, openingFloat: number) => {
+    async (cashier: string, openingFloat: number) => {
       const terminal = readTerminalConfig();
-      logger.log("sale_event", "Shift opened", "shifts", {
-        cashier,
-        openingFloat,
-        storeId: stateRef.current.currentStoreId,
-        terminal: terminal?.locationName ?? "This PC",
-      });
       const shift: Shift = {
         id: crypto.randomUUID(),
         storeId: stateRef.current.currentStoreId,
@@ -495,7 +498,14 @@ export function PosProvider({ children }: { children: ReactNode }) {
         closingFloat: null,
         userId: authUserId ?? null,
       };
-      db.upsertShift(shift);
+      // Nothing opens until the shift is stored (cloud, local DB or offline queue).
+      await db.commitShift(shift);
+      logger.log("sale_event", "Shift opened", "shifts", {
+        cashier,
+        openingFloat,
+        storeId: stateRef.current.currentStoreId,
+        terminal: terminal?.locationName ?? "This PC",
+      });
       setState((s) => ({ ...s, shifts: [shift, ...s.shifts] }));
       setDbShift(shift);
       setShiftChecked(true);
@@ -504,7 +514,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
   );
 
   const closeShift = useCallback(
-    (countedCash: number, note: string) => {
+    async (countedCash: number, note: string) => {
       if (!activeShift) return null;
       // Only the PC that opened the shift may close it — unless a manager or
       // admin is signed in, who can close from anywhere.
@@ -523,7 +533,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
         closedByRole: user?.role ?? terminalUser?.role,
         overdue: isShiftOverdue(activeShift, stateRef.current.settings.hours),
       };
-      db.upsertShift(closed);
+      await db.commitShift(closed);
       // Everyone who was signed in on this shift is signed out with it.
       endShiftSessions({ shiftId: closed.id });
       setState((s) => ({
@@ -546,7 +556,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     [activeShift, user, terminalUser, isAdmin, isSupervisor],
   );
 
-  const recordSale = useCallback((input: Omit<Sale, "id" | "receiptNo" | "createdAt">) => {
+  const recordSale = useCallback(async (input: Omit<Sale, "id" | "receiptNo" | "createdAt">) => {
     const snapshot = stateRef.current;
     const counter = snapshot.counter + 1;
     const store = snapshot.stores.find((x) => x.id === input.storeId);
@@ -574,7 +584,8 @@ export function PosProvider({ children }: { children: ReactNode }) {
           totalSpend: Number((member.totalSpend + input.total).toFixed(2)),
         }
       : null;
-    void db.recordSale(sale, touchedProducts, updatedMember);
+    // The bill is only real once it is stored somewhere.
+    await db.commitSale(sale, touchedProducts, updatedMember);
 
     setState((s) => {
       const products = s.products.map((p) => {
@@ -629,7 +640,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     return sale;
   }, []);
 
-  const createBooking = useCallback((input: NewBooking) => {
+  const createBooking = useCallback(async (input: NewBooking) => {
     const snapshot = stateRef.current;
     const counter = snapshot.bookingCounter + 1;
     const store = snapshot.stores.find((x) => x.id === input.storeId);
@@ -674,12 +685,12 @@ export function PosProvider({ children }: { children: ReactNode }) {
       jobStatusBy: input.job ? input.cashier : undefined,
       jobStatusAt: input.job ? now : undefined,
     };
+    await commitBooking(booking);
     setState((s) => ({
       ...s,
       bookingCounter: Math.max(counter, s.bookingCounter + 1),
       bookings: [booking, ...s.bookings],
     }));
-    saveBookingQuietly(booking);
     logger.log("sale_event", "Booking created", "bookings", {
       ref: booking.ref,
       storeId: booking.storeId,
@@ -694,7 +705,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addBookingPayment = useCallback(
-    (id: string, amount: number, method: PaymentMethod, cashier: string) => {
+    async (id: string, amount: number, method: PaymentMethod, cashier: string) => {
       const current = stateRef.current.bookings.find((b) => b.id === id);
       if (!current || current.status !== "active" || amount <= 0) return null;
       const payment: BookingPayment = {
@@ -709,11 +720,11 @@ export function PosProvider({ children }: { children: ReactNode }) {
         paid: r2(current.paid + payment.amount),
         payments: [...current.payments, payment],
       };
+      await commitBooking(updated);
       setState((s) => ({
         ...s,
         bookings: s.bookings.map((b) => (b.id === id ? updated : b)),
       }));
-      saveBookingQuietly(updated);
       logger.log("sale_event", "Booking part payment", "bookings", {
         ref: updated.ref,
         amount: payment.amount,
@@ -772,12 +783,12 @@ export function PosProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const collectBooking = useCallback(
-    (id: string, amount: number, method: PaymentMethod) => {
+    async (id: string, amount: number, method: PaymentMethod) => {
       const current = stateRef.current.bookings.find((b) => b.id === id);
       if (!current || current.status !== "active") return null;
       const balance = bookingBalance(current);
       const settled = r2(Math.min(Math.max(amount, 0), balance));
-      const sale = recordSale({
+      const sale = await recordSale({
         storeId: current.storeId,
         shiftId: activeShift?.id ?? current.shiftId,
         lines: current.lines,
@@ -810,11 +821,11 @@ export function PosProvider({ children }: { children: ReactNode }) {
         jobStatus: current.job ? "collected" : current.jobStatus,
         jobStatusAt: current.job ? new Date().toISOString() : current.jobStatusAt,
       };
+      await commitBooking(updated);
       setState((s) => ({
         ...s,
         bookings: s.bookings.map((b) => (b.id === id ? updated : b)),
       }));
-      saveBookingQuietly(updated);
       logger.log("sale_event", "Booking collected", "bookings", {
         ref: updated.ref,
         receiptNo: sale.receiptNo,

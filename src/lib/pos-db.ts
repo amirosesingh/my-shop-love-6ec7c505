@@ -3,7 +3,7 @@ import { supabaseExternal as supabase } from "@/integrations/supabase/external-c
 import { defaultSettings, seedState } from "./pos-seed";
 import { drainOutbox, runOpLive } from "./sync-engine";
 import { electronDb, localDb, readBranch } from "./local-db";
-import { enqueue, type SyncOp } from "./sync-outbox";
+import { enqueue, listQueue, persisted, type SyncOp } from "./sync-outbox";
 import { isLiveOnly } from "./live-mode";
 import type {
   AppSettings,
@@ -577,6 +577,65 @@ const queue = (context: string, op: SyncOp) => {
   void drainOutbox();
 };
 
+/* ---------------------------- durable commits --------------------------- */
+
+/** Where a committed change actually landed. */
+export type CommitTarget = "cloud" | "local" | "outbox";
+
+/**
+ * Store a group of writes and only resolve once they are safe somewhere:
+ * the cloud database, the local desktop database, or the on-disk outbox.
+ *
+ * Callers await this before printing, clearing the cart or starting the next
+ * action — nothing moves on while the data is still only in memory.
+ */
+export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitTarget> {
+  if (!ops.length) return noteCommitTarget("cloud");
+
+  // Android / live-only: the backend is the single source of truth.
+  if (isLiveOnly()) {
+    for (const op of ops) await runOpLive(context, op);
+    return noteCommitTarget("cloud");
+  }
+
+  // Windows desktop: the local SQL Server instance is the source of truth.
+  const bridge = localDb();
+  if (bridge) {
+    for (const op of ops) {
+      const res = await bridge.write(context, op);
+      if (!res.ok) throw new Error(res.error ?? `${context} could not be stored locally`);
+    }
+    return noteCommitTarget("local");
+  }
+
+  // Browser: queue to disk first (durable), then try to push it up now.
+  const ids = ops.map((op) => enqueue(context, op).id);
+  if (!persisted(ids)) {
+    throw new Error(`${context} could not be stored on this device — nothing was saved`);
+  }
+  try {
+    await drainOutbox();
+  } catch {
+    /* still safely queued on disk */
+  }
+  const remaining = listQueue().filter((q) => ids.includes(q.id));
+  const stuck = remaining.find((q) => q.quarantined);
+  if (stuck) throw new Error(stuck.lastError ?? `${context} failed`);
+  return noteCommitTarget(remaining.length ? "outbox" : "cloud");
+}
+
+/** Human wording for a completed commit. */
+export const commitLabel = (t: CommitTarget) =>
+  t === "cloud" ? "Saved" : t === "local" ? "Saved on this terminal" : "Saved offline — will sync";
+
+let lastTarget: CommitTarget = "cloud";
+/** Where the most recent successful commit landed (for the "Saved…" note). */
+export const lastCommitTarget = () => lastTarget;
+export const noteCommitTarget = (t: CommitTarget) => {
+  lastTarget = t;
+  return t;
+};
+
 export const db = {
   upsertProduct: (p: Product) =>
     queue("Saving product", { kind: "upsert", table: "products", rows: [productToRow(p)] }),
@@ -810,4 +869,98 @@ export const db = {
       })),
     });
   },
+
+  /* --------------------- awaited, confirmed versions --------------------- */
+
+  /** Save a completed bill and wait until it is stored somewhere. */
+  async commitSale(sale: Sale, products: Product[], member: Member | null): Promise<CommitTarget> {
+    const bridge = electronDb();
+    if (bridge) {
+      const res = await bridge.createSale({
+        sale: saleToRow(sale),
+        items: saleItemRows(sale),
+        products: products.map(productToRow),
+        member: member ? memberToRow(member, tierId) : null,
+        branchId: readBranch().branchId ?? sale.storeId ?? null,
+        exchangeOfBillNumber: sale.exchangeOfReceiptNo ?? null,
+      });
+      if (!res.ok) throw new Error(res.error ?? "The sale could not be stored on this terminal");
+      return "local";
+    }
+    const ops: SyncOp[] = [
+      { kind: "insert", table: "sales", rows: [saleToRow(sale)] },
+      { kind: "insert", table: "sale_items", rows: saleItemRows(sale) },
+    ];
+    if (products.length)
+      ops.push({ kind: "upsert", table: "products", rows: products.map(productToRow) });
+    if (member) ops.push({ kind: "upsert", table: "members", rows: [memberToRow(member, tierId)] });
+    if (sale.exchangeOfReceiptNo)
+      ops.push({
+        kind: "update",
+        table: "sales",
+        values: { exchanged_to_bill_number: sale.receiptNo },
+        match: { bill_number: sale.exchangeOfReceiptNo },
+      });
+    return commitOps("Saving sale", ops);
+  },
+
+  /** Save a shift open/close and wait until it is stored somewhere. */
+  commitShift: (s: Shift) =>
+    commitOps("Saving shift", [{ kind: "upsert", table: "shifts", rows: [shiftToRow(s)] }]),
+
+  /** Log a manual drawer open and wait until it is stored somewhere. */
+  commitDrawerEvent: (row: {
+    id: string;
+    storeId: string | null;
+    terminalId: string | null;
+    shiftId: string | null;
+    staffId: string | null;
+    staffName: string | null;
+    role: string | null;
+    reason: string;
+    note: string | null;
+    approvedBy: string | null;
+    at: string;
+  }) =>
+    commitOps("Logging drawer open", [
+      {
+        kind: "insert",
+        table: "drawer_events",
+        rows: [
+          {
+            id: row.id,
+            store_id: row.storeId,
+            terminal_id: row.terminalId,
+            shift_id: row.shiftId,
+            staff_id: row.staffId,
+            staff_name: row.staffName,
+            role: row.role,
+            reason: row.reason,
+            note: row.note,
+            approved_by: row.approvedBy,
+            created_at: row.at,
+          },
+        ],
+      },
+    ]),
+
+  /** Save a staff sign-in and wait until it is stored somewhere. */
+  commitShiftSession: (s: ShiftSession) =>
+    commitOps("Saving shift sign-in", [
+      { kind: "upsert", table: "shift_sessions", rows: [shiftSessionToRow(s)] },
+    ]),
+
+  /** Save stock changes and wait until they are stored somewhere. */
+  commitProducts: (list: Product[]) =>
+    list.length
+      ? commitOps("Saving products", [
+          { kind: "upsert", table: "products", rows: list.map(productToRow) },
+        ])
+      : Promise.resolve<CommitTarget>("cloud"),
+
+  /** Save a member and wait until it is stored somewhere. */
+  commitMember: (m: Member) =>
+    commitOps("Saving member", [
+      { kind: "upsert", table: "members", rows: [memberToRow(m, tierId)] },
+    ]),
 };

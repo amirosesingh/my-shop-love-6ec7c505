@@ -75,7 +75,7 @@ import {
   voucherValue,
 } from "@/lib/coupons";
 import type { Campaign, VoucherView } from "@/lib/coupons";
-import type { CartLine, DiscountType, PaymentMethod, Sale } from "@/lib/pos-types";
+import type { Booking, CartLine, DiscountType, PaymentMethod, Sale } from "@/lib/pos-types";
 import type { Payment } from "@/lib/pos-types";
 import { TenderSplit, rememberBanks } from "@/components/pos/TenderSplit";
 import {
@@ -111,10 +111,8 @@ const isoDaysFromNow = (days: number) =>
   new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
 
 export const Route = createFileRoute("/")({
-  validateSearch: (search: Record<string, unknown>) => ({
-    /** hold ticket id to reopen, set by the Hold tickets screen */
-    resume: typeof search['resume'] === "string" ? (search['resume'] as string) : undefined,
-  }),
+  validateSearch: (search: Record<string, unknown>): { resume?: string } =>
+    typeof search['resume'] === "string" ? { resume: search['resume'] as string } : {},
   head: () => ({
     meta: [
       { title: "Register — Northwind POS" },
@@ -166,6 +164,8 @@ function Register() {
   const [exchangeRef, setExchangeRef] = useState<string | null>(null);
   const [memberId, setMemberId] = useState<string | null>(null);
   const [payOpen, setPayOpen] = useState(false);
+  /** True while a sale / booking is being stored — blocks a second click. */
+  const [saving, setSaving] = useState(false);
   const [openShiftOpen, setOpenShiftOpen] = useState(false);
   const [float, setFloat] = useState("150");
   const [cashier, setCashier] = useState(user?.name ?? "Cashier");
@@ -696,7 +696,10 @@ function Register() {
       toast.error("Choose a collect-by date");
       return;
     }
-    const booking = createBooking({
+    let booking: Booking;
+    try {
+      setSaving(true);
+      booking = await createBooking({
       storeId: currentStore.id,
       shiftId: activeShift.id,
       lines,
@@ -730,7 +733,15 @@ function Register() {
             notifyWhatsApp,
           }
         : undefined,
-    });
+      });
+    } catch (e) {
+      toast.error("Booking was not saved", {
+        description: (e as { message?: string })?.message ?? "Nothing was stored — try again.",
+      });
+      return;
+    } finally {
+      setSaving(false);
+    }
     if (paidNow > 0 && depositMethod === "cash") openCashDrawer();
     printBookingSlip(booking, member, state.settings.payment);
     if (booking.job) printJobTag(booking);
@@ -827,8 +838,11 @@ function Register() {
     // The headline method stays the largest tender so reports keep working.
     const headline = payments.reduce((a, p) => (p.amount > a.amount ? p : a), payments[0]!).method;
     rememberBanks(payments.map((p) => p.bankName ?? ""));
-    const sale = recordSale({
-      storeId: currentStore.id,
+    let sale: Sale;
+    try {
+      setSaving(true);
+      sale = await recordSale({
+        storeId: currentStore.id,
       shiftId: activeShift.id,
       lines,
       subtotal: totals.subtotal,
@@ -856,7 +870,17 @@ function Register() {
             couponRemaining: coupon.remaining,
           }
         : {}),
-    });
+      });
+    } catch (e) {
+      toast.error("Payment was not saved", {
+        description:
+          (e as { message?: string })?.message ??
+          "Nothing was stored, so the ticket is untouched — try again.",
+      });
+      return;
+    } finally {
+      setSaving(false);
+    }
     if (coupon) {
       logger.log("promotion", "Coupon redeemed on a bill", "register", {
         receiptNo: sale.receiptNo,
@@ -2320,10 +2344,13 @@ function Register() {
             <Button
               onClick={completeSale}
               disabled={
-                refundDue === 0 && tenders.length > 0 && !!validateTenders(balanceDue, tenders).error
+                saving ||
+                (refundDue === 0 &&
+                  tenders.length > 0 &&
+                  !!validateTenders(balanceDue, tenders).error)
               }
             >
-              Complete &amp; print
+              {saving ? "Saving…" : "Complete & print"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2501,13 +2528,13 @@ function Register() {
           if (!o && racketMode) resetJobCard();
         }}
       >
-        <DialogContent className="max-w-lg">
+        <DialogContent className="flex max-h-[90vh] max-w-lg flex-col">
           <DialogHeader>
             <DialogTitle>
               {racketMode ? "Racket / stringing booking" : "Book & pay later"}
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
+          <div className="-mr-2 flex-1 space-y-3 overflow-y-auto pr-2">
             <div className="rounded-md border border-border px-3 py-2 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Booking total</span>
@@ -2802,7 +2829,9 @@ function Register() {
             <Button variant="outline" onClick={() => setBookOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={() => void bookAndPayLater()}>Reserve &amp; print slip</Button>
+            <Button onClick={() => void bookAndPayLater()} disabled={saving}>
+              {saving ? "Saving…" : "Reserve & print slip"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
