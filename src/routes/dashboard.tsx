@@ -24,7 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { money, usePos } from "@/lib/pos-store";
-import { useDrawerEvents, NO_SALE_LABELS } from "@/lib/drawer-events";
+import { useDrawerEvents } from "@/lib/drawer-events";
 import { paymentsLabel } from "@/lib/pos-types";
 
 export const Route = createFileRoute("/dashboard")({
@@ -282,7 +282,7 @@ function Dashboard() {
                   <TableCell>
                     {d.staffName} <span className="text-[11px] text-muted-foreground">({d.role})</span>
                   </TableCell>
-                  <TableCell>{NO_SALE_LABELS[d.reason] ?? d.reason}</TableCell>
+                  <TableCell>{d.reason}</TableCell>
                   <TableCell className="text-muted-foreground">{d.note || "—"}</TableCell>
                   <TableCell className="text-muted-foreground">{d.approvedBy ?? "—"}</TableCell>
                 </TableRow>
