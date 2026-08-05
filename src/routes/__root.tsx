@@ -11,9 +11,9 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
-import { PosProvider } from "../lib/pos-store";
-import { AuthProvider } from "../lib/pos-auth";
-import { PermissionsProvider } from "../lib/pos-permissions";
+import { PosProvider } from "@/lib/pos-store";
+import { AuthProvider } from "@/lib/pos-auth";
+import { PermissionsProvider } from "@/lib/pos-permissions";
 import { Toaster } from "../components/ui/sonner";
 import { AuditTracker } from "../components/pos/AuditTracker";
 import { FirstRunSetup } from "../components/pos/FirstRunSetup";
