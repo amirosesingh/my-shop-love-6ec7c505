@@ -120,6 +120,11 @@ function ReceiptVault() {
     } else {
       printSaleReceipt(selected, member, "sale");
     }
+    logger.log("print", "Receipt printed", "receipts", {
+      saleId: selected.id,
+      receiptNo: selected.receiptNo,
+      template,
+    });
     toast.success("Sent to printer");
   }
 
