@@ -1833,50 +1833,7 @@ function Register() {
           </div>
           )}
 
-          {/* Card 2 · payment execution */}
-          {visible("register.paymentExecution") && (
-          <div className="rounded-lg border border-border bg-card p-3">
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Payment execution
-            </p>
-            <div className="space-y-2">
-              <ActionButton
-                layout="inline"
-                className="h-14 w-full text-base sm:gap-3"
-                label="Cash"
-                icon={<Banknote className="size-5" />}
-                disabled={!lines.length || tillLocked}
-                disabledReason={tillLocked ? lockedReason : undefined}
-                onClick={() => openPayment("cash")}
-              />
-              <ActionButton
-                layout="inline"
-                variant="secondary"
-                className="h-14 w-full text-base sm:gap-3"
-                label="Card"
-                icon={<CreditCard className="size-5" />}
-                disabled={!lines.length || tillLocked}
-                disabledReason={tillLocked ? lockedReason : undefined}
-                onClick={() => openPayment("card")}
-              />
-              <ActionButton
-                layout="inline"
-                variant="outline"
-                className="h-14 w-full text-base sm:gap-3"
-                label="Digital pay"
-                icon={<Wallet className="size-5" />}
-                disabled={!lines.length || tillLocked}
-                disabledReason={tillLocked ? lockedReason : undefined}
-                onClick={() => openPayment("wallet")}
-              />
-            </div>
-            <p className="numeric mt-2 text-center text-[11px] text-muted-foreground">
-              Due {money(refundDue > 0 ? refundDue : balanceDue)}
-            </p>
-          </div>
-          )}
-
-          {/* Card 3 · device & printing */}
+          {/* Card 2 · device & printing */}
           <div className="rounded-lg border border-border bg-card p-3">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Device &amp; printing
