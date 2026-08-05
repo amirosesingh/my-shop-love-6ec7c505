@@ -78,6 +78,14 @@ export const defaultIntegrations: AppSettings["integrations"] = {
   requireTransferApproval: true,
   autoIssueWelcome: false,
   offlineMode: false,
+  timeZone: "",
+  usePaymentAccounts: false,
+  paymentAccounts: [],
+  useServiceTypes: false,
+  allowCustomServiceType: true,
+  serviceTypes: [],
+  branches: {},
+  productOwners: {},
 };
 
 export const defaultSettings: AppSettings = {
