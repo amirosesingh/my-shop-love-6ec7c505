@@ -23,6 +23,8 @@ export function CatalogPanel({
   onDetail,
   onOpenCustomerDisplay,
   onOpenShift,
+  onCloseShift,
+
   showHeaderActions = true,
   autoFocus = true,
   showSearch = true,
