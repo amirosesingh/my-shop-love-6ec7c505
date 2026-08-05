@@ -522,8 +522,8 @@ function Shifts() {
               Cancel
             </Button>
             <Button
-              onClick={() => {
-                const closed = closeShift(Number(counted || 0), note);
+              onClick={async () => {
+                const closed = await closeShift(Number(counted || 0), note);
                 if (closed) {
                   printShiftReport(closed, storeSales, "zreport");
                   openCashDrawer();
