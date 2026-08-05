@@ -2493,11 +2493,19 @@ function Register() {
         </DialogContent>
       </Dialog>
 
-      {/* Book & pay later */}
-      <Dialog open={bookOpen} onOpenChange={setBookOpen}>
+      {/* Book & pay later (goods) / racket stringing booking */}
+      <Dialog
+        open={bookOpen}
+        onOpenChange={(o) => {
+          setBookOpen(o);
+          if (!o && racketMode) resetJobCard();
+        }}
+      >
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Book &amp; pay later</DialogTitle>
+            <DialogTitle>
+              {racketMode ? "Racket / stringing booking" : "Book & pay later"}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div className="rounded-md border border-border px-3 py-2 text-sm">
@@ -2524,11 +2532,12 @@ function Register() {
                 </span>
               </div>
               <p className="mt-1 text-[11px] text-muted-foreground">
-                {lines.reduce((a, l) => a + l.qty, 0)} unit(s) are reserved at{" "}
-                {currentStore.name} until the collect-by date.
+                {racketMode
+                  ? `Job taken at ${currentStore.name} — no cart items needed.`
+                  : `${lines.reduce((a, l) => a + l.qty, 0)} unit(s) are reserved at ${currentStore.name} until the collect-by date.`}
               </p>
             </div>
-            {useServices && (
+            {useServices && !racketMode && (
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label>What is this booking for?</Label>
@@ -2540,11 +2549,9 @@ function Register() {
                       setServiceId(v);
                       const hit = serviceTypes.find((s2) => s2.id === v);
                       if (hit) setServiceFee(hit.fee ? String(hit.fee) : "");
-                      // A racket / stringing service opens its job card straight away.
-                      if (hit?.isStringingJob) setJobOpen(true);
                     }}
                     options={[
-                      ...serviceTypes.map((s2) => ({ value: s2.id, label: s2.name })),
+                      ...cartServiceTypes.map((s2) => ({ value: s2.id, label: s2.name })),
                       ...(state.settings.integrations.allowCustomServiceType !== false
                         ? [{ value: "", label: "Something else…" }]
                         : []),
@@ -2572,6 +2579,18 @@ function Register() {
                     Added on top of the items in the cart.
                   </p>
                 </div>
+              </div>
+            )}
+            {racketMode && (
+              <div className="space-y-1">
+                <Label>Stringing fee</Label>
+                <Input
+                  className="numeric text-right"
+                  inputMode="decimal"
+                  placeholder="0.00"
+                  value={serviceFee}
+                  onChange={(e) => setServiceFee(e.target.value)}
+                />
               </div>
             )}
             <div className="space-y-1">
