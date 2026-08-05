@@ -146,6 +146,8 @@ function Register() {
   const [lines, setLines] = useState<CartLine[]>([]);
   const [cartDiscount, setCartDiscount] = useState(0);
   const [cartDiscountType, setCartDiscountType] = useState<DiscountType>("amount");
+  /** Calculator-style discount pad: index of the cart line, or "bill". */
+  const [padTarget, setPadTarget] = useState<number | "bill" | null>(null);
   const [exchangeOpen, setExchangeOpen] = useState(false);
   const [billQuery, setBillQuery] = useState("");
   const [billHit, setBillHit] = useState<Sale | null>(null);
