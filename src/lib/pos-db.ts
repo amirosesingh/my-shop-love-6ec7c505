@@ -898,9 +898,43 @@ export const db = {
 
   /** Save a shift open/close and wait until it is stored somewhere. */
   commitShift: (s: Shift) =>
-    commitOps("Saving shift", { kind: "upsert", table: "shifts", rows: [shiftToRow(s)] } as SyncOp
-      ? [{ kind: "upsert", table: "shifts", rows: [shiftToRow(s)] }]
-      : []),
+    commitOps("Saving shift", [{ kind: "upsert", table: "shifts", rows: [shiftToRow(s)] }]),
+
+  /** Log a manual drawer open and wait until it is stored somewhere. */
+  commitDrawerEvent: (row: {
+    id: string;
+    storeId: string | null;
+    terminalId: string | null;
+    shiftId: string | null;
+    staffId: string | null;
+    staffName: string | null;
+    role: string | null;
+    reason: string;
+    note: string | null;
+    approvedBy: string | null;
+    at: string;
+  }) =>
+    commitOps("Logging drawer open", [
+      {
+        kind: "insert",
+        table: "drawer_events",
+        rows: [
+          {
+            id: row.id,
+            store_id: row.storeId,
+            terminal_id: row.terminalId,
+            shift_id: row.shiftId,
+            staff_id: row.staffId,
+            staff_name: row.staffName,
+            role: row.role,
+            reason: row.reason,
+            note: row.note,
+            approved_by: row.approvedBy,
+            created_at: row.at,
+          },
+        ],
+      },
+    ]),
 
   /** Save a staff sign-in and wait until it is stored somewhere. */
   commitShiftSession: (s: ShiftSession) =>
