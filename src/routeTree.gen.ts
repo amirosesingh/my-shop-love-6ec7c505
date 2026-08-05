@@ -18,6 +18,7 @@ import { Route as CouponsRouteImport } from './routes/coupons'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as DisplayRouteImport } from './routes/display'
+import { Route as HoldsRouteImport } from './routes/holds'
 import { Route as InventoryRouteImport } from './routes/inventory'
 import { Route as InventoryHubRouteImport } from './routes/inventory-hub'
 import { Route as JoinRouteImport } from './routes/join'
@@ -104,6 +105,11 @@ const DashboardRoute = DashboardRouteImport.update({
 const DisplayRoute = DisplayRouteImport.update({
   id: '/display',
   path: '/display',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HoldsRoute = HoldsRouteImport.update({
+  id: '/holds',
+  path: '/holds',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InventoryRoute = InventoryRouteImport.update({
@@ -327,6 +333,7 @@ export interface FileRoutesByFullPath {
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
   '/display': typeof DisplayRoute
+  '/holds': typeof HoldsRoute
   '/inventory': typeof InventoryRoute
   '/inventory-hub': typeof InventoryHubRoute
   '/join': typeof JoinRoute
@@ -380,6 +387,7 @@ export interface FileRoutesByTo {
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
   '/display': typeof DisplayRoute
+  '/holds': typeof HoldsRoute
   '/inventory': typeof InventoryRoute
   '/inventory-hub': typeof InventoryHubRoute
   '/join': typeof JoinRoute
@@ -434,6 +442,7 @@ export interface FileRoutesById {
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
   '/display': typeof DisplayRoute
+  '/holds': typeof HoldsRoute
   '/inventory': typeof InventoryRoute
   '/inventory-hub': typeof InventoryHubRoute
   '/join': typeof JoinRoute
@@ -489,6 +498,7 @@ export interface FileRouteTypes {
     | '/customers'
     | '/dashboard'
     | '/display'
+    | '/holds'
     | '/inventory'
     | '/inventory-hub'
     | '/join'
@@ -542,6 +552,7 @@ export interface FileRouteTypes {
     | '/customers'
     | '/dashboard'
     | '/display'
+    | '/holds'
     | '/inventory'
     | '/inventory-hub'
     | '/join'
@@ -595,6 +606,7 @@ export interface FileRouteTypes {
     | '/customers'
     | '/dashboard'
     | '/display'
+    | '/holds'
     | '/inventory'
     | '/inventory-hub'
     | '/join'
@@ -649,6 +661,7 @@ export interface RootRouteChildren {
   CustomersRoute: typeof CustomersRoute
   DashboardRoute: typeof DashboardRoute
   DisplayRoute: typeof DisplayRoute
+  HoldsRoute: typeof HoldsRoute
   InventoryRoute: typeof InventoryRoute
   InventoryHubRoute: typeof InventoryHubRoute
   JoinRoute: typeof JoinRoute
@@ -756,6 +769,13 @@ declare module '@tanstack/react-router' {
       path: '/display'
       fullPath: '/display'
       preLoaderRoute: typeof DisplayRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/holds': {
+      id: '/holds'
+      path: '/holds'
+      fullPath: '/holds'
+      preLoaderRoute: typeof HoldsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/inventory': {
@@ -1065,6 +1085,7 @@ const rootRouteChildren: RootRouteChildren = {
   CustomersRoute: CustomersRoute,
   DashboardRoute: DashboardRoute,
   DisplayRoute: DisplayRoute,
+  HoldsRoute: HoldsRoute,
   InventoryRoute: InventoryRoute,
   InventoryHubRoute: InventoryHubRoute,
   JoinRoute: JoinRoute,

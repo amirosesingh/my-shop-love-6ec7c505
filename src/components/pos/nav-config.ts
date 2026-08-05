@@ -5,6 +5,7 @@ import {
   Landmark,
   ListPlus,
   MessageCircle,
+  PauseCircle,
   MonitorCog,
   MonitorSmartphone,
   QrCode,
