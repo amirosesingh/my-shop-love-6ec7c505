@@ -111,6 +111,12 @@ const GROUPS = [
         icon: ScanBarcode,
         blurb: "Automatic running-number product codes, or manual entry.",
       },
+      {
+        to: "/settings/region",
+        label: "Region & time",
+        icon: Globe,
+        blurb: "Country, time zone, date order and 12 / 24-hour clock.",
+      },
     ],
   },
   {
