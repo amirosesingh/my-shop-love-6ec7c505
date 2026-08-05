@@ -44,4 +44,5 @@ Windows also mirrors these three tables into the local SQL Server database and s
 - New SQL script `supabase/schema23.sql`: the three branch tables with staff-only access rules matching the existing tables, plus `terminal_tokens.device_type` and the approve-by-QR RPC. Existing branch settings in the JSON blob are migrated into rows on first load.
 - New files: `src/components/pos/ActionButton.tsx`, `src/components/pos/DiscountPad.tsx`, `src/components/pos/CameraScanner.tsx`, `src/components/pos/MobileTerminalManager.tsx`, `src/lib/branch-tables.ts`.
 - Touched: `src/routes/index.tsx` (register), `ScanBar.tsx`, `TerminalActivation.tsx`, `TerminalTokens.tsx`, `terminal-tokens.ts`, `branch-policy.ts`, `BranchSettings.tsx`, `pos-db.ts`, `sync-engine.ts`, `electron/db/schema.sql`, `electron/db/repo.cjs`.
-- Version bump plus the usual typecheck / lint / test run at the end.
+- Version set to **1.1.0** for this release, and from here on each future update steps the last number (1.1.1, 1.1.2, …) instead of the old 1.0.x line.
+- The usual typecheck / lint / test run at the end.
