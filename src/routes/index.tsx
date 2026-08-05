@@ -2799,6 +2799,7 @@ function Register() {
                 </div>
               )}
             </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBookOpen(false)}>
