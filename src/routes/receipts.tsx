@@ -298,6 +298,82 @@ function ReceiptVault() {
           </aside>
         </div>
       </div>
+
+      <Dialog open={cancelOpen} onOpenChange={setCancelOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancel bill {selected?.receiptNo}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            The items go back into stock at {currentStore.name} and the receipt is flagged as
+            cancelled. This is recorded against {user?.name}.
+          </p>
+          <div className="space-y-2">
+            <Label htmlFor="cancel-reason">Reason (required)</Label>
+            <Textarea
+              id="cancel-reason"
+              value={cancelReason}
+              maxLength={200}
+              placeholder="e.g. customer changed their mind before leaving"
+              onChange={(e) => setCancelReason(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelOpen(false)}>
+              Keep bill
+            </Button>
+            <Button variant="destructive" onClick={confirmCancel}>
+              Cancel bill
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={payOpen} onOpenChange={setPayOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Correct payment on {selected?.receiptNo}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Currently recorded as{" "}
+            <span className="font-semibold capitalize">
+              {selected?.method.replace("_", " ")}
+            </span>
+            . Pick what the customer actually paid with.
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            {METHODS.map((m) => (
+              <button
+                key={m.value}
+                onClick={() => setPayMethod(m.value)}
+                className={`rounded-md border px-2 py-3 text-xs transition-colors ${
+                  payMethod === m.value
+                    ? "border-primary bg-primary/15 text-primary"
+                    : "border-border text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="pay-reason">Note (optional)</Label>
+            <Input
+              id="pay-reason"
+              value={payReason}
+              maxLength={200}
+              placeholder="e.g. cashier pressed card by mistake"
+              onChange={(e) => setPayReason(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPayOpen(false)}>
+              Close
+            </Button>
+            <Button onClick={confirmPaymentFix}>Save correction</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
 }
