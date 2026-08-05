@@ -78,7 +78,10 @@ function SystemSettingsPage() {
 
   const diagnose = () => {
     setBusy(true);
-    void runDiagnostics([integrations.memberDomain, integrations.redeemDomain])
+    void runDiagnostics([
+      { url: integrations.memberDomain, label: "Member domain" },
+      { url: integrations.redeemDomain, label: "Redeem domain" },
+    ])
       .then((r) => {
         setChecks(r);
         refresh();
@@ -145,6 +148,22 @@ Both subdomains serve the same build; only the landing path differs.`;
                 )}
               </div>
               <p className="mt-1 text-[11px] text-muted-foreground">{c.detail}</p>
+              {c.url && (
+                <a
+                  href={c.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-1 inline-block text-[11px] text-primary underline"
+                >
+                  Open page
+                </a>
+              )}
+              {c.url && c.state === "down" && (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Fix: connect this domain in Project settings → Domains, add the CNAME and TXT
+                  records it shows at your DNS provider, then wait for verification.
+                </p>
+              )}
             </div>
           ))}
           {!checks.length && (

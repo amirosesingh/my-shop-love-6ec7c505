@@ -40,7 +40,10 @@ export function SystemStatusPill({ compact }: { compact?: boolean }) {
 
   const run = () => {
     setBusy(true);
-    void runDiagnostics([integrations.memberDomain, integrations.redeemDomain])
+    void runDiagnostics([
+      { url: integrations.memberDomain, label: "Member domain" },
+      { url: integrations.redeemDomain, label: "Redeem domain" },
+    ])
       .then(setChecks)
       .finally(() => setBusy(false));
   };
@@ -48,9 +51,10 @@ export function SystemStatusPill({ compact }: { compact?: boolean }) {
   useEffect(() => {
     let live = true;
     const tick = () =>
-      void runDiagnostics([integrations.memberDomain, integrations.redeemDomain]).then(
-        (r) => live && setChecks(r),
-      );
+      void runDiagnostics([
+        { url: integrations.memberDomain, label: "Member domain" },
+        { url: integrations.redeemDomain, label: "Redeem domain" },
+      ]).then((r) => live && setChecks(r));
     tick();
     const t = window.setInterval(tick, 120_000);
     return () => {
