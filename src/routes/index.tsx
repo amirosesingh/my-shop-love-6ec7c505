@@ -62,6 +62,7 @@ import { BOOKING_TIMING_LABELS, type BookingPaymentTiming } from "@/lib/pos-type
 import { useUserPermissions } from "@/lib/pos-permissions";
 import { useVisibility } from "@/lib/ui-visibility";
 import { useUiScale } from "@/lib/use-ui-scale";
+import { removeHeldOrder, setHeldOrders, useHeldOrders } from "@/lib/held-orders";
 import {
   discountLabel,
   loadMemberVouchers,
