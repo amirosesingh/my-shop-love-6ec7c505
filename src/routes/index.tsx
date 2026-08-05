@@ -198,7 +198,6 @@ function Register() {
   const [serviceFee, setServiceFee] = useState("");
   const [payTiming, setPayTiming] = useState<BookingPaymentTiming>("deposit");
   /* Racket stringing job card */
-  const [jobOpen, setJobOpen] = useState(false);
   /** Which flow opened the booking dialog: goods booking vs racket job. */
   const [bookMode, setBookMode] = useState<"cart" | "racket">("cart");
   const [racketModel, setRacketModel] = useState("");
@@ -639,7 +638,6 @@ function Register() {
   const racketMode = bookMode === "racket";
 
   function resetJobCard() {
-    setJobOpen(false);
     setRacketModel("");
     setStringType("");
     setTensionMain("");
@@ -665,7 +663,6 @@ function Register() {
       setServiceFee(stringingService.fee ? String(stringingService.fee) : "");
     }
     setBookMode("racket");
-    setJobOpen(true);
     setBookOpen(true);
   }
   const serviceLabel = pickedService?.name ?? customService.trim();
@@ -2700,8 +2697,7 @@ function Register() {
                   <span className="truncate">Racket / stringing job card</span>
                 </span>
               </div>
-              {true && (
-                <div className="space-y-3 border-t border-border p-3">
+              <div className="space-y-3 border-t border-border p-3">
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <Label>Racket brand / model</Label>
