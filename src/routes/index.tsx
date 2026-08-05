@@ -1499,27 +1499,14 @@ function Register() {
                 >
                   <span className="text-muted-foreground">Bill discount</span>
                   <div className="flex items-center gap-1">
-                    <Input
-                      value={cartDiscount || ""}
-                      onChange={(e) => setCartDiscount(Number(e.target.value) || 0)}
-                      placeholder="0.00"
-                      className="numeric h-8 w-20 text-right"
-                    />
-                    <div className="flex overflow-hidden rounded-md border border-border">
-                      {(["amount", "percent"] as const).map((t) => (
-                        <button
-                          key={t}
-                          onClick={() => setCartDiscountType(t)}
-                          className={`px-2 py-1.5 text-xs ${
-                            cartDiscountType === t
-                              ? "bg-primary/15 text-primary"
-                              : "text-muted-foreground hover:text-foreground"
-                          }`}
-                        >
-                          {t === "amount" ? "$" : "%"}
-                        </button>
-                      ))}
-                    </div>
+                    <button
+                      onClick={() => setPadTarget("bill")}
+                      className="numeric rounded-md border border-border px-3 py-1.5 text-xs hover:border-primary hover:text-primary"
+                    >
+                      {cartDiscount
+                        ? `${cartDiscount}${cartDiscountType === "percent" ? "%" : ""}`
+                        : "Add discount"}
+                    </button>
                   </div>
                 </div>
                 {promo.promoDiscount > 0 && (
