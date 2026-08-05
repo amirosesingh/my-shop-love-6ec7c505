@@ -94,6 +94,8 @@ export type Payment = {
   bankName?: string;
   /** slip, approval or transfer reference */
   ref?: string;
+  /** id of the configured payment account (card machine / bank / e-wallet) */
+  accountId?: string;
 };
 
 export const paymentsTotal = (ps: Payment[] | undefined) =>
