@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import {
   PAYMENT_LABELS,
   paymentsLabel,
@@ -10,6 +11,7 @@ import {
   type Payment,
   type PaymentMethod,
 } from "@/lib/pos-types";
+import { usePos } from "@/lib/pos-store";
 
 const RECENT_BANKS_KEY = "pos.recent-banks";
 const money = (n: number) => n.toFixed(2);
@@ -54,6 +56,17 @@ type Props = {
 export function TenderSplit({ total, tenders, onChange, onBeforeAdd }: Props) {
   const [recent, setRecent] = useState<string[]>([]);
   useEffect(() => setRecent(readRecentBanks()), []);
+
+  // Named card machines / bank accounts, so takings can be reconciled per
+  // machine at close of day.
+  const { state, currentStore } = usePos();
+  const useAccounts = !!state.settings.integrations.usePaymentAccounts;
+  const accounts = (state.settings.integrations.paymentAccounts ?? []).filter(
+    (a) =>
+      a.active &&
+      a.name.trim() &&
+      (!a.storeIds || a.storeIds.length === 0 || a.storeIds.includes(currentStore.id)),
+  );
 
   const check = validateTenders(total, tenders);
   const outstanding = check.balance;
@@ -153,6 +166,25 @@ export function TenderSplit({ total, tenders, onChange, onBeforeAdd }: Props) {
               </Button>
             </div>
             <div className="flex flex-wrap gap-1.5">
+              {useAccounts && t.method !== "cash" && accounts.length > 0 && (
+                <ThemedSelect
+                  ariaLabel="Payment account"
+                  className="h-7 w-full text-[11px]"
+                  placeholder="Which account received it?"
+                  value={t.accountId ?? ""}
+                  onChange={(v) => {
+                    const acc = accounts.find((a) => a.id === v);
+                    patch(i, {
+                      accountId: v,
+                      ...(acc?.bankName || acc ? { bankName: acc?.bankName || acc?.name } : {}),
+                    });
+                  }}
+                  options={accounts.map((a) => ({
+                    value: a.id,
+                    label: a.bankName ? `${a.name} · ${a.bankName}` : a.name,
+                  }))}
+                />
+              )}
               <Button
                 size="sm"
                 variant="ghost"
