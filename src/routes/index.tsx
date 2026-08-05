@@ -2528,13 +2528,13 @@ function Register() {
           if (!o && racketMode) resetJobCard();
         }}
       >
-        <DialogContent className="max-w-lg">
+        <DialogContent className="flex max-h-[90vh] max-w-lg flex-col">
           <DialogHeader>
             <DialogTitle>
               {racketMode ? "Racket / stringing booking" : "Book & pay later"}
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
+          <div className="-mr-2 flex-1 space-y-3 overflow-y-auto pr-2">
             <div className="rounded-md border border-border px-3 py-2 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Booking total</span>
