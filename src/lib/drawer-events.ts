@@ -2,27 +2,9 @@ import { useSyncExternalStore } from "react";
 import { db } from "./pos-db";
 import { logger } from "./audit-log";
 
-/** Why the drawer was opened outside a sale. */
-export type NoSaleReason =
-  | "change_float"
-  | "cash_drop"
-  | "petty_cash"
-  | "count_check"
-  | "mistake"
-  | "other";
-
-export const NO_SALE_REASONS: { value: NoSaleReason; label: string }[] = [
-  { value: "change_float", label: "Giving change / adding float" },
-  { value: "cash_drop", label: "Cash drop to safe" },
-  { value: "petty_cash", label: "Petty cash payout" },
-  { value: "count_check", label: "Spot count / check" },
-  { value: "mistake", label: "Opened by mistake" },
-  { value: "other", label: "Other" },
-];
-
-export const NO_SALE_LABELS: Record<string, string> = Object.fromEntries(
-  NO_SALE_REASONS.map((r) => [r.value, r.label]),
-);
+/** Minimum / maximum length of the typed no-sale reason. */
+export const NO_SALE_REASON_MIN = 3;
+export const NO_SALE_REASON_MAX = 200;
 
 export type DrawerEvent = {
   id: string;
@@ -33,7 +15,8 @@ export type DrawerEvent = {
   staffId: string;
   staffName: string;
   role: string;
-  reason: NoSaleReason;
+  /** Free-text reason typed by the operator. */
+  reason: string;
   note: string;
   /** supervisor who authorised the open when the cashier lacked the right */
   approvedBy: string | null;
@@ -72,6 +55,7 @@ function emit() {
 export function recordNoSale(input: Omit<DrawerEvent, "id" | "at">) {
   const entry: DrawerEvent = {
     ...input,
+    reason: input.reason.trim().slice(0, NO_SALE_REASON_MAX),
     id: crypto.randomUUID(),
     at: new Date().toISOString(),
   };
@@ -92,7 +76,7 @@ export function recordNoSale(input: Omit<DrawerEvent, "id" | "at">) {
     at: entry.at,
   });
   logger.log("cash", "Cash drawer opened without a sale", "register", {
-    reason: NO_SALE_LABELS[entry.reason] ?? entry.reason,
+    reason: entry.reason,
     note: entry.note,
     storeId: entry.storeId,
     shiftId: entry.shiftId,

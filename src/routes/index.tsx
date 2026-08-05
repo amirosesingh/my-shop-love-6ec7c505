@@ -82,7 +82,7 @@ import {
   r2,
   validateTenders,
 } from "@/lib/pos-types";
-import { NO_SALE_REASONS, recordNoSale, type NoSaleReason } from "@/lib/drawer-events";
+import { NO_SALE_REASON_MAX, NO_SALE_REASON_MIN, recordNoSale } from "@/lib/drawer-events";
 import { buildBookingMessage, buildSaleMessage, sendBillOnWhatsApp } from "@/lib/whatsapp";
 import { logger } from "@/lib/audit-log";
 import { evaluatePromotions, focLine } from "@/lib/pos-promotions";
@@ -221,7 +221,7 @@ function Register() {
   const [bankName, setBankName] = useState("");
   /* No-sale drawer open */
   const [noSaleOpen, setNoSaleOpen] = useState(false);
-  const [noSaleReason, setNoSaleReason] = useState<NoSaleReason>("change_float");
+  const [noSaleReason, setNoSaleReason] = useState("");
   const [noSaleNote, setNoSaleNote] = useState("");
 
   const categories = useMemo(
@@ -1811,7 +1811,7 @@ function Register() {
               onClick={async () => {
                 if (!(await requirePermission("can_open_drawer"))) return;
                 setNoSaleNote("");
-                setNoSaleReason("change_float");
+                setNoSaleReason("");
                 setNoSaleOpen(true);
               }}
             />
@@ -2195,18 +2195,20 @@ function Register() {
             This open is logged against {user?.name ?? "this user"} with a timestamp.
           </p>
           <div className="space-y-2">
-            <Label>Reason</Label>
-            <select
+            <Label htmlFor="no-sale-reason">Reason (type it out)</Label>
+            <Input
+              id="no-sale-reason"
+              autoFocus
               value={noSaleReason}
-              onChange={(e) => setNoSaleReason(e.target.value as NoSaleReason)}
-              className="h-10 w-full rounded-md border border-border bg-background px-2 text-sm"
-            >
-              {NO_SALE_REASONS.map((r) => (
-                <option key={r.value} value={r.value}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
+              maxLength={NO_SALE_REASON_MAX}
+              placeholder="e.g. Adding change float for the till"
+              onChange={(e) => setNoSaleReason(e.target.value)}
+            />
+            <p className="text-[11px] text-muted-foreground">
+              {noSaleReason.trim().length < NO_SALE_REASON_MIN
+                ? `Type at least ${NO_SALE_REASON_MIN} characters — no preset reasons.`
+                : `${noSaleReason.trim().length}/${NO_SALE_REASON_MAX} characters`}
+            </p>
             <Label>Note (optional)</Label>
             <Input value={noSaleNote} onChange={(e) => setNoSaleNote(e.target.value)} />
           </div>
@@ -2215,7 +2217,10 @@ function Register() {
               Cancel
             </Button>
             <Button
+              disabled={noSaleReason.trim().length < NO_SALE_REASON_MIN}
               onClick={async () => {
+                const reason = noSaleReason.trim();
+                if (reason.length < NO_SALE_REASON_MIN) return;
                 const approved = await requirePermission("can_no_sale_open");
                 if (!approved) return;
                 recordNoSale({
@@ -2225,12 +2230,14 @@ function Register() {
                   staffId: user?.staffId ?? "unknown",
                   staffName: user?.name ?? "Unknown",
                   role: user?.role ?? "unknown",
-                  reason: noSaleReason,
+                  reason,
                   note: noSaleNote.trim(),
                   approvedBy: can("can_no_sale_open") ? null : "supervisor override",
                 });
                 openCashDrawer();
                 setNoSaleOpen(false);
+                setNoSaleReason("");
+                setNoSaleNote("");
                 toast.success("Drawer opened and logged");
               }}
             >
