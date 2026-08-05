@@ -14,7 +14,7 @@ const sb = supabaseExternal as unknown as SupabaseClient;
 
 export type DiscountKind = "PERCENTAGE" | "FIXED_AMOUNT";
 export type CampaignScope = "BILL" | "CATEGORY" | "PRODUCT";
-export type VoucherStatus = "ISSUED" | "REDEEMED" | "EXPIRED";
+export type VoucherStatus = "ISSUED" | "REDEEMED" | "EXPIRED" | "DISABLED";
 
 export type Campaign = {
   id: string;
@@ -52,9 +52,19 @@ export type Voucher = {
   issuedBy?: string | null;
   issuedSource?: "PUBLIC" | "MANUAL" | string | null;
   redeemedSaleId?: string | null;
+  /** set when a manager switches the voucher off */
+  disabledAt?: string | null;
+  disabledBy?: string | null;
+  disableReason?: string | null;
 };
 
-export type CouponEventType = "CLAIMED" | "ISSUED_MANUAL" | "REDEEMED" | "BLOCKED";
+export type CouponEventType =
+  | "CLAIMED"
+  | "ISSUED_MANUAL"
+  | "REDEEMED"
+  | "BLOCKED"
+  | "DISABLED"
+  | "REENABLED";
 
 export type CouponEvent = {
   id: string;
@@ -123,6 +133,9 @@ const toVoucher = (r: Row): Voucher => ({
   issuedBy: r.issued_by ?? null,
   issuedSource: r.issued_source ?? null,
   redeemedSaleId: r.redeemed_sale_id ?? null,
+  disabledAt: r.disabled_at ?? null,
+  disabledBy: r.disabled_by ?? null,
+  disableReason: r.disable_reason ?? null,
 });
 
 const toEvent = (r: Row): CouponEvent => ({
@@ -360,6 +373,7 @@ const friendly: Record<string, string> = {
   VOUCHER_NOT_FOUND: "That voucher code is not recognised.",
   VOUCHER_ALREADY_REDEEMED: "This voucher has already been used.",
   VOUCHER_EXPIRED: "This voucher has expired.",
+  VOUCHER_DISABLED: "This voucher has been switched off and can no longer be used.",
   MEMBER_LIMIT_REACHED: "This member has already claimed the maximum for this campaign.",
 };
 
@@ -442,6 +456,38 @@ export async function issueVoucherManually(input: {
 }
 
 /* ------------------------------ status helpers ---------------------------- */
+
+/** Backoffice: switch a voucher off (or back on). Used vouchers stay locked. */
+export async function setVoucherStatus(input: {
+  token: string;
+  status: "ISSUED" | "DISABLED";
+  reason?: string | null;
+  staff?: string;
+  role?: string;
+  storeId?: string;
+}): Promise<void> {
+  const res = await sb.rpc("voucher_set_status", {
+    _token: input.token,
+    _status: input.status,
+    _reason: input.reason ?? null,
+    _staff: input.staff ?? null,
+    _role: input.role ?? null,
+    _store: input.storeId ?? null,
+  });
+  if (res.error) throw new Error(explain(res.error.message));
+}
+
+/** Effective, display-ready status for a voucher (expiry resolved live). */
+export function voucherState(
+  v: Voucher,
+  c: Campaign,
+  now = new Date(),
+): "Available" | "Used" | "Expired" | "Disabled" {
+  if (v.status === "REDEEMED") return "Used";
+  if (v.status === "DISABLED") return "Disabled";
+  if (isVoucherExpired(v, c, now)) return "Expired";
+  return "Available";
+}
 
 export const isExpired = (c: Campaign, now = new Date()) =>
   Boolean(c.expiresAt && now > new Date(c.expiresAt));

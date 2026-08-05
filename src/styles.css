@@ -188,7 +188,9 @@
 }
 
 .pos-scaled {
-  font-size: calc(0.875rem * var(--pos-scale) * var(--pos-text-scale));
+  /* Text size already lives on the root font size, so only the interface
+     scale is applied here — otherwise fonts would grow twice over. */
+  font-size: calc(0.875rem * var(--pos-scale));
   line-height: 1.45;
 }
 
@@ -196,28 +198,28 @@
 .pos-scaled [role="button"],
 .pos-scaled input,
 .pos-scaled select {
-  min-height: calc(2.5rem * var(--pos-scale));
+  min-height: calc(40px * var(--pos-scale));
 }
 
 .pos-scaled button.size-7,
 .pos-scaled button.size-8,
 .pos-scaled .pos-icon-btn {
-  min-height: calc(1.75rem * var(--pos-scale));
-  min-width: calc(1.75rem * var(--pos-scale));
+  min-height: calc(28px * var(--pos-scale));
+  min-width: calc(28px * var(--pos-scale));
 }
 
 .pos-compact .pos-scaled button,
 .pos-compact .pos-scaled [role="button"],
 .pos-compact .pos-scaled input,
 .pos-compact .pos-scaled select {
-  min-height: calc(2.1rem * var(--pos-scale));
+  min-height: calc(34px * var(--pos-scale));
 }
 
 @media (pointer: coarse) {
   .pos-scaled button,
   .pos-scaled [role="button"],
   .pos-scaled input {
-    min-height: max(44px, calc(2.5rem * var(--pos-scale)));
+    min-height: max(44px, calc(40px * var(--pos-scale)));
   }
 }
 

@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CouponAuditLog } from "@/components/pos/CouponAuditLog";
+import { CampaignVouchers } from "@/components/pos/CampaignVouchers";
 import { CouponAnalytics } from "@/components/pos/CouponAnalytics";
 import { IssueVoucherDialog } from "@/components/pos/IssueVoucherDialog";
 import { useAuth } from "@/lib/pos-auth";
@@ -210,6 +211,7 @@ function CouponsPage() {
         <Tabs defaultValue="campaigns">
           <TabsList>
             <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
+            <TabsTrigger value="vouchers">Vouchers</TabsTrigger>
             <TabsTrigger value="performance">Performance</TabsTrigger>
             <TabsTrigger value="audit">Audit log</TabsTrigger>
           </TabsList>
@@ -319,6 +321,18 @@ function CouponsPage() {
 
           <TabsContent value="performance" className="mt-4">
             <CouponAnalytics />
+          </TabsContent>
+
+          <TabsContent value="vouchers" className="mt-4">
+            <CampaignVouchers
+              campaigns={campaigns}
+              vouchers={vouchers}
+              members={state.members.map((m) => ({ id: m.id, name: m.name, phone: m.phone }))}
+              staffName={user?.name}
+              staffRole={user?.role}
+              storeId={state.currentStoreId}
+              onChanged={refresh}
+            />
           </TabsContent>
 
           <TabsContent value="audit" className="mt-4">
