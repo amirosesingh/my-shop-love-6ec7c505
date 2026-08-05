@@ -13,6 +13,7 @@ import type {
   AppSettings,
   Booking,
   BookingPayment,
+  BookingPaymentTiming,
   CartLine,
   Member,
   PaymentMethod,
