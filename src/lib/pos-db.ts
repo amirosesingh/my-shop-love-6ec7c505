@@ -3,7 +3,7 @@ import { supabaseExternal as supabase } from "@/integrations/supabase/external-c
 import { defaultSettings, seedState } from "./pos-seed";
 import { drainOutbox, runOpLive } from "./sync-engine";
 import { electronDb, localDb, readBranch } from "./local-db";
-import { enqueue, type SyncOp } from "./sync-outbox";
+import { enqueue, listQueue, persisted, type SyncOp } from "./sync-outbox";
 import { isLiveOnly } from "./live-mode";
 import type {
   AppSettings,
@@ -576,6 +576,57 @@ const queue = (context: string, op: SyncOp) => {
   enqueue(context, op);
   void drainOutbox();
 };
+
+/* ---------------------------- durable commits --------------------------- */
+
+/** Where a committed change actually landed. */
+export type CommitTarget = "cloud" | "local" | "outbox";
+
+/**
+ * Store a group of writes and only resolve once they are safe somewhere:
+ * the cloud database, the local desktop database, or the on-disk outbox.
+ *
+ * Callers await this before printing, clearing the cart or starting the next
+ * action — nothing moves on while the data is still only in memory.
+ */
+export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitTarget> {
+  if (!ops.length) return "cloud";
+
+  // Android / live-only: the backend is the single source of truth.
+  if (isLiveOnly()) {
+    for (const op of ops) await runOpLive(context, op);
+    return "cloud";
+  }
+
+  // Windows desktop: the local SQL Server instance is the source of truth.
+  const bridge = localDb();
+  if (bridge) {
+    for (const op of ops) {
+      const res = await bridge.write(context, op);
+      if (!res.ok) throw new Error(res.error ?? `${context} could not be stored locally`);
+    }
+    return "local";
+  }
+
+  // Browser: queue to disk first (durable), then try to push it up now.
+  const ids = ops.map((op) => enqueue(context, op).id);
+  if (!persisted(ids)) {
+    throw new Error(`${context} could not be stored on this device — nothing was saved`);
+  }
+  try {
+    await drainOutbox();
+  } catch {
+    /* still safely queued on disk */
+  }
+  const remaining = listQueue().filter((q) => ids.includes(q.id));
+  const stuck = remaining.find((q) => q.quarantined);
+  if (stuck) throw new Error(stuck.lastError ?? `${context} failed`);
+  return remaining.length ? "outbox" : "cloud";
+}
+
+/** Human wording for a completed commit. */
+export const commitLabel = (t: CommitTarget) =>
+  t === "cloud" ? "Saved" : t === "local" ? "Saved on this terminal" : "Saved offline — will sync";
 
 export const db = {
   upsertProduct: (p: Product) =>
