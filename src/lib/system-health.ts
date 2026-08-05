@@ -6,7 +6,7 @@
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { pendingCount, retryQuarantined } from "@/lib/sync-outbox";
 
-export type ServiceId = "database" | "realtime" | "subdomains" | "sync";
+export type ServiceId = "database" | "realtime" | "sync" | (string & {});
 export type ServiceState = "ok" | "degraded" | "down" | "checking";
 
 export type ServiceCheck = {
@@ -17,6 +17,8 @@ export type ServiceCheck = {
   /** round trip in ms, when the check measured one */
   latency?: number;
   at: string;
+  /** for public domain checks: the URL that was tested */
+  url?: string;
 };
 
 export type HealthError = {
