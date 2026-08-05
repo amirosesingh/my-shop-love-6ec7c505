@@ -167,6 +167,10 @@ function Register() {
   /** Who is actually signed in right now — sales are stamped with this, not
    *  the name captured when the shift was opened (users may switch mid-shift). */
   const activeCashier = user?.name || activeShift?.cashier || cashier;
+  /** No open shift = the whole till is frozen, for every role including
+   *  supervisors: no coupons, exchanges, drawer opens, prints or payments. */
+  const tillLocked = !activeShift;
+  const lockedReason = "Open a shift first";
   const [tendered, setTendered] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("cash");
   const [transferRef, setTransferRef] = useState("");
