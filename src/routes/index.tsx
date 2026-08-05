@@ -1205,6 +1205,16 @@ function Register() {
               visible("register.customerDisplay") ? openCustomerDisplay : undefined
             }
             onOpenShift={() => setOpenShiftOpen(true)}
+            onCloseShift={
+              visible("register.closeShift")
+                ? async () => {
+                    if (!(await requirePermission("can_close_shift"))) return;
+                    setCountedCash("");
+                    setCloseNote("");
+                    setCloseShiftOpen(true);
+                  }
+                : undefined
+            }
             showSearch={false}
           />
         </section>
