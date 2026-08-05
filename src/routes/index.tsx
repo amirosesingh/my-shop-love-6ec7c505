@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
+import { ActionButton } from "@/components/pos/ActionButton";
 import { CatalogPanel } from "@/components/pos/CatalogPanel";
 import { ScanBar } from "@/components/pos/ScanBar";
 import { setTicketDirty } from "@/lib/desktop-window";
@@ -1701,41 +1702,41 @@ function Register() {
             </p>
             <div className="grid grid-cols-2 gap-2">
               {visible("register.holdOrder") && (
-              <Button
+              <ActionButton
                 variant="outline"
-                className="h-16 flex-col gap-1 text-xs"
+                className="h-16"
+                label="Hold order"
+                icon={<PauseCircle className="size-4" />}
                 disabled={!lines.length}
                 onClick={holdOrder}
-              >
-                <PauseCircle className="size-4" /> Hold order
-              </Button>
+              />
               )}
-              <Button
+              <ActionButton
                 variant="outline"
-                className="h-16 flex-col gap-1 text-xs text-destructive hover:text-destructive"
+                className="h-16 text-destructive hover:text-destructive"
+                label="Void cart"
+                icon={<Trash2 className="size-4" />}
                 disabled={!lines.length}
                 onClick={() => void clearCart()}
-              >
-                <Trash2 className="size-4" /> Void cart
-              </Button>
+              />
               {visible("register.coupon") && (
-              <Button
+              <ActionButton
                 variant="outline"
-                className="h-16 flex-col gap-1 text-xs"
+                className="h-16"
+                label="Apply coupon"
+                icon={<TicketPercent className="size-4" />}
                 onClick={() => setCouponOpen(true)}
-              >
-                <TicketPercent className="size-4" /> Apply coupon
-              </Button>
+              />
               )}
               {visible("register.splitBill") && (
-              <Button
+              <ActionButton
                 variant="outline"
-                className="h-16 flex-col gap-1 text-xs"
+                className="h-16"
+                label="Split bill"
+                icon={<Split className="size-4" />}
                 disabled={balanceDue <= 0}
                 onClick={() => setSplitOpen(true)}
-              >
-                <Split className="size-4" /> Split bill
-              </Button>
+              />
               )}
             </div>
             {held.length > 0 && (
@@ -1763,29 +1764,32 @@ function Register() {
               Payment execution
             </p>
             <div className="space-y-2">
-              <Button
-                className="h-14 w-full justify-start gap-3 text-base"
+              <ActionButton
+                layout="inline"
+                className="h-14 w-full text-base sm:gap-3"
+                label="Cash"
+                icon={<Banknote className="size-5" />}
                 disabled={!lines.length || !activeShift}
                 onClick={() => openPayment("cash")}
-              >
-                <Banknote className="size-5" /> Cash
-              </Button>
-              <Button
+              />
+              <ActionButton
+                layout="inline"
                 variant="secondary"
-                className="h-14 w-full justify-start gap-3 text-base"
+                className="h-14 w-full text-base sm:gap-3"
+                label="Card"
+                icon={<CreditCard className="size-5" />}
                 disabled={!lines.length || !activeShift}
                 onClick={() => openPayment("card")}
-              >
-                <CreditCard className="size-5" /> Card
-              </Button>
-              <Button
+              />
+              <ActionButton
+                layout="inline"
                 variant="outline"
-                className="h-14 w-full justify-start gap-3 text-base"
+                className="h-14 w-full text-base sm:gap-3"
+                label="Digital pay"
+                icon={<Wallet className="size-5" />}
                 disabled={!lines.length || !activeShift}
                 onClick={() => openPayment("wallet")}
-              >
-                <Wallet className="size-5" /> Digital pay
-              </Button>
+              />
             </div>
             <p className="numeric mt-2 text-center text-[11px] text-muted-foreground">
               Due {money(refundDue > 0 ? refundDue : balanceDue)}
@@ -1798,18 +1802,19 @@ function Register() {
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Device &amp; printing
             </p>
-            <Button
+            <ActionButton
+              layout="inline"
               variant="outline"
-              className="h-12 w-full justify-start gap-3"
+              className="h-12 w-full sm:gap-3"
+              label="Open cash drawer"
+              icon={<Vault className="size-4" />}
               onClick={async () => {
                 if (!(await requirePermission("can_open_drawer"))) return;
                 setNoSaleNote("");
                 setNoSaleReason("change_float");
                 setNoSaleOpen(true);
               }}
-            >
-              <Vault className="size-4" /> Open cash drawer
-            </Button>
+            />
             <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
               <Label htmlFor="live-receipt" className="text-xs leading-tight">
                 Live receipt preview
