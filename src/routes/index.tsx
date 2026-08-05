@@ -1433,11 +1433,21 @@ function Register() {
                       <span className="text-[11px] text-muted-foreground">Disc</span>
                       <button
                         onClick={() => setPadTarget(i)}
-                        className="numeric rounded-md border border-border px-2 py-1 text-[11px] hover:border-primary hover:text-primary"
+                        title="Add discount"
+                        aria-label="Add discount"
+                        className="numeric flex min-h-9 items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] hover:border-primary hover:text-primary"
                       >
-                        {l.discount
-                          ? `${l.discount}${(l.discountType ?? "amount") === "percent" ? "%" : ""}`
-                          : "Add discount"}
+                        <Percent className="size-3.5" />
+                        <span className="hidden sm:inline">
+                          {l.discount
+                            ? `${l.discount}${(l.discountType ?? "amount") === "percent" ? "%" : ""}`
+                            : "Add discount"}
+                        </span>
+                        <span className="sm:hidden">
+                          {l.discount
+                            ? `${l.discount}${(l.discountType ?? "amount") === "percent" ? "%" : ""}`
+                            : ""}
+                        </span>
                       </button>
                       <span className="numeric w-14 text-right text-[11px] text-muted-foreground">
                         -{money(lineUnitDiscount(l) * l.qty)}
@@ -1719,7 +1729,10 @@ function Register() {
                     onClick={() => resumeHeld(h.id)}
                     className="flex w-full items-center justify-between rounded-md border border-border px-2 py-1.5 text-[11px] hover:border-primary/60"
                   >
-                    <span className="truncate">{h.label}</span>
+                    <span className="truncate">
+                      {h.cancelledFrom ? "↩ " : ""}
+                      {h.label}
+                    </span>
                     <span className="numeric font-semibold">{money(h.total)}</span>
                   </button>
                 ))}
