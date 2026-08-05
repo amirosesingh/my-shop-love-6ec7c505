@@ -2792,8 +2792,7 @@ function Register() {
                   <p className="text-[11px] text-muted-foreground">
                     A job tag prints with the slip so it can be tied to the racket.
                   </p>
-                </div>
-              )}
+              </div>
             </div>
             )}
           </div>
