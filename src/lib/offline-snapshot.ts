@@ -6,6 +6,7 @@
  * into a working register instead of waiting on a request that cannot finish.
  */
 import type { CloudSlice } from "./pos-db";
+import { isLiveOnly } from "./live-mode";
 
 const KEY = "pos.offline.snapshot.v1";
 
@@ -31,7 +32,8 @@ function normalise(raw: Partial<Snapshot>): Snapshot {
 }
 
 export function writeSnapshot(slice: CloudSlice) {
-  if (!isBrowser()) return;
+  // Android is live-only: nothing about the business is kept on the device.
+  if (!isBrowser() || isLiveOnly()) return;
   try {
     window.localStorage.setItem(
       KEY,
@@ -43,7 +45,7 @@ export function writeSnapshot(slice: CloudSlice) {
 }
 
 export function readSnapshot(): Snapshot | null {
-  if (!isBrowser()) return null;
+  if (!isBrowser() || isLiveOnly()) return null;
   try {
     const raw = window.localStorage.getItem(KEY);
     if (!raw) return null;
