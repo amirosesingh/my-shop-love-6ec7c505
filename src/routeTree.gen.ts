@@ -45,6 +45,7 @@ import { Route as SettingsDisplayRouteImport } from './routes/settings.display'
 import { Route as SettingsElementsRouteImport } from './routes/settings.elements'
 import { Route as SettingsIdentityRouteImport } from './routes/settings.identity'
 import { Route as SettingsLinesRouteImport } from './routes/settings.lines'
+import { Route as SettingsMobileTerminalsRouteImport } from './routes/settings.mobile-terminals'
 import { Route as SettingsPaymentRouteImport } from './routes/settings.payment'
 import { Route as SettingsPrinterRouteImport } from './routes/settings.printer'
 import { Route as SettingsQrRouteImport } from './routes/settings.qr'
@@ -240,6 +241,11 @@ const SettingsLinesRoute = SettingsLinesRouteImport.update({
   path: '/settings/lines',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsMobileTerminalsRoute = SettingsMobileTerminalsRouteImport.update({
+  id: '/settings/mobile-terminals',
+  path: '/settings/mobile-terminals',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsPaymentRoute = SettingsPaymentRouteImport.update({
   id: '/settings/payment',
   path: '/settings/payment',
@@ -346,6 +352,7 @@ export interface FileRoutesByFullPath {
   '/settings/elements': typeof SettingsElementsRoute
   '/settings/identity': typeof SettingsIdentityRoute
   '/settings/lines': typeof SettingsLinesRoute
+  '/settings/mobile-terminals': typeof SettingsMobileTerminalsRoute
   '/settings/payment': typeof SettingsPaymentRoute
   '/settings/printer': typeof SettingsPrinterRoute
   '/settings/qr': typeof SettingsQrRoute
@@ -398,6 +405,7 @@ export interface FileRoutesByTo {
   '/settings/elements': typeof SettingsElementsRoute
   '/settings/identity': typeof SettingsIdentityRoute
   '/settings/lines': typeof SettingsLinesRoute
+  '/settings/mobile-terminals': typeof SettingsMobileTerminalsRoute
   '/settings/payment': typeof SettingsPaymentRoute
   '/settings/printer': typeof SettingsPrinterRoute
   '/settings/qr': typeof SettingsQrRoute
@@ -451,6 +459,7 @@ export interface FileRoutesById {
   '/settings/elements': typeof SettingsElementsRoute
   '/settings/identity': typeof SettingsIdentityRoute
   '/settings/lines': typeof SettingsLinesRoute
+  '/settings/mobile-terminals': typeof SettingsMobileTerminalsRoute
   '/settings/payment': typeof SettingsPaymentRoute
   '/settings/printer': typeof SettingsPrinterRoute
   '/settings/qr': typeof SettingsQrRoute
@@ -505,6 +514,7 @@ export interface FileRouteTypes {
     | '/settings/elements'
     | '/settings/identity'
     | '/settings/lines'
+    | '/settings/mobile-terminals'
     | '/settings/payment'
     | '/settings/printer'
     | '/settings/qr'
@@ -557,6 +567,7 @@ export interface FileRouteTypes {
     | '/settings/elements'
     | '/settings/identity'
     | '/settings/lines'
+    | '/settings/mobile-terminals'
     | '/settings/payment'
     | '/settings/printer'
     | '/settings/qr'
@@ -609,6 +620,7 @@ export interface FileRouteTypes {
     | '/settings/elements'
     | '/settings/identity'
     | '/settings/lines'
+    | '/settings/mobile-terminals'
     | '/settings/payment'
     | '/settings/printer'
     | '/settings/qr'
@@ -662,6 +674,7 @@ export interface RootRouteChildren {
   SettingsElementsRoute: typeof SettingsElementsRoute
   SettingsIdentityRoute: typeof SettingsIdentityRoute
   SettingsLinesRoute: typeof SettingsLinesRoute
+  SettingsMobileTerminalsRoute: typeof SettingsMobileTerminalsRoute
   SettingsPaymentRoute: typeof SettingsPaymentRoute
   SettingsPrinterRoute: typeof SettingsPrinterRoute
   SettingsQrRoute: typeof SettingsQrRoute
@@ -934,6 +947,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsLinesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/mobile-terminals': {
+      id: '/settings/mobile-terminals'
+      path: '/settings/mobile-terminals'
+      fullPath: '/settings/mobile-terminals'
+      preLoaderRoute: typeof SettingsMobileTerminalsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/payment': {
       id: '/settings/payment'
       path: '/settings/payment'
@@ -1070,6 +1090,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsElementsRoute: SettingsElementsRoute,
   SettingsIdentityRoute: SettingsIdentityRoute,
   SettingsLinesRoute: SettingsLinesRoute,
+  SettingsMobileTerminalsRoute: SettingsMobileTerminalsRoute,
   SettingsPaymentRoute: SettingsPaymentRoute,
   SettingsPrinterRoute: SettingsPrinterRoute,
   SettingsQrRoute: SettingsQrRoute,
