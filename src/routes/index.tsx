@@ -186,14 +186,7 @@ function Register() {
   /** Narrow windows: the action deck collapses so it can't cover the totals. */
   const [deckOpen, setDeckOpen] = useState(false);
   /* Operation deck state */
-  type HeldOrder = {
-    id: string;
-    label: string;
-    total: number;
-    lines: CartLine[];
-    heldAt: string;
-  };
-  const [held, setHeld] = useState<HeldOrder[]>([]);
+  const held = useHeldOrders();
   const [receiptPreview, setReceiptPreview] = useState(false);
   const [couponOpen, setCouponOpen] = useState(false);
   const [couponCode, setCouponCode] = useState("");
