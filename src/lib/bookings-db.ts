@@ -121,6 +121,37 @@ export const saveBookingQuietly = (b: Booking) => {
   void saveBooking(b).catch(() => undefined);
 };
 
+/**
+ * Store a booking and only resolve once it is safe: straight to the cloud when
+ * the connection is up, otherwise into the offline queue on this device.
+ */
+export async function commitBooking(b: Booking): Promise<CommitTarget> {
+  try {
+    await saveBooking(b);
+    return "cloud";
+  } catch (err) {
+    const ops: SyncOp[] = [{ kind: "upsert", table: "bookings", rows: [toRow(b)] }];
+    if (b.payments.length)
+      ops.push({
+        kind: "upsert",
+        table: "booking_payments",
+        rows: b.payments.map((p) => ({
+          id: p.id,
+          booking_id: b.id,
+          amount: p.amount,
+          method: p.method,
+          cashier: p.cashier,
+          paid_at: p.at,
+        })),
+      });
+    try {
+      return await commitOps("Saving booking", ops);
+    } catch {
+      throw err instanceof Error ? err : new Error(String(err));
+    }
+  }
+}
+
 /** Every booking raised in the company, newest first. */
 export async function loadBookings(): Promise<Booking[]> {
   const heads = await sb
