@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BadgeCheck,
   Banknote,
@@ -90,6 +90,7 @@ import { buildBookingMessage, buildSaleMessage, sendBillOnWhatsApp } from "@/lib
 import { logger } from "@/lib/audit-log";
 import { DiscountPad } from "@/components/pos/DiscountPad";
 import { evaluatePromotions, focLine } from "@/lib/pos-promotions";
+import { clearCartDraft, loadCartDraft, saveCartDraft } from "@/lib/cart-draft";
 import {
   openCashDrawer,
   printBookingSlip,
@@ -257,6 +258,43 @@ function Register() {
 
   const member = state.members.find((m) => m.id === memberId) ?? null;
 
+  /* ── Sticky ticket ──────────────────────────────────────────────────────
+     The open ticket is stored per store so a refresh, a trip to another page
+     or an app restart never silently drops what the cashier rang up. It is
+     only cleared by Clear/Void, a completed payment, or holding/booking. */
+  const draftStore = currentStore.id;
+  const hydratedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (hydratedFor.current === draftStore) return;
+    if (!state.products.length) return; // wait for the catalogue before validating
+    hydratedFor.current = draftStore;
+    const draft = loadCartDraft(draftStore);
+    if (!draft) return;
+    const known = new Set(state.products.map((p) => p.id));
+    const kept = draft.lines.filter((l) => known.has(l.productId));
+    setLines(kept);
+    setCartDiscount(draft.cartDiscount);
+    setCartDiscountType(draft.cartDiscountType);
+    setExchangeRef(draft.exchangeRef);
+    setMemberId(draft.memberId);
+    setCoupon((draft.coupon as typeof coupon) ?? null);
+    if (kept.length < draft.lines.length)
+      toast.info("Some items on the saved ticket are no longer in the catalogue");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftStore, state.products.length]);
+
+  useEffect(() => {
+    if (hydratedFor.current !== draftStore) return;
+    saveCartDraft(draftStore, {
+      lines,
+      cartDiscount,
+      cartDiscountType,
+      exchangeRef,
+      memberId,
+      coupon,
+    });
+  }, [draftStore, lines, cartDiscount, cartDiscountType, exchangeRef, memberId, coupon]);
+
   // Keep the attached member's live vouchers loaded for the picker.
   useEffect(() => {
     if (!memberId) {
@@ -406,6 +444,7 @@ function Register() {
     setCartDiscount(0);
     setExchangeRef(null);
     setCoupon(null);
+    clearCartDraft(currentStore.id);
   }
 
   async function clearCart() {
@@ -1347,7 +1386,7 @@ function Register() {
                         value={memberQuery}
                         onChange={(e) => setMemberQuery(e.target.value)}
                         placeholder="Phone number or name…"
-                        className="h-9 pl-8 text-sm"
+                        className="h-10 pl-8 text-sm"
                       />
                     </div>
                     <div className="mt-2 space-y-1">
@@ -1482,7 +1521,7 @@ function Register() {
                         variant="outline"
                         size="sm"
                         onClick={() => setPadTarget(i)}
-                        className="numeric min-h-11 max-w-full text-[11px]"
+                        className="numeric h-10 min-h-10 w-32 justify-between text-[11px]"
                         label={l.discount
                           ? `${l.discount}${(l.discountType ?? "amount") === "percent" ? "%" : ""}`
                           : "Add discount"}
@@ -1549,7 +1588,7 @@ function Register() {
                     variant="outline"
                     size="sm"
                     onClick={() => setPadTarget("bill")}
-                    className="numeric min-h-11 max-w-full text-xs"
+                    className="numeric h-10 min-h-10 w-32 justify-between text-xs"
                     label={cartDiscount
                       ? `${cartDiscount}${cartDiscountType === "percent" ? "%" : ""}`
                       : "Add discount"}

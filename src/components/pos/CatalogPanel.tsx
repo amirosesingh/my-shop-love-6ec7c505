@@ -119,21 +119,18 @@ export function CatalogPanel({
       </div>
 
       <ScrollArea className="min-h-0 flex-1 pr-2">
-        <div className="grid grid-cols-2 gap-3 pb-6 xl:grid-cols-3">
+        <div className="flex flex-col gap-2 pb-6">
           {products.map((p) => (
             <div key={p.id} className="relative">
               <button
                 onClick={() => onAdd(p.id)}
                 disabled={!shiftOpen}
-                className="group flex h-full w-full flex-col justify-between rounded-lg border border-border bg-card p-3 text-left transition-colors hover:border-primary/60 hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border disabled:hover:bg-card"
+                className="group grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-lg border border-border bg-card py-2 pl-3 pr-10 text-left transition-colors hover:border-primary/60 hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border disabled:hover:bg-card"
               >
-                <span className="pr-6 text-sm font-medium leading-snug">{p.name}</span>
-                <span className="mt-2 flex items-center justify-between">
-                  <span className="numeric text-base font-semibold text-primary">
-                    {money(p.price)}
-                  </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-medium leading-snug">{p.name}</span>
                   <span
-                    className={`numeric text-[11px] ${
+                    className={`numeric block text-[11px] ${
                       stockAt(p, storeId) <= p.reorderLevel
                         ? "text-warning"
                         : "text-muted-foreground"
@@ -142,18 +139,21 @@ export function CatalogPanel({
                     {stockAt(p, storeId)} left
                   </span>
                 </span>
+                <span className="numeric shrink-0 text-base font-semibold text-primary">
+                  {money(p.price)}
+                </span>
               </button>
               <button
                 aria-label={`Stock across stores for ${p.name}`}
                 onClick={() => onDetail(p.id)}
-                className="absolute right-2 top-2 rounded p-1 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
               >
                 <Info className="size-3.5" />
               </button>
             </div>
           ))}
           {products.length === 0 && (
-            <p className="col-span-full py-10 text-center text-sm text-muted-foreground">
+            <p className="py-10 text-center text-sm text-muted-foreground">
               No products match “{query}”.
             </p>
           )}
