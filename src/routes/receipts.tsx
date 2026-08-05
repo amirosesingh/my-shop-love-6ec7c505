@@ -256,6 +256,29 @@ function ReceiptVault() {
               <Printer className="size-4" /> Print this template
             </Button>
 
+            <div className="grid gap-2 rounded-lg border border-border bg-card p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Bill corrections
+              </p>
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                disabled={!selected}
+                onClick={() => void openPaymentFix()}
+              >
+                <Wallet className="size-4" /> Change payment method
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full justify-start text-destructive hover:text-destructive"
+                disabled={!selected || selected.refunded}
+                onClick={() => void openCancel()}
+              >
+                <Ban className="size-4" />
+                {selected?.refunded ? "Bill already cancelled" : "Cancel this bill"}
+              </Button>
+            </div>
+
             <div className="overflow-hidden rounded-lg border border-border bg-white">
               {selected && previewHtml ? (
                 <iframe
