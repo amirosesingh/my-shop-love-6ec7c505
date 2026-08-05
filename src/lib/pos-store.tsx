@@ -85,6 +85,12 @@ export type NewBooking = {
   discount: number;
   tax: number;
   total: number;
+  /** what the booking is for, and what the job costs */
+  serviceTypeId?: string;
+  serviceName?: string;
+  serviceFee?: number;
+  /** up front, part deposit, or on collection */
+  paymentTiming?: BookingPaymentTiming;
   /** deposit collected at the counter right now */
   deposit: number;
   depositMethod: PaymentMethod;
