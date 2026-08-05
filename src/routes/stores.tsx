@@ -9,6 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
+import { ConfirmSwitch } from "@/components/pos/ConfirmSwitch";
+import { BRANCH_POLICY_COPY, branchPolicy, type BranchPolicyKey } from "@/lib/branch-policy";
+import type { BranchPolicy, Store } from "@/lib/pos-types";
 
 export const Route = createFileRoute("/stores")({
   head: () => ({
@@ -27,7 +30,8 @@ export const Route = createFileRoute("/stores")({
 });
 
 function Locations() {
-  const { stores, currentStore, upsertStore, removeStore, setCurrentStore, state } = usePos();
+  const { stores, currentStore, upsertStore, removeStore, setCurrentStore, state, updateSettings } =
+    usePos();
   const { isAdmin } = useAuth();
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
@@ -68,6 +72,20 @@ function Locations() {
     setAddress("");
     setPhone("");
     toast.success(`${trimmed} added — now ${stores.length + 1} locations`);
+  }
+
+  function setPolicy(store: Store, key: BranchPolicyKey, value: boolean) {
+    const current = branchPolicy(state.settings, store.id);
+    const next: BranchPolicy = { ...current, [key]: value };
+    updateSettings({
+      integrations: {
+        ...state.settings.integrations,
+        branches: { ...(state.settings.integrations.branches ?? {}), [store.id]: next },
+      },
+    });
+    toast.success(
+      `${BRANCH_POLICY_COPY[key].label} ${value ? "turned on" : "turned off"} for ${store.name}`,
+    );
   }
 
   return (
