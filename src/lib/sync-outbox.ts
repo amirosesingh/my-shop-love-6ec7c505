@@ -108,6 +108,18 @@ export function resolveOp(id: string) {
   write(read().filter((q) => q.id !== id));
 }
 
+/**
+ * Durability check: re-reads the queue from disk and reports whether every id
+ * really landed there. Used by the commit layer so an action can only continue
+ * once its data is stored somewhere.
+ */
+export function persisted(ids: string[]): boolean {
+  if (!ids.length) return true;
+  if (isLiveOnly()) return false;
+  const have = new Set(read().map((q) => q.id));
+  return ids.every((id) => have.has(id));
+}
+
 export function failOp(id: string, message: string) {
   write(
     read().map((q) =>
