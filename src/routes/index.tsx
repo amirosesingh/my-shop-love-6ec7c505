@@ -1729,10 +1729,11 @@ function Register() {
                         state.members.find((m) => m.id === lastSale.memberId) ?? null,
                         "duplicate",
                       );
-                      logger.log("print", "Receipt reprinted", "register", {
+                      logTicketEvent(TICKET_ACTIONS.reprinted, {
                         saleId: lastSale.id,
                         receiptNo: lastSale.receiptNo,
                         template: "duplicate",
+                        storeId: currentStore.id,
                       });
                     }}
                   />
