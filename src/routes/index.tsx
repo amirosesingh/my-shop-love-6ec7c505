@@ -25,6 +25,7 @@ import {
   Landmark,
   MessageCircle,
   PauseCircle,
+  Percent,
   TicketPercent,
   Split,
 } from "lucide-react";
