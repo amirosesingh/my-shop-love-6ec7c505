@@ -41,8 +41,11 @@ export function CatalogPanel({
   onDetail: (id: string) => void;
   onOpenCustomerDisplay?: () => void;
   onOpenShift?: () => void;
+  onCloseShift?: () => void;
+  canCloseShift?: boolean;
   showHeaderActions?: boolean;
   autoFocus?: boolean;
+
   /** hidden on the till, where the dedicated scan bar above the cart is used */
   showSearch?: boolean;
 }) {
