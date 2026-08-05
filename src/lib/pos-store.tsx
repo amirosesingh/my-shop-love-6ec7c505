@@ -1188,6 +1188,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     closeShift,
     recordSale,
     refundSale,
+    changeSalePayment,
     createBooking,
     addBookingPayment,
     collectBooking,
