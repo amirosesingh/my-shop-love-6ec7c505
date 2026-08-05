@@ -19,6 +19,7 @@ import { AuditTracker } from "../components/pos/AuditTracker";
 import { FirstRunSetup } from "../components/pos/FirstRunSetup";
 import { ThemeProvider, themeBootScript } from "../lib/theme";
 import { NativeBoot } from "../components/pos/NativeBoot";
+import { OfflineGate } from "../components/mobile/OfflineGate";
 import { AndroidUpdateBanner } from "../components/pos/AndroidUpdateBanner";
 import { usePublicHostLanding } from "../lib/coupon-hosts";
 
@@ -163,6 +164,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
       <NativeBoot>
+      <OfflineGate>
       <AuthProvider>
         <PermissionsProvider>
         <PosProvider>
@@ -176,6 +178,7 @@ function RootComponent() {
         </PosProvider>
         </PermissionsProvider>
       </AuthProvider>
+      </OfflineGate>
       </NativeBoot>
       </ThemeProvider>
     </QueryClientProvider>
