@@ -90,6 +90,7 @@ import { buildBookingMessage, buildSaleMessage, sendBillOnWhatsApp } from "@/lib
 import { logger } from "@/lib/audit-log";
 import { DiscountPad } from "@/components/pos/DiscountPad";
 import { evaluatePromotions, focLine } from "@/lib/pos-promotions";
+import { clearCartDraft, loadCartDraft, saveCartDraft } from "@/lib/cart-draft";
 import {
   openCashDrawer,
   printBookingSlip,
