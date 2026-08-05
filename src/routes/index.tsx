@@ -64,7 +64,8 @@ import { BOOKING_TIMING_LABELS, type BookingPaymentTiming } from "@/lib/pos-type
 import { useUserPermissions } from "@/lib/pos-permissions";
 import { useVisibility } from "@/lib/ui-visibility";
 import { useUiScale } from "@/lib/use-ui-scale";
-import { removeHeldOrder, setHeldOrders, useHeldOrders } from "@/lib/held-orders";
+import { removeHeldOrder, setHeldOrders, useHeldOrders, type HeldOrder } from "@/lib/held-orders";
+import { TICKET_ACTIONS, logTicketEvent } from "@/lib/ticket-audit";
 import {
   discountLabel,
   loadMemberVouchers,
@@ -447,14 +448,15 @@ function Register() {
     clearCartDraft(currentStore.id);
   }
 
-  async function clearCart() {
+  async function clearCart(source: "clear" | "void" = "void") {
     if (lines.length && !(await requirePermission("can_void_cart"))) return;
     if (lines.length) {
-      logger.log("refund", "Cart voided", "register", {
+      logTicketEvent(source === "clear" ? TICKET_ACTIONS.cleared : TICKET_ACTIONS.voided, {
         lines: lines.length,
         value: totals.total,
         coupon: coupon?.code ?? null,
         storeId: currentStore.id,
+        member: member?.name ?? null,
         items: lines.map((l) => ({ name: l.name, qty: l.qty, price: l.price })),
       });
     }
