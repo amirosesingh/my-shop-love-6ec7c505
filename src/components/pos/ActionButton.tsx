@@ -1,4 +1,4 @@
-import type { ComponentProps, ReactNode } from "react";
+import { useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -29,13 +29,29 @@ export function ActionButton({
   className,
   ...props
 }: ActionButtonProps) {
+  // Touch devices have no hover — a long press (450ms) reveals the label.
+  const [held, setHeld] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelHold = () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    setHeld(false);
+  };
+  const startHold = () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setHeld(true), 450);
+  };
   return (
     <TooltipProvider delayDuration={200}>
-      <Tooltip>
+      <Tooltip {...(held ? { open: true } : {})} onOpenChange={(o) => !o && cancelHold()}>
         <TooltipTrigger asChild>
           <Button
             aria-label={label}
             title={label}
+            onTouchStart={startHold}
+            onTouchEnd={cancelHold}
+            onTouchCancel={cancelHold}
+            onTouchMove={cancelHold}
             className={cn(
               layout === "stack"
                 ? "flex-col gap-1 text-xs"
@@ -50,9 +66,7 @@ export function ActionButton({
             </span>
           </Button>
         </TooltipTrigger>
-        <TooltipContent side="top" className="sm:hidden">
-          {label}
-        </TooltipContent>
+        <TooltipContent side="top">{label}</TooltipContent>
       </Tooltip>
     </TooltipProvider>
   );
