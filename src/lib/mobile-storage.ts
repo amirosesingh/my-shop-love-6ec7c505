@@ -1,16 +1,17 @@
 /**
- * Durable storage for the Android build.
+ * Device storage for the Android build.
  *
- * Everything offline in this app (snapshot, outbox, journal, cached logins,
- * settings) is written through `localStorage`. On a phone that store can be
- * cleared by the system when space runs low, which would throw away unsynced
- * sales. So on Android every `pos.*` key is mirrored into Capacitor
- * Preferences — real app storage that survives — and read back on start-up.
+ * Android runs live-only: business records (catalogue, members, sales, stock,
+ * shifts, coupons) are never kept on the phone. Only a short allow-list of
+ * interface preferences is mirrored into Capacitor Preferences so the app
+ * remembers its look and its terminal identity between launches. Anything left
+ * behind by an older offline build is purged on start-up.
  *
  * Web and Electron are untouched: `hydrateNativeStorage()` returns immediately
  * when the app is not running inside Capacitor.
  */
 import { isNative } from "./native";
+import { isUiKey } from "./live-mode";
 
 const PREFIX = "pos.";
 
@@ -35,7 +36,7 @@ async function loadPrefs(): Promise<Prefs | null> {
   }
 }
 
-/** Write-through: local reads stay synchronous, the phone copy catches up. */
+/** Write-through for preference keys only; business keys are never persisted. */
 function install(store: Prefs) {
   if (installed) return;
   installed = true;
@@ -46,11 +47,11 @@ function install(store: Prefs) {
 
   ls.setItem = (key: string, value: string) => {
     setItem(key, value);
-    if (key.startsWith(PREFIX)) void store.set({ key, value }).catch(() => {});
+    if (isUiKey(key)) void store.set({ key, value }).catch(() => {});
   };
   ls.removeItem = (key: string) => {
     removeItem(key);
-    if (key.startsWith(PREFIX)) void store.remove({ key }).catch(() => {});
+    if (isUiKey(key)) void store.remove({ key }).catch(() => {});
   };
   ls.clear = () => {
     const keys = Object.keys(ls).filter((k) => k.startsWith(PREFIX));
@@ -60,24 +61,29 @@ function install(store: Prefs) {
 }
 
 /**
- * Copy the device's durable copy into `localStorage` and start mirroring.
- * Must finish before the app reads any offline state.
+ * Restore saved preferences, drop every business key an older offline build
+ * may have written, and start mirroring. Must finish before the app renders.
  */
 export async function hydrateNativeStorage(): Promise<void> {
   if (typeof window === "undefined" || !isNative()) return;
+  // Business data must never survive on the phone, whether or not the
+  // Preferences plugin is available this session.
+  purgeBusinessKeys();
   const store = await loadPrefs();
   if (!store) return;
   try {
     const { keys } = await store.keys();
     for (const key of keys) {
-      if (!key.startsWith(PREFIX)) continue;
+      if (!isUiKey(key)) {
+        // Left over from the previous offline-first build.
+        await store.remove({ key }).catch(() => {});
+        continue;
+      }
       const { value } = await store.get({ key });
       if (value !== null) window.localStorage.setItem(key, value);
     }
-    // Anything already in localStorage but not yet mirrored (first run after
-    // an update) is pushed across so nothing is lost later.
     for (const key of Object.keys(window.localStorage)) {
-      if (!key.startsWith(PREFIX) || keys.includes(key)) continue;
+      if (!isUiKey(key) || keys.includes(key)) continue;
       const value = window.localStorage.getItem(key);
       if (value !== null) await store.set({ key, value });
     }
@@ -85,4 +91,18 @@ export async function hydrateNativeStorage(): Promise<void> {
     /* fall back to plain localStorage for this session */
   }
   install(store);
+}
+
+/** Remove every non-preference key the app may have cached on this device. */
+export function purgeBusinessKeys() {
+  if (typeof window === "undefined") return;
+  try {
+    const ls = window.localStorage;
+    for (const key of Object.keys(ls)) {
+      if (isUiKey(key)) continue;
+      if (key.startsWith(PREFIX) || key === "pos-state-v2") ls.removeItem(key);
+    }
+  } catch {
+    /* nothing else we can do */
+  }
 }
