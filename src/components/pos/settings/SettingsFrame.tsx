@@ -8,8 +8,9 @@
  * receipt profile, and the live preview.
  */
 import { Link } from "@tanstack/react-router";
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
-import { ArrowLeft, Eye } from "lucide-react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { ArrowLeft, Check, Eye, Loader2, RotateCcw, Save, TriangleAlert } from "lucide-react";
+import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import { Switch } from "@/components/ui/switch";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
+import { db } from "@/lib/pos-db";
 import { defaultPaymentDetails, defaultWhatsApp } from "@/lib/pos-seed";
 import {
   PAPER_LABELS,
