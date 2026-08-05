@@ -176,6 +176,36 @@ function Locations() {
                 onChange={(e) => upsertStore({ ...s, phone: e.target.value })}
                 className="numeric h-9"
               />
+
+              <div className="space-y-2 rounded-md border border-border/70 bg-muted/30 p-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Branch independence
+                </p>
+                {(
+                  [
+                    "privateStock",
+                    "privateCatalogue",
+                    "allowTransfers",
+                    "syncInventory",
+                    "syncOther",
+                  ] as BranchPolicyKey[]
+                ).map((key) => {
+                  const copy = BRANCH_POLICY_COPY[key];
+                  return (
+                    <ConfirmSwitch
+                      key={key}
+                      label={copy.label}
+                      hint={copy.hint}
+                      subject={s.name}
+                      onWarning={copy.onWarning}
+                      offWarning={copy.offWarning}
+                      checked={branchPolicy(state.settings, s.id)[key]}
+                      onConfirmedChange={(v) => setPolicy(s, key, v)}
+                    />
+                  );
+                })}
+              </div>
+
               <div className="flex gap-2">
                 <Button
                   size="sm"
