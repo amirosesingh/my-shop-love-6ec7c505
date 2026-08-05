@@ -91,6 +91,13 @@ export const navGroups: NavGroup[] = [
         blurb: "Deposits, balances due and collections.",
       },
       {
+        to: "/holds",
+        label: "Hold Tickets",
+        icon: PauseCircle,
+        keywords: "held parked draft ticket resume switch park",
+        blurb: "Reopen parked tickets and see who cleared or voided them.",
+      },
+      {
         to: "/display",
         label: "Customer Display",
         icon: MonitorPlay,
