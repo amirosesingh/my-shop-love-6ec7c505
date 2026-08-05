@@ -2691,22 +2691,16 @@ function Register() {
               />
             </div>
 
-            {/* Racket stringing job card */}
+            {/* Racket stringing job card — racket bookings only */}
+            {racketMode && (
             <div className="rounded-md border border-border">
-              <button
-                type="button"
-                onClick={() => setJobOpen((v) => !v)}
-                className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium"
-              >
+              <div className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium">
                 <span className="flex min-w-0 items-center gap-2">
                   <Wrench className="size-4 shrink-0 text-primary" />
                   <span className="truncate">Racket / stringing job card</span>
                 </span>
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  {jobOpen ? "Hide" : "Add"}
-                </span>
-              </button>
-              {jobOpen && (
+              </div>
+              {true && (
                 <div className="space-y-3 border-t border-border p-3">
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
