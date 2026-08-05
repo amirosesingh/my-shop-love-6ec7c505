@@ -218,21 +218,23 @@ export type VoucherView = {
   memberCode: string;
 };
 
-/** Everything the public voucher page needs, in one round trip. */
+/**
+ * Everything the public voucher page needs, in one round trip.
+ *
+ * The voucher table itself is closed to anonymous readers, so a shopper's
+ * link resolves through a database function that can only ever return the
+ * single voucher whose token was supplied.
+ */
 export async function loadVoucherByToken(token: string): Promise<VoucherView | null> {
-  const res = await sb
-    .from("issued_vouchers")
-    .select("*, coupon_campaigns(*), members(full_name, member_code)")
-    .eq("token_slug", token)
-    .maybeSingle();
+  const res = await sb.rpc("voucher_by_token", { _token: token });
   if (res.error) throw new Error(res.error.message);
-  const row = res.data as Row | null;
-  if (!row?.coupon_campaigns) return null;
+  const row = ((res.data as Row[] | null) ?? [])[0];
+  if (!row?.voucher || !row?.campaign) return null;
   return {
-    voucher: toVoucher(row),
-    campaign: toCampaign(row.coupon_campaigns as Row),
-    memberName: row.members?.full_name ?? "Lucky Charms member",
-    memberCode: row.members?.member_code ?? "",
+    voucher: toVoucher(row.voucher as Row),
+    campaign: toCampaign(row.campaign as Row),
+    memberName: (row.member_name as string) || "Lucky Charms member",
+    memberCode: (row.member_code as string) || "",
   };
 }
 

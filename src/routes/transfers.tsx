@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
+import { groupOf, scopeBetween } from "@/lib/stock-transfers";
 import { AppShell } from "@/components/pos/AppShell";
 import { useAuth } from "@/lib/pos-auth";
 import { Button } from "@/components/ui/button";
@@ -106,6 +107,10 @@ function Transfers() {
   const [items, setItems] = useState<TransferItem[]>([]);
   const [pickId, setPickId] = useState(state.products[0]?.id ?? "");
   const [otherStoreId, setOtherStoreId] = useState(others[0]?.id ?? "");
+  // A move between clusters re-maps the item into the receiving catalogue.
+  const crossGroup =
+    Boolean(otherStoreId) &&
+    scopeBetween(currentStore, stores.find((s) => s.id === otherStoreId)) === "INTER_GROUP";
   const [note, setNote] = useState("");
 
   const storeOf = (id: string) => stores.find((s) => s.id === id);
@@ -353,6 +358,12 @@ function Transfers() {
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {storeOf(t.fromStoreId)?.code} → {storeOf(t.toStoreId)?.code}
+                      {scopeBetween(storeOf(t.fromStoreId), storeOf(t.toStoreId)) ===
+                        "INTER_GROUP" && (
+                        <div className="text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                          inter-group
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className={statusStyle[t.status]}>
@@ -533,6 +544,19 @@ function Transfers() {
                 </SelectContent>
               </Select>
             </div>
+            {crossGroup && (
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
+                <p className="font-semibold text-amber-600 dark:text-amber-400">
+                  Inter-group transfer
+                </p>
+                <p className="mt-1 text-muted-foreground">
+                  {currentStore.name} ({groupOf(currentStore)}) and{" "}
+                  {storeOf(otherStoreId)?.name} ({groupOf(storeOf(otherStoreId))}) sit in different
+                  clusters. On arrival each line is matched into the receiving cluster's own
+                  catalogue by barcode, so stock stays isolated per group.
+                </p>
+              </div>
+            )}
             <div className="space-y-1">
               <Label>Note</Label>
               <Input value={note} onChange={(e) => setNote(e.target.value)} />

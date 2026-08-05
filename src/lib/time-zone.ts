@@ -6,6 +6,8 @@
  * instead of the machine's own. Stored values stay absolute ISO timestamps.
  */
 let zone = "";
+let dateOrder: "dmy" | "mdy" | "ymd" = "dmy";
+let hour12 = false;
 
 /** Common regions offered in settings; "" means "use this computer". */
 export const TIME_ZONES = [
@@ -34,6 +36,16 @@ export function setPosTimeZone(next: string | undefined) {
   zone = (next ?? "").trim();
 }
 
+/** Date order and clock chosen in Region & time settings. */
+export function setPosFormats(date: string | undefined, time: string | undefined) {
+  dateOrder = date === "mdy" || date === "ymd" ? date : "dmy";
+  hour12 = time === "12h";
+}
+
+/** The locale that renders the chosen date order without inventing one. */
+const localeForOrder = () =>
+  dateOrder === "mdy" ? "en-US" : dateOrder === "ymd" ? "en-CA" : "en-GB";
+
 export function posTimeZone(): string {
   return zone;
 }
@@ -43,8 +55,11 @@ export function effectiveTimeZone(): string {
   return zone || Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
-const opts = (extra: Intl.DateTimeFormatOptions): Intl.DateTimeFormatOptions =>
-  zone ? { ...extra, timeZone: zone } : extra;
+const opts = (extra: Intl.DateTimeFormatOptions): Intl.DateTimeFormatOptions => ({
+  hour12,
+  ...extra,
+  ...(zone ? { timeZone: zone } : {}),
+});
 
 const asDate = (value: string | number | Date) =>
   value instanceof Date ? value : new Date(value);
@@ -52,17 +67,17 @@ const asDate = (value: string | number | Date) =>
 export function formatDateTime(value: string | number | Date, extra: Intl.DateTimeFormatOptions = {}) {
   const d = asDate(value);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString(undefined, opts(extra));
+  return d.toLocaleString(localeForOrder(), opts(extra));
 }
 
 export function formatTime(value: string | number | Date, extra: Intl.DateTimeFormatOptions = {}) {
   const d = asDate(value);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleTimeString(undefined, opts(extra));
+  return d.toLocaleTimeString(localeForOrder(), opts(extra));
 }
 
 export function formatDate(value: string | number | Date, extra: Intl.DateTimeFormatOptions = {}) {
   const d = asDate(value);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString(undefined, opts(extra));
+  return d.toLocaleDateString(localeForOrder(), opts(extra));
 }

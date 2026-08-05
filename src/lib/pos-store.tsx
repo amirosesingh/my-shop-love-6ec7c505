@@ -40,7 +40,8 @@ import { isShiftOverdue, localTerminalId } from "./shift-hours";
 import { beginShiftSession, endShiftSessions } from "./shift-sessions";
 import { branchPolicy } from "./branch-policy";
 import { setActiveBranchSyncPolicy } from "./sync-policy";
-import { setPosTimeZone } from "./time-zone";
+import { setPosFormats, setPosTimeZone } from "./time-zone";
+import { receiveTransferInDb, saveTransfer, setTransferStatus } from "./stock-transfers";
 
 const KEY = "pos-state-v2";
 
@@ -208,6 +209,9 @@ export function PosProvider({ children }: { children: ReactNode }) {
   // Latest snapshot for audit logging without re-creating every callback.
   const stateRef = useRef(state);
   stateRef.current = state;
+  // Who is acting right now — stamped on transfer approvals and receipts.
+  const actorRef = useRef("Manager");
+  actorRef.current = terminalUser?.name || user?.email || "Manager";
   // Lets earlier callbacks reach the settings writer defined further down.
   const updateSettingsRef = useRef<((patch: Partial<AppSettings>) => void) | null>(null);
 
@@ -306,7 +310,15 @@ export function PosProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setPosTimeZone(state.settings.integrations.timeZone);
-  }, [state.settings.integrations.timeZone]);
+    setPosFormats(
+      state.settings.integrations.dateFormat,
+      state.settings.integrations.timeFormat,
+    );
+  }, [
+    state.settings.integrations.timeZone,
+    state.settings.integrations.dateFormat,
+    state.settings.integrations.timeFormat,
+  ]);
 
   // Authoritative open shift for this branch, straight from the database.
   // Falls back to the cached list when the terminal is offline. Purely
@@ -1034,6 +1046,12 @@ export function PosProvider({ children }: { children: ReactNode }) {
         ),
       );
     }
+    void saveTransfer({
+      transfer,
+      from: stateRef.current.stores.find((x) => x.id === transfer.fromStoreId),
+      to: stateRef.current.stores.find((x) => x.id === transfer.toStoreId),
+      products: stateRef.current.products,
+    }).catch((e: unknown) => dbError("Saving transfer", e as Error));
     return transfer;
   }, []);
 
@@ -1059,6 +1077,8 @@ export function PosProvider({ children }: { children: ReactNode }) {
         ),
       };
     });
+    void setTransferStatus(id, "in_transit", actorRef.current)
+      .catch((e: unknown) => dbError("Approving transfer", e));
   }, []);
 
   const receiveTransfer = useCallback((id: string) => {
@@ -1083,6 +1103,11 @@ export function PosProvider({ children }: { children: ReactNode }) {
         ),
       };
     });
+    // Stock already left the sender at dispatch, so the database only books
+    // the goods in — and re-maps them when the branches sit in different groups.
+    void receiveTransferInDb(id, actorRef.current).catch((e: unknown) =>
+      dbError("Receiving transfer", e as Error),
+    );
   }, []);
 
   const rejectTransfer = useCallback((id: string) => {
@@ -1104,6 +1129,11 @@ export function PosProvider({ children }: { children: ReactNode }) {
         t.status === "in_transit"
           ? bumpItems(s.products, t.items, t.fromStoreId, 1)
           : s.products;
+      void setTransferStatus(
+        id,
+        t.status === "in_transit" ? "cancelled" : "rejected",
+        actorRef.current,
+      ).catch((e: unknown) => dbError("Updating transfer", e));
       return {
         ...s,
         products,

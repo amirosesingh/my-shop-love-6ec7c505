@@ -4,6 +4,13 @@ export type Store = {
   name: string;
   address: string;
   phone: string;
+  /**
+   * Cluster this branch belongs to. Branches in the same group share one
+   * catalogue, so stock moves between them are "intra-group"; a move to a
+   * branch in another group is "inter-group" and re-maps the product into the
+   * receiving group's catalogue.
+   */
+  groupId?: string;
   /** prefix stamped on every receipt number raised at this branch */
   receiptPrefix?: string;
   /** optional branch-level receipt branding overrides */
@@ -520,6 +527,9 @@ export type AppSettings = {
 };
 
 /** Operational switches an admin can change from System & Integrations. */
+export type DateFormat = "dmy" | "mdy" | "ymd";
+export type TimeFormat = "12h" | "24h";
+
 export type IntegrationSettings = {
   /** public member signup domain */
   memberDomain: string;
@@ -533,6 +543,12 @@ export type IntegrationSettings = {
   offlineMode: boolean;
   /** IANA zone used for every displayed / printed time; "" = this PC's zone */
   timeZone?: string;
+  /** ISO country of the business, used to suggest a zone and formats */
+  country?: string;
+  /** how dates read on screen and on slips */
+  dateFormat?: DateFormat;
+  /** 12-hour or 24-hour clock */
+  timeFormat?: TimeFormat;
   /** pick a configured account for card / transfer / wallet tenders */
   usePaymentAccounts?: boolean;
   /** card machines, bank accounts and e-wallets money can land in */

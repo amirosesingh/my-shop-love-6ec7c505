@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_users: {
+        Row: {
+          auth_user_id: string | null
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          is_active: boolean
+          last_login_at: string | null
+          permissions: Json
+          pin_hash: string
+          role: Database["public"]["Enums"]["app_role"]
+          store_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auth_user_id?: string | null
+          created_at?: string
+          email: string
+          full_name: string
+          id?: string
+          is_active?: boolean
+          last_login_at?: string | null
+          permissions?: Json
+          pin_hash?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          store_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auth_user_id?: string | null
+          created_at?: string
+          email?: string
+          full_name?: string
+          id?: string
+          is_active?: boolean
+          last_login_at?: string | null
+          permissions?: Json
+          pin_hash?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          store_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action_category: string
@@ -43,6 +91,168 @@ export type Database = {
           user_name?: string | null
         }
         Relationships: []
+      }
+      cashiers: {
+        Row: {
+          created_at: string
+          full_name: string
+          id: string
+          is_active: boolean
+          last_login_at: string | null
+          permissions: Json
+          pin_hash: string
+          store_id: string | null
+          updated_at: string
+          username: string
+        }
+        Insert: {
+          created_at?: string
+          full_name?: string
+          id?: string
+          is_active?: boolean
+          last_login_at?: string | null
+          permissions?: Json
+          pin_hash: string
+          store_id?: string | null
+          updated_at?: string
+          username: string
+        }
+        Update: {
+          created_at?: string
+          full_name?: string
+          id?: string
+          is_active?: boolean
+          last_login_at?: string | null
+          permissions?: Json
+          pin_hash?: string
+          store_id?: string | null
+          updated_at?: string
+          username?: string
+        }
+        Relationships: []
+      }
+      coupon_campaigns: {
+        Row: {
+          claims_count: number
+          created_at: string
+          discount_type: string
+          discount_value: number
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          is_welcome: boolean
+          max_claims: number | null
+          max_per_member: number | null
+          name: string
+          scope: string
+          scope_value: string | null
+          slug: string
+          starts_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          claims_count?: number
+          created_at?: string
+          discount_type?: string
+          discount_value?: number
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          is_welcome?: boolean
+          max_claims?: number | null
+          max_per_member?: number | null
+          name: string
+          scope?: string
+          scope_value?: string | null
+          slug: string
+          starts_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          claims_count?: number
+          created_at?: string
+          discount_type?: string
+          discount_value?: number
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          is_welcome?: boolean
+          max_claims?: number | null
+          max_per_member?: number | null
+          name?: string
+          scope?: string
+          scope_value?: string | null
+          slug?: string
+          starts_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      coupon_events: {
+        Row: {
+          campaign_id: string | null
+          campaign_name: string | null
+          created_at: string
+          event_type: string
+          id: string
+          member_id: string | null
+          member_phone: string | null
+          note: string | null
+          sale_id: string | null
+          staff_name: string | null
+          staff_role: string | null
+          store_id: string | null
+          terminal_id: string | null
+          voucher_token: string | null
+        }
+        Insert: {
+          campaign_id?: string | null
+          campaign_name?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          member_id?: string | null
+          member_phone?: string | null
+          note?: string | null
+          sale_id?: string | null
+          staff_name?: string | null
+          staff_role?: string | null
+          store_id?: string | null
+          terminal_id?: string | null
+          voucher_token?: string | null
+        }
+        Update: {
+          campaign_id?: string | null
+          campaign_name?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          member_id?: string | null
+          member_phone?: string | null
+          note?: string | null
+          sale_id?: string | null
+          staff_name?: string | null
+          staff_role?: string | null
+          store_id?: string | null
+          terminal_id?: string | null
+          voucher_token?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coupon_events_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "coupon_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coupon_events_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       drawer_events: {
         Row: {
@@ -85,6 +295,78 @@ export type Database = {
           terminal_id?: string | null
         }
         Relationships: []
+      }
+      issued_vouchers: {
+        Row: {
+          campaign_id: string
+          disable_reason: string | null
+          disabled_at: string | null
+          disabled_by: string | null
+          expires_at: string | null
+          id: string
+          issued_at: string
+          issued_by: string | null
+          issued_source: string
+          member_id: string | null
+          redeemed_at: string | null
+          redeemed_by: string | null
+          redeemed_sale_id: string | null
+          status: string
+          store_id: string | null
+          token_slug: string
+        }
+        Insert: {
+          campaign_id: string
+          disable_reason?: string | null
+          disabled_at?: string | null
+          disabled_by?: string | null
+          expires_at?: string | null
+          id?: string
+          issued_at?: string
+          issued_by?: string | null
+          issued_source?: string
+          member_id?: string | null
+          redeemed_at?: string | null
+          redeemed_by?: string | null
+          redeemed_sale_id?: string | null
+          status?: string
+          store_id?: string | null
+          token_slug: string
+        }
+        Update: {
+          campaign_id?: string
+          disable_reason?: string | null
+          disabled_at?: string | null
+          disabled_by?: string | null
+          expires_at?: string | null
+          id?: string
+          issued_at?: string
+          issued_by?: string | null
+          issued_source?: string
+          member_id?: string | null
+          redeemed_at?: string | null
+          redeemed_by?: string | null
+          redeemed_sale_id?: string | null
+          status?: string
+          store_id?: string | null
+          token_slug?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "issued_vouchers_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "coupon_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issued_vouchers_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       members: {
         Row: {
@@ -164,6 +446,7 @@ export type Database = {
         Row: {
           company_name: string
           custom_lines: Json
+          date_format: string
           day_end_time: string
           day_start_time: string
           enable_tax: boolean
@@ -177,6 +460,7 @@ export type Database = {
           phone: string | null
           qr: Json
           reg_number: string | null
+          region_country: string
           review_max_discount_pct: number
           review_max_nosale: number
           review_max_refund_value: number
@@ -190,6 +474,8 @@ export type Database = {
           tax_mode: string
           tax_number: string | null
           tax_percentage: number
+          time_format: string
+          time_zone: string
           ui_visibility: Json
           updated_at: string
           website: string | null
@@ -197,6 +483,7 @@ export type Database = {
         Insert: {
           company_name?: string
           custom_lines?: Json
+          date_format?: string
           day_end_time?: string
           day_start_time?: string
           enable_tax?: boolean
@@ -210,6 +497,7 @@ export type Database = {
           phone?: string | null
           qr?: Json
           reg_number?: string | null
+          region_country?: string
           review_max_discount_pct?: number
           review_max_nosale?: number
           review_max_refund_value?: number
@@ -223,6 +511,8 @@ export type Database = {
           tax_mode?: string
           tax_number?: string | null
           tax_percentage?: number
+          time_format?: string
+          time_zone?: string
           ui_visibility?: Json
           updated_at?: string
           website?: string | null
@@ -230,6 +520,7 @@ export type Database = {
         Update: {
           company_name?: string
           custom_lines?: Json
+          date_format?: string
           day_end_time?: string
           day_start_time?: string
           enable_tax?: boolean
@@ -243,6 +534,7 @@ export type Database = {
           phone?: string | null
           qr?: Json
           reg_number?: string | null
+          region_country?: string
           review_max_discount_pct?: number
           review_max_nosale?: number
           review_max_refund_value?: number
@@ -256,6 +548,8 @@ export type Database = {
           tax_mode?: string
           tax_number?: string | null
           tax_percentage?: number
+          time_format?: string
+          time_zone?: string
           ui_visibility?: Json
           updated_at?: string
           website?: string | null
@@ -835,6 +1129,162 @@ export type Database = {
         }
         Relationships: []
       }
+      stock_transfer_items: {
+        Row: {
+          barcode: string | null
+          created_at: string
+          id: string
+          product_id: string | null
+          product_name: string | null
+          quantity: number
+          quantity_received: number
+          sku: string | null
+          transfer_id: string
+          unit_cost: number
+        }
+        Insert: {
+          barcode?: string | null
+          created_at?: string
+          id?: string
+          product_id?: string | null
+          product_name?: string | null
+          quantity?: number
+          quantity_received?: number
+          sku?: string | null
+          transfer_id: string
+          unit_cost?: number
+        }
+        Update: {
+          barcode?: string | null
+          created_at?: string
+          id?: string
+          product_id?: string | null
+          product_name?: string | null
+          quantity?: number
+          quantity_received?: number
+          sku?: string | null
+          transfer_id?: string
+          unit_cost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_transfer_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_transfer_items_transfer_id_fkey"
+            columns: ["transfer_id"]
+            isOneToOne: false
+            referencedRelation: "stock_transfers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_transfers: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          created_by: string | null
+          from_group_id: string | null
+          from_store_id: string
+          from_store_name: string | null
+          id: string
+          kind: string
+          note: string
+          received_at: string | null
+          received_by: string | null
+          ref: string
+          rejected_reason: string | null
+          status: string
+          to_group_id: string | null
+          to_store_id: string
+          to_store_name: string | null
+          transfer_scope: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          from_group_id?: string | null
+          from_store_id: string
+          from_store_name?: string | null
+          id?: string
+          kind?: string
+          note?: string
+          received_at?: string | null
+          received_by?: string | null
+          ref: string
+          rejected_reason?: string | null
+          status?: string
+          to_group_id?: string | null
+          to_store_id: string
+          to_store_name?: string | null
+          transfer_scope?: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          from_group_id?: string | null
+          from_store_id?: string
+          from_store_name?: string | null
+          id?: string
+          kind?: string
+          note?: string
+          received_at?: string | null
+          received_by?: string | null
+          ref?: string
+          rejected_reason?: string | null
+          status?: string
+          to_group_id?: string | null
+          to_store_id?: string
+          to_store_name?: string | null
+          transfer_scope?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      stores: {
+        Row: {
+          address: string | null
+          code: string
+          created_at: string
+          group_id: string | null
+          id: string
+          name: string
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          code: string
+          created_at?: string
+          group_id?: string | null
+          id: string
+          name: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          code?: string
+          created_at?: string
+          group_id?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       suppliers: {
         Row: {
           address: string | null
@@ -877,6 +1327,62 @@ export type Database = {
         }
         Relationships: []
       }
+      terminal_tokens: {
+        Row: {
+          activated_at: string | null
+          claimed_at: string | null
+          claimed_by_device: string | null
+          created_at: string
+          device_name: string
+          id: string
+          last_seen_at: string | null
+          location_id: string | null
+          location_name: string | null
+          reissued_at: string | null
+          replaced_by: string | null
+          revoked_at: string | null
+          status: string
+        }
+        Insert: {
+          activated_at?: string | null
+          claimed_at?: string | null
+          claimed_by_device?: string | null
+          created_at?: string
+          device_name: string
+          id?: string
+          last_seen_at?: string | null
+          location_id?: string | null
+          location_name?: string | null
+          reissued_at?: string | null
+          replaced_by?: string | null
+          revoked_at?: string | null
+          status?: string
+        }
+        Update: {
+          activated_at?: string | null
+          claimed_at?: string | null
+          claimed_by_device?: string | null
+          created_at?: string
+          device_name?: string
+          id?: string
+          last_seen_at?: string | null
+          location_id?: string | null
+          location_name?: string | null
+          reissued_at?: string | null
+          replaced_by?: string | null
+          revoked_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "terminal_tokens_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -903,6 +1409,63 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      campaign_is_live: {
+        Args: { _c: Database["public"]["Tables"]["coupon_campaigns"]["Row"] }
+        Returns: boolean
+      }
+      coupon_claim: {
+        Args: {
+          _email?: string
+          _full_name?: string
+          _phone: string
+          _slug: string
+        }
+        Returns: string
+      }
+      coupon_issue_manual: {
+        Args: {
+          _expires_at?: string
+          _full_name?: string
+          _ignore_limit?: boolean
+          _phone: string
+          _role?: string
+          _slug: string
+          _staff?: string
+          _store?: string
+        }
+        Returns: string
+      }
+      coupon_log: {
+        Args: {
+          _campaign: Database["public"]["Tables"]["coupon_campaigns"]["Row"]
+          _member?: string
+          _note?: string
+          _phone?: string
+          _role?: string
+          _sale?: string
+          _staff?: string
+          _store?: string
+          _terminal?: string
+          _token?: string
+          _type: string
+        }
+        Returns: undefined
+      }
+      current_app_user: {
+        Args: never
+        Returns: {
+          email: string
+          full_name: string
+          id: string
+          is_active: boolean
+          permissions: Json
+          role: Database["public"]["Enums"]["app_role"]
+          store_id: string
+          user_id: string
+        }[]
+      }
+      delete_cashier: { Args: { p_id: string }; Returns: undefined }
+      delete_terminal_user: { Args: { p_user_id: string }; Returns: undefined }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -910,11 +1473,210 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_app_supervisor: { Args: never; Returns: boolean }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
+      list_app_users: {
+        Args: never
+        Returns: {
+          auth_user_id: string
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          is_active: boolean
+          last_login_at: string
+          permissions: Json
+          role: Database["public"]["Enums"]["app_role"]
+          store_id: string
+          user_id: string
+        }[]
+      }
+      list_cashiers: {
+        Args: never
+        Returns: {
+          created_at: string
+          full_name: string
+          id: string
+          is_active: boolean
+          last_login_at: string
+          permissions: Json
+          store_id: string
+          username: string
+        }[]
+      }
+      member_join: {
+        Args: { _email?: string; _full_name: string; _phone: string }
+        Returns: string
+      }
       member_welcome_claim: {
         Args: { _email?: string; _full_name: string; _phone: string }
         Returns: string
       }
+      normalize_phone: { Args: { _phone: string }; Returns: string }
+      set_app_user_permissions: {
+        Args: { p_permissions: Json; p_user_id: string }
+        Returns: undefined
+      }
+      set_app_user_profile: {
+        Args: {
+          p_full_name: string
+          p_is_active: boolean
+          p_role: Database["public"]["Enums"]["app_role"]
+          p_store_id: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
+      set_cashier_permissions: {
+        Args: { p_id: string; p_permissions: Json }
+        Returns: undefined
+      }
+      set_terminal_active: {
+        Args: { p_active: boolean; p_user_id: string }
+        Returns: undefined
+      }
+      stock_transfer_receive: {
+        Args: {
+          p_deduct_source?: boolean
+          p_received_by?: string
+          p_transfer_id: string
+        }
+        Returns: undefined
+      }
+      terminal_token_claim: {
+        Args: { p_device?: string; p_token_id: string }
+        Returns: boolean
+      }
+      terminal_token_heartbeat: {
+        Args: { p_activate?: boolean; p_token_id: string }
+        Returns: undefined
+      }
+      terminal_token_status: {
+        Args: { p_token_id: string }
+        Returns: {
+          location_name: string
+          status: string
+        }[]
+      }
+      upsert_cashier: {
+        Args: {
+          p_full_name: string
+          p_id: string
+          p_is_active: boolean
+          p_pin: string
+          p_store_id: string
+          p_username: string
+        }
+        Returns: string
+      }
+      upsert_terminal_user: {
+        Args: {
+          p_email: string
+          p_full_name: string
+          p_password: string
+          p_pin: string
+          p_role: Database["public"]["Enums"]["app_role"]
+          p_store_id: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
+      verify_cashier_pin: {
+        Args: { p_pin: string; p_username: string }
+        Returns: {
+          full_name: string
+          id: string
+          permissions: Json
+          store_id: string
+          username: string
+        }[]
+      }
+      verify_terminal_pin: {
+        Args: { p_pin: string; p_user_id: string }
+        Returns: {
+          email: string
+          full_name: string
+          role: Database["public"]["Enums"]["app_role"]
+          store_id: string
+          user_id: string
+        }[]
+      }
+      voucher_by_token: {
+        Args: { _token: string }
+        Returns: {
+          campaign: Json
+          member_code: string
+          member_name: string
+          voucher: Json
+        }[]
+      }
+      voucher_redeem: {
+        Args: {
+          _sale_id?: string
+          _staff?: string
+          _store_id?: string
+          _token: string
+        }
+        Returns: {
+          campaign_id: string
+          disable_reason: string | null
+          disabled_at: string | null
+          disabled_by: string | null
+          expires_at: string | null
+          id: string
+          issued_at: string
+          issued_by: string | null
+          issued_source: string
+          member_id: string | null
+          redeemed_at: string | null
+          redeemed_by: string | null
+          redeemed_sale_id: string | null
+          status: string
+          store_id: string | null
+          token_slug: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "issued_vouchers"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      voucher_set_status: {
+        Args: {
+          _reason?: string
+          _role?: string
+          _staff?: string
+          _status: string
+          _store?: string
+          _token: string
+        }
+        Returns: {
+          campaign_id: string
+          disable_reason: string | null
+          disabled_at: string | null
+          disabled_by: string | null
+          expires_at: string | null
+          id: string
+          issued_at: string
+          issued_by: string | null
+          issued_source: string
+          member_id: string | null
+          redeemed_at: string | null
+          redeemed_by: string | null
+          redeemed_sale_id: string | null
+          status: string
+          store_id: string | null
+          token_slug: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "issued_vouchers"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      voucher_token: { Args: never; Returns: string }
     }
     Enums: {
       app_role: "admin" | "manager" | "staff"
