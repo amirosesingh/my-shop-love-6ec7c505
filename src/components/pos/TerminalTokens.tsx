@@ -8,6 +8,7 @@ import {
   Copy,
   KeyRound,
   Loader2,
+  Camera,
   MonitorSmartphone,
   RefreshCw,
   RotateCcw,
@@ -49,8 +50,11 @@ import {
   reissueTerminalToken,
   restoreTerminalToken,
   revokeTerminalToken,
+  decodePairingRequest,
+  readTerminalConfig,
   type TerminalToken,
 } from "@/lib/terminal-tokens";
+import { CameraScanner } from "@/components/pos/CameraScanner";
 
 const qrDataUrl = (value: string) => {
   const qr = qrcode(0, "M");
@@ -78,6 +82,10 @@ export function TerminalTokens() {
   const [reissuing, setReissuing] = useState("");
   const [reissued, setReissued] = useState<{ token: TerminalToken; code: string } | null>(null);
   const [reissueCopied, setReissueCopied] = useState(false);
+  const [pairScan, setPairScan] = useState(false);
+  const [pairTokenId, setPairTokenId] = useState("");
+  /** This device's own token — never offer to revoke the terminal you are on. */
+  const selfTokenId = useMemo(() => readTerminalConfig()?.tokenId ?? "", []);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -146,9 +154,11 @@ export function TerminalTokens() {
         },
         locationName,
         deviceName: deviceName.trim(),
+        ...(pairTokenId ? { tokenId: pairTokenId } : {}),
       });
       setCode(issued);
       setDeviceName("");
+      setPairTokenId("");
       logger.log("settings_change", "Terminal token issued", "terminals", {
         location: locationName,
         device: deviceName.trim(),
@@ -291,6 +301,45 @@ export function TerminalTokens() {
           </Button>
         </div>
 
+        <div className="mt-4 rounded-lg border border-dashed border-border p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-xs font-medium">Pair a PC by scanning its screen</p>
+              <p className="text-[11px] text-muted-foreground">
+                {pairTokenId
+                  ? `Pairing request ${pairTokenId.slice(0, 8)}… ready — approve it with Generate activation token.`
+                  : "Point the camera at the pairing QR shown on the PC activation screen."}
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => setPairScan((v) => !v)}
+            >
+              <Camera className="size-3.5" /> {pairScan ? "Stop camera" : "Scan PC screen"}
+            </Button>
+          </div>
+          {pairScan && (
+            <div className="mt-3">
+              <CameraScanner
+                onScan={(value) => {
+                  const request = decodePairingRequest(value);
+                  if (!request) {
+                    toast.error("That is not a terminal pairing code");
+                    return;
+                  }
+                  setPairTokenId(request.tokenId);
+                  setDeviceName((current) => current || request.deviceName);
+                  setPairScan(false);
+                  toast.success("Pairing request captured — choose the location and approve");
+                }}
+                onClose={() => setPairScan(false)}
+              />
+            </div>
+          )}
+        </div>
+
         {code && (
           <div className="mt-5 grid gap-4 rounded-lg border border-border bg-surface-2 p-4 sm:grid-cols-[auto_minmax(0,1fr)]">
             <img
@@ -385,7 +434,9 @@ export function TerminalTokens() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {tokens.map((t) => (
+              {tokens
+                .filter((t) => t.id !== selfTokenId)
+                .map((t) => (
                 <TableRow key={t.id} className="hover:bg-muted/40">
                   <TableCell className="font-medium">{t.deviceName}</TableCell>
                   <TableCell className="text-muted-foreground">{t.locationName || "—"}</TableCell>
