@@ -545,6 +545,8 @@ export type IntegrationSettings = {
   serviceTypes?: BookingServiceType[];
   /** per-branch isolation and sync switches, keyed by store id */
   branches?: Record<string, BranchPolicy>;
+  /** products owned by a private-catalogue branch: productId -> storeId */
+  productOwners?: Record<string, string>;
 };
 
 export type PaymentAccountType = "card_machine" | "bank_account" | "ewallet" | "other";
