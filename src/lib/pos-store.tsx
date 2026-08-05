@@ -283,6 +283,16 @@ export function PosProvider({ children }: { children: ReactNode }) {
     [state.stores, state.currentStoreId],
   );
 
+  // Publish the branch's sync switches to the outbox drainer and the region
+  // clock to every formatter, so both follow the saved settings.
+  useEffect(() => {
+    setActiveBranchSyncPolicy(branchPolicy(state.settings, state.currentStoreId));
+  }, [state.settings, state.currentStoreId]);
+
+  useEffect(() => {
+    setPosTimeZone(state.settings.integrations.timeZone);
+  }, [state.settings.integrations.timeZone]);
+
   // Authoritative open shift for this branch, straight from the database.
   // Falls back to the cached list when the terminal is offline. Purely
   // status-driven: a shift opened days ago stays active until it is closed.
