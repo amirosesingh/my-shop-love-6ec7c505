@@ -145,7 +145,7 @@ function BookingsPage() {
         toast.error(`Collecting requires the full balance of ${money(balance)}`);
         return;
       }
-      const done = collectBooking(payFor.id, value, method);
+      const done = await collectBooking(payFor.id, value, method);
       if (!done) return;
       printSaleReceipt(done.sale, memberOf(payFor), "sale");
       toast.success(`Booking ${done.booking.ref} collected · bill ${done.sale.receiptNo}`);
@@ -154,7 +154,7 @@ function BookingsPage() {
         toast.error("Part payment cannot exceed the outstanding balance");
         return;
       }
-      const updated = addBookingPayment(payFor.id, value, method, payFor.cashier);
+      const updated = await addBookingPayment(payFor.id, value, method, payFor.cashier);
       if (!updated) return;
       printBookingPayment(updated, updated.payments[updated.payments.length - 1]);
       toast.success(`${money(value)} received · balance ${money(bookingBalance(updated))}`);
