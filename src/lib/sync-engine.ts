@@ -134,6 +134,8 @@ export async function drainOutbox(): Promise<{ pushed: number; failed: number }>
   try {
     for (const entry of replayOrder(listQueue())) {
       if (entry.quarantined) continue;
+      // Branch-level switches: held writes stay queued, never dropped.
+      if (!tableSyncAllowed(entry.op.table)) continue;
       const terminal = entry.terminalId ?? "legacy";
       if (blocked.has(terminal)) continue;
       // Exponential backoff: 0s, 5s, 20s, 45s ... since the last attempt.
