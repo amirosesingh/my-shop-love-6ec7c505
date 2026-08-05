@@ -332,6 +332,36 @@ export function SettingsFrame({
           )}
 
           <section className="space-y-4 rounded-lg border border-border bg-card p-5">{children}</section>
+
+          {/* Nothing is considered stored until this bar confirms it. */}
+          <div className="sticky bottom-0 -mx-6 flex flex-wrap items-center gap-3 border-t border-border bg-background/95 px-6 py-3 backdrop-blur">
+            <span className="flex items-center gap-2 text-xs text-muted-foreground">
+              {saveError ? (
+                <>
+                  <TriangleAlert className="size-4 text-destructive" />
+                  <span className="text-destructive">Could not save — {saveError}</span>
+                </>
+              ) : dirty ? (
+                <>
+                  <TriangleAlert className="size-4 text-amber-500" /> Unsaved changes
+                </>
+              ) : (
+                <>
+                  <Check className="size-4 text-emerald-500" />
+                  {savedAt ? `All changes saved · ${savedAt}` : "All changes saved"}
+                </>
+              )}
+            </span>
+            <div className="ml-auto flex gap-2">
+              <Button variant="ghost" size="sm" disabled={!dirty || saving} onClick={discard}>
+                <RotateCcw className="size-4" /> Discard changes
+              </Button>
+              <Button size="sm" disabled={saving || (!dirty && !saveError)} onClick={() => void save()}>
+                {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                {saving ? "Saving…" : "Save settings"}
+              </Button>
+            </div>
+          </div>
         </div>
       </SettingsCtx.Provider>
     </AppShell>
