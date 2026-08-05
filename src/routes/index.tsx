@@ -1292,6 +1292,7 @@ function Register() {
               visible("register.customerDisplay") ? openCustomerDisplay : undefined
             }
             onOpenShift={() => setOpenShiftOpen(true)}
+            onRacketBooking={startRacketBooking}
             onCloseShift={
               visible("register.closeShift")
                 ? async () => {
