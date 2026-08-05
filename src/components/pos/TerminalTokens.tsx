@@ -423,8 +423,12 @@ export function TerminalTokens({
           <div className="flex items-center gap-2 px-5 py-6 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin" /> Loading terminals…
           </div>
-        ) : tokens.length === 0 && !error ? (
-          <p className="px-5 py-6 text-sm text-muted-foreground">No terminals registered yet.</p>
+        ) : tokens.filter((t) => (only ? t.platform === only : true)).length === 0 && !error ? (
+          <p className="px-5 py-6 text-sm text-muted-foreground">
+            {only === "mobile"
+              ? "No phones or tablets registered yet."
+              : "No terminals registered yet."}
+          </p>
         ) : (
           <Table>
             <TableHeader>
