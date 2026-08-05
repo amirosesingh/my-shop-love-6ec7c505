@@ -190,6 +190,22 @@ Both subdomains serve the same build; only the landing path differs.`;
               {showErrors ? "Hide" : "View"} error logs ({errors.length})
             </Button>
           </div>
+          <div className="space-y-1 rounded-md border border-border bg-card px-3 py-2">
+            <p className="text-sm font-medium">Time zone</p>
+            <p className="text-[11px] text-muted-foreground">
+              Every displayed and printed time uses this region instead of the clock on this PC.
+            </p>
+            <ThemedSelect
+              ariaLabel="Time zone"
+              className="max-w-xs"
+              value={integrations.timeZone ?? ""}
+              onChange={(v) => updateSettings({ integrations: { ...integrations, timeZone: v } })}
+              options={[
+                { value: "", label: `Use this computer (${effectiveTimeZone()})` },
+                ...TIME_ZONES.map((z) => ({ value: z, label: z.replace(/_/g, " ") })),
+              ]}
+            />
+          </div>
           <div className="flex items-center justify-between rounded-md border border-border bg-card px-3 py-2">
             <div className="flex items-center gap-2">
               <WifiOff className="size-4 text-muted-foreground" />

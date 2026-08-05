@@ -138,6 +138,18 @@ const GROUPS = [
         blurb: "Bank account and payment QR for the customer display.",
       },
       {
+        to: "/settings/accounts",
+        label: "Payment accounts",
+        icon: Landmark,
+        blurb: "Card machines, bank accounts and e-wallets cashiers can pick at the till.",
+      },
+      {
+        to: "/settings/services",
+        label: "Booking services",
+        icon: Landmark,
+        blurb: "Re-stringing, repairs and other jobs with their default fee.",
+      },
+      {
         to: "/settings/whatsapp",
         label: "WhatsApp bills",
         icon: MessageCircle,
