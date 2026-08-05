@@ -1,0 +1,118 @@
+/**
+ * Self-hosted live updates for the Android web bundle.
+ *
+ * The release workflow uploads a zipped web bundle plus a small manifest to
+ * the same update bucket the Windows till uses. The phone reads the manifest,
+ * downloads a newer bundle into app storage and serves it from the next
+ * launch, so interface fixes arrive without a Play Store release. The native
+ * shell itself still updates through the APK / Google Play.
+ *
+ * Nothing here runs on web or Electron: every entry point returns early when
+ * the app is not inside Capacitor.
+ */
+import { APP_VERSION } from "./app-updates";
+import { isNative } from "./native";
+
+const FEED = "https://updatecms.luckycharmsdnbhd.com/pos-app/android/web/latest.json";
+const SIX_HOURS = 6 * 60 * 60 * 1000;
+const STATE_KEY = "pos.ui.webBundle";
+
+type Manifest = { version: string; file: string; url?: string };
+
+type StoredBundle = { version: string; path: string };
+
+function readState(): StoredBundle | null {
+  try {
+    const raw = window.localStorage.getItem(STATE_KEY);
+    return raw ? (JSON.parse(raw) as StoredBundle) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeState(value: StoredBundle) {
+  try {
+    window.localStorage.setItem(STATE_KEY, JSON.stringify(value));
+  } catch {
+    /* preference storage full — the bundle simply re-downloads next time */
+  }
+}
+
+/** "1.2.10" > "1.2.9" — plain numeric compare, missing parts count as 0. */
+export function isNewerBundle(candidate: string, current: string): boolean {
+  const a = candidate.split(".").map((n) => Number.parseInt(n, 10) || 0);
+  const b = current.split(".").map((n) => Number.parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(a.length, b.length); i += 1) {
+    const d = (a[i] ?? 0) - (b[i] ?? 0);
+    if (d !== 0) return d > 0;
+  }
+  return false;
+}
+
+/** Serve a bundle downloaded on an earlier run, if there is one. */
+export async function applyPendingWebBundle(): Promise<void> {
+  if (typeof window === "undefined" || !isNative()) return;
+  const pending = readState();
+  if (!pending || !isNewerBundle(pending.version, APP_VERSION)) return;
+  try {
+    const { Capacitor } = (await import("@capacitor/core")) as unknown as {
+      Capacitor: { setServerBasePath?: (p: string) => void };
+    };
+    Capacitor.setServerBasePath?.(pending.path);
+  } catch {
+    /* the packaged bundle stays in use */
+  }
+}
+
+/**
+ * Check the bucket and download a newer bundle in the background. The new
+ * files are only served from the next launch, so a shift is never interrupted.
+ */
+export async function checkWebBundle(): Promise<string | null> {
+  if (typeof window === "undefined" || !isNative() || !navigator.onLine) return null;
+  try {
+    const res = await fetch(`${FEED}?t=${Date.now()}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    const manifest = (await res.json()) as Manifest;
+    const current = readState()?.version ?? APP_VERSION;
+    if (!manifest?.version || !isNewerBundle(manifest.version, current)) return null;
+
+    const url = manifest.url ?? `https://updatecms.luckycharmsdnbhd.com/pos-app/android/web/${manifest.file}`;
+    const zip = await fetch(url);
+    if (!zip.ok) return null;
+    const bytes = new Uint8Array(await zip.arrayBuffer());
+    if (!bytes.byteLength) return null;
+
+    const { Filesystem, Directory } = (await import("@capacitor/filesystem")) as unknown as {
+      Filesystem: {
+        writeFile: (o: {
+          path: string;
+          data: string;
+          directory: string;
+          recursive?: boolean;
+        }) => Promise<{ uri: string }>;
+      };
+      Directory: { Data: string };
+    };
+    let binary = "";
+    for (const b of bytes) binary += String.fromCharCode(b);
+    const written = await Filesystem.writeFile({
+      path: `web/${manifest.version}/${manifest.file}`,
+      data: btoa(binary),
+      directory: Directory.Data,
+      recursive: true,
+    });
+    writeState({ version: manifest.version, path: written.uri.replace(/\/[^/]+$/, "") });
+    return manifest.version;
+  } catch {
+    return null;
+  }
+}
+
+/** Start the periodic background check (called once from the app shell). */
+export function startWebBundleChecks(): () => void {
+  if (typeof window === "undefined" || !isNative()) return () => {};
+  void checkWebBundle();
+  const timer = window.setInterval(() => void checkWebBundle(), SIX_HOURS);
+  return () => window.clearInterval(timer);
+}
