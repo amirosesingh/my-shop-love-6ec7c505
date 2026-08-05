@@ -1386,7 +1386,7 @@ function Register() {
                         value={memberQuery}
                         onChange={(e) => setMemberQuery(e.target.value)}
                         placeholder="Phone number or name…"
-                        className="h-9 pl-8 text-sm"
+                        className="h-10 pl-8 text-sm"
                       />
                     </div>
                     <div className="mt-2 space-y-1">
@@ -1521,7 +1521,7 @@ function Register() {
                         variant="outline"
                         size="sm"
                         onClick={() => setPadTarget(i)}
-                        className="numeric min-h-11 max-w-full text-[11px]"
+                        className="numeric h-10 min-h-10 w-32 justify-between text-[11px]"
                         label={l.discount
                           ? `${l.discount}${(l.discountType ?? "amount") === "percent" ? "%" : ""}`
                           : "Add discount"}
@@ -1588,7 +1588,7 @@ function Register() {
                     variant="outline"
                     size="sm"
                     onClick={() => setPadTarget("bill")}
-                    className="numeric min-h-11 max-w-full text-xs"
+                    className="numeric h-10 min-h-10 w-32 justify-between text-xs"
                     label={cartDiscount
                       ? `${cartDiscount}${cartDiscountType === "percent" ? "%" : ""}`
                       : "Add discount"}
