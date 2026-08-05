@@ -8,8 +8,9 @@
  * receipt profile, and the live preview.
  */
 import { Link } from "@tanstack/react-router";
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
-import { ArrowLeft, Eye } from "lucide-react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { ArrowLeft, Check, Eye, Loader2, RotateCcw, Save, TriangleAlert } from "lucide-react";
+import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import { Switch } from "@/components/ui/switch";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
+import { db } from "@/lib/pos-db";
 import { defaultPaymentDetails, defaultWhatsApp } from "@/lib/pos-seed";
 import {
   PAPER_LABELS,
@@ -80,6 +82,51 @@ export function SettingsFrame({
   const { state, stores, currentStore, updateSettings, upsertStore } = usePos();
   const { isAdmin, can } = useAuth();
   const canSettings = isAdmin || can("can_access_pos_settings");
+
+  /* ---- Save / discard -------------------------------------------------- */
+  // Edits apply live so the preview stays honest, but nothing is considered
+  // stored until "Save settings" confirms the database write. The snapshot is
+  // what "Discard changes" puts back.
+  const [snapshot, setSnapshot] = useState(() => JSON.stringify(state.settings));
+  const [saving, setSaving] = useState(false);
+  const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState("");
+  const dirty = JSON.stringify(state.settings) !== snapshot;
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
+
+  useEffect(() => {
+    const warn = (e: BeforeUnloadEvent) => {
+      if (!dirtyRef.current) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, []);
+
+  const save = async () => {
+    setSaving(true);
+    setSaveError("");
+    try {
+      await db.saveSettingsNow(state.settings);
+      setSnapshot(JSON.stringify(state.settings));
+      setSavedAt(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+      toast.success("Settings saved");
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Could not reach the database";
+      setSaveError(message);
+      toast.error("Could not save settings", { description: message });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const discard = () => {
+    updateSettings(JSON.parse(snapshot));
+    setSaveError("");
+    toast.info("Changes discarded");
+  };
 
   const { tax, receipt } = state.settings;
   const payment = state.settings.payment ?? defaultPaymentDetails;
@@ -285,6 +332,36 @@ export function SettingsFrame({
           )}
 
           <section className="space-y-4 rounded-lg border border-border bg-card p-5">{children}</section>
+
+          {/* Nothing is considered stored until this bar confirms it. */}
+          <div className="sticky bottom-0 -mx-6 flex flex-wrap items-center gap-3 border-t border-border bg-background/95 px-6 py-3 backdrop-blur">
+            <span className="flex items-center gap-2 text-xs text-muted-foreground">
+              {saveError ? (
+                <>
+                  <TriangleAlert className="size-4 text-destructive" />
+                  <span className="text-destructive">Could not save — {saveError}</span>
+                </>
+              ) : dirty ? (
+                <>
+                  <TriangleAlert className="size-4 text-amber-500" /> Unsaved changes
+                </>
+              ) : (
+                <>
+                  <Check className="size-4 text-emerald-500" />
+                  {savedAt ? `All changes saved · ${savedAt}` : "All changes saved"}
+                </>
+              )}
+            </span>
+            <div className="ml-auto flex gap-2">
+              <Button variant="ghost" size="sm" disabled={!dirty || saving} onClick={discard}>
+                <RotateCcw className="size-4" /> Discard changes
+              </Button>
+              <Button size="sm" disabled={saving || (!dirty && !saveError)} onClick={() => void save()}>
+                {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                {saving ? "Saving…" : "Save settings"}
+              </Button>
+            </div>
+          </div>
         </div>
       </SettingsCtx.Provider>
     </AppShell>

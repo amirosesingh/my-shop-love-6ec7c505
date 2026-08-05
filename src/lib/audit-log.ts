@@ -2,44 +2,39 @@ import { useSyncExternalStore } from "react";
 import { db } from "./pos-db";
 import { replayOrder, stamp } from "./activity-journal";
 
-/** Action types — what the person actually did, never a button name. */
+/**
+ * Business-language activity groups.
+ *
+ * The trail is read by shop managers, so every entry lands in one of these
+ * plain groups rather than a technical name like "interaction".
+ */
 export type AuditCategory =
   | "sale"
+  | "payment"
   | "refund"
-  | "booking"
-  | "cash"
+  | "drawer"
+  | "discount"
   | "inventory"
-  | "purchasing"
+  | "shift"
   | "member"
-  | "promotion"
-  | "staff"
   | "settings"
-  | "messaging"
-  | "session"
-  | "navigation"
-  | "interaction"
-  | "lookup"
+  | "security"
   | "report"
-  | "sync";
+  | "other";
 
 export const AUDIT_CATEGORIES: { value: AuditCategory; label: string }[] = [
-  { value: "sale", label: "Sale & payment" },
-  { value: "refund", label: "Refund & exchange" },
-  { value: "booking", label: "Booking & pay later" },
-  { value: "cash", label: "Cash drawer & shift" },
-  { value: "inventory", label: "Inventory & stock" },
-  { value: "purchasing", label: "Purchasing & receiving" },
-  { value: "member", label: "Member & loyalty" },
-  { value: "promotion", label: "Promotions & pricing" },
-  { value: "staff", label: "Staff & permissions" },
-  { value: "settings", label: "Settings & configuration" },
-  { value: "messaging", label: "Customer messaging" },
-  { value: "session", label: "Sign-in & session" },
-  { value: "navigation", label: "Moving around the app" },
-  { value: "interaction", label: "Screen interaction" },
-  { value: "lookup", label: "Search & lookup" },
+  { value: "sale", label: "Sales" },
+  { value: "payment", label: "Payments" },
+  { value: "refund", label: "Returns & exchanges" },
+  { value: "drawer", label: "No-sale & cash drawer" },
+  { value: "discount", label: "Discounts & coupons" },
+  { value: "inventory", label: "Inventory" },
+  { value: "shift", label: "Shifts & attendance" },
+  { value: "member", label: "Members" },
+  { value: "settings", label: "Settings" },
+  { value: "security", label: "Security & access" },
   { value: "report", label: "Reports & exports" },
-  { value: "sync", label: "Data sync" },
+  { value: "other", label: "Other activity" },
 ];
 
 export const AUDIT_CATEGORY_LABELS: Record<string, string> = Object.fromEntries(
@@ -48,9 +43,20 @@ export const AUDIT_CATEGORY_LABELS: Record<string, string> = Object.fromEntries(
 
 /** Legacy category names still stored in older local logs. */
 const LEGACY: Record<string, AuditCategory> = {
-  ui_click: "interaction",
-  modal: "interaction",
-  search: "lookup",
+  ui_click: "other",
+  modal: "other",
+  search: "other",
+  navigation: "other",
+  interaction: "other",
+  lookup: "other",
+  sync: "other",
+  messaging: "member",
+  booking: "sale",
+  cash: "drawer",
+  purchasing: "inventory",
+  promotion: "discount",
+  staff: "security",
+  session: "security",
   sale_event: "sale",
   inventory_edit: "inventory",
   member_event: "member",
@@ -63,21 +69,26 @@ const LEGACY: Record<string, AuditCategory> = {
 export function resolveCategory(raw: string, action: string): AuditCategory {
   const a = action.toLowerCase();
   if (/refund|exchange|void|return/.test(a)) return "refund";
-  if (/booking|pay later|deposit|part payment|collect/.test(a)) return "booking";
-  if (/shift|drawer|float|cash count/.test(a)) return "cash";
-  if (/whatsapp|message sent|sms/.test(a)) return "messaging";
-  if (/sign in|signed in|sign out|login|logout|locked|unlock|override/.test(a)) return "session";
-  if (/receiving|purchase order|supplier|barcode scanned/.test(a)) return "purchasing";
-  if (/promotion|discount policy|tier/.test(a)) return "promotion";
-  if (/staff|permission|role|cashier account/.test(a)) return "staff";
+  if (/drawer|no.?sale|cash count|float/.test(a)) return "drawer";
+  if (/shift|attendance|sign.?in|signed in|sign.?out/.test(a)) return "shift";
+  if (/whatsapp|message sent|sms/.test(a)) return "member";
+  if (/login|logout|locked|unlock|override|permission|role|staff|cashier account/.test(a))
+    return "security";
+  if (/receiving|purchase order|supplier|barcode scanned/.test(a)) return "inventory";
+  if (/coupon|voucher|promotion|discount|tier/.test(a)) return "discount";
+  if (/payment|transfer|tender|paid|card/.test(a)) return "payment";
   if (/export|report/.test(a)) return "report";
-  if (/bill|sale|payment|receipt printed/.test(a)) return "sale";
+  if (/bill|sale|booking|pay later|deposit|collect|receipt printed/.test(a)) return "sale";
   if (/stock|product|inventory|price/.test(a)) return "inventory";
   if (/member|points|loyalty/.test(a)) return "member";
   if (/setting/.test(a)) return "settings";
   if (LEGACY[raw]) return LEGACY[raw]!;
-  return (AUDIT_CATEGORY_LABELS[raw] ? (raw as AuditCategory) : "interaction");
+  return AUDIT_CATEGORY_LABELS[raw] ? (raw as AuditCategory) : "other";
 }
+
+/** Old records still carry retired category names — map them for display. */
+export const displayCategory = (c: string): AuditCategory =>
+  (AUDIT_CATEGORY_LABELS[c] ? (c as AuditCategory) : (LEGACY[c] ?? "other"));
 
 export type AuditLog = {
   id: string;

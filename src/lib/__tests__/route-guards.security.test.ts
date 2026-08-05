@@ -11,7 +11,14 @@ const routeFiles = readdirSync(ROUTES_DIR).filter(
 );
 
 /** Screens that must never render outside the permission-gated shell. */
-const PUBLIC_ROUTES = new Set(["display.tsx"]);
+/** Customer-facing screens: the display pole plus the member signup and
+ *  voucher pages served on the member./redeem. subdomains. */
+const PUBLIC_ROUTES = new Set([
+  "display.tsx",
+  "join.tsx",
+  "claim.$campaignSlug.tsx",
+  "c.$tokenSlug.tsx",
+]);
 
 describe("route guards", () => {
   it("every screen renders inside AppShell, which enforces login + permissions", () => {
@@ -38,7 +45,7 @@ describe("route guards", () => {
   /** Sidebar-only hiding is not a guard: a signed-in cashier can still type
    *  the URL. Every screen must have an entry in the AppShell route map. */
   it("every screen has a permission entry in the route guard map", () => {
-    const OPEN_ROUTES = new Set(["index.tsx", "display.tsx"]);
+    const OPEN_ROUTES = new Set(["index.tsx", ...PUBLIC_ROUTES]);
     const missing = routeFiles
       .filter((f) => !OPEN_ROUTES.has(f))
       .map((f) => `/${f.replace(/\.tsx$/, "").split(".")[0]}`)

@@ -42,7 +42,7 @@ export const Route = createFileRoute("/reports/activity")({
   component: ActivityReport,
 });
 
-const REGISTER = new Set(["sale", "refund", "cash", "booking", "promotion"]);
+const REGISTER = new Set(["sale", "payment", "refund", "drawer", "discount"]);
 
 function ActivityReport() {
   const logs = useAuditLogs();

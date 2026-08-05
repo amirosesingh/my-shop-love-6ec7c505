@@ -27,6 +27,8 @@ export function ReceiptPrinterSettings() {
     encoding: "cp437",
     lineEnding: "lf",
     margins: { top: 4, right: 4, bottom: 4, left: 4 },
+    printWidth: { "58mm": 48, "80mm": 72 },
+    printOffset: 0,
   });
   const [printers, setPrinters] = useState<{ name: string; displayName: string }[]>([]);
   const [testing, setTesting] = useState(false);
@@ -43,11 +45,25 @@ export function ReceiptPrinterSettings() {
   };
 
   const margins = prefs.margins ?? { top: 4, right: 4, bottom: 4, left: 4 };
+  const widths = prefs.printWidth ?? { "58mm": 48, "80mm": 72 };
   const setMargin = (side: keyof typeof margins, raw: string) => {
     const n = Number(raw);
     update({
       ...prefs,
       margins: { ...margins, [side]: Number.isFinite(n) ? Math.min(30, Math.max(0, n)) : 0 },
+    });
+  };
+
+  const setWidth = (paper: "58mm" | "80mm", raw: string) => {
+    const n = Number(raw);
+    const max = paper === "58mm" ? 58 : 80;
+    const min = paper === "58mm" ? 30 : 50;
+    update({
+      ...prefs,
+      printWidth: {
+        ...widths,
+        [paper]: Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : widths[paper],
+      },
     });
   };
 
@@ -173,6 +189,59 @@ export function ReceiptPrinterSettings() {
           Applies to every printed document — receipts, reports and slips — on all paper sizes.
           Increase the right margin if words are cut off at the edge, then use “Test receipt” to
           check the alignment.
+        </p>
+      </div>
+
+      <div className="mt-4 space-y-2">
+        <Label className="text-xs text-muted-foreground">Print width (mm)</Label>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="space-y-1">
+            <Label className="text-[11px] text-muted-foreground">58mm roll</Label>
+            <Input
+              type="number"
+              min={30}
+              max={58}
+              step={0.5}
+              value={widths["58mm"]}
+              onChange={(e) => setWidth("58mm", e.target.value)}
+              className="h-9 text-sm"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[11px] text-muted-foreground">80mm roll</Label>
+            <Input
+              type="number"
+              min={50}
+              max={80}
+              step={0.5}
+              value={widths["80mm"]}
+              onChange={(e) => setWidth("80mm", e.target.value)}
+              className="h-9 text-sm"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[11px] text-muted-foreground">Left nudge</Label>
+            <Input
+              type="number"
+              min={0}
+              max={20}
+              step={0.5}
+              value={prefs.printOffset ?? 0}
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                update({
+                  ...prefs,
+                  printOffset: Number.isFinite(n) ? Math.min(20, Math.max(0, n)) : 0,
+                });
+              }}
+              className="h-9 text-sm"
+            />
+          </div>
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          A 58mm roll only prints about 48mm of its width, and an 80mm roll about 72mm. If the left
+          side of the slip is cut off, lower the print width; if it prints too far left, add a small
+          nudge. “Test receipt” prints an edge ruler — both ends must be visible.
         </p>
       </div>
 

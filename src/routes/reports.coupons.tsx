@@ -89,7 +89,7 @@ function CouponReport() {
   const allRows = useMemo<Row[]>(() => {
     // Applications, removals and item-level hits come from the audit trail.
     const events: Row[] = logs
-      .filter((l) => l.category === "promotion" && /coupon/i.test(l.action))
+      .filter((l) => l.category === "discount" && /coupon/i.test(l.action))
       .filter((l) => inRange(l.at, from, to))
       .map((l) => {
         const d = l.details as Record<string, unknown>;

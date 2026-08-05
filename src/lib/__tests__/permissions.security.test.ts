@@ -37,6 +37,7 @@ const WAREHOUSE_ALLOWED: PermissionKey[] = [
   "can_adjust_stock",
   "can_create_transfer",
   "can_receive_transfer",
+  "can_approve_transfer",
   "can_manage_locations",
 ];
 

@@ -103,6 +103,9 @@ export function useUiScale(): number {
   useEffect(() => {
     document.documentElement.style.setProperty("--pos-scale", String(scale));
     document.documentElement.style.setProperty("--pos-text-scale", String(textScale));
+    // Text size drives the root font size, so headings, tables, dialogs and
+    // menus all resize together — not just the scaled register shell.
+    document.documentElement.style.fontSize = `${Math.round(16 * textScale)}px`;
     document.documentElement.classList.toggle("pos-compact", density === "compact");
   }, [scale, textScale, density]);
 

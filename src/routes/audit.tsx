@@ -11,7 +11,6 @@ import {
   Tag,
   MousePointerClick,
   Compass,
-  Search as SearchIcon,
   PanelTop,
   UserRound,
   Settings2,
@@ -50,6 +49,7 @@ import {
 import {
   AUDIT_CATEGORIES,
   AUDIT_CATEGORY_LABELS,
+  displayCategory,
   auditToCsv,
   logger,
   useAuditLogs,
@@ -87,31 +87,26 @@ const categoryVisual: Record<
   { icon: typeof ShoppingCart; className: string }
 > = {
   sale: { icon: ShoppingCart, className: "bg-emerald-500/15 text-emerald-500" },
+  payment: { icon: ShoppingCart, className: "bg-teal-500/15 text-teal-500" },
   refund: { icon: RefreshCw, className: "bg-orange-500/15 text-orange-500" },
-  booking: { icon: ShoppingCart, className: "bg-cyan-500/15 text-cyan-500" },
-  cash: { icon: ShoppingCart, className: "bg-lime-500/15 text-lime-500" },
+  drawer: { icon: ShoppingCart, className: "bg-lime-500/15 text-lime-500" },
+  discount: { icon: Tag, className: "bg-pink-500/15 text-pink-400" },
   inventory: { icon: Tag, className: "bg-sky-500/15 text-sky-500" },
-  purchasing: { icon: Tag, className: "bg-blue-500/15 text-blue-400" },
+  shift: { icon: Compass, className: "bg-cyan-500/15 text-cyan-500" },
   member: { icon: UserRound, className: "bg-violet-500/15 text-violet-500" },
-  promotion: { icon: Tag, className: "bg-pink-500/15 text-pink-400" },
-  staff: { icon: UserRound, className: "bg-rose-500/15 text-rose-400" },
-  messaging: { icon: RefreshCw, className: "bg-green-500/15 text-green-500" },
-  session: { icon: UserRound, className: "bg-yellow-500/15 text-yellow-500" },
+  security: { icon: UserRound, className: "bg-rose-500/15 text-rose-400" },
   report: { icon: PanelTop, className: "bg-indigo-500/15 text-indigo-400" },
-  lookup: { icon: SearchIcon, className: "bg-slate-500/15 text-slate-400" },
   settings: { icon: Settings2, className: "bg-amber-500/15 text-amber-500" },
-  sync: { icon: RefreshCw, className: "bg-orange-500/15 text-orange-500" },
-  navigation: { icon: Compass, className: "bg-teal-500/15 text-teal-500" },
-  interaction: { icon: MousePointerClick, className: "bg-muted text-muted-foreground" },
+  other: { icon: MousePointerClick, className: "bg-muted text-muted-foreground" },
 };
 
 const visualFor = (l: AuditLog) => {
   if (l.action.toLowerCase().includes("exchange"))
     return { icon: RefreshCw, className: "bg-orange-500/15 text-orange-500" };
-  return categoryVisual[l.category] ?? categoryVisual["interaction"]!;
+  return categoryVisual[displayCategory(l.category)] ?? categoryVisual["other"]!;
 };
 
-const categoryLabel = (c: string) => AUDIT_CATEGORY_LABELS[c] ?? c;
+const categoryLabel = (c: string) => AUDIT_CATEGORY_LABELS[displayCategory(c)] ?? c;
 
 const dayStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 
@@ -142,7 +137,7 @@ function AuditPage() {
         if (to && t > new Date(`${to}T23:59:59`).getTime()) return false;
       }
       if (who !== "all" && l.staffId !== who) return false;
-      if (category !== "all" && l.category !== category) return false;
+      if (category !== "all" && displayCategory(l.category) !== category) return false;
       if (
         text &&
         !`${describeLog(l)} ${l.action} ${l.module} ${l.staffName} ${l.staffId} ${l.route} ${JSON.stringify(
