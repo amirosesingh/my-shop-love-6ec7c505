@@ -44,7 +44,7 @@ import { branchPolicy } from "./branch-policy";
 import { setActiveBranchSyncPolicy } from "./sync-policy";
 import { setPosFormats, setPosTimeZone } from "./time-zone";
 import { receiveTransferInDb, saveTransfer, setTransferStatus } from "./stock-transfers";
-import { loadBookings, saveBookingQuietly } from "./bookings-db";
+import { commitBooking, loadBookings, saveBookingQuietly } from "./bookings-db";
 
 const KEY = "pos-state-v2";
 
