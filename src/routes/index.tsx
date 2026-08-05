@@ -1335,7 +1335,7 @@ function Register() {
                 variant="ghost"
                 size="sm"
                 disabled={!lines.length}
-                onClick={() => void clearCart()}
+                onClick={() => void clearCart("clear")}
               >
                 <Trash2 className="size-4" /> Clear
               </Button>
