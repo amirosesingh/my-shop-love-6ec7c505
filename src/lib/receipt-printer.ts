@@ -47,6 +47,14 @@ export type PrinterPrefs = {
   lineEnding?: SlipLineEnding;
   /** Page margins in millimetres applied to every printed document. */
   margins?: { top: number; right: number; bottom: number; left: number };
+  /**
+   * Real printable band of the roll, per paper size, in millimetres.
+   * 58mm rolls only print about 48mm; 80mm rolls about 72mm. A printer that
+   * starts a few millimetres further right can be nudged with `printOffset`.
+   */
+  printWidth?: { "58mm": number; "80mm": number };
+  /** Left nudge in millimetres applied to slip printing. */
+  printOffset?: number;
 };
 
 const EMPTY: PrinterPrefs = {
@@ -57,6 +65,8 @@ const EMPTY: PrinterPrefs = {
   encoding: "cp437",
   lineEnding: "lf",
   margins: { top: 4, right: 4, bottom: 4, left: 4 },
+  printWidth: { "58mm": 48, "80mm": 72 },
+  printOffset: 0,
 };
 
 const mm = (v: unknown, fallback: number) => {
@@ -76,6 +86,19 @@ function normalizeMargins(v: unknown): NonNullable<PrinterPrefs["margins"]> {
 }
 
 const ENCODINGS: SlipEncoding[] = ["ascii", "cp437", "cp850", "cp858", "utf8"];
+
+function normalizeWidths(v: unknown): NonNullable<PrinterPrefs["printWidth"]> {
+  const w = (v ?? {}) as Partial<NonNullable<PrinterPrefs["printWidth"]>>;
+  const clamp = (n: unknown, fallback: number, min: number, max: number) => {
+    const x = typeof n === "number" ? n : Number(n);
+    if (!Number.isFinite(x)) return fallback;
+    return Math.min(max, Math.max(min, Math.round(x * 10) / 10));
+  };
+  return {
+    "58mm": clamp(w["58mm"], 48, 30, 58),
+    "80mm": clamp(w["80mm"], 72, 50, 80),
+  };
+}
 
 function normalizeEncoding(v: unknown): SlipEncoding {
   return ENCODINGS.includes(v as SlipEncoding) ? (v as SlipEncoding) : "cp437";
@@ -112,6 +135,8 @@ export function getPrinterPrefs(): PrinterPrefs {
       encoding: normalizeEncoding(parsed.encoding),
       lineEnding: normalizeLineEnding(parsed.lineEnding),
       margins: normalizeMargins(parsed.margins),
+      printWidth: normalizeWidths(parsed.printWidth),
+      printOffset: mm(parsed.printOffset, 0),
     };
   } catch {
     return EMPTY;
