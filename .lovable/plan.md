@@ -27,7 +27,7 @@ Applied across the register action bar, cart rows, catalog panel header, invento
 
 ## 4. Branch stock and catalogue as real, tracked data
 
-Today the private-stock / private-catalogue switches and product ownership live inside a settings JSON blob, which is why nothing is queryable or auditable.
+Products themselves are already real database rows in the `products` table. What is not: each product's per-branch stock is packed into a `stock_by_store` JSON field on that row, and the private-stock / private-catalogue switches plus product ownership sit inside the settings JSON blob — which is why per-branch stock and branch rules cannot be queried, reported on or audited.
 
 Move them to proper database tables — the secure route: no table is created on the fly from the browser, the app writes rows, not schema.
 
