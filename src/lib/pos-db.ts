@@ -590,12 +590,12 @@ export type CommitTarget = "cloud" | "local" | "outbox";
  * action — nothing moves on while the data is still only in memory.
  */
 export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitTarget> {
-  if (!ops.length) return "cloud";
+  if (!ops.length) return noteCommitTarget("cloud");
 
   // Android / live-only: the backend is the single source of truth.
   if (isLiveOnly()) {
     for (const op of ops) await runOpLive(context, op);
-    return "cloud";
+    return noteCommitTarget("cloud");
   }
 
   // Windows desktop: the local SQL Server instance is the source of truth.
@@ -605,7 +605,7 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
       const res = await bridge.write(context, op);
       if (!res.ok) throw new Error(res.error ?? `${context} could not be stored locally`);
     }
-    return "local";
+    return noteCommitTarget("local");
   }
 
   // Browser: queue to disk first (durable), then try to push it up now.
@@ -621,7 +621,7 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
   const remaining = listQueue().filter((q) => ids.includes(q.id));
   const stuck = remaining.find((q) => q.quarantined);
   if (stuck) throw new Error(stuck.lastError ?? `${context} failed`);
-  return remaining.length ? "outbox" : "cloud";
+  return noteCommitTarget(remaining.length ? "outbox" : "cloud");
 }
 
 /** Human wording for a completed commit. */
