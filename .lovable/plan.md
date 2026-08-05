@@ -8,6 +8,7 @@ Today the update card only knows about the Windows updater, so on Android it rep
 - Make the update settings card detect the platform and, on Android, show installed version, latest version from the update feed, download progress and an Install button.
 - Show a real error message when the feed can't be reached instead of "not supported".
 - Keep Windows and browser behaviour unchanged.
+- The Android feed lives at https://updatecms.luckycharmsdnbhd.com/pos-app/android/ and stays the source for version checks and downloads.
 
 ## 3. Cash drawer reason
 - Replace the reason dropdown on manual drawer opens with a required free-text field (trimmed, minimum a few characters).
