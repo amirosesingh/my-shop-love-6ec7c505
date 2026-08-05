@@ -10,6 +10,7 @@ import {
   MessageCircle,
   MonitorCog,
   MonitorSmartphone,
+  Smartphone,
   DownloadCloud,
   ArrowLeft,
   Printer,
