@@ -133,16 +133,25 @@ type Ctx = {
   setCurrentStore: (id: string) => void;
   upsertStore: (store: Store) => void;
   removeStore: (id: string) => void;
-  openShift: (cashier: string, openingFloat: number) => void;
-  closeShift: (countedCash: number, note: string) => Shift | null;
+  openShift: (cashier: string, openingFloat: number) => Promise<void>;
+  closeShift: (countedCash: number, note: string) => Promise<Shift | null>;
   activeShift: Shift | null;
-  recordSale: (sale: Omit<Sale, "id" | "receiptNo" | "createdAt">) => Sale;
+  recordSale: (sale: Omit<Sale, "id" | "receiptNo" | "createdAt">) => Promise<Sale>;
   refundSale: (saleId: string) => void;
   changeSalePayment: (saleId: string, method: PaymentMethod, reason?: string) => void;
-  createBooking: (input: NewBooking) => Booking;
+  createBooking: (input: NewBooking) => Promise<Booking>;
   setBookingJobStatus: (id: string, status: JobStatus, who: string) => Booking | null;
-  addBookingPayment: (id: string, amount: number, method: PaymentMethod, cashier: string) => Booking | null;
-  collectBooking: (id: string, amount: number, method: PaymentMethod) => { booking: Booking; sale: Sale } | null;
+  addBookingPayment: (
+    id: string,
+    amount: number,
+    method: PaymentMethod,
+    cashier: string,
+  ) => Promise<Booking | null>;
+  collectBooking: (
+    id: string,
+    amount: number,
+    method: PaymentMethod,
+  ) => Promise<{ booking: Booking; sale: Sale } | null>;
   cancelBooking: (id: string, reason: string) => void;
   upsertProduct: (product: Product) => void;
   removeProduct: (id: string) => void;
