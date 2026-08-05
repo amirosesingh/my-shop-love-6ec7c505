@@ -2829,7 +2829,9 @@ function Register() {
             <Button variant="outline" onClick={() => setBookOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={() => void bookAndPayLater()}>Reserve &amp; print slip</Button>
+            <Button onClick={() => void bookAndPayLater()} disabled={saving}>
+              {saving ? "Saving…" : "Reserve & print slip"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
