@@ -87,7 +87,7 @@ function ServicesForm() {
       </div>
 
       {services.map((s) => (
-        <div key={s.id} className="grid gap-3 rounded-md border border-border p-3 sm:grid-cols-[1fr_140px_auto_auto]">
+        <div key={s.id} className="grid gap-3 rounded-md border border-border p-3 sm:grid-cols-[1fr_140px_auto_auto_auto]">
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Service</Label>
             <Input
@@ -112,6 +112,14 @@ function ServicesForm() {
               onCheckedChange={(v) => patch(s.id, { active: v })}
             />
             Active
+          </label>
+          <label className="flex items-end gap-2 pb-2 text-xs text-muted-foreground">
+            <Switch
+              aria-label={`${s.name || "Service"} is a racket or stringing job`}
+              checked={!!s.isStringingJob}
+              onCheckedChange={(v) => patch(s.id, { isStringingJob: v })}
+            />
+            Racket / stringing job
           </label>
           <Button
             size="icon"

@@ -635,6 +635,8 @@ export type BookingServiceType = {
   name: string;
   fee: number;
   active: boolean;
+  /** Racket / stringing work — opens the job card instead of needing cart items. */
+  isStringingJob?: boolean;
 };
 
 /** How one branch shares stock, catalogue and sync with the rest of the group. */
