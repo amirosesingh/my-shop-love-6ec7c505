@@ -125,6 +125,7 @@ export const rowToStore = (r: Row): Store => ({
   name: r.name ?? "",
   address: r.address ?? "",
   phone: r.phone ?? "",
+  groupId: r.group_id ?? "default",
 });
 
 export const storeToRow = (s: Store): Row => ({
@@ -133,6 +134,7 @@ export const storeToRow = (s: Store): Row => ({
   name: s.name,
   address: s.address || null,
   phone: s.phone || null,
+  group_id: s.groupId?.trim() || "default",
 });
 
 const promotionToRow = (p: Promotion): Row => ({

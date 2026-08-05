@@ -166,6 +166,20 @@ function Locations() {
                   -000123, keeping every branch unique. Leave blank to use the store code.
                 </p>
               </div>
+              <div className="space-y-1">
+                <Label className="text-[11px] text-muted-foreground">Group / cluster</Label>
+                <Input
+                  value={s.groupId ?? ""}
+                  onChange={(e) => upsertStore({ ...s, groupId: e.target.value.trim() })}
+                  placeholder="default"
+                  className="h-9"
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Branches sharing a group move stock as an internal transfer. Sending to a
+                  different group is an inter-group transfer and re-maps the item into that
+                  group's catalogue on arrival.
+                </p>
+              </div>
               <Input
                 value={s.address}
                 onChange={(e) => upsertStore({ ...s, address: e.target.value })}
