@@ -899,50 +899,65 @@ function Register() {
     setPayOpen(true);
   }
 
-  function holdOrder() {
-    if (!lines.length) return;
+  /** Park the open ticket with everything on it, so reopening is lossless. */
+  function holdOrder(silent = false) {
+    if (!lines.length) return null;
     const snapshot = lines;
     const id = `H${Date.now()}`;
-    setHeldOrders((hs) => [
-      ...hs,
-      {
-        id,
-        label: `${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · ${snapshot.length} item(s)`,
-        total: totals.total,
-        lines: snapshot,
-        heldAt: new Date().toISOString(),
-      },
-    ]);
-    logger.log("sale", "Order put on hold", "register", {
+    const order: HeldOrder = {
+      id,
+      label: `${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · ${snapshot.length} item(s)`,
+      total: totals.total,
+      lines: snapshot,
+      heldAt: new Date().toISOString(),
+      storeId: currentStore.id,
+      heldBy: activeCashier,
+      cartDiscount,
+      cartDiscountType,
+      exchangeRef,
+      memberId,
+      memberName: member?.name ?? null,
+      coupon,
+    };
+    setHeldOrders((hs) => [...hs, order]);
+    logTicketEvent(TICKET_ACTIONS.held, {
       holdRef: id,
       lines: snapshot.length,
       value: totals.total,
       storeId: currentStore.id,
       memberId,
+      member: member?.name ?? null,
       items: snapshot.map((l) => ({ name: l.name, qty: l.qty, price: l.price })),
     });
     resetCart();
-    toast.success("Order held — resume it from the operation deck");
+    if (!silent) toast.success("Order held — reopen it from Hold tickets");
+    return order;
   }
 
+  /** Reopen a parked ticket. An open ticket is parked first, so the cashier
+   *  can switch between drafts without losing either one. */
   function resumeHeld(id: string) {
     const order = held.find((h) => h.id === id);
     if (!order) return;
-    if (lines.length) {
-      toast.error("Clear or hold the current ticket first");
-      return;
-    }
+    const parked = lines.length ? holdOrder(true) : null;
     setLines(order.lines);
+    setCartDiscount(order.cartDiscount ?? 0);
+    setCartDiscountType(order.cartDiscountType ?? "amount");
+    setExchangeRef(order.exchangeRef ?? null);
+    setMemberId(order.memberId ?? null);
+    setCoupon((order.coupon as typeof coupon) ?? null);
     removeHeldOrder(id);
-    logger.log("sale", "Held order resumed", "register", {
+    logTicketEvent(parked ? TICKET_ACTIONS.switched : TICKET_ACTIONS.resumed, {
       holdRef: order.id,
+      parkedRef: parked?.id ?? null,
       lines: order.lines.length,
       value: order.total,
       heldAt: order.heldAt,
+      heldBy: order.heldBy ?? null,
       heldForSeconds: Math.round((Date.now() - new Date(order.heldAt).getTime()) / 1000),
       storeId: currentStore.id,
     });
-    toast.success("Held order resumed");
+    toast.success(parked ? "Switched ticket — the previous one is on hold" : "Held order resumed");
   }
 
   async function applyCoupon() {
