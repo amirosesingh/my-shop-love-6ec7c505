@@ -8,6 +8,7 @@
  * allow it.
  */
 import { stamp } from "./activity-journal";
+import { isLiveOnly } from "./live-mode";
 
 export type Row = Record<string, unknown>;
 
@@ -47,7 +48,8 @@ const listeners = new Set<Listener>();
 const isBrowser = () => typeof window !== "undefined";
 
 function read(): QueuedOp[] {
-  if (!isBrowser()) return [];
+  // The phone never queues: writes go straight to the backend.
+  if (!isBrowser() || isLiveOnly()) return [];
   try {
     return JSON.parse(window.localStorage.getItem(QUEUE_KEY) ?? "[]") as QueuedOp[];
   } catch {
@@ -56,7 +58,10 @@ function read(): QueuedOp[] {
 }
 
 function write(queue: QueuedOp[]) {
-  if (!isBrowser()) return;
+  if (!isBrowser() || isLiveOnly()) {
+    for (const l of listeners) l();
+    return;
+  }
   try {
     window.localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
   } catch {
