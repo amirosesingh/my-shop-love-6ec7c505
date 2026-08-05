@@ -804,6 +804,27 @@ export function PosProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  /** Correct the tender recorded on a completed bill (e.g. rung up as card). */
+  const changeSalePayment = useCallback(
+    (saleId: string, method: PaymentMethod, reason?: string) => {
+      const sale = stateRef.current.sales.find((x) => x.id === saleId);
+      if (!sale || sale.method === method) return;
+      logger.log("sale_event", "Bill payment method corrected", "receipts", {
+        saleId,
+        receiptNo: sale.receiptNo,
+        from: sale.method,
+        to: method,
+        reason: reason ?? null,
+      });
+      void db.updateSalePayment(saleId, method);
+      setState((s) => ({
+        ...s,
+        sales: s.sales.map((x) => (x.id === saleId ? { ...x, method } : x)),
+      }));
+    },
+    [],
+  );
+
   const upsertProduct = useCallback((product: Product) => {
     const prev = stateRef.current.products.find((p) => p.id === product.id);
     // The catalog is shared by every branch: make sure the product exists at
