@@ -88,6 +88,15 @@ jobs:
             "$v" "$v" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > android-release/latest.json
           echo "version=$v" >> "$GITHUB_OUTPUT"
 
+      - name: Stage the live web bundle
+        if: ${{ !inputs.app_url }}
+        run: |
+          mkdir -p android-web
+          v="${{ steps.meta.outputs.version }}"
+          (cd capacitor-shell && zip -qr "../android-web/web-$v.zip" .)
+          printf '{"version":"%s","file":"web-%s.zip","released":"%s"}\n' \
+            "$v" "$v" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > android-web/latest.json
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
@@ -102,6 +111,16 @@ jobs:
           AWS_DEFAULT_REGION: auto
         run: |
           aws s3 sync android-release s3://updatelccms/pos-app/android \
+            --endpoint-url ${{ secrets.R2_ENDPOINT }}
+
+      - name: Deploy the live web bundle to Cloudflare R2
+        if: ${{ !inputs.app_url }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          aws s3 sync android-web s3://updatelccms/pos-app/android/web \
             --endpoint-url ${{ secrets.R2_ENDPOINT }}
 
       - name: Attach APK to the GitHub release
