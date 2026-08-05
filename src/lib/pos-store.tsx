@@ -1048,7 +1048,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     const previous = stateRef.current.promotions.find((p) => p.id === promotion.id);
     logger.log("promotion", previous ? "Promotion updated" : "Promotion created", "promotions", {
       promotionId: promotion.id,
-      title: promotion.title,
+      name: promotion.name,
       active: promotion.active,
     });
     void db.upsertPromotion(promotion);
@@ -1064,7 +1064,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     const promotion = stateRef.current.promotions.find((p) => p.id === id);
     logger.log("promotion", "Promotion deleted", "promotions", {
       promotionId: id,
-      title: promotion?.title ?? null,
+      name: promotion?.name ?? null,
     });
     void db.deletePromotion(id);
     setState((s) => ({ ...s, promotions: s.promotions.filter((p) => p.id !== id) }));
@@ -1076,7 +1076,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       if (p) {
         logger.log("promotion", active ? "Promotion enabled" : "Promotion disabled", "promotions", {
           promotionId: id,
-          title: p.title,
+          name: p.name,
         });
         void db.upsertPromotion({ ...p, active });
       }
@@ -1136,7 +1136,6 @@ export function PosProvider({ children }: { children: ReactNode }) {
       transferId: transfer.id,
       ref: transfer.ref,
       kind: transfer.kind,
-      scope: transfer.scope,
       fromStoreId: transfer.fromStoreId,
       toStoreId: transfer.toStoreId,
       itemCount: transfer.items.length,
