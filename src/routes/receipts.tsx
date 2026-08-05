@@ -20,6 +20,7 @@ import { money, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
 import { useUserPermissions } from "@/lib/pos-permissions";
 import { logger } from "@/lib/audit-log";
+import { holdCancelledBill } from "@/lib/held-orders";
 import {
   printSaleReceipt,
   printShiftReport,
@@ -137,9 +138,16 @@ function ReceiptVault() {
       return;
     }
     refundSale(selected.id);
+    holdCancelledBill({
+      receiptNo: selected.receiptNo,
+      total: selected.total,
+      lines: selected.lines,
+    });
     logActivity(selected, reason);
     setCancelOpen(false);
-    toast.success(`Bill ${selected.receiptNo} cancelled and stock returned`);
+    toast.success(
+      `Bill ${selected.receiptNo} cancelled — the items are waiting on the register's hold list`,
+    );
   }
 
   function logActivity(sale: Sale, reason: string) {
