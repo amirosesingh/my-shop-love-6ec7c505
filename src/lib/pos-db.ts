@@ -628,6 +628,14 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
 export const commitLabel = (t: CommitTarget) =>
   t === "cloud" ? "Saved" : t === "local" ? "Saved on this terminal" : "Saved offline — will sync";
 
+let lastTarget: CommitTarget = "cloud";
+/** Where the most recent successful commit landed (for the "Saved…" note). */
+export const lastCommitTarget = () => lastTarget;
+export const noteCommitTarget = (t: CommitTarget) => {
+  lastTarget = t;
+  return t;
+};
+
 export const db = {
   upsertProduct: (p: Product) =>
     queue("Saving product", { kind: "upsert", table: "products", rows: [productToRow(p)] }),
