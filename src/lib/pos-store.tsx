@@ -967,6 +967,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       },
     }));
   }, []);
+  updateSettingsRef.current = updateSettings;
 
   const createTransfer = useCallback((input: NewTransfer) => {
     const now = new Date().toISOString();
