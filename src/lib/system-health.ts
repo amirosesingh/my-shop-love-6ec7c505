@@ -131,35 +131,59 @@ export function checkRealtime(timeoutMs = 6000): Promise<ServiceCheck> {
   });
 }
 
-/** Are the public member / redeem subdomains serving? */
-export async function checkSubdomains(domains: string[]): Promise<ServiceCheck> {
+/** Accept "member.example.com" as well as a full URL. */
+export function normaliseDomain(input: string): { url: string; host: string } | null {
+  const raw = (input ?? "").trim();
+  if (!raw) return null;
+  try {
+    const url = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+    return { url: url.origin, host: url.hostname };
+  } catch {
+    return null;
+  }
+}
+
+/** Is one public domain serving? One check per domain so the UI can name it. */
+export async function checkDomain(input: string, label: string): Promise<ServiceCheck> {
   const started = Date.now();
-  const results = await Promise.all(
-    domains.map(async (d) => {
-      try {
-        await fetch(d, { mode: "no-cors", cache: "no-store" });
-        return true;
-      } catch {
-        return false;
-      }
-    }),
-  );
-  const okCount = results.filter(Boolean).length;
-  const state: ServiceState =
-    okCount === results.length ? "ok" : okCount > 0 ? "degraded" : "down";
-  const detail =
-    state === "ok"
-      ? "Member signup and voucher redemption pages responding."
-      : `${results.length - okCount} of ${results.length} public domains did not respond.`;
-  if (state !== "ok") recordError("subdomains", "DOMAIN_UNREACHABLE", detail);
-  return {
-    id: "subdomains",
-    label: "Public subdomains",
-    state,
-    detail,
-    latency: Date.now() - started,
-    at: now(),
-  };
+  const parsed = normaliseDomain(input);
+  const base = { id: `domain:${parsed?.host ?? label}`, label, at: now() };
+
+  if (!parsed) {
+    return {
+      ...base,
+      state: "down",
+      detail: `"${input}" is not a valid address — fix it in Subdomains & API configuration.`,
+    };
+  }
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    return {
+      ...base,
+      url: parsed.url,
+      state: "degraded",
+      detail: `Unknown — this terminal is offline, so ${parsed.host} could not be tested.`,
+    };
+  }
+  try {
+    await fetch(parsed.url, { mode: "no-cors", cache: "no-store" });
+    return {
+      ...base,
+      url: parsed.url,
+      state: "ok",
+      detail: `${parsed.host} is responding.`,
+      latency: Date.now() - started,
+    };
+  } catch {
+    const detail = `${parsed.host} did not respond — check the domain is connected and its DNS records are live.`;
+    recordError(base.id, "DOMAIN_UNREACHABLE", detail);
+    return {
+      ...base,
+      url: parsed.url,
+      state: "down",
+      detail,
+      latency: Date.now() - started,
+    };
+  }
 }
 
 /** Anything still waiting to be pushed up from this terminal? */
