@@ -1875,7 +1875,15 @@ function Register() {
             </div>
             {held.length > 0 && (
               <div className="mt-2 space-y-1">
-                <p className="text-[11px] text-muted-foreground">Held orders ({held.length})</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] text-muted-foreground">Held orders ({held.length})</p>
+                  <Link
+                    to="/holds"
+                    className="text-[11px] font-medium text-primary hover:underline"
+                  >
+                    Hold tickets
+                  </Link>
+                </div>
                 {held.map((h) => (
                   <button
                     key={h.id}
