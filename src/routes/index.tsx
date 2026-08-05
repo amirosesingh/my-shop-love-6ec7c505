@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BadgeCheck,
@@ -64,7 +64,8 @@ import { BOOKING_TIMING_LABELS, type BookingPaymentTiming } from "@/lib/pos-type
 import { useUserPermissions } from "@/lib/pos-permissions";
 import { useVisibility } from "@/lib/ui-visibility";
 import { useUiScale } from "@/lib/use-ui-scale";
-import { removeHeldOrder, setHeldOrders, useHeldOrders } from "@/lib/held-orders";
+import { removeHeldOrder, setHeldOrders, useHeldOrders, type HeldOrder } from "@/lib/held-orders";
+import { TICKET_ACTIONS, logTicketEvent } from "@/lib/ticket-audit";
 import {
   discountLabel,
   loadMemberVouchers,
@@ -110,6 +111,10 @@ const isoDaysFromNow = (days: number) =>
   new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
 
 export const Route = createFileRoute("/")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    /** hold ticket id to reopen, set by the Hold tickets screen */
+    resume: typeof search['resume'] === "string" ? (search['resume'] as string) : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Register — Northwind POS" },
@@ -447,14 +452,15 @@ function Register() {
     clearCartDraft(currentStore.id);
   }
 
-  async function clearCart() {
+  async function clearCart(source: "clear" | "void" = "void") {
     if (lines.length && !(await requirePermission("can_void_cart"))) return;
     if (lines.length) {
-      logger.log("refund", "Cart voided", "register", {
+      logTicketEvent(source === "clear" ? TICKET_ACTIONS.cleared : TICKET_ACTIONS.voided, {
         lines: lines.length,
         value: totals.total,
         coupon: coupon?.code ?? null,
         storeId: currentStore.id,
+        member: member?.name ?? null,
         items: lines.map((l) => ({ name: l.name, qty: l.qty, price: l.price })),
       });
     }
@@ -897,51 +903,76 @@ function Register() {
     setPayOpen(true);
   }
 
-  function holdOrder() {
-    if (!lines.length) return;
+  /** Park the open ticket with everything on it, so reopening is lossless. */
+  function holdOrder(silent = false) {
+    if (!lines.length) return null;
     const snapshot = lines;
     const id = `H${Date.now()}`;
-    setHeldOrders((hs) => [
-      ...hs,
-      {
-        id,
-        label: `${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · ${snapshot.length} item(s)`,
-        total: totals.total,
-        lines: snapshot,
-        heldAt: new Date().toISOString(),
-      },
-    ]);
-    logger.log("sale", "Order put on hold", "register", {
+    const order: HeldOrder = {
+      id,
+      label: `${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · ${snapshot.length} item(s)`,
+      total: totals.total,
+      lines: snapshot,
+      heldAt: new Date().toISOString(),
+      storeId: currentStore.id,
+      heldBy: activeCashier,
+      cartDiscount,
+      cartDiscountType,
+      exchangeRef,
+      memberId,
+      memberName: member?.name ?? null,
+      coupon,
+    };
+    setHeldOrders((hs) => [...hs, order]);
+    logTicketEvent(TICKET_ACTIONS.held, {
       holdRef: id,
       lines: snapshot.length,
       value: totals.total,
       storeId: currentStore.id,
       memberId,
+      member: member?.name ?? null,
       items: snapshot.map((l) => ({ name: l.name, qty: l.qty, price: l.price })),
     });
     resetCart();
-    toast.success("Order held — resume it from the operation deck");
+    if (!silent) toast.success("Order held — reopen it from Hold tickets");
+    return order;
   }
 
+  /** Reopen a parked ticket. An open ticket is parked first, so the cashier
+   *  can switch between drafts without losing either one. */
   function resumeHeld(id: string) {
     const order = held.find((h) => h.id === id);
     if (!order) return;
-    if (lines.length) {
-      toast.error("Clear or hold the current ticket first");
-      return;
-    }
+    const parked = lines.length ? holdOrder(true) : null;
     setLines(order.lines);
+    setCartDiscount(order.cartDiscount ?? 0);
+    setCartDiscountType(order.cartDiscountType ?? "amount");
+    setExchangeRef(order.exchangeRef ?? null);
+    setMemberId(order.memberId ?? null);
+    setCoupon((order.coupon as typeof coupon) ?? null);
     removeHeldOrder(id);
-    logger.log("sale", "Held order resumed", "register", {
+    logTicketEvent(parked ? TICKET_ACTIONS.switched : TICKET_ACTIONS.resumed, {
       holdRef: order.id,
+      parkedRef: parked?.id ?? null,
       lines: order.lines.length,
       value: order.total,
       heldAt: order.heldAt,
+      heldBy: order.heldBy ?? null,
       heldForSeconds: Math.round((Date.now() - new Date(order.heldAt).getTime()) / 1000),
       storeId: currentStore.id,
     });
-    toast.success("Held order resumed");
+    toast.success(parked ? "Switched ticket — the previous one is on hold" : "Held order resumed");
   }
+
+  /** Arriving from the Hold tickets screen with ?resume=<id>. */
+  const { resume } = Route.useSearch();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (!resume) return;
+    resumeHeld(resume);
+    void navigate({ to: "/", search: {}, replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resume]);
 
   async function applyCoupon() {
     const code = couponCode.trim();
@@ -1318,7 +1349,7 @@ function Register() {
                 variant="ghost"
                 size="sm"
                 disabled={!lines.length}
-                onClick={() => void clearCart()}
+                onClick={() => void clearCart("clear")}
               >
                 <Trash2 className="size-4" /> Clear
               </Button>
@@ -1712,10 +1743,11 @@ function Register() {
                         state.members.find((m) => m.id === lastSale.memberId) ?? null,
                         "duplicate",
                       );
-                      logger.log("print", "Receipt reprinted", "register", {
+                      logTicketEvent(TICKET_ACTIONS.reprinted, {
                         saleId: lastSale.id,
                         receiptNo: lastSale.receiptNo,
                         template: "duplicate",
+                        storeId: currentStore.id,
                       });
                     }}
                   />
@@ -1806,7 +1838,7 @@ function Register() {
                 icon={<PauseCircle className="size-4" />}
                 disabled={!lines.length || tillLocked}
                 disabledReason={tillLocked ? lockedReason : undefined}
-                onClick={holdOrder}
+                onClick={() => holdOrder()}
               />
               )}
               <ActionButton
@@ -1843,7 +1875,15 @@ function Register() {
             </div>
             {held.length > 0 && (
               <div className="mt-2 space-y-1">
-                <p className="text-[11px] text-muted-foreground">Held orders ({held.length})</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] text-muted-foreground">Held orders ({held.length})</p>
+                  <Link
+                    to="/holds"
+                    className="text-[11px] font-medium text-primary hover:underline"
+                  >
+                    Hold tickets
+                  </Link>
+                </div>
                 {held.map((h) => (
                   <button
                     key={h.id}

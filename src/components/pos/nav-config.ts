@@ -5,6 +5,7 @@ import {
   Landmark,
   ListPlus,
   MessageCircle,
+  PauseCircle,
   MonitorCog,
   MonitorSmartphone,
   QrCode,
@@ -88,6 +89,13 @@ export const navGroups: NavGroup[] = [
         flag: "can_manage_bookings",
         keywords: "layaway reserve deposit balance due collect",
         blurb: "Deposits, balances due and collections.",
+      },
+      {
+        to: "/holds",
+        label: "Hold Tickets",
+        icon: PauseCircle,
+        keywords: "held parked draft ticket resume switch park",
+        blurb: "Reopen parked tickets and see who cleared or voided them.",
       },
       {
         to: "/display",
