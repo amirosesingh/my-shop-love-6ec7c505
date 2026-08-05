@@ -130,6 +130,7 @@ type Ctx = {
   activeShift: Shift | null;
   recordSale: (sale: Omit<Sale, "id" | "receiptNo" | "createdAt">) => Sale;
   refundSale: (saleId: string) => void;
+  changeSalePayment: (saleId: string, method: PaymentMethod, reason?: string) => void;
   createBooking: (input: NewBooking) => Booking;
   addBookingPayment: (id: string, amount: number, method: PaymentMethod, cashier: string) => Booking | null;
   collectBooking: (id: string, amount: number, method: PaymentMethod) => { booking: Booking; sale: Sale } | null;
