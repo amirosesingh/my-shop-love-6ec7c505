@@ -11,7 +11,6 @@ import {
   Tag,
   MousePointerClick,
   Compass,
-  Search as SearchIcon,
   PanelTop,
   UserRound,
   Settings2,
