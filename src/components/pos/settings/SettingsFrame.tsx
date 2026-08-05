@@ -83,6 +83,51 @@ export function SettingsFrame({
   const { isAdmin, can } = useAuth();
   const canSettings = isAdmin || can("can_access_pos_settings");
 
+  /* ---- Save / discard -------------------------------------------------- */
+  // Edits apply live so the preview stays honest, but nothing is considered
+  // stored until "Save settings" confirms the database write. The snapshot is
+  // what "Discard changes" puts back.
+  const [snapshot, setSnapshot] = useState(() => JSON.stringify(state.settings));
+  const [saving, setSaving] = useState(false);
+  const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState("");
+  const dirty = JSON.stringify(state.settings) !== snapshot;
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
+
+  useEffect(() => {
+    const warn = (e: BeforeUnloadEvent) => {
+      if (!dirtyRef.current) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, []);
+
+  const save = async () => {
+    setSaving(true);
+    setSaveError("");
+    try {
+      await db.saveSettingsNow(state.settings);
+      setSnapshot(JSON.stringify(state.settings));
+      setSavedAt(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+      toast.success("Settings saved");
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Could not reach the database";
+      setSaveError(message);
+      toast.error("Could not save settings", { description: message });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const discard = () => {
+    updateSettings(JSON.parse(snapshot));
+    setSaveError("");
+    toast.info("Changes discarded");
+  };
+
   const { tax, receipt } = state.settings;
   const payment = state.settings.payment ?? defaultPaymentDetails;
   const whatsapp = state.settings.whatsapp ?? defaultWhatsApp;
