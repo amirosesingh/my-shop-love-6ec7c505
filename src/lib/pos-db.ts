@@ -1,9 +1,10 @@
 import { toast } from "sonner";
 import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
 import { defaultSettings, seedState } from "./pos-seed";
-import { drainOutbox } from "./sync-engine";
+import { drainOutbox, runOpLive } from "./sync-engine";
 import { electronDb, localDb, readBranch } from "./local-db";
 import { enqueue, type SyncOp } from "./sync-outbox";
+import { isLiveOnly } from "./live-mode";
 import type {
   AppSettings,
   Member,
@@ -557,6 +558,12 @@ export async function loadShiftSessions(storeId: string, limit = 200): Promise<S
  * in-page sync engine drains them. Either way the till keeps working offline.
  */
 const queue = (context: string, op: SyncOp) => {
+  // Android is live-only: the write goes to the backend now, and any failure
+  // is surfaced instead of being queued for later.
+  if (isLiveOnly()) {
+    void runOpLive(context, op).catch((e) => dbError(context, e));
+    return;
+  }
   const bridge = localDb();
   if (bridge) {
     void bridge.write(context, op).then((res) => {
