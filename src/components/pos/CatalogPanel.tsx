@@ -52,7 +52,7 @@ export function CatalogPanel({
         className={
           showSearch
             ? "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2"
-            : "flex items-center justify-end gap-2"
+            : "flex items-center justify-start gap-2"
         }
       >
         {showSearch && (
