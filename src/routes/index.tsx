@@ -634,6 +634,24 @@ function Register() {
   /** Stringing work is the job itself — such a booking needs no cart lines. */
   const serviceIsJob = !!pickedService?.isStringingJob;
   const bookingNeedsNoCart = useServices && serviceTypes.some((s2) => s2.isStringingJob);
+  const stringingService = serviceTypes.find((s2) => s2.isStringingJob) ?? null;
+
+  /** Racket / stringing job started from the products card — cart independent. */
+  function startRacketBooking() {
+    if (!activeShift) {
+      toast.error("Open a shift before taking a booking");
+      return;
+    }
+    setDeposit("");
+    setBookName(member?.name ?? "");
+    setBookPhone(member?.phone ?? "");
+    if (stringingService) {
+      setServiceId(stringingService.id);
+      setServiceFee(stringingService.fee ? String(stringingService.fee) : "");
+    }
+    setJobOpen(true);
+    setBookOpen(true);
+  }
   const serviceLabel = pickedService?.name ?? customService.trim();
   const serviceCharge = useServices ? r2(Math.max(0, Number(serviceFee || 0))) : 0;
   const bookingTotal = r2(totals.total + serviceCharge);
@@ -643,7 +661,7 @@ function Register() {
       toast.error("Open a shift before taking a booking");
       return;
     }
-    if (!serviceIsJob && !lines.length) {
+    if (!serviceIsJob && !jobOpen && !lines.length) {
       toast.error("Add at least one item to the cart before booking", {
         description: "Only racket / stringing jobs can be booked with an empty cart.",
       });
@@ -1274,6 +1292,7 @@ function Register() {
               visible("register.customerDisplay") ? openCustomerDisplay : undefined
             }
             onOpenShift={() => setOpenShiftOpen(true)}
+            onRacketBooking={startRacketBooking}
             onCloseShift={
               visible("register.closeShift")
                 ? async () => {

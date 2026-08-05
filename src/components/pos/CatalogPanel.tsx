@@ -1,5 +1,5 @@
 import type { FormEvent } from "react";
-import { Info, Lock, MonitorPlay, Search } from "lucide-react";
+import { Info, Lock, MonitorPlay, Search, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -24,6 +24,7 @@ export function CatalogPanel({
   onOpenCustomerDisplay,
   onOpenShift,
   onCloseShift,
+  onRacketBooking,
 
   showHeaderActions = true,
   autoFocus = true,
@@ -44,6 +45,8 @@ export function CatalogPanel({
   onOpenCustomerDisplay?: () => void;
   onOpenShift?: () => void;
   onCloseShift?: () => void;
+  /** Opens a racket / stringing job booking — independent of the cart. */
+  onRacketBooking?: () => void;
   showHeaderActions?: boolean;
   autoFocus?: boolean;
 
@@ -94,6 +97,23 @@ export function CatalogPanel({
           </div>
         )}
       </div>
+
+      {onRacketBooking && (
+        <Button
+          variant="secondary"
+          className="h-11 w-full justify-center gap-2"
+          disabled={!shiftOpen}
+          title={
+            shiftOpen
+              ? "Take a racket / stringing job — no cart items needed"
+              : "Open a shift to take a booking"
+          }
+          onClick={onRacketBooking}
+        >
+          <Zap className="size-4" />
+          <span className="truncate">Racket booking</span>
+        </Button>
+      )}
 
       {!shiftOpen && (
         <div className="flex flex-wrap items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
