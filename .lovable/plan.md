@@ -1,106 +1,51 @@
-# Android warehouse app — phased build on top of the existing POS
+# Android: live-data-only build
 
-Nothing on Web or Windows changes. Every Android screen lives behind a runtime
-`isNative()` check, so the browser and Electron bundles never render or even load
-the new code (native plugins are loaded with dynamic imports, as the existing
-mobile storage already does).
+Android becomes a thin, always-online client of the existing cloud backend. Web and Windows are untouched — every change is behind a runtime `isNative()` check or lives in a new file that only the phone bundle loads.
 
-I'm building this in three phases so each part can be verified on a real phone
-before the next lands. Phase 1 is the one that makes the app useful in a warehouse.
+## 1. No local business data on the phone
 
-## Decisions I made (you skipped the questions)
+- The device storage mirror (`mobile-storage.ts`) stops mirroring business keys. Only UI preferences survive: theme, text size, last store/terminal, session token. Products, members, sales, shifts, suppliers, coupons and stock never touch device storage.
+- On Android start-up the app clears any business keys left behind by a previous offline install, so upgrading phones do not carry stale stock figures.
+- The offline snapshot, sync outbox and activity journal are disabled on Android: writes go straight to the backend and fail loudly instead of queueing.
+- The local SQL Server / Electron database path stays exactly as it is for Windows; Android simply never reaches it.
 
-- **Phased delivery.** Phase 1 = dashboard, scanner, stock check, offline queue.
-- **New tables only.** Stock counts, counted lines, unknown barcodes and photo
-  records get their own tables. No existing table or business rule is touched.
-- **Location level under each store.** No new "warehouse" entity — the flow
-  becomes Store -> Location (aisle/shelf/bin, optional and free to skip), which
-  fits the multi-store logic already in place.
-- **Keep the existing APK self-updater.** Capgo needs a paid account and key;
-  the app already checks `latest.json` in your bucket. If you get a Capgo key
-  later I'll swap the download step over without touching anything else.
+## 2. Every screen reads live
 
-## Phase 1 — Scan and count
+- On Android, cached reads are switched off: each screen fetches from the backend when opened, refetches when the app returns to the foreground, and shows a skeleton while loading.
+- Realtime updates already in place keep stock and prices current while a screen is open.
+- Pull-to-refresh on the main lists for a manual reload.
 
-### Android dashboard
-A tile grid that replaces the sidebar only when running inside the APK: Stock
-Check, Scanner, Adjustment, Transfer, Product Search, Products, Purchase, Sales,
-Reports, Recent Scans, Offline Queue, Sync, Settings. Large touch targets, dark
-mode, portrait and landscape, phone and tablet. Reached at `/m`; on web that
-route redirects to the normal dashboard so nobody stumbles into it.
+## 3. No-connection screen
 
-### Barcode scanner
-Full-screen camera scanner using ML Kit (already a dependency): EAN-13, EAN-8,
-UPC-A/E, Code 128, Code 39, QR. Continuous or single-shot mode, autofocus,
-torch, zoom slider, front/rear switch, beep and vibrate on a read, a manual
-"type the barcode" fallback, and a rolling scan history. Camera permission is
-requested with a plain-English explanation and a link to settings if denied.
+- A full-screen "No internet connection" state (icon, plain explanation, Retry button) covers the app whenever the phone is offline or the backend is unreachable.
+- It watches for the connection coming back, then reloads the current page automatically — no restart, no crash, no frozen screen.
+- Because there is no offline mode on Android, the till blocks all work until the connection returns; an in-progress cart is discarded with a clear message rather than silently kept.
 
-### Stock check
-Pick store, then location, then Start counting. Each scan of a known barcode
-**increments the existing line rather than adding a new one** — expected,
-counted and difference recalculate on every scan. Per-line quick buttons
-+1/+5/+10/+20 and -1/-5/-10/-20 plus manual entry. The product panel shows
-image, name, SKU, barcode, brand, category, colour, size, unit, selling price,
-cost price, current stock, expected, counted, difference and last updated
-(fields the catalogue does not carry yet show as blank rather than fake data).
-Save closes the session; Sync pushes it.
+## 4. Speed
 
-Unknown barcode: an "Unknown product" sheet to photograph the item, confirm the
-barcode, type a name and save it as **Pending** for an administrator to match to
-a real product later.
+- Pages load on demand rather than all at once, so the first screen appears quickly.
+- Loading skeletons on every list and detail screen.
+- Icons, fonts and UI images are pre-cached; business data never is.
+- Requests are de-duplicated so opening a screen twice does not hit the backend twice.
 
-### Offline and sync
-Products, inventory, sessions, scans, images, adjustments, settings, session and
-the pending queue are stored on the device (Capacitor Preferences today, moving
-count data to SQLite because the volume is larger than Preferences is meant for).
-Photos are compressed and written to the filesystem, uploaded when a connection
-returns. The sync panel lists every queued item as Pending / Uploading /
-Completed / Failed with automatic retry and a manual retry, and resolves
-conflicts by keeping the latest approved version.
+## 5. Barcode scanner
 
-## Phase 2 — Adjustments, search, review
+- Camera scan → barcode goes to the backend → live product, live price, live stock come back.
+- Stock adjustments post straight to the backend and the screen shows the server's new figure. Nothing is queued locally; if the post fails, the scan is shown as failed and can be retried.
 
-- Inventory adjustment page: increase, decrease, transfer, damaged, expired,
-  returned, lost, found, manual correction — reason and notes required, photos
-  optional, saved offline and queued.
-- Product search across barcode, SKU, name, category, brand, colour, size,
-  supplier and location, working fully from the on-device catalogue.
-- Recent scans list with product, image, barcode, time, user, quantity and sync
-  status, editable until it has been uploaded.
+## 6. Over-the-air web updates (self-hosted)
 
-## Phase 3 — Packaging and polish
-
-- Android settings page: app version, bundle version, database version, user,
-  company, storage used, offline database size, pending uploads, last sync, Sync
-  now, camera test, scanner test, clear cache, check/download/apply update,
-  about, privacy policy, terms, logout.
-- Startup and performance work: no splash freeze, lazy-loaded modules, list
-  virtualisation, background sync throttled for battery.
-- Signed **APK and AAB** produced by the existing GitHub workflow, uploaded to
-  your bucket and ready for Google Play, with the keystore steps documented.
-
-## Security
-
-HTTPS only, encrypted local store for tokens and credentials, images kept in the
-app's private storage, and an automatic backup of any unsent stock count so a
-crash or a forced update can never lose a count.
+- The phone checks a small `web/latest.json` in your existing update bucket (`pos-app/android/web/`) on start-up and every few hours.
+- If a newer web bundle is there it downloads the zip, verifies it, unpacks it into app storage and loads it on next launch — same idea as the Windows updater, no third-party service.
+- The Android release workflow uploads the bundle and manifest alongside the APK it already produces.
+- The native shell itself keeps updating through the APK / Google Play as today.
 
 ## Technical notes
 
-- New tables: `stock_count_sessions`, `stock_count_lines`, `pending_barcodes`,
-  `stock_photos`, plus `store_locations`. Each gets grants, RLS scoped to staff
-  roles, and created/updated timestamps. Existing tables untouched.
-- Android-only routes are registered normally but their components return a
-  redirect on non-native platforms; `nav-config.ts` gains a `nativeOnly` flag so
-  the desktop/web sidebar never lists them.
-- Plugins added: `@capacitor/camera`, `@capacitor-community/sqlite`,
-  `@capacitor/network`, `@capacitor/splash-screen`, `@capacitor/local-notifications`.
-  All loaded through `await import()` behind `isNative()` so the web and Electron
-  bundles are byte-for-byte unaffected.
-- Count data uses a device SQLite database with a Preferences fallback, sitting
-  behind the same outbox/journal interfaces `sync-engine.ts` already uses, so the
-  existing sync policy, branch isolation and audit logging all still apply.
-- `android/` project files, `AndroidManifest` permissions (camera, vibrate,
-  internet, install packages) and the AAB build step are added to
-  `.github/workflows/android-apk.yml`; `docs/android-apk.md` is extended.
+- New `src/lib/live-mode.ts` exporting `isLiveOnly()` (= `isNative()`), used to gate snapshot/outbox/journal writes in `offline-snapshot.ts`, `sync-outbox.ts`, `activity-journal.ts`, `sync-engine.ts` and `pos-store.tsx`. Web/Electron paths keep their current behaviour byte-for-byte.
+- `mobile-storage.ts`: replace the `pos.` prefix mirror with an explicit allow-list of UI keys, plus a one-time purge of non-allow-listed `pos.` keys.
+- `NativeBoot.tsx` becomes the live gate: purge → connectivity check → render, with `@capacitor/network` (added dependency) plus `navigator.onLine` fallback; new `src/components/mobile/OfflineGate.tsx` renders the no-connection screen and calls `router.invalidate()` on recovery.
+- Query defaults on native: `staleTime: 0`, `gcTime: 0`, `refetchOnWindowFocus: true`, `networkMode: "online"`, applied where the QueryClient is created in `src/router.tsx` — desktop/web defaults unchanged.
+- Scanner screens call the existing product/stock queries by barcode; no new API surface, no schema change.
+- Live web updates: `src/lib/web-bundle-updates.ts` using `@capacitor/filesystem` + `Capacitor.setServerBasePath`, manifest at `pos-app/android/web/latest.json`; `.github/workflows/android-apk.yml` gains a zip+upload step reusing the existing R2 secrets.
+- No changes to `vite.config.ts` targets, Electron files, database schema, RLS or server functions.
