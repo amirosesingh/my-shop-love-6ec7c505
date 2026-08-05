@@ -140,7 +140,11 @@ const customLines = (placement: "header" | "footer") =>
 /** QR block if it belongs at the given placement. */
 const qrBlock = (placement: "header" | "footer") =>
   receiptCfg.qr?.enabled && receiptCfg.qr.placement === placement
-    ? qrSvg(receiptCfg.qr.value, receiptCfg.qr.size || 96)
+    ? qrSvg(
+        receiptCfg.qr.value,
+        // Never wider than the printable band (~3.78px per millimetre).
+        Math.min(receiptCfg.qr.size || 96, Math.round(printableWidthMm(receiptCfg.paper) * 3.6)),
+      )
     : "";
 
 /**
