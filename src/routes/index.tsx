@@ -29,6 +29,7 @@ import {
   TicketPercent,
   Split,
   Wrench,
+  ChefHat,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
@@ -1403,7 +1404,7 @@ function Register() {
                   key={`${l.credit ? "C" : "S"}-${l.productId}-${i}`}
                   className={`px-4 py-3 ${l.credit ? "bg-accent/5" : ""}`}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium">
                         {l.name}
@@ -1442,7 +1443,7 @@ function Register() {
                       </Button>
                     </div>
                     <span
-                      className={`numeric w-24 shrink-0 text-right text-sm font-semibold ${l.credit ? "text-accent" : ""}`}
+                      className={`numeric col-span-2 text-right text-sm font-semibold sm:col-span-1 sm:w-24 ${l.credit ? "text-accent" : ""}`}
                     >
                       {money((l.price - lineUnitDiscount(l)) * l.qty)}
                     </span>
@@ -1458,29 +1459,19 @@ function Register() {
                     </div>
                   )}
                   {!l.credit && !l.foc && discountAllowed && (
-                    <div className="mt-2 flex items-center justify-end gap-1">
+                    <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
                       <span className="text-[11px] text-muted-foreground">Disc</span>
-                      <button
+                      <ActionButton
+                        layout="inline"
+                        variant="outline"
+                        size="sm"
                         onClick={() => setPadTarget(i)}
-                        title="Add discount"
-                        aria-label="Add discount"
-                        className="numeric flex min-h-9 items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] hover:border-primary hover:text-primary"
-                      >
-                        <Percent className="size-3.5" />
-                        <span className="hidden sm:inline">
-                          {l.discount
-                            ? `${l.discount}${(l.discountType ?? "amount") === "percent" ? "%" : ""}`
-                            : "Add discount"}
-                        </span>
-                        <span className="sm:hidden">
-                          {l.discount
-                            ? `${l.discount}${(l.discountType ?? "amount") === "percent" ? "%" : ""}`
-                            : ""}
-                        </span>
-                      </button>
-                      <span className="numeric w-14 text-right text-[11px] text-muted-foreground">
-                        -{money(lineUnitDiscount(l) * l.qty)}
-                      </span>
+                        className="numeric min-h-11 max-w-full text-[11px]"
+                        label={l.discount
+                          ? `${l.discount}${(l.discountType ?? "amount") === "percent" ? "%" : ""}`
+                          : "Add discount"}
+                        icon={<Percent className="size-4" />}
+                      />
                     </div>
                   )}
                 </div>
@@ -1496,16 +1487,21 @@ function Register() {
           <div className="shrink-0 space-y-2 border-t border-border px-4 py-3 text-sm">
             {exchangeRef && (
               <div className="flex items-center justify-between rounded-md border border-accent/40 bg-accent/10 px-2 py-1.5 text-[11px]">
-                <span>Exchange against bill #{exchangeRef}</span>
-                <button
-                  className="text-muted-foreground hover:text-foreground"
+                <span className="min-w-0 truncate">Exchange against bill #{exchangeRef}</span>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="size-9 shrink-0"
+                  aria-label="Remove exchange"
+                  title="Remove exchange"
                   onClick={() => {
                     setLines((ls) => ls.filter((l) => !l.credit));
                     setExchangeRef(null);
                   }}
                 >
-                  remove
-                </button>
+                  <X className="size-4" />
+                </Button>
               </div>
             )}
             <div className="grid gap-x-8 gap-y-2 xl:grid-cols-2">
@@ -1529,19 +1525,20 @@ function Register() {
                   </button>
                 )}
                 <div
-                  className={`flex items-center justify-between ${discountAllowed ? "" : "hidden"}`}
+                  className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 ${discountAllowed ? "" : "hidden"}`}
                 >
                   <span className="text-muted-foreground">Bill discount</span>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => setPadTarget("bill")}
-                      className="numeric rounded-md border border-border px-3 py-1.5 text-xs hover:border-primary hover:text-primary"
-                    >
-                      {cartDiscount
-                        ? `${cartDiscount}${cartDiscountType === "percent" ? "%" : ""}`
-                        : "Add discount"}
-                    </button>
-                  </div>
+                  <ActionButton
+                    layout="inline"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPadTarget("bill")}
+                    className="numeric min-h-11 max-w-full text-xs"
+                    label={cartDiscount
+                      ? `${cartDiscount}${cartDiscountType === "percent" ? "%" : ""}`
+                      : "Add discount"}
+                    icon={<Percent className="size-4" />}
+                  />
                 </div>
                 {promo.promoDiscount > 0 && (
                   <Row label="Promotion discount" value={`-${money(promo.promoDiscount)}`} />
@@ -1581,17 +1578,22 @@ function Register() {
                 )}
                 {coupon && (
                   <div className="flex items-center justify-between rounded-md border border-primary/40 bg-primary/10 px-2 py-1.5 text-[11px]">
-                    <span>
+                    <span className="min-w-0 truncate">
                       Coupon <span className="font-semibold">{coupon.code}</span> ·{" "}
                       {coupon.scope === "item" ? coupon.productName : "whole bill"} ·{" "}
                       <span className="numeric">-{money(coupon.discount)}</span>
                     </span>
-                    <button
-                      className="text-muted-foreground hover:text-foreground"
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="size-9 shrink-0"
+                      aria-label="Remove coupon"
+                      title="Remove coupon"
                       onClick={removeCoupon}
                     >
-                      remove
-                    </button>
+                      <X className="size-4" />
+                    </Button>
                   </div>
                 )}
                 <Separator />
@@ -1605,22 +1607,26 @@ function Register() {
                     {money(refundDue > 0 ? refundDue : balanceDue)}
                   </span>
                 </div>
-                <Button
+                <ActionButton
+                  layout="inline"
                   className="h-12 w-full text-base"
                   disabled={!lines.length || !activeShift || (refundDue > 0 && !canRefund)}
                   onClick={() => openPayment()}
-                >
-                  {!activeShift
+                  icon={<Banknote className="size-5" />}
+                  label={!activeShift
                     ? "Shift closed — selling locked"
                     : refundDue > 0
                       ? canRefund
                         ? `Refund ${money(refundDue)}`
                         : "Refunds locked for this user"
                       : `Charge ${money(balanceDue)}`}
-                </Button>
-                <Button
+                />
+                <ActionButton
+                  layout="inline"
                   variant="outline"
                   className="h-11 w-full"
+                  label="Book & pay later"
+                  icon={<CalendarClock className="size-4" />}
                   disabled={!lines.length || !activeShift || refundDue > 0}
                   onClick={() => {
                     setDeposit("");
@@ -1628,43 +1634,61 @@ function Register() {
                     setBookPhone(member?.phone ?? "");
                     setBookOpen(true);
                   }}
-                >
-                  <CalendarClock className="size-4" /> Book &amp; pay later
-                </Button>
+                />
               </div>
             </div>
 
             {lastSale && (
               <div className="flex flex-wrap items-center gap-2 border-t border-border pt-2">
                 {can("can_reprint_bill") && (
-                  <Button
+                  <ActionButton
+                    layout="inline"
                     variant="outline"
                     size="sm"
-                    onClick={() =>
+                    label="Reprint"
+                    icon={<Printer className="size-4" />}
+                    onClick={() => {
                       printSaleReceipt(
                         lastSale,
                         state.members.find((m) => m.id === lastSale.memberId) ?? null,
                         "duplicate",
-                      )
-                    }
-                  >
-                    <Printer className="size-4" /> Reprint
-                  </Button>
+                      );
+                      logger.log("print", "Receipt reprinted", "register", {
+                        saleId: lastSale.id,
+                        receiptNo: lastSale.receiptNo,
+                        template: "duplicate",
+                      });
+                    }}
+                  />
                 )}
-                <Button
+                <ActionButton
+                  layout="inline"
                   variant="outline"
                   size="sm"
-                  onClick={() => printSaleReceipt(lastSale, null, "gift")}
-                >
-                  <Gift className="size-4" /> Gift
-                </Button>
-                <Button
+                  label="Gift"
+                  icon={<Gift className="size-4" />}
+                  onClick={() => {
+                    printSaleReceipt(lastSale, null, "gift");
+                    logger.log("print", "Gift receipt printed", "register", {
+                      saleId: lastSale.id,
+                      receiptNo: lastSale.receiptNo,
+                    });
+                  }}
+                />
+                <ActionButton
+                  layout="inline"
                   variant="outline"
                   size="sm"
-                  onClick={() => printSaleReceipt(lastSale, null, "kitchen")}
-                >
-                  Kitchen
-                </Button>
+                  label="Kitchen"
+                  icon={<ChefHat className="size-4" />}
+                  onClick={() => {
+                    printSaleReceipt(lastSale, null, "kitchen");
+                    logger.log("print", "Kitchen receipt printed", "register", {
+                      saleId: lastSale.id,
+                      receiptNo: lastSale.receiptNo,
+                    });
+                  }}
+                />
                 {wa.enabled && can("can_send_whatsapp_bill") && (
                   <div className="flex flex-wrap items-center gap-2">
                     <Input

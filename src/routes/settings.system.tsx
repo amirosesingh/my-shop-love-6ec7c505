@@ -108,7 +108,10 @@ function SystemSettingsPage() {
   const clearCache = () => {
     try {
       for (const key of Object.keys(window.localStorage)) {
-        if (key.startsWith("pos.") && key !== "pos.terminal") window.localStorage.removeItem(key);
+        // Recovery must never unregister this device or replace its pending QR.
+        if (key.startsWith("pos.") && !key.startsWith("pos.terminal")) {
+          window.localStorage.removeItem(key);
+        }
       }
     } catch {
       /* nothing else to do */

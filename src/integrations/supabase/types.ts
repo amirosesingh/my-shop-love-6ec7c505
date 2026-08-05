@@ -1726,6 +1726,7 @@ export type Database = {
       terminal_token_status: {
         Args: { p_token_id: string }
         Returns: {
+          location_id: string
           location_name: string
           status: string
         }[]

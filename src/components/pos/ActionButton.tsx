@@ -53,6 +53,7 @@ export function ActionButton({
             onTouchCancel={cancelHold}
             onTouchMove={cancelHold}
             className={cn(
+              "min-w-0 overflow-hidden",
               layout === "stack"
                 ? "flex-col gap-1 text-xs"
                 : "justify-center gap-2 sm:justify-start",
@@ -60,8 +61,8 @@ export function ActionButton({
             )}
             {...props}
           >
-            {icon}
-            <span className={cn(layout === "stack" ? "hidden sm:inline" : "hidden sm:inline")}>
+            <span className="shrink-0" aria-hidden="true">{icon}</span>
+            <span className="hidden min-w-0 truncate sm:inline">
               {label}
             </span>
           </Button>

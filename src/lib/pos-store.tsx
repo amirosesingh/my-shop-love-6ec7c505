@@ -922,6 +922,12 @@ export function PosProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const removeProduct = useCallback((id: string) => {
+    const product = stateRef.current.products.find((p) => p.id === id);
+    logger.log("inventory_edit", "Product deleted", "inventory", {
+      productId: id,
+      name: product?.name ?? null,
+      barcode: product?.barcode ?? null,
+    });
     void db.deleteProduct(id);
     setState((s) => ({ ...s, products: s.products.filter((p) => p.id !== id) }));
   }, []);
@@ -1028,11 +1034,23 @@ export function PosProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const removeMember = useCallback((id: string) => {
+    const member = stateRef.current.members.find((m) => m.id === id);
+    logger.log("member_event", "Member deleted", "members", {
+      memberId: id,
+      name: member?.name ?? null,
+      phone: member?.phone ?? null,
+    });
     void db.deleteMember(id);
     setState((s) => ({ ...s, members: s.members.filter((m) => m.id !== id) }));
   }, []);
 
   const upsertPromotion = useCallback((promotion: Promotion) => {
+    const previous = stateRef.current.promotions.find((p) => p.id === promotion.id);
+    logger.log("promotion", previous ? "Promotion updated" : "Promotion created", "promotions", {
+      promotionId: promotion.id,
+      name: promotion.name,
+      active: promotion.active,
+    });
     void db.upsertPromotion(promotion);
     setState((s) => ({
       ...s,
@@ -1043,6 +1061,11 @@ export function PosProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const removePromotion = useCallback((id: string) => {
+    const promotion = stateRef.current.promotions.find((p) => p.id === id);
+    logger.log("promotion", "Promotion deleted", "promotions", {
+      promotionId: id,
+      name: promotion?.name ?? null,
+    });
     void db.deletePromotion(id);
     setState((s) => ({ ...s, promotions: s.promotions.filter((p) => p.id !== id) }));
   }, []);
@@ -1050,7 +1073,13 @@ export function PosProvider({ children }: { children: ReactNode }) {
   const togglePromotion = useCallback((id: string, active: boolean) => {
     {
       const p = stateRef.current.promotions.find((x) => x.id === id);
-      if (p) void db.upsertPromotion({ ...p, active });
+      if (p) {
+        logger.log("promotion", active ? "Promotion enabled" : "Promotion disabled", "promotions", {
+          promotionId: id,
+          name: p.name,
+        });
+        void db.upsertPromotion({ ...p, active });
+      }
     }
     setState((s) => ({
       ...s,
@@ -1103,6 +1132,16 @@ export function PosProvider({ children }: { children: ReactNode }) {
       createdAt: now,
       updatedAt: now,
     };
+    logger.log("inventory", "Stock transfer created", "transfers", {
+      transferId: transfer.id,
+      ref: transfer.ref,
+      kind: transfer.kind,
+      fromStoreId: transfer.fromStoreId,
+      toStoreId: transfer.toStoreId,
+      itemCount: transfer.items.length,
+      quantity: transfer.items.reduce((sum, item) => sum + item.qty, 0),
+      status: transfer.status,
+    });
     setState((s) => {
       const transferCounter = s.transferCounter + 1;
       transfer.ref = `${input.kind === "transfer" ? "TRF" : "REQ"}-${String(
@@ -1155,6 +1194,13 @@ export function PosProvider({ children }: { children: ReactNode }) {
     });
     void setTransferStatus(id, "in_transit", actorRef.current)
       .catch((e: unknown) => dbError("Approving transfer", e));
+    const transfer = stateRef.current.transfers.find((x) => x.id === id);
+    logger.log("inventory", "Stock transfer approved", "transfers", {
+      transferId: id,
+      ref: transfer?.ref ?? null,
+      fromStoreId: transfer?.fromStoreId ?? null,
+      toStoreId: transfer?.toStoreId ?? null,
+    });
   }, []);
 
   const receiveTransfer = useCallback((id: string) => {
@@ -1184,9 +1230,17 @@ export function PosProvider({ children }: { children: ReactNode }) {
     void receiveTransferInDb(id, actorRef.current).catch((e: unknown) =>
       dbError("Receiving transfer", e as Error),
     );
+    const transfer = stateRef.current.transfers.find((x) => x.id === id);
+    logger.log("inventory", "Stock transfer received", "transfers", {
+      transferId: id,
+      ref: transfer?.ref ?? null,
+      fromStoreId: transfer?.fromStoreId ?? null,
+      toStoreId: transfer?.toStoreId ?? null,
+    });
   }, []);
 
   const rejectTransfer = useCallback((id: string) => {
+    const transfer = stateRef.current.transfers.find((x) => x.id === id);
     {
       const s = stateRef.current;
       const t = s.transfers.find((x) => x.id === id);
@@ -1223,6 +1277,12 @@ export function PosProvider({ children }: { children: ReactNode }) {
             : x,
         ),
       };
+    });
+    logger.log("inventory", transfer?.status === "in_transit" ? "Stock transfer cancelled" : "Stock transfer rejected", "transfers", {
+      transferId: id,
+      ref: transfer?.ref ?? null,
+      fromStoreId: transfer?.fromStoreId ?? null,
+      toStoreId: transfer?.toStoreId ?? null,
     });
   }, []);
 

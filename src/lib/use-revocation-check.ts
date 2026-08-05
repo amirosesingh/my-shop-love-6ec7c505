@@ -96,7 +96,10 @@ export function useRevocationCheck(): RevocationState {
         const remote = await fetchTokenStatus(config.tokenId);
         if (cancelled) return;
         setLastCheckedAt(new Date().toISOString());
-        if (!remote || remote.status === "revoked") {
+        // An empty lookup is inconclusive (for example while the API schema is
+        // reloading). Only a positive revoked verdict may wipe activation.
+        if (!remote) return;
+        if (remote.status === "revoked") {
           setBlocked(true);
           clearTerminalConfig();
           return;
