@@ -160,8 +160,7 @@ export async function issueTerminalToken(input: {
     status: "active" as const,
     created_at: new Date().toISOString(),
   };
-  const { error } = await table().insert([row]);
-  if (error) throw error;
+  await insertTokenRow(row);
 
   const payload: ActivationPayload = {
     token_id: id,
@@ -195,12 +194,12 @@ export async function reissueTerminalToken(
     location_id: token.locationId,
     location_name: token.locationName,
     device_name: token.deviceName,
+    platform: token.platform,
     status: "active" as const,
     created_at: now,
     reissued_at: now,
   };
-  const { error } = await table().insert([row]);
-  if (error) throw error;
+  await insertTokenRow(row);
 
   const { error: retireError } = await table()
     .update({ status: "revoked", revoked_at: now, replaced_by: id })
