@@ -352,6 +352,27 @@ export function PosProvider({ children }: { children: ReactNode }) {
     void refreshActiveShift();
   }, [signedIn, currentStore.id, refreshActiveShift]);
 
+  // Android holds nothing locally, so coming back to the app must re-read the
+  // catalogue, members, prices and shift from the backend.
+  useEffect(() => {
+    if (!isLiveOnly() || !signedIn) return;
+    const resume = () => {
+      if (document.visibilityState !== "visible" || !navigator.onLine) return;
+      void loadCloudState()
+        .then((cloud) => setState((s) => applyCloud(s, cloud)))
+        .catch(() => {
+          /* the offline gate takes over if the connection is gone */
+        });
+      void refreshActiveShift();
+    };
+    document.addEventListener("visibilitychange", resume);
+    window.addEventListener("online", resume);
+    return () => {
+      document.removeEventListener("visibilitychange", resume);
+      window.removeEventListener("online", resume);
+    };
+  }, [signedIn, refreshActiveShift]);
+
   const activeShift = useMemo(() => {
     if (dbShift && dbShift.storeId === currentStore.id && !dbShift.closedAt) return dbShift;
     if (shiftChecked) return null;
