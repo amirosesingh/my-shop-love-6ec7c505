@@ -63,11 +63,17 @@ const TEMPLATES: { key: Template; label: string; icon: typeof Printer }[] = [
 ];
 
 function ReceiptVault() {
-  const { state, currentStore } = usePos();
+  const { state, currentStore, refundSale, changeSalePayment } = usePos();
   const { user } = useAuth();
+  const { requirePermission } = useUserPermissions();
   const [query, setQuery] = useState("");
   const [template, setTemplate] = useState<Template>("standard");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [payOpen, setPayOpen] = useState(false);
+  const [payMethod, setPayMethod] = useState<PaymentMethod>("cash");
+  const [payReason, setPayReason] = useState("");
 
   // Employees only ever see the log of the store they are on duty at.
   const sales = useMemo(
