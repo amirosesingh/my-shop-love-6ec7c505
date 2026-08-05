@@ -41,7 +41,10 @@ export const Route = createFileRoute("/all-shops")({
 const isToday = (iso: string) => new Date(iso).toDateString() === new Date().toDateString();
 
 function AllShops() {
-  const { state, stores } = usePos();
+  const { state, stores: allStores } = usePos();
+  // Branches that keep their stock private are left out of group figures.
+  const hidden = privateStockStores(state.settings);
+  const stores = allStores.filter((s) => !hidden.has(s.id));
   const { can, isAdmin } = useAuth();
   const allowed = isAdmin || can("can_view_inventory");
   const showMoney = isAdmin || can("can_view_sales_reports");
