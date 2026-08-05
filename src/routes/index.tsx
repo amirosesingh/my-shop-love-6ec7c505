@@ -56,6 +56,7 @@ import {
 import { availableAt, cartTotals, money, stockAt, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
 import { productVisibleAt } from "@/lib/branch-policy";
+import { BOOKING_TIMING_LABELS, type BookingPaymentTiming } from "@/lib/pos-types";
 import { useUserPermissions } from "@/lib/pos-permissions";
 import { useVisibility } from "@/lib/ui-visibility";
 import { useUiScale } from "@/lib/use-ui-scale";
@@ -172,6 +173,11 @@ function Register() {
   const [bookName, setBookName] = useState("");
   const [bookPhone, setBookPhone] = useState("");
   const [bookNote, setBookNote] = useState("");
+  // What the booking is for (re-stringing, repair …) and when it gets paid.
+  const [serviceId, setServiceId] = useState("");
+  const [customService, setCustomService] = useState("");
+  const [serviceFee, setServiceFee] = useState("");
+  const [payTiming, setPayTiming] = useState<BookingPaymentTiming>("deposit");
   /** Narrow windows: the action deck collapses so it can't cover the totals. */
   const [deckOpen, setDeckOpen] = useState(false);
   /* Operation deck state */
@@ -558,14 +564,28 @@ function Register() {
     else toast.error("WhatsApp send failed", { description: res.error });
   }
 
+  const serviceTypes = (state.settings.integrations.serviceTypes ?? []).filter(
+    (s2) => s2.active && s2.name.trim(),
+  );
+  const useServices = !!state.settings.integrations.useServiceTypes;
+  const pickedService = serviceTypes.find((s2) => s2.id === serviceId) ?? null;
+  const serviceLabel = pickedService?.name ?? customService.trim();
+  const serviceCharge = useServices ? r2(Math.max(0, Number(serviceFee || 0))) : 0;
+  const bookingTotal = r2(totals.total + serviceCharge);
+
   async function bookAndPayLater() {
     if (!activeShift) {
       toast.error("Open a shift before taking a booking");
       return;
     }
     if (!(await requirePermission("can_process_sale"))) return;
-    const paidNow = r2(Math.max(0, Number(deposit || 0)));
-    if (paidNow > totals.total) {
+    const paidNow =
+      payTiming === "collection"
+        ? 0
+        : payTiming === "now"
+          ? bookingTotal
+          : r2(Math.max(0, Number(deposit || 0)));
+    if (paidNow > bookingTotal) {
       toast.error("Deposit cannot exceed the booking total");
       return;
     }
@@ -577,10 +597,14 @@ function Register() {
       storeId: currentStore.id,
       shiftId: activeShift.id,
       lines,
-      subtotal: totals.subtotal,
+      subtotal: r2(totals.subtotal + serviceCharge),
       discount: totals.discount,
       tax: totals.tax,
-      total: totals.total,
+      total: bookingTotal,
+      serviceTypeId: pickedService?.id,
+      serviceName: serviceLabel || undefined,
+      serviceFee: serviceCharge || undefined,
+      paymentTiming: payTiming,
       deposit: paidNow,
       depositMethod,
       dueDate,
@@ -617,6 +641,10 @@ function Register() {
     setBookName("");
     setBookPhone("");
     setBookNote("");
+    setServiceId("");
+    setCustomService("");
+    setServiceFee("");
+    setPayTiming("deposit");
     setDueDate(isoDaysFromNow(14));
     toast.success(`Booking ${booking.ref} reserved until ${new Date(booking.dueDate).toDateString()}`);
   }
@@ -2318,12 +2346,24 @@ function Register() {
             <div className="rounded-md border border-border px-3 py-2 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Booking total</span>
-                <span className="numeric font-semibold">{money(totals.total)}</span>
+                <span className="numeric font-semibold">{money(bookingTotal)}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Balance after deposit</span>
                 <span className="numeric font-semibold text-primary">
-                  {money(r2(Math.max(0, totals.total - Number(deposit || 0))))}
+                  {money(
+                    r2(
+                      Math.max(
+                        0,
+                        bookingTotal -
+                          (payTiming === "collection"
+                            ? 0
+                            : payTiming === "now"
+                              ? bookingTotal
+                              : Number(deposit || 0)),
+                      ),
+                    ),
+                  )}
                 </span>
               </div>
               <p className="mt-1 text-[11px] text-muted-foreground">
@@ -2331,11 +2371,74 @@ function Register() {
                 {currentStore.name} until the collect-by date.
               </p>
             </div>
+            {useServices && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>What is this booking for?</Label>
+                  <ThemedSelect
+                    ariaLabel="Booking service"
+                    value={serviceId}
+                    placeholder="Choose a service"
+                    onChange={(v) => {
+                      setServiceId(v);
+                      const hit = serviceTypes.find((s2) => s2.id === v);
+                      if (hit) setServiceFee(hit.fee ? String(hit.fee) : "");
+                    }}
+                    options={[
+                      ...serviceTypes.map((s2) => ({ value: s2.id, label: s2.name })),
+                      ...(state.settings.integrations.allowCustomServiceType !== false
+                        ? [{ value: "", label: "Something else…" }]
+                        : []),
+                    ]}
+                  />
+                  {!serviceId && state.settings.integrations.allowCustomServiceType !== false && (
+                    <Input
+                      className="mt-1"
+                      placeholder="Describe the job"
+                      value={customService}
+                      onChange={(e) => setCustomService(e.target.value)}
+                    />
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <Label>Service fee</Label>
+                  <Input
+                    className="numeric text-right"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    value={serviceFee}
+                    onChange={(e) => setServiceFee(e.target.value)}
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Added on top of the items in the cart.
+                  </p>
+                </div>
+              </div>
+            )}
+            <div className="space-y-1">
+              <Label>When does the customer pay?</Label>
+              <div className="flex overflow-hidden rounded-md border border-border">
+                {(["now", "deposit", "collection"] as BookingPaymentTiming[]).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setPayTiming(t)}
+                    className={`flex-1 px-2 py-2 text-xs ${
+                      payTiming === t
+                        ? "bg-primary/15 text-primary"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {BOOKING_TIMING_LABELS[t]}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>Deposit taken now</Label>
                 <Input
-                  value={deposit}
+                  value={payTiming === "now" ? bookingTotal.toFixed(2) : payTiming === "collection" ? "0.00" : deposit}
+                  disabled={payTiming !== "deposit"}
                   onChange={(e) => setDeposit(e.target.value)}
                   placeholder="0.00"
                   className="numeric"
