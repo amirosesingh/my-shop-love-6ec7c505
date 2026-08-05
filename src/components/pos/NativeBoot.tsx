@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
 
 import { isNative } from "../../lib/native";
 import { hydrateNativeStorage } from "../../lib/mobile-storage";
-import { applyPendingWebBundle } from "../../lib/web-bundle-updates";
+import { applyPendingWebBundle, startWebBundleChecks } from "../../lib/web-bundle-updates";
 
 export function NativeBoot({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(() => !isNative());
@@ -31,6 +31,12 @@ export function NativeBoot({ children }: { children: React.ReactNode }) {
       cancelled = true;
       window.clearTimeout(watchdog);
     };
+  }, [ready]);
+
+  // Background check for a newer web bundle once the app is up.
+  useEffect(() => {
+    if (!ready || !isNative()) return;
+    return startWebBundleChecks();
   }, [ready]);
 
   if (!ready) {
