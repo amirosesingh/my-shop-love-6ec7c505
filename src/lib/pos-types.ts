@@ -290,6 +290,12 @@ export type Booking = {
   storeId: string;
   shiftId: string;
   lines: CartLine[];
+  /** what the booking is for, e.g. re-stringing (blank for plain layaway) */
+  serviceTypeId?: string;
+  serviceName?: string;
+  serviceFee?: number;
+  /** when the customer settles: up front, part deposit, or on collection */
+  paymentTiming?: BookingPaymentTiming;
   subtotal: number;
   discount: number;
   tax: number;
