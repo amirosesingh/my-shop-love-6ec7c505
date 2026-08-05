@@ -645,6 +645,7 @@ function bookingBody(booking: Booking, member: Member | null, pay: PaymentDetail
     <div class="c b">Collect &amp; settle by ${esc(new Date(booking.dueDate).toDateString())}</div>
     <div class="c muted">Goods are reserved until this date. Bring this slip to collect.</div>
     ${booking.note ? `<div class="c muted">${esc(booking.note)}</div>` : ""}
+    ${jobCardBlock(booking)}
     ${transferBlock(pay)}
     ${member ? `<hr><div>Member ${esc(member.code)} · ${esc(member.name)}</div>` : ""}
     <hr>${receiptCfg.showBarcode ? barcodeSvg(booking.ref) : ""}
@@ -687,6 +688,57 @@ export function printBookingSlip(
 
 export function printBookingPayment(booking: Booking, payment: BookingPayment) {
   printHtml(`${booking.ref} payment`, bookingPaymentBody(booking, payment));
+}
+
+/** Job-card details, printed under the booking slip for string jobs. */
+function jobCardBlock(booking: Booking) {
+  const j = booking.job;
+  if (!j) return "";
+  const unit = j.tensionUnit ?? "lb";
+  const rows = [
+    j.racketModel ? `<tr><td>Racket</td><td class="r">${esc(j.racketModel)}</td></tr>` : "",
+    j.stringType ? `<tr><td>String</td><td class="r">${esc(j.stringType)}</td></tr>` : "",
+    j.tensionMain || j.tensionCross
+      ? `<tr><td>Tension</td><td class="r b">${esc(String(j.tensionMain ?? "—"))} / ${esc(String(j.tensionCross ?? j.tensionMain ?? "—"))} ${esc(unit)}</td></tr>`
+      : "",
+    j.grommetNotes ? `<tr><td>Grommet / grip</td><td class="r">${esc(j.grommetNotes)}</td></tr>` : "",
+    j.promisedAt
+      ? `<tr><td>Ready by</td><td class="r b">${esc(new Date(j.promisedAt).toLocaleString())}</td></tr>`
+      : "",
+    booking.jobStatus ? `<tr><td>Status</td><td class="r">${esc(booking.jobStatus.toUpperCase())}</td></tr>` : "",
+  ]
+    .filter(Boolean)
+    .join("");
+  if (!rows) return "";
+  return `<hr><div class="c b">JOB CARD</div><table>${rows}</table>${
+    j.jobNotes ? `<div class="c muted">${esc(j.jobNotes)}</div>` : ""
+  }`;
+}
+
+/** Small tag tied to the racket itself while it waits on the rack. */
+export function printJobTag(booking: Booking) {
+  const j = booking.job;
+  const unit = j?.tensionUnit ?? "lb";
+  const body = `${header("RACKET JOB TAG")}
+    <table>
+      <tr><td>Job</td><td class="r b">${esc(booking.ref)}</td></tr>
+      <tr><td>Customer</td><td class="r b">${esc(booking.customerName)}</td></tr>
+      ${booking.customerPhone ? `<tr><td>Phone</td><td class="r">${esc(booking.customerPhone)}</td></tr>` : ""}
+      ${j?.racketModel ? `<tr><td>Racket</td><td class="r">${esc(j.racketModel)}</td></tr>` : ""}
+      ${j?.stringType ? `<tr><td>String</td><td class="r">${esc(j.stringType)}</td></tr>` : ""}
+      ${
+        j?.tensionMain || j?.tensionCross
+          ? `<tr class="b big"><td>Tension</td><td class="r">${esc(String(j?.tensionMain ?? "—"))}/${esc(String(j?.tensionCross ?? j?.tensionMain ?? "—"))} ${esc(unit)}</td></tr>`
+          : ""
+      }
+      ${j?.promisedAt ? `<tr><td>Ready by</td><td class="r b">${esc(new Date(j.promisedAt).toLocaleString())}</td></tr>` : ""}
+      <tr><td>Status</td><td class="r">${esc((booking.jobStatus ?? "received").toUpperCase())}</td></tr>
+    </table>
+    ${j?.grommetNotes ? `<div class="muted">${esc(j.grommetNotes)}</div>` : ""}
+    ${j?.jobNotes ? `<div class="muted">${esc(j.jobNotes)}</div>` : ""}
+    <hr>${barcodeSvg(booking.ref)}
+    <div class="c muted">${esc(booking.ref)}</div>`;
+  printHtml(`${booking.ref} job tag`, body, true, booking.ref);
 }
 
 export function bookingSlipPreview(

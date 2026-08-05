@@ -28,6 +28,7 @@ import {
   Percent,
   TicketPercent,
   Split,
+  Wrench,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
@@ -92,6 +93,7 @@ import { evaluatePromotions, focLine } from "@/lib/pos-promotions";
 import {
   openCashDrawer,
   printBookingSlip,
+  printJobTag,
   printSaleReceipt,
   saleReceiptPreview,
 } from "@/lib/pos-print";
@@ -185,6 +187,17 @@ function Register() {
   const [customService, setCustomService] = useState("");
   const [serviceFee, setServiceFee] = useState("");
   const [payTiming, setPayTiming] = useState<BookingPaymentTiming>("deposit");
+  /* Racket stringing job card */
+  const [jobOpen, setJobOpen] = useState(false);
+  const [racketModel, setRacketModel] = useState("");
+  const [stringType, setStringType] = useState("");
+  const [tensionMain, setTensionMain] = useState("");
+  const [tensionCross, setTensionCross] = useState("");
+  const [tensionUnit, setTensionUnit] = useState<"lb" | "kg">("lb");
+  const [grommetNotes, setGrommetNotes] = useState("");
+  const [jobNotes, setJobNotes] = useState("");
+  const [promisedAt, setPromisedAt] = useState("");
+  const [notifyWhatsApp, setNotifyWhatsApp] = useState(false);
   /** Narrow windows: the action deck collapses so it can't cover the totals. */
   const [deckOpen, setDeckOpen] = useState(false);
   /* Operation deck state */
@@ -613,9 +626,24 @@ function Register() {
       customerPhone: bookPhone.trim() || member?.phone || "",
       note: bookNote.trim(),
       cashier: activeCashier,
+      job: jobOpen
+        ? {
+            racketModel: racketModel.trim() || undefined,
+            stringType: stringType.trim() || undefined,
+            tensionMain: tensionMain ? Number(tensionMain) : undefined,
+            tensionCross: tensionCross ? Number(tensionCross) : undefined,
+            tensionUnit,
+            grommetNotes: grommetNotes.trim() || undefined,
+            jobNotes: jobNotes.trim() || undefined,
+            droppedOffAt: new Date().toISOString(),
+            promisedAt: promisedAt ? new Date(promisedAt).toISOString() : undefined,
+            notifyWhatsApp,
+          }
+        : undefined,
     });
     if (paidNow > 0 && depositMethod === "cash") openCashDrawer();
     printBookingSlip(booking, member, state.settings.payment);
+    if (booking.job) printJobTag(booking);
     if (wa.enabled && wa.autoSendOnBooking) {
       void sendBillOnWhatsApp({
         cfg: wa,
@@ -2508,6 +2536,121 @@ function Register() {
                 onChange={(e) => setBookNote(e.target.value)}
                 placeholder="Colour, size, collection instructions…"
               />
+            </div>
+
+            {/* Racket stringing job card */}
+            <div className="rounded-md border border-border">
+              <button
+                type="button"
+                onClick={() => setJobOpen((v) => !v)}
+                className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium"
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  <Wrench className="size-4 shrink-0 text-primary" />
+                  <span className="truncate">Racket / stringing job card</span>
+                </span>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {jobOpen ? "Hide" : "Add"}
+                </span>
+              </button>
+              {jobOpen && (
+                <div className="space-y-3 border-t border-border p-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label>Racket brand / model</Label>
+                      <Input
+                        value={racketModel}
+                        onChange={(e) => setRacketModel(e.target.value)}
+                        placeholder="Yonex Astrox 88D"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>String type / brand</Label>
+                      <Input
+                        value={stringType}
+                        onChange={(e) => setStringType(e.target.value)}
+                        placeholder="BG65 Ti"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <Label>Tension main</Label>
+                      <Input
+                        value={tensionMain}
+                        inputMode="decimal"
+                        onChange={(e) => setTensionMain(e.target.value)}
+                        className="numeric"
+                        placeholder="26"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Tension cross</Label>
+                      <Input
+                        value={tensionCross}
+                        inputMode="decimal"
+                        onChange={(e) => setTensionCross(e.target.value)}
+                        className="numeric"
+                        placeholder="28"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Unit</Label>
+                      <div className="flex overflow-hidden rounded-md border border-border">
+                        {(["lb", "kg"] as const).map((u) => (
+                          <button
+                            key={u}
+                            onClick={() => setTensionUnit(u)}
+                            className={`flex-1 px-2 py-2 text-xs uppercase ${
+                              tensionUnit === u
+                                ? "bg-primary/15 text-primary"
+                                : "text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            {u}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Promised ready date &amp; time</Label>
+                    <Input
+                      type="datetime-local"
+                      value={promisedAt}
+                      onChange={(e) => setPromisedAt(e.target.value)}
+                      className="numeric"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Grommet / grip notes</Label>
+                    <Input
+                      value={grommetNotes}
+                      onChange={(e) => setGrommetNotes(e.target.value)}
+                      placeholder="Two cracked grommets at 12 o'clock, replace grip"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Anything else the stringer needs</Label>
+                    <Input
+                      value={jobNotes}
+                      onChange={(e) => setJobNotes(e.target.value)}
+                      placeholder="Knot preference, stencil, urgent…"
+                    />
+                  </div>
+                  <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={notifyWhatsApp}
+                      onChange={(e) => setNotifyWhatsApp(e.target.checked)}
+                    />
+                    Notify the customer on WhatsApp when the racket is ready
+                  </label>
+                  <p className="text-[11px] text-muted-foreground">
+                    A job tag prints with the slip so it can be tied to the racket.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>

@@ -15,11 +15,13 @@ import type {
   BookingPayment,
   BookingPaymentTiming,
   CartLine,
+  JobStatus,
   Member,
   PaymentMethod,
   PosState,
   Product,
   Promotion,
+  RacketJob,
   Sale,
   Shift,
   Store,
@@ -42,6 +44,7 @@ import { branchPolicy } from "./branch-policy";
 import { setActiveBranchSyncPolicy } from "./sync-policy";
 import { setPosFormats, setPosTimeZone } from "./time-zone";
 import { receiveTransferInDb, saveTransfer, setTransferStatus } from "./stock-transfers";
+import { loadBookings, saveBookingQuietly } from "./bookings-db";
 
 const KEY = "pos-state-v2";
 
@@ -103,7 +106,12 @@ export type NewBooking = {
   customerPhone: string;
   note: string;
   cashier: string;
+  /** racket stringing job card, when the booking is a string job */
+  job?: RacketJob;
 };
+
+/** Racket stringing job card captured with the booking. */
+export type NewBookingJob = RacketJob;
 
 /** Apply a stock delta for every line of a transfer at one store. */
 const bumpItems = (
@@ -132,6 +140,7 @@ type Ctx = {
   refundSale: (saleId: string) => void;
   changeSalePayment: (saleId: string, method: PaymentMethod, reason?: string) => void;
   createBooking: (input: NewBooking) => Booking;
+  setBookingJobStatus: (id: string, status: JobStatus, who: string) => Booking | null;
   addBookingPayment: (id: string, amount: number, method: PaymentMethod, cashier: string) => Booking | null;
   collectBooking: (id: string, amount: number, method: PaymentMethod) => { booking: Booking; sale: Sale } | null;
   cancelBooking: (id: string, reason: string) => void;
@@ -276,6 +285,19 @@ export function PosProvider({ children }: { children: ReactNode }) {
         writeSnapshot(cloud);
         setState((s) => applyCloud(s, cloud));
         if (!cloud.stores.length) db.upsertStores(stateRef.current.stores);
+        // Bookings and racket job cards live in the cloud so every till and
+        // the phone see the same list.
+        try {
+          const cloudBookings = await loadBookings();
+          if (!cancelled && cloudBookings.length) {
+            setState((s: PosState) => {
+              const seen = new Set(cloudBookings.map((b) => b.id));
+              return { ...s, bookings: [...cloudBookings, ...s.bookings.filter((b) => !seen.has(b.id))] };
+            });
+          }
+        } catch {
+          /* offline or not permitted — the local list still works */
+        }
       } catch (e) {
         dbError("Loading data", e);
       } finally {
@@ -647,12 +669,17 @@ export function PosProvider({ children }: { children: ReactNode }) {
       cashier: input.cashier,
       createdAt: now,
       status: "active",
+      job: input.job,
+      jobStatus: input.job ? "received" : undefined,
+      jobStatusBy: input.job ? input.cashier : undefined,
+      jobStatusAt: input.job ? now : undefined,
     };
     setState((s) => ({
       ...s,
       bookingCounter: Math.max(counter, s.bookingCounter + 1),
       bookings: [booking, ...s.bookings],
     }));
+    saveBookingQuietly(booking);
     logger.log("sale_event", "Booking created", "bookings", {
       ref: booking.ref,
       storeId: booking.storeId,
@@ -686,6 +713,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
         ...s,
         bookings: s.bookings.map((b) => (b.id === id ? updated : b)),
       }));
+      saveBookingQuietly(updated);
       logger.log("sale_event", "Booking part payment", "bookings", {
         ref: updated.ref,
         amount: payment.amount,
@@ -701,24 +729,46 @@ export function PosProvider({ children }: { children: ReactNode }) {
   const cancelBooking = useCallback((id: string, reason: string) => {
     const current = stateRef.current.bookings.find((b) => b.id === id);
     if (!current || current.status !== "active") return;
+    const cancelled: Booking = {
+      ...current,
+      status: "cancelled",
+      closedAt: new Date().toISOString(),
+      note: reason ? `${current.note ? `${current.note} · ` : ""}Cancelled: ${reason}` : current.note,
+    };
     setState((s) => ({
       ...s,
-      bookings: s.bookings.map((b) =>
-        b.id === id
-          ? {
-              ...b,
-              status: "cancelled",
-              closedAt: new Date().toISOString(),
-              note: reason ? `${b.note ? `${b.note} · ` : ""}Cancelled: ${reason}` : b.note,
-            }
-          : b,
-      ),
+      bookings: s.bookings.map((b) => (b.id === id ? cancelled : b)),
     }));
+    saveBookingQuietly(cancelled);
     logger.log("sale_event", "Booking cancelled", "bookings", {
       ref: current.ref,
       reason,
       refundable: current.paid,
     });
+  }, []);
+
+  /** Move a racket through received → strung → ready → collected. */
+  const setBookingJobStatus = useCallback((id: string, status: JobStatus, who: string) => {
+    const current = stateRef.current.bookings.find((b) => b.id === id);
+    if (!current) return null;
+    const updated: Booking = {
+      ...current,
+      jobStatus: status,
+      jobStatusBy: who,
+      jobStatusAt: new Date().toISOString(),
+    };
+    setState((s) => ({
+      ...s,
+      bookings: s.bookings.map((b) => (b.id === id ? updated : b)),
+    }));
+    saveBookingQuietly(updated);
+    logger.log("sale_event", "Job card status changed", "bookings", {
+      ref: updated.ref,
+      status,
+      by: who,
+      customer: updated.customerName,
+    });
+    return updated;
   }, []);
 
   const collectBooking = useCallback(
@@ -757,11 +807,14 @@ export function PosProvider({ children }: { children: ReactNode }) {
         status: "collected",
         closedAt: new Date().toISOString(),
         saleReceiptNo: sale.receiptNo,
+        jobStatus: current.job ? "collected" : current.jobStatus,
+        jobStatusAt: current.job ? new Date().toISOString() : current.jobStatusAt,
       };
       setState((s) => ({
         ...s,
         bookings: s.bookings.map((b) => (b.id === id ? updated : b)),
       }));
+      saveBookingQuietly(updated);
       logger.log("sale_event", "Booking collected", "bookings", {
         ref: updated.ref,
         receiptNo: sale.receiptNo,
@@ -1193,6 +1246,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     addBookingPayment,
     collectBooking,
     cancelBooking,
+    setBookingJobStatus,
     upsertProduct,
     removeProduct,
     adjustStock,

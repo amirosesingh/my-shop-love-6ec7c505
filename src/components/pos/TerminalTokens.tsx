@@ -66,7 +66,12 @@ const qrDataUrl = (value: string) => {
 const formatDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "—";
 
-export function TerminalTokens() {
+export function TerminalTokens({
+  only,
+}: {
+  /** Restrict the panel to desktop tills or to phones/tablets. */
+  only?: "pc" | "mobile";
+} = {}) {
   const { stores } = usePos();
   const [tokens, setTokens] = useState<TerminalToken[]>([]);
   const [loading, setLoading] = useState(true);
@@ -154,6 +159,7 @@ export function TerminalTokens() {
         },
         locationName,
         deviceName: deviceName.trim(),
+        platform: only ?? "pc",
         ...(pairTokenId ? { tokenId: pairTokenId } : {}),
       });
       setCode(issued);
@@ -417,8 +423,12 @@ export function TerminalTokens() {
           <div className="flex items-center gap-2 px-5 py-6 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin" /> Loading terminals…
           </div>
-        ) : tokens.length === 0 && !error ? (
-          <p className="px-5 py-6 text-sm text-muted-foreground">No terminals registered yet.</p>
+        ) : tokens.filter((t) => (only ? t.platform === only : true)).length === 0 && !error ? (
+          <p className="px-5 py-6 text-sm text-muted-foreground">
+            {only === "mobile"
+              ? "No phones or tablets registered yet."
+              : "No terminals registered yet."}
+          </p>
         ) : (
           <Table>
             <TableHeader>
@@ -436,6 +446,7 @@ export function TerminalTokens() {
             <TableBody>
               {tokens
                 .filter((t) => t.id !== selfTokenId)
+                .filter((t) => (only ? t.platform === only : true))
                 .map((t) => (
                 <TableRow key={t.id} className="hover:bg-muted/40">
                   <TableCell className="font-medium">{t.deviceName}</TableCell>

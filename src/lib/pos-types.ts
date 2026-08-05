@@ -299,6 +299,44 @@ export type BookingPayment = {
   cashier: string;
 };
 
+/** Where a racket sits in the stringing workflow. */
+export type JobStatus = "received" | "strung" | "ready" | "collected";
+
+export const JOB_STATUS_LABELS: Record<JobStatus, string> = {
+  received: "Received",
+  strung: "Strung",
+  ready: "Ready to collect",
+  collected: "Collected",
+};
+
+export const JOB_STATUS_FLOW: JobStatus[] = ["received", "strung", "ready", "collected"];
+
+/** Everything the stringer needs written on the job card. */
+export type RacketJob = {
+  racketModel?: string;
+  stringType?: string;
+  tensionMain?: number;
+  tensionCross?: number;
+  tensionUnit?: "lb" | "kg";
+  grommetNotes?: string;
+  jobNotes?: string;
+  /** ISO timestamps for drop-off and the promised ready time */
+  droppedOffAt?: string;
+  promisedAt?: string;
+  notifyWhatsApp?: boolean;
+};
+
+/** One-line summary of the string job, used on slips and tags. */
+export const racketSummary = (j: RacketJob | undefined) => {
+  if (!j) return "";
+  const unit = j.tensionUnit ?? "lb";
+  const tension =
+    j.tensionMain || j.tensionCross
+      ? `${j.tensionMain ?? "—"}/${j.tensionCross ?? j.tensionMain ?? "—"} ${unit}`
+      : "";
+  return [j.racketModel, j.stringType, tension].filter(Boolean).join(" · ");
+};
+
 /** A "book now, pay later" ticket. Stock is reserved the moment it is created. */
 export type Booking = {
   id: string;
@@ -329,6 +367,11 @@ export type Booking = {
   createdAt: string;
   status: BookingStatus;
   closedAt?: string;
+  /** racket stringing job card (blank for plain layaway) */
+  job?: RacketJob;
+  jobStatus?: JobStatus;
+  jobStatusBy?: string;
+  jobStatusAt?: string;
   /** receipt number of the bill raised when the goods were collected */
   saleReceiptNo?: string;
 };

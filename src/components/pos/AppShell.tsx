@@ -43,6 +43,7 @@ import { reportAppReady } from "@/lib/app-health";
  *  every signed-in account. Keep this in sync with nav-config.ts. */
 const ROUTE_PERMISSIONS: Record<string, PermissionFlag> = {
   "/settings/terminals": "can_manage_terminals",
+  "/settings/mobile-terminals": "can_manage_terminals",
   "/settings/sync": "can_manage_sync_backup",
   "/settings": "can_access_pos_settings",
   "/staff": "can_manage_staff",
@@ -75,7 +76,13 @@ const SECTION_HUBS = new Set(["/sales", "/inventory-hub", "/customers", "/admin"
 
 /** Cloud-only admin tools. The Windows till never manages accounts, branches,
  *  messaging credentials or device activation — those stay in the web console. */
-const DESKTOP_BLOCKED = ["/settings/terminals", "/settings/whatsapp", "/staff", "/stores"];
+const DESKTOP_BLOCKED = [
+  "/settings/terminals",
+  "/settings/mobile-terminals",
+  "/settings/whatsapp",
+  "/staff",
+  "/stores",
+];
 
 const isDesktopBlocked = (pathname: string) =>
   DESKTOP_BLOCKED.some((p) => pathname === p || pathname.startsWith(`${p}/`));
