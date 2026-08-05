@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { BOOKING_TIMING_LABELS } from "@/lib/pos-types";
 import {
   Dialog,
   DialogContent,
@@ -185,6 +186,13 @@ function BookingsPage() {
                       <p className="mt-1 text-xs text-muted-foreground">
                         {b.lines.map((l) => `${l.qty} × ${l.name}`).join(" · ")}
                       </p>
+                      {b.serviceName && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {b.serviceName}
+                          {b.serviceFee ? ` · service fee ${b.serviceFee.toFixed(2)}` : ""}
+                          {b.paymentTiming ? ` · ${BOOKING_TIMING_LABELS[b.paymentTiming]}` : ""}
+                        </p>
+                      )}
                       {b.note && <p className="mt-1 text-xs text-muted-foreground">{b.note}</p>}
                       {b.saleReceiptNo && (
                         <p className="mt-1 text-xs text-success">Billed as {b.saleReceiptNo}</p>
