@@ -614,6 +614,26 @@ export const db = {
       rows: [settingsToRow(s)],
     }),
 
+  /**
+   * Explicit "Save settings" from a settings page: writes the whole record and
+   * waits for confirmation, so the page can say whether it really landed.
+   */
+  async saveSettingsNow(s: AppSettings): Promise<void> {
+    const op: SyncOp = {
+      kind: "upsert",
+      table: "pos_settings",
+      rows: [settingsToRow(s)],
+    };
+    const bridge = localDb();
+    if (bridge) {
+      const res = await bridge.write("Saving settings", op);
+      if (!res.ok) throw new Error(res.error ?? "Local database write failed");
+      return;
+    }
+    const res = await supabase.from("pos_settings").upsert(settingsToRow(s) as never);
+    if (res.error) throw new Error(res.error.message);
+  },
+
   /** Persist a completed bill, its lines, the stock movement and member points. */
   recordSale(sale: Sale, products: Product[], member: Member | null) {
     // Desktop shell: one transactional, fully offline call into local SQL Server.
