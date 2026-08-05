@@ -2,6 +2,7 @@ import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { logSync } from "./sync-log";
 import { replayOrder } from "./activity-journal";
 import { isTerminalRevoked } from "./use-revocation-check";
+import { tableSyncAllowed } from "./sync-policy";
 import {
   failOp,
   isOnline,
