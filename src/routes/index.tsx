@@ -694,7 +694,10 @@ function Register() {
       toast.error("Choose a collect-by date");
       return;
     }
-    const booking = createBooking({
+    let booking: Booking;
+    try {
+      setSaving(true);
+      booking = await createBooking({
       storeId: currentStore.id,
       shiftId: activeShift.id,
       lines,
@@ -728,7 +731,15 @@ function Register() {
             notifyWhatsApp,
           }
         : undefined,
-    });
+      });
+    } catch (e) {
+      toast.error("Booking was not saved", {
+        description: (e as { message?: string })?.message ?? "Nothing was stored — try again.",
+      });
+      return;
+    } finally {
+      setSaving(false);
+    }
     if (paidNow > 0 && depositMethod === "cash") openCashDrawer();
     printBookingSlip(booking, member, state.settings.payment);
     if (booking.job) printJobTag(booking);
