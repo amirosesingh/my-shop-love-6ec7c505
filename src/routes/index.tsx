@@ -1811,7 +1811,7 @@ function Register() {
               onClick={async () => {
                 if (!(await requirePermission("can_open_drawer"))) return;
                 setNoSaleNote("");
-                setNoSaleReason("change_float");
+                setNoSaleReason("");
                 setNoSaleOpen(true);
               }}
             />
