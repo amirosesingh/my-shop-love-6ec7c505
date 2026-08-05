@@ -116,6 +116,24 @@ async function runOne(entry: QueuedOp): Promise<boolean> {
   return true;
 }
 
+/**
+ * Live write for the Android build: send the operation to the backend now and
+ * report the result. Nothing is stored or retried on the device.
+ */
+export async function runOpLive(context: string, op: SyncOp): Promise<void> {
+  let res = await execute(op);
+  if ((op.kind === "upsert" || op.kind === "insert") && res.error?.code === "PGRST204") {
+    const named = missingColumn(res.error.message);
+    const drop = named ? [named] : (OPTIONAL_COLUMNS[op.table] ?? []);
+    if (drop.length) res = await execute({ ...op, rows: strip(op.rows, drop) } as SyncOp);
+  }
+  if (res.error) {
+    logSync("push", op.table, false, `${context}: ${res.error.message}`);
+    throw new Error(res.error.message);
+  }
+  logSync("push", op.table, true, context);
+}
+
 let draining = false;
 
 /**
