@@ -2344,10 +2344,13 @@ function Register() {
             <Button
               onClick={completeSale}
               disabled={
-                refundDue === 0 && tenders.length > 0 && !!validateTenders(balanceDue, tenders).error
+                saving ||
+                (refundDue === 0 &&
+                  tenders.length > 0 &&
+                  !!validateTenders(balanceDue, tenders).error)
               }
             >
-              Complete &amp; print
+              {saving ? "Saving…" : "Complete & print"}
             </Button>
           </DialogFooter>
         </DialogContent>
