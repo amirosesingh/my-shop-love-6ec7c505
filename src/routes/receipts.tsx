@@ -121,6 +121,55 @@ function ReceiptVault() {
     toast.success("Sent to printer");
   }
 
+  async function openCancel() {
+    if (!selected) return;
+    if (!(await requirePermission("can_process_refund"))) return;
+    setCancelReason("");
+    setCancelOpen(true);
+  }
+
+  function confirmCancel() {
+    if (!selected) return;
+    const reason = cancelReason.trim();
+    if (reason.length < 3) {
+      toast.error("Type why this bill is being cancelled");
+      return;
+    }
+    refundSale(selected.id);
+    logActivity(selected, reason);
+    setCancelOpen(false);
+    toast.success(`Bill ${selected.receiptNo} cancelled and stock returned`);
+  }
+
+  function logActivity(sale: Sale, reason: string) {
+    logger.log("sale_event", "Bill cancelled", "receipts", {
+      saleId: sale.id,
+      receiptNo: sale.receiptNo,
+      total: sale.total,
+      reason,
+      staff: user?.name ?? null,
+    });
+  }
+
+  async function openPaymentFix() {
+    if (!selected) return;
+    if (!(await requirePermission("can_edit_tenders"))) return;
+    setPayMethod(selected.method);
+    setPayReason("");
+    setPayOpen(true);
+  }
+
+  function confirmPaymentFix() {
+    if (!selected) return;
+    if (payMethod === selected.method) {
+      setPayOpen(false);
+      return;
+    }
+    changeSalePayment(selected.id, payMethod, payReason.trim() || undefined);
+    setPayOpen(false);
+    toast.success(`Bill ${selected.receiptNo} now recorded as ${payMethod.replace("_", " ")}`);
+  }
+
   return (
     <AppShell>
       <div className="space-y-5 p-6">
