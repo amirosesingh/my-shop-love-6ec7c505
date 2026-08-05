@@ -777,6 +777,17 @@ export function PosProvider({ children }: { children: ReactNode }) {
       },
     });
     void db.upsertProduct(record);
+    // A branch that keeps a private catalogue owns whatever it creates, so
+    // the item never shows up at the other shops.
+    if (!prev && branchPolicy(stateRef.current.settings, stateRef.current.currentStoreId).privateCatalogue) {
+      const owners = {
+        ...(stateRef.current.settings.integrations.productOwners ?? {}),
+        [record.id]: stateRef.current.currentStoreId,
+      };
+      updateSettingsRef.current?.({
+        integrations: { ...stateRef.current.settings.integrations, productOwners: owners },
+      });
+    }
     setState((s) => ({
       ...s,
       products: s.products.some((p) => p.id === record.id)
