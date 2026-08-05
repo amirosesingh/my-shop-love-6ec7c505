@@ -220,11 +220,16 @@ export const STATE_LABEL: Record<ServiceState, string> = {
   checking: "Checking…",
 };
 
-export async function runDiagnostics(domains: string[]): Promise<ServiceCheck[]> {
-  const [database, realtime, subdomains] = await Promise.all([
+export async function runDiagnostics(
+  domains: Array<string | { url: string; label: string }>,
+): Promise<ServiceCheck[]> {
+  const entries = domains.map((d) =>
+    typeof d === "string" ? { url: d, label: normaliseDomain(d)?.host ?? d } : d,
+  );
+  const [database, realtime, ...domainChecks] = await Promise.all([
     checkDatabase(),
     checkRealtime(),
-    checkSubdomains(domains),
+    ...entries.map((e) => checkDomain(e.url, e.label)),
   ]);
-  return [database, realtime, subdomains, checkSync()];
+  return [database, realtime, ...domainChecks, checkSync()];
 }
