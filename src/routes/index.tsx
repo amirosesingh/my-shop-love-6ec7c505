@@ -258,6 +258,43 @@ function Register() {
 
   const member = state.members.find((m) => m.id === memberId) ?? null;
 
+  /* ── Sticky ticket ──────────────────────────────────────────────────────
+     The open ticket is stored per store so a refresh, a trip to another page
+     or an app restart never silently drops what the cashier rang up. It is
+     only cleared by Clear/Void, a completed payment, or holding/booking. */
+  const draftStore = currentStore.id;
+  const hydratedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (hydratedFor.current === draftStore) return;
+    if (!state.products.length) return; // wait for the catalogue before validating
+    hydratedFor.current = draftStore;
+    const draft = loadCartDraft(draftStore);
+    if (!draft) return;
+    const known = new Set(state.products.map((p) => p.id));
+    const kept = draft.lines.filter((l) => known.has(l.productId));
+    setLines(kept);
+    setCartDiscount(draft.cartDiscount);
+    setCartDiscountType(draft.cartDiscountType);
+    setExchangeRef(draft.exchangeRef);
+    setMemberId(draft.memberId);
+    setCoupon((draft.coupon as typeof coupon) ?? null);
+    if (kept.length < draft.lines.length)
+      toast.info("Some items on the saved ticket are no longer in the catalogue");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftStore, state.products.length]);
+
+  useEffect(() => {
+    if (hydratedFor.current !== draftStore) return;
+    saveCartDraft(draftStore, {
+      lines,
+      cartDiscount,
+      cartDiscountType,
+      exchangeRef,
+      memberId,
+      coupon,
+    });
+  }, [draftStore, lines, cartDiscount, cartDiscountType, exchangeRef, memberId, coupon]);
+
   // Keep the attached member's live vouchers loaded for the picker.
   useEffect(() => {
     if (!memberId) {
