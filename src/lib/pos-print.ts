@@ -561,11 +561,20 @@ export function printShiftReport(shift: Shift, sales: Sale[], kind: "xreport" | 
 
 /** Short sample slip used by the printer settings "Test receipt" button. */
 export function printTestReceipt() {
+  const width = printableWidthMm(receiptCfg.paper);
+  // Edge ruler: if the first or last tick is missing, the slip is clipped.
+  const ticks = Array.from({ length: Math.floor(width / 5) + 1 }, (_, i) => i * 5)
+    .map((mmv) => `<span style="display:inline-block;width:5mm">${mmv % 10 === 0 ? "|" : "."}</span>`)
+    .join("");
   const body = `${header("TEST RECEIPT")}
     <table>
       <tr><td>Printer test</td><td class="r b">OK</td></tr>
       <tr><td>Date</td><td class="r">${new Date().toLocaleString()}</td></tr>
+      <tr><td>Print width</td><td class="r">${width}mm</td></tr>
     </table>
+    <hr>
+    <div class="muted" style="white-space:nowrap;overflow:hidden">${ticks}</div>
+    <div class="muted">|&lt;— edge ruler, both ends must be visible —&gt;|</div>
     <hr>
     <table>
       <tr><td>Sample item<div class="muted">1 x 10.00</div></td><td class="r">10.00</td></tr>
