@@ -33,6 +33,7 @@ import { logger } from "./audit-log";
 import { db, dbError, loadActiveShift, loadCloudState } from "./pos-db";
 import type { CloudSlice } from "./pos-db";
 import { clearSnapshot, readSnapshot, writeSnapshot } from "./offline-snapshot";
+import { isLiveOnly } from "./live-mode";
 import { useAuth } from "./pos-auth";
 import { readTerminalConfig } from "./terminal-tokens";
 import { isShiftOverdue, localTerminalId } from "./shift-hours";
