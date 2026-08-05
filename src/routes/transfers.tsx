@@ -46,6 +46,7 @@ import {
 import { stockAt, usePos } from "@/lib/pos-store";
 import { printTransferNote } from "@/lib/pos-print";
 import type { Transfer, TransferItem, TransferKind } from "@/lib/pos-types";
+import { branchPolicy } from "@/lib/branch-policy";
 
 export const Route = createFileRoute("/transfers")({
   head: () => ({
