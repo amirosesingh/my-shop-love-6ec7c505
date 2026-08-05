@@ -1614,7 +1614,8 @@ function Register() {
                 <ActionButton
                   layout="inline"
                   className="h-12 w-full text-base"
-                  disabled={!lines.length || !activeShift || (refundDue > 0 && !canRefund)}
+                  disabled={!lines.length || tillLocked || (refundDue > 0 && !canRefund)}
+                  disabledReason={tillLocked ? lockedReason : undefined}
                   onClick={() => openPayment()}
                   icon={<Banknote className="size-5" />}
                   label={!activeShift
@@ -1631,7 +1632,8 @@ function Register() {
                   className="h-11 w-full"
                   label="Book & pay later"
                   icon={<CalendarClock className="size-4" />}
-                  disabled={!lines.length || !activeShift || refundDue > 0}
+                  disabled={tillLocked || refundDue > 0 || (!lines.length && !bookingNeedsNoCart)}
+                  disabledReason={tillLocked ? lockedReason : undefined}
                   onClick={() => {
                     setDeposit("");
                     setBookName(member?.name ?? "");
@@ -1651,6 +1653,8 @@ function Register() {
                     size="sm"
                     label="Reprint"
                     icon={<Printer className="size-4" />}
+                    disabled={tillLocked}
+                    disabledReason={tillLocked ? lockedReason : undefined}
                     onClick={() => {
                       printSaleReceipt(
                         lastSale,
@@ -1671,6 +1675,8 @@ function Register() {
                   size="sm"
                   label="Gift"
                   icon={<Gift className="size-4" />}
+                  disabled={tillLocked}
+                  disabledReason={tillLocked ? lockedReason : undefined}
                   onClick={() => {
                     printSaleReceipt(lastSale, null, "gift");
                     logger.log("print", "Gift receipt printed", "register", {
@@ -1685,6 +1691,8 @@ function Register() {
                   size="sm"
                   label="Kitchen"
                   icon={<ChefHat className="size-4" />}
+                  disabled={tillLocked}
+                  disabledReason={tillLocked ? lockedReason : undefined}
                   onClick={() => {
                     printSaleReceipt(lastSale, null, "kitchen");
                     logger.log("print", "Kitchen receipt printed", "register", {
