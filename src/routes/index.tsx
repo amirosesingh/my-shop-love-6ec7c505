@@ -111,6 +111,10 @@ const isoDaysFromNow = (days: number) =>
   new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
 
 export const Route = createFileRoute("/")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    /** hold ticket id to reopen, set by the Hold tickets screen */
+    resume: typeof search['resume'] === "string" ? (search['resume'] as string) : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Register — Northwind POS" },
