@@ -118,10 +118,12 @@ export async function issueTerminalToken(input: {
   location: TokenLocation;
   locationName: string;
   deviceName: string;
+  /** reserved id when approving a pairing request scanned off a PC screen */
+  tokenId?: string;
 }): Promise<{ token: TerminalToken; code: string }> {
   // Self-healing: guarantee the referenced location row exists.
   await ensureLocations([input.location]);
-  const id = crypto.randomUUID();
+  const id = input.tokenId || crypto.randomUUID();
   const row = {
     id,
     location_id: input.location.id,
@@ -284,7 +286,7 @@ export const TERMINAL_CONFIG_EVENT = EVENT;
 /** Look the token up by id. `null` means the network answered "no such token". */
 export async function fetchTokenStatus(
   tokenId: string,
-): Promise<{ status: TokenStatus; locationName: string } | null> {
+): Promise<{ status: TokenStatus; locationName: string; locationId: string } | null> {
   const { data, error } = await rpc("terminal_token_status", { p_token_id: tokenId });
   if (error) throw error;
   const row = Array.isArray(data) ? data[0] : data;
@@ -292,6 +294,7 @@ export async function fetchTokenStatus(
   return {
     status: asStatus(row.status),
     locationName: row.location_name ?? "",
+    locationId: row.location_id ?? "",
   };
 }
 
@@ -379,5 +382,98 @@ export async function activateTerminal(code: string): Promise<TerminalConfig> {
   };
   writeTerminalConfig(config);
   await rpc("terminal_token_heartbeat", { p_token_id: config.tokenId, p_activate: true });
+  return config;
+}
+
+
+/* ------------------------- phone-assisted pairing ------------------------ */
+
+export type PairingRequest = {
+  /** the token id the terminal reserved for itself */
+  tokenId: string;
+  deviceName: string;
+};
+
+const PAIR_KEY = "pos.terminal.pairing";
+const PAIR_PREFIX = "POSPAIR1:";
+
+/** Stable pairing request for this machine — reused across reloads. */
+export function getPairingRequest(): PairingRequest {
+  const suggested =
+    typeof navigator !== "undefined" && /Windows/i.test(navigator.userAgent)
+      ? "Windows till"
+      : "POS terminal";
+  if (typeof window === "undefined") return { tokenId: crypto.randomUUID(), deviceName: suggested };
+  try {
+    const raw = window.localStorage.getItem(PAIR_KEY);
+    const parsed = raw ? (JSON.parse(raw) as PairingRequest) : null;
+    if (parsed?.tokenId) return parsed;
+  } catch {
+    /* fall through and mint a new request */
+  }
+  const request: PairingRequest = { tokenId: crypto.randomUUID(), deviceName: suggested };
+  try {
+    window.localStorage.setItem(PAIR_KEY, JSON.stringify(request));
+  } catch {
+    /* non-fatal: the request simply changes on the next reload */
+  }
+  return request;
+}
+
+export function clearPairingRequest() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(PAIR_KEY);
+}
+
+/** Text placed in the QR shown on the terminal for the phone to scan. */
+export function encodePairingRequest(request: PairingRequest): string {
+  return `${PAIR_PREFIX}${btoa(JSON.stringify(request))}`;
+}
+
+export function decodePairingRequest(value: string): PairingRequest | null {
+  const trimmed = value.trim();
+  if (!trimmed.startsWith(PAIR_PREFIX)) return null;
+  try {
+    const parsed = JSON.parse(atob(trimmed.slice(PAIR_PREFIX.length))) as PairingRequest;
+    return parsed?.tokenId ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Register this machine against a token id an administrator approved from the
+ * phone. Same claim-once rules as pasting a code by hand.
+ */
+export async function activateWithTokenId(tokenId: string): Promise<TerminalConfig | null> {
+  const remote = await fetchTokenStatus(tokenId).catch(() => null);
+  if (!remote) return null; // not approved yet
+  if (remote.status !== "active") {
+    throw new ActivationError(
+      remote.status === "revoked"
+        ? "This terminal has been revoked by management."
+        : "This pairing request was already used. Ask for a new approval.",
+    );
+  }
+  const deviceName = typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 120) : null;
+  const { data: claimed, error } = await rpc("terminal_token_claim", {
+    p_token_id: tokenId,
+    p_device: deviceName,
+  });
+  if (error) throw new ActivationError(activationFailureMessage(error));
+  if (claimed !== true) {
+    throw new ActivationError("This pairing request was already used on another terminal.");
+  }
+  const config: TerminalConfig = {
+    tokenId,
+    locationId: remote.locationId,
+    locationName: remote.locationName,
+    supabaseUrl: POS_SUPABASE_URL,
+    supabaseKey: POS_SUPABASE_KEY,
+    activatedAt: new Date().toISOString(),
+  };
+  writeTerminalConfig(config);
+  clearPairingRequest();
+  await rpc("terminal_token_heartbeat", { p_token_id: tokenId, p_activate: true });
   return config;
 }
