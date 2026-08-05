@@ -18,11 +18,15 @@ export const POS_SUPABASE_KEY =
 
 export type TokenStatus = "active" | "used" | "revoked";
 
+/** Which kind of machine the code was issued for. */
+export type TerminalPlatform = "pc" | "mobile";
+
 export type TerminalToken = {
   id: string;
   locationId: string | null;
   locationName: string;
   deviceName: string;
+  platform: TerminalPlatform;
   status: TokenStatus;
   createdAt: string;
   activatedAt: string | null;
@@ -94,6 +98,7 @@ const rowToToken = (r: Record<string, any>): TerminalToken => ({
   locationId: r.location_id ?? null,
   locationName: r.location_name ?? "",
   deviceName: r.device_name ?? "",
+  platform: r.platform === "mobile" ? "mobile" : "pc",
   status: asStatus(r.status),
   createdAt: r.created_at,
   activatedAt: r.activated_at ?? null,
@@ -118,6 +123,8 @@ export async function issueTerminalToken(input: {
   location: TokenLocation;
   locationName: string;
   deviceName: string;
+  /** Defaults to a desktop till. */
+  platform?: TerminalPlatform;
   /** reserved id when approving a pairing request scanned off a PC screen */
   tokenId?: string;
 }): Promise<{ token: TerminalToken; code: string }> {
@@ -129,6 +136,7 @@ export async function issueTerminalToken(input: {
     location_id: input.location.id,
     location_name: input.locationName,
     device_name: input.deviceName,
+    platform: input.platform ?? "pc",
     status: "active" as const,
     created_at: new Date().toISOString(),
   };
