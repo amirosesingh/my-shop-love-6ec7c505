@@ -19,6 +19,7 @@ import {
 import { money, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
 import { useUserPermissions } from "@/lib/pos-permissions";
+import { logger } from "@/lib/audit-log";
 import {
   printSaleReceipt,
   printShiftReport,
