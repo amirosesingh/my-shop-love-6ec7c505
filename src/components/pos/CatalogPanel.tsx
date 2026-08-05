@@ -44,7 +44,6 @@ export function CatalogPanel({
   onOpenCustomerDisplay?: () => void;
   onOpenShift?: () => void;
   onCloseShift?: () => void;
-  canCloseShift?: boolean;
   showHeaderActions?: boolean;
   autoFocus?: boolean;
 
