@@ -6,6 +6,7 @@ import {
   Landmark,
   ListPlus,
   EyeOff,
+  Globe,
   MessageCircle,
   MonitorCog,
   MonitorSmartphone,
