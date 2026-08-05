@@ -7,7 +7,7 @@
  * ticket trail shown at the bottom of the page.
  */
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { PauseCircle, PlayCircle, Trash2, User } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
@@ -115,8 +115,8 @@ function HoldTickets() {
             </TableHeader>
             <TableBody>
               {tickets.map((h) => (
-                <>
-                  <TableRow key={h.id}>
+                <Fragment key={h.id}>
+                  <TableRow>
                     <TableCell>
                       <button
                         className="text-left hover:text-primary"
@@ -162,7 +162,7 @@ function HoldTickets() {
                     </TableCell>
                   </TableRow>
                   {openId === h.id && (
-                    <TableRow key={`${h.id}-lines`}>
+                    <TableRow>
                       <TableCell colSpan={6} className="bg-surface-2">
                         <ul className="space-y-1 text-sm">
                           {h.lines.map((l, i) => (
@@ -177,7 +177,7 @@ function HoldTickets() {
                       </TableCell>
                     </TableRow>
                   )}
-                </>
+                </Fragment>
               ))}
               {tickets.length === 0 && (
                 <TableRow>
