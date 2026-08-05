@@ -531,6 +531,72 @@ export type IntegrationSettings = {
   autoIssueWelcome: boolean;
   /** keep working from the local cache even when the cloud is reachable */
   offlineMode: boolean;
+  /** IANA zone used for every displayed / printed time; "" = this PC's zone */
+  timeZone?: string;
+  /** pick a configured account for card / transfer / wallet tenders */
+  usePaymentAccounts?: boolean;
+  /** card machines, bank accounts and e-wallets money can land in */
+  paymentAccounts?: PaymentAccount[];
+  /** offer a service type when raising a booking */
+  useServiceTypes?: boolean;
+  /** allow a typed-in service when nothing on the list fits */
+  allowCustomServiceType?: boolean;
+  /** re-stringing, repairs, custom orders … with their default fee */
+  serviceTypes?: BookingServiceType[];
+  /** per-branch isolation and sync switches, keyed by store id */
+  branches?: Record<string, BranchPolicy>;
+};
+
+export type PaymentAccountType = "card_machine" | "bank_account" | "ewallet" | "other";
+
+export const PAYMENT_ACCOUNT_LABELS: Record<PaymentAccountType, string> = {
+  card_machine: "Card machine",
+  bank_account: "Bank account",
+  ewallet: "E-wallet",
+  other: "Other",
+};
+
+/** A place money can land: one card terminal, bank account or e-wallet. */
+export type PaymentAccount = {
+  id: string;
+  name: string;
+  type: PaymentAccountType;
+  bankName?: string;
+  accountNumber?: string;
+  active: boolean;
+  /** empty = available at every branch */
+  storeIds?: string[];
+};
+
+/** A bookable service, e.g. racket re-stringing. */
+export type BookingServiceType = {
+  id: string;
+  name: string;
+  fee: number;
+  active: boolean;
+};
+
+/** How one branch shares stock, catalogue and sync with the rest of the group. */
+export type BranchPolicy = {
+  /** stock levels here are hidden from other branches and group totals */
+  privateStock: boolean;
+  /** products created here stay local */
+  privateCatalogue: boolean;
+  /** stock may move in and out of this branch */
+  allowTransfers: boolean;
+  /** push stock and product changes to the central server */
+  syncInventory: boolean;
+  /** push sales, shifts, members and audit to the central server */
+  syncOther: boolean;
+};
+
+/** Shared-with-the-group defaults; every branch starts here. */
+export const defaultBranchPolicy: BranchPolicy = {
+  privateStock: false,
+  privateCatalogue: false,
+  allowTransfers: true,
+  syncInventory: true,
+  syncOther: true,
 };
 
 /**
