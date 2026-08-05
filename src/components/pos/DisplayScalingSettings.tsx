@@ -157,7 +157,7 @@ export function DisplayScalingSettings({ bare = false }: { bare?: boolean }) {
 
         <div
           className="rounded-md border border-border p-4"
-          style={{ fontSize: `calc(0.875rem * ${effective} * ${text})` }}
+          style={{ fontSize: `calc(0.875rem * ${effective})` }}
         >
           <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Preview</p>
           <p className="mt-2 font-medium">Espresso Beans 250g</p>
@@ -165,13 +165,13 @@ export function DisplayScalingSettings({ bare = false }: { bare?: boolean }) {
           <div className="mt-3 flex gap-2">
             <button
               className="rounded-md bg-primary px-3 text-primary-foreground"
-              style={{ minHeight: `calc(2.5rem * ${effective})` }}
+              style={{ minHeight: `calc(40px * ${effective})` }}
             >
               Charge
             </button>
             <button
               className="rounded-md border border-border px-3"
-              style={{ minHeight: `calc(2.5rem * ${effective})` }}
+              style={{ minHeight: `calc(40px * ${effective})` }}
             >
               Hold
             </button>
