@@ -138,7 +138,7 @@ function AuditPage() {
         if (to && t > new Date(`${to}T23:59:59`).getTime()) return false;
       }
       if (who !== "all" && l.staffId !== who) return false;
-      if (category !== "all" && l.category !== category) return false;
+      if (category !== "all" && displayCategory(l.category) !== category) return false;
       if (
         text &&
         !`${describeLog(l)} ${l.action} ${l.module} ${l.staffName} ${l.staffId} ${l.route} ${JSON.stringify(
