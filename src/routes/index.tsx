@@ -407,6 +407,7 @@ function Register() {
     setCartDiscount(0);
     setExchangeRef(null);
     setCoupon(null);
+    clearCartDraft(currentStore.id);
   }
 
   async function clearCart() {
