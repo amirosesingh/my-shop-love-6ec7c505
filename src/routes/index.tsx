@@ -819,7 +819,7 @@ function Register() {
     if (!lines.length) return;
     const snapshot = lines;
     const id = `H${Date.now()}`;
-    setHeld((hs) => [
+    setHeldOrders((hs) => [
       ...hs,
       {
         id,
@@ -849,7 +849,7 @@ function Register() {
       return;
     }
     setLines(order.lines);
-    setHeld((hs) => hs.filter((h) => h.id !== id));
+    removeHeldOrder(id);
     logger.log("sale", "Held order resumed", "register", {
       holdRef: order.id,
       lines: order.lines.length,
