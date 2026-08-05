@@ -1,10 +1,13 @@
 # Building the Android app (step by step)
 
-The phone app now carries the **entire POS inside the APK**. It opens, signs
-staff in, opens shifts, sells, prints and queues everything with no internet at
-all; when a signal is back it syncs to the cloud like the Windows till. Only
-genuinely online jobs (cloud reports, terminal activation, WhatsApp sending)
-need a connection.
+The phone app is a **live client of the central system**. It keeps no business
+data on the device: catalogue, members, stock, prices, shifts and reports are
+read from the backend every time a screen opens, and every write goes straight
+to the backend. With no connection it shows a "No internet connection" screen
+and continues automatically once the signal returns.
+
+The Windows till and the web app are unchanged — they keep their offline-first
+behaviour.
 
 ## What you need
 
@@ -62,14 +65,25 @@ there a strip appears at the bottom of the screen: tap **Update**, the APK
 downloads and Android's installer takes over. Allow "install unknown apps" for
 the POS once, and updates are one tap from then on.
 
-## Offline behaviour
+## Live-data behaviour
 
-- Catalogue, members, prices, promotions and settings come from the on-device
-  snapshot, refreshed whenever the app is online.
-- Sales, bookings, drawer events, stock moves and audit logs queue in the sync
-  outbox and upload automatically once a connection returns.
-- All of it is stored in the phone's own app storage (Capacitor Preferences),
-  so Android cannot quietly clear it the way it can clear browser data.
+- Every screen loads from the backend when it opens, refetches when the app
+  returns to the foreground, and shows a skeleton while loading.
+- Barcode scans query the backend and show live product, price and stock;
+  adjustments post straight to the backend.
+- Nothing about the business is stored on the phone — no local database, no
+  cached inventory, no sync outbox. Only interface preferences (theme, text
+  size, terminal identity) are kept in app storage.
+- No internet means a full-screen notice; the app reconnects and reloads the
+  current page by itself.
+
+## Live web updates
+
+Alongside the APK the workflow uploads a zipped web bundle and a manifest to
+`pos-app/android/web/`. The app checks it on start-up and every six hours,
+downloads a newer bundle quietly and serves it from the next launch, so
+interface fixes do not need a Play Store release. The native shell keeps
+updating through the APK / Google Play.
 
 ## Install it on a phone
 
