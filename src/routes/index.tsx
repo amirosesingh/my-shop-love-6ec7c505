@@ -85,6 +85,7 @@ import {
 import { NO_SALE_REASON_MAX, NO_SALE_REASON_MIN, recordNoSale } from "@/lib/drawer-events";
 import { buildBookingMessage, buildSaleMessage, sendBillOnWhatsApp } from "@/lib/whatsapp";
 import { logger } from "@/lib/audit-log";
+import { DiscountPad } from "@/components/pos/DiscountPad";
 import { evaluatePromotions, focLine } from "@/lib/pos-promotions";
 import {
   openCashDrawer,
