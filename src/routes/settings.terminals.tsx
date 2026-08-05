@@ -23,9 +23,9 @@ export const Route = createFileRoute("/settings/terminals")({
   component: () => (
     <SettingsFrame
       title="Terminal activation"
-      description="Every Windows till registers once with a code issued here. Revoke a token to cut a machine off from the company data."
+      description="Every Windows till registers once with a code issued here. Phones and tablets live on the Mobile terminals page. Revoke a token to cut a machine off from the company data."
     >
-      <TerminalTokens />
+      <TerminalTokens only="pc" />
     </SettingsFrame>
   ),
 });
