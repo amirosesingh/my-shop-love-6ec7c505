@@ -16,7 +16,7 @@ import {
 import { TablePagination, usePagination } from "@/components/pos/TablePagination";
 import { money, stockAt, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
-import { privateStockStores } from "@/lib/branch-policy";
+import { privateStockStores, productVisibleAt } from "@/lib/branch-policy";
 
 export const Route = createFileRoute("/all-shops")({
   head: () => ({
@@ -98,6 +98,7 @@ function AllShops() {
   }, [state.sales, state.products]);
 
   const rows = state.products.filter((p) => {
+    if (hidden.size > 0 && !stores.some((s2) => productVisibleAt(state.settings, p.id, s2.id))) return false;
     if (category !== "all" && p.category !== category) return false;
     if (
       query &&

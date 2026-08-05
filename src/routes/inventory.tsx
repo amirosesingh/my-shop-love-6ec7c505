@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/table";
 import { money, stockAt, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
+import { productVisibleAt } from "@/lib/branch-policy";
 import { TablePagination, usePagination } from "@/components/pos/TablePagination";
 import { Switch } from "@/components/ui/switch";
 import { BulkImportDialog } from "@/components/pos/BulkImportDialog";
@@ -81,8 +82,11 @@ function Inventory() {
   const [skuOverride, setSkuOverride] = useState(false);
   const autoSku = readSkuSettings().mode === "auto";
 
-  const rows = state.products.filter((p) =>
-    `${p.name} ${p.sku} ${p.barcode} ${p.category}`.toLowerCase().includes(query.toLowerCase()),
+  const rows = state.products.filter(
+    (p) =>
+      // Items owned by a private-catalogue branch stay at that branch.
+      productVisibleAt(state.settings, p.id, state.currentStoreId) &&
+      `${p.name} ${p.sku} ${p.barcode} ${p.category}`.toLowerCase().includes(query.toLowerCase()),
   );
   const pager = usePagination(rows, 25);
   const pageRows = pager.pageItems;

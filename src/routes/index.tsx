@@ -55,6 +55,7 @@ import {
 } from "@/components/ui/sheet";
 import { availableAt, cartTotals, money, stockAt, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
+import { productVisibleAt } from "@/lib/branch-policy";
 import { useUserPermissions } from "@/lib/pos-permissions";
 import { useVisibility } from "@/lib/ui-visibility";
 import { useUiScale } from "@/lib/use-ui-scale";
@@ -221,6 +222,7 @@ function Register() {
   );
 
   const filtered = state.products.filter((p) => {
+    if (!productVisibleAt(state.settings, p.id, state.currentStoreId)) return false;
     const q = query.trim().toLowerCase();
     const match =
       !q ||
