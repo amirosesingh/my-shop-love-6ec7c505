@@ -25,19 +25,6 @@ Applied across the register action bar, cart rows, catalog panel header, invento
 - **Manage terminals from the phone.** A mobile-friendly terminal manager lists every PC terminal with location, status and last seen, and lets an admin issue, re-issue, revoke or delete a token. Mobile devices are filtered out of that list.
 - **Production-grade scanning** (shared by the register scanner and the activation scanner): explicit camera-permission request with a clear denied state and guidance to re-enable it, 700 ms debounce so one barcode can't fire twice, a confirmation step showing what was scanned before it is applied, torch toggle where supported, and a manual search/entry fallback whenever the camera is unavailable or a scan finds nothing.
 
-## 4. Branch stock and catalogue as real, tracked data
-
-Products themselves are already real database rows in the `products` table. What is not: each product's per-branch stock is packed into a `stock_by_store` JSON field on that row, and the private-stock / private-catalogue switches plus product ownership sit inside the settings JSON blob — which is why per-branch stock and branch rules cannot be queried, reported on or audited.
-
-Move them to proper database tables — the secure route: no table is created on the fly from the browser, the app writes rows, not schema.
-
-- `branch_policies` — one row per branch holding the five switches, with who changed what and when.
-- `branch_stock` — per branch, per product stock with its own timestamps; the authoritative source for a private-stock branch and for group totals.
-- `branch_products` — which branch owns/publishes which product, driving the private catalogue rule.
-
-Flipping a switch in Inventory & Supply immediately creates that branch's rows and the screen shows a live table for the branch without any manual setup. Every change is recorded in the audit log.
-
-Windows also mirrors these three tables into the local SQL Server database and syncs them through the existing outbox, so a branch keeps working offline. Android does not mirror them — it reads them live, as required.
 
 ## Technical notes
 
