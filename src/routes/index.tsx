@@ -838,8 +838,11 @@ function Register() {
     // The headline method stays the largest tender so reports keep working.
     const headline = payments.reduce((a, p) => (p.amount > a.amount ? p : a), payments[0]!).method;
     rememberBanks(payments.map((p) => p.bankName ?? ""));
-    const sale = recordSale({
-      storeId: currentStore.id,
+    let sale: Sale;
+    try {
+      setSaving(true);
+      sale = await recordSale({
+        storeId: currentStore.id,
       shiftId: activeShift.id,
       lines,
       subtotal: totals.subtotal,
@@ -867,7 +870,17 @@ function Register() {
             couponRemaining: coupon.remaining,
           }
         : {}),
-    });
+      });
+    } catch (e) {
+      toast.error("Payment was not saved", {
+        description:
+          (e as { message?: string })?.message ??
+          "Nothing was stored, so the ticket is untouched — try again.",
+      });
+      return;
+    } finally {
+      setSaving(false);
+    }
     if (coupon) {
       logger.log("promotion", "Coupon redeemed on a bill", "register", {
         receiptNo: sale.receiptNo,
