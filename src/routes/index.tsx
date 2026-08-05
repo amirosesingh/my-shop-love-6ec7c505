@@ -762,6 +762,8 @@ function Register() {
     setServiceId("");
     setCustomService("");
     setServiceFee("");
+    resetJobCard();
+    setBookMode("cart");
     setPayTiming("deposit");
     setDueDate(isoDaysFromNow(14));
     toast.success(`Booking ${booking.ref} reserved until ${new Date(booking.dueDate).toDateString()}`);
