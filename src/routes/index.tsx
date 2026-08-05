@@ -1738,41 +1738,46 @@ function Register() {
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Transaction actions
             </p>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid auto-rows-fr grid-cols-2 gap-2">
               {visible("register.holdOrder") && (
               <ActionButton
                 variant="outline"
-                className="h-16"
+                className="h-16 min-w-0"
                 label="Hold order"
                 icon={<PauseCircle className="size-4" />}
-                disabled={!lines.length}
+                disabled={!lines.length || tillLocked}
+                disabledReason={tillLocked ? lockedReason : undefined}
                 onClick={holdOrder}
               />
               )}
               <ActionButton
                 variant="outline"
-                className="h-16 text-destructive hover:text-destructive"
+                className="h-16 min-w-0 text-destructive hover:text-destructive"
                 label="Void cart"
                 icon={<Trash2 className="size-4" />}
-                disabled={!lines.length}
+                disabled={!lines.length || tillLocked}
+                disabledReason={tillLocked ? lockedReason : undefined}
                 onClick={() => void clearCart()}
               />
               {visible("register.coupon") && (
               <ActionButton
                 variant="outline"
-                className="h-16"
+                className="h-16 min-w-0"
                 label="Apply coupon"
                 icon={<TicketPercent className="size-4" />}
+                disabled={tillLocked}
+                disabledReason={tillLocked ? lockedReason : undefined}
                 onClick={() => setCouponOpen(true)}
               />
               )}
               {visible("register.splitBill") && (
               <ActionButton
                 variant="outline"
-                className="h-16"
+                className="h-16 min-w-0"
                 label="Split bill"
                 icon={<Split className="size-4" />}
-                disabled={balanceDue <= 0}
+                disabled={balanceDue <= 0 || tillLocked}
+                disabledReason={tillLocked ? lockedReason : undefined}
                 onClick={() => setSplitOpen(true)}
               />
               )}
@@ -1810,7 +1815,8 @@ function Register() {
                 className="h-14 w-full text-base sm:gap-3"
                 label="Cash"
                 icon={<Banknote className="size-5" />}
-                disabled={!lines.length || !activeShift}
+                disabled={!lines.length || tillLocked}
+                disabledReason={tillLocked ? lockedReason : undefined}
                 onClick={() => openPayment("cash")}
               />
               <ActionButton
@@ -1819,7 +1825,8 @@ function Register() {
                 className="h-14 w-full text-base sm:gap-3"
                 label="Card"
                 icon={<CreditCard className="size-5" />}
-                disabled={!lines.length || !activeShift}
+                disabled={!lines.length || tillLocked}
+                disabledReason={tillLocked ? lockedReason : undefined}
                 onClick={() => openPayment("card")}
               />
               <ActionButton
@@ -1828,7 +1835,8 @@ function Register() {
                 className="h-14 w-full text-base sm:gap-3"
                 label="Digital pay"
                 icon={<Wallet className="size-5" />}
-                disabled={!lines.length || !activeShift}
+                disabled={!lines.length || tillLocked}
+                disabledReason={tillLocked ? lockedReason : undefined}
                 onClick={() => openPayment("wallet")}
               />
             </div>
@@ -1849,6 +1857,8 @@ function Register() {
               className="h-12 w-full sm:gap-3"
               label="Open cash drawer"
               icon={<Vault className="size-4" />}
+              disabled={tillLocked}
+              disabledReason={tillLocked ? lockedReason : undefined}
               onClick={async () => {
                 if (!(await requirePermission("can_open_drawer"))) return;
                 setNoSaleNote("");
