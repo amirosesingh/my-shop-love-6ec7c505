@@ -96,7 +96,10 @@ function Transfers() {
   const requireApproval = state.settings.integrations.requireTransferApproval;
   const canApprove = can("can_approve_transfer") || can("can_receive_transfer");
 
-  const others = stores.filter((s) => s.id !== currentStore.id);
+  // A branch with transfers switched off cannot send or receive stock.
+  const others = stores.filter(
+    (s) => s.id !== currentStore.id && branchPolicy(state.settings, s.id).allowTransfers,
+  );
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<TransferKind>("transfer");
   const [items, setItems] = useState<TransferItem[]>([]);
