@@ -599,6 +599,12 @@ function Register() {
       toast.error("Open a shift before taking a booking");
       return;
     }
+    if (!serviceIsJob && !lines.length) {
+      toast.error("Add at least one item to the cart before booking", {
+        description: "Only racket / stringing jobs can be booked with an empty cart.",
+      });
+      return;
+    }
     if (!(await requirePermission("can_process_sale"))) return;
     const paidNow =
       payTiming === "collection"
