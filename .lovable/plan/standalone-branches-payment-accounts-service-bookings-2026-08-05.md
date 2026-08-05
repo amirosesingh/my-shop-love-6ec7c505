@@ -1,79 +1,78 @@
-# Standalone branches, payment accounts, service bookings
+# Saved settings, 58mm printing, audit categories and coupon voucher tracking
 
-## 1. Branch isolation with toggles
+## 1. Settings that stay saved
 
-Each branch (store) gets three independent switches in Locations settings, all
-defaulting to today's shared behaviour:
+Settings pages currently write as you type, so a field that fails to reach the database
+only shows up as a wrong value after a restart.
 
-- **Private stock** — stock levels for this branch are excluded from other
-  branches' views and from the group dashboard totals.
-- **Private catalogue** — products created at this branch stay local and are
-  hidden from other branches.
-- **Allow transfers** — when off, this branch cannot send or receive stock
-  transfers, and it disappears from other branches' transfer destination lists.
+- Each settings page gets a footer bar: **Save settings**, **Discard changes**, and a
+  status line ("All changes saved · 09:14" / "Unsaved changes" / "Could not save — retry").
+- Edits are held in the page until you press Save, then written to the database in one
+  go and confirmed. Nothing is applied half-way.
+- Leaving a page with unsaved changes asks first.
+- Saved values are re-read from the database on start, so re-running the app never
+  re-adds defaults or re-creates entries that were removed. Setting groups that are
+  missing in the database (payment accounts, booking services, branch policies, time
+  zone, integrations) are added to the stored record so they survive too.
+- Display & text size stays per terminal (it is hardware, not company policy) but is
+  also written to that terminal's record so a reinstall restores it.
 
-Plus a master **Branch sync** control with two sub-toggles:
+## 2. Text size actually changes text
 
-- *Sync inventory* — stock and product changes push to the central server.
-- *Sync everything else* — sales, shifts, members, audit.
+The text-size slider only affects elements inside the scaled shell today, so many
+screens look unchanged. It will drive the root font size instead, so headings, tables,
+dialogs and menus resize together, while buttons keep their touch-safe minimum height.
+The settings preview reflects the real result.
 
-Every one of these switches opens a confirmation dialog naming the branch and
-spelling out the consequence before it flips, and each change is written to the
-audit log with the staff member who made it.
+## 3. 58mm slips cut off on the left
 
-## 2. Suppliers on/off from the list
+The 58mm layout prints a body wider than the paper's real printable area, so the left
+edge falls off the roll.
 
-The suppliers table gets an inline active switch on every row, so a supplier can
-be deactivated without opening the edit dialog. Inactive suppliers stop appearing
-in purchase-order pickers but keep their history.
+- 58mm printable width is corrected to the roll's true print band, and column counts,
+  font sizes, barcode and QR widths are recalculated from it.
+- A per-paper **Print width (mm)** and left-offset control is added to Receipt printer
+  settings, so a printer that starts a few millimetres further right can be nudged.
+- Barcodes and QR blocks scale to the printable width instead of a fixed size.
+- The test slip prints an edge ruler so you can confirm nothing is clipped.
 
-## 3. Region-based time
+## 4. Audit and activity trail categories
 
-A **Time zone** setting (region list, e.g. Asia/Kuala_Lumpur) in system settings.
-When set, all POS timestamps that are displayed or printed — receipts, shift open
-and close, bookings, reports, live clock — are formatted in that zone instead of
-the PC's own clock. Stored values remain absolute timestamps, so branches in
-different zones stay comparable. Default is "Use this computer's time zone".
+The category filter becomes a dropdown of business-language groups rather than
+technical names: Sales, Payments, Returns & exchanges, No-sale / drawer, Discounts &
+coupons, Inventory, Shifts & attendance, Members, Settings, Security. Every logged
+action maps to one of these, old records included, and the same names are used in the
+row badges, the detail panel and CSV export.
 
-## 4. Payment accounts (card machines, bank accounts, e-wallets)
+## 5. Coupon campaigns: full voucher register
 
-New admin-managed list: **Payment accounts**, each with a name, a type (card
-machine / bank account / e-wallet / other), optional bank name and account
-number, an active switch, and optional branch restriction.
-
-At the till, when a tender is card, bank transfer or wallet, the cashier picks
-the account from a dropdown of active accounts instead of typing a bank name
-free-hand. The chosen account is saved on the sale, printed on the receipt, and
-becomes a filter and grouping column in sales and payment reports so takings can
-be reconciled per machine/account.
-
-Existing free-typed bank names keep working for old sales.
-
-## 5. Bookings: service type, service fee, pay now or on collection
-
-- Admin-managed **Service types** list (name, default fee, active switch), with
-  a toggle to also allow a free-text "other" type when nothing fits.
-- Booking creation gains a service-type dropdown; picking one pre-fills the
-  service fee, which the cashier can override. The fee is added as a line on the
-  booking and appears on the slip and the final receipt.
-- A payment-timing choice on the booking: **Pay now**, **Deposit**, or **Pay on
-  collection**. Pay-on-collection bookings are created with zero paid and are
-  clearly flagged in the bookings list and on the printed slip.
-- Bookings list gains a service-type filter and shows the type as a badge.
+- Opening a campaign shows a **Vouchers** tab listing every token created for it:
+  token, member, phone, issued date, expiry, source (claimed / issued manually) and
+  status — Available, Used (with bill number, shop, cashier, time), Expired, Disabled.
+- Counters at the top: created, available, used, expired, disabled, redemption rate.
+- Search and status filter, plus CSV export of the voucher register.
+- **Disable voucher** action (single or bulk). A disabled voucher can no longer be
+  scanned at the till; the reason and who disabled it are recorded.
+- A used voucher is already locked at redemption; the till now also refuses disabled
+  and expired ones with a clear message instead of a generic error.
+- Every event — created, claimed, issued manually, redeemed, disabled, re-enabled,
+  blocked attempt — is written to the coupon event log in the same transaction and is
+  visible and exportable from the Audit log tab.
 
 ## Technical notes
 
-- Schema additions: store flags (`private_stock`, `private_catalogue`,
-  `allow_transfers`, `sync_inventory`, `sync_other`), `payment_accounts` table,
-  `booking_service_types` table, sale/tender `payment_account_id`, booking
-  `service_type_id`, `service_fee`, `payment_timing`; plus grants, RLS and
-  timezone/settings columns on `pos_settings`. Delivered as one migration and
-  mirrored into `electron/db/schema.sql` for the local SQL Server.
-- Sync gating is enforced in `src/lib/sync-outbox.ts` / `sync-engine.ts` by
-  filtering queued operations against the active branch's flags, so switching
-  sync off simply holds rows in the outbox rather than dropping them.
-- Stock and catalogue visibility filters live in `src/lib/pos-store.tsx` and the
-  all-shops dashboard, keyed off the branch flags.
-- Time zone formatting goes through one shared helper used by print, reports and
-  the live clock, rather than scattered `toLocaleString` calls.
-- Confirmation dialogs reuse the existing dialog component; no new dependency.
+- New `supabase/schema22.sql`: `issued_vouchers` gains `DISABLED` status plus
+  `disabled_at`, `disabled_by`, `disable_reason`; new `voucher_set_status` security
+  definer function writing a `coupon_events` row; `voucher_redeem` rejects `DISABLED`;
+  a campaign voucher-register view for the admin list.
+- `src/lib/pos-db.ts` `saveSettings` writes the full settings record and returns the
+  saved row so the UI can confirm; a `useSettingsDraft` hook backs the new save/discard
+  footer used by every `SettingsFrame` page.
+- `src/lib/use-ui-scale.ts` applies `--pos-text-scale` to the root font size;
+  `styles.css` keeps control min-heights on `--pos-scale` only.
+- `src/lib/pos-print.ts`: `PAPER_MM`/`paperCss` corrected for 58mm, printable width and
+  offset read from printer prefs, barcode/QR sized relative to it.
+- `src/lib/audit-log.ts`: category taxonomy rewritten with legacy mapping; `audit.tsx`
+  and the activity report use the shared list.
+- `src/lib/coupons.ts` plus a new `CampaignVouchers.tsx` tab in `src/routes/coupons.tsx`.
+- Version bump on release.
