@@ -2,7 +2,9 @@ import { DownloadCloud, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { APP_VERSION, useAppUpdates } from "@/lib/app-updates";
+import { useEffect, useState } from "react";
 import { useAndroidUpdates } from "@/lib/android-updates";
+import { isAndroid, isNative } from "@/lib/native";
 import { checkWebBundle } from "@/lib/web-bundle-updates";
 
 const LABELS: Record<string, string> = {
@@ -19,10 +21,14 @@ const LABELS: Record<string, string> = {
  *  card still shows the running version, with checks disabled. */
 export function AppUpdateSettings() {
   const { state, supported, check, install, lastChecked } = useAppUpdates();
-  const android = useAndroidUpdates();
+  const [onAndroid, setOnAndroid] = useState(false);
   const version = state.version || APP_VERSION;
 
-  if (android.state.supported) return <AndroidUpdateCard />;
+  useEffect(() => {
+    setOnAndroid(isNative() && isAndroid());
+  }, []);
+
+  if (onAndroid) return <AndroidUpdateCard />;
 
   return (
     <section className="rounded-lg border border-border bg-card p-5">
