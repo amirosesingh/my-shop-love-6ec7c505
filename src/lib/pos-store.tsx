@@ -774,6 +774,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
   );
 
   const refundSale = useCallback((saleId: string) => {
+
     logger.log("sale_event", "Sale refunded", "receipts", {
       saleId,
       receiptNo: stateRef.current.sales.find((x) => x.id === saleId)?.receiptNo ?? null,
