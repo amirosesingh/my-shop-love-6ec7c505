@@ -92,8 +92,8 @@ function HoldTickets() {
           <div>
             <h1 className="text-2xl font-semibold">Hold tickets</h1>
             <p className="text-sm text-muted-foreground">
-              {tickets.length} parked ticket{tickets.length === 1 ? "" : "s"} at{" "}
-              {currentStore.name} · signed in as {user?.name}
+              {tickets.length} parked ticket{tickets.length === 1 ? "" : "s"} at {currentStore.name}{" "}
+              · signed in as {user?.name}
             </p>
           </div>
           <Button variant="outline" onClick={() => void navigate({ to: "/" })}>
@@ -181,7 +181,10 @@ function HoldTickets() {
               ))}
               {tickets.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
+                  <TableCell
+                    colSpan={6}
+                    className="py-10 text-center text-sm text-muted-foreground"
+                  >
                     <PauseCircle className="mx-auto mb-2 size-5" />
                     No tickets on hold. Park one from the register with “Hold order”.
                   </TableCell>
@@ -208,11 +211,11 @@ function HoldTickets() {
                     <span className="text-muted-foreground">
                       by {e.staffName}
                       {e.role ? ` (${e.role})` : ""}
-                      {typeof e.details?.['lines'] === "number"
-                        ? ` · ${String(e.details['lines'])} item(s)`
+                      {typeof e.details?.["lines"] === "number"
+                        ? ` · ${String(e.details["lines"])} item(s)`
                         : ""}
-                      {typeof e.details?.['receiptNo'] === "string"
-                        ? ` · ${String(e.details['receiptNo'])}`
+                      {typeof e.details?.["receiptNo"] === "string"
+                        ? ` · ${String(e.details["receiptNo"])}`
                         : ""}
                     </span>
                   </span>
