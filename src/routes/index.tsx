@@ -964,6 +964,16 @@ function Register() {
     toast.success(parked ? "Switched ticket — the previous one is on hold" : "Held order resumed");
   }
 
+  /** Arriving from the Hold tickets screen with ?resume=<id>. */
+  const { resume } = Route.useSearch();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (!resume) return;
+    resumeHeld(resume);
+    void navigate({ to: "/", search: {}, replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resume]);
+
   async function applyCoupon() {
     const code = couponCode.trim();
     if (!code) return;
