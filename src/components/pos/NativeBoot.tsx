@@ -1,14 +1,16 @@
 /**
  * Phone start-up gate.
  *
- * On Android the offline state lives in the device's own storage, so it has to
- * be pulled back into `localStorage` before any provider reads it. On web and
- * desktop this renders its children straight away.
+ * Android runs live-only, so start-up clears any business data left on the
+ * device, restores the handful of interface preferences and then checks for a
+ * newer web bundle in the update bucket. On web and desktop this renders its
+ * children straight away.
  */
 import { useEffect, useState } from "react";
 
 import { isNative } from "../../lib/native";
 import { hydrateNativeStorage } from "../../lib/mobile-storage";
+import { applyPendingWebBundle } from "../../lib/web-bundle-updates";
 
 export function NativeBoot({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(() => !isNative());
@@ -16,11 +18,18 @@ export function NativeBoot({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (ready) return;
     let cancelled = false;
-    void hydrateNativeStorage().finally(() => {
+    void hydrateNativeStorage()
+      .then(() => applyPendingWebBundle())
+      .finally(() => {
+        if (!cancelled) setReady(true);
+      });
+    // Never leave the phone on the splash if a plugin hangs.
+    const watchdog = window.setTimeout(() => {
       if (!cancelled) setReady(true);
-    });
+    }, 6000);
     return () => {
       cancelled = true;
+      window.clearTimeout(watchdog);
     };
   }, [ready]);
 
