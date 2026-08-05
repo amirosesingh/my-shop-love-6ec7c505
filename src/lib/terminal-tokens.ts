@@ -454,7 +454,9 @@ export function decodePairingRequest(value: string): PairingRequest | null {
  * phone. Same claim-once rules as pasting a code by hand.
  */
 export async function activateWithTokenId(tokenId: string): Promise<TerminalConfig | null> {
-  const remote = await fetchTokenStatus(tokenId).catch(() => null);
+  const remote = await fetchTokenStatus(tokenId).catch((e: unknown) => {
+    throw new ActivationError(activationFailureMessage(e));
+  });
   if (!remote) return null; // not approved yet
   if (remote.status !== "active") {
     throw new ActivationError(

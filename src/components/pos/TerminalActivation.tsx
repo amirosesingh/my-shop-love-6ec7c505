@@ -82,10 +82,13 @@ export function TerminalActivation({ onActivated }: { onActivated: (c: TerminalC
           (text) => {
             if (stopped) return;
             stopped = true;
-            void scanner.stop().then(() => {
-              setScanning(false);
-              void submit(text);
-            });
+            void scanner
+              .stop()
+              .catch(() => {})
+              .then(() => {
+                setScanning(false);
+                void submit(text);
+              });
           },
           () => {},
         );
@@ -116,6 +119,7 @@ export function TerminalActivation({ onActivated }: { onActivated: (c: TerminalC
         if (!stopped && e instanceof ActivationError) setError(e.message);
       }
     };
+    void tick();
     const timer = window.setInterval(() => void tick(), 3000);
     return () => {
       stopped = true;
