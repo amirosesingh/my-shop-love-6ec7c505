@@ -199,6 +199,8 @@ function Register() {
   const [payTiming, setPayTiming] = useState<BookingPaymentTiming>("deposit");
   /* Racket stringing job card */
   const [jobOpen, setJobOpen] = useState(false);
+  /** Which flow opened the booking dialog: goods booking vs racket job. */
+  const [bookMode, setBookMode] = useState<"cart" | "racket">("cart");
   const [racketModel, setRacketModel] = useState("");
   const [stringType, setStringType] = useState("");
   const [tensionMain, setTensionMain] = useState("");
@@ -631,10 +633,23 @@ function Register() {
   );
   const useServices = !!state.settings.integrations.useServiceTypes;
   const pickedService = serviceTypes.find((s2) => s2.id === serviceId) ?? null;
-  /** Stringing work is the job itself — such a booking needs no cart lines. */
-  const serviceIsJob = !!pickedService?.isStringingJob;
-  const bookingNeedsNoCart = useServices && serviceTypes.some((s2) => s2.isStringingJob);
   const stringingService = serviceTypes.find((s2) => s2.isStringingJob) ?? null;
+  /** Goods bookings never offer stringing work — that is the racket flow. */
+  const cartServiceTypes = serviceTypes.filter((s2) => !s2.isStringingJob);
+  const racketMode = bookMode === "racket";
+
+  function resetJobCard() {
+    setJobOpen(false);
+    setRacketModel("");
+    setStringType("");
+    setTensionMain("");
+    setTensionCross("");
+    setTensionUnit("lb");
+    setGrommetNotes("");
+    setJobNotes("");
+    setPromisedAt("");
+    setNotifyWhatsApp(false);
+  }
 
   /** Racket / stringing job started from the products card — cart independent. */
   function startRacketBooking() {
@@ -649,6 +664,7 @@ function Register() {
       setServiceId(stringingService.id);
       setServiceFee(stringingService.fee ? String(stringingService.fee) : "");
     }
+    setBookMode("racket");
     setJobOpen(true);
     setBookOpen(true);
   }
@@ -661,7 +677,7 @@ function Register() {
       toast.error("Open a shift before taking a booking");
       return;
     }
-    if (!serviceIsJob && !jobOpen && !lines.length) {
+    if (!racketMode && !lines.length) {
       toast.error("Add at least one item to the cart before booking", {
         description: "Only racket / stringing jobs can be booked with an empty cart.",
       });
@@ -702,7 +718,7 @@ function Register() {
       customerPhone: bookPhone.trim() || member?.phone || "",
       note: bookNote.trim(),
       cashier: activeCashier,
-      job: jobOpen
+      job: racketMode
         ? {
             racketModel: racketModel.trim() || undefined,
             stringType: stringType.trim() || undefined,
