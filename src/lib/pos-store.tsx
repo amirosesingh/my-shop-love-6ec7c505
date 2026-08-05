@@ -215,7 +215,8 @@ export function PosProvider({ children }: { children: ReactNode }) {
     // Local-only slices (stores, shifts, transfers, counters) stay on the
     // terminal; catalogue, members, bills, promos and settings come from cloud.
     try {
-      const raw = window.localStorage.getItem(KEY);
+      // Android keeps nothing on the device — every slice is loaded live.
+      const raw = isLiveOnly() ? null : window.localStorage.getItem(KEY);
       if (raw) {
         const saved = JSON.parse(raw) as PosState;
         // Migrate single-product transfers saved before multi-item support.
@@ -283,6 +284,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!ready) return;
+    if (isLiveOnly()) return;
     try {
       window.localStorage.setItem(KEY, JSON.stringify(state));
     } catch {
