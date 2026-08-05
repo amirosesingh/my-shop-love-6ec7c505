@@ -54,7 +54,7 @@ function CatalogReport() {
       logs
         .filter(
           (l) =>
-            (l.category === "inventory" || l.category === "purchasing") && inRange(l.at, from, to),
+            l.category === "inventory" && inRange(l.at, from, to),
         )
         .filter((l) => {
           const needle = q.trim().toLowerCase();
