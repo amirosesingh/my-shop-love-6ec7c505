@@ -1436,27 +1436,14 @@ function Register() {
                   {!l.credit && !l.foc && discountAllowed && (
                     <div className="mt-2 flex items-center justify-end gap-1">
                       <span className="text-[11px] text-muted-foreground">Disc</span>
-                      <Input
-                        value={l.discount || ""}
-                        onChange={(e) => patchLine(i, { discount: Number(e.target.value) || 0 })}
-                        placeholder="0"
-                        className="numeric h-7 w-16 text-right text-xs"
-                      />
-                      <div className="flex overflow-hidden rounded-md border border-border">
-                        {(["amount", "percent"] as const).map((t) => (
-                          <button
-                            key={t}
-                            onClick={() => patchLine(i, { discountType: t })}
-                            className={`px-2 py-1 text-[11px] ${
-                              (l.discountType ?? "amount") === t
-                                ? "bg-primary/15 text-primary"
-                                : "text-muted-foreground hover:text-foreground"
-                            }`}
-                          >
-                            {t === "amount" ? "$" : "%"}
-                          </button>
-                        ))}
-                      </div>
+                      <button
+                        onClick={() => setPadTarget(i)}
+                        className="numeric rounded-md border border-border px-2 py-1 text-[11px] hover:border-primary hover:text-primary"
+                      >
+                        {l.discount
+                          ? `${l.discount}${(l.discountType ?? "amount") === "percent" ? "%" : ""}`
+                          : "Add discount"}
+                      </button>
                       <span className="numeric w-14 text-right text-[11px] text-muted-foreground">
                         -{money(lineUnitDiscount(l) * l.qty)}
                       </span>
