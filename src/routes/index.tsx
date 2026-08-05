@@ -56,6 +56,7 @@ import {
 import { availableAt, cartTotals, money, stockAt, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
 import { productVisibleAt } from "@/lib/branch-policy";
+import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { BOOKING_TIMING_LABELS, type BookingPaymentTiming } from "@/lib/pos-types";
 import { useUserPermissions } from "@/lib/pos-permissions";
 import { useVisibility } from "@/lib/ui-visibility";
