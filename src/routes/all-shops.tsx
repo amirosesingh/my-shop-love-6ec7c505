@@ -16,6 +16,7 @@ import {
 import { TablePagination, usePagination } from "@/components/pos/TablePagination";
 import { money, stockAt, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
+import { privateStockStores } from "@/lib/branch-policy";
 
 export const Route = createFileRoute("/all-shops")({
   head: () => ({
