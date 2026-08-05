@@ -1,21 +1,31 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Gift, Printer, ReceiptText, Search, ScrollText } from "lucide-react";
+import { Ban, Gift, Printer, ReceiptText, Search, ScrollText, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { money, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
+import { useUserPermissions } from "@/lib/pos-permissions";
 import {
   printSaleReceipt,
   printShiftReport,
   saleReceiptPreview,
   shiftReportPreview,
 } from "@/lib/pos-print";
-import type { Sale } from "@/lib/pos-types";
+import type { PaymentMethod, Sale } from "@/lib/pos-types";
 
 export const Route = createFileRoute("/receipts")({
   head: () => ({
@@ -37,6 +47,14 @@ export const Route = createFileRoute("/receipts")({
 });
 
 type Template = "standard" | "gift" | "zreport";
+
+const METHODS: { value: PaymentMethod; label: string }[] = [
+  { value: "cash", label: "Cash" },
+  { value: "card", label: "Card" },
+  { value: "wallet", label: "Wallet" },
+  { value: "points", label: "Points" },
+  { value: "bank_transfer", label: "Bank transfer" },
+];
 
 const TEMPLATES: { key: Template; label: string; icon: typeof Printer }[] = [
   { key: "standard", label: "Standard Customer Receipt", icon: ReceiptText },
