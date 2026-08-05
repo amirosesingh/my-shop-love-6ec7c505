@@ -1823,7 +1823,7 @@ function Register() {
                 icon={<PauseCircle className="size-4" />}
                 disabled={!lines.length || tillLocked}
                 disabledReason={tillLocked ? lockedReason : undefined}
-                onClick={holdOrder}
+                onClick={() => holdOrder()}
               />
               )}
               <ActionButton
