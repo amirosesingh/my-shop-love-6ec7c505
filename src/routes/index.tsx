@@ -198,7 +198,8 @@ function Register() {
   const [serviceFee, setServiceFee] = useState("");
   const [payTiming, setPayTiming] = useState<BookingPaymentTiming>("deposit");
   /* Racket stringing job card */
-  const [jobOpen, setJobOpen] = useState(false);
+  /** Which flow opened the booking dialog: goods booking vs racket job. */
+  const [bookMode, setBookMode] = useState<"cart" | "racket">("cart");
   const [racketModel, setRacketModel] = useState("");
   const [stringType, setStringType] = useState("");
   const [tensionMain, setTensionMain] = useState("");
@@ -631,10 +632,22 @@ function Register() {
   );
   const useServices = !!state.settings.integrations.useServiceTypes;
   const pickedService = serviceTypes.find((s2) => s2.id === serviceId) ?? null;
-  /** Stringing work is the job itself — such a booking needs no cart lines. */
-  const serviceIsJob = !!pickedService?.isStringingJob;
-  const bookingNeedsNoCart = useServices && serviceTypes.some((s2) => s2.isStringingJob);
   const stringingService = serviceTypes.find((s2) => s2.isStringingJob) ?? null;
+  /** Goods bookings never offer stringing work — that is the racket flow. */
+  const cartServiceTypes = serviceTypes.filter((s2) => !s2.isStringingJob);
+  const racketMode = bookMode === "racket";
+
+  function resetJobCard() {
+    setRacketModel("");
+    setStringType("");
+    setTensionMain("");
+    setTensionCross("");
+    setTensionUnit("lb");
+    setGrommetNotes("");
+    setJobNotes("");
+    setPromisedAt("");
+    setNotifyWhatsApp(false);
+  }
 
   /** Racket / stringing job started from the products card — cart independent. */
   function startRacketBooking() {
@@ -649,11 +662,12 @@ function Register() {
       setServiceId(stringingService.id);
       setServiceFee(stringingService.fee ? String(stringingService.fee) : "");
     }
-    setJobOpen(true);
+    setBookMode("racket");
     setBookOpen(true);
   }
   const serviceLabel = pickedService?.name ?? customService.trim();
-  const serviceCharge = useServices ? r2(Math.max(0, Number(serviceFee || 0))) : 0;
+  const serviceCharge =
+    useServices || racketMode ? r2(Math.max(0, Number(serviceFee || 0))) : 0;
   const bookingTotal = r2(totals.total + serviceCharge);
 
   async function bookAndPayLater() {
@@ -661,7 +675,7 @@ function Register() {
       toast.error("Open a shift before taking a booking");
       return;
     }
-    if (!serviceIsJob && !jobOpen && !lines.length) {
+    if (!racketMode && !lines.length) {
       toast.error("Add at least one item to the cart before booking", {
         description: "Only racket / stringing jobs can be booked with an empty cart.",
       });
@@ -702,7 +716,7 @@ function Register() {
       customerPhone: bookPhone.trim() || member?.phone || "",
       note: bookNote.trim(),
       cashier: activeCashier,
-      job: jobOpen
+      job: racketMode
         ? {
             racketModel: racketModel.trim() || undefined,
             stringType: stringType.trim() || undefined,
@@ -748,6 +762,8 @@ function Register() {
     setServiceId("");
     setCustomService("");
     setServiceFee("");
+    resetJobCard();
+    setBookMode("cart");
     setPayTiming("deposit");
     setDueDate(isoDaysFromNow(14));
     toast.success(`Booking ${booking.ref} reserved until ${new Date(booking.dueDate).toDateString()}`);
@@ -1733,12 +1749,14 @@ function Register() {
                   className="h-11 w-full"
                   label="Book & pay later"
                   icon={<CalendarClock className="size-4" />}
-                  disabled={tillLocked || refundDue > 0 || (!lines.length && !bookingNeedsNoCart)}
+                  disabled={tillLocked || refundDue > 0 || !lines.length}
                   disabledReason={tillLocked ? lockedReason : undefined}
                   onClick={() => {
                     setDeposit("");
                     setBookName(member?.name ?? "");
                     setBookPhone(member?.phone ?? "");
+                    setBookMode("cart");
+                    resetJobCard();
                     setBookOpen(true);
                   }}
                 />
@@ -2475,11 +2493,19 @@ function Register() {
         </DialogContent>
       </Dialog>
 
-      {/* Book & pay later */}
-      <Dialog open={bookOpen} onOpenChange={setBookOpen}>
+      {/* Book & pay later (goods) / racket stringing booking */}
+      <Dialog
+        open={bookOpen}
+        onOpenChange={(o) => {
+          setBookOpen(o);
+          if (!o && racketMode) resetJobCard();
+        }}
+      >
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Book &amp; pay later</DialogTitle>
+            <DialogTitle>
+              {racketMode ? "Racket / stringing booking" : "Book & pay later"}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div className="rounded-md border border-border px-3 py-2 text-sm">
@@ -2506,11 +2532,12 @@ function Register() {
                 </span>
               </div>
               <p className="mt-1 text-[11px] text-muted-foreground">
-                {lines.reduce((a, l) => a + l.qty, 0)} unit(s) are reserved at{" "}
-                {currentStore.name} until the collect-by date.
+                {racketMode
+                  ? `Job taken at ${currentStore.name} — no cart items needed.`
+                  : `${lines.reduce((a, l) => a + l.qty, 0)} unit(s) are reserved at ${currentStore.name} until the collect-by date.`}
               </p>
             </div>
-            {useServices && (
+            {useServices && !racketMode && (
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label>What is this booking for?</Label>
@@ -2522,11 +2549,9 @@ function Register() {
                       setServiceId(v);
                       const hit = serviceTypes.find((s2) => s2.id === v);
                       if (hit) setServiceFee(hit.fee ? String(hit.fee) : "");
-                      // A racket / stringing service opens its job card straight away.
-                      if (hit?.isStringingJob) setJobOpen(true);
                     }}
                     options={[
-                      ...serviceTypes.map((s2) => ({ value: s2.id, label: s2.name })),
+                      ...cartServiceTypes.map((s2) => ({ value: s2.id, label: s2.name })),
                       ...(state.settings.integrations.allowCustomServiceType !== false
                         ? [{ value: "", label: "Something else…" }]
                         : []),
@@ -2554,6 +2579,18 @@ function Register() {
                     Added on top of the items in the cart.
                   </p>
                 </div>
+              </div>
+            )}
+            {racketMode && (
+              <div className="space-y-1">
+                <Label>Stringing fee</Label>
+                <Input
+                  className="numeric text-right"
+                  inputMode="decimal"
+                  placeholder="0.00"
+                  value={serviceFee}
+                  onChange={(e) => setServiceFee(e.target.value)}
+                />
               </div>
             )}
             <div className="space-y-1">
@@ -2653,23 +2690,16 @@ function Register() {
               />
             </div>
 
-            {/* Racket stringing job card */}
+            {/* Racket stringing job card — racket bookings only */}
+            {racketMode && (
             <div className="rounded-md border border-border">
-              <button
-                type="button"
-                onClick={() => setJobOpen((v) => !v)}
-                className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium"
-              >
+              <div className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium">
                 <span className="flex min-w-0 items-center gap-2">
                   <Wrench className="size-4 shrink-0 text-primary" />
                   <span className="truncate">Racket / stringing job card</span>
                 </span>
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  {jobOpen ? "Hide" : "Add"}
-                </span>
-              </button>
-              {jobOpen && (
-                <div className="space-y-3 border-t border-border p-3">
+              </div>
+              <div className="space-y-3 border-t border-border p-3">
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <Label>Racket brand / model</Label>
@@ -2764,9 +2794,9 @@ function Register() {
                   <p className="text-[11px] text-muted-foreground">
                     A job tag prints with the slip so it can be tied to the racket.
                   </p>
-                </div>
-              )}
+              </div>
             </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBookOpen(false)}>
