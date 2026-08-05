@@ -93,6 +93,26 @@ export async function ensureLocations(locations: TokenLocation[]): Promise<void>
 const asStatus = (value: unknown): TokenStatus =>
   value === "revoked" ? "revoked" : value === "used" ? "used" : "active";
 
+/**
+ * Older POS databases predate the `platform` column, and PostgREST then rejects
+ * the write with "could not find the platform column ... in the schema cache".
+ * Run supabase/schema25.sql to add it; until then those rows are plain PC tills.
+ */
+const isMissingColumn = (error: { message?: string; code?: string } | null, column: string) =>
+  !!error &&
+  (error.code === "PGRST204" || /schema cache|does not exist/i.test(error.message ?? "")) &&
+  (error.message ?? "").includes(column);
+
+/** Insert a token row, retrying without `platform` on legacy databases. */
+async function insertTokenRow(row: Record<string, unknown>): Promise<void> {
+  const { error } = await table().insert([row]);
+  if (!error) return;
+  if (!isMissingColumn(error, "platform")) throw error;
+  const { platform: _platform, ...legacy } = row;
+  const retry = await table().insert([legacy]);
+  if (retry.error) throw retry.error;
+}
+
 const rowToToken = (r: Record<string, any>): TerminalToken => ({
   id: r.id,
   locationId: r.location_id ?? null,
