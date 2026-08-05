@@ -12,7 +12,6 @@ import {
   Wallet,
   Gift,
   Vault,
-  Lock,
   Info,
   UserPlus,
   X,
@@ -1205,6 +1204,16 @@ function Register() {
               visible("register.customerDisplay") ? openCustomerDisplay : undefined
             }
             onOpenShift={() => setOpenShiftOpen(true)}
+            onCloseShift={
+              visible("register.closeShift")
+                ? async () => {
+                    if (!(await requirePermission("can_close_shift"))) return;
+                    setCountedCash("");
+                    setCloseNote("");
+                    setCloseShiftOpen(true);
+                  }
+                : undefined
+            }
             showSearch={false}
           />
         </section>
@@ -1247,36 +1256,9 @@ function Register() {
           <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border px-4 py-3">
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">Current ticket</p>
-              <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <p className="numeric truncate text-[11px] text-muted-foreground">
-                  {activeShift ? `${activeShift.cashier} · shift open` : "No shift open"}
-                </p>
-                {activeShift
-                  ? visible("register.closeShift") && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 shrink-0 px-2 text-[11px]"
-                        onClick={async () => {
-                          if (!(await requirePermission("can_close_shift"))) return;
-                          setCountedCash("");
-                          setCloseNote("");
-                          setCloseShiftOpen(true);
-                        }}
-                      >
-                        <Lock className="size-3.5" /> Close shift
-                      </Button>
-                    )
-                  : (
-                      <Button
-                        size="sm"
-                        className="h-7 shrink-0 px-2 text-[11px]"
-                        onClick={() => setOpenShiftOpen(true)}
-                      >
-                        <Lock className="size-3.5" /> Open shift
-                      </Button>
-                    )}
-              </div>
+              <p className="numeric truncate text-[11px] text-muted-foreground">
+                {activeShift ? `${activeShift.cashier} · shift open` : "No shift open"}
+              </p>
             </div>
             <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
               <Button size="sm" className="lg:hidden" onClick={() => setCatalogOpen(true)}>
@@ -1304,123 +1286,131 @@ function Register() {
             </div>
           </div>
 
-          <div className="border-b border-border px-4 py-2">
-            <ScanBar onScan={scanCode} />
-          </div>
-
           <div className="border-b border-border px-4 py-3">
-            <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">
-              Search loyalty member
-            </Label>
-            {member ? (
-              <div className="mt-2 flex items-center gap-2 rounded-md border border-accent/50 bg-accent/10 px-3 py-2">
-                <BadgeCheck className="size-4 shrink-0 text-accent" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{member.name}</p>
-                  <p className="numeric text-[11px] text-muted-foreground">
-                    {member.code} · {member.tier} · {member.points} pts · {member.phone}
-                  </p>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="min-w-0">
+                <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  Scan barcode
+                </Label>
+                <div className="mt-2">
+                  <ScanBar onScan={scanCode} />
                 </div>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="size-7 shrink-0"
-                  aria-label="Purchase history"
-                  onClick={() => setHistoryMemberId(memberId)}
-                >
-                  <History className="size-3.5" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="size-7 shrink-0"
-                  aria-label="Detach member"
-                  onClick={() => setMemberId(null)}
-                >
-                  <X className="size-3.5" />
-                </Button>
               </div>
-            ) : null}
-            {member && memberVouchers.length ? (
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-2 h-8 w-full text-xs"
-                onClick={() => setVoucherPickerOpen(true)}
-              >
-                <TicketPercent className="size-3.5" /> Vouchers ({memberVouchers.length})
-              </Button>
-            ) : null}
-            {member ? null : (
-              <>
-                <div className="relative mt-2 max-w-md">
-                  <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    value={memberQuery}
-                    onChange={(e) => setMemberQuery(e.target.value)}
-                    placeholder="Phone number or name…"
-                    className="h-9 pl-8 text-sm"
-                  />
-                </div>
-                <div className="mt-2 space-y-1">
-                  {memberMatches.map((m) => (
-                    <div
-                      key={m.id}
-                      className="flex items-center gap-2 rounded-md border border-border px-2 py-1.5"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-xs font-medium">{m.name}</p>
-                        <p className="numeric text-[11px] text-muted-foreground">
-                          {m.phone} · {m.points} pts · {m.tier}
-                        </p>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-[11px]"
-                        onClick={() => setHistoryMemberId(m.id)}
-                      >
-                        <History className="size-3" /> History
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-[11px]"
-                        onClick={() => {
-                          setMemberId(m.id);
-                          setMemberQuery("");
-                          toast.success(`${m.name} attached to receipt`);
-                          // Surface any digital vouchers this member is holding.
-                          void loadMemberVouchers(m.id)
-                            .then((vs) => {
-                              if (!vs.length) return;
-                              toast.info(
-                                vs.length === 1
-                                  ? `${m.name} has a voucher: ${vs[0]!.campaign.name}`
-                                  : `${m.name} has ${vs.length} vouchers available`,
-                                {
-                                  action: {
-                                    label: "Apply",
-                                    onClick: () => void applyVoucher(vs[0]!.voucher.tokenSlug),
-                                  },
-                                },
-                              );
-                            })
-                            .catch(() => undefined);
-                        }}
-                      >
-                        <UserPlus className="size-3" /> Attach
-                      </Button>
+              <div className="min-w-0">
+                <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  Search loyalty member
+                </Label>
+                {member ? (
+                  <div className="mt-2 flex items-center gap-2 rounded-md border border-accent/50 bg-accent/10 px-3 py-2">
+                    <BadgeCheck className="size-4 shrink-0 text-accent" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{member.name}</p>
+                      <p className="numeric text-[11px] text-muted-foreground">
+                        {member.code} · {member.tier} · {member.points} pts · {member.phone}
+                      </p>
                     </div>
-                  ))}
-                  {memberQuery.trim() && !memberMatches.length && (
-                    <p className="py-1 text-[11px] text-muted-foreground">
-                      No member matches “{memberQuery}”.
-                    </p>
-                  )}
-                </div>
-              </>
-            )}
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="size-7 shrink-0"
+                      aria-label="Purchase history"
+                      onClick={() => setHistoryMemberId(memberId)}
+                    >
+                      <History className="size-3.5" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="size-7 shrink-0"
+                      aria-label="Detach member"
+                      onClick={() => setMemberId(null)}
+                    >
+                      <X className="size-3.5" />
+                    </Button>
+                  </div>
+                ) : null}
+                {member && memberVouchers.length ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-2 h-8 w-full text-xs"
+                    onClick={() => setVoucherPickerOpen(true)}
+                  >
+                    <TicketPercent className="size-3.5" /> Vouchers ({memberVouchers.length})
+                  </Button>
+                ) : null}
+                {member ? null : (
+                  <>
+                    <div className="relative mt-2">
+                      <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        value={memberQuery}
+                        onChange={(e) => setMemberQuery(e.target.value)}
+                        placeholder="Phone number or name…"
+                        className="h-9 pl-8 text-sm"
+                      />
+                    </div>
+                    <div className="mt-2 space-y-1">
+                      {memberMatches.map((m) => (
+                        <div
+                          key={m.id}
+                          className="flex items-center gap-2 rounded-md border border-border px-2 py-1.5"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-xs font-medium">{m.name}</p>
+                            <p className="numeric text-[11px] text-muted-foreground">
+                              {m.phone} · {m.points} pts · {m.tier}
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-[11px]"
+                            onClick={() => setHistoryMemberId(m.id)}
+                          >
+                            <History className="size-3" /> History
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-[11px]"
+                            onClick={() => {
+                              setMemberId(m.id);
+                              setMemberQuery("");
+                              toast.success(`${m.name} attached to receipt`);
+                              // Surface any digital vouchers this member is holding.
+                              void loadMemberVouchers(m.id)
+                                .then((vs) => {
+                                  if (!vs.length) return;
+                                  toast.info(
+                                    vs.length === 1
+                                      ? `${m.name} has a voucher: ${vs[0]!.campaign.name}`
+                                      : `${m.name} has ${vs.length} vouchers available`,
+                                    {
+                                      action: {
+                                        label: "Apply",
+                                        onClick: () => void applyVoucher(vs[0]!.voucher.tokenSlug),
+                                      },
+                                    },
+                                  );
+                                })
+                                .catch(() => undefined);
+                            }}
+                          >
+                            <UserPlus className="size-3" /> Attach
+                          </Button>
+                        </div>
+                      ))}
+                      {memberQuery.trim() && !memberMatches.length && (
+                        <p className="py-1 text-[11px] text-muted-foreground">
+                          No member matches “{memberQuery}”.
+                        </p>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
 
           <ScrollArea className="min-h-0 flex-1">

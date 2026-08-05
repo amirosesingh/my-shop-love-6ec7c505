@@ -23,6 +23,8 @@ export function CatalogPanel({
   onDetail,
   onOpenCustomerDisplay,
   onOpenShift,
+  onCloseShift,
+
   showHeaderActions = true,
   autoFocus = true,
   showSearch = true,
@@ -41,8 +43,10 @@ export function CatalogPanel({
   onDetail: (id: string) => void;
   onOpenCustomerDisplay?: () => void;
   onOpenShift?: () => void;
+  onCloseShift?: () => void;
   showHeaderActions?: boolean;
   autoFocus?: boolean;
+
   /** hidden on the till, where the dedicated scan bar above the cart is used */
   showSearch?: boolean;
 }) {
@@ -69,15 +73,22 @@ export function CatalogPanel({
         )}
         {showHeaderActions && (
           <div className="flex shrink-0 gap-2">
-            {onOpenCustomerDisplay && (
-              <Button variant="outline" className="h-11" onClick={onOpenCustomerDisplay}>
-                <MonitorPlay className="size-4" />
-                <span className="hidden xl:inline">Customer screen</span>
+            {shiftOpen && onCloseShift && (
+              <Button variant="outline" className="h-11" onClick={onCloseShift}>
+                <Lock className="size-4" />
+                <span className="hidden xl:inline">Close shift</span>
               </Button>
             )}
             {!shiftOpen && onOpenShift && (
               <Button className="h-11" onClick={onOpenShift}>
-                Open shift
+                <Lock className="size-4" />
+                <span className="hidden xl:inline">Open shift</span>
+              </Button>
+            )}
+            {onOpenCustomerDisplay && (
+              <Button variant="outline" className="h-11" onClick={onOpenCustomerDisplay}>
+                <MonitorPlay className="size-4" />
+                <span className="hidden xl:inline">Customer screen</span>
               </Button>
             )}
           </div>
