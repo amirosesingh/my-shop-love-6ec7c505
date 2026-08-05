@@ -77,7 +77,8 @@ export async function checkWebBundle(): Promise<string | null> {
     const current = readState()?.version ?? APP_VERSION;
     if (!manifest?.version || !isNewerBundle(manifest.version, current)) return null;
 
-    const url = manifest.url ?? `https://updatecms.luckycharmsdnbhd.com/pos-app/android/web/${manifest.file}`;
+    const url =
+      manifest.url ?? `https://updatecms.luckycharmsdnbhd.com/pos-app/android/web/${manifest.file}`;
     const zip = await fetch(url);
     if (!zip.ok) return null;
     const bytes = new Uint8Array(await zip.arrayBuffer());
