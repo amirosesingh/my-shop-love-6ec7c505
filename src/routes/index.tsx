@@ -75,7 +75,7 @@ import {
   voucherValue,
 } from "@/lib/coupons";
 import type { Campaign, VoucherView } from "@/lib/coupons";
-import type { CartLine, DiscountType, PaymentMethod, Sale } from "@/lib/pos-types";
+import type { Booking, CartLine, DiscountType, PaymentMethod, Sale } from "@/lib/pos-types";
 import type { Payment } from "@/lib/pos-types";
 import { TenderSplit, rememberBanks } from "@/components/pos/TenderSplit";
 import {
@@ -164,6 +164,8 @@ function Register() {
   const [exchangeRef, setExchangeRef] = useState<string | null>(null);
   const [memberId, setMemberId] = useState<string | null>(null);
   const [payOpen, setPayOpen] = useState(false);
+  /** True while a sale / booking is being stored — blocks a second click. */
+  const [saving, setSaving] = useState(false);
   const [openShiftOpen, setOpenShiftOpen] = useState(false);
   const [float, setFloat] = useState("150");
   const [cashier, setCashier] = useState(user?.name ?? "Cashier");
