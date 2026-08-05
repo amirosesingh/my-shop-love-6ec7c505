@@ -587,6 +587,9 @@ function Register() {
   );
   const useServices = !!state.settings.integrations.useServiceTypes;
   const pickedService = serviceTypes.find((s2) => s2.id === serviceId) ?? null;
+  /** Stringing work is the job itself — such a booking needs no cart lines. */
+  const serviceIsJob = !!pickedService?.isStringingJob;
+  const bookingNeedsNoCart = useServices && serviceTypes.some((s2) => s2.isStringingJob);
   const serviceLabel = pickedService?.name ?? customService.trim();
   const serviceCharge = useServices ? r2(Math.max(0, Number(serviceFee || 0))) : 0;
   const bookingTotal = r2(totals.total + serviceCharge);
@@ -2455,6 +2458,8 @@ function Register() {
                       setServiceId(v);
                       const hit = serviceTypes.find((s2) => s2.id === v);
                       if (hit) setServiceFee(hit.fee ? String(hit.fee) : "");
+                      // A racket / stringing service opens its job card straight away.
+                      if (hit?.isStringingJob) setJobOpen(true);
                     }}
                     options={[
                       ...serviceTypes.map((s2) => ({ value: s2.id, label: s2.name })),
