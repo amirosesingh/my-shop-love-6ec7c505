@@ -40,6 +40,7 @@ import { Route as ReportsCouponsRouteImport } from './routes/reports.coupons'
 import { Route as ReportsSalesRouteImport } from './routes/reports.sales'
 import { Route as ReportsStockRouteImport } from './routes/reports.stock'
 import { Route as SettingsIndexRouteImport } from './routes/settings.index'
+import { Route as SettingsAccountsRouteImport } from './routes/settings.accounts'
 import { Route as SettingsDisplayRouteImport } from './routes/settings.display'
 import { Route as SettingsElementsRouteImport } from './routes/settings.elements'
 import { Route as SettingsIdentityRouteImport } from './routes/settings.identity'
@@ -47,6 +48,7 @@ import { Route as SettingsLinesRouteImport } from './routes/settings.lines'
 import { Route as SettingsPaymentRouteImport } from './routes/settings.payment'
 import { Route as SettingsPrinterRouteImport } from './routes/settings.printer'
 import { Route as SettingsQrRouteImport } from './routes/settings.qr'
+import { Route as SettingsServicesRouteImport } from './routes/settings.services'
 import { Route as SettingsSkuRouteImport } from './routes/settings.sku'
 import { Route as SettingsSyncRouteImport } from './routes/settings.sync'
 import { Route as SettingsSystemRouteImport } from './routes/settings.system'
@@ -212,6 +214,11 @@ const SettingsIndexRoute = SettingsIndexRouteImport.update({
   path: '/settings/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsAccountsRoute = SettingsAccountsRouteImport.update({
+  id: '/settings/accounts',
+  path: '/settings/accounts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsDisplayRoute = SettingsDisplayRouteImport.update({
   id: '/settings/display',
   path: '/settings/display',
@@ -245,6 +252,11 @@ const SettingsPrinterRoute = SettingsPrinterRouteImport.update({
 const SettingsQrRoute = SettingsQrRouteImport.update({
   id: '/settings/qr',
   path: '/settings/qr',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsServicesRoute = SettingsServicesRouteImport.update({
+  id: '/settings/services',
+  path: '/settings/services',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsSkuRoute = SettingsSkuRouteImport.update({
@@ -323,6 +335,7 @@ export interface FileRoutesByFullPath {
   '/reports/coupons': typeof ReportsCouponsRoute
   '/reports/sales': typeof ReportsSalesRoute
   '/reports/stock': typeof ReportsStockRoute
+  '/settings/accounts': typeof SettingsAccountsRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
   '/settings/identity': typeof SettingsIdentityRoute
@@ -330,6 +343,7 @@ export interface FileRoutesByFullPath {
   '/settings/payment': typeof SettingsPaymentRoute
   '/settings/printer': typeof SettingsPrinterRoute
   '/settings/qr': typeof SettingsQrRoute
+  '/settings/services': typeof SettingsServicesRoute
   '/settings/sku': typeof SettingsSkuRoute
   '/settings/sync': typeof SettingsSyncRoute
   '/settings/system': typeof SettingsSystemRoute
@@ -372,6 +386,7 @@ export interface FileRoutesByTo {
   '/reports/coupons': typeof ReportsCouponsRoute
   '/reports/sales': typeof ReportsSalesRoute
   '/reports/stock': typeof ReportsStockRoute
+  '/settings/accounts': typeof SettingsAccountsRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
   '/settings/identity': typeof SettingsIdentityRoute
@@ -379,6 +394,7 @@ export interface FileRoutesByTo {
   '/settings/payment': typeof SettingsPaymentRoute
   '/settings/printer': typeof SettingsPrinterRoute
   '/settings/qr': typeof SettingsQrRoute
+  '/settings/services': typeof SettingsServicesRoute
   '/settings/sku': typeof SettingsSkuRoute
   '/settings/sync': typeof SettingsSyncRoute
   '/settings/system': typeof SettingsSystemRoute
@@ -422,6 +438,7 @@ export interface FileRoutesById {
   '/reports/coupons': typeof ReportsCouponsRoute
   '/reports/sales': typeof ReportsSalesRoute
   '/reports/stock': typeof ReportsStockRoute
+  '/settings/accounts': typeof SettingsAccountsRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
   '/settings/identity': typeof SettingsIdentityRoute
@@ -429,6 +446,7 @@ export interface FileRoutesById {
   '/settings/payment': typeof SettingsPaymentRoute
   '/settings/printer': typeof SettingsPrinterRoute
   '/settings/qr': typeof SettingsQrRoute
+  '/settings/services': typeof SettingsServicesRoute
   '/settings/sku': typeof SettingsSkuRoute
   '/settings/sync': typeof SettingsSyncRoute
   '/settings/system': typeof SettingsSystemRoute
@@ -473,6 +491,7 @@ export interface FileRouteTypes {
     | '/reports/coupons'
     | '/reports/sales'
     | '/reports/stock'
+    | '/settings/accounts'
     | '/settings/display'
     | '/settings/elements'
     | '/settings/identity'
@@ -480,6 +499,7 @@ export interface FileRouteTypes {
     | '/settings/payment'
     | '/settings/printer'
     | '/settings/qr'
+    | '/settings/services'
     | '/settings/sku'
     | '/settings/sync'
     | '/settings/system'
@@ -522,6 +542,7 @@ export interface FileRouteTypes {
     | '/reports/coupons'
     | '/reports/sales'
     | '/reports/stock'
+    | '/settings/accounts'
     | '/settings/display'
     | '/settings/elements'
     | '/settings/identity'
@@ -529,6 +550,7 @@ export interface FileRouteTypes {
     | '/settings/payment'
     | '/settings/printer'
     | '/settings/qr'
+    | '/settings/services'
     | '/settings/sku'
     | '/settings/sync'
     | '/settings/system'
@@ -571,6 +593,7 @@ export interface FileRouteTypes {
     | '/reports/coupons'
     | '/reports/sales'
     | '/reports/stock'
+    | '/settings/accounts'
     | '/settings/display'
     | '/settings/elements'
     | '/settings/identity'
@@ -578,6 +601,7 @@ export interface FileRouteTypes {
     | '/settings/payment'
     | '/settings/printer'
     | '/settings/qr'
+    | '/settings/services'
     | '/settings/sku'
     | '/settings/sync'
     | '/settings/system'
@@ -621,6 +645,7 @@ export interface RootRouteChildren {
   ReportsCouponsRoute: typeof ReportsCouponsRoute
   ReportsSalesRoute: typeof ReportsSalesRoute
   ReportsStockRoute: typeof ReportsStockRoute
+  SettingsAccountsRoute: typeof SettingsAccountsRoute
   SettingsDisplayRoute: typeof SettingsDisplayRoute
   SettingsElementsRoute: typeof SettingsElementsRoute
   SettingsIdentityRoute: typeof SettingsIdentityRoute
@@ -628,6 +653,7 @@ export interface RootRouteChildren {
   SettingsPaymentRoute: typeof SettingsPaymentRoute
   SettingsPrinterRoute: typeof SettingsPrinterRoute
   SettingsQrRoute: typeof SettingsQrRoute
+  SettingsServicesRoute: typeof SettingsServicesRoute
   SettingsSkuRoute: typeof SettingsSkuRoute
   SettingsSyncRoute: typeof SettingsSyncRoute
   SettingsSystemRoute: typeof SettingsSystemRoute
@@ -860,6 +886,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/accounts': {
+      id: '/settings/accounts'
+      path: '/settings/accounts'
+      fullPath: '/settings/accounts'
+      preLoaderRoute: typeof SettingsAccountsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/display': {
       id: '/settings/display'
       path: '/settings/display'
@@ -907,6 +940,13 @@ declare module '@tanstack/react-router' {
       path: '/settings/qr'
       fullPath: '/settings/qr'
       preLoaderRoute: typeof SettingsQrRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/services': {
+      id: '/settings/services'
+      path: '/settings/services'
+      fullPath: '/settings/services'
+      preLoaderRoute: typeof SettingsServicesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings/sku': {
@@ -1005,6 +1045,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReportsCouponsRoute: ReportsCouponsRoute,
   ReportsSalesRoute: ReportsSalesRoute,
   ReportsStockRoute: ReportsStockRoute,
+  SettingsAccountsRoute: SettingsAccountsRoute,
   SettingsDisplayRoute: SettingsDisplayRoute,
   SettingsElementsRoute: SettingsElementsRoute,
   SettingsIdentityRoute: SettingsIdentityRoute,
@@ -1012,6 +1053,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsPaymentRoute: SettingsPaymentRoute,
   SettingsPrinterRoute: SettingsPrinterRoute,
   SettingsQrRoute: SettingsQrRoute,
+  SettingsServicesRoute: SettingsServicesRoute,
   SettingsSkuRoute: SettingsSkuRoute,
   SettingsSyncRoute: SettingsSyncRoute,
   SettingsSystemRoute: SettingsSystemRoute,
