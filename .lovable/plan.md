@@ -1,35 +1,64 @@
-# Compact UI, quick discounts, mobile terminal registration & branch stock tables
+# v1.1.x: Android updates, drawer reasons, region/time, branches & stock transfers
 
-Four separate pieces. Web and Windows behaviour stays intact; Android keeps its live-only rules.
+## 1. Version line
+Move the release to 1.1.1, and keep the bump script stepping 1.1.2, 1.1.3, … on each release.
 
-## 1. Space-aware buttons everywhere
+## 2. Android update status fix
+Today the update card only knows about the Windows updater, so on Android it reports "automatic updates are not supported in this version". The Android feed reader already exists but is not wired into that card.
+- Make the update settings card detect the platform and, on Android, show installed version, latest version from the update feed, download progress and an Install button.
+- Show a real error message when the feed can't be reached instead of "not supported".
+- Keep Windows and browser behaviour unchanged.
 
-Toolbars and action rows currently push their labels out of the frame and overlap on narrow windows. Introduce one shared `ActionButton` that:
+## 3. Cash drawer reason
+- Replace the reason dropdown on manual drawer opens with a required free-text field (trimmed, minimum a few characters).
+- Keep the manager/PIN gate and keep writing the typed reason to the drawer event log, so reports and the audit trail show the operator's own wording.
 
-- shows icon + label when there is room, collapses to icon-only below the breakpoint, and always exposes the full label as a tooltip (and as `aria-label`, so nothing is lost for screen readers or keyboard users);
-- uses the grid + `min-w-0` + `shrink-0` + `truncate` pattern so a long product or member name shrinks instead of shoving neighbours off screen.
+## 4. Region, date and time settings
+- Add a Region & time section in settings: region/time-zone picker, date format and time format (12/24h).
+- Save it with the other settings so every terminal follows the same clock formatting across headers, receipts, reports and audit timestamps.
 
-Applied across the register action bar, cart rows, catalog panel header, inventory, purchasing, transfers, receipts and the settings frames.
+## 5. Data-storage audit (report first, no code changes)
+Inspect each area and report what reaches the database and what is still local-only, then agree on fixes:
+- Sales, exchanges/refunds and their line items
+- Receipts/slips and reprints
+- Inventory, stock adjustments and SKU history
+- Staff accounts, roles, permissions, shift sessions
+- Every settings section
 
-## 2. Discount pad on the cart
+Delivered as a short table in chat: area, stored in database yes/no, what is missing.
 
-- The moment a line lands in the cart, that row shows a **Discount** button (only when the signed-in user has the discount permission, or after a manager override — the existing rule is unchanged).
-- A **Bill discount** button sits above the totals.
-- Tapping either opens a calculator-style pad: preset percentages in steps of five (5, 10, 15, 20 … 50), a **Custom %** entry and a **Custom amount** entry, a live preview of the resulting price, plus **Clear discount**.
-- The line pad writes to that line; the bill pad writes the ticket-level discount. Both keep writing to the existing audit trail.
+## 6. Branches, clusters and stock transfers
 
-## 3. Terminal registration on Android + PC-terminal management
+### Database
+New tables, each with access rules and grants:
+- `branch_groups` — cluster/group name, so branches can be isolated into groups.
+- `branches` — name, code, group, active flag; existing stores are migrated into it.
+- `branch_products` — which product sits in a branch's catalog, with a visible flag.
+- `branch_stock` — quantity per branch per product.
+- `stock_transfers` — transfer number (TR-YYYY-0001), source branch, destination branch, status (PENDING, APPROVED, IN_TRANSIT, COMPLETED, REJECTED, CANCELLED), notes, created by, approved by, timestamps.
+- `stock_transfer_items` — transfer, product, quantity greater than zero, removed together with its transfer.
 
-- **Android registers first.** On start-up the phone shows the activation screen before anything else. It registers as its own device type (`mobile`), so it never consumes a till token and never appears in the PC terminal list.
-- **QR at registration on the PC.** The Windows/desktop activation screen displays the machine's pending registration as a QR code. From the phone (already registered and signed in as an admin) you scan that QR to approve and activate the till — no copying and pasting a token. Pasting the code stays available as the fallback.
-- **Manage terminals from the phone.** A mobile-friendly terminal manager lists every PC terminal with location, status and last seen, and lets an admin issue, re-issue, revoke or delete a token. Mobile devices are filtered out of that list.
-- **Production-grade scanning** (shared by the register scanner and the activation scanner): explicit camera-permission request with a clear denied state and guidance to re-enable it, 700 ms debounce so one barcode can't fire twice, a confirmation step showing what was scanned before it is applied, torch toggle where supported, and a manual search/entry fallback whenever the camera is unavailable or a scan finds nothing.
+One database function performs completion atomically: decrement source stock, increment destination stock (creating the row when absent), and for a cross-group transfer create the missing `branch_products` row for the destination group with visibility on. Stock can never be lost halfway.
 
+### Rules
+- Intra-group: source requests, destination approves, stock moves on completion.
+- Inter-group: same flow plus automatic catalog mapping into the destination cluster.
+- Cluster isolation everywhere else stays exactly as it is.
+
+### Stock Transfers page
+- New Transfer form: source branch pre-filled with the user's branch (admins can change it), destination dropdown listing all active branches with their group in the label, multi-row product picker validating live source stock, submit as PENDING.
+- List with tabs: Incoming requests, Outgoing requests, Completed history. Columns: transfer #, from, to, type (Intra-Group / Inter-Group), total items, status, created date, actions.
+- Actions: destination sees Approve & receive / Reject; source sees Cancel while pending.
+- Inter-group banner: "Notice: This item will be mapped to the target cluster's catalog upon transfer completion."
 
 ## Technical notes
+- Branch tables land in one migration with GRANTs and RLS; completion logic lives in a `SECURITY DEFINER` function called from a server function so it runs as a single transaction.
+- `src/routes/transfers.tsx` is rebuilt on the new tables; the current in-app transfer state is migrated on first load.
+- Android update wiring reuses `src/lib/android-updates.ts` inside `AppUpdateSettings`.
+- Region/time settings extend `pos_settings` plus a shared formatting helper used by receipts, reports and audit views.
 
-- New SQL script `supabase/schema23.sql`: the three branch tables with staff-only access rules matching the existing tables, plus `terminal_tokens.device_type` and the approve-by-QR RPC. Existing branch settings in the JSON blob are migrated into rows on first load.
-- New files: `src/components/pos/ActionButton.tsx`, `src/components/pos/DiscountPad.tsx`, `src/components/pos/CameraScanner.tsx`, `src/components/pos/MobileTerminalManager.tsx`, `src/lib/branch-tables.ts`.
-- Touched: `src/routes/index.tsx` (register), `ScanBar.tsx`, `TerminalActivation.tsx`, `TerminalTokens.tsx`, `terminal-tokens.ts`, `branch-policy.ts`, `BranchSettings.tsx`, `pos-db.ts`, `sync-engine.ts`, `electron/db/schema.sql`, `electron/db/repo.cjs`.
-- Version set to **1.1.0** for this release, and from here on each future update steps the last number (1.1.1, 1.1.2, …) instead of the old 1.0.x line.
-- The usual typecheck / lint / test run at the end.
+## Order of work
+1. Version 1.1.1, Android update fix, drawer reason, region/time settings.
+2. Data-storage audit report.
+3. Branch/cluster schema and migration.
+4. Stock transfer engine and UI.
