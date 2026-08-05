@@ -79,7 +79,7 @@ export const PAPER_LABELS: Record<PaperSize, string> = {
 export function paperCss(paper: PaperSize) {
   switch (paper) {
     case "58mm":
-      return { page: "58mm auto", width: "50mm", font: "10px", h1: "13px" };
+      return { page: "58mm auto", width: "48mm", font: "10px", h1: "13px" };
     case "a4":
       return { page: "A4", width: "180mm", font: "13px", h1: "22px" };
     case "letter":
@@ -210,19 +210,46 @@ function printMargins() {
   return m;
 }
 
+/**
+ * Real printable band of the paper, in millimetres.
+ *
+ * A "58mm" roll only prints roughly 48mm of it, and an "80mm" roll about 72mm.
+ * Laying the body out at the full paper width is what pushed the left-hand
+ * column off the edge of 58mm slips.
+ */
+export function printableWidthMm(paper: PaperSize) {
+  const prefs = getPrinterPrefs();
+  const band =
+    paper === "58mm"
+      ? (prefs.printWidth?.["58mm"] ?? 48)
+      : paper === "80mm"
+        ? (prefs.printWidth?.["80mm"] ?? 72)
+        : (PAPER_MM[paper] ?? 80);
+  const m = printMargins();
+  return Math.max(20, band - m.left - m.right);
+}
+
+/** Left nudge for printers whose print head starts a few millimetres in. */
+const printOffsetMm = () => getPrinterPrefs().printOffset ?? 0;
+
 const shell = (title: string, body: string, autoPrint = true) => {
   const p = paperCss(receiptCfg.paper);
   const f = receiptCfg.fonts ?? defaultReceiptSettings.fonts;
   const m = printMargins();
-  const width = Math.max(20, (PAPER_MM[receiptCfg.paper] ?? 80) - m.left - m.right);
+  const paper = receiptCfg.paper;
+  const slip = paper === "58mm" || paper === "80mm";
+  const width = printableWidthMm(paper);
   const bodyWidth = `${width}mm`;
+  // Slips are pinned to the left of the printable band (plus any nudge) so
+  // nothing can drift off the roll; sheets stay centred.
+  const bodyMargin = slip ? `0 0 0 ${printOffsetMm()}mm` : "0 auto";
   return `<!doctype html><html><head>
 <meta charset="utf-8"><title>${esc(title)}</title>
 <style>
   @page { size: ${p.page}; margin: ${m.top}mm ${m.right}mm ${m.bottom}mm ${m.left}mm; }
   * { box-sizing: border-box; }
   html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  body { ${fontCss(f.body)} color: #000; margin: 0 auto; width: ${bodyWidth}; max-width: 100%; overflow-wrap: anywhere; }
+  body { ${fontCss(f.body)} color: #000; margin: ${bodyMargin}; width: ${bodyWidth}; max-width: 100%; overflow-wrap: anywhere; }
   .rcpt-head { ${fontCss(f.header)} }
   .rcpt-foot { ${fontCss(f.footer)} }
   h1 { ${fontCss(f.header)} font-size: ${Math.round(f.header.size * 1.25)}px; text-align: center; margin: 0 0 2px; }
@@ -239,9 +266,10 @@ const shell = (title: string, body: string, autoPrint = true) => {
   .tag { border: 1px solid #000; padding: 2px 4px; display: inline-block; margin-top: 4px; font-size: 0.8em; letter-spacing: 1px; }
   .barcode { margin-top: 6px; width: 100%; }
   .barcode svg { display: block; width: 100%; }
+  .c svg { max-width: 100%; height: auto; }
   .bc-text { text-align: center; font-size: 0.85em; letter-spacing: 3px; margin-top: 2px; }
   @media print {
-    html, body { width: ${bodyWidth}; margin: 0 auto; }
+    html, body { width: ${bodyWidth}; margin: ${bodyMargin}; }
     .no-print { display: none !important; }
   }
 </style></head><body>${body}
