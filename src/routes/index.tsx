@@ -1247,36 +1247,9 @@ function Register() {
           <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border px-4 py-3">
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">Current ticket</p>
-              <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <p className="numeric truncate text-[11px] text-muted-foreground">
-                  {activeShift ? `${activeShift.cashier} · shift open` : "No shift open"}
-                </p>
-                {activeShift
-                  ? visible("register.closeShift") && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 shrink-0 px-2 text-[11px]"
-                        onClick={async () => {
-                          if (!(await requirePermission("can_close_shift"))) return;
-                          setCountedCash("");
-                          setCloseNote("");
-                          setCloseShiftOpen(true);
-                        }}
-                      >
-                        <Lock className="size-3.5" /> Close shift
-                      </Button>
-                    )
-                  : (
-                      <Button
-                        size="sm"
-                        className="h-7 shrink-0 px-2 text-[11px]"
-                        onClick={() => setOpenShiftOpen(true)}
-                      >
-                        <Lock className="size-3.5" /> Open shift
-                      </Button>
-                    )}
-              </div>
+              <p className="numeric truncate text-[11px] text-muted-foreground">
+                {activeShift ? `${activeShift.cashier} · shift open` : "No shift open"}
+              </p>
             </div>
             <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
               <Button size="sm" className="lg:hidden" onClick={() => setCatalogOpen(true)}>
