@@ -861,4 +861,64 @@ export const db = {
       })),
     });
   },
+
+  /* --------------------- awaited, confirmed versions --------------------- */
+
+  /** Save a completed bill and wait until it is stored somewhere. */
+  async commitSale(sale: Sale, products: Product[], member: Member | null): Promise<CommitTarget> {
+    const bridge = electronDb();
+    if (bridge) {
+      const res = await bridge.createSale({
+        sale: saleToRow(sale),
+        items: saleItemRows(sale),
+        products: products.map(productToRow),
+        member: member ? memberToRow(member, tierId) : null,
+        branchId: readBranch().branchId ?? sale.storeId ?? null,
+        exchangeOfBillNumber: sale.exchangeOfReceiptNo ?? null,
+      });
+      if (!res.ok) throw new Error(res.error ?? "The sale could not be stored on this terminal");
+      return "local";
+    }
+    const ops: SyncOp[] = [
+      { kind: "insert", table: "sales", rows: [saleToRow(sale)] },
+      { kind: "insert", table: "sale_items", rows: saleItemRows(sale) },
+    ];
+    if (products.length)
+      ops.push({ kind: "upsert", table: "products", rows: products.map(productToRow) });
+    if (member) ops.push({ kind: "upsert", table: "members", rows: [memberToRow(member, tierId)] });
+    if (sale.exchangeOfReceiptNo)
+      ops.push({
+        kind: "update",
+        table: "sales",
+        values: { exchanged_to_bill_number: sale.receiptNo },
+        match: { bill_number: sale.exchangeOfReceiptNo },
+      });
+    return commitOps("Saving sale", ops);
+  },
+
+  /** Save a shift open/close and wait until it is stored somewhere. */
+  commitShift: (s: Shift) =>
+    commitOps("Saving shift", { kind: "upsert", table: "shifts", rows: [shiftToRow(s)] } as SyncOp
+      ? [{ kind: "upsert", table: "shifts", rows: [shiftToRow(s)] }]
+      : []),
+
+  /** Save a staff sign-in and wait until it is stored somewhere. */
+  commitShiftSession: (s: ShiftSession) =>
+    commitOps("Saving shift sign-in", [
+      { kind: "upsert", table: "shift_sessions", rows: [shiftSessionToRow(s)] },
+    ]),
+
+  /** Save stock changes and wait until they are stored somewhere. */
+  commitProducts: (list: Product[]) =>
+    list.length
+      ? commitOps("Saving products", [
+          { kind: "upsert", table: "products", rows: list.map(productToRow) },
+        ])
+      : Promise.resolve<CommitTarget>("cloud"),
+
+  /** Save a member and wait until it is stored somewhere. */
+  commitMember: (m: Member) =>
+    commitOps("Saving member", [
+      { kind: "upsert", table: "members", rows: [memberToRow(m, tierId)] },
+    ]),
 };
