@@ -12,7 +12,6 @@ import {
   Wallet,
   Gift,
   Vault,
-  Lock,
   Info,
   UserPlus,
   X,
