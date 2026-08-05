@@ -1487,16 +1487,21 @@ function Register() {
           <div className="shrink-0 space-y-2 border-t border-border px-4 py-3 text-sm">
             {exchangeRef && (
               <div className="flex items-center justify-between rounded-md border border-accent/40 bg-accent/10 px-2 py-1.5 text-[11px]">
-                <span>Exchange against bill #{exchangeRef}</span>
-                <button
-                  className="text-muted-foreground hover:text-foreground"
+                <span className="min-w-0 truncate">Exchange against bill #{exchangeRef}</span>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="size-9 shrink-0"
+                  aria-label="Remove exchange"
+                  title="Remove exchange"
                   onClick={() => {
                     setLines((ls) => ls.filter((l) => !l.credit));
                     setExchangeRef(null);
                   }}
                 >
-                  remove
-                </button>
+                  <X className="size-4" />
+                </Button>
               </div>
             )}
             <div className="grid gap-x-8 gap-y-2 xl:grid-cols-2">
@@ -1573,17 +1578,22 @@ function Register() {
                 )}
                 {coupon && (
                   <div className="flex items-center justify-between rounded-md border border-primary/40 bg-primary/10 px-2 py-1.5 text-[11px]">
-                    <span>
+                    <span className="min-w-0 truncate">
                       Coupon <span className="font-semibold">{coupon.code}</span> ·{" "}
                       {coupon.scope === "item" ? coupon.productName : "whole bill"} ·{" "}
                       <span className="numeric">-{money(coupon.discount)}</span>
                     </span>
-                    <button
-                      className="text-muted-foreground hover:text-foreground"
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="size-9 shrink-0"
+                      aria-label="Remove coupon"
+                      title="Remove coupon"
                       onClick={removeCoupon}
                     >
-                      remove
-                    </button>
+                      <X className="size-4" />
+                    </Button>
                   </div>
                 )}
                 <Separator />

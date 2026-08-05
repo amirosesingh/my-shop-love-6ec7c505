@@ -16,6 +16,6 @@ $$;
 
 REVOKE ALL ON FUNCTION public.terminal_token_status(uuid) FROM public;
 GRANT EXECUTE ON FUNCTION public.terminal_token_status(uuid)
-  TO anon, authenticated, service_role;
+  TO authenticated, service_role;
 
 NOTIFY pgrst, 'reload schema';
