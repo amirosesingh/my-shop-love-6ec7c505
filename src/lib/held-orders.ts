@@ -18,6 +18,18 @@ export type HeldOrder = {
   heldAt: string;
   /** set when the entry came from a cancelled bill */
   cancelledFrom?: string;
+  /** branch the ticket was parked at */
+  storeId?: string;
+  /** who parked it */
+  heldBy?: string;
+  /** full ticket context so a reopened draft is identical to the parked one */
+  cartDiscount?: number;
+  cartDiscountType?: "amount" | "percent";
+  exchangeRef?: string | null;
+  memberId?: string | null;
+  memberName?: string | null;
+  coupon?: unknown;
+  note?: string;
 };
 
 const KEY = "pos.held.orders";
@@ -54,6 +66,10 @@ export function addHeldOrder(order: HeldOrder) {
 
 export function removeHeldOrder(id: string) {
   setHeldOrders((hs) => hs.filter((h) => h.id !== id));
+}
+
+export function updateHeldOrder(id: string, patch: Partial<HeldOrder>) {
+  setHeldOrders((hs) => hs.map((h) => (h.id === id ? { ...h, ...patch } : h)));
 }
 
 /** Park a cancelled bill so the till can correct and re-ring it. */
