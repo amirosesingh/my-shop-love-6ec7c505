@@ -455,6 +455,11 @@ export async function activateWithTokenId(tokenId: string): Promise<TerminalConf
         : "This pairing request was already used. Ask for a new approval.",
     );
   }
+  if (!remote.locationId) {
+    throw new ActivationError(
+      "This POS database is missing the pairing helper. Run supabase/schema23.sql on the POS database, then try again.",
+    );
+  }
   const deviceName = typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 120) : null;
   const { data: claimed, error } = await rpc("terminal_token_claim", {
     p_token_id: tokenId,
