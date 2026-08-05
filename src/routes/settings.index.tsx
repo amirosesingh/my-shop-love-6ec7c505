@@ -50,6 +50,13 @@ const GROUPS = [
         blurb: "Register Windows tills, issue and revoke activation codes.",
         cloudOnly: true,
       },
+      {
+        to: "/settings/mobile-terminals",
+        label: "Mobile terminals",
+        icon: Smartphone,
+        blurb: "Phones and tablets running the POS, managed separately from the tills.",
+        cloudOnly: true,
+      },
     ],
   },
   {
