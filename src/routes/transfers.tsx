@@ -211,6 +211,20 @@ function Transfers() {
       ),
     [state.transfers, currentStore.id],
   );
+  /** Same cluster, across clusters, or everything. */
+  const [scopeTab, setScopeTab] = useState<"all" | "INTRA_GROUP" | "INTER_GROUP">("all");
+  const visible = useMemo(
+    () =>
+      mine.filter((t) =>
+        scopeTab === "all"
+          ? true
+          : scopeBetween(
+              stores.find((s) => s.id === t.fromStoreId),
+              stores.find((s) => s.id === t.toStoreId),
+            ) === scopeTab,
+      ),
+    [mine, scopeTab, stores],
+  );
   const inbound = mine.filter((t) => t.toStoreId === currentStore.id && t.status === "in_transit");
   const toApprove = mine.filter(
     (t) => t.fromStoreId === currentStore.id && t.status === "requested",
@@ -309,7 +323,30 @@ function Transfers() {
         </div>
 
         <section className="rounded-lg border border-border bg-card">
-          <h2 className="px-5 py-3 text-sm font-semibold">Transfer log</h2>
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-2 px-5 py-3 sm:flex sm:items-center sm:justify-between">
+            <h2 className="truncate text-sm font-semibold">Transfer log</h2>
+            <div className="flex flex-wrap gap-1">
+              {(
+                [
+                  ["all", "All routes"],
+                  ["INTRA_GROUP", "Within my group"],
+                  ["INTER_GROUP", "Between groups"],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setScopeTab(key)}
+                  className={`rounded-md border px-3 py-1.5 text-xs ${
+                    scopeTab === key
+                      ? "border-primary/40 bg-primary/10 text-primary"
+                      : "border-border text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
           <Separator />
           <Table>
             <TableHeader>
@@ -323,7 +360,7 @@ function Transfers() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mine.map((t) => {
+              {visible.map((t) => {
                 const showApprove =
                   t.status === "requested" &&
                   t.fromStoreId === currentStore.id &&
@@ -422,7 +459,7 @@ function Transfers() {
                   </TableRow>
                 );
               })}
-              {!mine.length && (
+              {!visible.length && (
                 <TableRow>
                   <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
                     No transfers for this store yet.

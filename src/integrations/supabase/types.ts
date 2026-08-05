@@ -92,6 +92,175 @@ export type Database = {
         }
         Relationships: []
       }
+      booking_payments: {
+        Row: {
+          amount: number
+          booking_id: string
+          cashier: string | null
+          created_at: string
+          id: string
+          method: string
+          paid_at: string
+        }
+        Insert: {
+          amount?: number
+          booking_id: string
+          cashier?: string | null
+          created_at?: string
+          id?: string
+          method?: string
+          paid_at?: string
+        }
+        Update: {
+          amount?: number
+          booking_id?: string
+          cashier?: string | null
+          created_at?: string
+          id?: string
+          method?: string
+          paid_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_payments_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bookings: {
+        Row: {
+          cashier: string | null
+          closed_at: string | null
+          created_at: string
+          customer_name: string
+          customer_phone: string
+          discount: number
+          dropped_off_at: string | null
+          due_date: string | null
+          grommet_notes: string | null
+          id: string
+          job_notes: string | null
+          job_status: string
+          job_status_at: string | null
+          job_status_by: string | null
+          lines: Json
+          member_id: string | null
+          note: string
+          notify_whatsapp: boolean
+          paid: number
+          payment_timing: string | null
+          promised_at: string | null
+          racket_model: string | null
+          ref: string
+          sale_receipt_no: string | null
+          service_fee: number
+          service_name: string | null
+          service_type_id: string | null
+          shift_id: string | null
+          status: string
+          store_id: string | null
+          string_type: string | null
+          subtotal: number
+          tax: number
+          tension_cross: number | null
+          tension_main: number | null
+          tension_unit: string
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          cashier?: string | null
+          closed_at?: string | null
+          created_at?: string
+          customer_name?: string
+          customer_phone?: string
+          discount?: number
+          dropped_off_at?: string | null
+          due_date?: string | null
+          grommet_notes?: string | null
+          id?: string
+          job_notes?: string | null
+          job_status?: string
+          job_status_at?: string | null
+          job_status_by?: string | null
+          lines?: Json
+          member_id?: string | null
+          note?: string
+          notify_whatsapp?: boolean
+          paid?: number
+          payment_timing?: string | null
+          promised_at?: string | null
+          racket_model?: string | null
+          ref: string
+          sale_receipt_no?: string | null
+          service_fee?: number
+          service_name?: string | null
+          service_type_id?: string | null
+          shift_id?: string | null
+          status?: string
+          store_id?: string | null
+          string_type?: string | null
+          subtotal?: number
+          tax?: number
+          tension_cross?: number | null
+          tension_main?: number | null
+          tension_unit?: string
+          total?: number
+          updated_at?: string
+        }
+        Update: {
+          cashier?: string | null
+          closed_at?: string | null
+          created_at?: string
+          customer_name?: string
+          customer_phone?: string
+          discount?: number
+          dropped_off_at?: string | null
+          due_date?: string | null
+          grommet_notes?: string | null
+          id?: string
+          job_notes?: string | null
+          job_status?: string
+          job_status_at?: string | null
+          job_status_by?: string | null
+          lines?: Json
+          member_id?: string | null
+          note?: string
+          notify_whatsapp?: boolean
+          paid?: number
+          payment_timing?: string | null
+          promised_at?: string | null
+          racket_model?: string | null
+          ref?: string
+          sale_receipt_no?: string | null
+          service_fee?: number
+          service_name?: string | null
+          service_type_id?: string | null
+          shift_id?: string | null
+          status?: string
+          store_id?: string | null
+          string_type?: string | null
+          subtotal?: number
+          tax?: number
+          tension_cross?: number | null
+          tension_main?: number | null
+          tension_unit?: string
+          total?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookings_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cashiers: {
         Row: {
           created_at: string
@@ -1338,6 +1507,7 @@ export type Database = {
           last_seen_at: string | null
           location_id: string | null
           location_name: string | null
+          platform: string
           reissued_at: string | null
           replaced_by: string | null
           revoked_at: string | null
@@ -1353,6 +1523,7 @@ export type Database = {
           last_seen_at?: string | null
           location_id?: string | null
           location_name?: string | null
+          platform?: string
           reissued_at?: string | null
           replaced_by?: string | null
           revoked_at?: string | null
@@ -1368,6 +1539,7 @@ export type Database = {
           last_seen_at?: string | null
           location_id?: string | null
           location_name?: string | null
+          platform?: string
           reissued_at?: string | null
           replaced_by?: string | null
           revoked_at?: string | null

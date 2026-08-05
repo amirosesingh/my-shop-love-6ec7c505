@@ -1,9 +1,19 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { CalendarClock, Printer, Search, Ban, Check } from "lucide-react";
+import {
+  CalendarClock,
+  Printer,
+  Search,
+  Ban,
+  Check,
+  Tag,
+  Wrench,
+  Banknote,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/pos/AppShell";
+import { ActionButton } from "@/components/pos/ActionButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,8 +28,22 @@ import {
 } from "@/components/ui/dialog";
 import { money, usePos } from "@/lib/pos-store";
 import { useUserPermissions } from "@/lib/pos-permissions";
-import { bookingBalance, r2, type Booking, type PaymentMethod } from "@/lib/pos-types";
-import { printBookingPayment, printBookingSlip, printSaleReceipt } from "@/lib/pos-print";
+import {
+  bookingBalance,
+  racketSummary,
+  r2,
+  JOB_STATUS_FLOW,
+  JOB_STATUS_LABELS,
+  type Booking,
+  type JobStatus,
+  type PaymentMethod,
+} from "@/lib/pos-types";
+import {
+  printBookingPayment,
+  printBookingSlip,
+  printJobTag,
+  printSaleReceipt,
+} from "@/lib/pos-print";
 
 export const Route = createFileRoute("/bookings")({
   head: () => ({
@@ -48,11 +72,27 @@ const statusTone: Record<Booking["status"], string> = {
   cancelled: "border-muted text-muted-foreground",
 };
 
+const jobTone: Record<JobStatus, string> = {
+  received: "border-muted text-muted-foreground",
+  strung: "border-primary/40 text-primary",
+  ready: "border-success/40 text-success",
+  collected: "border-success/40 text-success",
+};
+
 function BookingsPage() {
-  const { state, currentStore, addBookingPayment, collectBooking, cancelBooking } = usePos();
+  const {
+    state,
+    currentStore,
+    addBookingPayment,
+    collectBooking,
+    cancelBooking,
+    setBookingJobStatus,
+  } = usePos();
   const { requirePermission } = useUserPermissions();
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<Booking["status"] | "all">("active");
+  /** Extra lens over the racket workflow, on top of the booking status. */
+  const [jobFilter, setJobFilter] = useState<JobStatus | "all" | "jobs">("all");
   const [payFor, setPayFor] = useState<Booking | null>(null);
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("cash");
@@ -63,14 +103,23 @@ function BookingsPage() {
     return state.bookings
       .filter((b) => b.storeId === currentStore.id)
       .filter((b) => (tab === "all" ? true : b.status === tab))
+      .filter((b) =>
+        jobFilter === "all"
+          ? true
+          : jobFilter === "jobs"
+            ? !!b.job
+            : (b.jobStatus ?? "received") === jobFilter && !!b.job,
+      )
       .filter(
         (b) =>
           !q ||
           b.ref.toLowerCase().includes(q) ||
           b.customerName.toLowerCase().includes(q) ||
-          b.customerPhone.replace(/\s/g, "").includes(q.replace(/\s/g, "")),
+          b.customerPhone.replace(/\s/g, "").includes(q.replace(/\s/g, "")) ||
+          (b.job?.racketModel ?? "").toLowerCase().includes(q) ||
+          (b.job?.stringType ?? "").toLowerCase().includes(q),
       );
-  }, [state.bookings, currentStore.id, tab, query]);
+  }, [state.bookings, currentStore.id, tab, query, jobFilter]);
 
   const memberOf = (b: Booking) => state.members.find((m) => m.id === b.memberId) ?? null;
   const today = new Date().toISOString().slice(0, 10);
@@ -116,28 +165,29 @@ function BookingsPage() {
   return (
     <AppShell>
       <div className="space-y-4 p-4">
-        <header className="flex flex-wrap items-center justify-between gap-3">
-          <div>
+        <header className="grid grid-cols-[minmax(0,1fr)] items-center gap-3 sm:flex sm:flex-wrap sm:justify-between">
+          <div className="min-w-0">
             <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight">
-              <CalendarClock className="size-5 text-primary" /> Bookings &amp; pay later
+              <CalendarClock className="size-5 shrink-0 text-primary" />
+              <span className="truncate">Bookings, jobs &amp; pay later</span>
             </h1>
             <p className="text-sm text-muted-foreground">
-              Reserved goods at {currentStore.name}. Stock stays held until collection or
-              cancellation.
+              Reserved goods and racket stringing jobs at {currentStore.name}. Stock stays held
+              until collection or cancellation.
             </p>
           </div>
-          <div className="relative w-64">
+          <div className="relative w-full sm:w-64">
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Ref, customer or phone…"
+              placeholder="Ref, customer, phone, racket…"
               className="pl-9"
             />
           </div>
         </header>
 
-        <div className="flex gap-1">
+        <div className="flex flex-wrap gap-1">
           {(["active", "collected", "cancelled", "all"] as const).map((t) => (
             <button
               key={t}
@@ -153,6 +203,25 @@ function BookingsPage() {
           ))}
         </div>
 
+        <div className="flex flex-wrap items-center gap-1">
+          <span className="mr-1 flex items-center gap-1 text-xs text-muted-foreground">
+            <Wrench className="size-3.5" /> Job cards
+          </span>
+          {(["all", "jobs", ...JOB_STATUS_FLOW] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setJobFilter(f)}
+              className={`rounded-md border px-3 py-1.5 text-xs ${
+                jobFilter === f
+                  ? "border-primary/40 bg-primary/10 text-primary"
+                  : "border-border text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {f === "all" ? "Everything" : f === "jobs" ? "String jobs" : JOB_STATUS_LABELS[f]}
+            </button>
+          ))}
+        </div>
+
         {bookings.length === 0 ? (
           <p className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
             No bookings here yet. Start one from the register with “Book &amp; pay later”.
@@ -162,10 +231,15 @@ function BookingsPage() {
             {bookings.map((b) => {
               const balance = bookingBalance(b);
               const overdue = b.status === "active" && b.dueDate < today;
+              const job = b.job;
+              const jobStatus = (b.jobStatus ?? "received") as JobStatus;
+              const hasJob =
+                !!job &&
+                !!(job.racketModel || job.stringType || job.tensionMain || job.promisedAt);
               return (
                 <li key={b.id} className="rounded-lg border border-border p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+                    <div className="min-w-0">
                       <p className="flex items-center gap-2 font-semibold">
                         {b.ref}
                         <Badge variant="outline" className={statusTone[b.status]}>
@@ -193,6 +267,43 @@ function BookingsPage() {
                           {b.paymentTiming ? ` · ${BOOKING_TIMING_LABELS[b.paymentTiming]}` : ""}
                         </p>
                       )}
+                      {hasJob && (
+                        <div className="mt-2 rounded-md border border-border/70 bg-muted/30 p-2 text-xs">
+                          <p className="flex flex-wrap items-center gap-2 font-medium">
+                            <Wrench className="size-3.5 shrink-0 text-primary" />
+                            <span className="min-w-0 truncate">
+                              {racketSummary(job) || "String job"}
+                            </span>
+                            <Badge variant="outline" className={jobTone[jobStatus]}>
+                              {JOB_STATUS_LABELS[jobStatus]}
+                            </Badge>
+                          </p>
+                          {job?.promisedAt && (
+                            <p className="mt-1 text-muted-foreground">
+                              Ready by {new Date(job.promisedAt).toLocaleString()}
+                              {job.droppedOffAt
+                                ? ` · dropped off ${new Date(job.droppedOffAt).toLocaleDateString()}`
+                                : ""}
+                            </p>
+                          )}
+                          {(job?.grommetNotes || job?.jobNotes) && (
+                            <p className="mt-1 text-muted-foreground">
+                              {[job?.grommetNotes, job?.jobNotes].filter(Boolean).join(" · ")}
+                            </p>
+                          )}
+                          {b.jobStatusBy && b.jobStatusAt && (
+                            <p className="mt-1 text-[11px] text-muted-foreground">
+                              {JOB_STATUS_LABELS[jobStatus]} by {b.jobStatusBy} ·{" "}
+                              {new Date(b.jobStatusAt).toLocaleString()}
+                            </p>
+                          )}
+                          {job?.notifyWhatsApp && (
+                            <p className="mt-1 text-[11px] text-primary">
+                              Customer wants a WhatsApp when it is ready.
+                            </p>
+                          )}
+                        </div>
+                      )}
                       {b.note && <p className="mt-1 text-xs text-muted-foreground">{b.note}</p>}
                       {b.saleReceiptNo && (
                         <p className="mt-1 text-xs text-success">Billed as {b.saleReceiptNo}</p>
@@ -208,34 +319,76 @@ function BookingsPage() {
                       </p>
                     </div>
                   </div>
+                  {hasJob && b.status === "active" && (
+                    <div className="mt-3 flex flex-wrap items-center gap-1">
+                      <span className="mr-1 text-xs text-muted-foreground">Job status</span>
+                      {JOB_STATUS_FLOW.map((s) => (
+                        <button
+                          key={s}
+                          onClick={() => {
+                            setBookingJobStatus(b.id, s, b.cashier || "Counter");
+                            toast.success(`${b.ref} · ${JOB_STATUS_LABELS[s].toLowerCase()}`);
+                          }}
+                          className={`rounded-md border px-2.5 py-1 text-xs ${
+                            jobStatus === s
+                              ? "border-primary/40 bg-primary/10 text-primary"
+                              : "border-border text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {JOB_STATUS_LABELS[s]}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <Button
+                    <ActionButton
                       size="sm"
                       variant="outline"
+                      layout="inline"
+                      label="Slip"
+                      icon={<Printer className="size-4" />}
                       onClick={() => printBookingSlip(b, memberOf(b), state.settings.payment)}
-                    >
-                      <Printer className="size-4" /> Slip
-                    </Button>
+                    />
+                    {hasJob && (
+                      <ActionButton
+                        size="sm"
+                        variant="outline"
+                        layout="inline"
+                        label="Job tag"
+                        icon={<Tag className="size-4" />}
+                        onClick={() => printJobTag(b)}
+                      />
+                    )}
                     {b.status === "active" && (
                       <>
-                        <Button size="sm" variant="outline" onClick={() => openPay(b, false)}>
-                          Part payment
-                        </Button>
-                        <Button size="sm" onClick={() => openPay(b, true)}>
-                          <Check className="size-4" /> Collect &amp; settle {money(balance)}
-                        </Button>
-                        <Button
+                        <ActionButton
+                          size="sm"
+                          variant="outline"
+                          layout="inline"
+                          label="Part payment"
+                          icon={<Banknote className="size-4" />}
+                          onClick={() => openPay(b, false)}
+                        />
+                        <ActionButton
+                          size="sm"
+                          layout="inline"
+                          label={`Collect & settle ${money(balance)}`}
+                          icon={<Check className="size-4" />}
+                          onClick={() => openPay(b, true)}
+                        />
+                        <ActionButton
                           size="sm"
                           variant="ghost"
+                          layout="inline"
+                          label="Cancel"
+                          icon={<Ban className="size-4" />}
                           className="text-destructive"
                           onClick={async () => {
                             if (!(await requirePermission("can_void_item"))) return;
                             cancelBooking(b.id, "Cancelled at counter");
                             toast.success(`${b.ref} cancelled · stock released`);
                           }}
-                        >
-                          <Ban className="size-4" /> Cancel
-                        </Button>
+                        />
                       </>
                     )}
                   </div>
