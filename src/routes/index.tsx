@@ -510,9 +510,35 @@ function Register() {
     const hit = resolveByBarcode(state.products, code);
     if (!hit) {
       toast.error(`No product matches “${code}”`);
+      // A mis-read or unknown barcode drops the cashier straight into search.
+      setQuery(code);
+      setCatalogOpen(true);
       return;
     }
     addLine(hit.id);
+  }
+
+  /** Attaches a member to the ticket and surfaces any vouchers they hold. */
+  function attachMember(m: { id: string; name: string }) {
+    setMemberId(m.id);
+    setMemberQuery("");
+    toast.success(`${m.name} attached to receipt`);
+    void loadMemberVouchers(m.id)
+      .then((vs) => {
+        if (!vs.length) return;
+        toast.info(
+          vs.length === 1
+            ? `${m.name} has a voucher: ${vs[0]!.campaign.name}`
+            : `${m.name} has ${vs.length} vouchers available`,
+          {
+            action: {
+              label: "Apply",
+              onClick: () => void applyVoucher(vs[0]!.voucher.tokenSlug),
+            },
+          },
+        );
+      })
+      .catch(() => undefined);
   }
 
   function scanSubmit(e: React.FormEvent) {
