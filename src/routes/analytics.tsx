@@ -25,6 +25,7 @@ import { Label } from "@/components/ui/label";
 import { StatCard, downloadCsv, isoDay } from "@/components/pos/report-kit";
 import { money, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
+import { AnalyticsErrorPanel } from "@/components/pos/AnalyticsErrorPanel";
 import {
   fetchBoard,
   shopSlices,
@@ -266,10 +267,7 @@ function LiveBoard() {
         </div>
 
         {query.isError && (
-          <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">
-            <p className="font-medium">The board could not read your sales figures.</p>
-            <p className="mt-1 text-muted-foreground">{(query.error as Error).message}</p>
-          </div>
+          <AnalyticsErrorPanel error={query.error} onRetry={() => void query.refetch()} />
         )}
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
