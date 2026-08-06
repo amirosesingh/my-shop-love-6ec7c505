@@ -2992,6 +2992,11 @@ function Register() {
                 onChange={(e) => setCountedCash(e.target.value)}
               />
             </div>
+            {rules.block_shift_close_on_hold && held.length > 0 && (
+              <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                {held.length} held bill(s) pending. Settle or cancel them before closing.
+              </p>
+            )}
             <div className="space-y-1">
               <Label>Note (optional)</Label>
               <Input value={closeNote} onChange={(e) => setCloseNote(e.target.value)} />
@@ -3002,22 +3007,42 @@ function Register() {
               Cancel
             </Button>
             <Button
+              disabled={closing}
               onClick={() => {
-                const amount = Number(countedCash);
-                if (!Number.isFinite(amount) || amount < 0) {
-                  toast.error("Enter the counted cash amount");
-                  return;
-                }
-                const closed = closeShift(amount, closeNote.trim());
-                if (!closed) {
-                  toast.error("This shift was opened on another terminal");
-                  return;
-                }
-                setCloseShiftOpen(false);
-                toast.success("Shift closed");
+                void (async () => {
+                  const amount = Number(countedCash);
+                  const counted = Number.isFinite(amount) && amount >= 0 ? amount : null;
+                  setClosing(true);
+                  try {
+                    // The server re-checks held tickets and the cash count
+                    // against the database rules — the browser copy is only
+                    // used to give faster feedback.
+                    const auth = await getPosCallerAuth();
+                    const gate = await assertShiftClosable({
+                      data: { ...auth, storeId: currentStore.id, countedCash: counted },
+                    });
+                    if (!gate.ok) {
+                      toast.error(gate.error);
+                      return;
+                    }
+                    if (counted === null) {
+                      toast.error("Enter the counted cash amount");
+                      return;
+                    }
+                    const closed = closeShift(counted, closeNote.trim());
+                    if (!closed) {
+                      toast.error("This shift was opened on another terminal");
+                      return;
+                    }
+                    setCloseShiftOpen(false);
+                    toast.success("Shift closed");
+                  } finally {
+                    setClosing(false);
+                  }
+                })();
               }}
             >
-              Close shift
+              {closing ? "Checking…" : "Close shift"}
             </Button>
           </DialogFooter>
         </DialogContent>
