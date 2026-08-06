@@ -12,6 +12,7 @@ import {
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { AppShell } from "@/components/pos/AppShell";
+import { ActionButton } from "@/components/pos/ActionButton";
 import { db } from "@/lib/pos-db";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -450,12 +451,24 @@ function Purchasing() {
                 e.target.value = "";
               }}
             />
-            <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
-              <FileSpreadsheet className="size-4" /> Import Excel / CSV
-            </Button>
-            <Button variant="ghost" size="sm" onClick={downloadTemplate}>
-              <Download className="size-4" /> Template
-            </Button>
+            <ActionButton
+              layout="inline"
+              variant="outline"
+              size="sm"
+              className="w-auto"
+              label="Import Excel / CSV"
+              icon={<FileSpreadsheet className="size-4" />}
+              onClick={() => fileRef.current?.click()}
+            />
+            <ActionButton
+              layout="inline"
+              variant="ghost"
+              size="sm"
+              className="w-auto"
+              label="Template"
+              icon={<Download className="size-4" />}
+              onClick={downloadTemplate}
+            />
           </div>
 
           <Table>

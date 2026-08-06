@@ -11,9 +11,11 @@ import {
   Scale,
   Search,
   Trash2,
+  Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
+import { ActionButton } from "@/components/pos/ActionButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -171,8 +173,8 @@ function Inventory() {
   return (
     <AppShell>
       <div className="space-y-5 p-6">
-        <header className="flex flex-wrap items-end justify-between gap-3">
-          <div>
+        <header className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3 sm:flex sm:flex-wrap sm:justify-between">
+          <div className="min-w-0">
             <h1 className="text-2xl font-semibold">Inventory · {currentStore.name}</h1>
             <p className="text-sm text-muted-foreground">
               {state.products.length} products ·{" "}
@@ -184,34 +186,46 @@ function Inventory() {
               <span className="text-warning">{lowStock.length} below reorder level</span>
             </p>
           </div>
-          <div className="flex gap-2">
-            <div className="relative">
+          <div className="col-span-2 flex flex-wrap items-center gap-2 sm:col-span-1 sm:shrink-0 sm:flex-nowrap">
+            <div className="relative min-w-0 flex-1 sm:flex-none">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search products"
-                className="w-56 pl-9"
+                className="w-full pl-9 sm:w-56"
               />
             </div>
             {canEdit && (
-              <Button variant="outline" onClick={() => setImportOpen(true)}>
-                📥 Bulk Import from Excel
-              </Button>
+              <ActionButton
+                layout="inline"
+                variant="outline"
+                className="w-auto"
+                label="Bulk import"
+                icon={<Upload className="size-4" />}
+                onClick={() => setImportOpen(true)}
+              />
             )}
-            <Button
+            <ActionButton
+              layout="inline"
               variant="outline"
+              className="w-auto"
+              label="Export to Excel"
+              icon={<FileSpreadsheet className="size-4" />}
               onClick={() => {
                 void exportProductsXlsx(rows, stores, `products-${currentStore.code}`);
                 toast.success(`Exporting ${rows.length} products to Excel`);
               }}
-            >
-              <FileSpreadsheet className="size-4" /> Export to Excel
-            </Button>
+            />
             {canAdjust && (
-              <Button variant="outline" onClick={() => setCountOpen(true)}>
-                <ClipboardCheck className="size-4" /> Stock check
-              </Button>
+              <ActionButton
+                layout="inline"
+                variant="outline"
+                className="w-auto"
+                label="Stock check"
+                icon={<ClipboardCheck className="size-4" />}
+                onClick={() => setCountOpen(true)}
+              />
             )}
             {canEdit && (
             <Dialog
@@ -219,9 +233,13 @@ function Inventory() {
               onOpenChange={(o) => setDraft(o ? (draft ?? blank(currentStore.id)) : null)}
             >
               <DialogTrigger asChild>
-                <Button onClick={() => setDraft(blank(currentStore.id))}>
-                  <Plus className="size-4" /> New product
-                </Button>
+                <ActionButton
+                  layout="inline"
+                  className="w-auto"
+                  label="New product"
+                  icon={<Plus className="size-4" />}
+                  onClick={() => setDraft(blank(currentStore.id))}
+                />
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
