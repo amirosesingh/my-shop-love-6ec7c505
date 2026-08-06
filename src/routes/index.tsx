@@ -1348,7 +1348,7 @@ function Register() {
               </p>
             </div>
             <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-              <Button size="sm" className="lg:hidden" onClick={() => setCatalogOpen(true)}>
+              <Button size="sm" onClick={() => setCatalogOpen(true)}>
                 <Search className="size-4" /> Add product
               </Button>
               {visible("register.exchange") && (
