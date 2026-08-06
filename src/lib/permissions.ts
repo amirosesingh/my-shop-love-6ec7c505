@@ -56,6 +56,9 @@ export const PERMISSION_GROUPS = [
       "can_receive_transfer",
       "can_approve_transfer",
       "can_manage_locations",
+      "can_manage_categories",
+      "can_bulk_edit_products",
+      "can_merge_products",
     ],
   },
   {
@@ -124,6 +127,9 @@ export type PermissionKey =
   | "can_receive_transfer"
   | "can_approve_transfer"
   | "can_manage_locations"
+  | "can_manage_categories"
+  | "can_bulk_edit_products"
+  | "can_merge_products"
   | "can_add_member"
   | "can_edit_member_points"
   | "can_apply_member_discount"
@@ -171,6 +177,9 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   can_receive_transfer: "Approve / receive transfers",
   can_approve_transfer: "Authorise transfers before stock moves",
   can_manage_locations: "Manage locations & warehouses",
+  can_manage_categories: "Manage categories, sub-categories & units",
+  can_bulk_edit_products: "Bulk edit or delete products",
+  can_merge_products: "Merge duplicate products / add alias barcodes",
   can_add_member: "Add members",
   can_edit_member_points: "Edit member points",
   can_apply_member_discount: "Apply member discount",
