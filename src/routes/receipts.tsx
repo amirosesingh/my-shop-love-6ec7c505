@@ -271,6 +271,18 @@ function ReceiptVault() {
                     No receipts recorded at this store yet.
                   </li>
                 )}
+                {!exhausted && sales.length > 0 && (
+                  <li className="py-3 text-center">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void loadOlder()}
+                      disabled={loadingOlder}
+                    >
+                      {loadingOlder ? "Loading…" : "Load older receipts"}
+                    </Button>
+                  </li>
+                )}
               </ul>
             </ScrollArea>
           </section>
