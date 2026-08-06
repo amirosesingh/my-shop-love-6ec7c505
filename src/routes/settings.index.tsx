@@ -127,6 +127,12 @@ const GROUPS = [
         blurb: "Automatic running-number product codes, or manual entry.",
       },
       {
+        to: "/settings/catalog",
+        label: "Categories & units",
+        icon: ScanBarcode,
+        blurb: "Category groups, sub-categories and units of measure.",
+      },
+      {
         to: "/settings/region",
         label: "Region & time",
         icon: Globe,
