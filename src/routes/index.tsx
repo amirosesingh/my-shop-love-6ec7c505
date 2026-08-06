@@ -1412,8 +1412,8 @@ function Register() {
             </div>
           </div>
 
-          <div className="border-b border-border px-4 py-3">
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div className="@container border-b border-border px-4 py-3">
+            <div className="grid grid-cols-1 items-start gap-3 @[38rem]:grid-cols-2">
               <div className="min-w-0">
                 <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">
                   Scan barcode
@@ -1675,7 +1675,7 @@ function Register() {
                     variant="outline"
                     size="sm"
                     onClick={() => setPadTarget("bill")}
-                    className="numeric h-10 min-h-10 w-28 shrink-0 justify-between text-xs sm:w-32"
+                    className="numeric h-10 min-h-10 w-full max-w-32 min-w-0 shrink-0 justify-between text-xs"
                     label={cartDiscount
                       ? `${cartDiscount}${cartDiscountType === "percent" ? "%" : ""}`
                       : "Add discount"}
@@ -1887,12 +1887,12 @@ function Register() {
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Transaction actions
             </p>
-            <div className="grid auto-rows-fr grid-cols-1 gap-2 @[15rem]:grid-cols-2">
+            <div className="grid auto-rows-fr grid-cols-1 gap-2">
               {visible("register.holdOrder") && (
               <ActionButton
                 variant="outline"
                 layout="inline"
-                className="h-12 min-w-0 @[15rem]:h-16"
+                className="h-12 min-w-0"
                 label="Hold order"
                 icon={<PauseCircle className="size-4" />}
                 disabled={!lines.length || tillLocked}
@@ -1903,7 +1903,7 @@ function Register() {
               <ActionButton
                 variant="outline"
                 layout="inline"
-                className="h-12 min-w-0 text-destructive hover:text-destructive @[15rem]:h-16"
+                className="h-12 min-w-0 text-destructive hover:text-destructive"
                 label="Void cart"
                 icon={<Trash2 className="size-4" />}
                 disabled={!lines.length || tillLocked}
@@ -1914,7 +1914,7 @@ function Register() {
               <ActionButton
                 variant="outline"
                 layout="inline"
-                className="h-12 min-w-0 @[15rem]:h-16"
+                className="h-12 min-w-0"
                 label="Apply coupon"
                 icon={<TicketPercent className="size-4" />}
                 disabled={tillLocked}
@@ -1926,7 +1926,7 @@ function Register() {
               <ActionButton
                 variant="outline"
                 layout="inline"
-                className="h-12 min-w-0 @[15rem]:h-16"
+                className="h-12 min-w-0"
                 label="Split bill"
                 icon={<Split className="size-4" />}
                 disabled={balanceDue <= 0 || tillLocked}
