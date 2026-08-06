@@ -309,88 +309,108 @@ function BookingsPage() {
                         <p className="mt-1 text-xs text-success">Billed as {b.saleReceiptNo}</p>
                       )}
                     </div>
-                    <div className="text-right">
-                      <p className="numeric text-lg font-bold">{money(b.total)}</p>
-                      <p className="numeric text-xs text-muted-foreground">
-                        paid {money(b.paid)}
-                      </p>
-                      <p className="numeric text-sm font-semibold text-primary">
-                        balance {money(balance)}
-                      </p>
-                    </div>
-                  </div>
-                  {hasJob && b.status === "active" && (
-                    <div className="mt-3 flex flex-wrap items-center gap-1">
-                      <span className="mr-1 text-xs text-muted-foreground">Job status</span>
-                      {JOB_STATUS_FLOW.map((s) => (
-                        <button
-                          key={s}
-                          onClick={() => {
-                            setBookingJobStatus(b.id, s, b.cashier || "Counter");
-                            toast.success(`${b.ref} · ${JOB_STATUS_LABELS[s].toLowerCase()}`);
-                          }}
-                          className={`rounded-md border px-2.5 py-1 text-xs ${
-                            jobStatus === s
-                              ? "border-primary/40 bg-primary/10 text-primary"
-                              : "border-border text-muted-foreground hover:text-foreground"
-                          }`}
-                        >
-                          {JOB_STATUS_LABELS[s]}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <ActionButton
-                      size="sm"
-                      variant="outline"
-                      layout="inline"
-                      label="Slip"
-                      icon={<Printer className="size-4" />}
-                      onClick={() => printBookingSlip(b, memberOf(b), state.settings.payment)}
-                    />
-                    {hasJob && (
-                      <ActionButton
-                        size="sm"
-                        variant="outline"
-                        layout="inline"
-                        label="Job tag"
-                        icon={<Tag className="size-4" />}
-                        onClick={() => printJobTag(b)}
-                      />
-                    )}
-                    {b.status === "active" && (
-                      <>
+                    <div className="flex w-full flex-col gap-2 sm:w-56 sm:items-end">
+                      <div className="text-right">
+                        <p className="numeric text-lg font-bold">{money(b.total)}</p>
+                        <p className="numeric text-xs text-muted-foreground">
+                          paid {money(b.paid)}
+                        </p>
+                        <p className="numeric text-sm font-semibold text-primary">
+                          balance {money(balance)}
+                        </p>
+                      </div>
+
+                      {hasJob && b.status === "active" && (
+                        <div className="flex flex-wrap justify-end gap-1">
+                          {JOB_STATUS_FLOW.map((s) => (
+                            <button
+                              key={s}
+                              onClick={() => {
+                                setBookingJobStatus(b.id, s, b.cashier || "Counter");
+                                toast.success(`${b.ref} · ${JOB_STATUS_LABELS[s].toLowerCase()}`);
+                              }}
+                              className={`rounded-md border px-2 py-1 text-[11px] ${
+                                jobStatus === s
+                                  ? "border-primary/40 bg-primary/10 text-primary"
+                                  : "border-border text-muted-foreground hover:text-foreground"
+                              }`}
+                            >
+                              {JOB_STATUS_LABELS[s]}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="grid w-full gap-1.5">
                         <ActionButton
                           size="sm"
                           variant="outline"
                           layout="inline"
-                          label="Part payment"
-                          icon={<Banknote className="size-4" />}
-                          onClick={() => openPay(b, false)}
+                          label="Print slip"
+                          icon={<Printer className="size-4" />}
+                          onClick={() => printBookingSlip(b, memberOf(b), state.settings.payment)}
                         />
-                        <ActionButton
-                          size="sm"
-                          layout="inline"
-                          label={`Collect & settle ${money(balance)}`}
-                          icon={<Check className="size-4" />}
-                          onClick={() => openPay(b, true)}
-                        />
+                        {hasJob && (
+                          <ActionButton
+                            size="sm"
+                            variant="outline"
+                            layout="inline"
+                            label="Job tag"
+                            icon={<Tag className="size-4" />}
+                            onClick={() => printJobTag(b)}
+                          />
+                        )}
+                        {b.status === "active" && (
+                          <>
+                            <ActionButton
+                              size="sm"
+                              variant="outline"
+                              layout="inline"
+                              label="Part payment"
+                              icon={<Banknote className="size-4" />}
+                              onClick={() => openPay(b, false)}
+                            />
+                            <ActionButton
+                              size="sm"
+                              layout="inline"
+                              label={`Collect ${money(balance)}`}
+                              icon={<Check className="size-4" />}
+                              onClick={() => openPay(b, true)}
+                            />
+                            <ActionButton
+                              size="sm"
+                              variant="ghost"
+                              layout="inline"
+                              label="Cancel"
+                              icon={<Ban className="size-4" />}
+                              className="text-destructive"
+                              onClick={async () => {
+                                if (!(await requirePermission("can_void_item"))) return;
+                                cancelBooking(b.id, "Cancelled at counter");
+                                toast.success(`${b.ref} cancelled · stock released`);
+                              }}
+                            />
+                          </>
+                        )}
                         <ActionButton
                           size="sm"
                           variant="ghost"
                           layout="inline"
-                          label="Cancel"
-                          icon={<Ban className="size-4" />}
+                          label="Delete job"
+                          icon={<Trash2 className="size-4" />}
                           className="text-destructive"
                           onClick={async () => {
                             if (!(await requirePermission("can_void_item"))) return;
-                            cancelBooking(b.id, "Cancelled at counter");
-                            toast.success(`${b.ref} cancelled · stock released`);
+                            setRemoving(b);
+                            setRemoveReason(
+                              b.status === "active" && jobStatus !== "collected"
+                                ? ""
+                                : "Job completed and collected",
+                            );
                           }}
                         />
-                      </>
-                    )}
+                      </div>
+                    </div>
                   </div>
                 </li>
               );
