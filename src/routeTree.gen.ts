@@ -41,6 +41,7 @@ import { Route as ReportsCouponsRouteImport } from './routes/reports.coupons'
 import { Route as ReportsPaymentsRouteImport } from './routes/reports.payments'
 import { Route as ReportsSalesRouteImport } from './routes/reports.sales'
 import { Route as ReportsStockRouteImport } from './routes/reports.stock'
+import { Route as ReportsVoidsRouteImport } from './routes/reports.voids'
 import { Route as SettingsIndexRouteImport } from './routes/settings.index'
 import { Route as SettingsAccountsRouteImport } from './routes/settings.accounts'
 import { Route as SettingsBookingSlipRouteImport } from './routes/settings.booking-slip'
@@ -224,6 +225,11 @@ const ReportsStockRoute = ReportsStockRouteImport.update({
   path: '/reports/stock',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReportsVoidsRoute = ReportsVoidsRouteImport.update({
+  id: '/reports/voids',
+  path: '/reports/voids',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsIndexRoute = SettingsIndexRouteImport.update({
   id: '/settings/',
   path: '/settings/',
@@ -367,6 +373,7 @@ export interface FileRoutesByFullPath {
   '/reports/payments': typeof ReportsPaymentsRoute
   '/reports/sales': typeof ReportsSalesRoute
   '/reports/stock': typeof ReportsStockRoute
+  '/reports/voids': typeof ReportsVoidsRoute
   '/settings/accounts': typeof SettingsAccountsRoute
   '/settings/booking-slip': typeof SettingsBookingSlipRoute
   '/settings/display': typeof SettingsDisplayRoute
@@ -423,6 +430,7 @@ export interface FileRoutesByTo {
   '/reports/payments': typeof ReportsPaymentsRoute
   '/reports/sales': typeof ReportsSalesRoute
   '/reports/stock': typeof ReportsStockRoute
+  '/reports/voids': typeof ReportsVoidsRoute
   '/settings/accounts': typeof SettingsAccountsRoute
   '/settings/booking-slip': typeof SettingsBookingSlipRoute
   '/settings/display': typeof SettingsDisplayRoute
@@ -480,6 +488,7 @@ export interface FileRoutesById {
   '/reports/payments': typeof ReportsPaymentsRoute
   '/reports/sales': typeof ReportsSalesRoute
   '/reports/stock': typeof ReportsStockRoute
+  '/reports/voids': typeof ReportsVoidsRoute
   '/settings/accounts': typeof SettingsAccountsRoute
   '/settings/booking-slip': typeof SettingsBookingSlipRoute
   '/settings/display': typeof SettingsDisplayRoute
@@ -538,6 +547,7 @@ export interface FileRouteTypes {
     | '/reports/payments'
     | '/reports/sales'
     | '/reports/stock'
+    | '/reports/voids'
     | '/settings/accounts'
     | '/settings/booking-slip'
     | '/settings/display'
@@ -594,6 +604,7 @@ export interface FileRouteTypes {
     | '/reports/payments'
     | '/reports/sales'
     | '/reports/stock'
+    | '/reports/voids'
     | '/settings/accounts'
     | '/settings/booking-slip'
     | '/settings/display'
@@ -650,6 +661,7 @@ export interface FileRouteTypes {
     | '/reports/payments'
     | '/reports/sales'
     | '/reports/stock'
+    | '/reports/voids'
     | '/settings/accounts'
     | '/settings/booking-slip'
     | '/settings/display'
@@ -707,6 +719,7 @@ export interface RootRouteChildren {
   ReportsPaymentsRoute: typeof ReportsPaymentsRoute
   ReportsSalesRoute: typeof ReportsSalesRoute
   ReportsStockRoute: typeof ReportsStockRoute
+  ReportsVoidsRoute: typeof ReportsVoidsRoute
   SettingsAccountsRoute: typeof SettingsAccountsRoute
   SettingsBookingSlipRoute: typeof SettingsBookingSlipRoute
   SettingsDisplayRoute: typeof SettingsDisplayRoute
@@ -958,6 +971,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReportsStockRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reports/voids': {
+      id: '/reports/voids'
+      path: '/reports/voids'
+      fullPath: '/reports/voids'
+      preLoaderRoute: typeof ReportsVoidsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/': {
       id: '/settings/'
       path: '/settings'
@@ -1147,6 +1167,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReportsPaymentsRoute: ReportsPaymentsRoute,
   ReportsSalesRoute: ReportsSalesRoute,
   ReportsStockRoute: ReportsStockRoute,
+  ReportsVoidsRoute: ReportsVoidsRoute,
   SettingsAccountsRoute: SettingsAccountsRoute,
   SettingsBookingSlipRoute: SettingsBookingSlipRoute,
   SettingsDisplayRoute: SettingsDisplayRoute,
