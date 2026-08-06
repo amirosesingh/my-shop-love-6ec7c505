@@ -1,6 +1,17 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
-import { ArrowLeftRight, ClipboardCheck, Inbox, Minus, Plus, Scale, Search, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import {
+  ArrowLeftRight,
+  ClipboardCheck,
+  Combine,
+  FileSpreadsheet,
+  Inbox,
+  Minus,
+  Plus,
+  Scale,
+  Search,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
@@ -30,6 +41,11 @@ import { productVisibleAt } from "@/lib/branch-policy";
 import { TablePagination, usePagination } from "@/components/pos/TablePagination";
 import { Switch } from "@/components/ui/switch";
 import { BulkImportDialog } from "@/components/pos/BulkImportDialog";
+import { MergeProductsDialog } from "@/components/pos/MergeProductsDialog";
+import { ThemedSelect } from "@/components/pos/ThemedSelect";
+import { exportProductsXlsx } from "@/lib/product-export";
+import { subCategoriesOf, topCategories, useCategories, useUnits } from "@/lib/catalog-meta";
+import { codeTakenBy } from "@/lib/product-lookup";
 import { StockAdjustDialog, StockCountDialog } from "@/components/pos/StockAdjust";
 import type { Product } from "@/lib/pos-types";
 import { nextSku, peekSku, readSkuSettings } from "@/lib/sku";
@@ -65,29 +81,68 @@ const blank = (storeId: string): Product => ({
 });
 
 function Inventory() {
-  const { state, stores, currentStore, upsertProduct, removeProduct, adjustStock } = usePos();
+  const {
+    state,
+    stores,
+    currentStore,
+    upsertProduct,
+    removeProduct,
+    removeProducts,
+    patchProducts,
+    adjustStock,
+  } = usePos();
   const { can } = useAuth();
   const showMoney = can("can_view_sales_reports");
   const canEdit = can("can_add_new_product");
   const canPrice = can("can_edit_product_price");
   const canAdjust = can("can_adjust_stock");
+  const canBulk = can("can_bulk_edit_products");
+  const canMerge = can("can_merge_products");
   const canEcom = canPrice;
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState<Product | null>(null);
+  const [aliasDraft, setAliasDraft] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const [importOpen, setImportOpen] = useState(false);
+  const [mergeOpen, setMergeOpen] = useState(false);
+  const [catFilter, setCatFilter] = useState("all");
+  const [subFilter, setSubFilter] = useState("all");
+  const [bulkCategory, setBulkCategory] = useState("");
   const [adjustTarget, setAdjustTarget] = useState<Product | null>(null);
   const [countOpen, setCountOpen] = useState(false);
   const [skuOverride, setSkuOverride] = useState(false);
   const autoSku = readSkuSettings().mode === "auto";
+  const categories = useCategories();
+  const units = useUnits();
+
+  // Categories the catalogue actually uses, plus anything set up in settings.
+  const categoryNames = useMemo(() => {
+    const names = new Set<string>(topCategories(categories).map((c) => c.name));
+    state.products.forEach((p) => p.category && names.add(p.category));
+    return [...names].sort();
+  }, [categories, state.products]);
+
+  const subNames = useMemo(() => {
+    if (catFilter === "all") return [];
+    const names = new Set<string>(subCategoriesOf(categories, catFilter).map((c) => c.name));
+    state.products
+      .filter((p) => p.category === catFilter && p.subCategory)
+      .forEach((p) => names.add(p.subCategory!));
+    return [...names].sort();
+  }, [categories, state.products, catFilter]);
 
   const rows = state.products.filter(
     (p) =>
       // Items owned by a private-catalogue branch stay at that branch.
       productVisibleAt(state.settings, p.id, state.currentStoreId) &&
-      `${p.name} ${p.sku} ${p.barcode} ${p.category}`.toLowerCase().includes(query.toLowerCase()),
+      (catFilter === "all" || p.category === catFilter) &&
+      (subFilter === "all" || (p.subCategory ?? "") === subFilter) &&
+      `${p.name} ${p.sku} ${p.barcode} ${(p.barcodes ?? []).join(" ")} ${p.category} ${p.subCategory ?? ""}`
+        .toLowerCase()
+        .includes(query.toLowerCase()),
   );
+  const selectedProducts = state.products.filter((p) => selected.includes(p.id));
   const pager = usePagination(rows, 25);
   const pageRows = pager.pageItems;
   const allShownSelected =
