@@ -32,8 +32,12 @@ const lines = [
 ];
 
 let xml = fs.readFileSync(manifest, "utf8");
-const missing = lines.filter((l) => !xml.includes(l.trim().split(" ")[1]));
-if (!missing.length) {
+const needed = [
+  "android.permission.CAMERA",
+  "android.hardware.camera",
+  "android.hardware.camera.autofocus",
+];
+if (needed.every((n) => xml.includes(n))) {
   console.log("✓ camera permission already present");
   process.exit(0);
 }
