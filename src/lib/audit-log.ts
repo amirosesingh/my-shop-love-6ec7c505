@@ -111,7 +111,8 @@ export function resolveCategory(raw: string, action: string, module = ""): Audit
   // 1. an explicit, known group always wins
   if (AUDIT_CATEGORY_LABELS[raw] && raw !== "other") return raw as AuditCategory;
   const legacy = LEGACY[raw];
-  if (legacy && legacy !== "browse" && legacy !== "other") return legacy;
+  if (legacy === "browse") return "browse";
+  if (legacy && legacy !== "other") return legacy;
 
   // 2. read the wording of the action
   const a = action.toLowerCase();
