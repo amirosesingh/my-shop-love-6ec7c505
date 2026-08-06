@@ -370,6 +370,14 @@ export const standaloneNavItems: NavItem[] = [
     blurb: "Revenue, profit and peak hours as they happen.",
   },
   {
+    to: "/analytics",
+    label: "Live Business Board",
+    icon: BarChart3,
+    flag: "can_view_sales_reports",
+    keywords: "all shops combined pie chart top items margin discount coupon share trend",
+    blurb: "Every shop combined: top sellers, share, margin and giveaways.",
+  },
+  {
     to: "/",
     label: "Register POS",
     icon: LayoutGrid,
