@@ -76,12 +76,38 @@ function ReceiptVault() {
   const [payOpen, setPayOpen] = useState(false);
   const [payMethod, setPayMethod] = useState<PaymentMethod>("cash");
   const [payReason, setPayReason] = useState("");
+  // Older bills pulled a page at a time, below the ones already in memory.
+  const [older, setOlder] = useState<Sale[]>([]);
+  const [cursor, setCursor] = useState<Cursor>(null);
+  const [exhausted, setExhausted] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
 
   // Employees only ever see the log of the store they are on duty at.
-  const sales = useMemo(
-    () => state.sales.filter((s) => s.storeId === currentStore.id),
-    [state.sales, currentStore.id],
-  );
+  const sales = useMemo(() => {
+    const live = state.sales.filter((s) => s.storeId === currentStore.id);
+    const seen = new Set(live.map((s) => s.id));
+    return [...live, ...older.filter((s) => !seen.has(s.id))];
+  }, [state.sales, currentStore.id, older]);
+
+  const loadOlder = async () => {
+    setLoadingOlder(true);
+    try {
+      const from =
+        cursor ??
+        (() => {
+          const last = sales[sales.length - 1];
+          return last ? { ts: last.createdAt, id: last.id } : null;
+        })();
+      const page = await loadSalesPage(currentStore.id, from);
+      setOlder((prev) => [...prev, ...page.rows]);
+      setCursor(page.cursor);
+      if (!page.hasMore) setExhausted(true);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not load older receipts.");
+    } finally {
+      setLoadingOlder(false);
+    }
+  };
 
   const rows = sales.filter((s) => {
     const q = query.trim().toLowerCase();
