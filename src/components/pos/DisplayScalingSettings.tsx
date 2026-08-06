@@ -1,5 +1,6 @@
 import { Monitor, MonitorCog, Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import {
@@ -9,6 +10,7 @@ import {
   type UiDensity,
 } from "@/lib/use-ui-scale";
 import { useTheme, type ThemeChoice } from "@/lib/theme";
+import { ACCENT_PRESETS, DEFAULT_ACCENT, setAccent, useAccent } from "@/lib/accent";
 
 const THEMES: { value: ThemeChoice; label: string; icon: typeof Sun }[] = [
   { value: "system", label: "System", icon: Monitor },
@@ -30,6 +32,7 @@ const DENSITIES: { value: UiDensity; label: string }[] = [
 export function DisplayScalingSettings({ bare = false }: { bare?: boolean }) {
   const prefs = useUiScalePrefs();
   const { theme, setTheme } = useTheme();
+  const accent = useAccent();
   const auto =
     typeof window === "undefined" ? 1 : computeUiScale(window.innerWidth, window.innerHeight);
   const effective = prefs.mode === "manual" ? prefs.scale : auto;
@@ -63,6 +66,51 @@ export function DisplayScalingSettings({ bare = false }: { bare?: boolean }) {
               <t.icon className="size-3.5" /> {t.label}
             </button>
           ))}
+        </div>
+      </div>
+
+      <div className="mt-4 space-y-2">
+        <Label className="text-xs text-muted-foreground">Accent colour</Label>
+        <p className="text-[11px] text-muted-foreground">
+          Colours the buttons, icons and highlights on this terminal.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {ACCENT_PRESETS.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              title={p.label}
+              aria-label={p.label}
+              onClick={() => setAccent(p.hex)}
+              style={{ background: p.hex }}
+              className={`size-8 rounded-full border-2 ${
+                accent === p.hex ? "border-foreground" : "border-transparent"
+              }`}
+            />
+          ))}
+        </div>
+        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2">
+          <input
+            type="color"
+            aria-label="Custom accent colour"
+            value={accent}
+            onChange={(e) => setAccent(e.target.value)}
+            className="size-9 shrink-0 cursor-pointer rounded-md border border-border bg-transparent p-1"
+          />
+          <Input
+            value={accent}
+            aria-label="Accent colour hex"
+            onChange={(e) => setAccent(e.target.value)}
+            className="numeric h-9 min-w-0 text-xs"
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="shrink-0"
+            onClick={() => setAccent(DEFAULT_ACCENT)}
+          >
+            Reset
+          </Button>
         </div>
       </div>
 
@@ -120,6 +168,22 @@ export function DisplayScalingSettings({ bare = false }: { bare?: boolean }) {
               value={[Math.round(text * 100)]}
               onValueChange={([v]) => setUiScalePrefs({ textScale: (v ?? 100) / 100 })}
             />
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+              <Input
+                type="number"
+                min={90}
+                max={160}
+                step={1}
+                aria-label="Text size percentage"
+                value={Math.round(text * 100)}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  if (Number.isFinite(v)) setUiScalePrefs({ textScale: Math.min(160, Math.max(90, v)) / 100 });
+                }}
+                className="numeric h-9 min-w-0 text-xs"
+              />
+              <span className="shrink-0 text-[11px] text-muted-foreground">% of normal</span>
+            </div>
             <p className="text-[10px] text-muted-foreground">
               Font size only — works independently of the display size.
             </p>
