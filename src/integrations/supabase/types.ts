@@ -613,6 +613,7 @@ export type Database = {
       }
       pos_settings: {
         Row: {
+          booking_slip: Json
           company_name: string
           custom_lines: Json
           date_format: string
@@ -650,6 +651,7 @@ export type Database = {
           website: string | null
         }
         Insert: {
+          booking_slip?: Json
           company_name?: string
           custom_lines?: Json
           date_format?: string
@@ -687,6 +689,7 @@ export type Database = {
           website?: string | null
         }
         Update: {
+          booking_slip?: Json
           company_name?: string
           custom_lines?: Json
           date_format?: string
