@@ -1,0 +1,499 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { RefreshCw } from "lucide-react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ComposedChart,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { AppShell } from "@/components/pos/AppShell";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { StatCard, downloadCsv, isoDay } from "@/components/pos/report-kit";
+import { money, usePos } from "@/lib/pos-store";
+import { useAuth } from "@/lib/pos-auth";
+import {
+  fetchBoard,
+  shopSlices,
+  topItems,
+  trendSeries,
+  type ItemDayRow,
+} from "@/lib/analytics-board";
+
+export const Route = createFileRoute("/analytics")({
+  head: () => ({
+    meta: [
+      { title: "Live Business Board — every shop combined" },
+      {
+        name: "description",
+        content:
+          "One live board for the whole group: top selling items per shop and combined, revenue share, margin, and every ringgit given away in discounts, coupons and free items.",
+      },
+      { property: "og:title", content: "Live Business Board — every shop combined" },
+      {
+        property: "og:description",
+        content: "Top items, revenue share, margin and giveaways for every shop in one page.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
+  component: LiveBoard,
+});
+
+const PALETTE = [
+  "hsl(var(--primary))",
+  "hsl(var(--accent))",
+  "hsl(var(--success))",
+  "hsl(var(--warning))",
+  "hsl(var(--destructive))",
+  "hsl(var(--muted-foreground))",
+  "hsl(var(--chart-1, var(--primary)))",
+];
+
+const shift = (days: number) => isoDay(new Date(Date.now() - days * 86_400_000));
+
+function LiveBoard() {
+  const { stores } = usePos();
+  const { can, isAdmin } = useAuth();
+  const allowed = isAdmin || can("can_view_sales_reports");
+
+  const [from, setFrom] = useState(shift(29));
+  const [to, setTo] = useState(isoDay(new Date()));
+  const [preset, setPreset] = useState<"today" | "7" | "30" | "custom">("30");
+  const [topBy, setTopBy] = useState<"revenue" | "units">("revenue");
+  const [grain, setGrain] = useState<"daily" | "monthly">("daily");
+  const [picked, setPicked] = useState<string[]>([]);
+
+  const applyPreset = (p: "today" | "7" | "30") => {
+    setPreset(p);
+    setTo(isoDay(new Date()));
+    setFrom(p === "today" ? isoDay(new Date()) : shift(p === "7" ? 6 : 29));
+  };
+
+  const query = useQuery({
+    queryKey: ["analytics-board", from, to],
+    queryFn: () => fetchBoard(from, to),
+    enabled: allowed,
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  });
+
+  const nameOf = (id: string) => stores.find((s) => s.id === id)?.name ?? (id || "Unassigned");
+  const filter = picked.length ? new Set(picked) : undefined;
+  const data = query.data;
+
+  const shops = useMemo(
+    () => (data ? shopSlices(data, nameOf, filter) : []),
+    [data, picked, stores],
+  );
+
+  const itemRows: ItemDayRow[] = useMemo(
+    () => (data ? data.itemDays.filter((r) => !filter || filter.has(r.store_id ?? "")) : []),
+    [data, picked],
+  );
+
+  const combinedTop = useMemo(() => topItems(itemRows, topBy, 8), [itemRows, topBy]);
+  const trend = useMemo(
+    () =>
+      data
+        ? trendSeries(
+            data.storeDays.filter((r) => !filter || filter.has(r.store_id ?? "")),
+            grain,
+          )
+        : [],
+    [data, picked, grain],
+  );
+
+  const totals = useMemo(() => {
+    const revenue = shops.reduce((a, s) => a + s.revenue, 0);
+    const cost = shops.reduce((a, s) => a + s.cost, 0);
+    const bills = shops.reduce((a, s) => a + s.bills, 0);
+    const given = shops.reduce((a, s) => a + s.givenAway, 0);
+    const days = new Set(trend.map((t) => t.label.slice(0, 10))).size || 1;
+    const months = new Set(
+      (data?.storeDays ?? []).map((r) => r.sale_month),
+    ).size || 1;
+    return {
+      revenue,
+      profit: revenue - cost,
+      marginPct: revenue ? ((revenue - cost) / revenue) * 100 : 0,
+      bills,
+      basket: bills ? revenue / bills : 0,
+      given,
+      perDay: revenue / days,
+      perMonth: revenue / months,
+      days,
+    };
+  }, [shops, trend, data]);
+
+  const exportRows = () =>
+    downloadCsv("live-business-board", [
+      ["Shop", "Bills", "Revenue", "Cost", "Profit", "Margin %", "Share %", "Item discount", "Bill discount", "Coupons", "Free items"],
+      ...shops.map((s) => [
+        s.name,
+        s.bills,
+        s.revenue,
+        s.cost,
+        s.profit,
+        s.marginPct.toFixed(1),
+        s.sharePct.toFixed(1),
+        s.itemDiscount,
+        s.billDiscount,
+        s.coupon,
+        s.focValue,
+      ]),
+    ]);
+
+  if (!allowed) {
+    return (
+      <AppShell>
+        <div className="p-6">
+          <p className="text-sm text-muted-foreground">
+            You do not have permission to view sales reporting.
+          </p>
+        </div>
+      </AppShell>
+    );
+  }
+
+  const empty = !query.isLoading && shops.length === 0;
+
+  return (
+    <AppShell>
+      <div className="space-y-5 p-6">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <Link to="/reports" className="text-xs text-muted-foreground hover:text-foreground">
+              ← Reports &amp; Analytics
+            </Link>
+            <h1 className="text-2xl font-semibold tracking-tight">Live Business Board</h1>
+            <p className="text-sm text-muted-foreground">
+              Every shop combined — top sellers, revenue share, margin and what we gave away.
+              Refreshes on its own every minute.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => query.refetch()} disabled={query.isFetching}>
+              <RefreshCw className={`mr-2 h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+            <Button variant="outline" onClick={exportRows}>
+              Export CSV
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border p-3">
+          <div className="flex gap-1">
+            {(["today", "7", "30"] as const).map((p) => (
+              <Button
+                key={p}
+                size="sm"
+                variant={preset === p ? "default" : "outline"}
+                onClick={() => applyPreset(p)}
+              >
+                {p === "today" ? "Today" : p === "7" ? "7 days" : "30 days"}
+              </Button>
+            ))}
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">From</Label>
+            <Input
+              type="date"
+              value={from}
+              onChange={(e) => {
+                setFrom(e.target.value);
+                setPreset("custom");
+              }}
+              className="h-9 w-40"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">To</Label>
+            <Input
+              type="date"
+              value={to}
+              onChange={(e) => {
+                setTo(e.target.value);
+                setPreset("custom");
+              }}
+              className="h-9 w-40"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Shops</Label>
+            <div className="flex flex-wrap gap-1">
+              <Button
+                size="sm"
+                variant={picked.length === 0 ? "default" : "outline"}
+                onClick={() => setPicked([])}
+              >
+                All
+              </Button>
+              {stores.map((s) => (
+                <Button
+                  key={s.id}
+                  size="sm"
+                  variant={picked.includes(s.id) ? "default" : "outline"}
+                  onClick={() =>
+                    setPicked((prev) =>
+                      prev.includes(s.id) ? prev.filter((x) => x !== s.id) : [...prev, s.id],
+                    )
+                  }
+                >
+                  {s.name}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {query.isError && (
+          <p className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">
+            Could not load the board: {(query.error as Error).message}
+          </p>
+        )}
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
+          <StatCard label="Revenue" value={money(totals.revenue)} hint={`${totals.bills} bills`} />
+          <StatCard
+            label="Gross profit"
+            value={money(totals.profit)}
+            hint={`${totals.marginPct.toFixed(1)}% margin`}
+          />
+          <StatCard label="Given away" value={money(totals.given)} hint="Discounts, coupons, free items" />
+          <StatCard label="Avg basket" value={money(totals.basket)} hint="Per bill" />
+          <StatCard label="Avg / day" value={money(totals.perDay)} hint={`${totals.days} trading days`} />
+          <StatCard label="Avg / month" value={money(totals.perMonth)} hint="Across the range" />
+        </div>
+
+        {query.isLoading && (
+          <p className="rounded-lg border border-border p-6 text-sm text-muted-foreground">
+            Loading live figures…
+          </p>
+        )}
+
+        {empty && (
+          <p className="rounded-lg border border-border p-6 text-sm text-muted-foreground">
+            No sales in this range yet. Pick a wider date range or another shop.
+          </p>
+        )}
+
+        {!empty && !query.isLoading && (
+          <>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <section className="rounded-lg border border-border p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <h2 className="text-sm font-semibold">Top items — all shops combined</h2>
+                  <div className="flex gap-1">
+                    <Button
+                      size="sm"
+                      variant={topBy === "revenue" ? "default" : "outline"}
+                      onClick={() => setTopBy("revenue")}
+                    >
+                      Revenue
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={topBy === "units" ? "default" : "outline"}
+                      onClick={() => setTopBy("units")}
+                    >
+                      Units
+                    </Button>
+                  </div>
+                </div>
+                <ResponsiveContainer width="100%" height={320}>
+                  <PieChart>
+                    <Pie
+                      data={combinedTop}
+                      dataKey={topBy}
+                      nameKey="name"
+                      innerRadius={70}
+                      outerRadius={115}
+                      paddingAngle={2}
+                    >
+                      {combinedTop.map((s, i) => (
+                        <Cell key={s.name} fill={PALETTE[i % PALETTE.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(v: number) => (topBy === "revenue" ? money(v) : `${v} units`)}
+                    />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </section>
+
+              <section className="rounded-lg border border-border p-4">
+                <h2 className="mb-3 text-sm font-semibold">Revenue share by shop</h2>
+                <ResponsiveContainer width="100%" height={320}>
+                  <PieChart>
+                    <Pie
+                      data={shops}
+                      dataKey="revenue"
+                      nameKey="name"
+                      innerRadius={70}
+                      outerRadius={115}
+                      paddingAngle={2}
+                    >
+                      {shops.map((s, i) => (
+                        <Cell key={s.storeId} fill={PALETTE[i % PALETTE.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(v: number) => money(v)} />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </section>
+            </div>
+
+            <section className="rounded-lg border border-border p-4">
+              <h2 className="mb-3 text-sm font-semibold">Top items per shop</h2>
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {shops.map((shop) => {
+                  const rows = topItems(
+                    itemRows.filter((r) => (r.store_id ?? "") === shop.storeId),
+                    topBy,
+                    5,
+                  );
+                  return (
+                    <div key={shop.storeId} className="rounded-md border border-border p-3">
+                      <p className="text-xs font-medium">{shop.name}</p>
+                      <p className="mb-1 text-[11px] text-muted-foreground">
+                        {money(shop.revenue)} · {shop.sharePct.toFixed(1)}% of group
+                      </p>
+                      <ResponsiveContainer width="100%" height={200}>
+                        <PieChart>
+                          <Pie
+                            data={rows}
+                            dataKey={topBy}
+                            nameKey="name"
+                            innerRadius={40}
+                            outerRadius={70}
+                            paddingAngle={2}
+                          >
+                            {rows.map((s, i) => (
+                              <Cell key={s.name} fill={PALETTE[i % PALETTE.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            formatter={(v: number) =>
+                              topBy === "revenue" ? money(v) : `${v} units`
+                            }
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <section className="rounded-lg border border-border p-4">
+                <h2 className="mb-3 text-sm font-semibold">Revenue, cost, profit and margin</h2>
+                <ResponsiveContainer width="100%" height={320}>
+                  <ComposedChart data={shops}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" fontSize={11} />
+                    <YAxis yAxisId="left" fontSize={11} />
+                    <YAxis
+                      yAxisId="right"
+                      orientation="right"
+                      fontSize={11}
+                      unit="%"
+                      domain={[0, 100]}
+                    />
+                    <Tooltip
+                      formatter={(v: number, key: string) =>
+                        key === "marginPct" ? `${v.toFixed(1)}%` : money(v)
+                      }
+                    />
+                    <Legend />
+                    <Bar yAxisId="left" dataKey="revenue" name="Revenue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                    <Bar yAxisId="left" dataKey="cost" name="Cost" fill="hsl(var(--muted-foreground))" radius={[4, 4, 0, 0]} />
+                    <Bar yAxisId="left" dataKey="profit" name="Profit" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} />
+                    <Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="marginPct"
+                      name="Margin %"
+                      stroke="hsl(var(--warning))"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </section>
+
+              <section className="rounded-lg border border-border p-4">
+                <h2 className="mb-3 text-sm font-semibold">Where the money went</h2>
+                <ResponsiveContainer width="100%" height={320}>
+                  <BarChart data={shops}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" fontSize={11} />
+                    <YAxis fontSize={11} />
+                    <Tooltip formatter={(v: number) => money(v)} />
+                    <Legend />
+                    <Bar dataKey="profit" stackId="m" name="Kept as profit" fill="hsl(var(--success))" />
+                    <Bar dataKey="itemDiscount" stackId="m" name="Item discounts" fill="hsl(var(--primary))" />
+                    <Bar dataKey="billDiscount" stackId="m" name="Bill discounts" fill="hsl(var(--accent))" />
+                    <Bar dataKey="coupon" stackId="m" name="Coupons" fill="hsl(var(--warning))" />
+                    <Bar dataKey="focValue" stackId="m" name="Free items" fill="hsl(var(--destructive))" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </section>
+            </div>
+
+            <section className="rounded-lg border border-border p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-sm font-semibold">Revenue and profit trend</h2>
+                <div className="flex gap-1">
+                  <Button
+                    size="sm"
+                    variant={grain === "daily" ? "default" : "outline"}
+                    onClick={() => setGrain("daily")}
+                  >
+                    Daily
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={grain === "monthly" ? "default" : "outline"}
+                    onClick={() => setGrain("monthly")}
+                  >
+                    Monthly
+                  </Button>
+                </div>
+              </div>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={trend}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="label" fontSize={11} />
+                  <YAxis fontSize={11} />
+                  <Tooltip formatter={(v: number) => money(v)} />
+                  <Legend />
+                  <Line type="monotone" dataKey="revenue" name="Revenue" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="profit" name="Profit" stroke="hsl(var(--success))" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </section>
+          </>
+        )}
+      </div>
+    </AppShell>
+  );
+}
