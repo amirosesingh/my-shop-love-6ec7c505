@@ -6,13 +6,11 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { Camera, ScanBarcode } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-
-const isCapacitor = () =>
-  typeof window !== "undefined" &&
-  Boolean((window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor
-    ?.isNativePlatform?.());
+import { CameraScanner } from "@/components/pos/CameraScanner";
+import { isNativeApp, scanOnceNative } from "@/lib/camera";
 
 /** True when the user is typing into a real field, so we must not steal keys. */
 function typingInField(target: EventTarget | null) {
@@ -32,10 +30,15 @@ export function ScanBar({
   className?: string;
 }) {
   const [code, setCode] = useState("");
-  const [native, setNative] = useState(false);
+  const [hasCamera, setHasCamera] = useState(false);
+  const [webScan, setWebScan] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => setNative(isCapacitor()), []);
+  // Rendered after mount so the server and the browser agree on the markup.
+  useEffect(
+    () => setHasCamera(isNativeApp() || Boolean(navigator.mediaDevices?.getUserMedia)),
+    [],
+  );
 
   // Keyboard-wedge capture: a burst of characters ending with Enter is a scan.
   useEffect(() => {
@@ -71,15 +74,15 @@ export function ScanBar({
   };
 
   const cameraScan = async () => {
+    if (!isNativeApp()) {
+      setWebScan((v) => !v);
+      return;
+    }
     try {
-      const { BarcodeScanner } = await import("@capacitor-mlkit/barcode-scanning");
-      const perm = await BarcodeScanner.requestPermissions();
-      if (perm.camera !== "granted" && perm.camera !== "limited") return;
-      const { barcodes } = await BarcodeScanner.scan();
-      const value = barcodes[0]?.rawValue?.trim();
+      const value = await scanOnceNative();
       if (value) onScan(value);
-    } catch {
-      /* camera unavailable — the typed/scanner path still works */
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "The camera is not available.");
     }
   };
 
@@ -99,13 +102,29 @@ export function ScanBar({
             className="numeric h-10 pl-9"
           />
         </div>
-        {native && (
-          <Button type="button" variant="outline" className="h-10 shrink-0" onClick={cameraScan}>
+        {hasCamera && (
+          <Button
+            type="button"
+            variant="outline"
+            className="h-10 shrink-0"
+            onClick={() => void cameraScan()}
+          >
             <Camera className="size-4" />
-            <span className="hidden sm:inline">Scan</span>
+            <span className="hidden sm:inline">{webScan ? "Close" : "Scan"}</span>
           </Button>
         )}
       </div>
+      {webScan && (
+        <div className="mt-2">
+          <CameraScanner
+            onScan={(value) => {
+              setWebScan(false);
+              onScan(value);
+            }}
+            onClose={() => setWebScan(false)}
+          />
+        </div>
+      )}
     </form>
   );
 }
