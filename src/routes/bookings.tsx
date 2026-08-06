@@ -250,7 +250,7 @@ function BookingsPage() {
                             overdue
                           </Badge>
                         )}
-                      </p>
+                      </div>
                       <p className="text-sm text-muted-foreground">
                         {b.customerName}
                         {b.customerPhone ? ` · ${b.customerPhone}` : ""} · booked{" "}
