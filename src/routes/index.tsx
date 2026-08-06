@@ -2769,6 +2769,13 @@ function Register() {
         onOpenChange={(o) => !o && setHistoryMemberId(null)}
       />
 
+      <QuickMemberDialog
+        open={quickMemberOpen}
+        onOpenChange={setQuickMemberOpen}
+        prefill={memberQuery}
+        onCreated={(m) => attachMember(m)}
+      />
+
       {/* Pick which of the member's vouchers goes on this bill */}
       <Dialog open={voucherPickerOpen} onOpenChange={setVoucherPickerOpen}>
         <DialogContent className="max-w-md">
