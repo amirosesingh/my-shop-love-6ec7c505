@@ -495,7 +495,9 @@ export function decodePairingRequest(value: string): PairingRequest | null {
   } catch {
     /* not a URL */
   }
-  const embedded = trimmed.match(uuid);
+  const embedded = trimmed.match(
+    /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i,
+  );
   return embedded ? { tokenId: embedded[0], deviceName: "" } : null;
 }
 
