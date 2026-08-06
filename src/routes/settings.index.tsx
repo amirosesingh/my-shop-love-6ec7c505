@@ -208,6 +208,12 @@ const GROUPS = [
         icon: Activity,
         blurb: "Connection health, recovery tools, public domains and approval rules.",
       },
+      {
+        to: "/settings/inheritance",
+        label: "Settings inheritance",
+        icon: RefreshCw,
+        blurb: "Global, cluster and branch tiers with sync, override and push-down controls.",
+      },
     ],
   },
 ] as const;
