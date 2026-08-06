@@ -673,6 +673,14 @@ function Inventory() {
         </div>
       </div>
       {canEdit && <BulkImportDialog open={importOpen} onOpenChange={setImportOpen} />}
+      {canMerge && (
+        <MergeProductsDialog
+          open={mergeOpen}
+          products={selectedProducts}
+          onOpenChange={setMergeOpen}
+          onMerged={() => setSelected([])}
+        />
+      )}
       {canAdjust && (
         <>
           <StockAdjustDialog
