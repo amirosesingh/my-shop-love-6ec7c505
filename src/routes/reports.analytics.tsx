@@ -47,7 +47,7 @@ export const Route = createFileRoute("/reports/analytics")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: AnalyticsBoard;
+  component: AnalyticsBoard,
 });
 
 const PALETTE = [
