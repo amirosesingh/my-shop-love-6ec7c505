@@ -358,8 +358,10 @@ BEGIN
     RETURN new;
   END IF;
 
-  INSERT INTO public.app_users (user_id, full_name, role, store_id, email, auth_user_id)
-  VALUES (v_code, v_name, 'staff'::app_role, v_store, lower(new.email), new.id)
+  -- Self-service signups are created PENDING: no role grant and inactive until
+  -- an admin activates them from Staff Management. Never auto-grant staff access.
+  INSERT INTO public.app_users (user_id, full_name, role, store_id, email, auth_user_id, is_active)
+  VALUES (v_code, v_name, 'staff'::app_role, v_store, lower(new.email), new.id, false)
   ON CONFLICT (user_id) DO NOTHING;
   RETURN new;
 END $function$;
