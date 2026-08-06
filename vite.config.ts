@@ -12,8 +12,27 @@ const isDesktop = Boolean(process.env["DESKTOP_BUILD"]);
  * a static client bundle with an SPA fallback rather than a running server.
  */
 const isMobile = Boolean(process.env["MOBILE_BUILD"]);
+/**
+ * Cloudflare Workers build (GitHub Actions -> wrangler deploy). Pins the same
+ * preset and output layout that wrangler.jsonc points at, so CI never falls
+ * back to a Node target.
+ */
+const isCloudflare = Boolean(process.env["CLOUDFLARE_BUILD"]);
 
 export default defineConfig({
+  ...(isCloudflare
+    ? {
+        nitro: {
+          preset: "cloudflare-module" as const,
+          output: {
+            dir: "dist",
+            serverDir: "dist/server",
+            publicDir: "dist/client",
+          },
+          cloudflare: { nodeCompat: true },
+        },
+      }
+    : {}),
   // The desktop (Electron) build targets a plain Node server that the Electron
   // main process starts on 127.0.0.1 — this app is SSR, so there is no static
   // index.html to load over file://. The browser/cloud build is unchanged.
