@@ -12,6 +12,8 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { PosProvider } from "@/lib/pos-store";
+import { usePos } from "@/lib/pos-store";
+import { PosRulesProvider } from "@/lib/pos-rules.tsx";
 import { AuthProvider } from "@/lib/pos-auth";
 import { PermissionsProvider } from "@/lib/pos-permissions";
 import { Toaster } from "../components/ui/sonner";
@@ -170,6 +172,7 @@ function RootComponent() {
       <AuthProvider>
         <PermissionsProvider>
         <PosProvider>
+          <RulesBridge>
           {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
           <AuditTracker />
           <FirstRunSetup>
@@ -177,6 +180,7 @@ function RootComponent() {
           </FirstRunSetup>
           <AndroidUpdateBanner />
           <Toaster position="top-center" />
+          </RulesBridge>
         </PosProvider>
         </PermissionsProvider>
       </AuthProvider>
@@ -185,4 +189,10 @@ function RootComponent() {
       </ThemeProvider>
     </QueryClientProvider>
   );
+}
+
+/** Rules are per-branch, so the provider needs the active store from the till. */
+function RulesBridge({ children }: { children: ReactNode }) {
+  const { currentStore } = usePos();
+  return <PosRulesProvider storeId={currentStore?.id ?? ""}>{children}</PosRulesProvider>;
 }
