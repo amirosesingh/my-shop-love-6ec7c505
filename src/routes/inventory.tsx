@@ -199,6 +199,15 @@ function Inventory() {
                 📥 Bulk Import from Excel
               </Button>
             )}
+            <Button
+              variant="outline"
+              onClick={() => {
+                void exportProductsXlsx(rows, stores, `products-${currentStore.code}`);
+                toast.success(`Exporting ${rows.length} products to Excel`);
+              }}
+            >
+              <FileSpreadsheet className="size-4" /> Export to Excel
+            </Button>
             {canAdjust && (
               <Button variant="outline" onClick={() => setCountOpen(true)}>
                 <ClipboardCheck className="size-4" /> Stock check
