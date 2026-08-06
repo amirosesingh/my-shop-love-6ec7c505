@@ -47,6 +47,7 @@ import {
   type CouponEvent,
   type Voucher,
 } from "@/lib/coupons";
+import type { Cursor } from "@/lib/keyset";
 
 export const Route = createFileRoute("/coupons")({
   head: () => ({
