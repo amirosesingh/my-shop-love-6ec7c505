@@ -1585,7 +1585,7 @@ function Register() {
                       </Button>
                     </div>
                     <span
-                      className={`numeric col-span-2 text-right text-sm font-semibold sm:col-span-1 sm:w-24 ${l.credit ? "text-accent" : ""}`}
+                      className={`numeric col-span-2 shrink-0 text-right text-sm font-semibold sm:col-span-1 sm:w-24 ${l.credit ? "text-accent" : ""}`}
                     >
                       {money((l.price - lineUnitDiscount(l)) * l.qty)}
                     </span>
@@ -1602,13 +1602,13 @@ function Register() {
                   )}
                   {!l.credit && !l.foc && discountAllowed && (
                     <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-                      <span className="text-[11px] text-muted-foreground">Disc</span>
+                      <span className="truncate text-[11px] text-muted-foreground">Disc</span>
                       <ActionButton
                         layout="inline"
                         variant="outline"
                         size="sm"
                         onClick={() => setPadTarget(i)}
-                        className="numeric h-10 min-h-10 w-32 justify-between text-[11px]"
+                        className="numeric h-10 min-h-10 w-28 shrink-0 justify-between text-[11px] sm:w-32"
                         label={l.discount
                           ? `${l.discount}${(l.discountType ?? "amount") === "percent" ? "%" : ""}`
                           : "Add discount"}
@@ -1669,13 +1669,13 @@ function Register() {
                 <div
                   className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 ${discountAllowed ? "" : "hidden"}`}
                 >
-                  <span className="text-muted-foreground">Bill discount</span>
+                  <span className="truncate text-muted-foreground">Bill discount</span>
                   <ActionButton
                     layout="inline"
                     variant="outline"
                     size="sm"
                     onClick={() => setPadTarget("bill")}
-                    className="numeric h-10 min-h-10 w-32 justify-between text-xs"
+                    className="numeric h-10 min-h-10 w-28 shrink-0 justify-between text-xs sm:w-32"
                     label={cartDiscount
                       ? `${cartDiscount}${cartDiscountType === "percent" ? "%" : ""}`
                       : "Add discount"}
