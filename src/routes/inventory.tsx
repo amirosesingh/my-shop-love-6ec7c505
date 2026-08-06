@@ -423,13 +423,49 @@ function Inventory() {
           </div>
         </header>
 
+        <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border p-3">
+          <div className="space-y-1">
+            <Label className="text-xs">Category</Label>
+            <ThemedSelect
+              value={catFilter}
+              onChange={(v) => {
+                setCatFilter(v);
+                setSubFilter("all");
+              }}
+              ariaLabel="Filter by category"
+              className="w-48"
+              options={[
+                { value: "all", label: "All categories" },
+                ...categoryNames.map((c) => ({ value: c, label: c })),
+              ]}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Sub-category</Label>
+            <ThemedSelect
+              value={subFilter}
+              onChange={setSubFilter}
+              ariaLabel="Filter by sub-category"
+              className="w-48"
+              options={[
+                { value: "all", label: "All sub-categories" },
+                ...subNames.map((c) => ({ value: c, label: c })),
+              ]}
+            />
+          </div>
+          <p className="pb-2 text-xs text-muted-foreground">
+            Showing <span className="numeric">{rows.length}</span> of{" "}
+            <span className="numeric">{state.products.length}</span> products
+          </p>
+        </div>
+
         {selected.length > 0 && (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/40 bg-primary/5 px-4 py-3">
             <p className="text-sm">
               <span className="numeric font-semibold">{selected.length}</span> product
               {selected.length > 1 ? "s" : ""} selected
             </p>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button variant="outline" size="sm" onClick={() => setSelected([])}>
                 Clear
               </Button>
@@ -439,6 +475,53 @@ function Inventory() {
               <Button size="sm" onClick={() => goToTransfers("transfer")}>
                 <ArrowLeftRight className="size-4" /> Transfer selected
               </Button>
+              {canBulk && (
+                <>
+                  <Input
+                    value={bulkCategory}
+                    onChange={(e) => setBulkCategory(e.target.value)}
+                    placeholder="Move to category…"
+                    className="h-8 w-44"
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const name = bulkCategory.trim();
+                      if (!name) return toast.error("Type the category to move them to");
+                      patchProducts(selected, { category: name });
+                      setBulkCategory("");
+                      toast.success(`${selected.length} products moved to ${name}`);
+                    }}
+                  >
+                    Apply category
+                  </Button>
+                </>
+              )}
+              {canMerge && selected.length > 1 && (
+                <Button size="sm" variant="outline" onClick={() => setMergeOpen(true)}>
+                  <Combine className="size-4" /> Merge duplicates
+                </Button>
+              )}
+              {canBulk && (
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => {
+                    if (
+                      !window.confirm(
+                        `Delete ${selected.length} product${selected.length > 1 ? "s" : ""}? This cannot be undone.`,
+                      )
+                    )
+                      return;
+                    removeProducts(selected);
+                    toast.success(`${selected.length} products deleted`);
+                    setSelected([]);
+                  }}
+                >
+                  <Trash2 className="size-4" /> Delete selected
+                </Button>
+              )}
             </div>
           </div>
         )}
