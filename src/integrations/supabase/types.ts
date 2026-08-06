@@ -1837,7 +1837,84 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_daily_item_sales: {
+        Row: {
+          cost: number | null
+          product_id: string | null
+          product_name: string | null
+          profit: number | null
+          revenue: number | null
+          sale_day: string | null
+          sale_month: string | null
+          store_id: string | null
+          units: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sale_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_daily_store_sales: {
+        Row: {
+          bills: number | null
+          cost: number | null
+          discount: number | null
+          foc_value: number | null
+          profit: number | null
+          revenue: number | null
+          sale_day: string | null
+          sale_month: string | null
+          store_id: string | null
+          units: number | null
+        }
+        Relationships: []
+      }
+      v_sale_line_facts: {
+        Row: {
+          bill_number: string | null
+          cashier_name: string | null
+          created_at: string | null
+          is_foc: boolean | null
+          is_refunded: boolean | null
+          is_return: boolean | null
+          line_cost: number | null
+          line_discount: number | null
+          line_id: string | null
+          line_revenue: number | null
+          payment_type: string | null
+          product_id: string | null
+          product_name: string | null
+          quantity: number | null
+          sale_day: string | null
+          sale_id: string | null
+          sale_month: string | null
+          store_id: string | null
+          unit_cost: number | null
+          unit_discount: number | null
+          unit_price: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sale_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_items_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       campaign_is_live: {
