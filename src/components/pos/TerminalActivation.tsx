@@ -42,8 +42,14 @@ export function TerminalActivation({ onActivated }: { onActivated: (c: TerminalC
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [scanning, setScanning] = useState(false);
-  const pairing = useMemo(() => getPairingRequest(), []);
-  const pairQr = useMemo(() => qrDataUrl(encodePairingRequest(pairing)), [pairing]);
+  // Minted after mount: the id is random, so generating it during SSR would
+  // hydrate a different QR than the server drew and blow up the page.
+  const [pairing, setPairing] = useState<ReturnType<typeof getPairingRequest> | null>(null);
+  useEffect(() => setPairing(getPairingRequest()), []);
+  const pairQr = useMemo(
+    () => (pairing ? qrDataUrl(encodePairingRequest(pairing)) : ""),
+    [pairing],
+  );
   const scannerRef = useRef<{ stop: () => Promise<void>; clear: () => void } | null>(null);
 
   const submit = useCallback(
@@ -107,6 +113,7 @@ export function TerminalActivation({ onActivated }: { onActivated: (c: TerminalC
   // While the operator waits, keep asking whether an administrator approved
   // the pairing request from their phone. Approval activates the till itself.
   useEffect(() => {
+    if (!pairing) return;
     let stopped = false;
     const tick = async () => {
       try {
@@ -125,7 +132,7 @@ export function TerminalActivation({ onActivated }: { onActivated: (c: TerminalC
       stopped = true;
       window.clearInterval(timer);
     };
-  }, [pairing.tokenId, onActivated]);
+  }, [pairing, onActivated]);
 
   return (
     <Frame>
@@ -155,13 +162,21 @@ export function TerminalActivation({ onActivated }: { onActivated: (c: TerminalC
           till registers itself — nothing to type or copy.
         </p>
         <div className="mt-3 flex items-center gap-3">
-          <img
-            src={pairQr}
-            alt="Pairing code for this terminal"
-            className="size-32 rounded-lg bg-white p-1"
-          />
+          {pairQr ? (
+            <img
+              src={pairQr}
+              alt="Pairing code for this terminal"
+              className="size-32 rounded-lg bg-white p-1"
+            />
+          ) : (
+            <div className="grid size-32 place-items-center rounded-lg border border-slate-700 bg-slate-900">
+              <Loader2 className="size-5 animate-spin text-slate-500" />
+            </div>
+          )}
           <div className="text-[11px] text-slate-500">
-            <p className="font-mono break-all text-slate-400">{pairing.tokenId.slice(0, 8)}…</p>
+            <p className="font-mono break-all text-slate-400">
+              {pairing ? `${pairing.tokenId.slice(0, 8)}…` : "Preparing…"}
+            </p>
             <p className="mt-2 flex items-center gap-1">
               <Loader2 className="size-3 animate-spin" /> Waiting for approval…
             </p>
