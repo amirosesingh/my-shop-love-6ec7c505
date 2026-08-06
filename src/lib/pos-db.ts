@@ -489,7 +489,7 @@ export async function loadCloudState(): Promise<CloudSlice> {
     supabase.from("members").select("*").order("created_at"),
     supabase
       .from("sales")
-      .select("*, sale_items(*)")
+      .select(SALE_COLUMNS)
       .order("created_at", { ascending: false })
       .limit(500),
     supabase.from("promotions").select("*").order("created_at"),
