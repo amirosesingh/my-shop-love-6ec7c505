@@ -51,12 +51,16 @@ export const Route = createFileRoute("/reports/analytics")({
 });
 
 const PALETTE = [
-  "var(--primary)",
-  "var(--accent)",
-  "var(--success)",
-  "var(--warning)",
-  "var(--destructive)",
-  "var(--muted-foreground)",
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-6)",
+  "var(--chart-7)",
+  "var(--chart-8)",
+  "var(--chart-9)",
+  "var(--chart-10)",
+  "var(--chart-4)",
+  "var(--chart-5)",
 ];
 
 const monthKey = (iso: string) => iso.slice(0, 7);
