@@ -104,6 +104,8 @@ export type CartLine = {
   couponCode?: string;
   /** currency value the coupon took off this line */
   couponDiscount?: number;
+  /** unit cost price captured at the moment of sale (for margin reporting) */
+  cost?: number;
 };
 
 export type DiscountType = "amount" | "percent";
