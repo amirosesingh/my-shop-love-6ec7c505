@@ -45,6 +45,7 @@ import { Route as ReportsVoidsRouteImport } from './routes/reports.voids'
 import { Route as SettingsIndexRouteImport } from './routes/settings.index'
 import { Route as SettingsAccountsRouteImport } from './routes/settings.accounts'
 import { Route as SettingsBookingSlipRouteImport } from './routes/settings.booking-slip'
+import { Route as SettingsCatalogRouteImport } from './routes/settings.catalog'
 import { Route as SettingsDisplayRouteImport } from './routes/settings.display'
 import { Route as SettingsElementsRouteImport } from './routes/settings.elements'
 import { Route as SettingsIdentityRouteImport } from './routes/settings.identity'
@@ -245,6 +246,11 @@ const SettingsBookingSlipRoute = SettingsBookingSlipRouteImport.update({
   path: '/settings/booking-slip',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsCatalogRoute = SettingsCatalogRouteImport.update({
+  id: '/settings/catalog',
+  path: '/settings/catalog',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsDisplayRoute = SettingsDisplayRouteImport.update({
   id: '/settings/display',
   path: '/settings/display',
@@ -376,6 +382,7 @@ export interface FileRoutesByFullPath {
   '/reports/voids': typeof ReportsVoidsRoute
   '/settings/accounts': typeof SettingsAccountsRoute
   '/settings/booking-slip': typeof SettingsBookingSlipRoute
+  '/settings/catalog': typeof SettingsCatalogRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
   '/settings/identity': typeof SettingsIdentityRoute
@@ -433,6 +440,7 @@ export interface FileRoutesByTo {
   '/reports/voids': typeof ReportsVoidsRoute
   '/settings/accounts': typeof SettingsAccountsRoute
   '/settings/booking-slip': typeof SettingsBookingSlipRoute
+  '/settings/catalog': typeof SettingsCatalogRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
   '/settings/identity': typeof SettingsIdentityRoute
@@ -491,6 +499,7 @@ export interface FileRoutesById {
   '/reports/voids': typeof ReportsVoidsRoute
   '/settings/accounts': typeof SettingsAccountsRoute
   '/settings/booking-slip': typeof SettingsBookingSlipRoute
+  '/settings/catalog': typeof SettingsCatalogRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
   '/settings/identity': typeof SettingsIdentityRoute
@@ -550,6 +559,7 @@ export interface FileRouteTypes {
     | '/reports/voids'
     | '/settings/accounts'
     | '/settings/booking-slip'
+    | '/settings/catalog'
     | '/settings/display'
     | '/settings/elements'
     | '/settings/identity'
@@ -607,6 +617,7 @@ export interface FileRouteTypes {
     | '/reports/voids'
     | '/settings/accounts'
     | '/settings/booking-slip'
+    | '/settings/catalog'
     | '/settings/display'
     | '/settings/elements'
     | '/settings/identity'
@@ -664,6 +675,7 @@ export interface FileRouteTypes {
     | '/reports/voids'
     | '/settings/accounts'
     | '/settings/booking-slip'
+    | '/settings/catalog'
     | '/settings/display'
     | '/settings/elements'
     | '/settings/identity'
@@ -722,6 +734,7 @@ export interface RootRouteChildren {
   ReportsVoidsRoute: typeof ReportsVoidsRoute
   SettingsAccountsRoute: typeof SettingsAccountsRoute
   SettingsBookingSlipRoute: typeof SettingsBookingSlipRoute
+  SettingsCatalogRoute: typeof SettingsCatalogRoute
   SettingsDisplayRoute: typeof SettingsDisplayRoute
   SettingsElementsRoute: typeof SettingsElementsRoute
   SettingsIdentityRoute: typeof SettingsIdentityRoute
@@ -999,6 +1012,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsBookingSlipRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/catalog': {
+      id: '/settings/catalog'
+      path: '/settings/catalog'
+      fullPath: '/settings/catalog'
+      preLoaderRoute: typeof SettingsCatalogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/display': {
       id: '/settings/display'
       path: '/settings/display'
@@ -1170,6 +1190,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReportsVoidsRoute: ReportsVoidsRoute,
   SettingsAccountsRoute: SettingsAccountsRoute,
   SettingsBookingSlipRoute: SettingsBookingSlipRoute,
+  SettingsCatalogRoute: SettingsCatalogRoute,
   SettingsDisplayRoute: SettingsDisplayRoute,
   SettingsElementsRoute: SettingsElementsRoute,
   SettingsIdentityRoute: SettingsIdentityRoute,
