@@ -47,6 +47,7 @@ import {
   type CouponEvent,
   type Voucher,
 } from "@/lib/coupons";
+import type { Cursor } from "@/lib/keyset";
 
 export const Route = createFileRoute("/coupons")({
   head: () => ({
@@ -88,6 +89,9 @@ function CouponsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const [events, setEvents] = useState<CouponEvent[]>([]);
+  const [eventCursor, setEventCursor] = useState<Cursor>(null);
+  const [moreEvents, setMoreEvents] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [draft, setDraft] = useState<Campaign | null>(null);
@@ -100,11 +104,13 @@ function CouponsPage() {
       const [cs, vs, es] = await Promise.all([
         loadCampaigns(),
         loadVouchers(),
-        loadCouponEvents().catch(() => [] as CouponEvent[]),
+        loadCouponEvents().catch(() => ({ rows: [] as CouponEvent[], cursor: null, hasMore: false })),
       ]);
       setCampaigns(cs);
       setVouchers(vs);
-      setEvents(es);
+      setEvents(es.rows);
+      setEventCursor(es.cursor);
+      setMoreEvents(es.hasMore);
       setError("");
     } catch (e) {
       setError(
@@ -120,6 +126,20 @@ function CouponsPage() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  /** Pull the next page of the event trail without re-reading the ones on screen. */
+  const loadMoreEvents = useCallback(async () => {
+    if (!eventCursor) return;
+    setLoadingMore(true);
+    try {
+      const page = await loadCouponEvents({ cursor: eventCursor });
+      setEvents((prev) => [...prev, ...page.rows]);
+      setEventCursor(page.cursor);
+      setMoreEvents(page.hasMore);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [eventCursor]);
 
   const counts = useMemo(() => {
     const map = new Map<string, { issued: number; redeemed: number }>();
@@ -341,6 +361,13 @@ function CouponsPage() {
               campaigns={campaigns}
               stores={state.stores.map((s) => ({ id: s.id, name: s.name }))}
             />
+            {moreEvents ? (
+              <div className="mt-3 flex justify-center">
+                <Button variant="outline" onClick={() => void loadMoreEvents()} disabled={loadingMore}>
+                  {loadingMore ? "Loading…" : "Load older events"}
+                </Button>
+              </div>
+            ) : null}
           </TabsContent>
         </Tabs>
       </div>

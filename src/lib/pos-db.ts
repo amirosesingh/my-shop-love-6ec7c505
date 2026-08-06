@@ -5,6 +5,7 @@ import { drainOutbox, runOpLive } from "./sync-engine";
 import { electronDb, localDb, readBranch } from "./local-db";
 import { enqueue, listQueue, persisted, type SyncOp } from "./sync-outbox";
 import { isLiveOnly } from "./live-mode";
+import { keyset, nextCursor, PAGE_SIZE, type Cursor, type Page } from "./keyset";
 import type {
   AppSettings,
   Member,
@@ -346,6 +347,18 @@ const shiftSessionToRow = (s: ShiftSession): Row => ({
   updated_at: new Date().toISOString(),
 });
 
+/**
+ * Exactly the bill and line columns the till renders — no `SELECT *`, so a
+ * schema that grows new columns never inflates the payload of every read.
+ */
+const SALE_COLUMNS =
+  "id, bill_number, store_id, shift_id, cashier_name, member_id, subtotal_amount, " +
+  "discount_amount, tax_amount, total_amount, paid_amount, change_amount, payment_type, " +
+  "payments, points_earned, is_refunded, original_bill_number, exchanged_to_bill_number, " +
+  "exchange_credit, coupon_code, coupon_promo_id, coupon_scope, coupon_discount, created_at, " +
+  "sale_items(product_id, product_name, unit_price, quantity, tax_rate, discount_percent, " +
+  "discount_amount, is_return, is_foc, promo_id, coupon_code, coupon_discount, unit_cost)";
+
 const rowToSale = (r: Row): Sale => ({
   id: r.id,
   receiptNo: r.bill_number,
@@ -489,7 +502,7 @@ export async function loadCloudState(): Promise<CloudSlice> {
     supabase.from("members").select("*").order("created_at"),
     supabase
       .from("sales")
-      .select("*, sale_items(*)")
+      .select(SALE_COLUMNS)
       .order("created_at", { ascending: false })
       .limit(500),
     supabase.from("promotions").select("*").order("created_at"),
@@ -552,6 +565,31 @@ export async function loadActiveShift(storeId: string): Promise<Shift | null> {
   if (res.error) throw res.error;
   const rows = (res.data as Row[] | null) ?? [];
   return rows.length ? rowToShift(rows[0]) : null;
+}
+
+/**
+ * One page of older bills for a branch, newest first.
+ *
+ * Keyset paging on `(created_at, id)`: the register keeps the most recent 500
+ * bills in memory, and history screens walk further back a page at a time
+ * without ever paying for an OFFSET.
+ */
+export async function loadSalesPage(
+  storeId: string,
+  cursor: Cursor = null,
+  limit = PAGE_SIZE,
+): Promise<Page<Sale>> {
+  let q = supabase.from("sales").select(SALE_COLUMNS);
+  if (storeId) q = q.eq("store_id", storeId) as typeof q;
+  const res = await keyset(q as never, "created_at", cursor, limit);
+  const err = (res as { error?: { message: string } }).error;
+  if (err) throw new Error(err.message);
+  const rows = ((res as { data?: Row[] | null }).data ?? []) as Row[];
+  return {
+    rows: rows.map(rowToSale),
+    cursor: nextCursor(rows, "created_at", limit),
+    hasMore: rows.length >= limit,
+  };
 }
 
 /** Recent sign-in sessions for a branch, newest first. */
