@@ -2028,6 +2028,7 @@ export type Database = {
       }
       delete_cashier: { Args: { p_id: string }; Returns: undefined }
       delete_terminal_user: { Args: { p_user_id: string }; Returns: undefined }
+      has_perm: { Args: { _flag: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

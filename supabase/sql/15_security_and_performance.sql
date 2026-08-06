@@ -300,3 +300,43 @@ END $grants$;
 -- ---------- verification ----------
 SELECT 'branch isolation' AS check, count(*) AS policies
   FROM pg_policies WHERE schemaname = 'public' AND qual LIKE '%store_visible%';
+
+-- ============================================================
+-- Server-side enforcement of per-staff permission switches and
+-- strict branch isolation (added in the permissions hardening pass).
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION public.has_perm(_flag text)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT CASE
+    WHEN (SELECT auth.uid()) IS NULL THEN false
+    WHEN public.is_app_supervisor() THEN true
+    ELSE coalesce((
+      SELECT (a.permissions ->> _flag)::boolean
+        FROM public.app_users a
+       WHERE a.is_active
+         AND (a.auth_user_id = (SELECT auth.uid())
+              OR lower(a.email) = lower(coalesce((SELECT auth.jwt()) ->> 'email', '')))
+       LIMIT 1), false)
+  END
+$$;
+GRANT EXECUTE ON FUNCTION public.has_perm(text) TO authenticated, service_role;
+
+-- Unassigned staff no longer see every branch; only supervisors do.
+CREATE OR REPLACE FUNCTION public.store_visible(_store_id text)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT public.is_supervisor_now()
+      OR coalesce(btrim(_store_id), '') = ''
+      OR btrim(_store_id) = public.user_store_id()
+$$;
+
+-- Discount / refund / price / loyalty guards run in the database, so a
+-- direct PostgREST call cannot bypass the UI permission toggles.
+-- (See the matching migration for the full trigger bodies:
+--  enforce_sale_permissions, enforce_sale_item_permissions,
+--  enforce_booking_permissions, enforce_product_price_permissions,
+--  enforce_member_points_permissions.)
