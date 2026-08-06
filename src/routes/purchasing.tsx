@@ -34,6 +34,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { money, stockAt, usePos } from "@/lib/pos-store";
+import { resolveByBarcode } from "@/lib/product-lookup";
 import { useAuth } from "@/lib/pos-auth";
 import { logger } from "@/lib/audit-log";
 import { cachedSuppliers, loadSuppliers, type Supplier } from "@/lib/suppliers";
@@ -131,9 +132,7 @@ function Purchasing() {
   }
 
   const findProduct = (code: string) =>
-    state.products.find(
-      (p) => p.barcode === code.trim() || p.sku.toLowerCase() === code.trim().toLowerCase(),
-    );
+    resolveByBarcode(state.products, code);
 
   const patch = (id: string, next: Partial<Line>) =>
     setLines((ls) => ls.map((l) => (l.id === id ? { ...l, ...next } : l)));

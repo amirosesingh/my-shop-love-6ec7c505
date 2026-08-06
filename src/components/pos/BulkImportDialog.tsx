@@ -21,6 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { money, stockAt, usePos } from "@/lib/pos-store";
+import { resolveByBarcode } from "@/lib/product-lookup";
 import type { Product } from "@/lib/pos-types";
 
 export type ImportRow = {
@@ -141,9 +142,7 @@ export function BulkImportDialog({
           category: String(key("category") ?? "Imported").trim() || "Imported",
           stock: num(key("stock_quantity")),
           customPoints: num(key("custom_points")),
-          existing: state.products.some(
-            (p) => p.barcode === barcode || p.sku.toLowerCase() === barcode.toLowerCase(),
-          ),
+          existing: !!resolveByBarcode(state.products, barcode),
         });
       }
       const pct = Math.round(((i + 1) / total) * 100);
@@ -164,9 +163,7 @@ export function BulkImportDialog({
     let added = 0;
     let updated = 0;
     for (const r of rows) {
-      const hit = state.products.find(
-        (p) => p.barcode === r.barcode || p.sku.toLowerCase() === r.barcode.toLowerCase(),
-      );
+      const hit = resolveByBarcode(state.products, r.barcode);
       if (hit) {
         upsertProduct({
           ...hit,
