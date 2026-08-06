@@ -12,6 +12,7 @@ import {
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { AppShell } from "@/components/pos/AppShell";
+import { ActionButton } from "@/components/pos/ActionButton";
 import { db } from "@/lib/pos-db";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
