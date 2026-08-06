@@ -42,6 +42,7 @@ import { Route as ReportsSalesRouteImport } from './routes/reports.sales'
 import { Route as ReportsStockRouteImport } from './routes/reports.stock'
 import { Route as SettingsIndexRouteImport } from './routes/settings.index'
 import { Route as SettingsAccountsRouteImport } from './routes/settings.accounts'
+import { Route as SettingsBookingSlipRouteImport } from './routes/settings.booking-slip'
 import { Route as SettingsDisplayRouteImport } from './routes/settings.display'
 import { Route as SettingsElementsRouteImport } from './routes/settings.elements'
 import { Route as SettingsIdentityRouteImport } from './routes/settings.identity'
@@ -227,6 +228,11 @@ const SettingsAccountsRoute = SettingsAccountsRouteImport.update({
   path: '/settings/accounts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsBookingSlipRoute = SettingsBookingSlipRouteImport.update({
+  id: '/settings/booking-slip',
+  path: '/settings/booking-slip',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsDisplayRoute = SettingsDisplayRouteImport.update({
   id: '/settings/display',
   path: '/settings/display',
@@ -355,6 +361,7 @@ export interface FileRoutesByFullPath {
   '/reports/sales': typeof ReportsSalesRoute
   '/reports/stock': typeof ReportsStockRoute
   '/settings/accounts': typeof SettingsAccountsRoute
+  '/settings/booking-slip': typeof SettingsBookingSlipRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
   '/settings/identity': typeof SettingsIdentityRoute
@@ -409,6 +416,7 @@ export interface FileRoutesByTo {
   '/reports/sales': typeof ReportsSalesRoute
   '/reports/stock': typeof ReportsStockRoute
   '/settings/accounts': typeof SettingsAccountsRoute
+  '/settings/booking-slip': typeof SettingsBookingSlipRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
   '/settings/identity': typeof SettingsIdentityRoute
@@ -464,6 +472,7 @@ export interface FileRoutesById {
   '/reports/sales': typeof ReportsSalesRoute
   '/reports/stock': typeof ReportsStockRoute
   '/settings/accounts': typeof SettingsAccountsRoute
+  '/settings/booking-slip': typeof SettingsBookingSlipRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
   '/settings/identity': typeof SettingsIdentityRoute
@@ -520,6 +529,7 @@ export interface FileRouteTypes {
     | '/reports/sales'
     | '/reports/stock'
     | '/settings/accounts'
+    | '/settings/booking-slip'
     | '/settings/display'
     | '/settings/elements'
     | '/settings/identity'
@@ -574,6 +584,7 @@ export interface FileRouteTypes {
     | '/reports/sales'
     | '/reports/stock'
     | '/settings/accounts'
+    | '/settings/booking-slip'
     | '/settings/display'
     | '/settings/elements'
     | '/settings/identity'
@@ -628,6 +639,7 @@ export interface FileRouteTypes {
     | '/reports/sales'
     | '/reports/stock'
     | '/settings/accounts'
+    | '/settings/booking-slip'
     | '/settings/display'
     | '/settings/elements'
     | '/settings/identity'
@@ -683,6 +695,7 @@ export interface RootRouteChildren {
   ReportsSalesRoute: typeof ReportsSalesRoute
   ReportsStockRoute: typeof ReportsStockRoute
   SettingsAccountsRoute: typeof SettingsAccountsRoute
+  SettingsBookingSlipRoute: typeof SettingsBookingSlipRoute
   SettingsDisplayRoute: typeof SettingsDisplayRoute
   SettingsElementsRoute: typeof SettingsElementsRoute
   SettingsIdentityRoute: typeof SettingsIdentityRoute
@@ -939,6 +952,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsAccountsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/booking-slip': {
+      id: '/settings/booking-slip'
+      path: '/settings/booking-slip'
+      fullPath: '/settings/booking-slip'
+      preLoaderRoute: typeof SettingsBookingSlipRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/display': {
       id: '/settings/display'
       path: '/settings/display'
@@ -1107,6 +1127,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReportsSalesRoute: ReportsSalesRoute,
   ReportsStockRoute: ReportsStockRoute,
   SettingsAccountsRoute: SettingsAccountsRoute,
+  SettingsBookingSlipRoute: SettingsBookingSlipRoute,
   SettingsDisplayRoute: SettingsDisplayRoute,
   SettingsElementsRoute: SettingsElementsRoute,
   SettingsIdentityRoute: SettingsIdentityRoute,
@@ -1132,13 +1153,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

@@ -95,6 +95,12 @@ const GROUPS = [
         icon: QrCode,
         blurb: "QR payload, size and placement on the slip.",
       },
+      {
+        to: "/settings/booking-slip",
+        label: "Booking slip wording",
+        icon: ReceiptText,
+        blurb: "Terms & conditions and the customer signature line.",
+      },
     ],
   },
   {
