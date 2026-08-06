@@ -2934,9 +2934,9 @@ function Register() {
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="numeric">{value}</span>
+    <div className="flex w-full min-w-0 items-center justify-between gap-3">
+      <span className="min-w-0 truncate text-muted-foreground">{label}</span>
+      <span className="numeric shrink-0 text-right">{value}</span>
     </div>
   );
 }
