@@ -264,6 +264,79 @@ function Inventory() {
                         onChange={(e) => setDraft({ ...draft, category: e.target.value })}
                       />
                     </Field>
+                    <Field label="Sub-category">
+                      <Input
+                        value={draft.subCategory ?? ""}
+                        placeholder="optional"
+                        list="inventory-subcategories"
+                        onChange={(e) => setDraft({ ...draft, subCategory: e.target.value })}
+                      />
+                      <datalist id="inventory-subcategories">
+                        {subCategoriesOf(categories, draft.category).map((c) => (
+                          <option key={c.id} value={c.name} />
+                        ))}
+                      </datalist>
+                    </Field>
+                    <Field label="Unit of measure">
+                      <ThemedSelect
+                        value={draft.unit ?? "pcs"}
+                        onChange={(v) => setDraft({ ...draft, unit: v })}
+                        ariaLabel="Unit of measure"
+                        options={units.map((u) => ({
+                          value: u.code,
+                          label: `${u.code} · ${u.name}${u.allowDecimal ? " (decimal)" : ""}`,
+                        }))}
+                      />
+                    </Field>
+                    <Field label="Extra barcodes" className="col-span-2">
+                      <div className="flex flex-wrap gap-1">
+                        {(draft.barcodes ?? []).map((code) => (
+                          <Badge key={code} variant="outline" className="numeric gap-1 text-[11px]">
+                            {code}
+                            <button
+                              type="button"
+                              className="text-destructive"
+                              aria-label={`Remove barcode ${code}`}
+                              onClick={() =>
+                                setDraft({
+                                  ...draft,
+                                  barcodes: (draft.barcodes ?? []).filter((b) => b !== code),
+                                })
+                              }
+                            >
+                              ×
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                      <div className="mt-1 flex gap-2">
+                        <Input
+                          value={aliasDraft}
+                          placeholder="Scan or type another barcode for this item"
+                          onChange={(e) => setAliasDraft(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key !== "Enter") return;
+                            e.preventDefault();
+                            const code = aliasDraft.trim();
+                            if (!code) return;
+                            const clash = codeTakenBy(state.products, code, draft.id);
+                            if (clash) {
+                              toast.error(`${code} already belongs to ${clash.name}`);
+                              return;
+                            }
+                            setDraft({
+                              ...draft,
+                              barcodes: [...new Set([...(draft.barcodes ?? []), code])],
+                            });
+                            setAliasDraft("");
+                          }}
+                        />
+                      </div>
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        Press Enter to add. A delivery with a different barcode still scans to this
+                        product.
+                      </p>
+                    </Field>
                     <Field label="Tax rate %">
                       <Input
                         className="numeric"
