@@ -53,6 +53,7 @@ import { Route as SettingsCatalogRouteImport } from './routes/settings.catalog'
 import { Route as SettingsDisplayRouteImport } from './routes/settings.display'
 import { Route as SettingsElementsRouteImport } from './routes/settings.elements'
 import { Route as SettingsIdentityRouteImport } from './routes/settings.identity'
+import { Route as SettingsInheritanceRouteImport } from './routes/settings.inheritance'
 import { Route as SettingsLinesRouteImport } from './routes/settings.lines'
 import { Route as SettingsMobileTerminalsRouteImport } from './routes/settings.mobile-terminals'
 import { Route as SettingsPaymentRouteImport } from './routes/settings.payment'
@@ -293,6 +294,11 @@ const SettingsIdentityRoute = SettingsIdentityRouteImport.update({
   path: '/settings/identity',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsInheritanceRoute = SettingsInheritanceRouteImport.update({
+  id: '/settings/inheritance',
+  path: '/settings/inheritance',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsLinesRoute = SettingsLinesRouteImport.update({
   id: '/settings/lines',
   path: '/settings/lines',
@@ -432,6 +438,7 @@ export interface FileRoutesByFullPath {
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
   '/settings/identity': typeof SettingsIdentityRoute
+  '/settings/inheritance': typeof SettingsInheritanceRoute
   '/settings/lines': typeof SettingsLinesRoute
   '/settings/mobile-terminals': typeof SettingsMobileTerminalsRoute
   '/settings/payment': typeof SettingsPaymentRoute
@@ -497,6 +504,7 @@ export interface FileRoutesByTo {
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
   '/settings/identity': typeof SettingsIdentityRoute
+  '/settings/inheritance': typeof SettingsInheritanceRoute
   '/settings/lines': typeof SettingsLinesRoute
   '/settings/mobile-terminals': typeof SettingsMobileTerminalsRoute
   '/settings/payment': typeof SettingsPaymentRoute
@@ -563,6 +571,7 @@ export interface FileRoutesById {
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
   '/settings/identity': typeof SettingsIdentityRoute
+  '/settings/inheritance': typeof SettingsInheritanceRoute
   '/settings/lines': typeof SettingsLinesRoute
   '/settings/mobile-terminals': typeof SettingsMobileTerminalsRoute
   '/settings/payment': typeof SettingsPaymentRoute
@@ -630,6 +639,7 @@ export interface FileRouteTypes {
     | '/settings/display'
     | '/settings/elements'
     | '/settings/identity'
+    | '/settings/inheritance'
     | '/settings/lines'
     | '/settings/mobile-terminals'
     | '/settings/payment'
@@ -695,6 +705,7 @@ export interface FileRouteTypes {
     | '/settings/display'
     | '/settings/elements'
     | '/settings/identity'
+    | '/settings/inheritance'
     | '/settings/lines'
     | '/settings/mobile-terminals'
     | '/settings/payment'
@@ -760,6 +771,7 @@ export interface FileRouteTypes {
     | '/settings/display'
     | '/settings/elements'
     | '/settings/identity'
+    | '/settings/inheritance'
     | '/settings/lines'
     | '/settings/mobile-terminals'
     | '/settings/payment'
@@ -826,6 +838,7 @@ export interface RootRouteChildren {
   SettingsDisplayRoute: typeof SettingsDisplayRoute
   SettingsElementsRoute: typeof SettingsElementsRoute
   SettingsIdentityRoute: typeof SettingsIdentityRoute
+  SettingsInheritanceRoute: typeof SettingsInheritanceRoute
   SettingsLinesRoute: typeof SettingsLinesRoute
   SettingsMobileTerminalsRoute: typeof SettingsMobileTerminalsRoute
   SettingsPaymentRoute: typeof SettingsPaymentRoute
@@ -1157,6 +1170,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsIdentityRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/inheritance': {
+      id: '/settings/inheritance'
+      path: '/settings/inheritance'
+      fullPath: '/settings/inheritance'
+      preLoaderRoute: typeof SettingsInheritanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/lines': {
       id: '/settings/lines'
       path: '/settings/lines'
@@ -1350,6 +1370,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsDisplayRoute: SettingsDisplayRoute,
   SettingsElementsRoute: SettingsElementsRoute,
   SettingsIdentityRoute: SettingsIdentityRoute,
+  SettingsInheritanceRoute: SettingsInheritanceRoute,
   SettingsLinesRoute: SettingsLinesRoute,
   SettingsMobileTerminalsRoute: SettingsMobileTerminalsRoute,
   SettingsPaymentRoute: SettingsPaymentRoute,
