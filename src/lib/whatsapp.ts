@@ -98,7 +98,15 @@ export async function sendBillOnWhatsApp({ cfg, to, body, reference, member }: S
 
   // No connection: park the message and tell the cashier it will go out later.
   if (typeof navigator !== "undefined" && !navigator.onLine) {
-    queueMessage({ phoneNumberId: cfg.phoneNumberId, to: number, body, reference });
+    const parked = queueMessage({ phoneNumberId: cfg.phoneNumberId, to: number, body, reference });
+    db.queueWhatsAppMessage({
+      id: parked.id,
+      phoneNumberId: parked.phoneNumberId,
+      to: parked.to,
+      body: parked.body,
+      reference: parked.reference,
+      queuedAt: parked.queuedAt,
+    });
     logger.log("messaging", "WhatsApp bill queued (offline)", "messaging", {
       reference,
       to: number,
@@ -142,6 +150,7 @@ export async function flushWhatsAppQueue() {
     }).catch(() => ({ ok: false as const }));
     if (!res.ok) break;
     resolveMessage(msg.id);
+    db.settleWhatsAppMessage(msg.id, true);
     sent += 1;
     logger.log("messaging", "Queued WhatsApp bill sent", "messaging", {
       reference: msg.reference,
