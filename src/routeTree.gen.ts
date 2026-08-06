@@ -36,6 +36,7 @@ import { Route as CTokenSlugRouteImport } from './routes/c.$tokenSlug'
 import { Route as ClaimCampaignSlugRouteImport } from './routes/claim.$campaignSlug'
 import { Route as ReportsIndexRouteImport } from './routes/reports.index'
 import { Route as ReportsActivityRouteImport } from './routes/reports.activity'
+import { Route as ReportsAnalyticsRouteImport } from './routes/reports.analytics'
 import { Route as ReportsCatalogRouteImport } from './routes/reports.catalog'
 import { Route as ReportsCouponsRouteImport } from './routes/reports.coupons'
 import { Route as ReportsItemsRouteImport } from './routes/reports.items'
@@ -200,6 +201,11 @@ const ReportsIndexRoute = ReportsIndexRouteImport.update({
 const ReportsActivityRoute = ReportsActivityRouteImport.update({
   id: '/reports/activity',
   path: '/reports/activity',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsAnalyticsRoute = ReportsAnalyticsRouteImport.update({
+  id: '/reports/analytics',
+  path: '/reports/analytics',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReportsCatalogRoute = ReportsCatalogRouteImport.update({
@@ -380,6 +386,7 @@ export interface FileRoutesByFullPath {
   '/c/$tokenSlug': typeof CTokenSlugRoute
   '/claim/$campaignSlug': typeof ClaimCampaignSlugRoute
   '/reports/activity': typeof ReportsActivityRoute
+  '/reports/analytics': typeof ReportsAnalyticsRoute
   '/reports/catalog': typeof ReportsCatalogRoute
   '/reports/coupons': typeof ReportsCouponsRoute
   '/reports/items': typeof ReportsItemsRoute
@@ -439,6 +446,7 @@ export interface FileRoutesByTo {
   '/c/$tokenSlug': typeof CTokenSlugRoute
   '/claim/$campaignSlug': typeof ClaimCampaignSlugRoute
   '/reports/activity': typeof ReportsActivityRoute
+  '/reports/analytics': typeof ReportsAnalyticsRoute
   '/reports/catalog': typeof ReportsCatalogRoute
   '/reports/coupons': typeof ReportsCouponsRoute
   '/reports/items': typeof ReportsItemsRoute
@@ -499,6 +507,7 @@ export interface FileRoutesById {
   '/c/$tokenSlug': typeof CTokenSlugRoute
   '/claim/$campaignSlug': typeof ClaimCampaignSlugRoute
   '/reports/activity': typeof ReportsActivityRoute
+  '/reports/analytics': typeof ReportsAnalyticsRoute
   '/reports/catalog': typeof ReportsCatalogRoute
   '/reports/coupons': typeof ReportsCouponsRoute
   '/reports/items': typeof ReportsItemsRoute
@@ -560,6 +569,7 @@ export interface FileRouteTypes {
     | '/c/$tokenSlug'
     | '/claim/$campaignSlug'
     | '/reports/activity'
+    | '/reports/analytics'
     | '/reports/catalog'
     | '/reports/coupons'
     | '/reports/items'
@@ -619,6 +629,7 @@ export interface FileRouteTypes {
     | '/c/$tokenSlug'
     | '/claim/$campaignSlug'
     | '/reports/activity'
+    | '/reports/analytics'
     | '/reports/catalog'
     | '/reports/coupons'
     | '/reports/items'
@@ -678,6 +689,7 @@ export interface FileRouteTypes {
     | '/c/$tokenSlug'
     | '/claim/$campaignSlug'
     | '/reports/activity'
+    | '/reports/analytics'
     | '/reports/catalog'
     | '/reports/coupons'
     | '/reports/items'
@@ -738,6 +750,7 @@ export interface RootRouteChildren {
   CTokenSlugRoute: typeof CTokenSlugRoute
   ClaimCampaignSlugRoute: typeof ClaimCampaignSlugRoute
   ReportsActivityRoute: typeof ReportsActivityRoute
+  ReportsAnalyticsRoute: typeof ReportsAnalyticsRoute
   ReportsCatalogRoute: typeof ReportsCatalogRoute
   ReportsCouponsRoute: typeof ReportsCouponsRoute
   ReportsItemsRoute: typeof ReportsItemsRoute
@@ -960,6 +973,13 @@ declare module '@tanstack/react-router' {
       path: '/reports/activity'
       fullPath: '/reports/activity'
       preLoaderRoute: typeof ReportsActivityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports/analytics': {
+      id: '/reports/analytics'
+      path: '/reports/analytics'
+      fullPath: '/reports/analytics'
+      preLoaderRoute: typeof ReportsAnalyticsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reports/catalog': {
@@ -1202,6 +1222,7 @@ const rootRouteChildren: RootRouteChildren = {
   CTokenSlugRoute: CTokenSlugRoute,
   ClaimCampaignSlugRoute: ClaimCampaignSlugRoute,
   ReportsActivityRoute: ReportsActivityRoute,
+  ReportsAnalyticsRoute: ReportsAnalyticsRoute,
   ReportsCatalogRoute: ReportsCatalogRoute,
   ReportsCouponsRoute: ReportsCouponsRoute,
   ReportsItemsRoute: ReportsItemsRoute,
