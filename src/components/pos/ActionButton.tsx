@@ -18,6 +18,8 @@ export type ActionButtonProps = Omit<ButtonProps, "children"> & {
   layout?: "stack" | "inline";
   /** Explains why the control is unavailable, shown in place of the label. */
   disabledReason?: string;
+  /** Forces an icon-only control (dense table rows); label stays in the tooltip. */
+  compact?: boolean;
 };
 
 /**
@@ -31,6 +33,7 @@ export function ActionButton({
   layout = "stack",
   className,
   disabledReason,
+  compact = false,
   ...props
 }: ActionButtonProps) {
   // Touch devices have no hover — a long press (450ms) reveals the label.
@@ -63,6 +66,7 @@ export function ActionButton({
                 layout === "stack"
                   ? "flex-col gap-1 text-xs"
                   : "justify-center gap-2 @[8rem]:justify-start",
+                compact && "justify-center",
                 className,
               )}
               {...props}
@@ -70,16 +74,18 @@ export function ActionButton({
               <span className="shrink-0" aria-hidden="true">
                 {icon}
               </span>
-              <span
+              {!compact && (
+                <span
                 className={cn(
                   "hidden min-w-0 leading-tight break-words",
                   layout === "stack"
                     ? "@[4.5rem]:line-clamp-2 @[4.5rem]:block"
                     : "@[8rem]:line-clamp-2 @[8rem]:block",
                 )}
-              >
-                {label}
-              </span>
+                >
+                  {label}
+                </span>
+              )}
             </Button>
           </div>
         </TooltipTrigger>
