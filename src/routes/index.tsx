@@ -35,6 +35,7 @@ import { AppShell } from "@/components/pos/AppShell";
 import { ActionButton } from "@/components/pos/ActionButton";
 import { CatalogPanel } from "@/components/pos/CatalogPanel";
 import { ScanBar } from "@/components/pos/ScanBar";
+import { QuickMemberDialog } from "@/components/pos/QuickMemberDialog";
 import { ZoomCanvas } from "@/components/pos/ZoomCanvas";
 import { setTicketDirty } from "@/lib/desktop-window";
 import { Button } from "@/components/ui/button";
@@ -173,6 +174,8 @@ function Register() {
   const [waSending, setWaSending] = useState(false);
   const [lastSale, setLastSale] = useState<Sale | null>(null);
   const [memberQuery, setMemberQuery] = useState("");
+  const [quickMemberOpen, setQuickMemberOpen] = useState(false);
+  const memberInputRef = useRef<HTMLInputElement>(null);
   const [historyMemberId, setHistoryMemberId] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [bookOpen, setBookOpen] = useState(false);
