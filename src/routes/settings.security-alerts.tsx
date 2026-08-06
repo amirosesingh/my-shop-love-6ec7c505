@@ -39,7 +39,7 @@ function SecurityAlertsPage() {
 
   async function act(f: SecurityFinding, status: SecurityFinding["status"]) {
     try {
-      await setFindingStatus(f.id, status, user.name || user.staffId);
+      await setFindingStatus(f.id, status, user?.name ?? user?.staffId ?? "admin");
       await load();
     } catch (e) {
       toast.error((e as Error).message);
