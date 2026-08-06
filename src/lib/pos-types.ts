@@ -515,6 +515,20 @@ export type ReceiptQrSettings = {
   placement: ReceiptLinePlacement;
 };
 
+/** Wording printed on booking / racket job slips. */
+export type BookingSlipSettings = {
+  /** free-text terms & conditions, printed line by line */
+  terms: string;
+  /** print the terms block on booking slips */
+  showTerms: boolean;
+  /** print a customer signature rule under the terms */
+  showSignature: boolean;
+  /** line printed above the signature rule */
+  signatureCaption: string;
+  /** repeat the terms on part-payment receipts */
+  termsOnPayment: boolean;
+};
+
 export type ReceiptSettings = {
   paper: PaperSize;
   /** business identity printed at the top of every slip */
@@ -553,6 +567,7 @@ export type ReceiptOverride = Partial<
     | "footerText"
     | "customLines"
     | "qr"
+    | "bookingSlip"
   >
 >;
 
