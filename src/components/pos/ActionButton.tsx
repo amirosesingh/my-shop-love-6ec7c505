@@ -11,20 +11,23 @@ export type ActionButtonProps = Omit<ButtonProps, "children"> & {
   icon?: ReactNode;
   /** "stack" = icon above label (grid tiles), "inline" = icon beside label. */
   layout?: "stack" | "inline";
+  /** Hide the text label and show only the icon (tooltip keeps the label). */
+  iconOnly?: boolean;
   /** Explains why the control is unavailable, shown in place of the label. */
   disabledReason?: string;
 };
 
 /**
- * Space-aware action button: measures the space it actually sits in (container
- * query, not the viewport) and shows icon + label when there is room, else an
- * icon-only control with a tooltip. Labels wrap to two lines before clipping.
+ * Fluid action button: icon plus label by default, sized by its own content so
+ * it never overflows its row. Pass `iconOnly` for compact toolbars — the label
+ * stays available through the tooltip and the accessible name.
  */
 export function ActionButton({
   label,
   icon,
   layout = "stack",
   className,
+  iconOnly = false,
   disabledReason,
   ...props
 }: ActionButtonProps) {
@@ -55,7 +58,7 @@ export function ActionButton({
               onTouchMove={cancelHold}
               className={cn(
                 "h-auto min-h-10 w-full min-w-0 px-2 py-2",
-                layout === "stack" ? "flex-col gap-1 text-xs" : "justify-center gap-2 @[8rem]:justify-start",
+                layout === "stack" ? "flex-col gap-1 text-xs" : "justify-center gap-2",
                 className,
               )}
               {...props}
@@ -63,14 +66,9 @@ export function ActionButton({
               <span className="shrink-0" aria-hidden="true">
                 {icon}
               </span>
-              <span
-                className={cn(
-                  "hidden min-w-0 leading-tight break-words",
-                  layout === "stack" ? "@[4.5rem]:line-clamp-2 @[4.5rem]:block" : "@[8rem]:line-clamp-2 @[8rem]:block",
-                )}
-              >
-                {label}
-              </span>
+              {!iconOnly && (
+                <span className="line-clamp-2 min-w-0 leading-tight break-words">{label}</span>
+              )}
             </Button>
           </div>
         </TooltipTrigger>
