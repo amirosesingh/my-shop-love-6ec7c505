@@ -313,7 +313,7 @@ function BookingsPage() {
                         <p className="mt-1 text-xs text-success">Billed as {b.saleReceiptNo}</p>
                       )}
                     </div>
-                    <div className="flex w-full flex-col gap-2 sm:w-56 sm:items-end">
+                    <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:min-w-56 sm:max-w-full sm:items-end">
                       <div className="text-right">
                         <p className="numeric text-lg font-bold">{money(b.total)}</p>
                         <p className="numeric text-xs text-muted-foreground">
@@ -345,7 +345,7 @@ function BookingsPage() {
                         </div>
                       )}
 
-                      <div className="grid w-full gap-1.5">
+                      <div className="flex w-full flex-wrap items-center justify-end gap-1.5">
                         <ActionButton
                           size="sm"
                           variant="outline"
