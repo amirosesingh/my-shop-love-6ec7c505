@@ -1,11 +1,6 @@
 import { useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 type ButtonProps = ComponentProps<typeof Button>;
@@ -50,7 +45,7 @@ export function ActionButton({
     <TooltipProvider delayDuration={200}>
       <Tooltip {...(held ? { open: true } : {})} onOpenChange={(o) => !o && cancelHold()}>
         <TooltipTrigger asChild>
-          <div className="@container min-w-0">
+          <div className="min-w-0">
             <Button
               aria-label={label}
               title={tip}
@@ -60,9 +55,7 @@ export function ActionButton({
               onTouchMove={cancelHold}
               className={cn(
                 "h-auto min-h-10 w-full min-w-0 px-2 py-2",
-                layout === "stack"
-                  ? "flex-col gap-1 text-xs"
-                  : "justify-center gap-2 @[8rem]:justify-start",
+                layout === "stack" ? "flex-col gap-1 text-xs" : "justify-center gap-2 @[8rem]:justify-start",
                 className,
               )}
               {...props}
@@ -73,9 +66,7 @@ export function ActionButton({
               <span
                 className={cn(
                   "hidden min-w-0 leading-tight break-words",
-                  layout === "stack"
-                    ? "@[4.5rem]:line-clamp-2 @[4.5rem]:block"
-                    : "@[8rem]:line-clamp-2 @[8rem]:block",
+                  layout === "stack" ? "@[4.5rem]:line-clamp-2 @[4.5rem]:block" : "@[8rem]:line-clamp-2 @[8rem]:block",
                 )}
               >
                 {label}
