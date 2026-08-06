@@ -35,6 +35,7 @@ import { AppShell } from "@/components/pos/AppShell";
 import { ActionButton } from "@/components/pos/ActionButton";
 import { CatalogPanel } from "@/components/pos/CatalogPanel";
 import { ScanBar } from "@/components/pos/ScanBar";
+import { QuickMemberDialog } from "@/components/pos/QuickMemberDialog";
 import { ZoomCanvas } from "@/components/pos/ZoomCanvas";
 import { setTicketDirty } from "@/lib/desktop-window";
 import { Button } from "@/components/ui/button";
@@ -173,6 +174,8 @@ function Register() {
   const [waSending, setWaSending] = useState(false);
   const [lastSale, setLastSale] = useState<Sale | null>(null);
   const [memberQuery, setMemberQuery] = useState("");
+  const [quickMemberOpen, setQuickMemberOpen] = useState(false);
+  const memberInputRef = useRef<HTMLInputElement>(null);
   const [historyMemberId, setHistoryMemberId] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [bookOpen, setBookOpen] = useState(false);
@@ -507,9 +510,35 @@ function Register() {
     const hit = resolveByBarcode(state.products, code);
     if (!hit) {
       toast.error(`No product matches “${code}”`);
+      // A mis-read or unknown barcode drops the cashier straight into search.
+      setQuery(code);
+      setCatalogOpen(true);
       return;
     }
     addLine(hit.id);
+  }
+
+  /** Attaches a member to the ticket and surfaces any vouchers they hold. */
+  function attachMember(m: { id: string; name: string }) {
+    setMemberId(m.id);
+    setMemberQuery("");
+    toast.success(`${m.name} attached to receipt`);
+    void loadMemberVouchers(m.id)
+      .then((vs) => {
+        if (!vs.length) return;
+        toast.info(
+          vs.length === 1
+            ? `${m.name} has a voucher: ${vs[0]!.campaign.name}`
+            : `${m.name} has ${vs.length} vouchers available`,
+          {
+            action: {
+              label: "Apply",
+              onClick: () => void applyVoucher(vs[0]!.voucher.tokenSlug),
+            },
+          },
+        );
+      })
+      .catch(() => undefined);
   }
 
   function scanSubmit(e: React.FormEvent) {
@@ -1319,7 +1348,7 @@ function Register() {
               </p>
             </div>
             <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-              <Button size="sm" className="lg:hidden" onClick={() => setCatalogOpen(true)}>
+              <Button size="sm" onClick={() => setCatalogOpen(true)}>
                 <Search className="size-4" /> Add product
               </Button>
               {visible("register.exchange") && (
@@ -1392,14 +1421,25 @@ function Register() {
                 ) : null}
                 {member ? null : (
                   <>
-                    <div className="relative mt-2">
-                      <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        value={memberQuery}
-                        onChange={(e) => setMemberQuery(e.target.value)}
-                        placeholder="Phone number or name…"
-                        className="h-10 pl-8 text-sm"
-                      />
+                    <div className="mt-2 flex items-center gap-2">
+                      <div className="relative min-w-0 flex-1">
+                        <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          ref={memberInputRef}
+                          value={memberQuery}
+                          onChange={(e) => setMemberQuery(e.target.value)}
+                          placeholder="Phone number or name…"
+                          className="h-10 pl-8 text-sm"
+                        />
+                      </div>
+                      <Button
+                        variant="outline"
+                        className="h-10 shrink-0"
+                        onClick={() => setQuickMemberOpen(true)}
+                      >
+                        <UserPlus className="size-4" />
+                        <span className="hidden sm:inline">New member</span>
+                      </Button>
                     </div>
                     <div className="mt-2 space-y-1">
                       {memberMatches.map((m) => (
@@ -1422,35 +1462,38 @@ function Register() {
                             size="sm"
                             variant="outline"
                             className="h-7 text-[11px]"
-                            onClick={() => {
-                              setMemberId(m.id);
-                              setMemberQuery("");
-                              toast.success(`${m.name} attached to receipt`);
-                              // Surface any digital vouchers this member is holding.
-                              void loadMemberVouchers(m.id)
-                                .then((vs) => {
-                                  if (!vs.length) return;
-                                  toast.info(
-                                    vs.length === 1
-                                      ? `${m.name} has a voucher: ${vs[0]!.campaign.name}`
-                                      : `${m.name} has ${vs.length} vouchers available`,
-                                    {
-                                      action: {
-                                        label: "Apply",
-                                        onClick: () => void applyVoucher(vs[0]!.voucher.tokenSlug),
-                                      },
-                                    },
-                                  );
-                                })
-                                .catch(() => undefined);
-                            }}
+                            onClick={() => attachMember(m)}
                           >
                             <UserPlus className="size-3" /> Attach
                           </Button>
                         </div>
                       ))}
                       {memberQuery.trim() && !memberMatches.length && (
-                        <p className="py-1 text-[11px] text-muted-foreground">No member matches “{memberQuery}”.</p>
+                        <div className="space-y-2 py-1">
+                          <p className="text-[11px] text-muted-foreground">
+                            No member matches “{memberQuery}”.
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-[11px]"
+                              onClick={() => {
+                                setMemberQuery("");
+                                memberInputRef.current?.focus();
+                              }}
+                            >
+                              <Search className="size-3" /> Search again
+                            </Button>
+                            <Button
+                              size="sm"
+                              className="h-7 text-[11px]"
+                              onClick={() => setQuickMemberOpen(true)}
+                            >
+                              <UserPlus className="size-3" /> Enroll new member
+                            </Button>
+                          </div>
+                        </div>
                       )}
                     </div>
                   </>
@@ -2724,6 +2767,13 @@ function Register() {
       <MemberHistoryDialog
         member={state.members.find((m) => m.id === historyMemberId) ?? null}
         onOpenChange={(o) => !o && setHistoryMemberId(null)}
+      />
+
+      <QuickMemberDialog
+        open={quickMemberOpen}
+        onOpenChange={setQuickMemberOpen}
+        prefill={memberQuery}
+        onCreated={(m) => attachMember(m)}
       />
 
       {/* Pick which of the member's vouchers goes on this bill */}
