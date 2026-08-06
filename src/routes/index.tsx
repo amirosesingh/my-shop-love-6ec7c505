@@ -35,6 +35,7 @@ import { AppShell } from "@/components/pos/AppShell";
 import { ActionButton } from "@/components/pos/ActionButton";
 import { CatalogPanel } from "@/components/pos/CatalogPanel";
 import { ScanBar } from "@/components/pos/ScanBar";
+import { ZoomCanvas } from "@/components/pos/ZoomCanvas";
 import { setTicketDirty } from "@/lib/desktop-window";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1241,6 +1242,7 @@ function Register() {
 
   return (
     <AppShell>
+      <ZoomCanvas>
       <div className="pos-scaled flex h-full min-h-0 min-w-0 flex-col overflow-hidden lg:flex-row">
         {/* ── LEFT: product catalog (hidden on narrow windows) ─────────── */}
         <section className="hidden min-h-0 w-full shrink-0 flex-col gap-3 border-b border-border p-4 lg:flex lg:w-[clamp(340px,32vw,520px)] lg:min-w-[340px] lg:border-b-0 lg:border-r">
@@ -1512,7 +1514,7 @@ function Register() {
                         variant="outline"
                         size="sm"
                         onClick={() => setPadTarget(i)}
-                        className="numeric h-10 min-h-10 w-28 shrink-0 justify-between text-[11px] sm:w-32"
+                        className="numeric h-10 min-h-10 max-w-full shrink-0 justify-center gap-2 px-3 text-[11px]"
                         label={
                           l.discount
                             ? `${l.discount}${(l.discountType ?? "amount") === "percent" ? "%" : ""}`
@@ -1532,7 +1534,7 @@ function Register() {
             </div>
           </ScrollArea>
 
-          <div className="@container shrink-0 space-y-2 border-t border-border px-4 py-3 text-sm">
+          <div className="w-full min-w-0 shrink-0 space-y-2 border-t border-border px-4 py-3 text-sm">
             {exchangeRef && (
               <div className="flex items-center justify-between rounded-md border border-accent/40 bg-accent/10 px-2 py-1.5 text-[11px]">
                 <span className="min-w-0 truncate">Exchange against bill #{exchangeRef}</span>
@@ -1552,8 +1554,8 @@ function Register() {
                 </Button>
               </div>
             )}
-            <div className="grid gap-x-8 gap-y-2 @[40rem]:grid-cols-2">
-              <div className="space-y-2">
+            <div className="grid w-full min-w-0 gap-2">
+              <div className="w-full min-w-0 space-y-2">
                 <Row label="Subtotal" value={money(totals.subtotal)} />
                 {totals.credit > 0 && (
                   <Row label={`Store credit #${exchangeRef ?? ""}`} value={`-${money(totals.credit)}`} />
@@ -1561,22 +1563,26 @@ function Register() {
                 {!discountAllowed && (
                   <button
                     onClick={() => void unlockDiscounts()}
-                    className="flex w-full items-center justify-between text-muted-foreground"
+                    className="flex w-full min-w-0 items-center justify-between gap-3 text-muted-foreground"
                   >
-                    <span>Bill discount</span>
-                    <span className="text-[11px] underline-offset-2 hover:underline">locked · supervisor override</span>
+                    <span className="min-w-0 truncate">Bill discount</span>
+                    <span className="shrink-0 text-[11px] underline-offset-2 hover:underline">
+                      locked · supervisor override
+                    </span>
                   </button>
                 )}
-                {/* Label and control sit in one row: the button is sized by its
-                    own column so it can never slide out to the right edge. */}
-                <div className={`flex items-center justify-between gap-3 ${discountAllowed ? "" : "hidden"}`}>
+                {/* Label left, control flush right — sized by its own content so
+                    it can never push past the panel edge. */}
+                <div
+                  className={`flex w-full min-w-0 items-center justify-between gap-3 ${discountAllowed ? "" : "hidden"}`}
+                >
                   <span className="min-w-0 flex-1 truncate text-muted-foreground">Bill discount</span>
                   <ActionButton
                     layout="inline"
                     variant="outline"
                     size="sm"
                     onClick={() => setPadTarget("bill")}
-                    className="numeric h-10 min-h-10 w-32 shrink-0 justify-center gap-2 text-xs"
+                    className="numeric h-10 min-h-10 max-w-full shrink-0 justify-center gap-2 px-3 text-xs"
                     label={
                       cartDiscount ? `${cartDiscount}${cartDiscountType === "percent" ? "%" : ""}` : "Add discount"
                     }
@@ -1597,7 +1603,7 @@ function Register() {
                 />
               </div>
 
-              <div className="space-y-2">
+              <div className="w-full min-w-0 space-y-2">
                 {promo.applied.length > 0 && (
                   <div className="rounded-md border border-success/30 bg-success/5 px-2 py-2">
                     <p className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-success">
@@ -1896,6 +1902,7 @@ function Register() {
           </div>
         </aside>
       </div>
+      </ZoomCanvas>
 
       {/* Live receipt preview overlay */}
       <Sheet open={receiptPreview} onOpenChange={setReceiptPreview}>
@@ -2927,9 +2934,9 @@ function Register() {
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="numeric">{value}</span>
+    <div className="flex w-full min-w-0 items-center justify-between gap-3">
+      <span className="min-w-0 truncate text-muted-foreground">{label}</span>
+      <span className="numeric shrink-0 text-right">{value}</span>
     </div>
   );
 }
