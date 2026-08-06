@@ -54,7 +54,7 @@ const ROUTE_PERMISSIONS: Record<string, PermissionFlag> = {
   "/audit": "can_view_audit_trail",
   "/dashboard": "can_view_dashboard",
   "/analytics": "can_view_sales_reports",
-  "/holds": "can_hold_order",
+  "/holds": "can_hold_cart",
   "/reports/activity": "can_view_audit_trail",
   "/reports": "can_view_sales_reports",
   "/receipts": "can_view_sales_reports",
