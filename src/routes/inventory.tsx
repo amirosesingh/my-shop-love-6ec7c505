@@ -186,14 +186,14 @@ function Inventory() {
               <span className="text-warning">{lowStock.length} below reorder level</span>
             </p>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <div className="relative hidden min-w-0 sm:block">
+          <div className="col-span-2 flex flex-wrap items-center gap-2 sm:col-span-1 sm:shrink-0 sm:flex-nowrap">
+            <div className="relative min-w-0 flex-1 sm:flex-none">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search products"
-                className="w-56 pl-9"
+                className="w-full pl-9 sm:w-56"
               />
             </div>
             {canEdit && (
