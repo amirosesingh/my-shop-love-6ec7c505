@@ -100,11 +100,13 @@ function CouponsPage() {
       const [cs, vs, es] = await Promise.all([
         loadCampaigns(),
         loadVouchers(),
-        loadCouponEvents().catch(() => [] as CouponEvent[]),
+        loadCouponEvents().catch(() => ({ rows: [] as CouponEvent[], cursor: null, hasMore: false })),
       ]);
       setCampaigns(cs);
       setVouchers(vs);
-      setEvents(es);
+      setEvents(es.rows);
+      setEventCursor(es.cursor);
+      setMoreEvents(es.hasMore);
       setError("");
     } catch (e) {
       setError(
