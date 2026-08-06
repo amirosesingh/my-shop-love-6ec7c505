@@ -181,6 +181,10 @@ const rowToSettings = (r: Row | null): AppSettings =>
           },
           customLines: Array.isArray(r.custom_lines) ? r.custom_lines : [],
           qr: { ...defaultSettings.receipt.qr, ...((r.qr ?? {}) as object) },
+          bookingSlip: {
+            ...defaultSettings.receipt.bookingSlip,
+            ...((r.booking_slip ?? {}) as object),
+          },
         },
         payment: {
           ...defaultSettings.payment,
@@ -237,6 +241,7 @@ const settingsToRow = (s: AppSettings): Row => ({
   fonts: s.receipt.fonts,
   custom_lines: s.receipt.customLines,
   qr: s.receipt.qr,
+  booking_slip: s.receipt.bookingSlip,
   payment_details: s.payment,
   whatsapp_settings: s.whatsapp,
   header_text: s.receipt.headerText,

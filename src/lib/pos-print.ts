@@ -607,6 +607,33 @@ function transferBlock(pay: PaymentDetails | null) {
     ${link ? `<div class="c" style="margin-top:6px">${qrSvg(link, 90)}<div class="muted">Scan to chat on WhatsApp</div></div>` : ""}`;
 }
 
+/** Terms & conditions block, printed under the job card when enabled. */
+function termsBlock() {
+  const cfg = receiptCfg.bookingSlip;
+  const text = (cfg?.terms ?? "").trim();
+  if (!cfg?.showTerms || !text) return "";
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((l) => `<div class="muted">${esc(l)}</div>`)
+    .join("");
+  return `<hr><div class="c b">TERMS &amp; CONDITIONS</div>${lines}`;
+}
+
+/** Customer signature rule with the name and a date line. */
+function signatureBlock(customerName: string) {
+  const cfg = receiptCfg.bookingSlip;
+  if (!cfg?.showSignature) return "";
+  const caption = (cfg.signatureCaption ?? "").trim();
+  return `<hr>
+    ${caption ? `<div class="muted">${esc(caption)}</div>` : ""}
+    <div style="margin-top:26px;border-top:1px solid #000"></div>
+    <div class="muted">Customer signature${customerName ? ` — ${esc(customerName)}` : ""}</div>
+    <div style="margin-top:20px;border-top:1px solid #000"></div>
+    <div class="muted">Date</div>`;
+}
+
 function bookingBody(booking: Booking, member: Member | null, pay: PaymentDetails | null) {
   const rows = booking.lines
     .map(
@@ -646,6 +673,8 @@ function bookingBody(booking: Booking, member: Member | null, pay: PaymentDetail
     <div class="c muted">Goods are reserved until this date. Bring this slip to collect.</div>
     ${booking.note ? `<div class="c muted">${esc(booking.note)}</div>` : ""}
     ${jobCardBlock(booking)}
+    ${termsBlock()}
+    ${signatureBlock(booking.customerName)}
     ${transferBlock(pay)}
     ${member ? `<hr><div>Member ${esc(member.code)} · ${esc(member.name)}</div>` : ""}
     <hr>${receiptCfg.showBarcode ? barcodeSvg(booking.ref) : ""}
@@ -669,6 +698,7 @@ function bookingPaymentBody(booking: Booking, payment: BookingPayment) {
       <tr class="b"><td>BALANCE DUE</td><td class="r">${fmt(bookingBalance(booking))}</td></tr>
     </table>
     <hr><div class="c">Collect &amp; settle by ${esc(new Date(booking.dueDate).toDateString())}</div>
+    ${receiptCfg.bookingSlip?.termsOnPayment ? termsBlock() : ""}
     <hr><div class="c muted rcpt-foot">${esc(receiptCfg.footerText || "")}</div>
     <div class="c muted">${esc(booking.ref)}</div>`;
 }
@@ -695,23 +725,40 @@ function jobCardBlock(booking: Booking) {
   const j = booking.job;
   if (!j) return "";
   const unit = j.tensionUnit ?? "lb";
+  const timing: Record<string, string> = {
+    now: "Paid up front",
+    deposit: "Deposit taken",
+    collection: "Settle on collection",
+  };
   const rows = [
+    booking.serviceName ? `<tr><td>Service</td><td class="r">${esc(booking.serviceName)}</td></tr>` : "",
     j.racketModel ? `<tr><td>Racket</td><td class="r">${esc(j.racketModel)}</td></tr>` : "",
     j.stringType ? `<tr><td>String</td><td class="r">${esc(j.stringType)}</td></tr>` : "",
     j.tensionMain || j.tensionCross
-      ? `<tr><td>Tension</td><td class="r b">${esc(String(j.tensionMain ?? "—"))} / ${esc(String(j.tensionCross ?? j.tensionMain ?? "—"))} ${esc(unit)}</td></tr>`
+      ? `<tr class="b"><td>Tension (main / cross)</td><td class="r b">${esc(String(j.tensionMain ?? "—"))} / ${esc(String(j.tensionCross ?? j.tensionMain ?? "—"))} ${esc(unit)}</td></tr>`
       : "",
     j.grommetNotes ? `<tr><td>Grommet / grip</td><td class="r">${esc(j.grommetNotes)}</td></tr>` : "",
+    j.droppedOffAt
+      ? `<tr><td>Dropped off</td><td class="r">${esc(new Date(j.droppedOffAt).toLocaleString())}</td></tr>`
+      : "",
     j.promisedAt
       ? `<tr><td>Ready by</td><td class="r b">${esc(new Date(j.promisedAt).toLocaleString())}</td></tr>`
       : "",
     booking.jobStatus ? `<tr><td>Status</td><td class="r">${esc(booking.jobStatus.toUpperCase())}</td></tr>` : "",
+    booking.paymentTiming
+      ? `<tr><td>Payment</td><td class="r">${esc(timing[booking.paymentTiming] ?? booking.paymentTiming)}</td></tr>`
+      : "",
+    j.notifyWhatsApp
+      ? `<tr><td>Notify</td><td class="r">WhatsApp when ready</td></tr>`
+      : "",
   ]
     .filter(Boolean)
     .join("");
   if (!rows) return "";
-  return `<hr><div class="c b">JOB CARD</div><table>${rows}</table>${
-    j.jobNotes ? `<div class="c muted">${esc(j.jobNotes)}</div>` : ""
+  return `<hr><div class="c b">RACKET JOB CARD</div><table>${rows}</table>${
+    j.jobNotes
+      ? `<div class="muted">Notes: ${esc(j.jobNotes)}</div>`
+      : ""
   }`;
 }
 
