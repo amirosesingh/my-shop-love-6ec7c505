@@ -61,6 +61,7 @@ import { Route as SettingsPrinterRouteImport } from './routes/settings.printer'
 import { Route as SettingsQrRouteImport } from './routes/settings.qr'
 import { Route as SettingsRegionRouteImport } from './routes/settings.region'
 import { Route as SettingsRulesRouteImport } from './routes/settings.rules'
+import { Route as SettingsSecurityAlertsRouteImport } from './routes/settings.security-alerts'
 import { Route as SettingsServicesRouteImport } from './routes/settings.services'
 import { Route as SettingsSkuRouteImport } from './routes/settings.sku'
 import { Route as SettingsSyncRouteImport } from './routes/settings.sync'
@@ -71,6 +72,7 @@ import { Route as SettingsTypeRouteImport } from './routes/settings.type'
 import { Route as SettingsUpdatesRouteImport } from './routes/settings.updates'
 import { Route as SettingsVisibilityRouteImport } from './routes/settings.visibility'
 import { Route as SettingsWhatsappRouteImport } from './routes/settings.whatsapp'
+import { Route as ApiPublicSecurityAlertsRouteImport } from './routes/api/public/security-alerts'
 import { Route as ApiSettingsSyncBatchRouteImport } from './routes/api/settings.sync-batch'
 import { Route as ApiSettingsUpsertRouteImport } from './routes/api/settings.upsert'
 
@@ -334,6 +336,11 @@ const SettingsRulesRoute = SettingsRulesRouteImport.update({
   path: '/settings/rules',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsSecurityAlertsRoute = SettingsSecurityAlertsRouteImport.update({
+  id: '/settings/security-alerts',
+  path: '/settings/security-alerts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsServicesRoute = SettingsServicesRouteImport.update({
   id: '/settings/services',
   path: '/settings/services',
@@ -382,6 +389,11 @@ const SettingsVisibilityRoute = SettingsVisibilityRouteImport.update({
 const SettingsWhatsappRoute = SettingsWhatsappRouteImport.update({
   id: '/settings/whatsapp',
   path: '/settings/whatsapp',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicSecurityAlertsRoute = ApiPublicSecurityAlertsRouteImport.update({
+  id: '/api/public/security-alerts',
+  path: '/api/public/security-alerts',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSettingsSyncBatchRoute = ApiSettingsSyncBatchRouteImport.update({
@@ -446,6 +458,7 @@ export interface FileRoutesByFullPath {
   '/settings/qr': typeof SettingsQrRoute
   '/settings/region': typeof SettingsRegionRoute
   '/settings/rules': typeof SettingsRulesRoute
+  '/settings/security-alerts': typeof SettingsSecurityAlertsRoute
   '/settings/services': typeof SettingsServicesRoute
   '/settings/sku': typeof SettingsSkuRoute
   '/settings/sync': typeof SettingsSyncRoute
@@ -458,6 +471,7 @@ export interface FileRoutesByFullPath {
   '/settings/whatsapp': typeof SettingsWhatsappRoute
   '/reports/': typeof ReportsIndexRoute
   '/settings/': typeof SettingsIndexRoute
+  '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
   '/api/settings/sync-batch': typeof ApiSettingsSyncBatchRoute
   '/api/settings/upsert': typeof ApiSettingsUpsertRoute
 }
@@ -512,6 +526,7 @@ export interface FileRoutesByTo {
   '/settings/qr': typeof SettingsQrRoute
   '/settings/region': typeof SettingsRegionRoute
   '/settings/rules': typeof SettingsRulesRoute
+  '/settings/security-alerts': typeof SettingsSecurityAlertsRoute
   '/settings/services': typeof SettingsServicesRoute
   '/settings/sku': typeof SettingsSkuRoute
   '/settings/sync': typeof SettingsSyncRoute
@@ -524,6 +539,7 @@ export interface FileRoutesByTo {
   '/settings/whatsapp': typeof SettingsWhatsappRoute
   '/reports': typeof ReportsIndexRoute
   '/settings': typeof SettingsIndexRoute
+  '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
   '/api/settings/sync-batch': typeof ApiSettingsSyncBatchRoute
   '/api/settings/upsert': typeof ApiSettingsUpsertRoute
 }
@@ -579,6 +595,7 @@ export interface FileRoutesById {
   '/settings/qr': typeof SettingsQrRoute
   '/settings/region': typeof SettingsRegionRoute
   '/settings/rules': typeof SettingsRulesRoute
+  '/settings/security-alerts': typeof SettingsSecurityAlertsRoute
   '/settings/services': typeof SettingsServicesRoute
   '/settings/sku': typeof SettingsSkuRoute
   '/settings/sync': typeof SettingsSyncRoute
@@ -591,6 +608,7 @@ export interface FileRoutesById {
   '/settings/whatsapp': typeof SettingsWhatsappRoute
   '/reports/': typeof ReportsIndexRoute
   '/settings/': typeof SettingsIndexRoute
+  '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
   '/api/settings/sync-batch': typeof ApiSettingsSyncBatchRoute
   '/api/settings/upsert': typeof ApiSettingsUpsertRoute
 }
@@ -647,6 +665,7 @@ export interface FileRouteTypes {
     | '/settings/qr'
     | '/settings/region'
     | '/settings/rules'
+    | '/settings/security-alerts'
     | '/settings/services'
     | '/settings/sku'
     | '/settings/sync'
@@ -659,6 +678,7 @@ export interface FileRouteTypes {
     | '/settings/whatsapp'
     | '/reports/'
     | '/settings/'
+    | '/api/public/security-alerts'
     | '/api/settings/sync-batch'
     | '/api/settings/upsert'
   fileRoutesByTo: FileRoutesByTo
@@ -713,6 +733,7 @@ export interface FileRouteTypes {
     | '/settings/qr'
     | '/settings/region'
     | '/settings/rules'
+    | '/settings/security-alerts'
     | '/settings/services'
     | '/settings/sku'
     | '/settings/sync'
@@ -725,6 +746,7 @@ export interface FileRouteTypes {
     | '/settings/whatsapp'
     | '/reports'
     | '/settings'
+    | '/api/public/security-alerts'
     | '/api/settings/sync-batch'
     | '/api/settings/upsert'
   id:
@@ -779,6 +801,7 @@ export interface FileRouteTypes {
     | '/settings/qr'
     | '/settings/region'
     | '/settings/rules'
+    | '/settings/security-alerts'
     | '/settings/services'
     | '/settings/sku'
     | '/settings/sync'
@@ -791,6 +814,7 @@ export interface FileRouteTypes {
     | '/settings/whatsapp'
     | '/reports/'
     | '/settings/'
+    | '/api/public/security-alerts'
     | '/api/settings/sync-batch'
     | '/api/settings/upsert'
   fileRoutesById: FileRoutesById
@@ -846,6 +870,7 @@ export interface RootRouteChildren {
   SettingsQrRoute: typeof SettingsQrRoute
   SettingsRegionRoute: typeof SettingsRegionRoute
   SettingsRulesRoute: typeof SettingsRulesRoute
+  SettingsSecurityAlertsRoute: typeof SettingsSecurityAlertsRoute
   SettingsServicesRoute: typeof SettingsServicesRoute
   SettingsSkuRoute: typeof SettingsSkuRoute
   SettingsSyncRoute: typeof SettingsSyncRoute
@@ -858,6 +883,7 @@ export interface RootRouteChildren {
   SettingsWhatsappRoute: typeof SettingsWhatsappRoute
   ReportsIndexRoute: typeof ReportsIndexRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
+  ApiPublicSecurityAlertsRoute: typeof ApiPublicSecurityAlertsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1226,6 +1252,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsRulesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/security-alerts': {
+      id: '/settings/security-alerts'
+      path: '/settings/security-alerts'
+      fullPath: '/settings/security-alerts'
+      preLoaderRoute: typeof SettingsSecurityAlertsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/services': {
       id: '/settings/services'
       path: '/settings/services'
@@ -1294,6 +1327,13 @@ declare module '@tanstack/react-router' {
       path: '/settings/whatsapp'
       fullPath: '/settings/whatsapp'
       preLoaderRoute: typeof SettingsWhatsappRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/security-alerts': {
+      id: '/api/public/security-alerts'
+      path: '/api/public/security-alerts'
+      fullPath: '/api/public/security-alerts'
+      preLoaderRoute: typeof ApiPublicSecurityAlertsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/settings/sync-batch': {
@@ -1378,6 +1418,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsQrRoute: SettingsQrRoute,
   SettingsRegionRoute: SettingsRegionRoute,
   SettingsRulesRoute: SettingsRulesRoute,
+  SettingsSecurityAlertsRoute: SettingsSecurityAlertsRoute,
   SettingsServicesRoute: SettingsServicesRoute,
   SettingsSkuRoute: SettingsSkuRoute,
   SettingsSyncRoute: SettingsSyncRoute,
@@ -1390,17 +1431,8 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsWhatsappRoute: SettingsWhatsappRoute,
   ReportsIndexRoute: ReportsIndexRoute,
   SettingsIndexRoute: SettingsIndexRoute,
+  ApiPublicSecurityAlertsRoute: ApiPublicSecurityAlertsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

@@ -13,6 +13,7 @@ import { SidebarNav, useSidebarCollapsed } from "@/components/pos/SidebarNav";
 import { SyncStatus } from "@/components/pos/SyncStatus";
 import { WindowControls } from "@/components/pos/WindowControls";
 import { SystemStatusPill } from "@/components/pos/SystemStatusPill";
+import { SecurityAlertBell } from "@/components/pos/SecurityAlertBell";
 import { ShiftGuard } from "@/components/pos/ShiftGuard";
 import { LiveClock } from "@/components/pos/LiveClock";
 import { ThemeToggle } from "@/components/pos/ThemeToggle";
@@ -339,6 +340,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <LiveClock compact />
           <SyncStatus />
           <SystemStatusPill compact />
+          <SecurityAlertBell compact />
           <ThemeToggle />
           <Button
             variant="outline"
@@ -361,6 +363,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <SyncStatus className="ml-auto" />
           <LiveClock />
           <SystemStatusPill />
+          <SecurityAlertBell />
           {terminal.config && (
             <Badge
               variant="outline"

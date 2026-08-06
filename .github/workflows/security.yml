@@ -23,3 +23,22 @@ jobs:
         run: bun run build
       - name: Dependency vulnerability audit
         run: bunx --bun npm audit --audit-level=high || exit 1
+      - name: Report findings to the app
+        if: always() && github.ref == 'refs/heads/main'
+        env:
+          INGEST_URL: ${{ secrets.SECURITY_ALERT_INGEST_URL }}
+          INGEST_SECRET: ${{ secrets.SECURITY_ALERT_INGEST_SECRET }}
+          OUTCOME: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$INGEST_URL" ] || [ -z "$INGEST_SECRET" ]; then
+            echo "Alert ingest not configured; skipping."; exit 0
+          fi
+          if [ "$OUTCOME" = "success" ]; then
+            BODY=$(jq -nc --arg ref "$RUN_URL" '{deploymentRef:$ref, findings:[]}')
+          else
+            BODY=$(jq -nc --arg ref "$RUN_URL" '{deploymentRef:$ref, findings:[{id:"ci_guardrails_failed", severity:"high", title:"Deployment security checks failed", detail:("The security workflow failed on main. Review the run: " + $ref)}]}')
+          fi
+          SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$INGEST_SECRET" | awk '{print $2}')
+          curl -sS -X POST "$INGEST_URL" -H 'Content-Type: application/json' \
+            -H "x-security-signature: sha256=$SIG" --data "$BODY"

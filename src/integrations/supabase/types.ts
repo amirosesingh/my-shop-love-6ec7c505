@@ -1246,6 +1246,60 @@ export type Database = {
         }
         Relationships: []
       }
+      security_findings: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          created_at: string
+          deployment_ref: string | null
+          detail: string
+          fingerprint: string
+          first_seen_at: string
+          id: string
+          last_seen_at: string
+          resolved_at: string | null
+          severity: string
+          source: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          created_at?: string
+          deployment_ref?: string | null
+          detail?: string
+          fingerprint: string
+          first_seen_at?: string
+          id?: string
+          last_seen_at?: string
+          resolved_at?: string | null
+          severity?: string
+          source: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          created_at?: string
+          deployment_ref?: string | null
+          detail?: string
+          fingerprint?: string
+          first_seen_at?: string
+          id?: string
+          last_seen_at?: string
+          resolved_at?: string | null
+          severity?: string
+          source?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       shift_sessions: {
         Row: {
           created_at: string
@@ -2023,6 +2077,15 @@ export type Database = {
         Returns: string
       }
       normalize_phone: { Args: { _phone: string }; Returns: string }
+      security_report_findings: {
+        Args: { _deployment_ref: string; _findings: Json; _source: string }
+        Returns: Json
+      }
+      security_selfcheck: { Args: never; Returns: Json }
+      security_set_finding_status: {
+        Args: { _by?: string; _id: string; _status: string }
+        Returns: undefined
+      }
       set_app_user_permissions: {
         Args: { p_permissions: Json; p_user_id: string }
         Returns: undefined
