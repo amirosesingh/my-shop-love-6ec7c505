@@ -91,25 +91,21 @@ export const savePosRules = createServerFn({ method: "POST" })
 export const verifyManagerPin = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => pinInput.parse(data))
   .handler(async ({ data }) => {
-    const { verifyManagerPinInDb, signOverrideGrant, logOverride, loadRules } = await import(
+    const { verifyManagerPinInDb, signOverrideGrant } = await import(
       "./pos-rules.server"
     );
     try {
-      const manager = await verifyManagerPinInDb(data.managerId, data.pin);
+      // The audit entry is written by the database inside the same routine that
+      // checks the PIN, so an override record can never be forged separately.
+      const manager = await verifyManagerPinInDb(data.managerId, data.pin, {
+        action: data.action,
+        ruleKey: data.ruleKey ?? null,
+        requestedBy: data.requestedBy ?? null,
+        storeId: data.storeId ?? null,
+        terminalId: data.terminalId ?? null,
+        detail: data.detail ?? null,
+      });
       if (!manager) return { ok: false as const, error: "Invalid manager ID or PIN" };
-      const rules = await loadRules(data.storeId ?? "");
-      if (rules.enable_manager_pin_audit_log) {
-        await logOverride({
-          action: data.action,
-          ruleKey: data.ruleKey ?? null,
-          requestedBy: data.requestedBy ?? null,
-          approvedBy: manager.userId,
-          approvedRole: manager.role,
-          storeId: data.storeId ?? null,
-          terminalId: data.terminalId ?? null,
-          detail: data.detail ?? null,
-        });
-      }
       return {
         ok: true as const,
         manager: { id: manager.userId, name: manager.name, role: manager.role },
