@@ -36,7 +36,7 @@ import { db, dbError, loadActiveShift, loadCloudState } from "./pos-db";
 import type { CloudSlice } from "./pos-db";
 import { clearSnapshot, readSnapshot, writeSnapshot } from "./offline-snapshot";
 import { isLiveOnly } from "./live-mode";
-import { useAuth } from "./pos-auth";
+import { useAuth } from "@/lib/pos-auth";
 import { readTerminalConfig } from "./terminal-tokens";
 import { isShiftOverdue, localTerminalId } from "./shift-hours";
 import { beginShiftSession, endShiftSessions } from "./shift-sessions";
