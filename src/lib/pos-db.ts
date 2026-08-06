@@ -566,6 +566,31 @@ export async function loadActiveShift(storeId: string): Promise<Shift | null> {
   return rows.length ? rowToShift(rows[0]) : null;
 }
 
+/**
+ * One page of older bills for a branch, newest first.
+ *
+ * Keyset paging on `(created_at, id)`: the register keeps the most recent 500
+ * bills in memory, and history screens walk further back a page at a time
+ * without ever paying for an OFFSET.
+ */
+export async function loadSalesPage(
+  storeId: string,
+  cursor: Cursor = null,
+  limit = PAGE_SIZE,
+): Promise<Page<Sale>> {
+  let q = supabase.from("sales").select(SALE_COLUMNS);
+  if (storeId) q = q.eq("store_id", storeId) as typeof q;
+  const res = await keyset(q as never, "created_at", cursor, limit);
+  const err = (res as { error?: { message: string } }).error;
+  if (err) throw new Error(err.message);
+  const rows = ((res as { data?: Row[] | null }).data ?? []) as Row[];
+  return {
+    rows: rows.map(rowToSale),
+    cursor: nextCursor(rows, "created_at", limit),
+    hasMore: rows.length >= limit,
+  };
+}
+
 /** Recent sign-in sessions for a branch, newest first. */
 export async function loadShiftSessions(storeId: string, limit = 200): Promise<ShiftSession[]> {
   const res = await supabase
