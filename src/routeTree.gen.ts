@@ -38,6 +38,7 @@ import { Route as ReportsIndexRouteImport } from './routes/reports.index'
 import { Route as ReportsActivityRouteImport } from './routes/reports.activity'
 import { Route as ReportsCatalogRouteImport } from './routes/reports.catalog'
 import { Route as ReportsCouponsRouteImport } from './routes/reports.coupons'
+import { Route as ReportsPaymentsRouteImport } from './routes/reports.payments'
 import { Route as ReportsSalesRouteImport } from './routes/reports.sales'
 import { Route as ReportsStockRouteImport } from './routes/reports.stock'
 import { Route as SettingsIndexRouteImport } from './routes/settings.index'
@@ -208,6 +209,11 @@ const ReportsCouponsRoute = ReportsCouponsRouteImport.update({
   path: '/reports/coupons',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReportsPaymentsRoute = ReportsPaymentsRouteImport.update({
+  id: '/reports/payments',
+  path: '/reports/payments',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReportsSalesRoute = ReportsSalesRouteImport.update({
   id: '/reports/sales',
   path: '/reports/sales',
@@ -358,6 +364,7 @@ export interface FileRoutesByFullPath {
   '/reports/activity': typeof ReportsActivityRoute
   '/reports/catalog': typeof ReportsCatalogRoute
   '/reports/coupons': typeof ReportsCouponsRoute
+  '/reports/payments': typeof ReportsPaymentsRoute
   '/reports/sales': typeof ReportsSalesRoute
   '/reports/stock': typeof ReportsStockRoute
   '/settings/accounts': typeof SettingsAccountsRoute
@@ -413,6 +420,7 @@ export interface FileRoutesByTo {
   '/reports/activity': typeof ReportsActivityRoute
   '/reports/catalog': typeof ReportsCatalogRoute
   '/reports/coupons': typeof ReportsCouponsRoute
+  '/reports/payments': typeof ReportsPaymentsRoute
   '/reports/sales': typeof ReportsSalesRoute
   '/reports/stock': typeof ReportsStockRoute
   '/settings/accounts': typeof SettingsAccountsRoute
@@ -469,6 +477,7 @@ export interface FileRoutesById {
   '/reports/activity': typeof ReportsActivityRoute
   '/reports/catalog': typeof ReportsCatalogRoute
   '/reports/coupons': typeof ReportsCouponsRoute
+  '/reports/payments': typeof ReportsPaymentsRoute
   '/reports/sales': typeof ReportsSalesRoute
   '/reports/stock': typeof ReportsStockRoute
   '/settings/accounts': typeof SettingsAccountsRoute
@@ -526,6 +535,7 @@ export interface FileRouteTypes {
     | '/reports/activity'
     | '/reports/catalog'
     | '/reports/coupons'
+    | '/reports/payments'
     | '/reports/sales'
     | '/reports/stock'
     | '/settings/accounts'
@@ -581,6 +591,7 @@ export interface FileRouteTypes {
     | '/reports/activity'
     | '/reports/catalog'
     | '/reports/coupons'
+    | '/reports/payments'
     | '/reports/sales'
     | '/reports/stock'
     | '/settings/accounts'
@@ -636,6 +647,7 @@ export interface FileRouteTypes {
     | '/reports/activity'
     | '/reports/catalog'
     | '/reports/coupons'
+    | '/reports/payments'
     | '/reports/sales'
     | '/reports/stock'
     | '/settings/accounts'
@@ -692,6 +704,7 @@ export interface RootRouteChildren {
   ReportsActivityRoute: typeof ReportsActivityRoute
   ReportsCatalogRoute: typeof ReportsCatalogRoute
   ReportsCouponsRoute: typeof ReportsCouponsRoute
+  ReportsPaymentsRoute: typeof ReportsPaymentsRoute
   ReportsSalesRoute: typeof ReportsSalesRoute
   ReportsStockRoute: typeof ReportsStockRoute
   SettingsAccountsRoute: typeof SettingsAccountsRoute
@@ -924,6 +937,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReportsCouponsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reports/payments': {
+      id: '/reports/payments'
+      path: '/reports/payments'
+      fullPath: '/reports/payments'
+      preLoaderRoute: typeof ReportsPaymentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reports/sales': {
       id: '/reports/sales'
       path: '/reports/sales'
@@ -1124,6 +1144,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReportsActivityRoute: ReportsActivityRoute,
   ReportsCatalogRoute: ReportsCatalogRoute,
   ReportsCouponsRoute: ReportsCouponsRoute,
+  ReportsPaymentsRoute: ReportsPaymentsRoute,
   ReportsSalesRoute: ReportsSalesRoute,
   ReportsStockRoute: ReportsStockRoute,
   SettingsAccountsRoute: SettingsAccountsRoute,
