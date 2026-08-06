@@ -1626,7 +1626,7 @@ function Register() {
             </div>
           </ScrollArea>
 
-          <div className="shrink-0 space-y-2 border-t border-border px-4 py-3 text-sm">
+          <div className="@container shrink-0 space-y-2 border-t border-border px-4 py-3 text-sm">
             {exchangeRef && (
               <div className="flex items-center justify-between rounded-md border border-accent/40 bg-accent/10 px-2 py-1.5 text-[11px]">
                 <span className="min-w-0 truncate">Exchange against bill #{exchangeRef}</span>
@@ -1646,7 +1646,7 @@ function Register() {
                 </Button>
               </div>
             )}
-            <div className="grid gap-x-8 gap-y-2 xl:grid-cols-2">
+            <div className="grid gap-x-8 gap-y-2 @[40rem]:grid-cols-2">
               <div className="space-y-2">
                 <Row label="Subtotal" value={money(totals.subtotal)} />
                 {totals.credit > 0 && (
