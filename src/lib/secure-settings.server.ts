@@ -17,7 +17,9 @@ export const SECURE_SETTING_KEYS: SecureSettingKey[] = [
 
 /**
  * Verifies the caller against the POS Supabase project and returns their role.
- * The token is validated server-side; nothing the browser claims is trusted.
+ * The token is validated server-side and the role comes only from the staff
+ * record in the database — the self-declared `user_metadata.role` in the JWT is
+ * never trusted. Callers without a staff record are rejected (fail closed).
  */
 export async function verifyPosStaff(accessToken: string): Promise<{
   userId: string;
@@ -32,24 +34,22 @@ export async function verifyPosStaff(accessToken: string): Promise<{
 
   const userRes = await fetch(`${EXTERNAL_SUPABASE_URL}/auth/v1/user`, { headers });
   if (!userRes.ok) throw new Error("Not signed in");
-  const user = (await userRes.json()) as { id: string; user_metadata?: { role?: string } };
+  const user = (await userRes.json()) as { id: string };
 
-  let role = user.user_metadata?.role ?? "staff";
-  try {
-    const rpc = await fetch(`${EXTERNAL_SUPABASE_URL}/rest/v1/rpc/current_app_user`, {
-      method: "POST",
-      headers,
-      body: "{}",
-    });
-    if (rpc.ok) {
-      const rows = (await rpc.json()) as unknown;
-      const row = Array.isArray(rows) ? rows[0] : rows;
-      const dbRole = (row as { role?: string } | null)?.role;
-      if (dbRole) role = dbRole;
-    }
-  } catch {
-    /* fall back to the token's metadata role */
-  }
+  const rpc = await fetch(`${EXTERNAL_SUPABASE_URL}/rest/v1/rpc/current_app_user`, {
+    method: "POST",
+    headers,
+    body: "{}",
+  });
+  if (!rpc.ok) throw new Error("Could not verify your staff record");
+
+  const rows = (await rpc.json()) as unknown;
+  const row = (Array.isArray(rows) ? rows[0] : rows) as
+    | { role?: string; is_active?: boolean }
+    | null;
+  const role = row?.role;
+  if (!role) throw new Error("No staff record for this account");
+  if (row?.is_active === false) throw new Error("This staff account is inactive");
 
   return { userId: user.id, role, isAdmin: role === "admin" || role === "manager" };
 }
