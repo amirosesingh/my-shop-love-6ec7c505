@@ -1169,6 +1169,7 @@ ALTER TABLE public.whatsapp_queue ADD COLUMN IF NOT EXISTS sent_at timestamp wit
 ALTER TABLE public.whatsapp_queue ADD COLUMN IF NOT EXISTS created_at timestamp with time zone DEFAULT now();
 ALTER TABLE public.whatsapp_queue ADD COLUMN IF NOT EXISTS updated_at timestamp with time zone DEFAULT now();
 CREATE UNIQUE INDEX IF NOT EXISTS whatsapp_queue_pkey ON public.whatsapp_queue USING btree (id);
+
 -- ---------- functions ----------
 CREATE OR REPLACE FUNCTION public.campaign_is_live(_c coupon_campaigns)
  RETURNS boolean
@@ -2182,11 +2183,8 @@ DROP POLICY IF EXISTS "Users can read their own roles" ON public.user_roles;
 CREATE POLICY "Users can read their own roles" ON public.user_roles FOR SELECT TO authenticated USING ((user_id = auth.uid()));
 ALTER TABLE public.whatsapp_queue ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Staff manage whatsapp queue" ON public.whatsapp_queue;
-CREATE POLICY "Staff manage whatsapp queue" ON public.whatsapp_queue FOR ALL TO authenticated USING (true) WITH CHECK (true);DROP POLICY IF EXISTS "Users can read their own roles" ON public.user_roles;
-CREATE POLICY "Users can read their own roles" ON public.user_roles FOR SELECT TO authenticated USING ((user_id = auth.uid()));
-ALTER TABLE public.whatsapp_queue ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Staff manage whatsapp queue" ON public.whatsapp_queue;
 CREATE POLICY "Staff manage whatsapp queue" ON public.whatsapp_queue FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
 -- ---------- verification ----------
 -- Run this after the script; every row should say OK.
 SELECT t.name AS table_name,
