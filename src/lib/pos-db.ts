@@ -5,6 +5,7 @@ import { drainOutbox, runOpLive } from "./sync-engine";
 import { electronDb, localDb, readBranch } from "./local-db";
 import { enqueue, listQueue, persisted, type SyncOp } from "./sync-outbox";
 import { isLiveOnly } from "./live-mode";
+import { keyset, nextCursor, PAGE_SIZE, type Cursor, type Page } from "./keyset";
 import type {
   AppSettings,
   Member,
