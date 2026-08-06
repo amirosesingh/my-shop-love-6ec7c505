@@ -607,6 +607,33 @@ function transferBlock(pay: PaymentDetails | null) {
     ${link ? `<div class="c" style="margin-top:6px">${qrSvg(link, 90)}<div class="muted">Scan to chat on WhatsApp</div></div>` : ""}`;
 }
 
+/** Terms & conditions block, printed under the job card when enabled. */
+function termsBlock() {
+  const cfg = receiptCfg.bookingSlip;
+  const text = (cfg?.terms ?? "").trim();
+  if (!cfg?.showTerms || !text) return "";
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((l) => `<div class="muted">${esc(l)}</div>`)
+    .join("");
+  return `<hr><div class="c b">TERMS &amp; CONDITIONS</div>${lines}`;
+}
+
+/** Customer signature rule with the name and a date line. */
+function signatureBlock(customerName: string) {
+  const cfg = receiptCfg.bookingSlip;
+  if (!cfg?.showSignature) return "";
+  const caption = (cfg.signatureCaption ?? "").trim();
+  return `<hr>
+    ${caption ? `<div class="muted">${esc(caption)}</div>` : ""}
+    <div style="margin-top:26px;border-top:1px solid #000"></div>
+    <div class="muted">Customer signature${customerName ? ` — ${esc(customerName)}` : ""}</div>
+    <div style="margin-top:20px;border-top:1px solid #000"></div>
+    <div class="muted">Date</div>`;
+}
+
 function bookingBody(booking: Booking, member: Member | null, pay: PaymentDetails | null) {
   const rows = booking.lines
     .map(
