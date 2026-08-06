@@ -125,6 +125,8 @@ AS $function$
   WHERE id = p_token_id AND status IN ('active', 'used')
 $function$;
 
+DROP FUNCTION IF EXISTS public.terminal_token_status(uuid);
+
 CREATE OR REPLACE FUNCTION public.terminal_token_status(p_token_id uuid)
  RETURNS TABLE(status text, location_name text, location_id text)
  LANGUAGE sql

@@ -310,6 +310,8 @@ AS $function$
   );
 $function$;
 
+DROP FUNCTION IF EXISTS public.voucher_by_token(text);
+
 CREATE OR REPLACE FUNCTION public.voucher_by_token(_token text)
  RETURNS TABLE(voucher jsonb, campaign jsonb, member_name text, member_code text)
  LANGUAGE sql
