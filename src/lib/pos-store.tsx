@@ -153,6 +153,7 @@ type Ctx = {
     method: PaymentMethod,
   ) => Promise<{ booking: Booking; sale: Sale } | null>;
   cancelBooking: (id: string, reason: string) => void;
+  deleteBooking: (id: string, reason: string) => Promise<void>;
   upsertProduct: (product: Product) => void;
   removeProduct: (id: string) => void;
   removeProducts: (ids: string[]) => void;
