@@ -946,6 +946,83 @@ export function PosProvider({ children }: { children: ReactNode }) {
     setState((s) => ({ ...s, products: s.products.filter((p) => p.id !== id) }));
   }, []);
 
+  /** Bulk delete from the inventory selection — one trail entry per item. */
+  const removeProducts = useCallback((ids: string[]) => {
+    const set = new Set(ids);
+    for (const id of ids) {
+      const product = stateRef.current.products.find((p) => p.id === id);
+      logger.log("inventory_edit", "Product deleted", "inventory", {
+        productId: id,
+        name: product?.name ?? null,
+        barcode: product?.barcode ?? null,
+        bulk: true,
+      });
+      void db.deleteProduct(id);
+    }
+    setState((s) => ({ ...s, products: s.products.filter((p) => !set.has(p.id)) }));
+  }, []);
+
+  /** Bulk field edit (category, tax, web visibility…) across a selection. */
+  const patchProducts = useCallback((ids: string[], patch: Partial<Product>) => {
+    const set = new Set(ids);
+    const updated = stateRef.current.products
+      .filter((p) => set.has(p.id))
+      .map((p) => ({ ...p, ...patch }));
+    logger.log("inventory_edit", "Products bulk edited", "inventory", {
+      count: updated.length,
+      changes: patch,
+      names: updated.slice(0, 10).map((p) => p.name),
+    });
+    void db.upsertProducts(updated);
+    setState((s) => ({
+      ...s,
+      products: s.products.map((p) => (set.has(p.id) ? { ...p, ...patch } : p)),
+    }));
+  }, []);
+
+  /**
+   * Folds duplicate product records into one master: branch stock is added
+   * together and every losing barcode/SKU becomes an alias on the master, so
+   * scanning the old code still finds the item.
+   */
+  const mergeProducts = useCallback((masterId: string, duplicateIds: string[]) => {
+    const all = stateRef.current.products;
+    const master = all.find((p) => p.id === masterId);
+    if (!master) return;
+    const losers = all.filter((p) => duplicateIds.includes(p.id) && p.id !== masterId);
+    if (!losers.length) return;
+
+    const stockByStore = { ...master.stockByStore };
+    const aliases = new Set([...(master.barcodes ?? [])]);
+    for (const loser of losers) {
+      for (const [storeId, qty] of Object.entries(loser.stockByStore ?? {})) {
+        stockByStore[storeId] = (stockByStore[storeId] ?? 0) + (qty || 0);
+      }
+      for (const code of [loser.barcode, loser.sku, ...(loser.barcodes ?? [])]) {
+        if (code && code !== master.barcode && code !== master.sku) aliases.add(code);
+      }
+    }
+    const merged: Product = { ...master, stockByStore, barcodes: [...aliases] };
+
+    logger.log("inventory_edit", "Products merged", "inventory", {
+      masterId,
+      masterName: master.name,
+      merged: losers.map((l) => ({ id: l.id, name: l.name, barcode: l.barcode })),
+      aliasBarcodes: merged.barcodes,
+    });
+
+    void db.upsertProduct(merged);
+    for (const loser of losers) void db.deleteProduct(loser.id);
+
+    const gone = new Set(losers.map((l) => l.id));
+    setState((s) => ({
+      ...s,
+      products: s.products
+        .filter((p) => !gone.has(p.id))
+        .map((p) => (p.id === masterId ? merged : p)),
+    }));
+  }, []);
+
   const adjustStock = useCallback((id: string, delta: number, storeId?: string) => {
     const target = storeId ?? stateRef.current.currentStoreId;
     const before = stateRef.current.products.find((p) => p.id === id);
@@ -1323,6 +1400,9 @@ export function PosProvider({ children }: { children: ReactNode }) {
     setBookingJobStatus,
     upsertProduct,
     removeProduct,
+    removeProducts,
+    patchProducts,
+    mergeProducts,
     adjustStock,
     applyStockCount,
     upsertMember,
