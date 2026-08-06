@@ -33,6 +33,7 @@ import { Route as StaffRouteImport } from './routes/staff'
 import { Route as StoresRouteImport } from './routes/stores'
 import { Route as SuppliersRouteImport } from './routes/suppliers'
 import { Route as TransfersRouteImport } from './routes/transfers'
+import { Route as ApiSettingsRouteImport } from './routes/api/settings'
 import { Route as CTokenSlugRouteImport } from './routes/c.$tokenSlug'
 import { Route as ClaimCampaignSlugRouteImport } from './routes/claim.$campaignSlug'
 import { Route as ReportsIndexRouteImport } from './routes/reports.index'
@@ -69,6 +70,8 @@ import { Route as SettingsTypeRouteImport } from './routes/settings.type'
 import { Route as SettingsUpdatesRouteImport } from './routes/settings.updates'
 import { Route as SettingsVisibilityRouteImport } from './routes/settings.visibility'
 import { Route as SettingsWhatsappRouteImport } from './routes/settings.whatsapp'
+import { Route as ApiSettingsSyncBatchRouteImport } from './routes/api/settings.sync-batch'
+import { Route as ApiSettingsUpsertRouteImport } from './routes/api/settings.upsert'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -188,6 +191,11 @@ const SuppliersRoute = SuppliersRouteImport.update({
 const TransfersRoute = TransfersRouteImport.update({
   id: '/transfers',
   path: '/transfers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSettingsRoute = ApiSettingsRouteImport.update({
+  id: '/api/settings',
+  path: '/api/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CTokenSlugRoute = CTokenSlugRouteImport.update({
@@ -370,6 +378,16 @@ const SettingsWhatsappRoute = SettingsWhatsappRouteImport.update({
   path: '/settings/whatsapp',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSettingsSyncBatchRoute = ApiSettingsSyncBatchRouteImport.update({
+  id: '/sync-batch',
+  path: '/sync-batch',
+  getParentRoute: () => ApiSettingsRoute,
+} as any)
+const ApiSettingsUpsertRoute = ApiSettingsUpsertRouteImport.update({
+  id: '/upsert',
+  path: '/upsert',
+  getParentRoute: () => ApiSettingsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -396,6 +414,7 @@ export interface FileRoutesByFullPath {
   '/stores': typeof StoresRoute
   '/suppliers': typeof SuppliersRoute
   '/transfers': typeof TransfersRoute
+  '/api/settings': typeof ApiSettingsRouteWithChildren
   '/c/$tokenSlug': typeof CTokenSlugRoute
   '/claim/$campaignSlug': typeof ClaimCampaignSlugRoute
   '/reports/activity': typeof ReportsActivityRoute
@@ -432,6 +451,8 @@ export interface FileRoutesByFullPath {
   '/settings/whatsapp': typeof SettingsWhatsappRoute
   '/reports/': typeof ReportsIndexRoute
   '/settings/': typeof SettingsIndexRoute
+  '/api/settings/sync-batch': typeof ApiSettingsSyncBatchRoute
+  '/api/settings/upsert': typeof ApiSettingsUpsertRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -458,6 +479,7 @@ export interface FileRoutesByTo {
   '/stores': typeof StoresRoute
   '/suppliers': typeof SuppliersRoute
   '/transfers': typeof TransfersRoute
+  '/api/settings': typeof ApiSettingsRouteWithChildren
   '/c/$tokenSlug': typeof CTokenSlugRoute
   '/claim/$campaignSlug': typeof ClaimCampaignSlugRoute
   '/reports/activity': typeof ReportsActivityRoute
@@ -494,6 +516,8 @@ export interface FileRoutesByTo {
   '/settings/whatsapp': typeof SettingsWhatsappRoute
   '/reports': typeof ReportsIndexRoute
   '/settings': typeof SettingsIndexRoute
+  '/api/settings/sync-batch': typeof ApiSettingsSyncBatchRoute
+  '/api/settings/upsert': typeof ApiSettingsUpsertRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -521,6 +545,7 @@ export interface FileRoutesById {
   '/stores': typeof StoresRoute
   '/suppliers': typeof SuppliersRoute
   '/transfers': typeof TransfersRoute
+  '/api/settings': typeof ApiSettingsRouteWithChildren
   '/c/$tokenSlug': typeof CTokenSlugRoute
   '/claim/$campaignSlug': typeof ClaimCampaignSlugRoute
   '/reports/activity': typeof ReportsActivityRoute
@@ -557,6 +582,8 @@ export interface FileRoutesById {
   '/settings/whatsapp': typeof SettingsWhatsappRoute
   '/reports/': typeof ReportsIndexRoute
   '/settings/': typeof SettingsIndexRoute
+  '/api/settings/sync-batch': typeof ApiSettingsSyncBatchRoute
+  '/api/settings/upsert': typeof ApiSettingsUpsertRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -585,6 +612,7 @@ export interface FileRouteTypes {
     | '/stores'
     | '/suppliers'
     | '/transfers'
+    | '/api/settings'
     | '/c/$tokenSlug'
     | '/claim/$campaignSlug'
     | '/reports/activity'
@@ -621,6 +649,8 @@ export interface FileRouteTypes {
     | '/settings/whatsapp'
     | '/reports/'
     | '/settings/'
+    | '/api/settings/sync-batch'
+    | '/api/settings/upsert'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -647,6 +677,7 @@ export interface FileRouteTypes {
     | '/stores'
     | '/suppliers'
     | '/transfers'
+    | '/api/settings'
     | '/c/$tokenSlug'
     | '/claim/$campaignSlug'
     | '/reports/activity'
@@ -683,6 +714,8 @@ export interface FileRouteTypes {
     | '/settings/whatsapp'
     | '/reports'
     | '/settings'
+    | '/api/settings/sync-batch'
+    | '/api/settings/upsert'
   id:
     | '__root__'
     | '/'
@@ -709,6 +742,7 @@ export interface FileRouteTypes {
     | '/stores'
     | '/suppliers'
     | '/transfers'
+    | '/api/settings'
     | '/c/$tokenSlug'
     | '/claim/$campaignSlug'
     | '/reports/activity'
@@ -745,6 +779,8 @@ export interface FileRouteTypes {
     | '/settings/whatsapp'
     | '/reports/'
     | '/settings/'
+    | '/api/settings/sync-batch'
+    | '/api/settings/upsert'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -772,6 +808,7 @@ export interface RootRouteChildren {
   StoresRoute: typeof StoresRoute
   SuppliersRoute: typeof SuppliersRoute
   TransfersRoute: typeof TransfersRoute
+  ApiSettingsRoute: typeof ApiSettingsRouteWithChildren
   CTokenSlugRoute: typeof CTokenSlugRoute
   ClaimCampaignSlugRoute: typeof ClaimCampaignSlugRoute
   ReportsActivityRoute: typeof ReportsActivityRoute
@@ -978,6 +1015,13 @@ declare module '@tanstack/react-router' {
       path: '/transfers'
       fullPath: '/transfers'
       preLoaderRoute: typeof TransfersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/settings': {
+      id: '/api/settings'
+      path: '/api/settings'
+      fullPath: '/api/settings'
+      preLoaderRoute: typeof ApiSettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/c/$tokenSlug': {
@@ -1232,8 +1276,36 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsWhatsappRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/settings/sync-batch': {
+      id: '/api/settings/sync-batch'
+      path: '/sync-batch'
+      fullPath: '/api/settings/sync-batch'
+      preLoaderRoute: typeof ApiSettingsSyncBatchRouteImport
+      parentRoute: typeof ApiSettingsRoute
+    }
+    '/api/settings/upsert': {
+      id: '/api/settings/upsert'
+      path: '/upsert'
+      fullPath: '/api/settings/upsert'
+      preLoaderRoute: typeof ApiSettingsUpsertRouteImport
+      parentRoute: typeof ApiSettingsRoute
+    }
   }
 }
+
+interface ApiSettingsRouteChildren {
+  ApiSettingsSyncBatchRoute: typeof ApiSettingsSyncBatchRoute
+  ApiSettingsUpsertRoute: typeof ApiSettingsUpsertRoute
+}
+
+const ApiSettingsRouteChildren: ApiSettingsRouteChildren = {
+  ApiSettingsSyncBatchRoute: ApiSettingsSyncBatchRoute,
+  ApiSettingsUpsertRoute: ApiSettingsUpsertRoute,
+}
+
+const ApiSettingsRouteWithChildren = ApiSettingsRoute._addFileChildren(
+  ApiSettingsRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -1260,6 +1332,7 @@ const rootRouteChildren: RootRouteChildren = {
   StoresRoute: StoresRoute,
   SuppliersRoute: SuppliersRoute,
   TransfersRoute: TransfersRoute,
+  ApiSettingsRoute: ApiSettingsRouteWithChildren,
   CTokenSlugRoute: CTokenSlugRoute,
   ClaimCampaignSlugRoute: ClaimCampaignSlugRoute,
   ReportsActivityRoute: ReportsActivityRoute,
@@ -1300,13 +1373,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
