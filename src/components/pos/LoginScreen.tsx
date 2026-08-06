@@ -32,8 +32,12 @@ export function LoginScreen() {
             } else {
               const res = await signUp(email, password, fullName);
               if (!res.ok) setError(res.error ?? "Sign up failed");
-              else if (res.needsConfirmation)
-                setNotice("Check your email to confirm the account, then sign in.");
+              else
+                setNotice(
+                  res.needsConfirmation
+                    ? "Check your email to confirm the account. An admin must then activate it before you can use the till."
+                    : "Account created. An admin must activate it before you can use the till.",
+                );
             }
           } finally {
             setBusy(false);
@@ -115,8 +119,8 @@ export function LoginScreen() {
         </Button>
 
         <p className="text-[11px] leading-relaxed text-muted-foreground">
-          Accounts sign in against the live backend. Access to sales, inventory and reports is
-          granted by an admin from the User Roles screen.
+          New accounts start deactivated. An admin must activate them and grant access to sales,
+          inventory and reports from the User Roles screen.
         </p>
       </form>
     </div>
