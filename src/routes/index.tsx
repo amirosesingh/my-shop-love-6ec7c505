@@ -1688,16 +1688,20 @@ function Register() {
                     </span>
                   </button>
                 )}
+                {/* Label and control sit in one row: the button is sized by its
+                    own column so it can never slide out to the right edge. */}
                 <div
-                  className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 ${discountAllowed ? "" : "hidden"}`}
+                  className={`flex w-full items-center justify-between gap-3 ${discountAllowed ? "" : "hidden"}`}
                 >
-                  <span className="truncate text-muted-foreground">Bill discount</span>
+                  <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                    Bill discount
+                  </span>
                   <ActionButton
                     layout="inline"
                     variant="outline"
                     size="sm"
                     onClick={() => setPadTarget("bill")}
-                    className="numeric h-10 min-h-10 w-full max-w-32 min-w-0 shrink-0 justify-between text-xs"
+                    className="numeric h-10 min-h-10 w-32 shrink-0 justify-center gap-2 text-xs"
                     label={cartDiscount
                       ? `${cartDiscount}${cartDiscountType === "percent" ? "%" : ""}`
                       : "Add discount"}
@@ -1910,7 +1914,8 @@ function Register() {
               Transaction actions
             </p>
             <div className="grid auto-rows-fr grid-cols-1 gap-2">
-              {visible("register.holdOrder") && (
+              {/* Only offered while there is something to park. */}
+              {visible("register.holdOrder") && lines.length > 0 && (
               <ActionButton
                 variant="outline"
                 layout="inline"
@@ -1960,12 +1965,15 @@ function Register() {
             {held.length > 0 && (
               <div className="mt-2 space-y-1">
                 <div className="flex items-center justify-between">
-                  <p className="text-[11px] text-muted-foreground">Held orders ({held.length})</p>
+                  <p className="text-[11px] text-muted-foreground">Held orders</p>
                   <Link
                     to="/holds"
-                    className="text-[11px] font-medium text-primary hover:underline"
+                    className="flex items-center gap-1.5 text-[11px] font-medium text-primary hover:underline"
                   >
-                    Hold tickets
+                    Held bills
+                    <span className="numeric inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
+                      {held.length}
+                    </span>
                   </Link>
                 </div>
                 {held.map((h) => (
