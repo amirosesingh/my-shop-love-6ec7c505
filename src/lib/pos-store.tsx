@@ -155,6 +155,9 @@ type Ctx = {
   cancelBooking: (id: string, reason: string) => void;
   upsertProduct: (product: Product) => void;
   removeProduct: (id: string) => void;
+  removeProducts: (ids: string[]) => void;
+  patchProducts: (ids: string[], patch: Partial<Product>) => void;
+  mergeProducts: (masterId: string, duplicateIds: string[]) => void;
   adjustStock: (id: string, delta: number, storeId?: string) => void;
   applyStockCount: (
     entries: { productId: string; counted: number }[],
