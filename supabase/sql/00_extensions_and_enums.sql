@@ -1,10 +1,16 @@
 -- ============================================================
--- 00_extensions_and_enums.sql — Extensions, shared enums and shared trigger helpers
+-- 00_extensions_and_enums.sql — Extensions, shared enums, shared trigger helpers
 -- Lucky Charms POS. Safe to run repeatedly: nothing is dropped.
--- Requires 00_extensions_and_enums.sql and 02_staff_and_access.sql first.
+-- Run this file FIRST. Every other file depends on it.
 -- ============================================================
 
--- ---------- functions ----------
+-- ---------- extensions ----------
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
+
+-- ---------- enum types ----------
+DO $$ BEGIN CREATE TYPE public.app_role AS ENUM ('admin', 'manager', 'staff'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- ---------- shared trigger helpers ----------
 CREATE OR REPLACE FUNCTION public.touch_updated_at()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -22,15 +28,3 @@ BEGIN
   RETURN NEW;
 END;
 $function$;
-
--- ---------- other ----------
--- ============================================================
--- Lucky Charms POS — complete backend schema
--- Safe to run repeatedly on an existing database: nothing is dropped.
--- Paste the whole file into the SQL editor and run once.
--- ============================================================
-
-CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
-
--- ---------- enum types ----------
-DO $$ BEGIN CREATE TYPE public.app_role AS ENUM ('admin', 'manager', 'staff'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;

@@ -1,7 +1,8 @@
 -- ============================================================
 -- 02_staff_and_access.sql — Staff accounts, cashiers, roles and PIN sign-in
 -- Lucky Charms POS. Safe to run repeatedly: nothing is dropped.
--- Requires 00_extensions_and_enums.sql and 02_staff_and_access.sql first.
+-- Requires: 00_extensions_and_enums.sql, then 02_staff_and_access.sql
+-- (row level security policies below call is_staff() / is_app_supervisor()).
 -- ============================================================
 
 -- ---------- tables, columns and indexes ----------
