@@ -552,6 +552,8 @@ export type ReceiptSettings = {
   };
   customLines: ReceiptCustomLine[];
   qr: ReceiptQrSettings;
+  /** wording printed on booking / racket job slips */
+  bookingSlip: BookingSlipSettings;
 };
 
 
