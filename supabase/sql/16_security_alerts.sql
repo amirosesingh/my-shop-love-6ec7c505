@@ -189,8 +189,8 @@ END $function$;
 REVOKE ALL ON FUNCTION public.security_report_findings(text, text, jsonb) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.security_selfcheck() FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.security_set_finding_status(uuid, text, text) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.security_report_findings(text, text, jsonb) TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.security_selfcheck() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.security_report_findings(text, text, jsonb) TO anon, authenticated, postgres;
+GRANT EXECUTE ON FUNCTION public.security_selfcheck() TO authenticated, postgres;
 GRANT EXECUTE ON FUNCTION public.security_set_finding_status(uuid, text, text) TO authenticated;
 
 -- Nightly run at 03:00.
