@@ -2479,7 +2479,7 @@ function Register() {
                         onChange={(e) =>
                           setPicks((p) => ({ ...p, [idx]: e.target.checked ? l.qty : 0 }))
                         }
-                        className="size-4 accent-[hsl(var(--primary))]"
+                        className="size-4 accent-[var(--primary)]"
                       />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium">{l.name}</p>

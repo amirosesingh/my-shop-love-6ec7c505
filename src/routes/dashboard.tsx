@@ -178,11 +178,11 @@ function Dashboard() {
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={daily}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="day" fontSize={11} stroke="hsl(var(--muted-foreground))" />
-                  <YAxis fontSize={11} stroke="hsl(var(--muted-foreground))" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="day" fontSize={11} stroke="var(--muted-foreground)" />
+                  <YAxis fontSize={11} stroke="var(--muted-foreground)" />
                   <Tooltip />
-                  <Line type="monotone" dataKey="total" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="total" stroke="var(--primary)" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -195,11 +195,11 @@ function Dashboard() {
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={hourly}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="hour" fontSize={10} interval={2} stroke="hsl(var(--muted-foreground))" />
-                  <YAxis fontSize={11} allowDecimals={false} stroke="hsl(var(--muted-foreground))" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="hour" fontSize={10} interval={2} stroke="var(--muted-foreground)" />
+                  <YAxis fontSize={11} allowDecimals={false} stroke="var(--muted-foreground)" />
                   <Tooltip />
-                  <Bar dataKey="bills" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="bills" fill="var(--primary)" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
