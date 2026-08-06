@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { groupOf, scopeBetween } from "@/lib/stock-transfers";
 import { AppShell } from "@/components/pos/AppShell";
+import { ActionButton } from "@/components/pos/ActionButton";
 import { useAuth } from "@/lib/pos-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
