@@ -1421,14 +1421,25 @@ function Register() {
                 ) : null}
                 {member ? null : (
                   <>
-                    <div className="relative mt-2">
-                      <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        value={memberQuery}
-                        onChange={(e) => setMemberQuery(e.target.value)}
-                        placeholder="Phone number or name…"
-                        className="h-10 pl-8 text-sm"
-                      />
+                    <div className="mt-2 flex items-center gap-2">
+                      <div className="relative min-w-0 flex-1">
+                        <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          ref={memberInputRef}
+                          value={memberQuery}
+                          onChange={(e) => setMemberQuery(e.target.value)}
+                          placeholder="Phone number or name…"
+                          className="h-10 pl-8 text-sm"
+                        />
+                      </div>
+                      <Button
+                        variant="outline"
+                        className="h-10 shrink-0"
+                        onClick={() => setQuickMemberOpen(true)}
+                      >
+                        <UserPlus className="size-4" />
+                        <span className="hidden sm:inline">New member</span>
+                      </Button>
                     </div>
                     <div className="mt-2 space-y-1">
                       {memberMatches.map((m) => (
@@ -1451,35 +1462,38 @@ function Register() {
                             size="sm"
                             variant="outline"
                             className="h-7 text-[11px]"
-                            onClick={() => {
-                              setMemberId(m.id);
-                              setMemberQuery("");
-                              toast.success(`${m.name} attached to receipt`);
-                              // Surface any digital vouchers this member is holding.
-                              void loadMemberVouchers(m.id)
-                                .then((vs) => {
-                                  if (!vs.length) return;
-                                  toast.info(
-                                    vs.length === 1
-                                      ? `${m.name} has a voucher: ${vs[0]!.campaign.name}`
-                                      : `${m.name} has ${vs.length} vouchers available`,
-                                    {
-                                      action: {
-                                        label: "Apply",
-                                        onClick: () => void applyVoucher(vs[0]!.voucher.tokenSlug),
-                                      },
-                                    },
-                                  );
-                                })
-                                .catch(() => undefined);
-                            }}
+                            onClick={() => attachMember(m)}
                           >
                             <UserPlus className="size-3" /> Attach
                           </Button>
                         </div>
                       ))}
                       {memberQuery.trim() && !memberMatches.length && (
-                        <p className="py-1 text-[11px] text-muted-foreground">No member matches “{memberQuery}”.</p>
+                        <div className="space-y-2 py-1">
+                          <p className="text-[11px] text-muted-foreground">
+                            No member matches “{memberQuery}”.
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-[11px]"
+                              onClick={() => {
+                                setMemberQuery("");
+                                memberInputRef.current?.focus();
+                              }}
+                            >
+                              <Search className="size-3" /> Search again
+                            </Button>
+                            <Button
+                              size="sm"
+                              className="h-7 text-[11px]"
+                              onClick={() => setQuickMemberOpen(true)}
+                            >
+                              <UserPlus className="size-3" /> Enroll new member
+                            </Button>
+                          </div>
+                        </div>
                       )}
                     </div>
                   </>
