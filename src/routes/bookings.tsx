@@ -237,10 +237,10 @@ function BookingsPage() {
                 !!job &&
                 !!(job.racketModel || job.stringType || job.tensionMain || job.promisedAt);
               return (
-                <li key={b.id} className="rounded-lg border border-border p-4">
-                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+                 <li key={b.id} className="rounded-lg border border-border p-4">
+                   <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
                     <div className="min-w-0">
-                      <p className="flex items-center gap-2 font-semibold">
+                      <div className="flex flex-wrap items-center gap-2 font-semibold">
                         {b.ref}
                         <Badge variant="outline" className={statusTone[b.status]}>
                           {b.status}
