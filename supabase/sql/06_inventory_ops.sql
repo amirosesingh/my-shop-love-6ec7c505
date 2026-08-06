@@ -423,11 +423,11 @@ CREATE POLICY "Staff can update" ON public.purchase_orders FOR UPDATE TO authent
 
 DROP POLICY IF EXISTS "Staff add stock adjustments" ON public.stock_adjustments;
 
-CREATE POLICY "Staff add stock adjustments" ON public.stock_adjustments FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Staff add stock adjustments" ON public.stock_adjustments FOR INSERT TO authenticated WITH CHECK (public.is_staff(auth.uid()));
 
 DROP POLICY IF EXISTS "Staff read stock adjustments" ON public.stock_adjustments;
 
-CREATE POLICY "Staff read stock adjustments" ON public.stock_adjustments FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Staff read stock adjustments" ON public.stock_adjustments FOR SELECT TO authenticated USING (public.is_staff(auth.uid()));
 
 DROP POLICY IF EXISTS "Staff read transfer items" ON public.stock_transfer_items;
 

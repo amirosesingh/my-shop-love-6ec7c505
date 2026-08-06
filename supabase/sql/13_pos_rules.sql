@@ -185,17 +185,32 @@ CREATE OR REPLACE FUNCTION public.log_manager_override(
   _action text, _rule_key text, _requested_by text, _approved_by text,
   _approved_role text, _store_id text, _terminal_id text, _detail text)
 RETURNS void
-LANGUAGE sql
+LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path TO 'public'
 AS $function$
+BEGIN
+  -- Only a verified manager/admin approver may be recorded; the approver name and
+  -- role are taken from the app_users row, never from free-text caller input.
+  IF NOT EXISTS (
+    SELECT 1 FROM public.app_users a
+     WHERE lower(a.user_id) = lower(trim(coalesce(_approved_by, '')))
+       AND a.is_active AND a.role IN ('admin','manager')
+  ) THEN
+    RAISE EXCEPTION 'UNKNOWN_APPROVER';
+  END IF;
+
   INSERT INTO public.manager_override_events
     (action, rule_key, requested_by, approved_by, approved_role, store_id, terminal_id, detail)
-  VALUES (_action, _rule_key, _requested_by, _approved_by, _approved_role, _store_id, _terminal_id, _detail);
-$function$;
+  SELECT _action, _rule_key, _requested_by, a.user_id, a.role::text, _store_id, _terminal_id, _detail
+    FROM public.app_users a
+   WHERE lower(a.user_id) = lower(trim(_approved_by))
+   LIMIT 1;
+END $function$;
 
+REVOKE ALL ON FUNCTION public.log_manager_override(text, text, text, text, text, text, text, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.log_manager_override(text, text, text, text, text, text, text, text)
-  TO anon, authenticated, service_role;
+  TO service_role;
 
 -- ---------- held ticket count used by the shift-close gate ----------
 DROP FUNCTION IF EXISTS public.held_orders_open_count(text);

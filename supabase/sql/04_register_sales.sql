@@ -294,7 +294,7 @@ CREATE POLICY "Staff can read drawer events" ON public.drawer_events FOR SELECT 
 
 DROP POLICY IF EXISTS "Staff manage held orders" ON public.held_orders;
 
-CREATE POLICY "Staff manage held orders" ON public.held_orders FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Staff manage held orders" ON public.held_orders FOR ALL TO authenticated USING (public.is_staff(auth.uid())) WITH CHECK (public.is_staff(auth.uid()));
 
 DROP POLICY IF EXISTS "Staff can delete" ON public.sale_items;
 

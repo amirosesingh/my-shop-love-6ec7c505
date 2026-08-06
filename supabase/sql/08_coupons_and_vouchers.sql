@@ -464,7 +464,10 @@ CREATE TRIGGER coupon_events_no_change BEFORE DELETE OR UPDATE ON public.coupon_
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.coupon_campaigns TO authenticated;
 GRANT ALL ON public.coupon_campaigns TO service_role;
 GRANT SELECT ON public.coupon_campaigns TO anon;  -- public claim / storefront pages
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.coupon_events TO authenticated;
+-- coupon_events is append-only: writes only happen through SECURITY DEFINER routines.
+GRANT SELECT ON public.coupon_events TO authenticated;
+REVOKE INSERT, UPDATE, DELETE ON public.coupon_events FROM authenticated;
+REVOKE ALL ON public.coupon_events FROM anon;
 GRANT ALL ON public.coupon_events TO service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.issued_vouchers TO authenticated;
 GRANT ALL ON public.issued_vouchers TO service_role;
@@ -483,8 +486,12 @@ DROP POLICY IF EXISTS "campaigns managed by staff" ON public.coupon_campaigns;
 CREATE POLICY "campaigns managed by staff" ON public.coupon_campaigns FOR ALL TO authenticated USING (is_staff(auth.uid())) WITH CHECK (is_staff(auth.uid()));
 
 DROP POLICY IF EXISTS "campaigns readable" ON public.coupon_campaigns;
+DROP POLICY IF EXISTS "campaigns readable by staff" ON public.coupon_campaigns;
+DROP POLICY IF EXISTS "live campaigns readable by public" ON public.coupon_campaigns;
 
-CREATE POLICY "campaigns readable" ON public.coupon_campaigns FOR SELECT TO anon,authenticated USING (true);
+CREATE POLICY "campaigns readable by staff" ON public.coupon_campaigns FOR SELECT TO authenticated USING (is_staff(auth.uid()));
+
+CREATE POLICY "live campaigns readable by public" ON public.coupon_campaigns FOR SELECT TO anon USING (public.campaign_is_live(coupon_campaigns));
 
 DROP POLICY IF EXISTS "coupon events readable by staff" ON public.coupon_events;
 
