@@ -361,6 +361,13 @@ function CouponsPage() {
               campaigns={campaigns}
               stores={state.stores.map((s) => ({ id: s.id, name: s.name }))}
             />
+            {moreEvents ? (
+              <div className="mt-3 flex justify-center">
+                <Button variant="outline" onClick={() => void loadMoreEvents()} disabled={loadingMore}>
+                  {loadingMore ? "Loading…" : "Load older events"}
+                </Button>
+              </div>
+            ) : null}
           </TabsContent>
         </Tabs>
       </div>
