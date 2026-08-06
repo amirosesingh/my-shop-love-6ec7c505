@@ -1,6 +1,6 @@
 import type { FormEvent } from "react";
 import { Info, Lock, MonitorPlay, Search, Zap } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ActionButton } from "@/components/pos/ActionButton";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { money, stockAt } from "@/lib/pos-store";
@@ -77,42 +77,49 @@ export function CatalogPanel({
         {showHeaderActions && (
           <div className="flex shrink-0 gap-2">
             {shiftOpen && onCloseShift && (
-              <Button variant="outline" className="h-11" onClick={onCloseShift}>
-                <Lock className="size-4" />
-                <span className="hidden xl:inline">Close shift</span>
-              </Button>
+              <ActionButton
+                layout="inline"
+                variant="outline"
+                className="h-11 w-auto"
+                label="Close shift"
+                icon={<Lock className="size-4" />}
+                onClick={onCloseShift}
+              />
             )}
             {!shiftOpen && onOpenShift && (
-              <Button className="h-11" onClick={onOpenShift}>
-                <Lock className="size-4" />
-                <span className="hidden xl:inline">Open shift</span>
-              </Button>
+              <ActionButton
+                layout="inline"
+                className="h-11 w-auto"
+                label="Open shift"
+                icon={<Lock className="size-4" />}
+                onClick={onOpenShift}
+              />
             )}
             {onOpenCustomerDisplay && (
-              <Button variant="outline" className="h-11" onClick={onOpenCustomerDisplay}>
-                <MonitorPlay className="size-4" />
-                <span className="hidden xl:inline">Customer screen</span>
-              </Button>
+              <ActionButton
+                layout="inline"
+                variant="outline"
+                className="h-11 w-auto"
+                label="Customer screen"
+                icon={<MonitorPlay className="size-4" />}
+                onClick={onOpenCustomerDisplay}
+              />
             )}
           </div>
         )}
       </div>
 
       {onRacketBooking && (
-        <Button
+        <ActionButton
+          layout="inline"
           variant="secondary"
           className="h-11 w-full justify-center gap-2"
           disabled={!shiftOpen}
-          title={
-            shiftOpen
-              ? "Take a racket / stringing job — no cart items needed"
-              : "Open a shift to take a booking"
-          }
+          disabledReason="open a shift to take a booking"
+          label="Racket booking"
+          icon={<Zap className="size-4" />}
           onClick={onRacketBooking}
-        >
-          <Zap className="size-4" />
-          <span className="truncate">Racket booking</span>
-        </Button>
+        />
       )}
 
       {!shiftOpen && (
