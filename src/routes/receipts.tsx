@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { Ban, Gift, Printer, ReceiptText, Search, ScrollText, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
+import { ActionButton } from "@/components/pos/ActionButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -265,31 +266,37 @@ function ReceiptVault() {
               ))}
             </div>
 
-            <Button className="w-full" disabled={!selected} onClick={print}>
-              <Printer className="size-4" /> Print this template
-            </Button>
+            <ActionButton
+              layout="inline"
+              disabled={!selected}
+              disabledReason="pick a bill first"
+              label="Print this template"
+              icon={<Printer className="size-4" />}
+              onClick={print}
+            />
 
             <div className="grid gap-2 rounded-lg border border-border bg-card p-3">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Bill corrections
               </p>
-              <Button
+              <ActionButton
+                layout="inline"
                 variant="outline"
-                className="w-full justify-start"
                 disabled={!selected}
+                disabledReason="pick a bill first"
+                label="Change payment method"
+                icon={<Wallet className="size-4" />}
                 onClick={() => void openPaymentFix()}
-              >
-                <Wallet className="size-4" /> Change payment method
-              </Button>
-              <Button
+              />
+              <ActionButton
+                layout="inline"
                 variant="outline"
-                className="w-full justify-start text-destructive hover:text-destructive"
+                className="text-destructive hover:text-destructive"
                 disabled={!selected || selected.refunded}
+                label={selected?.refunded ? "Bill already cancelled" : "Cancel this bill"}
+                icon={<Ban className="size-4" />}
                 onClick={() => void openCancel()}
-              >
-                <Ban className="size-4" />
-                {selected?.refunded ? "Bill already cancelled" : "Cancel this bill"}
-              </Button>
+              />
             </div>
 
             <div className="overflow-hidden rounded-lg border border-border bg-white">
