@@ -88,6 +88,9 @@ function CouponsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const [events, setEvents] = useState<CouponEvent[]>([]);
+  const [eventCursor, setEventCursor] = useState<Cursor>(null);
+  const [moreEvents, setMoreEvents] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [draft, setDraft] = useState<Campaign | null>(null);
