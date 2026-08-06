@@ -91,6 +91,13 @@ import { NO_SALE_REASON_MAX, NO_SALE_REASON_MIN, recordNoSale } from "@/lib/draw
 import { buildBookingMessage, buildSaleMessage, sendBillOnWhatsApp } from "@/lib/whatsapp";
 import { logger } from "@/lib/audit-log";
 import { DiscountPad } from "@/components/pos/DiscountPad";
+import {
+  ManagerOverrideDialog,
+  type OverrideRequest,
+} from "@/components/pos/ManagerOverrideDialog";
+import { usePosRules } from "@/lib/pos-rules.tsx";
+import { assertShiftClosable } from "@/lib/pos-rules.functions";
+import { getPosCallerAuth } from "@/lib/pos-caller-auth";
 import { evaluatePromotions, focLine } from "@/lib/pos-promotions";
 import { clearCartDraft, loadCartDraft, saveCartDraft } from "@/lib/cart-draft";
 import {
@@ -136,8 +143,23 @@ function Register() {
   const { user, can } = useAuth();
   const { requirePermission } = useUserPermissions();
   const { visible } = useVisibility();
+  /** Server-loaded operational rules. Never read from browser storage. */
+  const { rules } = usePosRules();
+  /** Pending manager-approval request and the work it unblocks. */
+  const [override, setOverride] = useState<OverrideRequest | null>(null);
+  const overrideResolve = useRef<((grant: string | null) => void) | null>(null);
+  /**
+   * Opens the manager PIN dialog and resolves with the signed grant token the
+   * server issued, or null when the cashier backs out.
+   */
+  const askManager = (request: OverrideRequest) =>
+    new Promise<string | null>((resolve) => {
+      overrideResolve.current = resolve;
+      setOverride(request);
+    });
   const [closeShiftOpen, setCloseShiftOpen] = useState(false);
   const [countedCash, setCountedCash] = useState("");
+  const [closing, setClosing] = useState(false);
   const [closeNote, setCloseNote] = useState("");
   const canDiscount = can("can_give_discount");
   const [discountOverride, setDiscountOverride] = useState(false);
@@ -1666,16 +1688,20 @@ function Register() {
                     </span>
                   </button>
                 )}
+                {/* Label and control sit in one row: the button is sized by its
+                    own column so it can never slide out to the right edge. */}
                 <div
-                  className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 ${discountAllowed ? "" : "hidden"}`}
+                  className={`flex w-full items-center justify-between gap-3 ${discountAllowed ? "" : "hidden"}`}
                 >
-                  <span className="truncate text-muted-foreground">Bill discount</span>
+                  <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                    Bill discount
+                  </span>
                   <ActionButton
                     layout="inline"
                     variant="outline"
                     size="sm"
                     onClick={() => setPadTarget("bill")}
-                    className="numeric h-10 min-h-10 w-full max-w-32 min-w-0 shrink-0 justify-between text-xs"
+                    className="numeric h-10 min-h-10 w-32 shrink-0 justify-center gap-2 text-xs"
                     label={cartDiscount
                       ? `${cartDiscount}${cartDiscountType === "percent" ? "%" : ""}`
                       : "Add discount"}
@@ -1888,7 +1914,8 @@ function Register() {
               Transaction actions
             </p>
             <div className="grid auto-rows-fr grid-cols-1 gap-2">
-              {visible("register.holdOrder") && (
+              {/* Only offered while there is something to park. */}
+              {visible("register.holdOrder") && lines.length > 0 && (
               <ActionButton
                 variant="outline"
                 layout="inline"
@@ -1938,12 +1965,15 @@ function Register() {
             {held.length > 0 && (
               <div className="mt-2 space-y-1">
                 <div className="flex items-center justify-between">
-                  <p className="text-[11px] text-muted-foreground">Held orders ({held.length})</p>
+                  <p className="text-[11px] text-muted-foreground">Held orders</p>
                   <Link
                     to="/holds"
-                    className="text-[11px] font-medium text-primary hover:underline"
+                    className="flex items-center gap-1.5 text-[11px] font-medium text-primary hover:underline"
                   >
-                    Hold tickets
+                    Held bills
+                    <span className="numeric inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
+                      {held.length}
+                    </span>
                   </Link>
                 </div>
                 {held.map((h) => (
@@ -2970,6 +3000,11 @@ function Register() {
                 onChange={(e) => setCountedCash(e.target.value)}
               />
             </div>
+            {rules.block_shift_close_on_hold && held.length > 0 && (
+              <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                {held.length} held bill(s) pending. Settle or cancel them before closing.
+              </p>
+            )}
             <div className="space-y-1">
               <Label>Note (optional)</Label>
               <Input value={closeNote} onChange={(e) => setCloseNote(e.target.value)} />
@@ -2980,22 +3015,42 @@ function Register() {
               Cancel
             </Button>
             <Button
+              disabled={closing}
               onClick={() => {
-                const amount = Number(countedCash);
-                if (!Number.isFinite(amount) || amount < 0) {
-                  toast.error("Enter the counted cash amount");
-                  return;
-                }
-                const closed = closeShift(amount, closeNote.trim());
-                if (!closed) {
-                  toast.error("This shift was opened on another terminal");
-                  return;
-                }
-                setCloseShiftOpen(false);
-                toast.success("Shift closed");
+                void (async () => {
+                  const amount = Number(countedCash);
+                  const counted = Number.isFinite(amount) && amount >= 0 ? amount : null;
+                  setClosing(true);
+                  try {
+                    // The server re-checks held tickets and the cash count
+                    // against the database rules — the browser copy is only
+                    // used to give faster feedback.
+                    const auth = await getPosCallerAuth();
+                    const gate = await assertShiftClosable({
+                      data: { ...auth, storeId: currentStore.id, countedCash: counted },
+                    });
+                    if (!gate.ok) {
+                      toast.error(gate.error);
+                      return;
+                    }
+                    if (counted === null) {
+                      toast.error("Enter the counted cash amount");
+                      return;
+                    }
+                    const closed = closeShift(counted, closeNote.trim());
+                    if (!closed) {
+                      toast.error("This shift was opened on another terminal");
+                      return;
+                    }
+                    setCloseShiftOpen(false);
+                    toast.success("Shift closed");
+                  } finally {
+                    setClosing(false);
+                  }
+                })();
               }}
             >
-              Close shift
+              {closing ? "Checking…" : "Close shift"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -3017,12 +3072,62 @@ function Register() {
               : "amount"
         }
         onApply={(v, t) => {
-          if (padTarget === "bill") {
-            setCartDiscount(v);
-            setCartDiscountType(t);
-          } else if (typeof padTarget === "number") {
-            patchLine(padTarget, { discount: v, discountType: t });
-          }
+          const target = padTarget;
+          void (async () => {
+            // Limits come from the database rule set; anything beyond them
+            // needs a manager PIN verified on the server.
+            const overLimit =
+              t === "percent"
+                ? v > rules.max_cashier_discount_percent
+                : v > rules.max_cart_discount_amount;
+            const stacking =
+              !rules.allow_discount_stacking &&
+              !!coupon &&
+              v > 0 &&
+              (target === "bill" || typeof target === "number");
+
+            if (stacking) {
+              toast.error("Discount stacking is off — remove the coupon first");
+              return;
+            }
+            if (overLimit) {
+              const grant = await askManager({
+                action: "discount_over_limit",
+                ruleKey:
+                  t === "percent" ? "max_cashier_discount_percent" : "max_cart_discount_amount",
+                title: "Discount above cashier limit",
+                reason:
+                  t === "percent"
+                    ? `Cashiers may give up to ${rules.max_cashier_discount_percent}%.`
+                    : `Cashiers may give up to ${money(rules.max_cart_discount_amount)}.`,
+                storeId: currentStore.id,
+                requestedBy: activeCashier,
+                detail: `${v}${t === "percent" ? "%" : ""} on ${target === "bill" ? "the bill" : "a line"}`,
+              });
+              if (!grant) return;
+            }
+            if (target === "bill") {
+              setCartDiscount(v);
+              setCartDiscountType(t);
+            } else if (typeof target === "number") {
+              patchLine(target, { discount: v, discountType: t });
+            }
+          })();
+        }}
+      />
+
+      {/* Shared manager PIN gate — the PIN is only ever checked server-side. */}
+      <ManagerOverrideDialog
+        request={override}
+        onClose={() => {
+          overrideResolve.current?.(null);
+          overrideResolve.current = null;
+          setOverride(null);
+        }}
+        onApproved={(grantToken) => {
+          overrideResolve.current?.(grantToken);
+          overrideResolve.current = null;
+          setOverride(null);
         }}
       />
     </AppShell>

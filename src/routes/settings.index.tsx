@@ -18,6 +18,7 @@ import {
   ReceiptText,
   RefreshCw,
   ScanBarcode,
+  ShieldCheck,
   Type,
 } from "lucide-react";
 import { AppShell } from "@/components/pos/AppShell";
@@ -119,6 +120,12 @@ const GROUPS = [
         label: "Tax & pricing",
         icon: ReceiptText,
         blurb: "Global tax rate and inclusive or exclusive pricing.",
+      },
+      {
+        to: "/settings/rules",
+        label: "POS rules & enforcement",
+        icon: ShieldCheck,
+        blurb: "Shift, discount, refund and terminal security limits.",
       },
       {
         to: "/settings/sku",

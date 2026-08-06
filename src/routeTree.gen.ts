@@ -58,6 +58,7 @@ import { Route as SettingsPaymentRouteImport } from './routes/settings.payment'
 import { Route as SettingsPrinterRouteImport } from './routes/settings.printer'
 import { Route as SettingsQrRouteImport } from './routes/settings.qr'
 import { Route as SettingsRegionRouteImport } from './routes/settings.region'
+import { Route as SettingsRulesRouteImport } from './routes/settings.rules'
 import { Route as SettingsServicesRouteImport } from './routes/settings.services'
 import { Route as SettingsSkuRouteImport } from './routes/settings.sku'
 import { Route as SettingsSyncRouteImport } from './routes/settings.sync'
@@ -314,6 +315,11 @@ const SettingsRegionRoute = SettingsRegionRouteImport.update({
   path: '/settings/region',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsRulesRoute = SettingsRulesRouteImport.update({
+  id: '/settings/rules',
+  path: '/settings/rules',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsServicesRoute = SettingsServicesRouteImport.update({
   id: '/settings/services',
   path: '/settings/services',
@@ -413,6 +419,7 @@ export interface FileRoutesByFullPath {
   '/settings/printer': typeof SettingsPrinterRoute
   '/settings/qr': typeof SettingsQrRoute
   '/settings/region': typeof SettingsRegionRoute
+  '/settings/rules': typeof SettingsRulesRoute
   '/settings/services': typeof SettingsServicesRoute
   '/settings/sku': typeof SettingsSkuRoute
   '/settings/sync': typeof SettingsSyncRoute
@@ -474,6 +481,7 @@ export interface FileRoutesByTo {
   '/settings/printer': typeof SettingsPrinterRoute
   '/settings/qr': typeof SettingsQrRoute
   '/settings/region': typeof SettingsRegionRoute
+  '/settings/rules': typeof SettingsRulesRoute
   '/settings/services': typeof SettingsServicesRoute
   '/settings/sku': typeof SettingsSkuRoute
   '/settings/sync': typeof SettingsSyncRoute
@@ -536,6 +544,7 @@ export interface FileRoutesById {
   '/settings/printer': typeof SettingsPrinterRoute
   '/settings/qr': typeof SettingsQrRoute
   '/settings/region': typeof SettingsRegionRoute
+  '/settings/rules': typeof SettingsRulesRoute
   '/settings/services': typeof SettingsServicesRoute
   '/settings/sku': typeof SettingsSkuRoute
   '/settings/sync': typeof SettingsSyncRoute
@@ -599,6 +608,7 @@ export interface FileRouteTypes {
     | '/settings/printer'
     | '/settings/qr'
     | '/settings/region'
+    | '/settings/rules'
     | '/settings/services'
     | '/settings/sku'
     | '/settings/sync'
@@ -660,6 +670,7 @@ export interface FileRouteTypes {
     | '/settings/printer'
     | '/settings/qr'
     | '/settings/region'
+    | '/settings/rules'
     | '/settings/services'
     | '/settings/sku'
     | '/settings/sync'
@@ -721,6 +732,7 @@ export interface FileRouteTypes {
     | '/settings/printer'
     | '/settings/qr'
     | '/settings/region'
+    | '/settings/rules'
     | '/settings/services'
     | '/settings/sku'
     | '/settings/sync'
@@ -783,6 +795,7 @@ export interface RootRouteChildren {
   SettingsPrinterRoute: typeof SettingsPrinterRoute
   SettingsQrRoute: typeof SettingsQrRoute
   SettingsRegionRoute: typeof SettingsRegionRoute
+  SettingsRulesRoute: typeof SettingsRulesRoute
   SettingsServicesRoute: typeof SettingsServicesRoute
   SettingsSkuRoute: typeof SettingsSkuRoute
   SettingsSyncRoute: typeof SettingsSyncRoute
@@ -1142,6 +1155,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsRegionRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/rules': {
+      id: '/settings/rules'
+      path: '/settings/rules'
+      fullPath: '/settings/rules'
+      preLoaderRoute: typeof SettingsRulesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/services': {
       id: '/settings/services'
       path: '/settings/services'
@@ -1263,6 +1283,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsPrinterRoute: SettingsPrinterRoute,
   SettingsQrRoute: SettingsQrRoute,
   SettingsRegionRoute: SettingsRegionRoute,
+  SettingsRulesRoute: SettingsRulesRoute,
   SettingsServicesRoute: SettingsServicesRoute,
   SettingsSkuRoute: SettingsSkuRoute,
   SettingsSyncRoute: SettingsSyncRoute,
@@ -1279,13 +1300,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
