@@ -91,6 +91,31 @@ CREATE INDEX IF NOT EXISTS terminal_tokens_location_idx ON public.terminal_token
 CREATE UNIQUE INDEX IF NOT EXISTS terminal_tokens_pkey ON public.terminal_tokens USING btree (id);
 
 -- ---------- functions ----------
+-- ── Safe re-run guard ─────────────────────────────────────────────────────
+-- Postgres refuses CREATE OR REPLACE when a function's return type changed.
+-- Drop any stale overload of the routines defined below first. Each drop is
+-- attempted on its own, so a routine still referenced by a policy or trigger
+-- is simply left in place instead of aborting the whole file.
+DO $guard$
+DECLARE r record;
+BEGIN
+  FOR r IN
+    SELECT p.oid::regprocedure AS sig
+      FROM pg_proc p
+     WHERE p.pronamespace = 'public'::regnamespace
+       AND p.proname = ANY (ARRAY[
+      'terminal_token_claim',
+      'terminal_token_heartbeat',
+      'terminal_token_status'
+       ])
+  LOOP
+    BEGIN
+      EXECUTE 'DROP FUNCTION IF EXISTS ' || r.sig;
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END;
+  END LOOP;
+END $guard$;
+
 CREATE OR REPLACE FUNCTION public.terminal_token_claim(p_token_id uuid, p_device text DEFAULT NULL::text)
  RETURNS boolean
  LANGUAGE plpgsql

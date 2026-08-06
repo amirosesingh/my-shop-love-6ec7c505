@@ -47,14 +47,44 @@ const n = (v: unknown) => (typeof v === "number" ? v : Number(v ?? 0) || 0);
 /** `to` is inclusive, so the upper bound is pushed to the end of that day. */
 const endOfDay = (to: string) => `${to}T23:59:59.999`;
 
-/** Friendly wording for the two things that actually go wrong here. */
-function readable(message: string): string {
+export type BoardIssue = {
+  /** Table or view that was refused. */
+  source: string;
+  kind: "permission" | "missing" | "other";
+  /** The SQL file that creates (and grants) this source. */
+  sqlFile: string;
+  detail: string;
+  advice: string;
+};
+
+export class BoardError extends Error {
+  issues: BoardIssue[];
+  constructor(issues: BoardIssue[]) {
+    super(issues.map((i) => `${i.source}: ${i.detail}`).join(" · "));
+    this.name = "BoardError";
+    this.issues = issues;
+  }
+}
+
+function classify(source: string, sqlFile: string, message: string): BoardIssue {
   const m = message.toLowerCase();
-  if (m.includes("permission denied") || m.includes("not authorized"))
-    return "This account cannot read the reporting tables yet. Sign in again, or run supabase/sql/12_analytics_views.sql and 04_register_sales.sql on your database so the reporting views and their access grants exist.";
+  if (m.includes("permission denied") || m.includes("not authorized") || m.includes("42501"))
+    return {
+      source,
+      kind: "permission",
+      sqlFile,
+      detail: message,
+      advice: `Access to "${source}" was refused. Re-run ${sqlFile} in the SQL editor — it re-applies the GRANT and policy statements for this ${source.startsWith("v_") ? "view" : "table"}.`,
+    };
   if (m.includes("does not exist") || m.includes("could not find") || m.includes("schema cache"))
-    return "The reporting views are missing. Run supabase/sql/12_analytics_views.sql on your database to create them.";
-  return message;
+    return {
+      source,
+      kind: "missing",
+      sqlFile,
+      detail: message,
+      advice: `"${source}" does not exist in the database yet. Run ${sqlFile} in the SQL editor to create it.`,
+    };
+  return { source, kind: "other", sqlFile, detail: message, advice: `Reading "${source}" failed. Re-running ${sqlFile} usually repairs it.` };
 }
 
 export async function fetchBoard(from: string, to: string): Promise<BoardData> {
@@ -76,8 +106,14 @@ export async function fetchBoard(from: string, to: string): Promise<BoardData> {
       .lte("created_at", endOfDay(to)),
   ]);
 
-  const err = storeRes.error ?? itemRes.error ?? billRes.error;
-  if (err) throw new Error(readable(err.message));
+  const issues: BoardIssue[] = [];
+  if (storeRes.error)
+    issues.push(classify("v_daily_store_sales", "supabase/sql/12_analytics_views.sql", storeRes.error.message));
+  if (itemRes.error)
+    issues.push(classify("v_daily_item_sales", "supabase/sql/12_analytics_views.sql", itemRes.error.message));
+  if (billRes.error)
+    issues.push(classify("sales", "supabase/sql/04_register_sales.sql", billRes.error.message));
+  if (issues.length) throw new BoardError(issues);
 
   return {
     storeDays: (storeRes.data ?? []).map((r) => ({

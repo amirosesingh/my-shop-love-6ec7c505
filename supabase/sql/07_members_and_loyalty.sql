@@ -128,6 +128,31 @@ DO $$ BEGIN ALTER TABLE public.promotions ADD CONSTRAINT promotions_foc_product_
 CREATE UNIQUE INDEX IF NOT EXISTS promotions_pkey ON public.promotions USING btree (id);
 
 -- ---------- functions ----------
+-- ── Safe re-run guard ─────────────────────────────────────────────────────
+-- Postgres refuses CREATE OR REPLACE when a function's return type changed.
+-- Drop any stale overload of the routines defined below first. Each drop is
+-- attempted on its own, so a routine still referenced by a policy or trigger
+-- is simply left in place instead of aborting the whole file.
+DO $guard$
+DECLARE r record;
+BEGIN
+  FOR r IN
+    SELECT p.oid::regprocedure AS sig
+      FROM pg_proc p
+     WHERE p.pronamespace = 'public'::regnamespace
+       AND p.proname = ANY (ARRAY[
+      'member_join',
+      'member_welcome_claim',
+      'normalize_phone'
+       ])
+  LOOP
+    BEGIN
+      EXECUTE 'DROP FUNCTION IF EXISTS ' || r.sig;
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END;
+  END LOOP;
+END $guard$;
+
 CREATE OR REPLACE FUNCTION public.member_join(_phone text, _full_name text, _email text DEFAULT NULL::text)
  RETURNS uuid
  LANGUAGE plpgsql

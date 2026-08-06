@@ -2,7 +2,7 @@
  * Full-screen activation gate for the Windows till, plus the lock screen the
  * kill-switch drops in when management revokes the machine.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Camera, KeyRound, Loader2, ScanLine, ShieldAlert, ShieldCheck, Smartphone } from "lucide-react";
 import qrcode from "qrcode-generator";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import {
   type TerminalConfig,
 } from "@/lib/terminal-tokens";
 import { clearRevocation } from "@/lib/use-revocation-check";
+import { CameraScanner } from "@/components/pos/CameraScanner";
 import { useBranding } from "@/lib/branding";
 
 const qrDataUrl = (value: string) => {
@@ -42,9 +43,14 @@ export function TerminalActivation({ onActivated }: { onActivated: (c: TerminalC
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [scanning, setScanning] = useState(false);
-  const pairing = useMemo(() => getPairingRequest(), []);
-  const pairQr = useMemo(() => qrDataUrl(encodePairingRequest(pairing)), [pairing]);
-  const scannerRef = useRef<{ stop: () => Promise<void>; clear: () => void } | null>(null);
+  // Minted after mount: the id is random, so generating it during SSR would
+  // hydrate a different QR than the server drew and blow up the page.
+  const [pairing, setPairing] = useState<ReturnType<typeof getPairingRequest> | null>(null);
+  useEffect(() => setPairing(getPairingRequest()), []);
+  const pairQr = useMemo(
+    () => (pairing ? qrDataUrl(encodePairingRequest(pairing)) : ""),
+    [pairing],
+  );
 
   const submit = useCallback(
     async (value: string) => {
@@ -67,46 +73,10 @@ export function TerminalActivation({ onActivated }: { onActivated: (c: TerminalC
     [onActivated],
   );
 
-  // Camera scanning is optional — the paste box always works.
-  useEffect(() => {
-    if (!scanning) return;
-    let stopped = false;
-    void (async () => {
-      try {
-        const { Html5Qrcode } = await import("html5-qrcode");
-        const scanner = new Html5Qrcode("terminal-qr-reader");
-        scannerRef.current = scanner as unknown as { stop: () => Promise<void>; clear: () => void };
-        await scanner.start(
-          { facingMode: "environment" },
-          { fps: 10, qrbox: 250 },
-          (text) => {
-            if (stopped) return;
-            stopped = true;
-            void scanner
-              .stop()
-              .catch(() => {})
-              .then(() => {
-                setScanning(false);
-                void submit(text);
-              });
-          },
-          () => {},
-        );
-      } catch {
-        setScanning(false);
-        setError("No camera available — paste the activation code instead.");
-      }
-    })();
-    return () => {
-      stopped = true;
-      void scannerRef.current?.stop().catch(() => {});
-      scannerRef.current = null;
-    };
-  }, [scanning, submit]);
-
   // While the operator waits, keep asking whether an administrator approved
   // the pairing request from their phone. Approval activates the till itself.
   useEffect(() => {
+    if (!pairing) return;
     let stopped = false;
     const tick = async () => {
       try {
@@ -125,7 +95,7 @@ export function TerminalActivation({ onActivated }: { onActivated: (c: TerminalC
       stopped = true;
       window.clearInterval(timer);
     };
-  }, [pairing.tokenId, onActivated]);
+  }, [pairing, onActivated]);
 
   return (
     <Frame>
@@ -155,13 +125,21 @@ export function TerminalActivation({ onActivated }: { onActivated: (c: TerminalC
           till registers itself — nothing to type or copy.
         </p>
         <div className="mt-3 flex items-center gap-3">
-          <img
-            src={pairQr}
-            alt="Pairing code for this terminal"
-            className="size-32 rounded-lg bg-white p-1"
-          />
+          {pairQr ? (
+            <img
+              src={pairQr}
+              alt="Pairing code for this terminal"
+              className="size-32 rounded-lg bg-white p-1"
+            />
+          ) : (
+            <div className="grid size-32 place-items-center rounded-lg border border-slate-700 bg-slate-900">
+              <Loader2 className="size-5 animate-spin text-slate-500" />
+            </div>
+          )}
           <div className="text-[11px] text-slate-500">
-            <p className="font-mono break-all text-slate-400">{pairing.tokenId.slice(0, 8)}…</p>
+            <p className="font-mono break-all text-slate-400">
+              {pairing ? `${pairing.tokenId.slice(0, 8)}…` : "Preparing…"}
+            </p>
             <p className="mt-2 flex items-center gap-1">
               <Loader2 className="size-3 animate-spin" /> Waiting for approval…
             </p>
@@ -170,11 +148,17 @@ export function TerminalActivation({ onActivated }: { onActivated: (c: TerminalC
       </div>
 
       {scanning ? (
-        <div className="mt-4 overflow-hidden rounded-xl border border-slate-700">
-          <div id="terminal-qr-reader" className="w-full" />
+        <div className="mt-4 space-y-2">
+          <CameraScanner
+            onScan={(text) => {
+              setScanning(false);
+              void submit(text);
+            }}
+            onClose={() => setScanning(false)}
+          />
           <Button
             variant="ghost"
-            className="w-full rounded-none text-slate-300"
+            className="w-full text-slate-300"
             onClick={() => setScanning(false)}
           >
             Cancel scanning

@@ -459,13 +459,46 @@ export function encodePairingRequest(request: PairingRequest): string {
 
 export function decodePairingRequest(value: string): PairingRequest | null {
   const trimmed = value.trim();
-  if (!trimmed.startsWith(PAIR_PREFIX)) return null;
-  try {
-    const parsed = JSON.parse(atob(trimmed.slice(PAIR_PREFIX.length))) as PairingRequest;
-    return parsed?.tokenId ? parsed : null;
-  } catch {
-    return null;
+  if (!trimmed) return null;
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  const fromJson = (raw: string): PairingRequest | null => {
+    try {
+      const parsed = JSON.parse(raw) as PairingRequest;
+      return parsed?.tokenId ? { tokenId: parsed.tokenId, deviceName: parsed.deviceName ?? "" } : null;
+    } catch {
+      return null;
+    }
+  };
+
+  // Preferred form: the prefixed base64 payload the till renders.
+  if (trimmed.startsWith(PAIR_PREFIX)) {
+    const body = trimmed.slice(PAIR_PREFIX.length);
+    try {
+      const decoded = fromJson(atob(body));
+      if (decoded) return decoded;
+    } catch {
+      /* fall through to the tolerant paths below */
+    }
+    return uuid.test(body) ? { tokenId: body, deviceName: "" } : null;
   }
+
+  // A phone camera sometimes hands back the raw JSON, a bare token id, or a
+  // link that carries the token. Accept all of them rather than failing.
+  const asJson = fromJson(trimmed);
+  if (asJson) return asJson;
+  if (uuid.test(trimmed)) return { tokenId: trimmed, deviceName: "" };
+  try {
+    const url = new URL(trimmed);
+    const fromQuery = url.searchParams.get("pair") ?? url.searchParams.get("token");
+    if (fromQuery && uuid.test(fromQuery)) return { tokenId: fromQuery, deviceName: "" };
+  } catch {
+    /* not a URL */
+  }
+  const embedded = trimmed.match(
+    /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i,
+  );
+  return embedded ? { tokenId: embedded[0], deviceName: "" } : null;
 }
 
 /**

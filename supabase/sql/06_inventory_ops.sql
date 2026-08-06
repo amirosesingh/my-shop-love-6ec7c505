@@ -270,6 +270,29 @@ CREATE INDEX IF NOT EXISTS stock_transfers_from_idx ON public.stock_transfers US
 CREATE INDEX IF NOT EXISTS stock_transfers_to_idx ON public.stock_transfers USING btree (to_store_id);
 
 -- ---------- functions ----------
+-- ── Safe re-run guard ─────────────────────────────────────────────────────
+-- Postgres refuses CREATE OR REPLACE when a function's return type changed.
+-- Drop any stale overload of the routines defined below first. Each drop is
+-- attempted on its own, so a routine still referenced by a policy or trigger
+-- is simply left in place instead of aborting the whole file.
+DO $guard$
+DECLARE r record;
+BEGIN
+  FOR r IN
+    SELECT p.oid::regprocedure AS sig
+      FROM pg_proc p
+     WHERE p.pronamespace = 'public'::regnamespace
+       AND p.proname = ANY (ARRAY[
+      'stock_transfer_receive'
+       ])
+  LOOP
+    BEGIN
+      EXECUTE 'DROP FUNCTION IF EXISTS ' || r.sig;
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END;
+  END LOOP;
+END $guard$;
+
 CREATE OR REPLACE FUNCTION public.stock_transfer_receive(p_transfer_id uuid, p_received_by text DEFAULT NULL::text, p_deduct_source boolean DEFAULT false)
  RETURNS void
  LANGUAGE plpgsql

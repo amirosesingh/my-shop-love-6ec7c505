@@ -51,12 +51,16 @@ export const Route = createFileRoute("/reports/analytics")({
 });
 
 const PALETTE = [
-  "hsl(var(--primary))",
-  "hsl(var(--accent))",
-  "hsl(var(--success))",
-  "hsl(var(--warning))",
-  "hsl(var(--destructive))",
-  "hsl(var(--muted-foreground))",
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-6)",
+  "var(--chart-7)",
+  "var(--chart-8)",
+  "var(--chart-9)",
+  "var(--chart-10)",
+  "var(--chart-4)",
+  "var(--chart-5)",
 ];
 
 const monthKey = (iso: string) => iso.slice(0, 7);
@@ -179,7 +183,7 @@ function AnalyticsBoard() {
                 <Tooltip
                   formatter={(v: number) => (topBy === "revenue" ? money(v) : `${v} units`)}
                 />
-                <Bar dataKey={topBy} fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                <Bar dataKey={topBy} fill="var(--primary)" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </section>
@@ -236,7 +240,7 @@ function AnalyticsBoard() {
                 <XAxis dataKey="label" fontSize={11} />
                 <YAxis fontSize={11} />
                 <Tooltip formatter={(v: number) => money(v)} />
-                <Bar dataKey="value" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="value" fill="var(--primary)" radius={[4, 4, 0, 0]} />
               </BarChart>
             ) : (
               <LineChart data={series}>
@@ -247,7 +251,7 @@ function AnalyticsBoard() {
                 <Line
                   type="monotone"
                   dataKey="value"
-                  stroke="hsl(var(--primary))"
+                  stroke="var(--primary)"
                   strokeWidth={2}
                   dot={false}
                 />
@@ -278,7 +282,7 @@ function AnalyticsBoard() {
                 <XAxis dataKey="label" fontSize={11} />
                 <YAxis fontSize={11} />
                 <Tooltip formatter={(v: number) => money(v)} />
-                <Bar dataKey="value" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="value" fill="var(--accent)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </section>

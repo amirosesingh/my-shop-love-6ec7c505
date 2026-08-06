@@ -131,6 +131,29 @@ CREATE INDEX IF NOT EXISTS shifts_open_by_store_idx ON public.shifts USING btree
 CREATE INDEX IF NOT EXISTS shifts_open_by_store ON public.shifts USING btree (store_id) WHERE (closed_at IS NULL);
 
 -- ---------- functions ----------
+-- ── Safe re-run guard ─────────────────────────────────────────────────────
+-- Postgres refuses CREATE OR REPLACE when a function's return type changed.
+-- Drop any stale overload of the routines defined below first. Each drop is
+-- attempted on its own, so a routine still referenced by a policy or trigger
+-- is simply left in place instead of aborting the whole file.
+DO $guard$
+DECLARE r record;
+BEGIN
+  FOR r IN
+    SELECT p.oid::regprocedure AS sig
+      FROM pg_proc p
+     WHERE p.pronamespace = 'public'::regnamespace
+       AND p.proname = ANY (ARRAY[
+      'shifts_sync_status'
+       ])
+  LOOP
+    BEGIN
+      EXECUTE 'DROP FUNCTION IF EXISTS ' || r.sig;
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END;
+  END LOOP;
+END $guard$;
+
 CREATE OR REPLACE FUNCTION public.shifts_sync_status()
  RETURNS trigger
  LANGUAGE plpgsql

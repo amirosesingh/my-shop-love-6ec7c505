@@ -25,6 +25,7 @@ import { Label } from "@/components/ui/label";
 import { StatCard, downloadCsv, isoDay } from "@/components/pos/report-kit";
 import { money, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
+import { AnalyticsErrorPanel } from "@/components/pos/AnalyticsErrorPanel";
 import {
   fetchBoard,
   shopSlices,
@@ -55,13 +56,16 @@ export const Route = createFileRoute("/analytics")({
 });
 
 const PALETTE = [
-  "hsl(var(--primary))",
-  "hsl(var(--accent))",
-  "hsl(var(--success))",
-  "hsl(var(--warning))",
-  "hsl(var(--destructive))",
-  "hsl(var(--muted-foreground))",
-  "hsl(var(--chart-1, var(--primary)))",
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-6)",
+  "var(--chart-7)",
+  "var(--chart-8)",
+  "var(--chart-9)",
+  "var(--chart-10)",
+  "var(--chart-4)",
+  "var(--chart-5)",
 ];
 
 const shift = (days: number) => isoDay(new Date(Date.now() - days * 86_400_000));
@@ -263,10 +267,7 @@ function LiveBoard() {
         </div>
 
         {query.isError && (
-          <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">
-            <p className="font-medium">The board could not read your sales figures.</p>
-            <p className="mt-1 text-muted-foreground">{(query.error as Error).message}</p>
-          </div>
+          <AnalyticsErrorPanel error={query.error} onRetry={() => void query.refetch()} />
         )}
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
@@ -425,15 +426,15 @@ function LiveBoard() {
                       }
                     />
                     <Legend />
-                    <Bar yAxisId="left" dataKey="revenue" name="Revenue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                    <Bar yAxisId="left" dataKey="cost" name="Cost" fill="hsl(var(--muted-foreground))" radius={[4, 4, 0, 0]} />
-                    <Bar yAxisId="left" dataKey="profit" name="Profit" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} />
+                    <Bar yAxisId="left" dataKey="revenue" name="Revenue" fill="var(--primary)" radius={[4, 4, 0, 0]} />
+                    <Bar yAxisId="left" dataKey="cost" name="Cost" fill="var(--muted-foreground)" radius={[4, 4, 0, 0]} />
+                    <Bar yAxisId="left" dataKey="profit" name="Profit" fill="var(--success)" radius={[4, 4, 0, 0]} />
                     <Line
                       yAxisId="right"
                       type="monotone"
                       dataKey="marginPct"
                       name="Margin %"
-                      stroke="hsl(var(--warning))"
+                      stroke="var(--warning)"
                       strokeWidth={2}
                       dot={false}
                     />
@@ -450,11 +451,11 @@ function LiveBoard() {
                     <YAxis fontSize={11} />
                     <Tooltip formatter={(v: number) => money(v)} />
                     <Legend />
-                    <Bar dataKey="profit" stackId="m" name="Kept as profit" fill="hsl(var(--success))" />
-                    <Bar dataKey="itemDiscount" stackId="m" name="Item discounts" fill="hsl(var(--primary))" />
-                    <Bar dataKey="billDiscount" stackId="m" name="Bill discounts" fill="hsl(var(--accent))" />
-                    <Bar dataKey="coupon" stackId="m" name="Coupons" fill="hsl(var(--warning))" />
-                    <Bar dataKey="focValue" stackId="m" name="Free items" fill="hsl(var(--destructive))" />
+                    <Bar dataKey="profit" stackId="m" name="Kept as profit" fill="var(--success)" />
+                    <Bar dataKey="itemDiscount" stackId="m" name="Item discounts" fill="var(--primary)" />
+                    <Bar dataKey="billDiscount" stackId="m" name="Bill discounts" fill="var(--accent)" />
+                    <Bar dataKey="coupon" stackId="m" name="Coupons" fill="var(--warning)" />
+                    <Bar dataKey="focValue" stackId="m" name="Free items" fill="var(--destructive)" />
                   </BarChart>
                 </ResponsiveContainer>
               </section>
@@ -487,8 +488,8 @@ function LiveBoard() {
                   <YAxis fontSize={11} />
                   <Tooltip formatter={(v: number) => money(v)} />
                   <Legend />
-                  <Line type="monotone" dataKey="revenue" name="Revenue" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="profit" name="Profit" stroke="hsl(var(--success))" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="revenue" name="Revenue" stroke="var(--primary)" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="profit" name="Profit" stroke="var(--success)" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             </section>

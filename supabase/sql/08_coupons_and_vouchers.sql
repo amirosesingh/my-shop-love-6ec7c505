@@ -195,6 +195,37 @@ CREATE UNIQUE INDEX IF NOT EXISTS issued_vouchers_token_slug_key ON public.issue
 CREATE UNIQUE INDEX IF NOT EXISTS issued_vouchers_pkey ON public.issued_vouchers USING btree (id);
 
 -- ---------- functions ----------
+-- ── Safe re-run guard ─────────────────────────────────────────────────────
+-- Postgres refuses CREATE OR REPLACE when a function's return type changed.
+-- Drop any stale overload of the routines defined below first. Each drop is
+-- attempted on its own, so a routine still referenced by a policy or trigger
+-- is simply left in place instead of aborting the whole file.
+DO $guard$
+DECLARE r record;
+BEGIN
+  FOR r IN
+    SELECT p.oid::regprocedure AS sig
+      FROM pg_proc p
+     WHERE p.pronamespace = 'public'::regnamespace
+       AND p.proname = ANY (ARRAY[
+      'campaign_is_live',
+      'coupon_claim',
+      'coupon_events_readonly',
+      'coupon_issue_manual',
+      'coupon_log',
+      'voucher_by_token',
+      'voucher_redeem',
+      'voucher_set_status',
+      'voucher_token'
+       ])
+  LOOP
+    BEGIN
+      EXECUTE 'DROP FUNCTION IF EXISTS ' || r.sig;
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END;
+  END LOOP;
+END $guard$;
+
 CREATE OR REPLACE FUNCTION public.coupon_claim(_slug text, _phone text, _full_name text DEFAULT NULL::text, _email text DEFAULT NULL::text)
  RETURNS text
  LANGUAGE plpgsql
