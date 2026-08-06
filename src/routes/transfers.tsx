@@ -284,32 +284,36 @@ function Transfers() {
   return (
     <AppShell>
       <div className="space-y-6 p-6">
-        <header className="flex flex-wrap items-end justify-between gap-3">
-          <div>
+        <header className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3 sm:flex sm:flex-wrap sm:justify-between">
+          <div className="min-w-0">
             <h1 className="text-2xl font-semibold">Stock transfers</h1>
             <p className="text-sm text-muted-foreground">
               Move product between branches or request it from another store ·{" "}
               <span className="text-primary">{currentStore.name}</span>
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button
+          <div className="flex shrink-0 gap-2">
+            <ActionButton
+              layout="inline"
               variant="outline"
+              className="w-auto"
+              label="Request stock"
+              icon={<ArrowLeftRight className="size-4" />}
               onClick={() => {
                 setKind("request");
                 setOpen(true);
               }}
-            >
-              <ArrowLeftRight className="size-4" /> Request stock
-            </Button>
-            <Button
+            />
+            <ActionButton
+              layout="inline"
+              className="w-auto"
+              label="New transfer"
+              icon={<Send className="size-4" />}
               onClick={() => {
                 setKind("transfer");
                 setOpen(true);
               }}
-            >
-              <Send className="size-4" /> New transfer
-            </Button>
+            />
           </div>
         </header>
 
