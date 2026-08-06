@@ -41,21 +41,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { availableAt, cartTotals, money, stockAt, usePos } from "@/lib/pos-store";
 import { resolveByBarcode } from "@/lib/product-lookup";
 import { useAuth } from "@/lib/pos-auth";
@@ -79,48 +68,26 @@ import type { Campaign, VoucherView } from "@/lib/coupons";
 import type { Booking, CartLine, DiscountType, PaymentMethod, Sale } from "@/lib/pos-types";
 import type { Payment } from "@/lib/pos-types";
 import { TenderSplit, rememberBanks } from "@/components/pos/TenderSplit";
-import {
-  lineUnitDiscount,
-  paymentsLabel,
-  paymentsTotal,
-  PAYMENT_LABELS,
-  r2,
-  validateTenders,
-} from "@/lib/pos-types";
+import { lineUnitDiscount, paymentsLabel, paymentsTotal, PAYMENT_LABELS, r2, validateTenders } from "@/lib/pos-types";
 import { NO_SALE_REASON_MAX, NO_SALE_REASON_MIN, recordNoSale } from "@/lib/drawer-events";
 import { buildBookingMessage, buildSaleMessage, sendBillOnWhatsApp } from "@/lib/whatsapp";
 import { logger } from "@/lib/audit-log";
 import { DiscountPad } from "@/components/pos/DiscountPad";
-import {
-  ManagerOverrideDialog,
-  type OverrideRequest,
-} from "@/components/pos/ManagerOverrideDialog";
+import { ManagerOverrideDialog, type OverrideRequest } from "@/components/pos/ManagerOverrideDialog";
 import { usePosRules } from "@/lib/pos-rules.tsx";
 import { assertShiftClosable } from "@/lib/pos-rules.functions";
 import { getPosCallerAuth } from "@/lib/pos-caller-auth";
 import { evaluatePromotions, focLine } from "@/lib/pos-promotions";
 import { clearCartDraft, loadCartDraft, saveCartDraft } from "@/lib/cart-draft";
-import {
-  openCashDrawer,
-  printBookingSlip,
-  printJobTag,
-  printSaleReceipt,
-  saleReceiptPreview,
-} from "@/lib/pos-print";
-import {
-  openCustomerDisplay,
-  publishDisplay,
-  toDisplayLine,
-  type DisplaySnapshot,
-} from "@/lib/customer-display";
+import { openCashDrawer, printBookingSlip, printJobTag, printSaleReceipt, saleReceiptPreview } from "@/lib/pos-print";
+import { openCustomerDisplay, publishDisplay, toDisplayLine, type DisplaySnapshot } from "@/lib/customer-display";
 import { MemberHistoryDialog } from "@/components/pos/MemberHistoryDialog";
 
-const isoDaysFromNow = (days: number) =>
-  new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+const isoDaysFromNow = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
 
 export const Route = createFileRoute("/")({
   validateSearch: (search: Record<string, unknown>): { resume?: string } =>
-    typeof search['resume'] === "string" ? { resume: search['resume'] as string } : {},
+    typeof search["resume"] === "string" ? { resume: search["resume"] as string } : {},
   head: () => ({
     meta: [
       { title: "Register — Northwind POS" },
@@ -137,8 +104,7 @@ export const Route = createFileRoute("/")({
 });
 
 function Register() {
-  const { state, activeShift, recordSale, createBooking, openShift, closeShift, currentStore } =
-    usePos();
+  const { state, activeShift, recordSale, createBooking, openShift, closeShift, currentStore } = usePos();
   useUiScale();
   const { user, can } = useAuth();
   const { requirePermission } = useUserPermissions();
@@ -277,11 +243,7 @@ function Register() {
   const filtered = state.products.filter((p) => {
     if (!productVisibleAt(state.settings, p.id, state.currentStoreId)) return false;
     const q = query.trim().toLowerCase();
-    const match =
-      !q ||
-      p.name.toLowerCase().includes(q) ||
-      p.sku.toLowerCase().includes(q) ||
-      p.barcode.includes(q);
+    const match = !q || p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q) || p.barcode.includes(q);
     return match && (category === "All" || p.category === category);
   });
 
@@ -307,8 +269,7 @@ function Register() {
     setExchangeRef(draft.exchangeRef);
     setMemberId(draft.memberId);
     setCoupon((draft.coupon as typeof coupon) ?? null);
-    if (kept.length < draft.lines.length)
-      toast.info("Some items on the saved ticket are no longer in the catalogue");
+    if (kept.length < draft.lines.length) toast.info("Some items on the saved ticket are no longer in the catalogue");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftStore, state.products.length]);
 
@@ -352,12 +313,7 @@ function Register() {
   const manualBillDiscount = r2(
     cartDiscountType === "percent" ? (promoBase * (cartDiscount || 0)) / 100 : cartDiscount || 0,
   );
-  const totals = cartTotals(
-    lines,
-    r2(manualBillDiscount + promo.promoDiscount),
-    "amount",
-    taxSettings,
-  );
+  const totals = cartTotals(lines, r2(manualBillDiscount + promo.promoDiscount), "amount", taxSettings);
   const pointsEarned = member ? Math.max(0, Math.round(totals.total * promo.pointsRate)) : 0;
 
   // Keep the qualifying FOC freebie in sync with the open ticket.
@@ -414,10 +370,7 @@ function Register() {
     }
     setLines((ls) => {
       const found = ls.find((l) => l.productId === productId && !l.credit);
-      if (found)
-        return ls.map((l) =>
-          l.productId === productId && !l.credit ? { ...l, qty: l.qty + 1 } : l,
-        );
+      if (found) return ls.map((l) => (l.productId === productId && !l.credit ? { ...l, qty: l.qty + 1 } : l));
       return [
         ...ls,
         {
@@ -646,9 +599,7 @@ function Register() {
     else toast.error("WhatsApp send failed", { description: res.error });
   }
 
-  const serviceTypes = (state.settings.integrations.serviceTypes ?? []).filter(
-    (s2) => s2.active && s2.name.trim(),
-  );
+  const serviceTypes = (state.settings.integrations.serviceTypes ?? []).filter((s2) => s2.active && s2.name.trim());
   const useServices = !!state.settings.integrations.useServiceTypes;
   const pickedService = serviceTypes.find((s2) => s2.id === serviceId) ?? null;
   const stringingService = serviceTypes.find((s2) => s2.isStringingJob) ?? null;
@@ -685,8 +636,7 @@ function Register() {
     setBookOpen(true);
   }
   const serviceLabel = pickedService?.name ?? customService.trim();
-  const serviceCharge =
-    useServices || racketMode ? r2(Math.max(0, Number(serviceFee || 0))) : 0;
+  const serviceCharge = useServices || racketMode ? r2(Math.max(0, Number(serviceFee || 0))) : 0;
   const bookingTotal = r2(totals.total + serviceCharge);
 
   async function bookAndPayLater() {
@@ -702,11 +652,7 @@ function Register() {
     }
     if (!(await requirePermission("can_process_sale"))) return;
     const paidNow =
-      payTiming === "collection"
-        ? 0
-        : payTiming === "now"
-          ? bookingTotal
-          : r2(Math.max(0, Number(deposit || 0)));
+      payTiming === "collection" ? 0 : payTiming === "now" ? bookingTotal : r2(Math.max(0, Number(deposit || 0)));
     if (paidNow > bookingTotal) {
       toast.error("Deposit cannot exceed the booking total");
       return;
@@ -719,39 +665,39 @@ function Register() {
     try {
       setSaving(true);
       booking = await createBooking({
-      storeId: currentStore.id,
-      shiftId: activeShift.id,
-      lines,
-      subtotal: r2(totals.subtotal + serviceCharge),
-      discount: totals.discount,
-      tax: totals.tax,
-      total: bookingTotal,
-      serviceTypeId: pickedService?.id,
-      serviceName: serviceLabel || undefined,
-      serviceFee: serviceCharge || undefined,
-      paymentTiming: payTiming,
-      deposit: paidNow,
-      depositMethod,
-      dueDate,
-      memberId,
-      customerName: bookName.trim() || member?.name || "Walk-in",
-      customerPhone: bookPhone.trim() || member?.phone || "",
-      note: bookNote.trim(),
-      cashier: activeCashier,
-      job: racketMode
-        ? {
-            racketModel: racketModel.trim() || undefined,
-            stringType: stringType.trim() || undefined,
-            tensionMain: tensionMain ? Number(tensionMain) : undefined,
-            tensionCross: tensionCross ? Number(tensionCross) : undefined,
-            tensionUnit,
-            grommetNotes: grommetNotes.trim() || undefined,
-            jobNotes: jobNotes.trim() || undefined,
-            droppedOffAt: new Date().toISOString(),
-            promisedAt: promisedAt ? new Date(promisedAt).toISOString() : undefined,
-            notifyWhatsApp,
-          }
-        : undefined,
+        storeId: currentStore.id,
+        shiftId: activeShift.id,
+        lines,
+        subtotal: r2(totals.subtotal + serviceCharge),
+        discount: totals.discount,
+        tax: totals.tax,
+        total: bookingTotal,
+        serviceTypeId: pickedService?.id,
+        serviceName: serviceLabel || undefined,
+        serviceFee: serviceCharge || undefined,
+        paymentTiming: payTiming,
+        deposit: paidNow,
+        depositMethod,
+        dueDate,
+        memberId,
+        customerName: bookName.trim() || member?.name || "Walk-in",
+        customerPhone: bookPhone.trim() || member?.phone || "",
+        note: bookNote.trim(),
+        cashier: activeCashier,
+        job: racketMode
+          ? {
+              racketModel: racketModel.trim() || undefined,
+              stringType: stringType.trim() || undefined,
+              tensionMain: tensionMain ? Number(tensionMain) : undefined,
+              tensionCross: tensionCross ? Number(tensionCross) : undefined,
+              tensionUnit,
+              grommetNotes: grommetNotes.trim() || undefined,
+              jobNotes: jobNotes.trim() || undefined,
+              droppedOffAt: new Date().toISOString(),
+              promisedAt: promisedAt ? new Date(promisedAt).toISOString() : undefined,
+              notifyWhatsApp,
+            }
+          : undefined,
       });
     } catch (e) {
       toast.error("Booking was not saved", {
@@ -849,9 +795,7 @@ function Register() {
             method,
             amount: r2(Math.abs(totals.total)),
             ...(method === "card" && bankName.trim() ? { bankName: bankName.trim() } : {}),
-            ...(method === "bank_transfer" && transferRef.trim()
-              ? { ref: transferRef.trim() }
-              : {}),
+            ...(method === "bank_transfer" && transferRef.trim() ? { ref: transferRef.trim() } : {}),
           },
         ];
     // The headline method stays the largest tender so reports keep working.
@@ -862,39 +806,36 @@ function Register() {
       setSaving(true);
       sale = await recordSale({
         storeId: currentStore.id,
-      shiftId: activeShift.id,
-      lines,
-      subtotal: totals.subtotal,
-      discount: totals.discount,
-      tax: totals.tax,
-      total: totals.total,
-      paid,
-      change: r2(Math.max(0, paid - totals.total)),
-      method: splitting ? headline : method,
-      payments,
-      memberId,
-      pointsEarned,
-      cashier: activeCashier,
-      ...(method === "bank_transfer" ? { transferRef: transferRef.trim() } : {}),
-      ...(exchangeRef
-        ? { exchangeOfReceiptNo: exchangeRef, exchangeCredit: totals.credit }
-        : {}),
-      ...(coupon
-        ? {
-            couponCode: coupon.code,
-            couponPromoId: coupon.promoId,
-            couponScope: coupon.scope,
-            couponDiscount: coupon.discount,
-            couponName: coupon.name,
-            couponRemaining: coupon.remaining,
-          }
-        : {}),
+        shiftId: activeShift.id,
+        lines,
+        subtotal: totals.subtotal,
+        discount: totals.discount,
+        tax: totals.tax,
+        total: totals.total,
+        paid,
+        change: r2(Math.max(0, paid - totals.total)),
+        method: splitting ? headline : method,
+        payments,
+        memberId,
+        pointsEarned,
+        cashier: activeCashier,
+        ...(method === "bank_transfer" ? { transferRef: transferRef.trim() } : {}),
+        ...(exchangeRef ? { exchangeOfReceiptNo: exchangeRef, exchangeCredit: totals.credit } : {}),
+        ...(coupon
+          ? {
+              couponCode: coupon.code,
+              couponPromoId: coupon.promoId,
+              couponScope: coupon.scope,
+              couponDiscount: coupon.discount,
+              couponName: coupon.name,
+              couponRemaining: coupon.remaining,
+            }
+          : {}),
       });
     } catch (e) {
       toast.error("Payment was not saved", {
         description:
-          (e as { message?: string })?.message ??
-          "Nothing was stored, so the ticket is untouched — try again.",
+          (e as { message?: string })?.message ?? "Nothing was stored, so the ticket is untouched — try again.",
       });
       return;
     } finally {
@@ -920,9 +861,7 @@ function Register() {
         saleId: sale.receiptNo,
         storeId: sale.storeId,
         staff: activeCashier,
-      }).catch((e: unknown) =>
-        toast.error(e instanceof Error ? e.message : "Could not lock the voucher"),
-      );
+      }).catch((e: unknown) => toast.error(e instanceof Error ? e.message : "Could not lock the voucher"));
       setVoucherToken(null);
     }
     if (splitting || payments.some((p) => p.bankName)) {
@@ -965,9 +904,7 @@ function Register() {
     setBankName("");
     setPayOpen(false);
     toast.success(
-      exchangeRef
-        ? `Exchange ${sale.receiptNo} completed against ${exchangeRef}`
-        : `Sale ${sale.receiptNo} completed`,
+      exchangeRef ? `Exchange ${sale.receiptNo} completed against ${exchangeRef}` : `Sale ${sale.receiptNo} completed`,
     );
   }
 
@@ -1054,9 +991,7 @@ function Register() {
   async function applyCoupon() {
     const code = couponCode.trim();
     if (!code) return;
-    const rule = state.promotions.find(
-      (p) => p.active && p.name.toLowerCase() === code.toLowerCase() && p.value,
-    );
+    const rule = state.promotions.find((p) => p.active && p.name.toLowerCase() === code.toLowerCase() && p.value);
     if (!rule) {
       toast.error(`No active promotion matches “${code}”`);
       return;
@@ -1070,10 +1005,7 @@ function Register() {
     const at = new Date().toISOString();
     if (couponScope === "item") {
       const line = lines[targetIndex]!;
-      const unit =
-        rule.valueType === "percent"
-          ? r2((line.price * (rule.value ?? 0)) / 100)
-          : r2(rule.value ?? 0);
+      const unit = rule.valueType === "percent" ? r2((line.price * (rule.value ?? 0)) / 100) : r2(rule.value ?? 0);
       const value = r2(unit * line.qty);
       patchLine(targetIndex, {
         discount: rule.value ?? 0,
@@ -1105,10 +1037,7 @@ function Register() {
     } else {
       setCartDiscountType(rule.valueType ?? "amount");
       setCartDiscount(rule.value ?? 0);
-      const value =
-        rule.valueType === "percent"
-          ? r2((promoBase * (rule.value ?? 0)) / 100)
-          : r2(rule.value ?? 0);
+      const value = rule.valueType === "percent" ? r2((promoBase * (rule.value ?? 0)) / 100) : r2(rule.value ?? 0);
       setCoupon({
         code: rule.name,
         promoId: rule.id,
@@ -1186,21 +1115,14 @@ function Register() {
           productName: line.name,
           appliedAt: at,
           name: campaign.name,
-          remaining:
-            campaign.discountType === "FIXED_AMOUNT"
-              ? Math.max(0, r2(campaign.discountValue - value))
-              : 0,
+          remaining: campaign.discountType === "FIXED_AMOUNT" ? Math.max(0, r2(campaign.discountValue - value)) : 0,
         });
       } else {
         const base =
           campaign.scope === "CATEGORY"
             ? r2(
                 lines
-                  .filter(
-                    (l) =>
-                      state.products.find((p) => p.id === l.productId)?.category ===
-                      campaign.scopeValue,
-                  )
+                  .filter((l) => state.products.find((p) => p.id === l.productId)?.category === campaign.scopeValue)
                   .reduce((a, l) => a + l.price * l.qty, 0),
               )
             : promoBase;
@@ -1218,10 +1140,7 @@ function Register() {
           discount: value,
           appliedAt: at,
           name: campaign.name,
-          remaining:
-            campaign.discountType === "FIXED_AMOUNT"
-              ? Math.max(0, r2(campaign.discountValue - value))
-              : 0,
+          remaining: campaign.discountType === "FIXED_AMOUNT" ? Math.max(0, r2(campaign.discountValue - value)) : 0,
         });
       }
 
@@ -1256,11 +1175,7 @@ function Register() {
       campaign.scope === "CATEGORY"
         ? r2(
             lines
-              .filter(
-                (l) =>
-                  state.products.find((p) => p.id === l.productId)?.category ===
-                  campaign.scopeValue,
-              )
+              .filter((l) => state.products.find((p) => p.id === l.productId)?.category === campaign.scopeValue)
               .reduce((a, l) => a + l.price * l.qty, 0),
           )
         : promoBase;
@@ -1273,8 +1188,7 @@ function Register() {
     if (!coupon) return;
     if (coupon.scope === "item") {
       const i = lines.findIndex((l) => l.couponCode === coupon.code);
-      if (i >= 0)
-        patchLine(i, { discount: 0, couponCode: undefined, couponDiscount: undefined });
+      if (i >= 0) patchLine(i, { discount: 0, couponCode: undefined, couponDiscount: undefined });
     } else {
       setCartDiscount(0);
     }
@@ -1294,9 +1208,7 @@ function Register() {
   const splitShares = useMemo(() => {
     const cents = Math.round(balanceDue * 100);
     const base = Math.floor(cents / splitWays);
-    return Array.from({ length: splitWays }, (_, i) =>
-      (base + (i < cents - base * splitWays ? 1 : 0)) / 100,
-    );
+    return Array.from({ length: splitWays }, (_, i) => (base + (i < cents - base * splitWays ? 1 : 0)) / 100);
   }, [balanceDue, splitWays]);
 
   /** Provisional receipt rendered from the live ticket for the overlay. */
@@ -1320,9 +1232,7 @@ function Register() {
           pointsEarned,
           cashier: activeCashier,
           createdAt: new Date().toISOString(),
-          ...(exchangeRef
-            ? { exchangeOfReceiptNo: exchangeRef, exchangeCredit: totals.credit }
-            : {}),
+          ...(exchangeRef ? { exchangeOfReceiptNo: exchangeRef, exchangeCredit: totals.credit } : {}),
         }
       : lastSale;
     return source ? saleReceiptPreview(source, member, "sale") : "";
@@ -1347,9 +1257,7 @@ function Register() {
             shiftOpen={!!activeShift}
             onAdd={addLine}
             onDetail={setDetailId}
-            onOpenCustomerDisplay={
-              visible("register.customerDisplay") ? openCustomerDisplay : undefined
-            }
+            onOpenCustomerDisplay={visible("register.customerDisplay") ? openCustomerDisplay : undefined}
             onOpenShift={() => setOpenShiftOpen(true)}
             onRacketBooking={startRacketBooking}
             onCloseShift={
@@ -1423,12 +1331,7 @@ function Register() {
                   <Repeat className="size-4" /> Exchange
                 </Button>
               )}
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={!lines.length}
-                onClick={() => void clearCart("clear")}
-              >
+              <Button variant="ghost" size="sm" disabled={!lines.length} onClick={() => void clearCart("clear")}>
                 <Trash2 className="size-4" /> Clear
               </Button>
             </div>
@@ -1437,9 +1340,7 @@ function Register() {
           <div className="@container border-b border-border px-4 py-3">
             <div className="grid grid-cols-1 items-start gap-3 @[38rem]:grid-cols-2">
               <div className="min-w-0">
-                <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                  Scan barcode
-                </Label>
+                <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Scan barcode</Label>
                 <div className="mt-2">
                   <ScanBar onScan={scanCode} />
                 </div>
@@ -1500,10 +1401,7 @@ function Register() {
                     </div>
                     <div className="mt-2 space-y-1">
                       {memberMatches.map((m) => (
-                        <div
-                          key={m.id}
-                          className="flex items-center gap-2 rounded-md border border-border px-2 py-1.5"
-                        >
+                        <div key={m.id} className="flex items-center gap-2 rounded-md border border-border px-2 py-1.5">
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-xs font-medium">{m.name}</p>
                             <p className="numeric text-[11px] text-muted-foreground">
@@ -1550,9 +1448,7 @@ function Register() {
                         </div>
                       ))}
                       {memberQuery.trim() && !memberMatches.length && (
-                        <p className="py-1 text-[11px] text-muted-foreground">
-                          No member matches “{memberQuery}”.
-                        </p>
+                        <p className="py-1 text-[11px] text-muted-foreground">No member matches “{memberQuery}”.</p>
                       )}
                     </div>
                   </>
@@ -1577,32 +1473,18 @@ function Register() {
                             credit
                           </Badge>
                         )}
-                        {l.foc && (
-                          <Badge className="ml-2 bg-success/15 text-[10px] text-success">
-                            FREE PROMO
-                          </Badge>
-                        )}
+                        {l.foc && <Badge className="ml-2 bg-success/15 text-[10px] text-success">FREE PROMO</Badge>}
                       </div>
                       <p className="numeric text-[11px] text-muted-foreground">
                         {money(l.price)} · tax {(l.taxRate * 100).toFixed(0)}%
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
-                      <Button
-                        size="icon"
-                        variant="outline"
-                        className="size-8"
-                        onClick={() => void setQty(i, -1)}
-                      >
+                      <Button size="icon" variant="outline" className="size-8" onClick={() => void setQty(i, -1)}>
                         <Minus className="size-3" />
                       </Button>
                       <span className="numeric w-7 text-center text-sm">{l.qty}</span>
-                      <Button
-                        size="icon"
-                        variant="outline"
-                        className="size-8"
-                        onClick={() => void setQty(i, 1)}
-                      >
+                      <Button size="icon" variant="outline" className="size-8" onClick={() => void setQty(i, 1)}>
                         <Plus className="size-3" />
                       </Button>
                     </div>
@@ -1631,9 +1513,11 @@ function Register() {
                         size="sm"
                         onClick={() => setPadTarget(i)}
                         className="numeric h-10 min-h-10 w-28 shrink-0 justify-between text-[11px] sm:w-32"
-                        label={l.discount
-                          ? `${l.discount}${(l.discountType ?? "amount") === "percent" ? "%" : ""}`
-                          : "Add discount"}
+                        label={
+                          l.discount
+                            ? `${l.discount}${(l.discountType ?? "amount") === "percent" ? "%" : ""}`
+                            : "Add discount"
+                        }
                         icon={<Percent className="size-4" />}
                       />
                     </div>
@@ -1672,10 +1556,7 @@ function Register() {
               <div className="space-y-2">
                 <Row label="Subtotal" value={money(totals.subtotal)} />
                 {totals.credit > 0 && (
-                  <Row
-                    label={`Store credit #${exchangeRef ?? ""}`}
-                    value={`-${money(totals.credit)}`}
-                  />
+                  <Row label={`Store credit #${exchangeRef ?? ""}`} value={`-${money(totals.credit)}`} />
                 )}
                 {!discountAllowed && (
                   <button
@@ -1683,34 +1564,26 @@ function Register() {
                     className="flex w-full items-center justify-between text-muted-foreground"
                   >
                     <span>Bill discount</span>
-                    <span className="text-[11px] underline-offset-2 hover:underline">
-                      locked · supervisor override
-                    </span>
+                    <span className="text-[11px] underline-offset-2 hover:underline">locked · supervisor override</span>
                   </button>
                 )}
                 {/* Label and control sit in one row: the button is sized by its
                     own column so it can never slide out to the right edge. */}
-                <div
-                  className={`flex w-full items-center justify-between gap-3 ${discountAllowed ? "" : "hidden"}`}
-                >
-                  <span className="min-w-0 flex-1 truncate text-muted-foreground">
-                    Bill discount
-                  </span>
+                <div className={`flex items-center justify-between gap-3 ${discountAllowed ? "" : "hidden"}`}>
+                  <span className="min-w-0 flex-1 truncate text-muted-foreground">Bill discount</span>
                   <ActionButton
                     layout="inline"
                     variant="outline"
                     size="sm"
                     onClick={() => setPadTarget("bill")}
                     className="numeric h-10 min-h-10 w-32 shrink-0 justify-center gap-2 text-xs"
-                    label={cartDiscount
-                      ? `${cartDiscount}${cartDiscountType === "percent" ? "%" : ""}`
-                      : "Add discount"}
+                    label={
+                      cartDiscount ? `${cartDiscount}${cartDiscountType === "percent" ? "%" : ""}` : "Add discount"
+                    }
                     icon={<Percent className="size-4" />}
                   />
                 </div>
-                {promo.promoDiscount > 0 && (
-                  <Row label="Promotion discount" value={`-${money(promo.promoDiscount)}`} />
-                )}
+                {promo.promoDiscount > 0 && <Row label="Promotion discount" value={`-${money(promo.promoDiscount)}`} />}
                 <Row label="Discount applied" value={`-${money(totals.discount)}`} />
                 <Row
                   label={
@@ -1766,12 +1639,8 @@ function Register() {
                 )}
                 <Separator />
                 <div className="flex items-center justify-between">
-                  <span className="text-base font-semibold">
-                    {refundDue > 0 ? "Refund due" : "Balance due"}
-                  </span>
-                  <span
-                    className={`numeric text-2xl font-bold ${refundDue > 0 ? "text-accent" : "text-primary"}`}
-                  >
+                  <span className="text-base font-semibold">{refundDue > 0 ? "Refund due" : "Balance due"}</span>
+                  <span className={`numeric text-2xl font-bold ${refundDue > 0 ? "text-accent" : "text-primary"}`}>
                     {money(refundDue > 0 ? refundDue : balanceDue)}
                   </span>
                 </div>
@@ -1782,13 +1651,15 @@ function Register() {
                   disabledReason={tillLocked ? lockedReason : undefined}
                   onClick={() => openPayment()}
                   icon={<Banknote className="size-5" />}
-                  label={!activeShift
-                    ? "Shift closed — selling locked"
-                    : refundDue > 0
-                      ? canRefund
-                        ? `Refund ${money(refundDue)}`
-                        : "Refunds locked for this user"
-                      : `Charge ${money(balanceDue)}`}
+                  label={
+                    !activeShift
+                      ? "Shift closed — selling locked"
+                      : refundDue > 0
+                        ? canRefund
+                          ? `Refund ${money(refundDue)}`
+                          : "Refunds locked for this user"
+                        : `Charge ${money(balanceDue)}`
+                  }
                 />
                 <ActionButton
                   layout="inline"
@@ -1907,127 +1778,121 @@ function Register() {
           <div
             className={`${deckOpen ? "flex" : "hidden"} max-h-[45vh] min-h-0 flex-col gap-3 overflow-y-auto p-3 pt-0 lg:flex lg:max-h-none lg:pt-3`}
           >
-          {/* Card 1 · transaction actions */}
-          {visible("register.transactionActions") && (
-          <div className="rounded-lg border border-border bg-card p-3">
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Transaction actions
-            </p>
-            <div className="grid auto-rows-fr grid-cols-1 gap-2">
-              {/* Only offered while there is something to park. */}
-              {visible("register.holdOrder") && lines.length > 0 && (
-              <ActionButton
-                variant="outline"
-                layout="inline"
-                className="h-12 min-w-0"
-                label="Hold order"
-                icon={<PauseCircle className="size-4" />}
-                disabled={!lines.length || tillLocked}
-                disabledReason={tillLocked ? lockedReason : undefined}
-                onClick={() => holdOrder()}
-              />
-              )}
-              <ActionButton
-                variant="outline"
-                layout="inline"
-                className="h-12 min-w-0 text-destructive hover:text-destructive"
-                label="Void cart"
-                icon={<Trash2 className="size-4" />}
-                disabled={!lines.length || tillLocked}
-                disabledReason={tillLocked ? lockedReason : undefined}
-                onClick={() => void clearCart()}
-              />
-              {visible("register.coupon") && (
-              <ActionButton
-                variant="outline"
-                layout="inline"
-                className="h-12 min-w-0"
-                label="Apply coupon"
-                icon={<TicketPercent className="size-4" />}
-                disabled={tillLocked}
-                disabledReason={tillLocked ? lockedReason : undefined}
-                onClick={() => setCouponOpen(true)}
-              />
-              )}
-              {visible("register.splitBill") && (
-              <ActionButton
-                variant="outline"
-                layout="inline"
-                className="h-12 min-w-0"
-                label="Split bill"
-                icon={<Split className="size-4" />}
-                disabled={balanceDue <= 0 || tillLocked}
-                disabledReason={tillLocked ? lockedReason : undefined}
-                onClick={() => setSplitOpen(true)}
-              />
-              )}
-            </div>
-            {held.length > 0 && (
-              <div className="mt-2 space-y-1">
-                <div className="flex items-center justify-between">
-                  <p className="text-[11px] text-muted-foreground">Held orders</p>
-                  <Link
-                    to="/holds"
-                    className="flex items-center gap-1.5 text-[11px] font-medium text-primary hover:underline"
-                  >
-                    Held bills
-                    <span className="numeric inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
-                      {held.length}
-                    </span>
-                  </Link>
+            {/* Card 1 · transaction actions */}
+            {visible("register.transactionActions") && (
+              <div className="rounded-lg border border-border bg-card p-3">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Transaction actions
+                </p>
+                <div className="grid auto-rows-fr grid-cols-1 gap-2">
+                  {/* Only offered while there is something to park. */}
+                  {visible("register.holdOrder") && lines.length > 0 && (
+                    <ActionButton
+                      variant="outline"
+                      layout="inline"
+                      className="h-12 min-w-0"
+                      label="Hold order"
+                      icon={<PauseCircle className="size-4" />}
+                      disabled={!lines.length || tillLocked}
+                      disabledReason={tillLocked ? lockedReason : undefined}
+                      onClick={() => holdOrder()}
+                    />
+                  )}
+                  <ActionButton
+                    variant="outline"
+                    layout="inline"
+                    className="h-12 min-w-0 text-destructive hover:text-destructive"
+                    label="Void cart"
+                    icon={<Trash2 className="size-4" />}
+                    disabled={!lines.length || tillLocked}
+                    disabledReason={tillLocked ? lockedReason : undefined}
+                    onClick={() => void clearCart()}
+                  />
+                  {visible("register.coupon") && (
+                    <ActionButton
+                      variant="outline"
+                      layout="inline"
+                      className="h-12 min-w-0"
+                      label="Apply coupon"
+                      icon={<TicketPercent className="size-4" />}
+                      disabled={tillLocked}
+                      disabledReason={tillLocked ? lockedReason : undefined}
+                      onClick={() => setCouponOpen(true)}
+                    />
+                  )}
+                  {visible("register.splitBill") && (
+                    <ActionButton
+                      variant="outline"
+                      layout="inline"
+                      className="h-12 min-w-0"
+                      label="Split bill"
+                      icon={<Split className="size-4" />}
+                      disabled={balanceDue <= 0 || tillLocked}
+                      disabledReason={tillLocked ? lockedReason : undefined}
+                      onClick={() => setSplitOpen(true)}
+                    />
+                  )}
                 </div>
-                {held.map((h) => (
-                  <button
-                    key={h.id}
-                    onClick={() => resumeHeld(h.id)}
-                    className="flex w-full items-center justify-between rounded-md border border-border px-2 py-1.5 text-[11px] hover:border-primary/60"
-                  >
-                    <span className="truncate">
-                      {h.cancelledFrom ? "↩ " : ""}
-                      {h.label}
-                    </span>
-                    <span className="numeric font-semibold">{money(h.total)}</span>
-                  </button>
-                ))}
+                {held.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[11px] text-muted-foreground">Held orders</p>
+                      <Link
+                        to="/holds"
+                        className="flex items-center gap-1.5 text-[11px] font-medium text-primary hover:underline"
+                      >
+                        Held bills
+                        <span className="numeric inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
+                          {held.length}
+                        </span>
+                      </Link>
+                    </div>
+                    {held.map((h) => (
+                      <button
+                        key={h.id}
+                        onClick={() => resumeHeld(h.id)}
+                        className="flex w-full items-center justify-between rounded-md border border-border px-2 py-1.5 text-[11px] hover:border-primary/60"
+                      >
+                        <span className="truncate">
+                          {h.cancelledFrom ? "↩ " : ""}
+                          {h.label}
+                        </span>
+                        <span className="numeric font-semibold">{money(h.total)}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
-          </div>
-          )}
 
-          {/* Card 2 · device & printing */}
-          <div className="rounded-lg border border-border bg-card p-3">
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Device &amp; printing
-            </p>
-            <ActionButton
-              layout="inline"
-              variant="outline"
-              className="h-12 w-full sm:gap-3"
-              label="Open cash drawer"
-              icon={<Vault className="size-4" />}
-              disabled={tillLocked}
-              disabledReason={tillLocked ? lockedReason : undefined}
-              onClick={async () => {
-                if (!(await requirePermission("can_open_drawer"))) return;
-                setNoSaleNote("");
-                setNoSaleReason("");
-                setNoSaleOpen(true);
-              }}
-            />
-            <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
-              <Label htmlFor="live-receipt" className="text-xs leading-tight">
-                Live receipt preview
-                <span className="block text-[11px] font-normal text-muted-foreground">
-                  Opens as an overlay
-                </span>
-              </Label>
-              <Switch
-                id="live-receipt"
-                checked={receiptPreview}
-                onCheckedChange={setReceiptPreview}
+            {/* Card 2 · device & printing */}
+            <div className="rounded-lg border border-border bg-card p-3">
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Device &amp; printing
+              </p>
+              <ActionButton
+                layout="inline"
+                variant="outline"
+                className="h-12 w-full sm:gap-3"
+                label="Open cash drawer"
+                icon={<Vault className="size-4" />}
+                disabled={tillLocked}
+                disabledReason={tillLocked ? lockedReason : undefined}
+                onClick={async () => {
+                  if (!(await requirePermission("can_open_drawer"))) return;
+                  setNoSaleNote("");
+                  setNoSaleReason("");
+                  setNoSaleOpen(true);
+                }}
               />
+              <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
+                <Label htmlFor="live-receipt" className="text-xs leading-tight">
+                  Live receipt preview
+                  <span className="block text-[11px] font-normal text-muted-foreground">Opens as an overlay</span>
+                </Label>
+                <Switch id="live-receipt" checked={receiptPreview} onCheckedChange={setReceiptPreview} />
+              </div>
             </div>
-          </div>
           </div>
         </aside>
       </div>
@@ -2040,11 +1905,7 @@ function Register() {
           </SheetHeader>
           <div className="mt-4 h-[calc(100vh-8rem)] overflow-hidden rounded-md border border-border bg-white">
             {previewHtml ? (
-              <iframe
-                title="Receipt preview"
-                srcDoc={previewHtml}
-                className="h-full w-full"
-              />
+              <iframe title="Receipt preview" srcDoc={previewHtml} className="h-full w-full" />
             ) : (
               <p className="p-6 text-center text-sm text-muted-foreground">
                 Add items to the ticket to preview the printed receipt.
@@ -2109,8 +1970,8 @@ function Register() {
               </div>
             )}
             <p className="text-[11px] text-muted-foreground">
-              Codes match an active promotion by name. Every application, its scope and the item it
-              touched are written to the audit trail with a timestamp.
+              Codes match an active promotion by name. Every application, its scope and the item it touched are written
+              to the audit trail with a timestamp.
             </p>
           </div>
           <DialogFooter>
@@ -2136,19 +1997,11 @@ function Register() {
             <div className="space-y-1">
               <Label>Split between</Label>
               <div className="flex items-center gap-2">
-                <Button
-                  size="icon"
-                  variant="outline"
-                  onClick={() => setSplitWays((n) => Math.max(2, n - 1))}
-                >
+                <Button size="icon" variant="outline" onClick={() => setSplitWays((n) => Math.max(2, n - 1))}>
                   <Minus className="size-3" />
                 </Button>
                 <span className="numeric w-10 text-center text-lg font-semibold">{splitWays}</span>
-                <Button
-                  size="icon"
-                  variant="outline"
-                  onClick={() => setSplitWays((n) => Math.min(12, n + 1))}
-                >
+                <Button size="icon" variant="outline" onClick={() => setSplitWays((n) => Math.min(12, n + 1))}>
                   <Plus className="size-3" />
                 </Button>
                 <span className="text-sm text-muted-foreground">guests</span>
@@ -2215,8 +2068,7 @@ function Register() {
                       }`}
                     >
                       <span>
-                        {s.name}{" "}
-                        <span className="text-[11px] text-muted-foreground">({s.code})</span>
+                        {s.name} <span className="text-[11px] text-muted-foreground">({s.code})</span>
                       </span>
                       <span
                         className={`numeric font-semibold ${
@@ -2234,8 +2086,7 @@ function Register() {
                 })}
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Stock counts are shared company-wide. Financial metrics stay locked to{" "}
-                {currentStore.name}.
+                Stock counts are shared company-wide. Financial metrics stay locked to {currentStore.name}.
               </p>
             </div>
           )}
@@ -2247,15 +2098,12 @@ function Register() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {refundDue > 0
-                ? `Refund customer · ${money(refundDue)}`
-                : `Take payment · ${money(balanceDue)}`}
+              {refundDue > 0 ? `Refund customer · ${money(refundDue)}` : `Take payment · ${money(balanceDue)}`}
             </DialogTitle>
           </DialogHeader>
           {exchangeRef && (
             <p className="rounded-md border border-accent/40 bg-accent/10 px-3 py-2 text-xs">
-              Store credit of {money(totals.credit)} from bill #{exchangeRef} applied to this
-              ticket.
+              Store credit of {money(totals.credit)} from bill #{exchangeRef} applied to this ticket.
             </p>
           )}
           <div className="grid grid-cols-5 gap-2">
@@ -2291,19 +2139,10 @@ function Register() {
           {method === "cash" && refundDue === 0 && (
             <div className="space-y-2">
               <Label>Cash tendered</Label>
-              <Input
-                value={tendered}
-                onChange={(e) => setTendered(e.target.value)}
-                className="numeric h-12 text-xl"
-              />
+              <Input value={tendered} onChange={(e) => setTendered(e.target.value)} className="numeric h-12 text-xl" />
               <div className="flex gap-2">
                 {[balanceDue, 20, 50, 100].map((v, i) => (
-                  <Button
-                    key={i}
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setTendered(v.toFixed(2))}
-                  >
+                  <Button key={i} variant="outline" size="sm" onClick={() => setTendered(v.toFixed(2))}>
                     {money(v)}
                   </Button>
                 ))}
@@ -2342,14 +2181,12 @@ function Register() {
           {method === "bank_transfer" && (
             <div className="space-y-2 rounded-md border border-border p-3">
               <p className="text-xs text-muted-foreground">
-                The customer screen is now showing your bank details and WhatsApp QR code so the
-                shopper can transfer {money(balanceDue)}.
+                The customer screen is now showing your bank details and WhatsApp QR code so the shopper can transfer{" "}
+                {money(balanceDue)}.
               </p>
               <div className="numeric space-y-0.5 text-sm">
                 {state.settings.payment.bankName && <p>{state.settings.payment.bankName}</p>}
-                {state.settings.payment.accountName && (
-                  <p>{state.settings.payment.accountName}</p>
-                )}
+                {state.settings.payment.accountName && <p>{state.settings.payment.accountName}</p>}
                 {state.settings.payment.accountNumber && (
                   <p className="font-bold">{state.settings.payment.accountNumber}</p>
                 )}
@@ -2375,10 +2212,7 @@ function Register() {
             <Button
               onClick={completeSale}
               disabled={
-                saving ||
-                (refundDue === 0 &&
-                  tenders.length > 0 &&
-                  !!validateTenders(balanceDue, tenders).error)
+                saving || (refundDue === 0 && tenders.length > 0 && !!validateTenders(balanceDue, tenders).error)
               }
             >
               {saving ? "Saving…" : "Complete & print"}
@@ -2486,11 +2320,9 @@ function Register() {
           {billHit && (
             <div className="space-y-3">
               <p className="numeric text-xs text-muted-foreground">
-                {billHit.receiptNo} · {new Date(billHit.createdAt).toLocaleString()} ·{" "}
-                {money(billHit.total)} · {billHit.cashier}
-                {billHit.exchangedToReceiptNo
-                  ? ` · already exchanged to ${billHit.exchangedToReceiptNo}`
-                  : ""}
+                {billHit.receiptNo} · {new Date(billHit.createdAt).toLocaleString()} · {money(billHit.total)} ·{" "}
+                {billHit.cashier}
+                {billHit.exchangedToReceiptNo ? ` · already exchanged to ${billHit.exchangedToReceiptNo}` : ""}
               </p>
               <Separator />
               <div className="max-h-64 space-y-1 overflow-y-auto">
@@ -2506,9 +2338,7 @@ function Register() {
                         type="checkbox"
                         aria-label={`Exchange ${l.name}`}
                         checked={picked > 0}
-                        onChange={(e) =>
-                          setPicks((p) => ({ ...p, [idx]: e.target.checked ? l.qty : 0 }))
-                        }
+                        onChange={(e) => setPicks((p) => ({ ...p, [idx]: e.target.checked ? l.qty : 0 }))}
                         className="size-4 accent-[var(--primary)]"
                       />
                       <div className="min-w-0 flex-1">
@@ -2534,8 +2364,8 @@ function Register() {
                 })}
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Returned items are credited even when their stock at {currentStore.name} is 0 —
-                the stock is added back on completion.
+                Returned items are credited even when their stock at {currentStore.name} is 0 — the stock is added back
+                on completion.
               </p>
             </div>
           )}
@@ -2561,9 +2391,7 @@ function Register() {
       >
         <DialogContent className="flex max-h-[90vh] max-w-lg flex-col">
           <DialogHeader>
-            <DialogTitle>
-              {racketMode ? "Racket / stringing booking" : "Book & pay later"}
-            </DialogTitle>
+            <DialogTitle>{racketMode ? "Racket / stringing booking" : "Book & pay later"}</DialogTitle>
           </DialogHeader>
           <div className="-mr-2 flex-1 space-y-3 overflow-y-auto pr-2">
             <div className="rounded-md border border-border px-3 py-2 text-sm">
@@ -2579,11 +2407,7 @@ function Register() {
                       Math.max(
                         0,
                         bookingTotal -
-                          (payTiming === "collection"
-                            ? 0
-                            : payTiming === "now"
-                              ? bookingTotal
-                              : Number(deposit || 0)),
+                          (payTiming === "collection" ? 0 : payTiming === "now" ? bookingTotal : Number(deposit || 0)),
                       ),
                     ),
                   )}
@@ -2633,9 +2457,7 @@ function Register() {
                     value={serviceFee}
                     onChange={(e) => setServiceFee(e.target.value)}
                   />
-                  <p className="text-[11px] text-muted-foreground">
-                    Added on top of the items in the cart.
-                  </p>
+                  <p className="text-[11px] text-muted-foreground">Added on top of the items in the cart.</p>
                 </div>
               </div>
             )}
@@ -2659,9 +2481,7 @@ function Register() {
                     key={t}
                     onClick={() => setPayTiming(t)}
                     className={`flex-1 px-2 py-2 text-xs ${
-                      payTiming === t
-                        ? "bg-primary/15 text-primary"
-                        : "text-muted-foreground hover:text-foreground"
+                      payTiming === t ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
                     {BOOKING_TIMING_LABELS[t]}
@@ -2732,11 +2552,7 @@ function Register() {
               </div>
               <div className="space-y-1">
                 <Label>Phone</Label>
-                <Input
-                  value={bookPhone}
-                  onChange={(e) => setBookPhone(e.target.value)}
-                  className="numeric"
-                />
+                <Input value={bookPhone} onChange={(e) => setBookPhone(e.target.value)} className="numeric" />
               </div>
             </div>
             <div className="space-y-1">
@@ -2750,14 +2566,14 @@ function Register() {
 
             {/* Racket stringing job card — racket bookings only */}
             {racketMode && (
-            <div className="rounded-md border border-border">
-              <div className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium">
-                <span className="flex min-w-0 items-center gap-2">
-                  <Wrench className="size-4 shrink-0 text-primary" />
-                  <span className="truncate">Racket / stringing job card</span>
-                </span>
-              </div>
-              <div className="space-y-3 border-t border-border p-3">
+              <div className="rounded-md border border-border">
+                <div className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <Wrench className="size-4 shrink-0 text-primary" />
+                    <span className="truncate">Racket / stringing job card</span>
+                  </span>
+                </div>
+                <div className="space-y-3 border-t border-border p-3">
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <Label>Racket brand / model</Label>
@@ -2769,11 +2585,7 @@ function Register() {
                     </div>
                     <div className="space-y-1">
                       <Label>String type / brand</Label>
-                      <Input
-                        value={stringType}
-                        onChange={(e) => setStringType(e.target.value)}
-                        placeholder="BG65 Ti"
-                      />
+                      <Input value={stringType} onChange={(e) => setStringType(e.target.value)} placeholder="BG65 Ti" />
                     </div>
                   </div>
                   <div className="grid grid-cols-3 gap-3">
@@ -2852,8 +2664,8 @@ function Register() {
                   <p className="text-[11px] text-muted-foreground">
                     A job tag prints with the slip so it can be tied to the racket.
                   </p>
+                </div>
               </div>
-            </div>
             )}
           </div>
           <DialogFooter>
@@ -2880,11 +2692,7 @@ function Register() {
             </div>
             <div className="space-y-1">
               <Label>Opening float</Label>
-              <Input
-                value={float}
-                onChange={(e) => setFloat(e.target.value)}
-                className="numeric"
-              />
+              <Input value={float} onChange={(e) => setFloat(e.target.value)} className="numeric" />
             </div>
           </div>
           <DialogFooter>
@@ -2942,25 +2750,17 @@ function Register() {
                       <p className="text-[11px] text-muted-foreground">
                         {discountLabel(v.campaign)} · {scopeLabel(v.campaign)}
                         {v.voucher.expiresAt || v.campaign.expiresAt
-                          ? ` · until ${new Date(
-                              v.voucher.expiresAt ?? v.campaign.expiresAt!,
-                            ).toLocaleDateString()}`
+                          ? ` · until ${new Date(v.voucher.expiresAt ?? v.campaign.expiresAt!).toLocaleDateString()}`
                           : ""}
                       </p>
-                      {usable ? null : (
-                        <p className="text-[11px] text-destructive">{preview.reason}</p>
-                      )}
+                      {usable ? null : <p className="text-[11px] text-destructive">{preview.reason}</p>}
                     </div>
-                    <span className="numeric shrink-0 text-sm font-semibold">
-                      −{money(preview.value)}
-                    </span>
+                    <span className="numeric shrink-0 text-sm font-semibold">−{money(preview.value)}</span>
                   </button>
                 );
               })}
             {!memberVouchers.length ? (
-              <p className="py-4 text-center text-sm text-muted-foreground">
-                This member has no live vouchers.
-              </p>
+              <p className="py-4 text-center text-sm text-muted-foreground">This member has no live vouchers.</p>
             ) : null}
           </div>
           <DialogFooter>
@@ -2988,8 +2788,7 @@ function Register() {
           </DialogHeader>
           <div className="space-y-3">
             <p className="text-xs text-muted-foreground">
-              Opened by {activeShift?.cashier} · float{" "}
-              {money(activeShift?.openingFloat ?? 0)}
+              Opened by {activeShift?.cashier} · float {money(activeShift?.openingFloat ?? 0)}
             </p>
             <div className="space-y-1">
               <Label>Counted cash in drawer</Label>
@@ -3060,9 +2859,7 @@ function Register() {
         onOpenChange={(o) => !o && setPadTarget(null)}
         title={padTarget === "bill" ? "Bill discount" : "Line discount"}
         value={
-          padTarget === "bill" ? cartDiscount : typeof padTarget === "number"
-            ? (lines[padTarget]?.discount ?? 0)
-            : 0
+          padTarget === "bill" ? cartDiscount : typeof padTarget === "number" ? (lines[padTarget]?.discount ?? 0) : 0
         }
         type={
           padTarget === "bill"
@@ -3077,14 +2874,9 @@ function Register() {
             // Limits come from the database rule set; anything beyond them
             // needs a manager PIN verified on the server.
             const overLimit =
-              t === "percent"
-                ? v > rules.max_cashier_discount_percent
-                : v > rules.max_cart_discount_amount;
+              t === "percent" ? v > rules.max_cashier_discount_percent : v > rules.max_cart_discount_amount;
             const stacking =
-              !rules.allow_discount_stacking &&
-              !!coupon &&
-              v > 0 &&
-              (target === "bill" || typeof target === "number");
+              !rules.allow_discount_stacking && !!coupon && v > 0 && (target === "bill" || typeof target === "number");
 
             if (stacking) {
               toast.error("Discount stacking is off — remove the coupon first");
@@ -3093,8 +2885,7 @@ function Register() {
             if (overLimit) {
               const grant = await askManager({
                 action: "discount_over_limit",
-                ruleKey:
-                  t === "percent" ? "max_cashier_discount_percent" : "max_cart_discount_amount",
+                ruleKey: t === "percent" ? "max_cashier_discount_percent" : "max_cart_discount_amount",
                 title: "Discount above cashier limit",
                 reason:
                   t === "percent"
