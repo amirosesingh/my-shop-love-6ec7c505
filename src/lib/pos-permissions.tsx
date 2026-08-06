@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -21,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useAuth } from "@/lib/pos-auth";
+import { useAuth, useAuthOptional } from "@/lib/pos-auth";
 import {
   PERMISSION_LABELS,
   resolvePermission,
@@ -46,7 +47,65 @@ type Ctx = {
 
 const PermissionsContext = createContext<Ctx | null>(null);
 
+/**
+ * Degrades gracefully when the auth context is missing (duplicate module
+ * instances, a route mounted outside the root provider) instead of throwing
+ * and blanking the page.
+ */
 export function PermissionsProvider({ children }: { children: ReactNode }) {
+  const auth = useAuthOptional();
+  const [waited, setWaited] = useState(false);
+
+  useEffect(() => {
+    if (auth) return;
+    const t = setTimeout(() => setWaited(true), 1200);
+    return () => clearTimeout(t);
+  }, [auth]);
+
+  if (!auth) return waited ? <AuthContextMissing /> : <AuthContextLoading />;
+  return <PermissionsInner>{children}</PermissionsInner>;
+}
+
+function AuthContextLoading() {
+  return (
+    <div className="flex min-h-screen items-center justify-center gap-2 text-muted-foreground">
+      <Loader2 className="h-4 w-4 animate-spin" />
+      <span className="text-sm">Starting the till…</span>
+    </div>
+  );
+}
+
+function AuthContextMissing() {
+  const clearAndReload = () => {
+    try {
+      window.localStorage.clear();
+      window.sessionStorage.clear();
+    } catch {
+      /* storage unavailable */
+    }
+    window.location.reload();
+  };
+  return (
+    <div className="flex min-h-screen items-center justify-center p-6">
+      <div className="w-full max-w-md space-y-4 rounded-lg border border-border bg-card p-6 text-center">
+        <ShieldAlert className="mx-auto h-8 w-8 text-destructive" />
+        <h1 className="text-lg font-semibold">Session context unavailable</h1>
+        <p className="text-sm text-muted-foreground">
+          The till could not read your sign-in session on this page. Reloading usually fixes it. If
+          it keeps happening, clear the local cache and sign in again.
+        </p>
+        <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+          <Button onClick={() => window.location.reload()}>Reload</Button>
+          <Button variant="outline" onClick={clearAndReload}>
+            Clear local cache and reload
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PermissionsInner({ children }: { children: ReactNode }) {
   const { user, can, appUser } = useAuth();
   const [pending, setPending] = useState<PermissionFlag | null>(null);
   const [userId, setUserId] = useState("");

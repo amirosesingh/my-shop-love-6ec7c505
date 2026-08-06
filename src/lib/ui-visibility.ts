@@ -7,7 +7,7 @@
  */
 import { useCallback } from "react";
 import { usePos } from "./pos-store";
-import { useAuth } from "./pos-auth";
+import { useAuth } from "@/lib/pos-auth";
 import type { StaffRole } from "./permissions";
 
 export type VisibilityRole = Exclude<StaffRole, "admin">;

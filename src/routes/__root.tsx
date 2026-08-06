@@ -165,6 +165,8 @@ function RootComponent() {
       <ThemeProvider>
       <NativeBoot>
       <OfflineGate>
+      {/* Single mount point for auth: no route or component may mount its own
+          AuthProvider — a second provider creates a second session tree. */}
       <AuthProvider>
         <PermissionsProvider>
         <PosProvider>
