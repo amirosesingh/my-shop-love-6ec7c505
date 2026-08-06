@@ -101,6 +101,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS user_roles_user_id_role_key ON public.user_rol
 CREATE UNIQUE INDEX IF NOT EXISTS user_roles_pkey ON public.user_roles USING btree (id);
 
 -- ---------- functions ----------
+-- Table-returning routines: a replace cannot change the output columns, so
+-- drop any older copy first. Dropping a function never touches data.
+DROP FUNCTION IF EXISTS public.current_app_user();
+
 CREATE OR REPLACE FUNCTION public.current_app_user()
  RETURNS TABLE(id uuid, user_id text, full_name text, role app_role, store_id text, email text, permissions jsonb, is_active boolean)
  LANGUAGE sql
@@ -189,6 +193,8 @@ AS $function$
   )
 $function$;
 
+DROP FUNCTION IF EXISTS public.list_app_users();
+
 CREATE OR REPLACE FUNCTION public.list_app_users()
  RETURNS TABLE(id uuid, auth_user_id uuid, user_id text, full_name text, email text, role app_role, store_id text, is_active boolean, permissions jsonb, last_login_at timestamp with time zone, created_at timestamp with time zone)
  LANGUAGE sql
@@ -201,6 +207,8 @@ AS $function$
   WHERE public.is_app_supervisor()
   ORDER BY a.user_id
 $function$;
+
+DROP FUNCTION IF EXISTS public.list_cashiers();
 
 CREATE OR REPLACE FUNCTION public.list_cashiers()
  RETURNS TABLE(id uuid, username text, full_name text, store_id text, permissions jsonb, is_active boolean, last_login_at timestamp with time zone, created_at timestamp with time zone)
@@ -381,6 +389,10 @@ BEGIN
         pin_hash = excluded.pin_hash, updated_at = now();
 END $function$;
 
+-- Older databases may hold earlier versions with different output columns;
+-- CREATE OR REPLACE cannot change a return type, so drop first.
+DROP FUNCTION IF EXISTS public.verify_cashier_pin(text, text);
+
 CREATE OR REPLACE FUNCTION public.verify_cashier_pin(p_username text, p_pin text)
  RETURNS TABLE(id uuid, username text, full_name text, store_id text, permissions jsonb)
  LANGUAGE plpgsql
@@ -399,6 +411,8 @@ BEGIN
   store_id := v_row.store_id; permissions := coalesce(v_row.permissions, '{}'::jsonb);
   RETURN NEXT;
 END $function$;
+
+DROP FUNCTION IF EXISTS public.verify_terminal_pin(text, text);
 
 CREATE OR REPLACE FUNCTION public.verify_terminal_pin(p_user_id text, p_pin text)
  RETURNS TABLE(user_id text, full_name text, role app_role, store_id text, email text)

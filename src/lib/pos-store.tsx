@@ -44,7 +44,7 @@ import { branchPolicy } from "./branch-policy";
 import { setActiveBranchSyncPolicy } from "./sync-policy";
 import { setPosFormats, setPosTimeZone } from "./time-zone";
 import { receiveTransferInDb, saveTransfer, setTransferStatus } from "./stock-transfers";
-import { commitBooking, loadBookings, saveBookingQuietly } from "./bookings-db";
+import { commitBooking, deleteBookingRow, loadBookings, saveBookingQuietly } from "./bookings-db";
 
 const KEY = "pos-state-v2";
 
@@ -153,6 +153,7 @@ type Ctx = {
     method: PaymentMethod,
   ) => Promise<{ booking: Booking; sale: Sale } | null>;
   cancelBooking: (id: string, reason: string) => void;
+  deleteBooking: (id: string, reason: string) => Promise<void>;
   upsertProduct: (product: Product) => void;
   removeProduct: (id: string) => void;
   removeProducts: (ids: string[]) => void;
@@ -768,6 +769,23 @@ export function PosProvider({ children }: { children: ReactNode }) {
       reason,
       refundable: current.paid,
     });
+  }, []);
+
+  /** Remove a booking / job card altogether, with the reason on the record. */
+  const deleteBooking = useCallback(async (id: string, reason: string) => {
+    const current = stateRef.current.bookings.find((b) => b.id === id);
+    if (!current) return;
+    setState((s) => ({ ...s, bookings: s.bookings.filter((b) => b.id !== id) }));
+    logger.log("sale_event", "Booking deleted", "bookings", {
+      ref: current.ref,
+      reason,
+      status: current.status,
+      jobStatus: current.jobStatus ?? "received",
+      customer: current.customerName,
+      total: current.total,
+      paid: current.paid,
+    });
+    await deleteBookingRow(id).catch(() => undefined);
   }, []);
 
   /** Move a racket through received → strung → ready → collected. */
@@ -1430,6 +1448,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     addBookingPayment,
     collectBooking,
     cancelBooking,
+    deleteBooking,
     setBookingJobStatus,
     upsertProduct,
     removeProduct,

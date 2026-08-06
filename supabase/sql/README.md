@@ -26,6 +26,11 @@ files calls. Run `00` then `02` before anything else.
 | `11_audit_and_logs.sql` | Audit trail | `audit_logs`, `sku_audit` |
 | `12_analytics_views.sql` | Reporting views | `v_sale_line_facts`, `v_daily_store_sales`, `v_daily_item_sales` |
 
+> The **Live Business Board** (`/analytics`) reads only these three views. If it
+> reports that it cannot read your figures, run `12_analytics_views.sql` (and
+> `04_register_sales.sql` for the underlying grants) on your database, then sign
+> in again so the request carries a staff session.
+
 ## Security
 
 Each file enables row level security on its tables, recreates its policies and
