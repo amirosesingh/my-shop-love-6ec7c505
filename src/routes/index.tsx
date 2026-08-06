@@ -527,9 +527,7 @@ function Register() {
       setOpenShiftOpen(true);
       return;
     }
-    const hit = state.products.find(
-      (p) => p.barcode === code || p.sku.toLowerCase() === code.toLowerCase(),
-    );
+    const hit = resolveByBarcode(state.products, code);
     if (!hit) {
       toast.error(`No product matches “${code}”`);
       return;
@@ -546,9 +544,7 @@ function Register() {
       void applyVoucher(code);
       return;
     }
-    const hit = state.products.find(
-      (p) => p.barcode === code || p.sku.toLowerCase() === code.toLowerCase(),
-    );
+    const hit = resolveByBarcode(state.products, code);
     if (hit) setQuery("");
     scanCode(code);
   }
