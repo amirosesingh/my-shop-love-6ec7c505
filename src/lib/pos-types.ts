@@ -554,6 +554,7 @@ export type ReceiptSettings = {
   qr: ReceiptQrSettings;
 };
 
+
 /** Fields a single branch may override on top of the global receipt profile. */
 export type ReceiptOverride = Partial<
   Pick<
