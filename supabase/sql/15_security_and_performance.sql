@@ -267,6 +267,36 @@ BEGIN
   END IF;
 END $do$;
 
+-- ---------- least-privilege EXECUTE on SECURITY DEFINER routines ----------
+-- Strip inherited rights, then grant back explicitly. Only the storefront /
+-- pre-auth entry points stay reachable by anonymous callers.
+DO $grants$
+DECLARE r record;
+BEGIN
+  FOR r IN
+    SELECT p.oid::regprocedure AS sig
+    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public' AND p.prosecdef
+  LOOP
+    EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC, anon, authenticated', r.sig);
+  END LOOP;
+
+  FOR r IN
+    SELECT p.oid::regprocedure AS sig, p.proname
+    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public' AND p.prosecdef
+  LOOP
+    IF r.proname IN ('coupon_claim', 'member_welcome_claim', 'voucher_by_token',
+                     'verify_cashier_pin', 'verify_terminal_pin',
+                     'terminal_token_heartbeat') THEN
+      EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO anon, authenticated', r.sig);
+    ELSIF r.proname NOT IN ('coupon_log', 'has_role', 'is_staff', 'member_join',
+                            'sync_auth_user_to_public') THEN
+      EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO authenticated', r.sig);
+    END IF;
+  END LOOP;
+END $grants$;
+
 -- ---------- verification ----------
 SELECT 'branch isolation' AS check, count(*) AS policies
   FROM pg_policies WHERE schemaname = 'public' AND qual LIKE '%store_visible%';
