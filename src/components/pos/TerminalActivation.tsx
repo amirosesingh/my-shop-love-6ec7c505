@@ -2,7 +2,7 @@
  * Full-screen activation gate for the Windows till, plus the lock screen the
  * kill-switch drops in when management revokes the machine.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Camera, KeyRound, Loader2, ScanLine, ShieldAlert, ShieldCheck, Smartphone } from "lucide-react";
 import qrcode from "qrcode-generator";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import {
   type TerminalConfig,
 } from "@/lib/terminal-tokens";
 import { clearRevocation } from "@/lib/use-revocation-check";
+import { CameraScanner } from "@/components/pos/CameraScanner";
 import { useBranding } from "@/lib/branding";
 
 const qrDataUrl = (value: string) => {
@@ -50,7 +51,6 @@ export function TerminalActivation({ onActivated }: { onActivated: (c: TerminalC
     () => (pairing ? qrDataUrl(encodePairingRequest(pairing)) : ""),
     [pairing],
   );
-  const scannerRef = useRef<{ stop: () => Promise<void>; clear: () => void } | null>(null);
 
   const submit = useCallback(
     async (value: string) => {
@@ -72,43 +72,6 @@ export function TerminalActivation({ onActivated }: { onActivated: (c: TerminalC
     },
     [onActivated],
   );
-
-  // Camera scanning is optional — the paste box always works.
-  useEffect(() => {
-    if (!scanning) return;
-    let stopped = false;
-    void (async () => {
-      try {
-        const { Html5Qrcode } = await import("html5-qrcode");
-        const scanner = new Html5Qrcode("terminal-qr-reader");
-        scannerRef.current = scanner as unknown as { stop: () => Promise<void>; clear: () => void };
-        await scanner.start(
-          { facingMode: "environment" },
-          { fps: 10, qrbox: 250 },
-          (text) => {
-            if (stopped) return;
-            stopped = true;
-            void scanner
-              .stop()
-              .catch(() => {})
-              .then(() => {
-                setScanning(false);
-                void submit(text);
-              });
-          },
-          () => {},
-        );
-      } catch {
-        setScanning(false);
-        setError("No camera available — paste the activation code instead.");
-      }
-    })();
-    return () => {
-      stopped = true;
-      void scannerRef.current?.stop().catch(() => {});
-      scannerRef.current = null;
-    };
-  }, [scanning, submit]);
 
   // While the operator waits, keep asking whether an administrator approved
   // the pairing request from their phone. Approval activates the till itself.
@@ -185,11 +148,17 @@ export function TerminalActivation({ onActivated }: { onActivated: (c: TerminalC
       </div>
 
       {scanning ? (
-        <div className="mt-4 overflow-hidden rounded-xl border border-slate-700">
-          <div id="terminal-qr-reader" className="w-full" />
+        <div className="mt-4 space-y-2">
+          <CameraScanner
+            onScan={(text) => {
+              setScanning(false);
+              void submit(text);
+            }}
+            onClose={() => setScanning(false)}
+          />
           <Button
             variant="ghost"
-            className="w-full rounded-none text-slate-300"
+            className="w-full text-slate-300"
             onClick={() => setScanning(false)}
           >
             Cancel scanning
