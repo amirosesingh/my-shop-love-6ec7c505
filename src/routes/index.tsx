@@ -35,6 +35,7 @@ import { AppShell } from "@/components/pos/AppShell";
 import { ActionButton } from "@/components/pos/ActionButton";
 import { CatalogPanel } from "@/components/pos/CatalogPanel";
 import { ScanBar } from "@/components/pos/ScanBar";
+import { ZoomCanvas } from "@/components/pos/ZoomCanvas";
 import { setTicketDirty } from "@/lib/desktop-window";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1241,6 +1242,7 @@ function Register() {
 
   return (
     <AppShell>
+      <ZoomCanvas>
       <div className="pos-scaled flex h-full min-h-0 min-w-0 flex-col overflow-hidden lg:flex-row">
         {/* ── LEFT: product catalog (hidden on narrow windows) ─────────── */}
         <section className="hidden min-h-0 w-full shrink-0 flex-col gap-3 border-b border-border p-4 lg:flex lg:w-[clamp(340px,32vw,520px)] lg:min-w-[340px] lg:border-b-0 lg:border-r">
@@ -1896,6 +1898,7 @@ function Register() {
           </div>
         </aside>
       </div>
+      </ZoomCanvas>
 
       {/* Live receipt preview overlay */}
       <Sheet open={receiptPreview} onOpenChange={setReceiptPreview}>
