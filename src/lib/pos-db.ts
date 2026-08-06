@@ -978,4 +978,152 @@ export const db = {
     commitOps("Saving member", [
       { kind: "upsert", table: "members", rows: [memberToRow(m, tierId)] },
     ]),
+
+  /* ------------------------- held tickets ------------------------- */
+
+  /** Park a ticket in the database so it survives a reload or a swapped till. */
+  commitHeldOrder: (row: {
+    id: string;
+    label: string;
+    storeId: string | null;
+    heldBy: string | null;
+    total: number;
+    lines: unknown;
+    cartDiscount?: number;
+    cartDiscountType?: string;
+    exchangeRef?: string | null;
+    memberId?: string | null;
+    memberName?: string | null;
+    coupon?: unknown;
+    note?: string;
+    cancelledFrom?: string | null;
+    heldAt: string;
+  }) =>
+    commitOps("Holding ticket", [
+      {
+        kind: "upsert",
+        table: "held_orders",
+        rows: [
+          {
+            id: row.id,
+            label: row.label,
+            store_id: row.storeId,
+            held_by: row.heldBy,
+            total: row.total,
+            lines: row.lines,
+            cart_discount: row.cartDiscount ?? 0,
+            cart_discount_type: row.cartDiscountType ?? "amount",
+            exchange_ref: row.exchangeRef ?? null,
+            member_id: row.memberId ?? null,
+            member_name: row.memberName ?? null,
+            coupon: row.coupon ?? null,
+            note: row.note ?? "",
+            cancelled_from: row.cancelledFrom ?? null,
+            held_at: row.heldAt,
+          },
+        ],
+      },
+    ]),
+
+  /** Remove a parked ticket once it has been resumed or discarded. */
+  removeHeldOrder: (id: string) =>
+    queue("Releasing held ticket", { kind: "delete", table: "held_orders", match: { id } }),
+
+  /** Every ticket still parked, newest first. */
+  async listHeldOrders() {
+    const { data, error } = await supabase
+      .from("held_orders")
+      .select("*")
+      .order("held_at", { ascending: false });
+    if (error) throw error;
+    return data ?? [];
+  },
+
+  /* ----------------------- stock adjustments ---------------------- */
+
+  /** Record a stock correction with its reason and cost impact. */
+  recordStockAdjustment: (row: {
+    id?: string;
+    productId: string | null;
+    productName: string | null;
+    sku: string | null;
+    storeId: string | null;
+    terminalId?: string | null;
+    reason: string;
+    note?: string;
+    previousStock: number;
+    updatedStock: number;
+    delta: number;
+    costImpact?: number;
+    staffId?: string | null;
+    staffName?: string | null;
+    role?: string | null;
+    at?: string;
+  }) =>
+    queue("Recording stock adjustment", {
+      kind: "insert",
+      table: "stock_adjustments",
+      rows: [
+        {
+          id: row.id ?? crypto.randomUUID(),
+          product_id: row.productId,
+          product_name: row.productName,
+          sku: row.sku,
+          store_id: row.storeId,
+          terminal_id: row.terminalId ?? null,
+          reason: row.reason,
+          note: row.note ?? "",
+          previous_stock: Math.round(row.previousStock),
+          updated_stock: Math.round(row.updatedStock),
+          delta: Math.round(row.delta),
+          cost_impact: row.costImpact ?? 0,
+          staff_id: row.staffId ?? null,
+          staff_name: row.staffName ?? null,
+          role: row.role ?? null,
+          created_at: row.at ?? new Date().toISOString(),
+        },
+      ],
+    }),
+
+  /* ------------------------ whatsapp outbox ----------------------- */
+
+  /** Park a WhatsApp bill so it is not lost when the branch is offline. */
+  queueWhatsAppMessage: (row: {
+    id: string;
+    phoneNumberId: string;
+    to: string;
+    body: string;
+    reference: string | null;
+    storeId?: string | null;
+    queuedAt: string;
+  }) =>
+    queue("Queuing WhatsApp bill", {
+      kind: "upsert",
+      table: "whatsapp_queue",
+      rows: [
+        {
+          id: row.id,
+          phone_number_id: row.phoneNumberId,
+          recipient: row.to,
+          body: row.body,
+          reference: row.reference,
+          store_id: row.storeId ?? null,
+          status: "QUEUED",
+          queued_at: row.queuedAt,
+        },
+      ],
+    }),
+
+  /** Mark a queued WhatsApp bill as sent (or failed). */
+  settleWhatsAppMessage: (id: string, ok: boolean, error?: string) =>
+    queue("Updating WhatsApp bill", {
+      kind: "update",
+      table: "whatsapp_queue",
+      values: {
+        status: ok ? "SENT" : "FAILED",
+        error: error ?? null,
+        sent_at: ok ? new Date().toISOString() : null,
+      },
+      match: { id },
+    }),
 };

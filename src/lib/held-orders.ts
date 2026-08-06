@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 
 import type { CartLine } from "./pos-types";
+import { db } from "./pos-db";
 
 export type HeldOrder = {
   id: string;
@@ -62,10 +63,37 @@ export function setHeldOrders(update: (current: HeldOrder[]) => HeldOrder[]) {
 
 export function addHeldOrder(order: HeldOrder) {
   setHeldOrders((hs) => [...hs, order]);
+  void persistHeldOrder(order);
 }
 
 export function removeHeldOrder(id: string) {
   setHeldOrders((hs) => hs.filter((h) => h.id !== id));
+  db.removeHeldOrder(id);
+}
+
+/**
+ * Store the parked ticket in the database (cloud, local SQL Server or the
+ * on-disk outbox) and only resolve once it is safe somewhere, so the till can
+ * wait before clearing the cart.
+ */
+export function persistHeldOrder(order: HeldOrder) {
+  return db.commitHeldOrder({
+    id: order.id,
+    label: order.label,
+    storeId: order.storeId ?? null,
+    heldBy: order.heldBy ?? null,
+    total: order.total,
+    lines: order.lines,
+    cartDiscount: order.cartDiscount ?? 0,
+    cartDiscountType: order.cartDiscountType ?? "amount",
+    exchangeRef: order.exchangeRef ?? null,
+    memberId: order.memberId ?? null,
+    memberName: order.memberName ?? null,
+    coupon: order.coupon ?? null,
+    note: order.note ?? "",
+    cancelledFrom: order.cancelledFrom ?? null,
+    heldAt: order.heldAt,
+  });
 }
 
 export function updateHeldOrder(id: string, patch: Partial<HeldOrder>) {

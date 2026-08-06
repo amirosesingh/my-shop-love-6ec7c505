@@ -1044,6 +1044,18 @@ export function PosProvider({ children }: { children: ReactNode }) {
       updatedStock: before ? stockAt(before, target) + delta : null,
     });
     if (before) void db.upsertProduct(bump(before, target, delta));
+    if (before)
+      db.recordStockAdjustment({
+        productId: before.id,
+        productName: before.name,
+        sku: before.sku ?? null,
+        storeId: target,
+        reason: "manual",
+        previousStock: stockAt(before, target),
+        updatedStock: stockAt(before, target) + delta,
+        delta,
+        costImpact: r2(delta * (before.cost ?? 0)),
+      });
     setState((s) => ({
       ...s,
       products: s.products.map((p) =>
@@ -1087,6 +1099,18 @@ export function PosProvider({ children }: { children: ReactNode }) {
           productId: c.product.id,
           name: c.product.name,
           sku: c.product.sku,
+          storeId: target,
+          reason,
+          note,
+          previousStock: c.before,
+          updatedStock: c.counted,
+          delta: c.delta,
+          costImpact: r2(c.delta * (c.product.cost ?? 0)),
+        });
+        db.recordStockAdjustment({
+          productId: c.product.id,
+          productName: c.product.name,
+          sku: c.product.sku ?? null,
           storeId: target,
           reason,
           note,

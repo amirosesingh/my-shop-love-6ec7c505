@@ -20,6 +20,8 @@ export type AuditCategory =
   | "settings"
   | "security"
   | "report"
+  | "print"
+  | "browse"
   | "other";
 
 export const AUDIT_CATEGORIES: { value: AuditCategory; label: string }[] = [
@@ -34,6 +36,8 @@ export const AUDIT_CATEGORIES: { value: AuditCategory; label: string }[] = [
   { value: "settings", label: "Settings" },
   { value: "security", label: "Security & access" },
   { value: "report", label: "Reports & exports" },
+  { value: "print", label: "Receipts & printing" },
+  { value: "browse", label: "Browsing & screens" },
   { value: "other", label: "Other activity" },
 ];
 
@@ -43,12 +47,12 @@ export const AUDIT_CATEGORY_LABELS: Record<string, string> = Object.fromEntries(
 
 /** Legacy category names still stored in older local logs. */
 const LEGACY: Record<string, AuditCategory> = {
-  ui_click: "other",
-  modal: "other",
-  search: "other",
-  navigation: "other",
-  interaction: "other",
-  lookup: "other",
+  ui_click: "browse",
+  modal: "browse",
+  search: "browse",
+  navigation: "browse",
+  interaction: "browse",
+  lookup: "browse",
   sync: "other",
   messaging: "member",
   booking: "sale",
@@ -60,13 +64,57 @@ const LEGACY: Record<string, AuditCategory> = {
   sale_event: "sale",
   inventory_edit: "inventory",
   member_event: "member",
+  settings_change: "settings",
+  transfer: "inventory",
+  coupon: "discount",
+  voucher: "discount",
 };
 
 /**
- * Resolves the action type from the action itself, so the trail reads as
- * "what happened" rather than "which control was pressed".
+ * Screen the action happened on. Used as the final fallback so an entry made
+ * on the inventory screen is filed under Inventory even when the wording is
+ * ambiguous.
  */
-export function resolveCategory(raw: string, action: string): AuditCategory {
+const MODULE_CATEGORY: Record<string, AuditCategory> = {
+  register: "sale",
+  sales: "sale",
+  receipts: "sale",
+  bookings: "sale",
+  holds: "sale",
+  inventory: "inventory",
+  purchasing: "inventory",
+  transfers: "inventory",
+  suppliers: "inventory",
+  members: "member",
+  customers: "member",
+  messaging: "member",
+  promotions: "discount",
+  coupons: "discount",
+  shifts: "shift",
+  staff: "security",
+  terminals: "settings",
+  settings: "settings",
+  reports: "report",
+  audit: "report",
+  dashboard: "browse",
+};
+
+/**
+ * Resolves the activity group.
+ *
+ * The group the screen passed in wins — pressing Pay on the till files under
+ * Sales, an edit on the stock screen files under Inventory. Only when the
+ * caller passes nothing meaningful do we read the wording of the action, and
+ * finally the screen it happened on.
+ */
+export function resolveCategory(raw: string, action: string, module = ""): AuditCategory {
+  // 1. an explicit, known group always wins
+  if (AUDIT_CATEGORY_LABELS[raw] && raw !== "other") return raw as AuditCategory;
+  const legacy = LEGACY[raw];
+  if (legacy === "browse") return "browse";
+  if (legacy && legacy !== "other") return legacy;
+
+  // 2. read the wording of the action
   const a = action.toLowerCase();
   if (/refund|exchange|void|return/.test(a)) return "refund";
   if (/drawer|no.?sale|cash count|float/.test(a)) return "drawer";
@@ -76,13 +124,19 @@ export function resolveCategory(raw: string, action: string): AuditCategory {
     return "security";
   if (/receiving|purchase order|supplier|barcode scanned/.test(a)) return "inventory";
   if (/coupon|voucher|promotion|discount|tier/.test(a)) return "discount";
-  if (/payment|transfer|tender|paid|card/.test(a)) return "payment";
+  if (/stock transfer/.test(a)) return "inventory";
+  if (/payment|tender|paid|card/.test(a)) return "payment";
+  if (/print/.test(a)) return "print";
   if (/export|report/.test(a)) return "report";
   if (/bill|sale|booking|pay later|deposit|collect|receipt printed/.test(a)) return "sale";
   if (/stock|product|inventory|price/.test(a)) return "inventory";
   if (/member|points|loyalty/.test(a)) return "member";
   if (/setting/.test(a)) return "settings";
-  if (LEGACY[raw]) return LEGACY[raw]!;
+
+  // 3. fall back to the screen, then the legacy name
+  const byModule = MODULE_CATEGORY[module.toLowerCase()];
+  if (byModule) return byModule;
+  if (legacy) return legacy;
   return AUDIT_CATEGORY_LABELS[raw] ? (raw as AuditCategory) : "other";
 }
 
@@ -184,7 +238,7 @@ export const logger = {
     const entry: AuditLog = {
       id: crypto.randomUUID(),
       at: s.deviceTime,
-      category: resolveCategory(category, actionName),
+      category: resolveCategory(category, actionName, module),
       action: actionName,
       module,
       staffId: actor.staffId,
