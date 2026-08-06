@@ -49,7 +49,11 @@ export async function verifyPosStaff(accessToken: string): Promise<{
     | null;
   const role = row?.role;
   if (!role) throw new Error("No staff record for this account");
-  if (row?.is_active === false) throw new Error("This staff account is inactive");
+  // Fail closed: only an explicitly activated staff record counts. Self-service
+  // signups land as inactive and must be approved by an admin first.
+  if (row?.is_active !== true) {
+    throw new Error("This account is awaiting administrator approval");
+  }
 
   return { userId: user.id, role, isAdmin: role === "admin" || role === "manager" };
 }
