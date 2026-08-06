@@ -98,10 +98,7 @@ export const sumLines = (rows: SoldLine[]) => {
 export const savingsOf = (sales: Sale[], rows: SoldLine[]) => {
   const lineDiscount = r2(rows.filter((r) => !r.foc).reduce((a, r) => a + r.discount, 0));
   const focValue = r2(rows.filter((r) => r.foc).reduce((a, r) => a + r.price * r.qty, 0));
-  const coupon = r2(
-    sales.reduce((a, s) => a + (s.couponDiscount ?? 0), 0) +
-      rows.reduce((a, r) => a + 0, 0),
-  );
+  const coupon = r2(sales.reduce((a, s) => a + (s.couponDiscount ?? 0), 0));
   const billDiscount = r2(
     Math.max(sales.reduce((a, s) => a + s.discount, 0) - lineDiscount - coupon, 0),
   );
