@@ -263,9 +263,10 @@ function LiveBoard() {
         </div>
 
         {query.isError && (
-          <p className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">
-            Could not load the board: {(query.error as Error).message}
-          </p>
+          <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">
+            <p className="font-medium">The board could not read your sales figures.</p>
+            <p className="mt-1 text-muted-foreground">{(query.error as Error).message}</p>
+          </div>
         )}
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
