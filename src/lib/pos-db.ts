@@ -346,6 +346,18 @@ const shiftSessionToRow = (s: ShiftSession): Row => ({
   updated_at: new Date().toISOString(),
 });
 
+/**
+ * Exactly the bill and line columns the till renders — no `SELECT *`, so a
+ * schema that grows new columns never inflates the payload of every read.
+ */
+const SALE_COLUMNS =
+  "id, bill_number, store_id, shift_id, cashier_name, member_id, subtotal_amount, " +
+  "discount_amount, tax_amount, total_amount, paid_amount, change_amount, payment_type, " +
+  "payments, points_earned, is_refunded, original_bill_number, exchanged_to_bill_number, " +
+  "exchange_credit, coupon_code, coupon_promo_id, coupon_scope, coupon_discount, created_at, " +
+  "sale_items(product_id, product_name, unit_price, quantity, tax_rate, discount_percent, " +
+  "discount_amount, is_return, is_foc, promo_id, coupon_code, coupon_discount, unit_cost)";
+
 const rowToSale = (r: Row): Sale => ({
   id: r.id,
   receiptNo: r.bill_number,
