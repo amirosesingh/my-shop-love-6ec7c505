@@ -126,6 +126,13 @@ export const saveBookingQuietly = (b: Booking) => {
   void saveBooking(b).catch(() => undefined);
 };
 
+/** Remove a booking (and its payment history) for good. */
+export async function deleteBookingRow(id: string) {
+  await sb.from("booking_payments").delete().eq("booking_id", id);
+  const res = await sb.from("bookings").delete().eq("id", id);
+  if (res.error) throw new Error(res.error.message);
+}
+
 /**
  * Store a booking and only resolve once it is safe: straight to the cloud when
  * the connection is up, otherwise into the offline queue on this device.
