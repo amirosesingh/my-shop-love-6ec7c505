@@ -121,6 +121,12 @@ const GROUPS = [
         blurb: "Global tax rate and inclusive or exclusive pricing.",
       },
       {
+        to: "/settings/rules",
+        label: "POS rules & enforcement",
+        icon: ShieldCheck,
+        blurb: "Shift, discount, refund and terminal security limits.",
+      },
+      {
         to: "/settings/sku",
         label: "SKU numbering",
         icon: ScanBarcode,
