@@ -3039,12 +3039,62 @@ function Register() {
               : "amount"
         }
         onApply={(v, t) => {
-          if (padTarget === "bill") {
-            setCartDiscount(v);
-            setCartDiscountType(t);
-          } else if (typeof padTarget === "number") {
-            patchLine(padTarget, { discount: v, discountType: t });
-          }
+          const target = padTarget;
+          void (async () => {
+            // Limits come from the database rule set; anything beyond them
+            // needs a manager PIN verified on the server.
+            const overLimit =
+              t === "percent"
+                ? v > rules.max_cashier_discount_percent
+                : v > rules.max_cart_discount_amount;
+            const stacking =
+              !rules.allow_discount_stacking &&
+              !!coupon &&
+              v > 0 &&
+              (target === "bill" || typeof target === "number");
+
+            if (stacking) {
+              toast.error("Discount stacking is off — remove the coupon first");
+              return;
+            }
+            if (overLimit) {
+              const grant = await askManager({
+                action: "discount_over_limit",
+                ruleKey:
+                  t === "percent" ? "max_cashier_discount_percent" : "max_cart_discount_amount",
+                title: "Discount above cashier limit",
+                reason:
+                  t === "percent"
+                    ? `Cashiers may give up to ${rules.max_cashier_discount_percent}%.`
+                    : `Cashiers may give up to ${money(rules.max_cart_discount_amount)}.`,
+                storeId: currentStore.id,
+                requestedBy: activeCashier,
+                detail: `${v}${t === "percent" ? "%" : ""} on ${target === "bill" ? "the bill" : "a line"}`,
+              });
+              if (!grant) return;
+            }
+            if (target === "bill") {
+              setCartDiscount(v);
+              setCartDiscountType(t);
+            } else if (typeof target === "number") {
+              patchLine(target, { discount: v, discountType: t });
+            }
+          })();
+        }}
+      />
+
+      {/* Shared manager PIN gate — the PIN is only ever checked server-side. */}
+      <ManagerOverrideDialog
+        request={override}
+        onClose={() => {
+          overrideResolve.current?.(null);
+          overrideResolve.current = null;
+          setOverride(null);
+        }}
+        onApproved={(grantToken) => {
+          overrideResolve.current?.(grantToken);
+          overrideResolve.current = null;
+          setOverride(null);
         }}
       />
     </AppShell>
