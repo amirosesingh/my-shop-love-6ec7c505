@@ -1,0 +1,26 @@
+{
+  // Cloudflare Workers deployment for the POS web app.
+  // Build first with:  CLOUDFLARE_BUILD=1 bun run build
+  // Then deploy with:  bunx wrangler deploy
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "lucky-charms-pos",
+  "main": "dist/server/index.mjs",
+  "compatibility_date": "2026-01-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "dist/client",
+    "binding": "ASSETS"
+  },
+  "observability": {
+    "enabled": true
+  },
+  // One Worker serves the back office and both public storefront hosts.
+  // Cloudflare Access rules decide which of them require a login.
+  "routes": [
+    { "pattern": "pos.luckycharmsdnbhd.com", "custom_domain": true },
+    { "pattern": "member.luckycharmsdnbhd.com", "custom_domain": true },
+    { "pattern": "redeem.luckycharmsdnbhd.com", "custom_domain": true }
+  ]
+  // Runtime values (backend URL, publishable key, ingest secret) are Worker
+  // secrets set with `wrangler secret put NAME` — never committed here.
+}
