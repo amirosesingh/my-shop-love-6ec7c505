@@ -209,6 +209,12 @@ const GROUPS = [
         blurb: "Connection health, recovery tools, public domains and approval rules.",
       },
       {
+        to: "/settings/security-alerts",
+        label: "Security alerts",
+        icon: Activity,
+        blurb: "Findings from deployment scans and the nightly database posture check.",
+      },
+      {
         to: "/settings/inheritance",
         label: "Settings inheritance",
         icon: RefreshCw,
