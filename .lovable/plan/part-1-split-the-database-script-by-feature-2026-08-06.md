@@ -1,8 +1,8 @@
-# Feature-split SQL files + a real all-shops live analytics page
+- Feature-split SQL files + a real all-shops live analytics page
 
 ## Part 1 — Split the database script by feature
 
-Today the whole backend lives in one 2,200-line `external-full-schema.sql`. It gets replaced by a numbered set of feature files, each self-contained and safe to re-run, plus a runner that loads them in order.
+Today the whole backend lives in one 2,200-line `external-full-schema.sql`. It gets replaced by a numbered set of feature files, each self-contained and safe to re-run, plus a runner that loads them in order and alo add required security like Row-level-Security (RLS) and other which are required
 
 ```text
 supabase/sql/
@@ -31,6 +31,7 @@ A new page at **/analytics** ("Live Business Board"), promoted at the top of the
 Top row of figures: revenue, gross profit and margin %, total discounts + coupons given away, bills and average basket, average per day and per month.
 
 Charts:
+
 - **Combined top items pie** — today's (or selected range's) top sellers across all shops, with an "everything else" slice.
 - **Per-shop top item pies** — one small donut per shop in a responsive grid, so each branch's mix is visible side by side.
 - **Revenue by shop donut** with share %.
