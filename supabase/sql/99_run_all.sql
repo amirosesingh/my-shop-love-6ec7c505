@@ -22,3 +22,5 @@
 \i 11_audit_and_logs.sql
 \i 12_analytics_views.sql
 \i 13_pos_rules.sql
+\i 14_settings_scopes.sql
+\i 15_security_and_performance.sql
