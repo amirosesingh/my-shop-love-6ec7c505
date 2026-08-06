@@ -266,8 +266,8 @@ ALTER TABLE public.coupon_events ADD COLUMN IF NOT EXISTS staff_role text;
 ALTER TABLE public.coupon_events ADD COLUMN IF NOT EXISTS sale_id text;
 ALTER TABLE public.coupon_events ADD COLUMN IF NOT EXISTS note text;
 ALTER TABLE public.coupon_events ADD COLUMN IF NOT EXISTS created_at timestamp with time zone DEFAULT now();
-DO $$ BEGIN ALTER TABLE public.coupon_events ADD CONSTRAINT coupon_events_campaign_id_fkey FOREIGN KEY (campaign_id) REFERENCES coupon_campaigns(id) ON DELETE CASCADE; EXCEPTION WHEN others THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE public.coupon_events ADD CONSTRAINT coupon_events_member_id_fkey FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE SET NULL; EXCEPTION WHEN others THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.coupon_events ADD CONSTRAINT coupon_events_campaign_id_fkey FOREIGN KEY (campaign_id) REFERENCES coupon_campaigns(id) ON DELETE CASCADE; EXCEPTION WHEN others THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE public.coupon_events ADD CONSTRAINT coupon_events_event_type_check CHECK ((event_type = ANY (ARRAY['CLAIMED'::text, 'ISSUED_MANUAL'::text, 'REDEEMED'::text, 'BLOCKED'::text, 'DISABLED'::text, 'REENABLED'::text]))); EXCEPTION WHEN others THEN NULL; END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS coupon_events_pkey ON public.coupon_events USING btree (id);
 CREATE INDEX IF NOT EXISTS coupon_events_created_idx ON public.coupon_events USING btree (created_at DESC);
@@ -301,7 +301,7 @@ ALTER TABLE public.drawer_events ADD COLUMN IF NOT EXISTS created_at timestamp w
 CREATE UNIQUE INDEX IF NOT EXISTS drawer_events_pkey ON public.drawer_events USING btree (id);
 
 CREATE TABLE IF NOT EXISTS public.held_orders (
-  id uuid DEFAULT gen_random_uuid() NOT NULL,
+  id text DEFAULT (gen_random_uuid())::text NOT NULL,
   label text DEFAULT ''::text NOT NULL,
   store_id text,
   shift_id text,
@@ -311,7 +311,7 @@ CREATE TABLE IF NOT EXISTS public.held_orders (
   cart_discount numeric DEFAULT 0 NOT NULL,
   cart_discount_type text DEFAULT 'amount'::text NOT NULL,
   exchange_ref text,
-  member_id uuid,
+  member_id text,
   member_name text,
   coupon jsonb,
   note text DEFAULT ''::text NOT NULL,
@@ -321,7 +321,7 @@ CREATE TABLE IF NOT EXISTS public.held_orders (
   updated_at timestamp with time zone DEFAULT now() NOT NULL,
   PRIMARY KEY (id)
 );
-ALTER TABLE public.held_orders ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid();
+ALTER TABLE public.held_orders ADD COLUMN IF NOT EXISTS id text DEFAULT (gen_random_uuid())::text;
 ALTER TABLE public.held_orders ADD COLUMN IF NOT EXISTS label text DEFAULT ''::text;
 ALTER TABLE public.held_orders ADD COLUMN IF NOT EXISTS store_id text;
 ALTER TABLE public.held_orders ADD COLUMN IF NOT EXISTS shift_id text;
@@ -331,7 +331,7 @@ ALTER TABLE public.held_orders ADD COLUMN IF NOT EXISTS lines jsonb DEFAULT '[]'
 ALTER TABLE public.held_orders ADD COLUMN IF NOT EXISTS cart_discount numeric DEFAULT 0;
 ALTER TABLE public.held_orders ADD COLUMN IF NOT EXISTS cart_discount_type text DEFAULT 'amount'::text;
 ALTER TABLE public.held_orders ADD COLUMN IF NOT EXISTS exchange_ref text;
-ALTER TABLE public.held_orders ADD COLUMN IF NOT EXISTS member_id uuid;
+ALTER TABLE public.held_orders ADD COLUMN IF NOT EXISTS member_id text;
 ALTER TABLE public.held_orders ADD COLUMN IF NOT EXISTS member_name text;
 ALTER TABLE public.held_orders ADD COLUMN IF NOT EXISTS coupon jsonb;
 ALTER TABLE public.held_orders ADD COLUMN IF NOT EXISTS note text DEFAULT ''::text;
@@ -410,8 +410,8 @@ ALTER TABLE public.members ADD COLUMN IF NOT EXISTS tier_id uuid;
 ALTER TABLE public.members ADD COLUMN IF NOT EXISTS loyalty_points numeric DEFAULT 0;
 ALTER TABLE public.members ADD COLUMN IF NOT EXISTS total_spent numeric DEFAULT 0;
 ALTER TABLE public.members ADD COLUMN IF NOT EXISTS created_at timestamp with time zone DEFAULT now();
-DO $$ BEGIN ALTER TABLE public.members ADD CONSTRAINT members_member_code_key UNIQUE (member_code); EXCEPTION WHEN others THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE public.members ADD CONSTRAINT members_phone_key UNIQUE (phone); EXCEPTION WHEN others THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.members ADD CONSTRAINT members_member_code_key UNIQUE (member_code); EXCEPTION WHEN others THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE public.members ADD CONSTRAINT members_tier_id_fkey FOREIGN KEY (tier_id) REFERENCES membership_tiers(id) ON DELETE SET NULL; EXCEPTION WHEN others THEN NULL; END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS members_member_code_key ON public.members USING btree (member_code);
 CREATE UNIQUE INDEX IF NOT EXISTS members_pkey ON public.members USING btree (id);
@@ -636,8 +636,8 @@ ALTER TABLE public.purchase_order_items ADD COLUMN IF NOT EXISTS selling_price n
 ALTER TABLE public.purchase_order_items ADD COLUMN IF NOT EXISTS quantity_received integer DEFAULT 0;
 ALTER TABLE public.purchase_order_items ADD COLUMN IF NOT EXISTS subtotal_cost numeric DEFAULT 0;
 ALTER TABLE public.purchase_order_items ADD COLUMN IF NOT EXISTS created_at timestamp with time zone DEFAULT now();
-DO $$ BEGIN ALTER TABLE public.purchase_order_items ADD CONSTRAINT purchase_order_items_product_id_fkey FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL; EXCEPTION WHEN others THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE public.purchase_order_items ADD CONSTRAINT purchase_order_items_po_id_fkey FOREIGN KEY (po_id) REFERENCES purchase_orders(id) ON DELETE CASCADE; EXCEPTION WHEN others THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.purchase_order_items ADD CONSTRAINT purchase_order_items_product_id_fkey FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL; EXCEPTION WHEN others THEN NULL; END $$;
 CREATE INDEX IF NOT EXISTS idx_po_items_po_id ON public.purchase_order_items USING btree (po_id);
 CREATE UNIQUE INDEX IF NOT EXISTS purchase_order_items_pkey ON public.purchase_order_items USING btree (id);
 
@@ -700,8 +700,8 @@ ALTER TABLE public.sale_items ADD COLUMN IF NOT EXISTS promo_id text;
 ALTER TABLE public.sale_items ADD COLUMN IF NOT EXISTS coupon_code text;
 ALTER TABLE public.sale_items ADD COLUMN IF NOT EXISTS coupon_discount numeric DEFAULT 0;
 ALTER TABLE public.sale_items ADD COLUMN IF NOT EXISTS unit_cost numeric DEFAULT 0;
-DO $$ BEGIN ALTER TABLE public.sale_items ADD CONSTRAINT sale_items_sale_id_fkey FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE; EXCEPTION WHEN others THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE public.sale_items ADD CONSTRAINT sale_items_product_id_fkey FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL; EXCEPTION WHEN others THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.sale_items ADD CONSTRAINT sale_items_sale_id_fkey FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE; EXCEPTION WHEN others THEN NULL; END $$;
 CREATE INDEX IF NOT EXISTS idx_sale_items_sale_id ON public.sale_items USING btree (sale_id);
 CREATE UNIQUE INDEX IF NOT EXISTS sale_items_pkey ON public.sale_items USING btree (id);
 
@@ -963,8 +963,8 @@ ALTER TABLE public.stock_transfer_items ADD COLUMN IF NOT EXISTS quantity intege
 ALTER TABLE public.stock_transfer_items ADD COLUMN IF NOT EXISTS quantity_received integer DEFAULT 0;
 ALTER TABLE public.stock_transfer_items ADD COLUMN IF NOT EXISTS unit_cost numeric DEFAULT 0;
 ALTER TABLE public.stock_transfer_items ADD COLUMN IF NOT EXISTS created_at timestamp with time zone DEFAULT now();
-DO $$ BEGIN ALTER TABLE public.stock_transfer_items ADD CONSTRAINT stock_transfer_items_product_id_fkey FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL; EXCEPTION WHEN others THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE public.stock_transfer_items ADD CONSTRAINT stock_transfer_items_transfer_id_fkey FOREIGN KEY (transfer_id) REFERENCES stock_transfers(id) ON DELETE CASCADE; EXCEPTION WHEN others THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.stock_transfer_items ADD CONSTRAINT stock_transfer_items_product_id_fkey FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL; EXCEPTION WHEN others THEN NULL; END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS stock_transfer_items_pkey ON public.stock_transfer_items USING btree (id);
 CREATE INDEX IF NOT EXISTS stock_transfer_items_transfer_idx ON public.stock_transfer_items USING btree (transfer_id);
 
@@ -1013,8 +1013,8 @@ ALTER TABLE public.stock_transfers ADD COLUMN IF NOT EXISTS created_at timestamp
 ALTER TABLE public.stock_transfers ADD COLUMN IF NOT EXISTS updated_at timestamp with time zone DEFAULT now();
 DO $$ BEGIN ALTER TABLE public.stock_transfers ADD CONSTRAINT stock_transfers_ref_key UNIQUE (ref); EXCEPTION WHEN others THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE public.stock_transfers ADD CONSTRAINT stock_transfers_transfer_scope_check CHECK ((transfer_scope = ANY (ARRAY['INTRA_GROUP'::text, 'INTER_GROUP'::text]))); EXCEPTION WHEN others THEN NULL; END $$;
-DO $$ BEGIN ALTER TABLE public.stock_transfers ADD CONSTRAINT stock_transfers_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'pending'::text, 'approved'::text, 'in_transit'::text, 'received'::text, 'rejected'::text, 'cancelled'::text]))); EXCEPTION WHEN others THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE public.stock_transfers ADD CONSTRAINT stock_transfers_kind_check CHECK ((kind = ANY (ARRAY['transfer'::text, 'request'::text]))); EXCEPTION WHEN others THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE public.stock_transfers ADD CONSTRAINT stock_transfers_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'pending'::text, 'approved'::text, 'in_transit'::text, 'received'::text, 'rejected'::text, 'cancelled'::text]))); EXCEPTION WHEN others THEN NULL; END $$;
 CREATE INDEX IF NOT EXISTS stock_transfers_status_idx ON public.stock_transfers USING btree (status);
 CREATE UNIQUE INDEX IF NOT EXISTS stock_transfers_pkey ON public.stock_transfers USING btree (id);
 CREATE UNIQUE INDEX IF NOT EXISTS stock_transfers_ref_key ON public.stock_transfers USING btree (ref);
