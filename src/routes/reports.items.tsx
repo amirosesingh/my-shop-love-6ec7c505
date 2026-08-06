@@ -141,7 +141,7 @@ function ItemSalesReport() {
             <Label className="text-xs">Store</Label>
             <ThemedSelect
               value={storeId}
-              onValueChange={setStoreId}
+              onChange={setStoreId}
               className="h-9 w-44"
               options={[
                 { value: "all", label: "All stores" },
@@ -153,7 +153,7 @@ function ItemSalesReport() {
             <Label className="text-xs">Cashier</Label>
             <ThemedSelect
               value={cashier}
-              onValueChange={setCashier}
+              onChange={setCashier}
               className="h-9 w-44"
               options={[
                 { value: "all", label: "All cashiers" },
