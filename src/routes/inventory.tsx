@@ -11,6 +11,7 @@ import {
   Scale,
   Search,
   Trash2,
+  Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
@@ -186,7 +187,7 @@ function Inventory() {
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <div className="relative hidden sm:block">
+            <div className="relative hidden min-w-0 sm:block">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={query}
