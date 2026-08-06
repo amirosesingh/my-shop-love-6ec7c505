@@ -3071,13 +3071,6 @@ function Register() {
               ? (lines[padTarget]?.discountType ?? "amount")
               : "amount"
         }
-        baseAmount={
-          padTarget === "bill"
-            ? totals.subtotal
-            : typeof padTarget === "number"
-              ? (lines[padTarget]?.price ?? 0) * (lines[padTarget]?.qty ?? 0)
-              : undefined
-        }
         onApply={(v, t) => {
           const target = padTarget;
           void (async () => {

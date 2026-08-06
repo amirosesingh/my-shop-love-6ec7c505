@@ -12,7 +12,6 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, type R
 import { ArrowLeft, Check, Eye, Loader2, RotateCcw, Save, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
-import { ActionButton } from "@/components/pos/ActionButton";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -282,13 +281,9 @@ export function SettingsFrame({
             {showPreview && (
               <Sheet>
                 <SheetTrigger asChild>
-                  <ActionButton
-                    layout="inline"
-                    variant="outline"
-                    className="w-auto shrink-0"
-                    label="Preview receipt"
-                    icon={<Eye className="size-4" />}
-                  />
+                  <Button variant="outline" className="shrink-0">
+                    <Eye className="size-4" /> Preview receipt
+                  </Button>
                 </SheetTrigger>
                 <SheetContent side="right" className="w-full sm:max-w-[520px]">
                   <SheetHeader>
@@ -357,30 +352,14 @@ export function SettingsFrame({
                 </>
               )}
             </span>
-            <div className="ml-auto flex shrink-0 gap-2">
-              <ActionButton
-                layout="inline"
-                variant="ghost"
-                size="sm"
-                className="w-auto"
-                disabled={!dirty || saving}
-                disabledReason="nothing to discard"
-                label="Discard changes"
-                icon={<RotateCcw className="size-4" />}
-                onClick={discard}
-              />
-              <ActionButton
-                layout="inline"
-                size="sm"
-                className="w-auto"
-                disabled={saving || (!dirty && !saveError)}
-                disabledReason="nothing to save"
-                label={saving ? "Saving…" : "Save settings"}
-                icon={
-                  saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />
-                }
-                onClick={() => void save()}
-              />
+            <div className="ml-auto flex gap-2">
+              <Button variant="ghost" size="sm" disabled={!dirty || saving} onClick={discard}>
+                <RotateCcw className="size-4" /> Discard changes
+              </Button>
+              <Button size="sm" disabled={saving || (!dirty && !saveError)} onClick={() => void save()}>
+                {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                {saving ? "Saving…" : "Save settings"}
+              </Button>
             </div>
           </div>
         </div>
