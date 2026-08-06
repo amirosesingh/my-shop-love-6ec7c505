@@ -56,32 +56,25 @@ export function ScopeSelector({
 
       {value.scope === "CLUSTER" && (
         <ThemedSelect
-          aria-label="Cluster"
+          ariaLabel="Cluster"
           className="h-9 min-w-44"
           value={value.scopeId}
-          onChange={(e) => onChange({ scope: "CLUSTER", scopeId: e.target.value })}
-        >
-          {clusters.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </ThemedSelect>
+          onChange={(v) => onChange({ scope: "CLUSTER", scopeId: v })}
+          options={clusters.map((c) => ({ value: c, label: c }))}
+        />
       )}
 
       {value.scope === "BRANCH" && (
         <ThemedSelect
-          aria-label="Branch"
+          ariaLabel="Branch"
           className="h-9 min-w-52"
           value={value.scopeId}
-          onChange={(e) => onChange({ scope: "BRANCH", scopeId: e.target.value })}
-        >
-          {stores.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name} · {s.groupId?.trim() || "default"}
-            </option>
-          ))}
-        </ThemedSelect>
+          onChange={(v) => onChange({ scope: "BRANCH", scopeId: v })}
+          options={stores.map((s) => ({
+            value: s.id,
+            label: `${s.name} · ${s.groupId?.trim() || "default"}`,
+          }))}
+        />
       )}
     </div>
   );
