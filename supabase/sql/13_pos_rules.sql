@@ -159,14 +159,23 @@ END $function$;
 GRANT EXECUTE ON FUNCTION public.pos_rules_save(text, jsonb) TO authenticated, service_role;
 
 -- ---------- manager PIN verification (server-side only) ----------
+-- The audit entry is written here, inside the same routine that verifies the
+-- PIN, so an override record can only exist for a genuinely approved action.
 DROP FUNCTION IF EXISTS public.verify_manager_pin(text, text);
-CREATE OR REPLACE FUNCTION public.verify_manager_pin(p_user_id text, p_pin text)
+DROP FUNCTION IF EXISTS public.verify_manager_pin(text, text, text, text, text, text, text, text);
+CREATE OR REPLACE FUNCTION public.verify_manager_pin(
+  p_user_id text, p_pin text,
+  p_action text DEFAULT NULL, p_rule_key text DEFAULT NULL,
+  p_requested_by text DEFAULT NULL, p_store_id text DEFAULT NULL,
+  p_terminal_id text DEFAULT NULL, p_detail text DEFAULT NULL)
 RETURNS TABLE(user_id text, full_name text, role app_role)
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path TO 'public', 'extensions'
 AS $function$
-DECLARE u public.app_users%rowtype;
+DECLARE
+  u public.app_users%rowtype;
+  v_audit boolean;
 BEGIN
   SELECT * INTO u FROM public.app_users a
    WHERE lower(a.user_id) = lower(trim(p_user_id)) AND a.is_active;
@@ -174,28 +183,60 @@ BEGIN
   IF u.role NOT IN ('admin','manager') THEN RETURN; END IF;
   IF coalesce(u.pin_hash,'') = ''
      OR u.pin_hash <> extensions.crypt(p_pin::text, u.pin_hash::text) THEN RETURN; END IF;
+
+  IF coalesce(trim(p_action), '') <> '' THEN
+    SELECT coalesce((public.pos_rules_get(coalesce(p_store_id, ''))->>'enable_manager_pin_audit_log')::boolean, true)
+      INTO v_audit;
+    IF coalesce(v_audit, true) THEN
+      INSERT INTO public.manager_override_events
+        (action, rule_key, requested_by, approved_by, approved_role, store_id, terminal_id, detail)
+      VALUES (p_action, p_rule_key, p_requested_by, u.user_id, u.role::text,
+              p_store_id, p_terminal_id, p_detail);
+    END IF;
+  END IF;
+
   RETURN QUERY SELECT u.user_id::text, u.full_name::text, u.role;
 END $function$;
 
-GRANT EXECUTE ON FUNCTION public.verify_manager_pin(text, text) TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.verify_manager_pin(text, text, text, text, text, text, text, text)
+  TO anon, authenticated, service_role;
 
--- ---------- override audit writer ----------
+-- ---------- override audit writer (privileged callers only) ----------
 DROP FUNCTION IF EXISTS public.log_manager_override(text, text, text, text, text, text, text, text);
 CREATE OR REPLACE FUNCTION public.log_manager_override(
   _action text, _rule_key text, _requested_by text, _approved_by text,
   _approved_role text, _store_id text, _terminal_id text, _detail text)
 RETURNS void
-LANGUAGE sql
+LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path TO 'public'
 AS $function$
+BEGIN
+  -- Staff-only, and the approver identity is taken from the app_users row
+  -- rather than from free-text caller input.
+  IF NOT public.is_staff(auth.uid()) THEN
+    RAISE EXCEPTION 'Only staff can write override audit entries';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.app_users a
+     WHERE lower(a.user_id) = lower(trim(coalesce(_approved_by, '')))
+       AND a.is_active AND a.role IN ('admin','manager')
+  ) THEN
+    RAISE EXCEPTION 'UNKNOWN_APPROVER';
+  END IF;
+
   INSERT INTO public.manager_override_events
     (action, rule_key, requested_by, approved_by, approved_role, store_id, terminal_id, detail)
-  VALUES (_action, _rule_key, _requested_by, _approved_by, _approved_role, _store_id, _terminal_id, _detail);
-$function$;
+  SELECT _action, _rule_key, _requested_by, a.user_id, a.role::text, _store_id, _terminal_id, _detail
+    FROM public.app_users a
+   WHERE lower(a.user_id) = lower(trim(_approved_by))
+   LIMIT 1;
+END $function$;
 
+REVOKE ALL ON FUNCTION public.log_manager_override(text, text, text, text, text, text, text, text)
+  FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.log_manager_override(text, text, text, text, text, text, text, text)
-  TO anon, authenticated, service_role;
+  TO authenticated, service_role;
 
 -- ---------- held ticket count used by the shift-close gate ----------
 DROP FUNCTION IF EXISTS public.held_orders_open_count(text);

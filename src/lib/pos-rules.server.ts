@@ -94,9 +94,26 @@ export async function saveRules(
 export async function verifyManagerPinInDb(
   userId: string,
   pin: string,
+  audit?: {
+    action?: string | null;
+    ruleKey?: string | null;
+    requestedBy?: string | null;
+    storeId?: string | null;
+    terminalId?: string | null;
+    detail?: string | null;
+  },
 ): Promise<{ userId: string; name: string; role: string } | null> {
   try {
-    const rows = await rpc<unknown>("verify_manager_pin", { p_user_id: userId, p_pin: pin });
+    const rows = await rpc<unknown>("verify_manager_pin", {
+      p_user_id: userId,
+      p_pin: pin,
+      p_action: audit?.action ?? null,
+      p_rule_key: audit?.ruleKey ?? null,
+      p_requested_by: audit?.requestedBy ?? null,
+      p_store_id: audit?.storeId ?? null,
+      p_terminal_id: audit?.terminalId ?? null,
+      p_detail: audit?.detail ?? null,
+    });
     const row = (Array.isArray(rows) ? rows[0] : rows) as
       | { user_id?: string; full_name?: string; role?: string }
       | undefined;

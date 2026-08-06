@@ -233,7 +233,7 @@ CREATE POLICY "Service role manages secure settings" ON public.secure_settings F
 
 DROP POLICY IF EXISTS "Staff manage whatsapp queue" ON public.whatsapp_queue;
 
-CREATE POLICY "Staff manage whatsapp queue" ON public.whatsapp_queue FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Staff manage whatsapp queue" ON public.whatsapp_queue FOR ALL TO authenticated USING (public.is_staff(auth.uid())) WITH CHECK (public.is_staff(auth.uid()));
 
 -- ---------- verification ----------
 SELECT t.name AS table_name,
