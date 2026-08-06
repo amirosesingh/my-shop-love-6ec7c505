@@ -5,6 +5,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  type Context,
   type ReactNode,
 } from "react";
 import type { Session } from "@supabase/supabase-js";
@@ -192,13 +193,13 @@ const AUTH_CTX_KEY = "__nwPosAuthContext__";
 const AUTH_LOADS_KEY = "__nwPosAuthModuleLoads__";
 
 type AuthGlobal = {
-  [AUTH_CTX_KEY]?: React.Context<AuthCtx | null>;
+  [AUTH_CTX_KEY]?: Context<AuthCtx | null>;
   [AUTH_LOADS_KEY]?: number;
 };
 
 const authGlobal = globalThis as unknown as AuthGlobal;
 
-const AuthContext: React.Context<AuthCtx | null> =
+const AuthContext: Context<AuthCtx | null> =
   authGlobal[AUTH_CTX_KEY] ?? createContext<AuthCtx | null>(null);
 authGlobal[AUTH_CTX_KEY] = AuthContext;
 
