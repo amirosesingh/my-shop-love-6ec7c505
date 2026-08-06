@@ -65,7 +65,7 @@ import { BOOKING_TIMING_LABELS, type BookingPaymentTiming } from "@/lib/pos-type
 import { useUserPermissions } from "@/lib/pos-permissions";
 import { useVisibility } from "@/lib/ui-visibility";
 import { useUiScale } from "@/lib/use-ui-scale";
-import { removeHeldOrder, setHeldOrders, useHeldOrders, type HeldOrder } from "@/lib/held-orders";
+import { addHeldOrder, removeHeldOrder, useHeldOrders, type HeldOrder } from "@/lib/held-orders";
 import { TICKET_ACTIONS, logTicketEvent } from "@/lib/ticket-audit";
 import {
   discountLabel,
@@ -978,7 +978,7 @@ function Register() {
       memberName: member?.name ?? null,
       coupon,
     };
-    setHeldOrders((hs) => [...hs, order]);
+    addHeldOrder(order);
     logTicketEvent(TICKET_ACTIONS.held, {
       holdRef: id,
       lines: snapshot.length,
