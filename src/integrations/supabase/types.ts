@@ -728,9 +728,45 @@ export type Database = {
         }
         Relationships: []
       }
+      product_categories: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          parent_id: string | null
+          sort: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          parent_id?: string | null
+          sort?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          parent_id?: string | null
+          sort?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_categories_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "product_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           barcode: string
+          barcode_aliases: string[]
           category: string | null
           cost_price: number
           created_at: string
@@ -740,17 +776,21 @@ export type Database = {
           id: string
           landing_pct: number | null
           name: string
+          packs: Json
           point_multiplier: number
           reorder_level: number
           selling_price: number
           sku: string | null
           stock_by_store: Json
           stock_quantity: number
+          sub_category: string | null
           tax_rate: number
+          unit: string | null
           updated_at: string
         }
         Insert: {
           barcode: string
+          barcode_aliases?: string[]
           category?: string | null
           cost_price?: number
           created_at?: string
@@ -760,17 +800,21 @@ export type Database = {
           id?: string
           landing_pct?: number | null
           name: string
+          packs?: Json
           point_multiplier?: number
           reorder_level?: number
           selling_price?: number
           sku?: string | null
           stock_by_store?: Json
           stock_quantity?: number
+          sub_category?: string | null
           tax_rate?: number
+          unit?: string | null
           updated_at?: string
         }
         Update: {
           barcode?: string
+          barcode_aliases?: string[]
           category?: string | null
           cost_price?: number
           created_at?: string
@@ -780,13 +824,16 @@ export type Database = {
           id?: string
           landing_pct?: number | null
           name?: string
+          packs?: Json
           point_multiplier?: number
           reorder_level?: number
           selling_price?: number
           sku?: string | null
           stock_by_store?: Json
           stock_quantity?: number
+          sub_category?: string | null
           tax_rate?: number
+          unit?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -1557,6 +1604,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      uom_units: {
+        Row: {
+          allow_decimal: boolean
+          code: string
+          created_at: string
+          id: string
+          name: string
+          sort: number
+          updated_at: string
+        }
+        Insert: {
+          allow_decimal?: boolean
+          code: string
+          created_at?: string
+          id?: string
+          name: string
+          sort?: number
+          updated_at?: string
+        }
+        Update: {
+          allow_decimal?: boolean
+          code?: string
+          created_at?: string
+          id?: string
+          name?: string
+          sort?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
