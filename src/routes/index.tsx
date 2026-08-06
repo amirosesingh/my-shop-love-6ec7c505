@@ -91,6 +91,13 @@ import { NO_SALE_REASON_MAX, NO_SALE_REASON_MIN, recordNoSale } from "@/lib/draw
 import { buildBookingMessage, buildSaleMessage, sendBillOnWhatsApp } from "@/lib/whatsapp";
 import { logger } from "@/lib/audit-log";
 import { DiscountPad } from "@/components/pos/DiscountPad";
+import {
+  ManagerOverrideDialog,
+  type OverrideRequest,
+} from "@/components/pos/ManagerOverrideDialog";
+import { usePosRules } from "@/lib/pos-rules.tsx";
+import { assertShiftClosable } from "@/lib/pos-rules.functions";
+import { getPosCallerAuth } from "@/lib/pos-caller-auth";
 import { evaluatePromotions, focLine } from "@/lib/pos-promotions";
 import { clearCartDraft, loadCartDraft, saveCartDraft } from "@/lib/cart-draft";
 import {
@@ -136,8 +143,23 @@ function Register() {
   const { user, can } = useAuth();
   const { requirePermission } = useUserPermissions();
   const { visible } = useVisibility();
+  /** Server-loaded operational rules. Never read from browser storage. */
+  const { rules } = usePosRules();
+  /** Pending manager-approval request and the work it unblocks. */
+  const [override, setOverride] = useState<OverrideRequest | null>(null);
+  const overrideResolve = useRef<((grant: string | null) => void) | null>(null);
+  /**
+   * Opens the manager PIN dialog and resolves with the signed grant token the
+   * server issued, or null when the cashier backs out.
+   */
+  const askManager = (request: OverrideRequest) =>
+    new Promise<string | null>((resolve) => {
+      overrideResolve.current = resolve;
+      setOverride(request);
+    });
   const [closeShiftOpen, setCloseShiftOpen] = useState(false);
   const [countedCash, setCountedCash] = useState("");
+  const [closing, setClosing] = useState(false);
   const [closeNote, setCloseNote] = useState("");
   const canDiscount = can("can_give_discount");
   const [discountOverride, setDiscountOverride] = useState(false);
