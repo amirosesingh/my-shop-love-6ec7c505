@@ -1983,6 +1983,8 @@ export type Database = {
       }
       is_app_supervisor: { Args: never; Returns: boolean }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
+      is_staff_now: { Args: never; Returns: boolean }
+      is_supervisor_now: { Args: never; Returns: boolean }
       list_app_users: {
         Args: never
         Returns: {
@@ -2051,6 +2053,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      store_visible: { Args: { _store_id: string }; Returns: boolean }
       terminal_token_claim: {
         Args: { p_device?: string; p_token_id: string }
         Returns: boolean
@@ -2090,6 +2093,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      user_store_id: { Args: never; Returns: string }
       verify_cashier_pin: {
         Args: { p_pin: string; p_username: string }
         Returns: {
