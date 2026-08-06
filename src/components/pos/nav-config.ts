@@ -285,14 +285,6 @@ export const navGroups: NavGroup[] = [
         blurb: "Top sellers, shop revenue, trends, savings and profit.",
       },
       {
-        to: "/reports/coupons.legacy-placeholder",
-        label: "Coupon Usage",
-        icon: TicketPercent,
-        flag: "can_view_sales_reports",
-        keywords: "coupon promotion discount bill item applied",
-        blurb: "Every coupon applied, bill or item level.",
-      },
-      {
         to: "/reports/payments",
         label: "Payments by Cashier",
         icon: BarChart3,
