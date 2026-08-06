@@ -257,17 +257,33 @@ export async function loadMemberVouchers(memberId: string): Promise<VoucherView[
     .filter((v) => !isVoucherExpired(v.voucher, v.campaign));
 }
 
-/** Audit trail: claims, manual issues, redemptions and blocked attempts. */
-export async function loadCouponEvents(campaignId?: string): Promise<CouponEvent[]> {
-  let q = sb
-    .from("coupon_events")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(2000);
-  if (campaignId) q = q.eq("campaign_id", campaignId);
-  const res = await q;
-  if (res.error) throw new Error(res.error.message);
-  return ((res.data as Row[] | null) ?? []).map(toEvent);
+/** Columns the event trail actually renders — never `*`. */
+const EVENT_COLUMNS =
+  "id, event_type, campaign_id, campaign_name, voucher_token, member_id, member_phone, " +
+  "store_id, terminal_id, staff_name, staff_role, sale_id, note, created_at";
+
+/**
+ * Audit trail: claims, manual issues, redemptions and blocked attempts.
+ *
+ * Paged with a keyset cursor so the trail stays fast however long it grows —
+ * each page is one index seek on `(created_at, id)` rather than an offset walk.
+ */
+export async function loadCouponEvents(
+  opts: { campaignId?: string; cursor?: Cursor; limit?: number } = {},
+): Promise<Page<CouponEvent>> {
+  const limit = opts.limit ?? PAGE_SIZE;
+  let q = sb.from("coupon_events").select(EVENT_COLUMNS);
+  if (opts.campaignId) q = q.eq("campaign_id", opts.campaignId);
+  const res = await keyset(q as never, "created_at", opts.cursor ?? null, limit);
+  if ((res as { error?: { message: string } }).error) {
+    throw new Error((res as { error: { message: string } }).error.message);
+  }
+  const rows = (((res as { data?: Row[] | null }).data ?? []) as Row[]);
+  return {
+    rows: rows.map(toEvent),
+    cursor: nextCursor(rows, "created_at", limit),
+    hasMore: rows.length >= limit,
+  };
 }
 
 /* ------------------------------ analytics -------------------------------- */
