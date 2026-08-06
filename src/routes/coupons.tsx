@@ -127,6 +127,20 @@ function CouponsPage() {
     void refresh();
   }, [refresh]);
 
+  /** Pull the next page of the event trail without re-reading the ones on screen. */
+  const loadMoreEvents = useCallback(async () => {
+    if (!eventCursor) return;
+    setLoadingMore(true);
+    try {
+      const page = await loadCouponEvents({ cursor: eventCursor });
+      setEvents((prev) => [...prev, ...page.rows]);
+      setEventCursor(page.cursor);
+      setMoreEvents(page.hasMore);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [eventCursor]);
+
   const counts = useMemo(() => {
     const map = new Map<string, { issued: number; redeemed: number }>();
     for (const v of vouchers) {
