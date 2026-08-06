@@ -2,7 +2,7 @@
  * Group-wide analytics feed. Every figure is aggregated in the database by the
  * reporting views so one page load never pulls every sale line into the till.
  */
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
 
 export type StoreDayRow = {
   sale_day: string;
@@ -47,6 +47,16 @@ const n = (v: unknown) => (typeof v === "number" ? v : Number(v ?? 0) || 0);
 /** `to` is inclusive, so the upper bound is pushed to the end of that day. */
 const endOfDay = (to: string) => `${to}T23:59:59.999`;
 
+/** Friendly wording for the two things that actually go wrong here. */
+function readable(message: string): string {
+  const m = message.toLowerCase();
+  if (m.includes("permission denied") || m.includes("not authorized"))
+    return "This account cannot read the reporting tables yet. Sign in again, or run supabase/sql/12_analytics_views.sql and 04_register_sales.sql on your database so the reporting views and their access grants exist.";
+  if (m.includes("does not exist") || m.includes("could not find") || m.includes("schema cache"))
+    return "The reporting views are missing. Run supabase/sql/12_analytics_views.sql on your database to create them.";
+  return message;
+}
+
 export async function fetchBoard(from: string, to: string): Promise<BoardData> {
   const [storeRes, itemRes, billRes] = await Promise.all([
     supabase
@@ -67,7 +77,7 @@ export async function fetchBoard(from: string, to: string): Promise<BoardData> {
   ]);
 
   const err = storeRes.error ?? itemRes.error ?? billRes.error;
-  if (err) throw new Error(err.message);
+  if (err) throw new Error(readable(err.message));
 
   return {
     storeDays: (storeRes.data ?? []).map((r) => ({

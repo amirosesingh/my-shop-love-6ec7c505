@@ -381,6 +381,10 @@ BEGIN
         pin_hash = excluded.pin_hash, updated_at = now();
 END $function$;
 
+-- Older databases may hold earlier versions with different output columns;
+-- CREATE OR REPLACE cannot change a return type, so drop first.
+DROP FUNCTION IF EXISTS public.verify_cashier_pin(text, text);
+
 CREATE OR REPLACE FUNCTION public.verify_cashier_pin(p_username text, p_pin text)
  RETURNS TABLE(id uuid, username text, full_name text, store_id text, permissions jsonb)
  LANGUAGE plpgsql
@@ -399,6 +403,8 @@ BEGIN
   store_id := v_row.store_id; permissions := coalesce(v_row.permissions, '{}'::jsonb);
   RETURN NEXT;
 END $function$;
+
+DROP FUNCTION IF EXISTS public.verify_terminal_pin(text, text);
 
 CREATE OR REPLACE FUNCTION public.verify_terminal_pin(p_user_id text, p_pin text)
  RETURNS TABLE(user_id text, full_name text, role app_role, store_id text, email text)
