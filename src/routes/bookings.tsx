@@ -9,6 +9,7 @@ import {
   Tag,
   Wrench,
   Banknote,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -86,6 +87,7 @@ function BookingsPage() {
     addBookingPayment,
     collectBooking,
     cancelBooking,
+    deleteBooking,
     setBookingJobStatus,
   } = usePos();
   const { requirePermission } = useUserPermissions();
@@ -94,6 +96,8 @@ function BookingsPage() {
   /** Extra lens over the racket workflow, on top of the booking status. */
   const [jobFilter, setJobFilter] = useState<JobStatus | "all" | "jobs">("all");
   const [payFor, setPayFor] = useState<Booking | null>(null);
+  const [removing, setRemoving] = useState<Booking | null>(null);
+  const [removeReason, setRemoveReason] = useState("");
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("cash");
   const [settle, setSettle] = useState(false);
@@ -482,6 +486,48 @@ function BookingsPage() {
             </Button>
             <Button onClick={() => void submitPayment()}>
               {settle ? "Collect & print bill" : "Record payment"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!removing} onOpenChange={(o) => !o && setRemoving(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete {removing?.ref}?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              This removes the booking and its job card for good. Tell us why so it stays on the
+              activity trail.
+            </p>
+            <div className="space-y-1">
+              <Label>Reason</Label>
+              <Input
+                autoFocus
+                value={removeReason}
+                onChange={(e) => setRemoveReason(e.target.value)}
+                placeholder="Job collected / booked by mistake / duplicate"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRemoving(null)}>
+              Keep it
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={removeReason.trim().length < 3}
+              onClick={async () => {
+                const target = removing;
+                if (!target) return;
+                setRemoving(null);
+                await deleteBooking(target.id, removeReason.trim());
+                toast.success(`${target.ref} deleted`);
+                setRemoveReason("");
+              }}
+            >
+              Delete job
             </Button>
           </DialogFooter>
         </DialogContent>
