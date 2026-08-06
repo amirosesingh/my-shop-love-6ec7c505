@@ -357,14 +357,30 @@ export function SettingsFrame({
                 </>
               )}
             </span>
-            <div className="ml-auto flex gap-2">
-              <Button variant="ghost" size="sm" disabled={!dirty || saving} onClick={discard}>
-                <RotateCcw className="size-4" /> Discard changes
-              </Button>
-              <Button size="sm" disabled={saving || (!dirty && !saveError)} onClick={() => void save()}>
-                {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-                {saving ? "Saving…" : "Save settings"}
-              </Button>
+            <div className="ml-auto flex shrink-0 gap-2">
+              <ActionButton
+                layout="inline"
+                variant="ghost"
+                size="sm"
+                className="w-auto"
+                disabled={!dirty || saving}
+                disabledReason="nothing to discard"
+                label="Discard changes"
+                icon={<RotateCcw className="size-4" />}
+                onClick={discard}
+              />
+              <ActionButton
+                layout="inline"
+                size="sm"
+                className="w-auto"
+                disabled={saving || (!dirty && !saveError)}
+                disabledReason="nothing to save"
+                label={saving ? "Saving…" : "Save settings"}
+                icon={
+                  saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />
+                }
+                onClick={() => void save()}
+              />
             </div>
           </div>
         </div>
