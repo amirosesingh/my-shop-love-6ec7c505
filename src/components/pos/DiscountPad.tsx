@@ -23,6 +23,7 @@ export function DiscountPad({
   title = "Apply discount",
   value,
   type,
+  baseAmount,
   onApply,
 }: {
   open: boolean;
@@ -30,6 +31,8 @@ export function DiscountPad({
   title?: string;
   value: number;
   type: DiscountType;
+  /** Amount the discount applies to — drives the live "was / now" preview. */
+  baseAmount?: number;
   onApply: (value: number, type: DiscountType) => void;
 }) {
   const [entry, setEntry] = useState(value ? String(value) : "");
@@ -43,6 +46,13 @@ export function DiscountPad({
 
   const numeric = Number(entry || 0);
   const invalid = mode === "percent" && numeric > 100;
+
+  const base = baseAmount ?? 0;
+  const off = mode === "percent" ? (base * numeric) / 100 : numeric;
+  const after = base - off;
+  const overshoot = baseAmount !== undefined && after < 0;
+  const fmt = (n: number) =>
+    n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const push = (k: string) =>
     setEntry((e) => (k === "." && e.includes(".") ? e : (e + k).replace(/^0(?=\d)/, "")));
@@ -85,6 +95,23 @@ export function DiscountPad({
           <p className="text-[11px] text-destructive">A percentage cannot go above 100.</p>
         )}
 
+        {baseAmount !== undefined && (
+          <div className="numeric flex items-baseline justify-between rounded-md border border-border px-3 py-2 text-xs">
+            <span className="text-muted-foreground line-through">{fmt(base)}</span>
+            <span className="text-muted-foreground">−{fmt(Math.max(0, off))}</span>
+            <span
+              className={`text-sm font-semibold ${overshoot ? "text-destructive" : "text-primary"}`}
+            >
+              {fmt(Math.max(0, after))}
+            </span>
+          </div>
+        )}
+        {overshoot && (
+          <p className="text-[11px] text-destructive">
+            That discount is larger than the amount it applies to.
+          </p>
+        )}
+
         {mode === "percent" && (
           <div className="grid grid-cols-5 gap-1.5">
             {PRESETS.map((p) => (
@@ -104,6 +131,9 @@ export function DiscountPad({
         )}
 
         <div className="grid grid-cols-3 gap-1.5">
+          <p className="col-span-3 text-[11px] text-muted-foreground">
+            {mode === "percent" ? "Custom %" : "Custom amount"}
+          </p>
           {KEYS.map((k) => (
             <Button key={k} variant="outline" className="h-11 text-base" onClick={() => push(k)}>
               {k}
@@ -130,7 +160,7 @@ export function DiscountPad({
             Clear
           </Button>
           <Button
-            disabled={invalid}
+            disabled={invalid || overshoot}
             onClick={() => {
               onApply(numeric, mode);
               onOpenChange(false);
