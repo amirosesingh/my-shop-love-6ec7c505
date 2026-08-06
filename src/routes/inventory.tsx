@@ -1,6 +1,17 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
-import { ArrowLeftRight, ClipboardCheck, Inbox, Minus, Plus, Scale, Search, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import {
+  ArrowLeftRight,
+  ClipboardCheck,
+  Combine,
+  FileSpreadsheet,
+  Inbox,
+  Minus,
+  Plus,
+  Scale,
+  Search,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
@@ -30,6 +41,11 @@ import { productVisibleAt } from "@/lib/branch-policy";
 import { TablePagination, usePagination } from "@/components/pos/TablePagination";
 import { Switch } from "@/components/ui/switch";
 import { BulkImportDialog } from "@/components/pos/BulkImportDialog";
+import { MergeProductsDialog } from "@/components/pos/MergeProductsDialog";
+import { ThemedSelect } from "@/components/pos/ThemedSelect";
+import { exportProductsXlsx } from "@/lib/product-export";
+import { subCategoriesOf, topCategories, useCategories, useUnits } from "@/lib/catalog-meta";
+import { codeTakenBy } from "@/lib/product-lookup";
 import { StockAdjustDialog, StockCountDialog } from "@/components/pos/StockAdjust";
 import type { Product } from "@/lib/pos-types";
 import { nextSku, peekSku, readSkuSettings } from "@/lib/sku";
@@ -65,29 +81,68 @@ const blank = (storeId: string): Product => ({
 });
 
 function Inventory() {
-  const { state, stores, currentStore, upsertProduct, removeProduct, adjustStock } = usePos();
+  const {
+    state,
+    stores,
+    currentStore,
+    upsertProduct,
+    removeProduct,
+    removeProducts,
+    patchProducts,
+    adjustStock,
+  } = usePos();
   const { can } = useAuth();
   const showMoney = can("can_view_sales_reports");
   const canEdit = can("can_add_new_product");
   const canPrice = can("can_edit_product_price");
   const canAdjust = can("can_adjust_stock");
+  const canBulk = can("can_bulk_edit_products");
+  const canMerge = can("can_merge_products");
   const canEcom = canPrice;
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState<Product | null>(null);
+  const [aliasDraft, setAliasDraft] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const [importOpen, setImportOpen] = useState(false);
+  const [mergeOpen, setMergeOpen] = useState(false);
+  const [catFilter, setCatFilter] = useState("all");
+  const [subFilter, setSubFilter] = useState("all");
+  const [bulkCategory, setBulkCategory] = useState("");
   const [adjustTarget, setAdjustTarget] = useState<Product | null>(null);
   const [countOpen, setCountOpen] = useState(false);
   const [skuOverride, setSkuOverride] = useState(false);
   const autoSku = readSkuSettings().mode === "auto";
+  const categories = useCategories();
+  const units = useUnits();
+
+  // Categories the catalogue actually uses, plus anything set up in settings.
+  const categoryNames = useMemo(() => {
+    const names = new Set<string>(topCategories(categories).map((c) => c.name));
+    state.products.forEach((p) => p.category && names.add(p.category));
+    return [...names].sort();
+  }, [categories, state.products]);
+
+  const subNames = useMemo(() => {
+    if (catFilter === "all") return [];
+    const names = new Set<string>(subCategoriesOf(categories, catFilter).map((c) => c.name));
+    state.products
+      .filter((p) => p.category === catFilter && p.subCategory)
+      .forEach((p) => names.add(p.subCategory!));
+    return [...names].sort();
+  }, [categories, state.products, catFilter]);
 
   const rows = state.products.filter(
     (p) =>
       // Items owned by a private-catalogue branch stay at that branch.
       productVisibleAt(state.settings, p.id, state.currentStoreId) &&
-      `${p.name} ${p.sku} ${p.barcode} ${p.category}`.toLowerCase().includes(query.toLowerCase()),
+      (catFilter === "all" || p.category === catFilter) &&
+      (subFilter === "all" || (p.subCategory ?? "") === subFilter) &&
+      `${p.name} ${p.sku} ${p.barcode} ${(p.barcodes ?? []).join(" ")} ${p.category} ${p.subCategory ?? ""}`
+        .toLowerCase()
+        .includes(query.toLowerCase()),
   );
+  const selectedProducts = state.products.filter((p) => selected.includes(p.id));
   const pager = usePagination(rows, 25);
   const pageRows = pager.pageItems;
   const allShownSelected =
@@ -144,6 +199,15 @@ function Inventory() {
                 📥 Bulk Import from Excel
               </Button>
             )}
+            <Button
+              variant="outline"
+              onClick={() => {
+                void exportProductsXlsx(rows, stores, `products-${currentStore.code}`);
+                toast.success(`Exporting ${rows.length} products to Excel`);
+              }}
+            >
+              <FileSpreadsheet className="size-4" /> Export to Excel
+            </Button>
             {canAdjust && (
               <Button variant="outline" onClick={() => setCountOpen(true)}>
                 <ClipboardCheck className="size-4" /> Stock check
@@ -199,6 +263,79 @@ function Inventory() {
                         value={draft.category}
                         onChange={(e) => setDraft({ ...draft, category: e.target.value })}
                       />
+                    </Field>
+                    <Field label="Sub-category">
+                      <Input
+                        value={draft.subCategory ?? ""}
+                        placeholder="optional"
+                        list="inventory-subcategories"
+                        onChange={(e) => setDraft({ ...draft, subCategory: e.target.value })}
+                      />
+                      <datalist id="inventory-subcategories">
+                        {subCategoriesOf(categories, draft.category).map((c) => (
+                          <option key={c.id} value={c.name} />
+                        ))}
+                      </datalist>
+                    </Field>
+                    <Field label="Unit of measure">
+                      <ThemedSelect
+                        value={draft.unit ?? "pcs"}
+                        onChange={(v) => setDraft({ ...draft, unit: v })}
+                        ariaLabel="Unit of measure"
+                        options={units.map((u) => ({
+                          value: u.code,
+                          label: `${u.code} · ${u.name}${u.allowDecimal ? " (decimal)" : ""}`,
+                        }))}
+                      />
+                    </Field>
+                    <Field label="Extra barcodes" className="col-span-2">
+                      <div className="flex flex-wrap gap-1">
+                        {(draft.barcodes ?? []).map((code) => (
+                          <Badge key={code} variant="outline" className="numeric gap-1 text-[11px]">
+                            {code}
+                            <button
+                              type="button"
+                              className="text-destructive"
+                              aria-label={`Remove barcode ${code}`}
+                              onClick={() =>
+                                setDraft({
+                                  ...draft,
+                                  barcodes: (draft.barcodes ?? []).filter((b) => b !== code),
+                                })
+                              }
+                            >
+                              ×
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                      <div className="mt-1 flex gap-2">
+                        <Input
+                          value={aliasDraft}
+                          placeholder="Scan or type another barcode for this item"
+                          onChange={(e) => setAliasDraft(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key !== "Enter") return;
+                            e.preventDefault();
+                            const code = aliasDraft.trim();
+                            if (!code) return;
+                            const clash = codeTakenBy(state.products, code, draft.id);
+                            if (clash) {
+                              toast.error(`${code} already belongs to ${clash.name}`);
+                              return;
+                            }
+                            setDraft({
+                              ...draft,
+                              barcodes: [...new Set([...(draft.barcodes ?? []), code])],
+                            });
+                            setAliasDraft("");
+                          }}
+                        />
+                      </div>
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        Press Enter to add. A delivery with a different barcode still scans to this
+                        product.
+                      </p>
                     </Field>
                     <Field label="Tax rate %">
                       <Input
@@ -286,13 +423,49 @@ function Inventory() {
           </div>
         </header>
 
+        <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border p-3">
+          <div className="space-y-1">
+            <Label className="text-xs">Category</Label>
+            <ThemedSelect
+              value={catFilter}
+              onChange={(v) => {
+                setCatFilter(v);
+                setSubFilter("all");
+              }}
+              ariaLabel="Filter by category"
+              className="w-48"
+              options={[
+                { value: "all", label: "All categories" },
+                ...categoryNames.map((c) => ({ value: c, label: c })),
+              ]}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Sub-category</Label>
+            <ThemedSelect
+              value={subFilter}
+              onChange={setSubFilter}
+              ariaLabel="Filter by sub-category"
+              className="w-48"
+              options={[
+                { value: "all", label: "All sub-categories" },
+                ...subNames.map((c) => ({ value: c, label: c })),
+              ]}
+            />
+          </div>
+          <p className="pb-2 text-xs text-muted-foreground">
+            Showing <span className="numeric">{rows.length}</span> of{" "}
+            <span className="numeric">{state.products.length}</span> products
+          </p>
+        </div>
+
         {selected.length > 0 && (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/40 bg-primary/5 px-4 py-3">
             <p className="text-sm">
               <span className="numeric font-semibold">{selected.length}</span> product
               {selected.length > 1 ? "s" : ""} selected
             </p>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button variant="outline" size="sm" onClick={() => setSelected([])}>
                 Clear
               </Button>
@@ -302,6 +475,53 @@ function Inventory() {
               <Button size="sm" onClick={() => goToTransfers("transfer")}>
                 <ArrowLeftRight className="size-4" /> Transfer selected
               </Button>
+              {canBulk && (
+                <>
+                  <Input
+                    value={bulkCategory}
+                    onChange={(e) => setBulkCategory(e.target.value)}
+                    placeholder="Move to category…"
+                    className="h-8 w-44"
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const name = bulkCategory.trim();
+                      if (!name) return toast.error("Type the category to move them to");
+                      patchProducts(selected, { category: name });
+                      setBulkCategory("");
+                      toast.success(`${selected.length} products moved to ${name}`);
+                    }}
+                  >
+                    Apply category
+                  </Button>
+                </>
+              )}
+              {canMerge && selected.length > 1 && (
+                <Button size="sm" variant="outline" onClick={() => setMergeOpen(true)}>
+                  <Combine className="size-4" /> Merge duplicates
+                </Button>
+              )}
+              {canBulk && (
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => {
+                    if (
+                      !window.confirm(
+                        `Delete ${selected.length} product${selected.length > 1 ? "s" : ""}? This cannot be undone.`,
+                      )
+                    )
+                      return;
+                    removeProducts(selected);
+                    toast.success(`${selected.length} products deleted`);
+                    setSelected([]);
+                  }}
+                >
+                  <Trash2 className="size-4" /> Delete selected
+                </Button>
+              )}
             </div>
           </div>
         )}
@@ -453,6 +673,14 @@ function Inventory() {
         </div>
       </div>
       {canEdit && <BulkImportDialog open={importOpen} onOpenChange={setImportOpen} />}
+      {canMerge && (
+        <MergeProductsDialog
+          open={mergeOpen}
+          products={selectedProducts}
+          onOpenChange={setMergeOpen}
+          onMerged={() => setSelected([])}
+        />
+      )}
       {canAdjust && (
         <>
           <StockAdjustDialog

@@ -1,0 +1,192 @@
+/**
+ * Catalogue metadata — categories, sub-categories and units of measure.
+ *
+ * Both lists live in the cloud (`product_categories`, `uom_units`) but are
+ * mirrored to localStorage so a till that boots offline still shows the
+ * pickers it had yesterday.
+ */
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import type { ProductCategory, UomUnit } from "./pos-types";
+
+const CAT_KEY = "pos.catalog.categories";
+const UOM_KEY = "pos.catalog.units";
+const isBrowser = () => typeof window !== "undefined";
+
+export const DEFAULT_UNITS: UomUnit[] = [
+  { id: "pcs", code: "pcs", name: "Pieces", allowDecimal: false, sort: 1 },
+  { id: "box", code: "box", name: "Box", allowDecimal: false, sort: 2 },
+  { id: "pack", code: "pack", name: "Pack", allowDecimal: false, sort: 3 },
+  { id: "set", code: "set", name: "Set", allowDecimal: false, sort: 4 },
+  { id: "kg", code: "kg", name: "Kilogram", allowDecimal: true, sort: 5 },
+  { id: "g", code: "g", name: "Gram", allowDecimal: true, sort: 6 },
+  { id: "l", code: "l", name: "Litre", allowDecimal: true, sort: 7 },
+  { id: "m", code: "m", name: "Metre", allowDecimal: true, sort: 8 },
+];
+
+const listeners = new Set<() => void>();
+const notify = () => listeners.forEach((l) => l());
+
+function readLocal<T>(key: string, fallback: T): T {
+  if (!isBrowser()) return fallback;
+  try {
+    const raw = window.localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeLocal(key: string, value: unknown) {
+  if (!isBrowser()) return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* storage full or blocked — the cloud copy is still authoritative */
+  }
+  notify();
+}
+
+export const readCategories = () => readLocal<ProductCategory[]>(CAT_KEY, []);
+export const readUnits = () => {
+  const stored = readLocal<UomUnit[]>(UOM_KEY, []);
+  return stored.length ? stored : DEFAULT_UNITS;
+};
+
+export async function loadCatalogMeta() {
+  const [cats, units] = await Promise.all([
+    supabase.from("product_categories").select("*").order("sort"),
+    supabase.from("uom_units").select("*").order("sort"),
+  ]);
+  if (!cats.error && cats.data) {
+    writeLocal(
+      CAT_KEY,
+      cats.data.map((r) => ({
+        id: r.id as string,
+        name: r.name as string,
+        parentId: (r.parent_id as string | null) ?? null,
+        sort: Number(r.sort ?? 0),
+      })),
+    );
+  }
+  if (!units.error && units.data?.length) {
+    writeLocal(
+      UOM_KEY,
+      units.data.map((r) => ({
+        id: r.id as string,
+        code: r.code as string,
+        name: r.name as string,
+        allowDecimal: !!r.allow_decimal,
+        sort: Number(r.sort ?? 0),
+      })),
+    );
+  }
+}
+
+export async function saveCategory(cat: Omit<ProductCategory, "id"> & { id?: string }) {
+  const row = {
+    ...(cat.id ? { id: cat.id } : {}),
+    name: cat.name,
+    parent_id: cat.parentId ?? null,
+    sort: cat.sort ?? 0,
+  };
+  const { data, error } = await supabase
+    .from("product_categories")
+    .upsert(row)
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  const saved: ProductCategory = {
+    id: (data?.id as string) ?? cat.id ?? crypto.randomUUID(),
+    name: cat.name,
+    parentId: cat.parentId ?? null,
+    sort: cat.sort ?? 0,
+  };
+  const list = readCategories().filter((c) => c.id !== saved.id);
+  writeLocal(CAT_KEY, [...list, saved].sort((a, b) => a.sort - b.sort));
+  return saved;
+}
+
+export async function deleteCategory(id: string) {
+  const { error } = await supabase.from("product_categories").delete().eq("id", id);
+  if (error) throw error;
+  writeLocal(
+    CAT_KEY,
+    readCategories().filter((c) => c.id !== id && c.parentId !== id),
+  );
+}
+
+export async function saveUnit(unit: Omit<UomUnit, "id"> & { id?: string }) {
+  const row = {
+    ...(unit.id && unit.id.includes("-") ? { id: unit.id } : {}),
+    code: unit.code.trim().toLowerCase(),
+    name: unit.name,
+    allow_decimal: unit.allowDecimal,
+    sort: unit.sort ?? 0,
+  };
+  const { data, error } = await supabase
+    .from("uom_units")
+    .upsert(row, { onConflict: "code" })
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  const saved: UomUnit = {
+    id: (data?.id as string) ?? unit.id ?? crypto.randomUUID(),
+    code: row.code,
+    name: unit.name,
+    allowDecimal: unit.allowDecimal,
+    sort: unit.sort ?? 0,
+  };
+  const list = readUnits().filter((u) => u.code !== saved.code);
+  writeLocal(UOM_KEY, [...list, saved].sort((a, b) => a.sort - b.sort));
+  return saved;
+}
+
+export async function deleteUnit(id: string, code: string) {
+  if (id.includes("-")) {
+    const { error } = await supabase.from("uom_units").delete().eq("id", id);
+    if (error) throw error;
+  } else {
+    await supabase.from("uom_units").delete().eq("code", code);
+  }
+  writeLocal(
+    UOM_KEY,
+    readUnits().filter((u) => u.code !== code),
+  );
+}
+
+function useCatalogStore<T>(read: () => T): T {
+  const [value, setValue] = useState<T>(read);
+  useEffect(() => {
+    const listener = () => setValue(read());
+    listeners.add(listener);
+    void loadCatalogMeta().then(listener);
+    return () => {
+      listeners.delete(listener);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return value;
+}
+
+export const useCategories = () => useCatalogStore(readCategories);
+export const useUnits = () => useCatalogStore(readUnits);
+
+/** Top-level categories, alphabetical. */
+export const topCategories = (all: ProductCategory[]) =>
+  all.filter((c) => !c.parentId).sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name));
+
+/** Sub-categories of a named parent category. */
+export const subCategoriesOf = (all: ProductCategory[], parentName: string) => {
+  const parent = all.find((c) => !c.parentId && c.name === parentName);
+  if (!parent) return [];
+  return all
+    .filter((c) => c.parentId === parent.id)
+    .sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name));
+};
+
+export const unitLabel = (units: UomUnit[], code: string | undefined) =>
+  units.find((u) => u.code === code)?.code ?? code ?? "";
+
+export const unitAllowsDecimal = (units: UomUnit[], code: string | undefined) =>
+  !!units.find((u) => u.code === code)?.allowDecimal;

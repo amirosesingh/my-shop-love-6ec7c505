@@ -57,6 +57,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { availableAt, cartTotals, money, stockAt, usePos } from "@/lib/pos-store";
+import { resolveByBarcode } from "@/lib/product-lookup";
 import { useAuth } from "@/lib/pos-auth";
 import { productVisibleAt } from "@/lib/branch-policy";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
@@ -527,9 +528,7 @@ function Register() {
       setOpenShiftOpen(true);
       return;
     }
-    const hit = state.products.find(
-      (p) => p.barcode === code || p.sku.toLowerCase() === code.toLowerCase(),
-    );
+    const hit = resolveByBarcode(state.products, code);
     if (!hit) {
       toast.error(`No product matches “${code}”`);
       return;
@@ -546,9 +545,7 @@ function Register() {
       void applyVoucher(code);
       return;
     }
-    const hit = state.products.find(
-      (p) => p.barcode === code || p.sku.toLowerCase() === code.toLowerCase(),
-    );
+    const hit = resolveByBarcode(state.products, code);
     if (hit) setQuery("");
     scanCode(code);
   }

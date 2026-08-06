@@ -1,0 +1,37 @@
+/**
+ * Excel export for the catalogue — same column names the bulk importer
+ * accepts, so an exported sheet can be edited and imported straight back.
+ */
+import type { Product, Store } from "./pos-types";
+
+export async function exportProductsXlsx(
+  products: Product[],
+  stores: Store[],
+  fileName = "products",
+) {
+  const XLSX = await import("xlsx");
+  const rows = products.map((p) => {
+    const row: Record<string, string | number> = {
+      name: p.name,
+      sku: p.sku,
+      barcode: p.barcode,
+      barcode_aliases: (p.barcodes ?? []).join("|"),
+      category: p.category,
+      sub_category: p.subCategory ?? "",
+      unit: p.unit ?? "",
+      cost: p.cost,
+      price: p.price,
+      ecom_price: p.ecomPrice ?? "",
+      tax_rate: p.taxRate,
+      reorder_level: p.reorderLevel,
+      custom_points: p.customPoints ?? "",
+    };
+    for (const s of stores) row[`stock_${s.code}`] = p.stockByStore?.[s.id] ?? 0;
+    return row;
+  });
+
+  const sheet = XLSX.utils.json_to_sheet(rows);
+  const book = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(book, sheet, "Products");
+  XLSX.writeFile(book, `${fileName}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}

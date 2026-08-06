@@ -38,11 +38,14 @@ import { Route as ReportsIndexRouteImport } from './routes/reports.index'
 import { Route as ReportsActivityRouteImport } from './routes/reports.activity'
 import { Route as ReportsCatalogRouteImport } from './routes/reports.catalog'
 import { Route as ReportsCouponsRouteImport } from './routes/reports.coupons'
+import { Route as ReportsPaymentsRouteImport } from './routes/reports.payments'
 import { Route as ReportsSalesRouteImport } from './routes/reports.sales'
 import { Route as ReportsStockRouteImport } from './routes/reports.stock'
+import { Route as ReportsVoidsRouteImport } from './routes/reports.voids'
 import { Route as SettingsIndexRouteImport } from './routes/settings.index'
 import { Route as SettingsAccountsRouteImport } from './routes/settings.accounts'
 import { Route as SettingsBookingSlipRouteImport } from './routes/settings.booking-slip'
+import { Route as SettingsCatalogRouteImport } from './routes/settings.catalog'
 import { Route as SettingsDisplayRouteImport } from './routes/settings.display'
 import { Route as SettingsElementsRouteImport } from './routes/settings.elements'
 import { Route as SettingsIdentityRouteImport } from './routes/settings.identity'
@@ -208,6 +211,11 @@ const ReportsCouponsRoute = ReportsCouponsRouteImport.update({
   path: '/reports/coupons',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReportsPaymentsRoute = ReportsPaymentsRouteImport.update({
+  id: '/reports/payments',
+  path: '/reports/payments',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReportsSalesRoute = ReportsSalesRouteImport.update({
   id: '/reports/sales',
   path: '/reports/sales',
@@ -216,6 +224,11 @@ const ReportsSalesRoute = ReportsSalesRouteImport.update({
 const ReportsStockRoute = ReportsStockRouteImport.update({
   id: '/reports/stock',
   path: '/reports/stock',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsVoidsRoute = ReportsVoidsRouteImport.update({
+  id: '/reports/voids',
+  path: '/reports/voids',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsIndexRoute = SettingsIndexRouteImport.update({
@@ -231,6 +244,11 @@ const SettingsAccountsRoute = SettingsAccountsRouteImport.update({
 const SettingsBookingSlipRoute = SettingsBookingSlipRouteImport.update({
   id: '/settings/booking-slip',
   path: '/settings/booking-slip',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsCatalogRoute = SettingsCatalogRouteImport.update({
+  id: '/settings/catalog',
+  path: '/settings/catalog',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsDisplayRoute = SettingsDisplayRouteImport.update({
@@ -358,10 +376,13 @@ export interface FileRoutesByFullPath {
   '/reports/activity': typeof ReportsActivityRoute
   '/reports/catalog': typeof ReportsCatalogRoute
   '/reports/coupons': typeof ReportsCouponsRoute
+  '/reports/payments': typeof ReportsPaymentsRoute
   '/reports/sales': typeof ReportsSalesRoute
   '/reports/stock': typeof ReportsStockRoute
+  '/reports/voids': typeof ReportsVoidsRoute
   '/settings/accounts': typeof SettingsAccountsRoute
   '/settings/booking-slip': typeof SettingsBookingSlipRoute
+  '/settings/catalog': typeof SettingsCatalogRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
   '/settings/identity': typeof SettingsIdentityRoute
@@ -413,10 +434,13 @@ export interface FileRoutesByTo {
   '/reports/activity': typeof ReportsActivityRoute
   '/reports/catalog': typeof ReportsCatalogRoute
   '/reports/coupons': typeof ReportsCouponsRoute
+  '/reports/payments': typeof ReportsPaymentsRoute
   '/reports/sales': typeof ReportsSalesRoute
   '/reports/stock': typeof ReportsStockRoute
+  '/reports/voids': typeof ReportsVoidsRoute
   '/settings/accounts': typeof SettingsAccountsRoute
   '/settings/booking-slip': typeof SettingsBookingSlipRoute
+  '/settings/catalog': typeof SettingsCatalogRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
   '/settings/identity': typeof SettingsIdentityRoute
@@ -469,10 +493,13 @@ export interface FileRoutesById {
   '/reports/activity': typeof ReportsActivityRoute
   '/reports/catalog': typeof ReportsCatalogRoute
   '/reports/coupons': typeof ReportsCouponsRoute
+  '/reports/payments': typeof ReportsPaymentsRoute
   '/reports/sales': typeof ReportsSalesRoute
   '/reports/stock': typeof ReportsStockRoute
+  '/reports/voids': typeof ReportsVoidsRoute
   '/settings/accounts': typeof SettingsAccountsRoute
   '/settings/booking-slip': typeof SettingsBookingSlipRoute
+  '/settings/catalog': typeof SettingsCatalogRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
   '/settings/identity': typeof SettingsIdentityRoute
@@ -526,10 +553,13 @@ export interface FileRouteTypes {
     | '/reports/activity'
     | '/reports/catalog'
     | '/reports/coupons'
+    | '/reports/payments'
     | '/reports/sales'
     | '/reports/stock'
+    | '/reports/voids'
     | '/settings/accounts'
     | '/settings/booking-slip'
+    | '/settings/catalog'
     | '/settings/display'
     | '/settings/elements'
     | '/settings/identity'
@@ -581,10 +611,13 @@ export interface FileRouteTypes {
     | '/reports/activity'
     | '/reports/catalog'
     | '/reports/coupons'
+    | '/reports/payments'
     | '/reports/sales'
     | '/reports/stock'
+    | '/reports/voids'
     | '/settings/accounts'
     | '/settings/booking-slip'
+    | '/settings/catalog'
     | '/settings/display'
     | '/settings/elements'
     | '/settings/identity'
@@ -636,10 +669,13 @@ export interface FileRouteTypes {
     | '/reports/activity'
     | '/reports/catalog'
     | '/reports/coupons'
+    | '/reports/payments'
     | '/reports/sales'
     | '/reports/stock'
+    | '/reports/voids'
     | '/settings/accounts'
     | '/settings/booking-slip'
+    | '/settings/catalog'
     | '/settings/display'
     | '/settings/elements'
     | '/settings/identity'
@@ -692,10 +728,13 @@ export interface RootRouteChildren {
   ReportsActivityRoute: typeof ReportsActivityRoute
   ReportsCatalogRoute: typeof ReportsCatalogRoute
   ReportsCouponsRoute: typeof ReportsCouponsRoute
+  ReportsPaymentsRoute: typeof ReportsPaymentsRoute
   ReportsSalesRoute: typeof ReportsSalesRoute
   ReportsStockRoute: typeof ReportsStockRoute
+  ReportsVoidsRoute: typeof ReportsVoidsRoute
   SettingsAccountsRoute: typeof SettingsAccountsRoute
   SettingsBookingSlipRoute: typeof SettingsBookingSlipRoute
+  SettingsCatalogRoute: typeof SettingsCatalogRoute
   SettingsDisplayRoute: typeof SettingsDisplayRoute
   SettingsElementsRoute: typeof SettingsElementsRoute
   SettingsIdentityRoute: typeof SettingsIdentityRoute
@@ -924,6 +963,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReportsCouponsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reports/payments': {
+      id: '/reports/payments'
+      path: '/reports/payments'
+      fullPath: '/reports/payments'
+      preLoaderRoute: typeof ReportsPaymentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reports/sales': {
       id: '/reports/sales'
       path: '/reports/sales'
@@ -936,6 +982,13 @@ declare module '@tanstack/react-router' {
       path: '/reports/stock'
       fullPath: '/reports/stock'
       preLoaderRoute: typeof ReportsStockRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports/voids': {
+      id: '/reports/voids'
+      path: '/reports/voids'
+      fullPath: '/reports/voids'
+      preLoaderRoute: typeof ReportsVoidsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings/': {
@@ -957,6 +1010,13 @@ declare module '@tanstack/react-router' {
       path: '/settings/booking-slip'
       fullPath: '/settings/booking-slip'
       preLoaderRoute: typeof SettingsBookingSlipRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/catalog': {
+      id: '/settings/catalog'
+      path: '/settings/catalog'
+      fullPath: '/settings/catalog'
+      preLoaderRoute: typeof SettingsCatalogRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings/display': {
@@ -1124,10 +1184,13 @@ const rootRouteChildren: RootRouteChildren = {
   ReportsActivityRoute: ReportsActivityRoute,
   ReportsCatalogRoute: ReportsCatalogRoute,
   ReportsCouponsRoute: ReportsCouponsRoute,
+  ReportsPaymentsRoute: ReportsPaymentsRoute,
   ReportsSalesRoute: ReportsSalesRoute,
   ReportsStockRoute: ReportsStockRoute,
+  ReportsVoidsRoute: ReportsVoidsRoute,
   SettingsAccountsRoute: SettingsAccountsRoute,
   SettingsBookingSlipRoute: SettingsBookingSlipRoute,
+  SettingsCatalogRoute: SettingsCatalogRoute,
   SettingsDisplayRoute: SettingsDisplayRoute,
   SettingsElementsRoute: SettingsElementsRoute,
   SettingsIdentityRoute: SettingsIdentityRoute,
@@ -1153,13 +1216,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

@@ -23,6 +23,14 @@ export type Product = {
   sku: string;
   barcode: string;
   category: string;
+  /** optional second classification level under `category` */
+  subCategory?: string;
+  /** base unit of measure code, e.g. pcs / kg / m */
+  unit?: string;
+  /** purchase / pack sizes expressed in base units, e.g. carton = 12 */
+  packs?: ProductPack[];
+  /** extra barcodes that resolve to this same product */
+  barcodes?: string[];
   price: number;
   cost: number;
   /** online storefront price */
@@ -35,6 +43,31 @@ export type Product = {
   taxRate: number;
   /** bonus loyalty points awarded for this item (bulk import field) */
   customPoints?: number;
+};
+
+export type ProductPack = {
+  /** label shown when receiving, e.g. "Carton" */
+  name: string;
+  /** how many base units one pack contains */
+  factor: number;
+};
+
+/** A catalogue classification. A row with `parentId` is a sub-category. */
+export type ProductCategory = {
+  id: string;
+  name: string;
+  parentId?: string | null;
+  sort: number;
+};
+
+/** A unit of measure the catalogue can use. */
+export type UomUnit = {
+  id: string;
+  code: string;
+  name: string;
+  /** weight / length style units accept fractional quantities */
+  allowDecimal: boolean;
+  sort: number;
 };
 
 export type Member = {
