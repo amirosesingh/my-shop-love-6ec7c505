@@ -1868,7 +1868,7 @@ function Register() {
 
         {/* ── RIGHT: operation deck. Below lg it collapses into a bar under
             the totals so it can never overlap the Charge buttons. ───────── */}
-        <aside className="flex w-full shrink-0 flex-col border-t border-border bg-background lg:w-[288px] lg:border-l lg:border-t-0">
+        <aside className="@container flex w-full shrink-0 flex-col border-t border-border bg-background lg:w-[288px] lg:border-l lg:border-t-0">
           <button
             type="button"
             onClick={() => setDeckOpen((v) => !v)}
@@ -1887,11 +1887,12 @@ function Register() {
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Transaction actions
             </p>
-            <div className="grid auto-rows-fr grid-cols-2 gap-2">
+            <div className="grid auto-rows-fr grid-cols-1 gap-2 @[15rem]:grid-cols-2">
               {visible("register.holdOrder") && (
               <ActionButton
                 variant="outline"
-                className="h-16 min-w-0"
+                layout="responsive"
+                className="h-12 min-w-0 @[15rem]:h-16"
                 label="Hold order"
                 icon={<PauseCircle className="size-4" />}
                 disabled={!lines.length || tillLocked}
@@ -1901,7 +1902,8 @@ function Register() {
               )}
               <ActionButton
                 variant="outline"
-                className="h-16 min-w-0 text-destructive hover:text-destructive"
+                layout="responsive"
+                className="h-12 min-w-0 text-destructive hover:text-destructive @[15rem]:h-16"
                 label="Void cart"
                 icon={<Trash2 className="size-4" />}
                 disabled={!lines.length || tillLocked}
@@ -1911,7 +1913,8 @@ function Register() {
               {visible("register.coupon") && (
               <ActionButton
                 variant="outline"
-                className="h-16 min-w-0"
+                layout="responsive"
+                className="h-12 min-w-0 @[15rem]:h-16"
                 label="Apply coupon"
                 icon={<TicketPercent className="size-4" />}
                 disabled={tillLocked}
@@ -1922,7 +1925,8 @@ function Register() {
               {visible("register.splitBill") && (
               <ActionButton
                 variant="outline"
-                className="h-16 min-w-0"
+                layout="responsive"
+                className="h-12 min-w-0 @[15rem]:h-16"
                 label="Split bill"
                 icon={<Split className="size-4" />}
                 disabled={balanceDue <= 0 || tillLocked}
