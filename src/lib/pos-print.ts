@@ -646,6 +646,8 @@ function bookingBody(booking: Booking, member: Member | null, pay: PaymentDetail
     <div class="c muted">Goods are reserved until this date. Bring this slip to collect.</div>
     ${booking.note ? `<div class="c muted">${esc(booking.note)}</div>` : ""}
     ${jobCardBlock(booking)}
+    ${termsBlock()}
+    ${signatureBlock(booking.customerName)}
     ${transferBlock(pay)}
     ${member ? `<hr><div>Member ${esc(member.code)} · ${esc(member.name)}</div>` : ""}
     <hr>${receiptCfg.showBarcode ? barcodeSvg(booking.ref) : ""}
@@ -669,6 +671,7 @@ function bookingPaymentBody(booking: Booking, payment: BookingPayment) {
       <tr class="b"><td>BALANCE DUE</td><td class="r">${fmt(bookingBalance(booking))}</td></tr>
     </table>
     <hr><div class="c">Collect &amp; settle by ${esc(new Date(booking.dueDate).toDateString())}</div>
+    ${receiptCfg.bookingSlip?.termsOnPayment ? termsBlock() : ""}
     <hr><div class="c muted rcpt-foot">${esc(receiptCfg.footerText || "")}</div>
     <div class="c muted">${esc(booking.ref)}</div>`;
 }
