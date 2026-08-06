@@ -105,6 +105,45 @@ CREATE UNIQUE INDEX IF NOT EXISTS user_roles_pkey ON public.user_roles USING btr
 -- drop any older copy first. Dropping a function never touches data.
 DROP FUNCTION IF EXISTS public.current_app_user();
 
+-- ── Safe re-run guard ─────────────────────────────────────────────────────
+-- Postgres refuses CREATE OR REPLACE when a function's return type changed.
+-- Drop any stale overload of the routines defined below first. Each drop is
+-- attempted on its own, so a routine still referenced by a policy or trigger
+-- is simply left in place instead of aborting the whole file.
+DO $guard$
+DECLARE r record;
+BEGIN
+  FOR r IN
+    SELECT p.oid::regprocedure AS sig
+      FROM pg_proc p
+     WHERE p.pronamespace = 'public'::regnamespace
+       AND p.proname = ANY (ARRAY[
+      'current_app_user',
+      'delete_cashier',
+      'delete_terminal_user',
+      'has_role',
+      'is_app_supervisor',
+      'is_staff',
+      'list_app_users',
+      'list_cashiers',
+      'set_app_user_permissions',
+      'set_app_user_profile',
+      'set_cashier_permissions',
+      'set_terminal_active',
+      'sync_auth_user_to_public',
+      'upsert_cashier',
+      'upsert_terminal_user',
+      'verify_cashier_pin',
+      'verify_terminal_pin'
+       ])
+  LOOP
+    BEGIN
+      EXECUTE 'DROP FUNCTION IF EXISTS ' || r.sig;
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END;
+  END LOOP;
+END $guard$;
+
 CREATE OR REPLACE FUNCTION public.current_app_user()
  RETURNS TABLE(id uuid, user_id text, full_name text, role app_role, store_id text, email text, permissions jsonb, is_active boolean)
  LANGUAGE sql
