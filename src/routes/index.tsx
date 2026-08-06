@@ -1891,7 +1891,7 @@ function Register() {
               {visible("register.holdOrder") && (
               <ActionButton
                 variant="outline"
-                layout="responsive"
+                layout="inline"
                 className="h-12 min-w-0 @[15rem]:h-16"
                 label="Hold order"
                 icon={<PauseCircle className="size-4" />}
@@ -1902,7 +1902,7 @@ function Register() {
               )}
               <ActionButton
                 variant="outline"
-                layout="responsive"
+                layout="inline"
                 className="h-12 min-w-0 text-destructive hover:text-destructive @[15rem]:h-16"
                 label="Void cart"
                 icon={<Trash2 className="size-4" />}
@@ -1913,7 +1913,7 @@ function Register() {
               {visible("register.coupon") && (
               <ActionButton
                 variant="outline"
-                layout="responsive"
+                layout="inline"
                 className="h-12 min-w-0 @[15rem]:h-16"
                 label="Apply coupon"
                 icon={<TicketPercent className="size-4" />}
@@ -1925,7 +1925,7 @@ function Register() {
               {visible("register.splitBill") && (
               <ActionButton
                 variant="outline"
-                layout="responsive"
+                layout="inline"
                 className="h-12 min-w-0 @[15rem]:h-16"
                 label="Split bill"
                 icon={<Split className="size-4" />}
