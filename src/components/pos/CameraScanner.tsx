@@ -1,9 +1,13 @@
 /**
- * Small camera QR reader used by the terminal pairing flow.
- * Renders nothing but the live preview; the caller decides what a scan means.
+ * Camera QR/barcode reader shared by pairing and stock lookups.
+ *
+ * Permission is requested up front so a blocked camera shows a readable
+ * message instead of an empty black box, and on Android the native MLKit
+ * reader is used because it handles EAN-13 far better than the web decoder.
  */
-import { useEffect, useId, useRef } from "react";
-import { Loader2 } from "lucide-react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { CameraOff, Loader2 } from "lucide-react";
+import { ensureCameraPermission, isNativeApp, scanOnceNative } from "@/lib/camera";
 
 export function CameraScanner({
   onScan,
@@ -14,11 +18,40 @@ export function CameraScanner({
 }) {
   const domId = `qr-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   const handled = useRef(false);
+  const [error, setError] = useState("");
+
+  const emit = useCallback(
+    (value: string) => {
+      if (handled.current) return;
+      handled.current = true;
+      onScan(value);
+    },
+    [onScan],
+  );
 
   useEffect(() => {
     let scanner: { stop: () => Promise<void> } | null = null;
     let stopped = false;
+
     void (async () => {
+      const permission = await ensureCameraPermission();
+      if (stopped) return;
+      if (!permission.ok) {
+        setError(permission.reason ?? "The camera is not available.");
+        return;
+      }
+
+      if (isNativeApp()) {
+        try {
+          const value = await scanOnceNative();
+          if (!stopped && value) emit(value);
+          else if (!stopped) onClose?.();
+        } catch (e) {
+          if (!stopped) setError(e instanceof Error ? e.message : "Scanning failed.");
+        }
+        return;
+      }
+
       try {
         const { Html5Qrcode } = await import("html5-qrcode");
         const instance = new Html5Qrcode(domId);
@@ -28,20 +61,32 @@ export function CameraScanner({
           { fps: 10, qrbox: 240 },
           (text) => {
             if (stopped || handled.current) return;
-            handled.current = true;
-            void instance.stop().then(() => onScan(text));
+            void instance
+              .stop()
+              .catch(() => {})
+              .then(() => emit(text));
           },
           () => {},
         );
       } catch {
-        onClose?.();
+        if (!stopped) setError("The camera could not be started. Close other apps using it and retry.");
       }
     })();
+
     return () => {
       stopped = true;
       void scanner?.stop().catch(() => {});
     };
-  }, [domId, onScan, onClose]);
+  }, [domId, emit, onClose]);
+
+  if (error) {
+    return (
+      <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
+        <CameraOff className="mt-0.5 size-4 shrink-0" />
+        <span>{error}</span>
+      </div>
+    );
+  }
 
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-black/80">
