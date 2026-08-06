@@ -12,19 +12,19 @@ DO $$ BEGIN CREATE TYPE public.app_role AS ENUM ('admin', 'manager', 'staff'); E
 -- ---------- tables ----------
 
 CREATE TABLE IF NOT EXISTS public.app_users (
-  id uuid DEFAULT gen_random_uuid(),
-  user_id character varying(64),
-  full_name character varying(160),
-  email character varying(255),
-  role app_role DEFAULT 'staff'::app_role,
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
+  user_id character varying(64) NOT NULL,
+  full_name character varying(160) NOT NULL,
+  email character varying(255) NOT NULL,
+  role app_role DEFAULT 'staff'::app_role NOT NULL,
   store_id character varying(64),
-  is_active boolean DEFAULT true,
-  permissions jsonb DEFAULT jsonb_build_object('can_open_drawer', true, 'can_close_drawer', true, 'can_view_drawer_balance', false, 'can_process_sale', true, 'can_give_discount', false, 'can_void_item', false, 'can_hold_cart', true, 'can_process_refund', false, 'can_process_exchange', false, 'can_view_inventory', true, 'can_edit_product_price', false, 'can_add_new_product', false, 'can_receive_purchase_order', false, 'can_add_member', true, 'can_edit_member_points', false, 'can_apply_member_discount', true, 'can_view_sales_reports', false, 'can_access_pos_settings', false, 'can_manage_staff', false),
-  pin_hash text DEFAULT ''::text,
+  is_active boolean DEFAULT true NOT NULL,
+  permissions jsonb DEFAULT jsonb_build_object('can_open_drawer', true, 'can_close_drawer', true, 'can_view_drawer_balance', false, 'can_process_sale', true, 'can_give_discount', false, 'can_void_item', false, 'can_hold_cart', true, 'can_process_refund', false, 'can_process_exchange', false, 'can_view_inventory', true, 'can_edit_product_price', false, 'can_add_new_product', false, 'can_receive_purchase_order', false, 'can_add_member', true, 'can_edit_member_points', false, 'can_apply_member_discount', true, 'can_view_sales_reports', false, 'can_access_pos_settings', false, 'can_manage_staff', false) NOT NULL,
+  pin_hash text DEFAULT ''::text NOT NULL,
   auth_user_id uuid,
   last_login_at timestamp with time zone,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
+  updated_at timestamp with time zone DEFAULT now() NOT NULL,
   PRIMARY KEY (id)
 );
 ALTER TABLE public.app_users ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid();
@@ -46,13 +46,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS app_users_pkey ON public.app_users USING btree
 CREATE UNIQUE INDEX IF NOT EXISTS app_users_user_id_key ON public.app_users USING btree (user_id);
 
 CREATE TABLE IF NOT EXISTS public.audit_logs (
-  id uuid DEFAULT gen_random_uuid(),
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
   user_name text,
-  action_category text,
-  action_name text,
+  action_category text NOT NULL,
+  action_name text NOT NULL,
   target_module text,
   details jsonb,
-  created_at timestamp with time zone DEFAULT now(),
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
   PRIMARY KEY (id)
 );
 ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid();
@@ -66,13 +66,13 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON public.audit_logs USING 
 CREATE UNIQUE INDEX IF NOT EXISTS audit_logs_pkey ON public.audit_logs USING btree (id);
 
 CREATE TABLE IF NOT EXISTS public.booking_payments (
-  id uuid DEFAULT gen_random_uuid(),
-  booking_id uuid,
-  amount numeric DEFAULT 0,
-  method text DEFAULT 'cash'::text,
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
+  booking_id uuid NOT NULL,
+  amount numeric DEFAULT 0 NOT NULL,
+  method text DEFAULT 'cash'::text NOT NULL,
   cashier text,
-  paid_at timestamp with time zone DEFAULT now(),
-  created_at timestamp with time zone DEFAULT now(),
+  paid_at timestamp with time zone DEFAULT now() NOT NULL,
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
   PRIMARY KEY (id)
 );
 ALTER TABLE public.booking_payments ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid();
@@ -86,44 +86,44 @@ DO $$ BEGIN ALTER TABLE public.booking_payments ADD CONSTRAINT booking_payments_
 CREATE UNIQUE INDEX IF NOT EXISTS booking_payments_pkey ON public.booking_payments USING btree (id);
 
 CREATE TABLE IF NOT EXISTS public.bookings (
-  id uuid DEFAULT gen_random_uuid(),
-  ref text,
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
+  ref text NOT NULL,
   store_id text,
   shift_id text,
-  customer_name text DEFAULT ''::text,
-  customer_phone text DEFAULT ''::text,
+  customer_name text DEFAULT ''::text NOT NULL,
+  customer_phone text DEFAULT ''::text NOT NULL,
   member_id uuid,
   service_type_id text,
   service_name text,
-  service_fee numeric DEFAULT 0,
+  service_fee numeric DEFAULT 0 NOT NULL,
   payment_timing text,
-  lines jsonb DEFAULT '[]'::jsonb,
-  subtotal numeric DEFAULT 0,
-  discount numeric DEFAULT 0,
-  tax numeric DEFAULT 0,
-  total numeric DEFAULT 0,
-  paid numeric DEFAULT 0,
+  lines jsonb DEFAULT '[]'::jsonb NOT NULL,
+  subtotal numeric DEFAULT 0 NOT NULL,
+  discount numeric DEFAULT 0 NOT NULL,
+  tax numeric DEFAULT 0 NOT NULL,
+  total numeric DEFAULT 0 NOT NULL,
+  paid numeric DEFAULT 0 NOT NULL,
   due_date date,
-  note text DEFAULT ''::text,
+  note text DEFAULT ''::text NOT NULL,
   cashier text,
-  status text DEFAULT 'active'::text,
+  status text DEFAULT 'active'::text NOT NULL,
   sale_receipt_no text,
   closed_at timestamp with time zone,
   racket_model text,
   string_type text,
   tension_main numeric,
   tension_cross numeric,
-  tension_unit text DEFAULT 'lb'::text,
+  tension_unit text DEFAULT 'lb'::text NOT NULL,
   grommet_notes text,
   job_notes text,
   dropped_off_at timestamp with time zone,
   promised_at timestamp with time zone,
-  job_status text DEFAULT 'received'::text,
+  job_status text DEFAULT 'received'::text NOT NULL,
   job_status_by text,
   job_status_at timestamp with time zone,
-  notify_whatsapp boolean DEFAULT false,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
+  notify_whatsapp boolean DEFAULT false NOT NULL,
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
+  updated_at timestamp with time zone DEFAULT now() NOT NULL,
   PRIMARY KEY (id)
 );
 ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid();
@@ -169,16 +169,16 @@ CREATE UNIQUE INDEX IF NOT EXISTS bookings_ref_key ON public.bookings USING btre
 CREATE UNIQUE INDEX IF NOT EXISTS bookings_pkey ON public.bookings USING btree (id);
 
 CREATE TABLE IF NOT EXISTS public.cashiers (
-  id uuid DEFAULT gen_random_uuid(),
-  username text,
-  full_name text DEFAULT ''::text,
-  pin_hash text,
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
+  username text NOT NULL,
+  full_name text DEFAULT ''::text NOT NULL,
+  pin_hash text NOT NULL,
   store_id text,
-  permissions jsonb DEFAULT '{}'::jsonb,
-  is_active boolean DEFAULT true,
+  permissions jsonb DEFAULT '{}'::jsonb NOT NULL,
+  is_active boolean DEFAULT true NOT NULL,
   last_login_at timestamp with time zone,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
+  updated_at timestamp with time zone DEFAULT now() NOT NULL,
   PRIMARY KEY (id)
 );
 ALTER TABLE public.cashiers ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid();
@@ -195,22 +195,22 @@ CREATE UNIQUE INDEX IF NOT EXISTS cashiers_pkey ON public.cashiers USING btree (
 CREATE UNIQUE INDEX IF NOT EXISTS cashiers_username_key ON public.cashiers USING btree (lower(username));
 
 CREATE TABLE IF NOT EXISTS public.coupon_campaigns (
-  id uuid DEFAULT gen_random_uuid(),
-  name text,
-  slug text,
-  discount_type text DEFAULT 'PERCENTAGE'::text,
-  discount_value numeric DEFAULT 0,
-  scope text DEFAULT 'BILL'::text,
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
+  name text NOT NULL,
+  slug text NOT NULL,
+  discount_type text DEFAULT 'PERCENTAGE'::text NOT NULL,
+  discount_value numeric DEFAULT 0 NOT NULL,
+  scope text DEFAULT 'BILL'::text NOT NULL,
   scope_value text,
   max_claims integer,
   max_per_member integer DEFAULT 1,
-  claims_count integer DEFAULT 0,
+  claims_count integer DEFAULT 0 NOT NULL,
   starts_at timestamp with time zone,
   expires_at timestamp with time zone,
-  is_active boolean DEFAULT true,
-  is_welcome boolean DEFAULT false,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
+  is_active boolean DEFAULT true NOT NULL,
+  is_welcome boolean DEFAULT false NOT NULL,
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
+  updated_at timestamp with time zone DEFAULT now() NOT NULL,
   PRIMARY KEY (id)
 );
 ALTER TABLE public.coupon_campaigns ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid();
@@ -236,8 +236,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS coupon_campaigns_slug_key ON public.coupon_cam
 CREATE UNIQUE INDEX IF NOT EXISTS coupon_campaigns_pkey ON public.coupon_campaigns USING btree (id);
 
 CREATE TABLE IF NOT EXISTS public.coupon_events (
-  id uuid DEFAULT gen_random_uuid(),
-  event_type text,
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
+  event_type text NOT NULL,
   campaign_id uuid,
   campaign_name text,
   voucher_token text,
@@ -249,7 +249,7 @@ CREATE TABLE IF NOT EXISTS public.coupon_events (
   staff_role text,
   sale_id text,
   note text,
-  created_at timestamp with time zone DEFAULT now(),
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
   PRIMARY KEY (id)
 );
 ALTER TABLE public.coupon_events ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid();
@@ -274,17 +274,17 @@ CREATE INDEX IF NOT EXISTS coupon_events_created_idx ON public.coupon_events USI
 CREATE INDEX IF NOT EXISTS coupon_events_campaign_idx ON public.coupon_events USING btree (campaign_id);
 
 CREATE TABLE IF NOT EXISTS public.drawer_events (
-  id uuid DEFAULT gen_random_uuid(),
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
   store_id text,
   terminal_id text,
   shift_id text,
   staff_id text,
   staff_name text,
   role text,
-  reason text,
+  reason text NOT NULL,
   note text,
   approved_by text,
-  created_at timestamp with time zone DEFAULT now(),
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
   PRIMARY KEY (id)
 );
 ALTER TABLE public.drawer_events ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid();
@@ -301,24 +301,24 @@ ALTER TABLE public.drawer_events ADD COLUMN IF NOT EXISTS created_at timestamp w
 CREATE UNIQUE INDEX IF NOT EXISTS drawer_events_pkey ON public.drawer_events USING btree (id);
 
 CREATE TABLE IF NOT EXISTS public.held_orders (
-  id uuid DEFAULT gen_random_uuid(),
-  label text DEFAULT ''::text,
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
+  label text DEFAULT ''::text NOT NULL,
   store_id text,
   shift_id text,
   held_by text,
-  total numeric DEFAULT 0,
-  lines jsonb DEFAULT '[]'::jsonb,
-  cart_discount numeric DEFAULT 0,
-  cart_discount_type text DEFAULT 'amount'::text,
+  total numeric DEFAULT 0 NOT NULL,
+  lines jsonb DEFAULT '[]'::jsonb NOT NULL,
+  cart_discount numeric DEFAULT 0 NOT NULL,
+  cart_discount_type text DEFAULT 'amount'::text NOT NULL,
   exchange_ref text,
   member_id uuid,
   member_name text,
   coupon jsonb,
-  note text DEFAULT ''::text,
+  note text DEFAULT ''::text NOT NULL,
   cancelled_from text,
-  held_at timestamp with time zone DEFAULT now(),
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
+  held_at timestamp with time zone DEFAULT now() NOT NULL,
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
+  updated_at timestamp with time zone DEFAULT now() NOT NULL,
   PRIMARY KEY (id)
 );
 ALTER TABLE public.held_orders ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid();
@@ -342,15 +342,15 @@ ALTER TABLE public.held_orders ADD COLUMN IF NOT EXISTS updated_at timestamp wit
 CREATE UNIQUE INDEX IF NOT EXISTS held_orders_pkey ON public.held_orders USING btree (id);
 
 CREATE TABLE IF NOT EXISTS public.issued_vouchers (
-  id uuid DEFAULT gen_random_uuid(),
-  token_slug text,
-  campaign_id uuid,
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
+  token_slug text NOT NULL,
+  campaign_id uuid NOT NULL,
   member_id uuid,
-  status text DEFAULT 'ISSUED'::text,
-  issued_at timestamp with time zone DEFAULT now(),
+  status text DEFAULT 'ISSUED'::text NOT NULL,
+  issued_at timestamp with time zone DEFAULT now() NOT NULL,
   expires_at timestamp with time zone,
   issued_by text,
-  issued_source text DEFAULT 'PUBLIC'::text,
+  issued_source text DEFAULT 'PUBLIC'::text NOT NULL,
   redeemed_at timestamp with time zone,
   redeemed_by text,
   redeemed_sale_id text,
@@ -386,17 +386,17 @@ CREATE UNIQUE INDEX IF NOT EXISTS issued_vouchers_token_slug_key ON public.issue
 CREATE UNIQUE INDEX IF NOT EXISTS issued_vouchers_pkey ON public.issued_vouchers USING btree (id);
 
 CREATE TABLE IF NOT EXISTS public.members (
-  id uuid DEFAULT gen_random_uuid(),
-  member_code text,
-  full_name text,
-  phone text,
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
+  member_code text NOT NULL,
+  full_name text NOT NULL,
+  phone text NOT NULL,
   email text,
   address text,
   date_of_birth date,
   tier_id uuid,
-  loyalty_points numeric DEFAULT 0,
-  total_spent numeric DEFAULT 0,
-  created_at timestamp with time zone DEFAULT now(),
+  loyalty_points numeric DEFAULT 0 NOT NULL,
+  total_spent numeric DEFAULT 0 NOT NULL,
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
   PRIMARY KEY (id)
 );
 ALTER TABLE public.members ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid();
@@ -418,11 +418,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS members_pkey ON public.members USING btree (id
 CREATE UNIQUE INDEX IF NOT EXISTS members_phone_key ON public.members USING btree (phone);
 
 CREATE TABLE IF NOT EXISTS public.membership_tiers (
-  id uuid DEFAULT gen_random_uuid(),
-  name text,
-  discount_percentage numeric DEFAULT 0,
-  points_multiplier numeric DEFAULT 1.0,
-  created_at timestamp with time zone DEFAULT now(),
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
+  name text NOT NULL,
+  discount_percentage numeric DEFAULT 0 NOT NULL,
+  points_multiplier numeric DEFAULT 1.0 NOT NULL,
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
   PRIMARY KEY (id)
 );
 ALTER TABLE public.membership_tiers ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid();
@@ -435,42 +435,42 @@ CREATE UNIQUE INDEX IF NOT EXISTS membership_tiers_name_key ON public.membership
 CREATE UNIQUE INDEX IF NOT EXISTS membership_tiers_pkey ON public.membership_tiers USING btree (id);
 
 CREATE TABLE IF NOT EXISTS public.pos_settings (
-  id integer DEFAULT 1,
-  tax_percentage numeric DEFAULT 0,
-  enable_tax boolean DEFAULT true,
-  tax_mode text DEFAULT 'exclusive'::text,
-  paper_size text DEFAULT '80mm'::text,
+  id integer DEFAULT 1 NOT NULL,
+  tax_percentage numeric DEFAULT 0 NOT NULL,
+  enable_tax boolean DEFAULT true NOT NULL,
+  tax_mode text DEFAULT 'exclusive'::text NOT NULL,
+  paper_size text DEFAULT '80mm'::text NOT NULL,
   header_text text,
   footer_text text,
-  show_logo boolean DEFAULT true,
-  show_points boolean DEFAULT true,
-  show_barcode boolean DEFAULT true,
-  show_tax_details boolean DEFAULT true,
-  updated_at timestamp with time zone DEFAULT now(),
-  company_name text DEFAULT 'NORTHWIND & CO.'::text,
+  show_logo boolean DEFAULT true NOT NULL,
+  show_points boolean DEFAULT true NOT NULL,
+  show_barcode boolean DEFAULT true NOT NULL,
+  show_tax_details boolean DEFAULT true NOT NULL,
+  updated_at timestamp with time zone DEFAULT now() NOT NULL,
+  company_name text DEFAULT 'NORTHWIND & CO.'::text NOT NULL,
   tax_number text,
   reg_number text,
   phone text,
   website text,
-  fonts jsonb DEFAULT '{}'::jsonb,
-  custom_lines jsonb DEFAULT '[]'::jsonb,
-  qr jsonb DEFAULT '{}'::jsonb,
-  review_max_voids integer DEFAULT 5,
-  review_max_refunds integer DEFAULT 3,
-  review_max_refund_value numeric DEFAULT 200,
-  review_max_nosale integer DEFAULT 5,
-  review_max_discount_pct numeric DEFAULT 15,
-  day_start_time text DEFAULT '09:00'::text,
-  day_end_time text DEFAULT '22:00'::text,
-  max_shift_hours numeric DEFAULT 12,
-  shift_reminder_minutes integer DEFAULT 30,
-  ui_visibility jsonb DEFAULT '{"hidden": {}}'::jsonb,
-  integration_settings jsonb DEFAULT '{}'::jsonb,
-  region_country text DEFAULT ''::text,
-  time_zone text DEFAULT ''::text,
-  date_format text DEFAULT 'dd/MM/yyyy'::text,
-  time_format text DEFAULT '24h'::text,
-  booking_slip jsonb DEFAULT '{}'::jsonb,
+  fonts jsonb DEFAULT '{}'::jsonb NOT NULL,
+  custom_lines jsonb DEFAULT '[]'::jsonb NOT NULL,
+  qr jsonb DEFAULT '{}'::jsonb NOT NULL,
+  review_max_voids integer DEFAULT 5 NOT NULL,
+  review_max_refunds integer DEFAULT 3 NOT NULL,
+  review_max_refund_value numeric DEFAULT 200 NOT NULL,
+  review_max_nosale integer DEFAULT 5 NOT NULL,
+  review_max_discount_pct numeric DEFAULT 15 NOT NULL,
+  day_start_time text DEFAULT '09:00'::text NOT NULL,
+  day_end_time text DEFAULT '22:00'::text NOT NULL,
+  max_shift_hours numeric DEFAULT 12 NOT NULL,
+  shift_reminder_minutes integer DEFAULT 30 NOT NULL,
+  ui_visibility jsonb DEFAULT '{"hidden": {}}'::jsonb NOT NULL,
+  integration_settings jsonb DEFAULT '{}'::jsonb NOT NULL,
+  region_country text DEFAULT ''::text NOT NULL,
+  time_zone text DEFAULT ''::text NOT NULL,
+  date_format text DEFAULT 'dd/MM/yyyy'::text NOT NULL,
+  time_format text DEFAULT '24h'::text NOT NULL,
+  booking_slip jsonb DEFAULT '{}'::jsonb NOT NULL,
   PRIMARY KEY (id)
 );
 ALTER TABLE public.pos_settings ADD COLUMN IF NOT EXISTS id integer DEFAULT 1;
@@ -512,12 +512,12 @@ ALTER TABLE public.pos_settings ADD COLUMN IF NOT EXISTS booking_slip jsonb DEFA
 CREATE UNIQUE INDEX IF NOT EXISTS pos_settings_pkey ON public.pos_settings USING btree (id);
 
 CREATE TABLE IF NOT EXISTS public.product_categories (
-  id uuid DEFAULT gen_random_uuid(),
-  name text,
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
+  name text NOT NULL,
   parent_id uuid,
-  sort integer DEFAULT 0,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
+  sort integer DEFAULT 0 NOT NULL,
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
+  updated_at timestamp with time zone DEFAULT now() NOT NULL,
   PRIMARY KEY (id)
 );
 ALTER TABLE public.product_categories ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid();
@@ -530,28 +530,28 @@ DO $$ BEGIN ALTER TABLE public.product_categories ADD CONSTRAINT product_categor
 CREATE UNIQUE INDEX IF NOT EXISTS product_categories_pkey ON public.product_categories USING btree (id);
 
 CREATE TABLE IF NOT EXISTS public.products (
-  id uuid DEFAULT gen_random_uuid(),
-  barcode text,
-  name text,
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
+  barcode text NOT NULL,
+  name text NOT NULL,
   category text,
-  cost_price numeric DEFAULT 0,
-  selling_price numeric DEFAULT 0,
+  cost_price numeric DEFAULT 0 NOT NULL,
+  selling_price numeric DEFAULT 0 NOT NULL,
   ecom_price numeric,
-  stock_quantity integer DEFAULT 0,
+  stock_quantity integer DEFAULT 0 NOT NULL,
   custom_points numeric,
-  point_multiplier numeric DEFAULT 1.0,
-  created_at timestamp with time zone DEFAULT now(),
+  point_multiplier numeric DEFAULT 1.0 NOT NULL,
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
   sku text,
-  reorder_level integer DEFAULT 0,
-  tax_rate numeric DEFAULT 0,
-  ecom_visible boolean DEFAULT true,
-  stock_by_store jsonb DEFAULT '{}'::jsonb,
-  updated_at timestamp with time zone DEFAULT now(),
+  reorder_level integer DEFAULT 0 NOT NULL,
+  tax_rate numeric DEFAULT 0 NOT NULL,
+  ecom_visible boolean DEFAULT true NOT NULL,
+  stock_by_store jsonb DEFAULT '{}'::jsonb NOT NULL,
+  updated_at timestamp with time zone DEFAULT now() NOT NULL,
   landing_pct numeric,
   sub_category text,
   unit text,
-  packs jsonb DEFAULT '[]'::jsonb,
-  barcode_aliases text[] DEFAULT '{}'::text[],
+  packs jsonb DEFAULT '[]'::jsonb NOT NULL,
+  barcode_aliases text[] DEFAULT '{}'::text[] NOT NULL,
   PRIMARY KEY (id)
 );
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid();
@@ -582,19 +582,19 @@ CREATE UNIQUE INDEX IF NOT EXISTS products_sku_unique_idx ON public.products USI
 CREATE UNIQUE INDEX IF NOT EXISTS products_barcode_key ON public.products USING btree (barcode);
 
 CREATE TABLE IF NOT EXISTS public.promotions (
-  id uuid DEFAULT gen_random_uuid(),
-  title text,
-  promo_type text,
-  min_spend numeric DEFAULT 0,
-  discount_percent numeric DEFAULT 0,
-  discount_amount numeric DEFAULT 0,
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
+  title text NOT NULL,
+  promo_type text NOT NULL,
+  min_spend numeric DEFAULT 0 NOT NULL,
+  discount_percent numeric DEFAULT 0 NOT NULL,
+  discount_amount numeric DEFAULT 0 NOT NULL,
   foc_product_id uuid,
-  points_per_dollar numeric DEFAULT 1,
+  points_per_dollar numeric DEFAULT 1 NOT NULL,
   tier_rates jsonb,
-  is_active boolean DEFAULT true,
+  is_active boolean DEFAULT true NOT NULL,
   start_date date,
   end_date date,
-  created_at timestamp with time zone DEFAULT now(),
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
   PRIMARY KEY (id)
 );
 ALTER TABLE public.promotions ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid();
@@ -614,16 +614,16 @@ DO $$ BEGIN ALTER TABLE public.promotions ADD CONSTRAINT promotions_foc_product_
 CREATE UNIQUE INDEX IF NOT EXISTS promotions_pkey ON public.promotions USING btree (id);
 
 CREATE TABLE IF NOT EXISTS public.purchase_order_items (
-  id uuid DEFAULT gen_random_uuid(),
-  po_id uuid,
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
+  po_id uuid NOT NULL,
   product_id uuid,
   barcode text,
   product_name text,
-  cost_price numeric DEFAULT 0,
-  selling_price numeric DEFAULT 0,
-  quantity_received integer DEFAULT 0,
-  subtotal_cost numeric DEFAULT 0,
-  created_at timestamp with time zone DEFAULT now(),
+  cost_price numeric DEFAULT 0 NOT NULL,
+  selling_price numeric DEFAULT 0 NOT NULL,
+  quantity_received integer DEFAULT 0 NOT NULL,
+  subtotal_cost numeric DEFAULT 0 NOT NULL,
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
   PRIMARY KEY (id)
 );
 ALTER TABLE public.purchase_order_items ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid();
@@ -642,13 +642,13 @@ CREATE INDEX IF NOT EXISTS idx_po_items_po_id ON public.purchase_order_items USI
 CREATE UNIQUE INDEX IF NOT EXISTS purchase_order_items_pkey ON public.purchase_order_items USING btree (id);
 
 CREATE TABLE IF NOT EXISTS public.purchase_orders (
-  id uuid DEFAULT gen_random_uuid(),
-  po_number text,
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
+  po_number text NOT NULL,
   supplier_name text,
   operator_name text,
-  total_cost numeric DEFAULT 0,
-  total_items_count integer DEFAULT 0,
-  created_at timestamp with time zone DEFAULT now(),
+  total_cost numeric DEFAULT 0 NOT NULL,
+  total_items_count integer DEFAULT 0 NOT NULL,
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
   supplier_id uuid,
   PRIMARY KEY (id)
 );
@@ -666,22 +666,22 @@ CREATE UNIQUE INDEX IF NOT EXISTS purchase_orders_pkey ON public.purchase_orders
 CREATE UNIQUE INDEX IF NOT EXISTS purchase_orders_po_number_key ON public.purchase_orders USING btree (po_number);
 
 CREATE TABLE IF NOT EXISTS public.sale_items (
-  id uuid DEFAULT gen_random_uuid(),
-  sale_id uuid,
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
+  sale_id uuid NOT NULL,
   product_id uuid,
-  product_name text,
-  unit_price numeric DEFAULT 0,
-  quantity integer DEFAULT 1,
-  discount_percent numeric DEFAULT 0,
-  discount_amount numeric DEFAULT 0,
-  is_return boolean DEFAULT false,
-  created_at timestamp with time zone DEFAULT now(),
-  tax_rate numeric DEFAULT 0,
-  is_foc boolean DEFAULT false,
+  product_name text NOT NULL,
+  unit_price numeric DEFAULT 0 NOT NULL,
+  quantity integer DEFAULT 1 NOT NULL,
+  discount_percent numeric DEFAULT 0 NOT NULL,
+  discount_amount numeric DEFAULT 0 NOT NULL,
+  is_return boolean DEFAULT false NOT NULL,
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
+  tax_rate numeric DEFAULT 0 NOT NULL,
+  is_foc boolean DEFAULT false NOT NULL,
   promo_id text,
   coupon_code text,
-  coupon_discount numeric DEFAULT 0,
-  unit_cost numeric DEFAULT 0,
+  coupon_discount numeric DEFAULT 0 NOT NULL,
+  unit_cost numeric DEFAULT 0 NOT NULL,
   PRIMARY KEY (id)
 );
 ALTER TABLE public.sale_items ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid();
@@ -706,32 +706,32 @@ CREATE INDEX IF NOT EXISTS idx_sale_items_sale_id ON public.sale_items USING btr
 CREATE UNIQUE INDEX IF NOT EXISTS sale_items_pkey ON public.sale_items USING btree (id);
 
 CREATE TABLE IF NOT EXISTS public.sales (
-  id uuid DEFAULT gen_random_uuid(),
-  bill_number text,
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
+  bill_number text NOT NULL,
   member_id uuid,
   store_id text,
   cashier_name text,
-  subtotal_amount numeric DEFAULT 0,
-  total_amount numeric DEFAULT 0,
-  discount_amount numeric DEFAULT 0,
-  tax_amount numeric DEFAULT 0,
-  payment_type text DEFAULT 'cash'::text,
-  points_earned numeric DEFAULT 0,
-  points_redeemed numeric DEFAULT 0,
-  is_exchange boolean DEFAULT false,
+  subtotal_amount numeric DEFAULT 0 NOT NULL,
+  total_amount numeric DEFAULT 0 NOT NULL,
+  discount_amount numeric DEFAULT 0 NOT NULL,
+  tax_amount numeric DEFAULT 0 NOT NULL,
+  payment_type text DEFAULT 'cash'::text NOT NULL,
+  points_earned numeric DEFAULT 0 NOT NULL,
+  points_redeemed numeric DEFAULT 0 NOT NULL,
+  is_exchange boolean DEFAULT false NOT NULL,
   original_bill_number text,
-  is_refunded boolean DEFAULT false,
-  created_at timestamp with time zone DEFAULT now(),
+  is_refunded boolean DEFAULT false NOT NULL,
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
   shift_id text,
-  paid_amount numeric DEFAULT 0,
-  change_amount numeric DEFAULT 0,
-  exchange_credit numeric DEFAULT 0,
+  paid_amount numeric DEFAULT 0 NOT NULL,
+  change_amount numeric DEFAULT 0 NOT NULL,
+  exchange_credit numeric DEFAULT 0 NOT NULL,
   exchanged_to_bill_number text,
   coupon_code text,
   coupon_promo_id text,
   coupon_scope text,
-  coupon_discount numeric DEFAULT 0,
-  payments jsonb DEFAULT '[]'::jsonb,
+  coupon_discount numeric DEFAULT 0 NOT NULL,
+  payments jsonb DEFAULT '[]'::jsonb NOT NULL,
   PRIMARY KEY (id)
 );
 ALTER TABLE public.sales ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid();
@@ -768,12 +768,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS sales_bill_number_key ON public.sales USING bt
 CREATE INDEX IF NOT EXISTS idx_sales_member_id ON public.sales USING btree (member_id);
 
 CREATE TABLE IF NOT EXISTS public.secure_settings (
-  key text,
-  ciphertext text,
+  key text NOT NULL,
+  ciphertext text NOT NULL,
   hint text,
   updated_by text,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
+  updated_at timestamp with time zone DEFAULT now() NOT NULL,
   PRIMARY KEY (key)
 );
 ALTER TABLE public.secure_settings ADD COLUMN IF NOT EXISTS key text;
@@ -785,18 +785,18 @@ ALTER TABLE public.secure_settings ADD COLUMN IF NOT EXISTS updated_at timestamp
 CREATE UNIQUE INDEX IF NOT EXISTS secure_settings_pkey ON public.secure_settings USING btree (key);
 
 CREATE TABLE IF NOT EXISTS public.shift_sessions (
-  id uuid DEFAULT gen_random_uuid(),
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
   shift_id text,
-  store_id text,
+  store_id text NOT NULL,
   terminal_id text,
   terminal_name text,
   staff_id text,
-  staff_name text,
+  staff_name text NOT NULL,
   role text,
-  signed_in_at timestamp with time zone DEFAULT now(),
+  signed_in_at timestamp with time zone DEFAULT now() NOT NULL,
   signed_out_at timestamp with time zone,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
+  updated_at timestamp with time zone DEFAULT now() NOT NULL,
   PRIMARY KEY (id)
 );
 ALTER TABLE public.shift_sessions ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid();
@@ -816,26 +816,26 @@ CREATE INDEX IF NOT EXISTS shift_sessions_shift_idx ON public.shift_sessions USI
 CREATE INDEX IF NOT EXISTS shift_sessions_store_idx ON public.shift_sessions USING btree (store_id, signed_in_at DESC);
 
 CREATE TABLE IF NOT EXISTS public.shifts (
-  id uuid DEFAULT gen_random_uuid(),
-  store_id text,
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
+  store_id text NOT NULL,
   terminal_id text,
   terminal_name text,
-  opened_by_name text DEFAULT 'Cashier'::text,
+  opened_by_name text DEFAULT 'Cashier'::text NOT NULL,
   opened_by_staff_id text,
   opened_by_role text,
   closed_by_name text,
   closed_by_staff_id text,
   closed_by_role text,
-  opened_at timestamp with time zone DEFAULT now(),
+  opened_at timestamp with time zone DEFAULT now() NOT NULL,
   closed_at timestamp with time zone,
-  opening_float numeric DEFAULT 0,
+  opening_float numeric DEFAULT 0 NOT NULL,
   counted_cash numeric,
   expected_cash numeric,
-  note text DEFAULT ''::text,
-  overdue boolean DEFAULT false,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
-  status text DEFAULT 'OPEN'::text,
+  note text DEFAULT ''::text NOT NULL,
+  overdue boolean DEFAULT false NOT NULL,
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
+  updated_at timestamp with time zone DEFAULT now() NOT NULL,
+  status text DEFAULT 'OPEN'::text NOT NULL,
   closing_float numeric,
   user_id uuid,
   PRIMARY KEY (id)
@@ -868,11 +868,11 @@ CREATE INDEX IF NOT EXISTS shifts_open_by_store_idx ON public.shifts USING btree
 CREATE INDEX IF NOT EXISTS shifts_open_by_store ON public.shifts USING btree (store_id) WHERE (closed_at IS NULL);
 
 CREATE TABLE IF NOT EXISTS public.sku_audit (
-  id uuid DEFAULT gen_random_uuid(),
-  sku text,
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
+  sku text NOT NULL,
   product_id uuid,
   product_name text,
-  source text DEFAULT 'auto'::text,
+  source text DEFAULT 'auto'::text NOT NULL,
   previous_sku text,
   store_id text,
   store_name text,
@@ -880,7 +880,7 @@ CREATE TABLE IF NOT EXISTS public.sku_audit (
   staff_id text,
   staff_name text,
   role text,
-  created_at timestamp with time zone DEFAULT now(),
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
   PRIMARY KEY (id)
 );
 ALTER TABLE public.sku_audit ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid();
@@ -900,23 +900,23 @@ CREATE INDEX IF NOT EXISTS sku_audit_created_idx ON public.sku_audit USING btree
 CREATE UNIQUE INDEX IF NOT EXISTS sku_audit_pkey ON public.sku_audit USING btree (id);
 
 CREATE TABLE IF NOT EXISTS public.stock_adjustments (
-  id uuid DEFAULT gen_random_uuid(),
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
   product_id uuid,
   product_name text,
   sku text,
   barcode text,
   store_id text,
   terminal_id text,
-  reason text DEFAULT 'manual'::text,
-  note text DEFAULT ''::text,
-  previous_stock integer DEFAULT 0,
-  updated_stock integer DEFAULT 0,
-  delta integer DEFAULT 0,
-  cost_impact numeric DEFAULT 0,
+  reason text DEFAULT 'manual'::text NOT NULL,
+  note text DEFAULT ''::text NOT NULL,
+  previous_stock integer DEFAULT 0 NOT NULL,
+  updated_stock integer DEFAULT 0 NOT NULL,
+  delta integer DEFAULT 0 NOT NULL,
+  cost_impact numeric DEFAULT 0 NOT NULL,
   staff_id text,
   staff_name text,
   role text,
-  created_at timestamp with time zone DEFAULT now(),
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
   PRIMARY KEY (id)
 );
 ALTER TABLE public.stock_adjustments ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid();
@@ -941,16 +941,16 @@ CREATE INDEX IF NOT EXISTS stock_adjustments_created_idx ON public.stock_adjustm
 CREATE UNIQUE INDEX IF NOT EXISTS stock_adjustments_pkey ON public.stock_adjustments USING btree (id);
 
 CREATE TABLE IF NOT EXISTS public.stock_transfer_items (
-  id uuid DEFAULT gen_random_uuid(),
-  transfer_id uuid,
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
+  transfer_id uuid NOT NULL,
   product_id uuid,
   barcode text,
   sku text,
   product_name text,
-  quantity integer DEFAULT 0,
-  quantity_received integer DEFAULT 0,
-  unit_cost numeric DEFAULT 0,
-  created_at timestamp with time zone DEFAULT now(),
+  quantity integer DEFAULT 0 NOT NULL,
+  quantity_received integer DEFAULT 0 NOT NULL,
+  unit_cost numeric DEFAULT 0 NOT NULL,
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
   PRIMARY KEY (id)
 );
 ALTER TABLE public.stock_transfer_items ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid();
@@ -969,26 +969,26 @@ CREATE UNIQUE INDEX IF NOT EXISTS stock_transfer_items_pkey ON public.stock_tran
 CREATE INDEX IF NOT EXISTS stock_transfer_items_transfer_idx ON public.stock_transfer_items USING btree (transfer_id);
 
 CREATE TABLE IF NOT EXISTS public.stock_transfers (
-  id uuid DEFAULT gen_random_uuid(),
-  ref text,
-  kind text DEFAULT 'transfer'::text,
-  transfer_scope text DEFAULT 'INTRA_GROUP'::text,
-  from_store_id text,
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
+  ref text NOT NULL,
+  kind text DEFAULT 'transfer'::text NOT NULL,
+  transfer_scope text DEFAULT 'INTRA_GROUP'::text NOT NULL,
+  from_store_id text NOT NULL,
   from_store_name text,
   from_group_id text,
-  to_store_id text,
+  to_store_id text NOT NULL,
   to_store_name text,
   to_group_id text,
-  status text DEFAULT 'pending'::text,
-  note text DEFAULT ''::text,
+  status text DEFAULT 'pending'::text NOT NULL,
+  note text DEFAULT ''::text NOT NULL,
   created_by text,
   approved_by text,
   approved_at timestamp with time zone,
   received_by text,
   received_at timestamp with time zone,
   rejected_reason text,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
+  updated_at timestamp with time zone DEFAULT now() NOT NULL,
   PRIMARY KEY (id)
 );
 ALTER TABLE public.stock_transfers ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid();
@@ -1022,13 +1022,13 @@ CREATE INDEX IF NOT EXISTS stock_transfers_from_idx ON public.stock_transfers US
 CREATE INDEX IF NOT EXISTS stock_transfers_to_idx ON public.stock_transfers USING btree (to_store_id);
 
 CREATE TABLE IF NOT EXISTS public.stores (
-  id text,
-  code text,
-  name text,
+  id text NOT NULL,
+  code text NOT NULL,
+  name text NOT NULL,
   address text,
   phone text,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
+  updated_at timestamp with time zone DEFAULT now() NOT NULL,
   group_id text,
   PRIMARY KEY (id)
 );
@@ -1043,17 +1043,17 @@ ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS group_id text;
 CREATE UNIQUE INDEX IF NOT EXISTS stores_pkey ON public.stores USING btree (id);
 
 CREATE TABLE IF NOT EXISTS public.suppliers (
-  id uuid DEFAULT gen_random_uuid(),
-  name text,
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
+  name text NOT NULL,
   contact_name text,
   phone text,
   email text,
   address text,
   tax_number text,
   notes text,
-  is_active boolean DEFAULT true,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
+  is_active boolean DEFAULT true NOT NULL,
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
+  updated_at timestamp with time zone DEFAULT now() NOT NULL,
   PRIMARY KEY (id)
 );
 ALTER TABLE public.suppliers ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid();
@@ -1070,12 +1070,12 @@ ALTER TABLE public.suppliers ADD COLUMN IF NOT EXISTS updated_at timestamp with 
 CREATE UNIQUE INDEX IF NOT EXISTS suppliers_pkey ON public.suppliers USING btree (id);
 
 CREATE TABLE IF NOT EXISTS public.terminal_tokens (
-  id uuid DEFAULT gen_random_uuid(),
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
   location_id text,
   location_name text,
-  device_name text,
-  status text DEFAULT 'active'::text,
-  created_at timestamp with time zone DEFAULT now(),
+  device_name text NOT NULL,
+  status text DEFAULT 'active'::text NOT NULL,
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
   activated_at timestamp with time zone,
   revoked_at timestamp with time zone,
   last_seen_at timestamp with time zone,
@@ -1083,7 +1083,7 @@ CREATE TABLE IF NOT EXISTS public.terminal_tokens (
   replaced_by uuid,
   claimed_by_device text,
   claimed_at timestamp with time zone,
-  platform text DEFAULT 'unknown'::text,
+  platform text DEFAULT 'unknown'::text NOT NULL,
   PRIMARY KEY (id)
 );
 ALTER TABLE public.terminal_tokens ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid();
@@ -1106,13 +1106,13 @@ CREATE INDEX IF NOT EXISTS terminal_tokens_location_idx ON public.terminal_token
 CREATE UNIQUE INDEX IF NOT EXISTS terminal_tokens_pkey ON public.terminal_tokens USING btree (id);
 
 CREATE TABLE IF NOT EXISTS public.uom_units (
-  id uuid DEFAULT gen_random_uuid(),
-  code text,
-  name text,
-  allow_decimal boolean DEFAULT false,
-  sort integer DEFAULT 0,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
+  code text NOT NULL,
+  name text NOT NULL,
+  allow_decimal boolean DEFAULT false NOT NULL,
+  sort integer DEFAULT 0 NOT NULL,
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
+  updated_at timestamp with time zone DEFAULT now() NOT NULL,
   PRIMARY KEY (id)
 );
 ALTER TABLE public.uom_units ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid();
@@ -1127,10 +1127,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS uom_units_code_key ON public.uom_units USING b
 CREATE UNIQUE INDEX IF NOT EXISTS uom_units_pkey ON public.uom_units USING btree (id);
 
 CREATE TABLE IF NOT EXISTS public.user_roles (
-  id uuid DEFAULT gen_random_uuid(),
-  user_id uuid,
-  role app_role,
-  created_at timestamp with time zone DEFAULT now(),
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
+  user_id uuid NOT NULL,
+  role app_role NOT NULL,
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
   PRIMARY KEY (id)
 );
 ALTER TABLE public.user_roles ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid();
@@ -1142,18 +1142,18 @@ CREATE UNIQUE INDEX IF NOT EXISTS user_roles_user_id_role_key ON public.user_rol
 CREATE UNIQUE INDEX IF NOT EXISTS user_roles_pkey ON public.user_roles USING btree (id);
 
 CREATE TABLE IF NOT EXISTS public.whatsapp_queue (
-  id uuid DEFAULT gen_random_uuid(),
-  phone_number_id text DEFAULT ''::text,
-  recipient text,
-  body text DEFAULT ''::text,
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
+  phone_number_id text DEFAULT ''::text NOT NULL,
+  recipient text NOT NULL,
+  body text DEFAULT ''::text NOT NULL,
   reference text,
   store_id text,
-  status text DEFAULT 'QUEUED'::text,
+  status text DEFAULT 'QUEUED'::text NOT NULL,
   error text,
-  queued_at timestamp with time zone DEFAULT now(),
+  queued_at timestamp with time zone DEFAULT now() NOT NULL,
   sent_at timestamp with time zone,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
+  updated_at timestamp with time zone DEFAULT now() NOT NULL,
   PRIMARY KEY (id)
 );
 ALTER TABLE public.whatsapp_queue ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid();
@@ -2179,6 +2179,10 @@ ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Admins manage roles" ON public.user_roles;
 CREATE POLICY "Admins manage roles" ON public.user_roles FOR ALL TO authenticated USING (has_role(auth.uid(), 'admin'::app_role)) WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
 DROP POLICY IF EXISTS "Users can read their own roles" ON public.user_roles;
+CREATE POLICY "Users can read their own roles" ON public.user_roles FOR SELECT TO authenticated USING ((user_id = auth.uid()));
+ALTER TABLE public.whatsapp_queue ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Staff manage whatsapp queue" ON public.whatsapp_queue;
+CREATE POLICY "Staff manage whatsapp queue" ON public.whatsapp_queue FOR ALL TO authenticated USING (true) WITH CHECK (true);DROP POLICY IF EXISTS "Users can read their own roles" ON public.user_roles;
 CREATE POLICY "Users can read their own roles" ON public.user_roles FOR SELECT TO authenticated USING ((user_id = auth.uid()));
 ALTER TABLE public.whatsapp_queue ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Staff manage whatsapp queue" ON public.whatsapp_queue;
