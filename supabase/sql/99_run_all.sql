@@ -21,3 +21,4 @@
 \i 10_settings_and_integrations.sql
 \i 11_audit_and_logs.sql
 \i 12_analytics_views.sql
+\i 13_pos_rules.sql
