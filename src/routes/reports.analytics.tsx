@@ -76,7 +76,8 @@ function AnalyticsBoard() {
   const lines = useMemo(() => soldLines(bills, state.products), [bills, state.products]);
   const totals = sumLines(lines);
   const savings = savingsOf(bills, lines);
-  const storeName = (id: string) => stores.find((s) => s.id === id)?.name ?? id || "Unassigned";
+  const storeName = (id: string) =>
+    stores.find((s) => s.id === id)?.name ?? (id || "Unassigned");
 
   const topItems = useMemo(() => {
     const by = new Map<string, { name: string; revenue: number; units: number }>();
