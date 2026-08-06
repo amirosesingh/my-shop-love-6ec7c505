@@ -465,6 +465,69 @@ export type Database = {
         }
         Relationships: []
       }
+      held_orders: {
+        Row: {
+          cancelled_from: string | null
+          cart_discount: number
+          cart_discount_type: string
+          coupon: Json | null
+          created_at: string
+          exchange_ref: string | null
+          held_at: string
+          held_by: string | null
+          id: string
+          label: string
+          lines: Json
+          member_id: string | null
+          member_name: string | null
+          note: string
+          shift_id: string | null
+          store_id: string | null
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          cancelled_from?: string | null
+          cart_discount?: number
+          cart_discount_type?: string
+          coupon?: Json | null
+          created_at?: string
+          exchange_ref?: string | null
+          held_at?: string
+          held_by?: string | null
+          id?: string
+          label?: string
+          lines?: Json
+          member_id?: string | null
+          member_name?: string | null
+          note?: string
+          shift_id?: string | null
+          store_id?: string | null
+          total?: number
+          updated_at?: string
+        }
+        Update: {
+          cancelled_from?: string | null
+          cart_discount?: number
+          cart_discount_type?: string
+          coupon?: Json | null
+          created_at?: string
+          exchange_ref?: string | null
+          held_at?: string
+          held_by?: string | null
+          id?: string
+          label?: string
+          lines?: Json
+          member_id?: string | null
+          member_name?: string | null
+          note?: string
+          shift_id?: string | null
+          store_id?: string | null
+          total?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       issued_vouchers: {
         Row: {
           campaign_id: string
@@ -1351,6 +1414,74 @@ export type Database = {
         }
         Relationships: []
       }
+      stock_adjustments: {
+        Row: {
+          barcode: string | null
+          cost_impact: number
+          created_at: string
+          delta: number
+          id: string
+          note: string
+          previous_stock: number
+          product_id: string | null
+          product_name: string | null
+          reason: string
+          role: string | null
+          sku: string | null
+          staff_id: string | null
+          staff_name: string | null
+          store_id: string | null
+          terminal_id: string | null
+          updated_stock: number
+        }
+        Insert: {
+          barcode?: string | null
+          cost_impact?: number
+          created_at?: string
+          delta?: number
+          id?: string
+          note?: string
+          previous_stock?: number
+          product_id?: string | null
+          product_name?: string | null
+          reason?: string
+          role?: string | null
+          sku?: string | null
+          staff_id?: string | null
+          staff_name?: string | null
+          store_id?: string | null
+          terminal_id?: string | null
+          updated_stock?: number
+        }
+        Update: {
+          barcode?: string | null
+          cost_impact?: number
+          created_at?: string
+          delta?: number
+          id?: string
+          note?: string
+          previous_stock?: number
+          product_id?: string | null
+          product_name?: string | null
+          reason?: string
+          role?: string | null
+          sku?: string | null
+          staff_id?: string | null
+          staff_name?: string | null
+          store_id?: string | null
+          terminal_id?: string | null
+          updated_stock?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_adjustments_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock_transfer_items: {
         Row: {
           barcode: string | null
@@ -1656,6 +1787,51 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      whatsapp_queue: {
+        Row: {
+          body: string
+          created_at: string
+          error: string | null
+          id: string
+          phone_number_id: string
+          queued_at: string
+          recipient: string
+          reference: string | null
+          sent_at: string | null
+          status: string
+          store_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          body?: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          phone_number_id?: string
+          queued_at?: string
+          recipient: string
+          reference?: string | null
+          sent_at?: string | null
+          status?: string
+          store_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          phone_number_id?: string
+          queued_at?: string
+          recipient?: string
+          reference?: string | null
+          sent_at?: string | null
+          status?: string
+          store_id?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
