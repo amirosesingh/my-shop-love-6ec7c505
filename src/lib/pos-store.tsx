@@ -565,6 +565,15 @@ export function PosProvider({ children }: { children: ReactNode }) {
     const store = snapshot.stores.find((x) => x.id === input.storeId);
     const sale: Sale = {
       ...input,
+      // Stamp the cost price of every line at the moment of sale so margin
+      // reports stay accurate when prices change later.
+      lines: input.lines.map((l) => ({
+        ...l,
+        cost:
+          l.cost ??
+          snapshot.products.find((p) => p.id === l.productId)?.cost ??
+          0,
+      })),
       id: crypto.randomUUID(),
       receiptNo: `${(store?.receiptPrefix?.trim() || store?.code || "R").toUpperCase()}-${String(
         counter,
