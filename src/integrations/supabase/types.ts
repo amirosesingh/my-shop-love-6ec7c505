@@ -2093,6 +2093,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      user_cluster_id: { Args: never; Returns: string }
       user_store_id: { Args: never; Returns: string }
       verify_cashier_pin: {
         Args: { p_pin: string; p_username: string }
