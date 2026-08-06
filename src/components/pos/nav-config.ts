@@ -269,6 +269,22 @@ export const navGroups: NavGroup[] = [
         blurb: "Every coupon applied, bill or item level.",
       },
       {
+        to: "/reports/payments",
+        label: "Payments by Cashier",
+        icon: BarChart3,
+        flag: "can_view_sales_reports",
+        keywords: "payment cashier cash card machine tender split takings",
+        blurb: "Every transaction taken, per cashier and tender.",
+      },
+      {
+        to: "/reports/voids",
+        label: "Voids & Refunds",
+        icon: Activity,
+        flag: "can_view_sales_reports",
+        keywords: "void refund cancel line removed reason approval",
+        blurb: "Who voided, cancelled or refunded, and why.",
+      },
+      {
         to: "/reports/activity",
         label: "Register Activity",
         icon: Activity,
