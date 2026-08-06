@@ -97,6 +97,8 @@ const categoryVisual: Record<
   security: { icon: UserRound, className: "bg-rose-500/15 text-rose-400" },
   report: { icon: PanelTop, className: "bg-indigo-500/15 text-indigo-400" },
   settings: { icon: Settings2, className: "bg-amber-500/15 text-amber-500" },
+  print: { icon: PanelTop, className: "bg-slate-500/15 text-slate-400" },
+  browse: { icon: Compass, className: "bg-muted text-muted-foreground" },
   other: { icon: MousePointerClick, className: "bg-muted text-muted-foreground" },
 };
 
@@ -119,9 +121,16 @@ function AuditPage() {
   const [to, setTo] = useState("");
   const [who, setWho] = useState("all");
   const [category, setCategory] = useState("all");
+  const [module, setModule] = useState("all");
+  const [showBrowse, setShowBrowse] = useState(false);
   const [q, setQ] = useState("");
   const [detail, setDetail] = useState<AuditLog | null>(null);
   const [view, setView] = useState<"table" | "stream">("table");
+
+  const modules = useMemo(
+    () => Array.from(new Set(logs.map((l) => l.module).filter(Boolean))).sort(),
+    [logs],
+  );
 
   const rows = useMemo(() => {
     const now = new Date();
@@ -137,7 +146,11 @@ function AuditPage() {
         if (to && t > new Date(`${to}T23:59:59`).getTime()) return false;
       }
       if (who !== "all" && l.staffId !== who) return false;
-      if (category !== "all" && displayCategory(l.category) !== category) return false;
+      const cat = displayCategory(l.category);
+      if (category !== "all" && cat !== category) return false;
+      // Screen views and searches are noise for a manager — off unless asked for.
+      if (category !== "browse" && !showBrowse && cat === "browse") return false;
+      if (module !== "all" && l.module !== module) return false;
       if (
         text &&
         !`${describeLog(l)} ${l.action} ${l.module} ${l.staffName} ${l.staffId} ${l.route} ${JSON.stringify(
@@ -149,7 +162,7 @@ function AuditPage() {
         return false;
       return true;
     });
-  }, [logs, range, from, to, who, category, q]);
+  }, [logs, range, from, to, who, category, module, showBrowse, q]);
 
   const pager = usePagination(rows, 25);
 
@@ -251,6 +264,32 @@ function AuditPage() {
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search action, module or payload"
             />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Screen / module</Label>
+            <Select value={module} onValueChange={setModule}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All screens</SelectItem>
+                {modules.map((m) => (
+                  <SelectItem key={m} value={m} className="capitalize">
+                    {m}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Browsing activity</Label>
+            <Button
+              type="button"
+              variant={showBrowse ? "secondary" : "outline"}
+              className="w-full justify-start"
+              onClick={() => setShowBrowse((v) => !v)}
+            >
+              <Compass className="size-4" />
+              {showBrowse ? "Shown" : "Hidden"}
+            </Button>
           </div>
           {range === "custom" && (
             <>
