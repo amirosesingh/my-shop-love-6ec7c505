@@ -333,6 +333,10 @@ IF COL_LENGTH('dbo.sale_items', 'branch_id') IS NULL
   ALTER TABLE dbo.sale_items ADD branch_id NVARCHAR(60) NULL;
 GO
 
+IF COL_LENGTH('dbo.sale_items', 'unit_cost') IS NULL
+  ALTER TABLE dbo.sale_items ADD unit_cost DECIMAL(18, 4) NOT NULL DEFAULT 0;
+GO
+
 /* Friendly branch-facing names used by the offline checkout path.
    Single-table views, so INSERT/UPDATE flow straight through. */
 IF OBJECT_ID('dbo.BranchSales', 'V') IS NOT NULL DROP VIEW dbo.BranchSales;

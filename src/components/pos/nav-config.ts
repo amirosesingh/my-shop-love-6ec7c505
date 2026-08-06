@@ -269,6 +269,22 @@ export const navGroups: NavGroup[] = [
         blurb: "Every coupon applied, bill or item level.",
       },
       {
+        to: "/reports/items",
+        label: "Item Sales History",
+        icon: PackageSearch,
+        flag: "can_view_sales_reports",
+        keywords: "item line product sold cost margin profit date time cashier price",
+        blurb: "Every item sold with cost price, margin and profit.",
+      },
+      {
+        to: "/reports/analytics",
+        label: "Business Analytics",
+        icon: BarChart3,
+        flag: "can_view_sales_reports",
+        keywords: "chart graph top selling shop revenue daily monthly average savings profit",
+        blurb: "Top sellers, shop revenue, trends, savings and profit.",
+      },
+      {
         to: "/reports/payments",
         label: "Payments by Cashier",
         icon: BarChart3,

@@ -100,13 +100,8 @@ const rowToBooking = (r: Row, payments: Row[]): Booking => ({
   },
 });
 
-/** Write (or re-write) a booking and its payment history. */
-export async function saveBooking(b: Booking) {
-  const head = await sb.from("bookings").upsert(toRow(b) as never);
-  if (head.error) throw new Error(head.error.message);
-  if (!b.payments.length) return;
-  await sb.from("booking_payments").delete().eq("booking_id", b.id);
-  const rows = b.payments.map((p) => ({
+const paymentRows = (b: Booking) =>
+  b.payments.map((p) => ({
     id: p.id,
     booking_id: b.id,
     amount: p.amount,
@@ -114,7 +109,15 @@ export async function saveBooking(b: Booking) {
     cashier: p.cashier,
     paid_at: p.at,
   }));
-  const res = await sb.from("booking_payments").insert(rows as never);
+
+/** Write (or re-write) a booking and its payment history. */
+export async function saveBooking(b: Booking) {
+  const head = await sb.from("bookings").upsert(toRow(b) as never);
+  if (head.error) throw new Error(head.error.message);
+  if (!b.payments.length) return;
+  // Upsert on the payment id: re-saving the same booking must never collide
+  // with the payment rows already stored.
+  const res = await sb.from("booking_payments").upsert(paymentRows(b) as never);
   if (res.error) throw new Error(res.error.message);
 }
 
@@ -137,14 +140,7 @@ export async function commitBooking(b: Booking): Promise<CommitTarget> {
       ops.push({
         kind: "upsert",
         table: "booking_payments",
-        rows: b.payments.map((p) => ({
-          id: p.id,
-          booking_id: b.id,
-          amount: p.amount,
-          method: p.method,
-          cashier: p.cashier,
-          paid_at: p.at,
-        })),
+        rows: paymentRows(b),
       });
     try {
       return await commitOps("Saving booking", ops);

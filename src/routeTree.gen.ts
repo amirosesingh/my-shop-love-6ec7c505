@@ -36,8 +36,10 @@ import { Route as CTokenSlugRouteImport } from './routes/c.$tokenSlug'
 import { Route as ClaimCampaignSlugRouteImport } from './routes/claim.$campaignSlug'
 import { Route as ReportsIndexRouteImport } from './routes/reports.index'
 import { Route as ReportsActivityRouteImport } from './routes/reports.activity'
+import { Route as ReportsAnalyticsRouteImport } from './routes/reports.analytics'
 import { Route as ReportsCatalogRouteImport } from './routes/reports.catalog'
 import { Route as ReportsCouponsRouteImport } from './routes/reports.coupons'
+import { Route as ReportsItemsRouteImport } from './routes/reports.items'
 import { Route as ReportsPaymentsRouteImport } from './routes/reports.payments'
 import { Route as ReportsSalesRouteImport } from './routes/reports.sales'
 import { Route as ReportsStockRouteImport } from './routes/reports.stock'
@@ -201,6 +203,11 @@ const ReportsActivityRoute = ReportsActivityRouteImport.update({
   path: '/reports/activity',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReportsAnalyticsRoute = ReportsAnalyticsRouteImport.update({
+  id: '/reports/analytics',
+  path: '/reports/analytics',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReportsCatalogRoute = ReportsCatalogRouteImport.update({
   id: '/reports/catalog',
   path: '/reports/catalog',
@@ -209,6 +216,11 @@ const ReportsCatalogRoute = ReportsCatalogRouteImport.update({
 const ReportsCouponsRoute = ReportsCouponsRouteImport.update({
   id: '/reports/coupons',
   path: '/reports/coupons',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsItemsRoute = ReportsItemsRouteImport.update({
+  id: '/reports/items',
+  path: '/reports/items',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReportsPaymentsRoute = ReportsPaymentsRouteImport.update({
@@ -374,8 +386,10 @@ export interface FileRoutesByFullPath {
   '/c/$tokenSlug': typeof CTokenSlugRoute
   '/claim/$campaignSlug': typeof ClaimCampaignSlugRoute
   '/reports/activity': typeof ReportsActivityRoute
+  '/reports/analytics': typeof ReportsAnalyticsRoute
   '/reports/catalog': typeof ReportsCatalogRoute
   '/reports/coupons': typeof ReportsCouponsRoute
+  '/reports/items': typeof ReportsItemsRoute
   '/reports/payments': typeof ReportsPaymentsRoute
   '/reports/sales': typeof ReportsSalesRoute
   '/reports/stock': typeof ReportsStockRoute
@@ -432,8 +446,10 @@ export interface FileRoutesByTo {
   '/c/$tokenSlug': typeof CTokenSlugRoute
   '/claim/$campaignSlug': typeof ClaimCampaignSlugRoute
   '/reports/activity': typeof ReportsActivityRoute
+  '/reports/analytics': typeof ReportsAnalyticsRoute
   '/reports/catalog': typeof ReportsCatalogRoute
   '/reports/coupons': typeof ReportsCouponsRoute
+  '/reports/items': typeof ReportsItemsRoute
   '/reports/payments': typeof ReportsPaymentsRoute
   '/reports/sales': typeof ReportsSalesRoute
   '/reports/stock': typeof ReportsStockRoute
@@ -491,8 +507,10 @@ export interface FileRoutesById {
   '/c/$tokenSlug': typeof CTokenSlugRoute
   '/claim/$campaignSlug': typeof ClaimCampaignSlugRoute
   '/reports/activity': typeof ReportsActivityRoute
+  '/reports/analytics': typeof ReportsAnalyticsRoute
   '/reports/catalog': typeof ReportsCatalogRoute
   '/reports/coupons': typeof ReportsCouponsRoute
+  '/reports/items': typeof ReportsItemsRoute
   '/reports/payments': typeof ReportsPaymentsRoute
   '/reports/sales': typeof ReportsSalesRoute
   '/reports/stock': typeof ReportsStockRoute
@@ -551,8 +569,10 @@ export interface FileRouteTypes {
     | '/c/$tokenSlug'
     | '/claim/$campaignSlug'
     | '/reports/activity'
+    | '/reports/analytics'
     | '/reports/catalog'
     | '/reports/coupons'
+    | '/reports/items'
     | '/reports/payments'
     | '/reports/sales'
     | '/reports/stock'
@@ -609,8 +629,10 @@ export interface FileRouteTypes {
     | '/c/$tokenSlug'
     | '/claim/$campaignSlug'
     | '/reports/activity'
+    | '/reports/analytics'
     | '/reports/catalog'
     | '/reports/coupons'
+    | '/reports/items'
     | '/reports/payments'
     | '/reports/sales'
     | '/reports/stock'
@@ -667,8 +689,10 @@ export interface FileRouteTypes {
     | '/c/$tokenSlug'
     | '/claim/$campaignSlug'
     | '/reports/activity'
+    | '/reports/analytics'
     | '/reports/catalog'
     | '/reports/coupons'
+    | '/reports/items'
     | '/reports/payments'
     | '/reports/sales'
     | '/reports/stock'
@@ -726,8 +750,10 @@ export interface RootRouteChildren {
   CTokenSlugRoute: typeof CTokenSlugRoute
   ClaimCampaignSlugRoute: typeof ClaimCampaignSlugRoute
   ReportsActivityRoute: typeof ReportsActivityRoute
+  ReportsAnalyticsRoute: typeof ReportsAnalyticsRoute
   ReportsCatalogRoute: typeof ReportsCatalogRoute
   ReportsCouponsRoute: typeof ReportsCouponsRoute
+  ReportsItemsRoute: typeof ReportsItemsRoute
   ReportsPaymentsRoute: typeof ReportsPaymentsRoute
   ReportsSalesRoute: typeof ReportsSalesRoute
   ReportsStockRoute: typeof ReportsStockRoute
@@ -949,6 +975,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReportsActivityRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reports/analytics': {
+      id: '/reports/analytics'
+      path: '/reports/analytics'
+      fullPath: '/reports/analytics'
+      preLoaderRoute: typeof ReportsAnalyticsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reports/catalog': {
       id: '/reports/catalog'
       path: '/reports/catalog'
@@ -961,6 +994,13 @@ declare module '@tanstack/react-router' {
       path: '/reports/coupons'
       fullPath: '/reports/coupons'
       preLoaderRoute: typeof ReportsCouponsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports/items': {
+      id: '/reports/items'
+      path: '/reports/items'
+      fullPath: '/reports/items'
+      preLoaderRoute: typeof ReportsItemsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reports/payments': {
@@ -1182,8 +1222,10 @@ const rootRouteChildren: RootRouteChildren = {
   CTokenSlugRoute: CTokenSlugRoute,
   ClaimCampaignSlugRoute: ClaimCampaignSlugRoute,
   ReportsActivityRoute: ReportsActivityRoute,
+  ReportsAnalyticsRoute: ReportsAnalyticsRoute,
   ReportsCatalogRoute: ReportsCatalogRoute,
   ReportsCouponsRoute: ReportsCouponsRoute,
+  ReportsItemsRoute: ReportsItemsRoute,
   ReportsPaymentsRoute: ReportsPaymentsRoute,
   ReportsSalesRoute: ReportsSalesRoute,
   ReportsStockRoute: ReportsStockRoute,
@@ -1216,13 +1258,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
