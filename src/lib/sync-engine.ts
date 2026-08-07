@@ -50,6 +50,25 @@ const strip = (rows: Record<string, unknown>[], columns: string[]) =>
     return copy;
   });
 
+type PostgrestError = { message: string; code?: string };
+
+/** True when the database refused the write because of who the caller is. */
+const isPermissionError = (error: PostgrestError) =>
+  error.code === "42501" ||
+  error.code === "PGRST301" ||
+  /row-level security|permission denied|jwt/i.test(error.message);
+
+/** Plain-language message for a failed push. */
+const describeError = (table: string, error: PostgrestError) => {
+  if (error.code === "PGRST205") {
+    return `The "${table}" table is missing on the central database — an administrator needs to run the database setup script once.`;
+  }
+  if (isPermissionError(error)) {
+    return `This till is not allowed to save "${table}" on the central database yet. Re-activate the terminal or sign in again, and the queued changes will go through.`;
+  }
+  return error.message;
+};
+
 /** Table names are dynamic here, so the generated row types don't apply. */
 type LooseQuery = {
   insert: (rows: unknown) => PromiseLike<QueryResult>;
