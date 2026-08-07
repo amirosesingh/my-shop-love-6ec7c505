@@ -411,7 +411,7 @@ export async function activateTerminal(code: string): Promise<TerminalConfig> {
   await rpc("terminal_token_heartbeat", { p_token_id: config.tokenId, p_activate: true });
   // Give this till its own machine account so its writes are accepted by the
   // central database even when a cashier signs in with a PIN.
-  void provisionTerminalAccount(config.tokenId).catch(() => null);
+  void import("./terminal-session").then((m) => m.provisionTerminalAccount(config.tokenId)).catch(() => null);
   return config;
 }
 
@@ -545,6 +545,6 @@ export async function activateWithTokenId(tokenId: string): Promise<TerminalConf
   writeTerminalConfig(config);
   clearPairingRequest();
   await rpc("terminal_token_heartbeat", { p_token_id: tokenId, p_activate: true });
-  void provisionTerminalAccount(tokenId).catch(() => null);
+  void import("./terminal-session").then((m) => m.provisionTerminalAccount(tokenId)).catch(() => null);
   return config;
 }
