@@ -51,6 +51,7 @@ function countdown(target: Date, now: Date) {
 
 function VoucherPage() {
   const { tokenSlug } = Route.useParams();
+  const { flags, ready: flagsReady } = usePublicFlags();
   const [view, setView] = useState<VoucherView | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
