@@ -2738,22 +2738,42 @@ function Register() {
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label>Cashier</Label>
+              <Label>
+                Cashier <span className="text-destructive">*</span>
+              </Label>
               <Input value={cashier} onChange={(e) => setCashier(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label>Opening float</Label>
-              <Input value={float} onChange={(e) => setFloat(e.target.value)} className="numeric" />
+              <Label>
+                Opening float{" "}
+                {rules.require_opening_float_count && <span className="text-destructive">*</span>}
+              </Label>
+              <Input
+                value={float}
+                inputMode="decimal"
+                placeholder="0.00"
+                onChange={(e) => setFloat(e.target.value)}
+                className="numeric"
+              />
+              {rules.require_opening_float_count && parsePositiveAmount(float) === null && (
+                <p className="text-[11px] text-destructive">
+                  Count the drawer and enter the opening float.
+                </p>
+              )}
             </div>
           </div>
           <DialogFooter>
             <Button
+              disabled={
+                !cashier.trim() ||
+                (rules.require_opening_float_count && parsePositiveAmount(float) === null)
+              }
               onClick={() => {
                 if (!can("can_open_shift")) {
                   toast.error("You are not allowed to open a shift");
                   return;
                 }
-                openShift(cashier || "Cashier", Number(float) || 0);
+                openShift(cashier.trim() || "Cashier", parsePositiveAmount(float) ?? 0);
                 openCashDrawer();
                 setOpenShiftOpen(false);
                 toast.success("Shift opened");
