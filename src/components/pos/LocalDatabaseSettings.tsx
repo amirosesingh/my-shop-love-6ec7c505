@@ -14,7 +14,7 @@ import {
   defaultLocalDbConfig,
   hasLocalDb,
   localDb,
-  readLocalDbConfig,
+  loadLocalDbConfig,
   writeLocalDbConfig,
   type LocalDbConfig,
   type LocalSyncStatus,
@@ -31,7 +31,7 @@ export function LocalDatabaseSettings() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    setConfig(readLocalDbConfig());
+    void loadLocalDbConfig().then(setConfig);
   }, []);
 
   const refresh = useCallback(async () => {
@@ -150,7 +150,7 @@ export function LocalDatabaseSettings() {
           disabled={busy}
           onClick={() =>
             run("Connected to local database", async () => {
-              writeLocalDbConfig(config);
+              await writeLocalDbConfig(config);
               return localDb()!.connect(config);
             })
           }
