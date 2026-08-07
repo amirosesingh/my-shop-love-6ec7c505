@@ -221,6 +221,12 @@ const GROUPS = [
         blurb: "Per-table reading and saving status, with the exact reason when one fails.",
       },
       {
+        to: "/settings/shift-alerts",
+        label: "Shift alerts",
+        icon: Activity,
+        blurb: "How the day-end shift summary reaches this device: in-app, WhatsApp or phone notification.",
+      },
+      {
         to: "/settings/inheritance",
         label: "Settings inheritance",
         icon: RefreshCw,
