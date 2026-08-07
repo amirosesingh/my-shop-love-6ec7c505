@@ -145,6 +145,30 @@ export function buildShiftSummary(
 
 type Row = Record<string, unknown>;
 
+/**
+ * `shift_notifications` is created by supabase/sql/18_shift_notifications.sql,
+ * so it is not in the generated types yet — reach it through a loose handle.
+ */
+type LooseTable = {
+  insert: (values: Row) => Promise<{ error: { message: string } | null }>;
+  select: (columns: string) => {
+    order: (
+      column: string,
+      opts: { ascending: boolean },
+    ) => {
+      limit: (n: number) => PromiseLike<{ data: Row[] | null; error: { message: string } | null }> & {
+        eq: (
+          column: string,
+          value: string,
+        ) => PromiseLike<{ data: Row[] | null; error: { message: string } | null }>;
+      };
+    };
+  };
+};
+
+const notifications = (): LooseTable =>
+  (supabase.from as unknown as (table: string) => LooseTable)("shift_notifications");
+
 const map = (row: Row): ShiftSummary => ({
   id: String(row["id"] ?? ""),
   shiftId: String(row["shift_id"] ?? ""),
@@ -170,7 +194,7 @@ export async function publishShiftSummary(
   channels: string[],
 ): Promise<void> {
   try {
-    await supabase.from("shift_notifications").insert({
+    await notifications().insert({
       shift_id: input.shiftId,
       store_id: input.storeId,
       store_name: input.storeName,
@@ -187,7 +211,7 @@ export async function publishShiftSummary(
       payment_breakdown: input.paymentBreakdown,
       summary: input.summary,
       channels,
-    } as never);
+    });
   } catch {
     /* the summary is still shown on this device */
   }
@@ -195,13 +219,11 @@ export async function publishShiftSummary(
 
 /** Most recent day-end summaries, newest first. */
 export async function listShiftSummaries(storeId?: string): Promise<ShiftSummary[]> {
-  let query = supabase
-    .from("shift_notifications")
+  const base = notifications()
     .select("*")
     .order("closed_at", { ascending: false })
     .limit(30);
-  if (storeId) query = query.eq("store_id", storeId);
-  const { data, error } = await query;
+  const { data, error } = await (storeId ? base.eq("store_id", storeId) : base);
   if (error) throw new Error(error.message);
   return ((data ?? []) as Row[]).map(map);
 }
