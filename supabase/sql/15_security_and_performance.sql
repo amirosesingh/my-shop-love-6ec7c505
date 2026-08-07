@@ -295,7 +295,11 @@ BEGIN
                      'verify_cashier_pin', 'verify_terminal_pin',
                      'terminal_token_status', 'terminal_token_heartbeat') THEN
       EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO anon, authenticated', r.sig);
-    ELSIF r.proname IN ('current_app_user', 'list_app_users', 'list_cashiers',
+    ELSIF r.proname IN ('is_staff_now', 'is_supervisor_now', 'is_staff',
+                        'is_app_supervisor', 'has_role', 'has_perm',
+                        'store_visible', 'user_store_id', 'user_cluster_id',
+                        'campaign_is_live',
+                        'current_app_user', 'list_app_users', 'list_cashiers',
                         'upsert_cashier', 'delete_cashier', 'set_cashier_permissions',
                         'upsert_terminal_user', 'delete_terminal_user', 'set_terminal_active',
                         'set_app_user_profile', 'set_app_user_permissions',
