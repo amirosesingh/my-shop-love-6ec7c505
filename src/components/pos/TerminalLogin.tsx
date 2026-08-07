@@ -7,21 +7,31 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { useBranding } from "@/lib/branding";
+import { isTerminalApp } from "@/lib/native";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
 export function TerminalLogin() {
   const { login, cashierLogin } = useAuth();
   const brand = useBranding();
+  // Cashier PIN sign-in only exists on a real till (Electron desktop or the
+  // Capacitor mobile app). In a plain browser this is a back-office console:
+  // supervisors and admins sign in with email and password.
+  const [terminal, setTerminal] = useState(false);
+  useEffect(() => setTerminal(isTerminalApp()), []);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
   const [pin, setPin] = useState("");
-  const [tab, setTab] = useState("cashier");
+  const [tab, setTab] = useState("admin");
   const pinRef = useRef(pin);
   pinRef.current = pin;
+
+  useEffect(() => {
+    setTab(terminal ? "cashier" : "admin");
+  }, [terminal]);
 
   const submitPin = async (value = pin) => {
     if (busy) return;
@@ -82,24 +92,29 @@ export function TerminalLogin() {
           </div>
           <div>
             <p className="font-semibold leading-tight">{brand.company}</p>
-            <p className="text-xs text-muted-foreground">Terminal sign in</p>
+            <p className="text-xs text-muted-foreground">
+              {terminal ? "Terminal sign in" : "Back office sign in"}
+            </p>
           </div>
           <Lock className="ml-auto size-4 text-muted-foreground" />
         </div>
 
         <Tabs
-          defaultValue="cashier"
+          value={tab}
           onValueChange={(v) => {
             setTab(v);
             setError("");
             setPin("");
           }}
         >
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="cashier">Cashier PIN</TabsTrigger>
-            <TabsTrigger value="admin">Supervisor / Admin</TabsTrigger>
-          </TabsList>
+          {terminal && (
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="cashier">Cashier PIN</TabsTrigger>
+              <TabsTrigger value="admin">Supervisor / Admin</TabsTrigger>
+            </TabsList>
+          )}
 
+          {terminal && (
           <TabsContent value="cashier" className="space-y-5 pt-4">
             <div className="space-y-1">
               <Label htmlFor="username">Username</Label>
@@ -199,6 +214,7 @@ export function TerminalLogin() {
               PINs are verified by the backend — they are never stored on this terminal.
             </p>
           </TabsContent>
+          )}
 
           <TabsContent value="admin" className="pt-4">
             <form
@@ -245,8 +261,9 @@ export function TerminalLogin() {
                 Sign in
               </Button>
               <p className="text-[11px] leading-relaxed text-muted-foreground">
-                Supervisor and admin accounts sign in with email and password; cashiers use the
-                PIN tab.
+                {terminal
+                  ? "Supervisor and admin accounts sign in with email and password; cashiers use the PIN tab."
+                  : "Cashier PIN sign-in is only available on the desktop and mobile terminal apps."}
               </p>
             </form>
           </TabsContent>
