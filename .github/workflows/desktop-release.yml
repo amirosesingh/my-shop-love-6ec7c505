@@ -57,7 +57,17 @@ jobs:
 
       - name: Read app version
         id: meta
-        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+        run: |
+          version=$(node -p "require('./package.json').version")
+          short_sha="${GITHUB_SHA:0:7}"
+          case "$GITHUB_REF" in
+            refs/tags/*) tag="${GITHUB_REF#refs/tags/}" ;;
+            *) tag="v$version" ;;
+          esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "commit=$short_sha" >> "$GITHUB_OUTPUT"
+          echo "release_id=$tag-$short_sha" >> "$GITHUB_OUTPUT"
 
       - name: Upload installer + update manifest
         uses: actions/upload-artifact@v4
@@ -75,13 +85,36 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: auto
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          RELEASE_ID: ${{ steps.meta.outputs.release_id }}
+          APP_VERSION: ${{ steps.meta.outputs.version }}
+          RELEASE_TAG: ${{ steps.meta.outputs.tag }}
+          RELEASE_COMMIT: ${{ steps.meta.outputs.commit }}
         run: |
           if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ] || [ -z "$R2_ENDPOINT" ]; then
             echo "R2 credentials are not configured; skipping the update-feed upload."
             exit 0
           fi
+          filters=(--exclude "*" --include "*.exe" --include "*.blockmap" --include "latest.yml")
+
+          # 1. Immutable, versioned copy: never overwritten, safe to roll back to.
+          aws s3 sync release "s3://updatelccms/pos-app/releases/$RELEASE_ID" \
+            "${filters[@]}" \
+            --cache-control "public,max-age=31536000,immutable" \
+            --endpoint-url "$R2_ENDPOINT"
+
+          # 2. Stable pointer the tills poll.
+          printf '{"version":"%s","tag":"%s","commit":"%s","released":"%s","path":"pos-app/releases/%s"}\n' \
+            "$APP_VERSION" "$RELEASE_TAG" "$RELEASE_COMMIT" \
+            "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$RELEASE_ID" > release/release.json
+          aws s3 sync release s3://updatelccms/pos-app/latest \
+            "${filters[@]}" --include "release.json" \
+            --cache-control "no-cache" \
+            --endpoint-url "$R2_ENDPOINT"
+
+          # 3. Legacy path, kept so already-deployed tills keep updating.
           aws s3 sync release s3://updatelccms/pos-app \
-            --exclude "*" --include "*.exe" --include "*.blockmap" --include "latest.yml" \
+            "${filters[@]}" --include "release.json" \
+            --cache-control "no-cache" \
             --endpoint-url "$R2_ENDPOINT"
 
       - name: Attach to GitHub release
