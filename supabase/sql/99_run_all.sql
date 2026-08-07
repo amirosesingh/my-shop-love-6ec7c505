@@ -25,3 +25,4 @@
 \i 14_settings_scopes.sql
 \i 15_security_and_performance.sql
 \i 16_security_alerts.sql
+\i 17_public_flags_and_grants.sql
