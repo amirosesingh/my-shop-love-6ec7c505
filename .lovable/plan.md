@@ -1,40 +1,69 @@
-# Fix shift sign-in errors in the browser + where the service key lives
+# Fix web sign-in errors, keep keys out of Git, encrypt sensitive settings, add a database health page
 
-## First, the important discovery
+## 1. Make the browser work like the till
 
-The app does **not** read/write the Lovable Cloud database. `src/lib/external-supabase-config.ts` points every read and write at your own POS project (`POS_SUPABASE_URL`, publishable key in code). The grant fix from the last turn was applied to the Lovable Cloud database, so it did **not** touch the database the app actually uses. That is why the errors are unchanged.
+Today the "server write relay" (the fallback that saves data when the database refuses a
+direct write) is only allowed for activated tills. From a normal browser it is switched
+off, so shift sign-in fails with "This till is not allowed to save ... on the central
+database".
 
-Everything below therefore has two halves: a SQL script you run once on **your POS project**, and app-side changes I make here.
+- Allow the relay whenever there is a valid signed-in staff session in the browser, not
+  only for activated tills.
+- The relay endpoint keeps verifying the caller (staff session, cashier session, or
+  terminal token) before writing — no new anonymous access.
+- Replace the confusing message with a clear one that says whether the problem is a
+  missing sign-in, a missing branch assignment, or a genuine access-rule refusal.
 
-## Why the browser fails but the terminal does not
+## 2. Keys and secrets out of the repository
 
-The error text comes from `src/lib/sync-engine.ts`: the database refused the write, so the queued change is parked. There is already a fallback — the server relay at `/api/public/sync`, which re-does the write with the service key after proving who the caller is. The relay accepts three proofs: a cashier session token, a terminal token, or a signed-in staff access token.
+Checked the code: the service key is **not** in the codebase. It is read only on the
+server from the `POS_SUPABASE_SERVICE_ROLE_KEY` environment secret, in
+`src/lib/pos-relay.server.ts`. Only the public/publishable key and project URL appear in
+`src/lib/external-supabase-config.ts`, which is safe and designed to be public.
 
-But the client-side gate `canRelay()` in `src/lib/sync-relay.ts` only returns true when a cashier token or terminal token exists. In a plain browser (no activated terminal, signed in by email) neither exists, so the fallback is never even tried and the raw refusal is shown. On an activated terminal the fallback runs and the write goes through — exactly the difference you are seeing.
+To make this safe for GitHub:
+- Move the project URL and publishable key to environment variables as the primary
+  source, with a documented `.env.example` (names only, no values).
+- Confirm `.env` is git-ignored and add a short note in `docs/` listing every secret the
+  app expects and where to set it.
+- Add a check to the security test suite that fails if any key-looking string is
+  committed in `src/`.
 
-## What I will change in the app
+## 3. Encrypt the sensitive settings
 
-1. **Let the browser use the server relay.** `canRelay()` also returns true when there is a signed-in session, so a web admin's refused write is retried through the relay (which already validates the access token server-side). Nothing new is exposed: the relay still rejects unproven callers with 401.
-2. **Better error text.** When the relay is unavailable or refuses, say which of the two problems it is — "not signed in / terminal not activated" vs "the database refused this write" — instead of the single generic sentence.
-3. **Connection check.** Extend the existing check panel so it reports, for the current browser: signed-in yes/no, staff role recognised yes/no, branch assigned yes/no, relay reachable yes/no. That turns the next occurrence into a one-glance diagnosis.
+The encrypted store already exists (`secure_settings` table + AES-256-GCM helpers).
+Extend it so all sensitive configuration goes through it instead of plain settings rows:
 
-## What you run once on your POS project
+- WhatsApp API token / phone ID, bank transfer account details, update-feed tokens, and
+  any integration keys.
+- Values are written encrypted, read back decrypted on the server only, and shown masked
+  in the UI with a "replace value" action.
+- Local device copies continue to use the existing encrypted device-secret store, so
+  nothing sensitive is written to the till in plain text.
 
-A single consolidated script, `supabase/sql/99_fix_grants_and_helpers.sql`, safe to re-run, containing:
+## 4. New "Database health" page
 
-- Execute rights for signed-in users on the access-rule helper checks (`is_staff_now`, `is_supervisor_now`, `is_staff`, `is_app_supervisor`, `has_role`, `has_perm`, `store_visible`, `user_store_id`, `user_cluster_id`), plus visitor access to `campaign_is_live`. Without these, every access rule that calls them fails with "permission denied for function is_staff_now" — the error you saw.
-- Table grants for `authenticated` and `service_role` on every operational table, so the Data API can reach them at all.
-- A verification query at the end that prints any helper or table still missing rights, so you can confirm the script worked.
+A new page under System & Settings that runs a read test against every core table
+(products, members, sales, shifts, shift sessions, bookings, stores, settings, coupons,
+vouchers, transfers, audit logs) and shows one row per table:
 
-The same two repo scripts that caused the regression (`15_security_and_performance.sql`, `17_public_flags_and_grants.sql`) were already corrected last turn, so re-running the full set no longer strips these rights.
-
-If a staff member is still refused after the script, the remaining cause is data, not permissions: their account needs a row in `user_roles` (admin/manager/staff) and a branch on their staff profile, since the rules also check `store_visible`. The connection check above will state which one is missing.
-
-## Where the service key is stored
-
-It is **not** in the code and never reaches the browser. `POS_SUPABASE_SERVICE_ROLE_KEY` is a backend secret, read only inside server code (`src/lib/pos-relay.server.ts`) at request time. Only the publishable key — which is safe to ship — appears in `external-supabase-config.ts`. A repo test (`route-guards.security.test.ts`) fails the build if any client file references a service key.
+- green when the read works, with the row count
+- red with the exact reason when it fails (not signed in, no access rule, missing table,
+  network)
+- extra checks: which database the app is pointing at, whether a staff session exists,
+  branch assignment, and whether the server relay answers
+- a "Copy report" button so the result can be pasted back here
 
 ## Technical notes
 
-- Files touched: `src/lib/sync-relay.ts`, `src/lib/sync-engine.ts`, the connection-check component, and the new SQL file.
-- No change to the relay's server-side verification or to its allow-list of writable tables.
+- `src/lib/sync-relay.ts` — `canRelay()` also returns true for an active Supabase session.
+- `src/lib/sync-engine.ts` — `describeError()` distinguishes activation vs. permission vs.
+  network failures.
+- New route `src/routes/settings.diagnostics.tsx` + `src/lib/db-health.ts` running
+  `select ... head/count` probes per table.
+- `src/lib/external-supabase-config.ts` — env-first, fallback kept for the published build.
+- Sensitive settings routed through `secure-settings.functions.ts`/`.server.ts`.
+- A SQL script `supabase/sql/99_fix_grants_and_helpers.sql` to run once on your own
+  Supabase project, restoring execute rights on the access-rule helpers
+  (`is_staff_now`, `is_supervisor_now`, `has_perm`, `store_visible`, …) and table grants —
+  this is what causes "permission denied for function is_staff_now".
