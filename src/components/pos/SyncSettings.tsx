@@ -6,6 +6,7 @@ import { usePos } from "@/lib/pos-store";
 import { downloadSqlBackup } from "@/lib/backup-sql";
 import { drainOutbox } from "@/lib/sync-engine";
 import { LocalDatabaseSettings } from "@/components/pos/LocalDatabaseSettings";
+import { ConnectionCheck } from "@/components/pos/ConnectionCheck";
 import { SyncLogViewer } from "@/components/SyncLogViewer";
 import { logSync } from "@/lib/sync-log";
 import { localDb } from "@/lib/local-db";
@@ -65,6 +66,8 @@ export function SyncSettings() {
       </div>
 
       <LocalDatabaseSettings />
+
+      <ConnectionCheck />
 
       <div className="grid gap-2 rounded-md border border-border px-3 py-2 text-sm sm:grid-cols-3">
         <Stat label="Connection" value={isOnline() ? "Online" : "Offline"} />
