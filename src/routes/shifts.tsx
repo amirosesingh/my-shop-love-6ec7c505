@@ -224,17 +224,22 @@ function Shifts() {
                 <Input value={cashier} onChange={(e) => setCashier(e.target.value)} />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Opening float</Label>
+                <Label className="text-xs text-muted-foreground">
+                  Opening float <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   className="numeric w-32"
+                  inputMode="decimal"
+                  placeholder="0.00"
                   value={float}
                   onChange={(e) => setFloat(e.target.value)}
                 />
               </div>
               <Button
+                disabled={!cashier.trim() || parsePositiveAmount(float) === null}
                 onClick={async () => {
                   if (!(await requirePermission("can_open_drawer"))) return;
-                  openShift(cashier || "Cashier", Number(float) || 0);
+                  openShift(cashier.trim() || "Cashier", parsePositiveAmount(float) ?? 0);
                   openCashDrawer();
                   toast.success("Shift opened");
                 }}
