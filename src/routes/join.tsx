@@ -59,12 +59,10 @@ function JoinPage() {
     }
   }
 
+  if (!ready) return <main className="min-h-screen bg-background" />;
+  if (!flags.member) return <PublicPageClosed what="Member signup" />;
+
   return (
-    !ready ? (
-      <main className="min-h-screen bg-background" />
-    ) : !flags.member ? (
-      <PublicPageClosed what="Member signup" />
-    ) : (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
       <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 shadow-lg">
         {done ? (
