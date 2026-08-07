@@ -1,0 +1,202 @@
+/**
+ * Per-table read/write probe against the central database.
+ *
+ * Reading uses a `head` count, so no customer data is pulled down. Writing is
+ * proven with a harmless update that matches nothing: the database still runs
+ * the access rules, so a refusal is reported exactly as a real save would fail,
+ * but no row is ever changed.
+ */
+import { supabaseExternal } from "@/integrations/supabase/external-client";
+import { EXTERNAL_SUPABASE_URL } from "./external-supabase-config";
+import { canRelay, hasStaffSession, probeRelay } from "./sync-relay";
+import { readTerminalConfig } from "./terminal-tokens";
+
+export type ProbeState = "ok" | "fail" | "skipped";
+
+export type TableProbe = {
+  table: string;
+  label: string;
+  read: ProbeState;
+  readDetail: string;
+  rows: number | null;
+  write: ProbeState;
+  writeDetail: string;
+};
+
+export type HeaderCheck = { label: string; ok: boolean; detail: string };
+
+export type DbHealthReport = {
+  at: string;
+  header: HeaderCheck[];
+  tables: TableProbe[];
+};
+
+/** Core tables the POS cannot work without. */
+export const CORE_TABLES: { table: string; label: string; writable: boolean }[] = [
+  { table: "products", label: "Products", writable: true },
+  { table: "product_categories", label: "Categories", writable: true },
+  { table: "members", label: "Members", writable: true },
+  { table: "membership_tiers", label: "Membership tiers", writable: false },
+  { table: "sales", label: "Sales", writable: true },
+  { table: "sale_items", label: "Sale items", writable: true },
+  { table: "shifts", label: "Shifts", writable: true },
+  { table: "shift_sessions", label: "Shift sign-ins", writable: true },
+  { table: "held_orders", label: "Held bills", writable: true },
+  { table: "bookings", label: "Bookings", writable: true },
+  { table: "booking_payments", label: "Booking payments", writable: true },
+  { table: "stores", label: "Branches", writable: true },
+  { table: "pos_settings", label: "Settings", writable: false },
+  { table: "coupon_campaigns", label: "Coupon campaigns", writable: false },
+  { table: "issued_vouchers", label: "Issued vouchers", writable: false },
+  { table: "stock_transfers", label: "Stock transfers", writable: true },
+  { table: "stock_transfer_items", label: "Transfer items", writable: true },
+  { table: "purchase_orders", label: "Purchase orders", writable: true },
+  { table: "purchase_order_items", label: "Purchase order items", writable: true },
+  { table: "stock_adjustments", label: "Stock adjustments", writable: true },
+  { table: "audit_logs", label: "Activity log", writable: true },
+  { table: "drawer_events", label: "Drawer events", writable: true },
+];
+
+type Loose = {
+  select: (cols: string, opts: { count: "exact"; head: true }) => PromiseLike<{
+    error: { message: string; code?: string } | null;
+    count: number | null;
+  }>;
+  update: (values: unknown) => {
+    eq: (col: string, val: unknown) => PromiseLike<{ error: { message: string; code?: string } | null }>;
+  };
+};
+
+const from = (table: string) =>
+  (supabaseExternal as unknown as { from: (t: string) => Loose }).from(table);
+
+/** Turn a database error into something a shop owner can act on. */
+export function explainError(error: { message: string; code?: string }): string {
+  if (error.code === "PGRST205" || /does not exist/i.test(error.message)) {
+    return `Table missing — the setup script has not been run on this database (${error.message})`;
+  }
+  if (/permission denied for function/i.test(error.message)) {
+    return `${error.message} — run supabase/sql/99_fix_grants_and_helpers.sql once`;
+  }
+  if (error.code === "42501" || /permission denied/i.test(error.message)) {
+    return `No access rule allows this account here (${error.message})`;
+  }
+  if (error.code === "PGRST301" || /jwt|not signed in/i.test(error.message)) {
+    return "Not signed in to the central database";
+  }
+  if (/row-level security/i.test(error.message)) {
+    return `Blocked by the row access rules (${error.message})`;
+  }
+  return error.message;
+}
+
+const NO_ROW = "00000000-0000-0000-0000-000000000000";
+
+async function probeTable(entry: {
+  table: string;
+  label: string;
+  writable: boolean;
+}): Promise<TableProbe> {
+  const probe: TableProbe = {
+    table: entry.table,
+    label: entry.label,
+    read: "fail",
+    readDetail: "",
+    rows: null,
+    write: "skipped",
+    writeDetail: "Not tested",
+  };
+
+  try {
+    const { error, count } = await from(entry.table).select("*", { count: "exact", head: true });
+    if (error) {
+      probe.readDetail = explainError(error);
+    } else {
+      probe.read = "ok";
+      probe.rows = count ?? 0;
+      probe.readDetail = `${count ?? 0} row${count === 1 ? "" : "s"} readable`;
+    }
+  } catch (e) {
+    probe.readDetail = (e as Error).message;
+  }
+
+  if (!entry.writable) return probe;
+
+  try {
+    // Matches no row, so nothing is changed — but the rules still run.
+    const { error } = await from(entry.table).update({}).eq("id", NO_ROW);
+    if (error && !/empty|no values|payload/i.test(error.message)) {
+      probe.write = "fail";
+      probe.writeDetail = explainError(error);
+    } else {
+      probe.write = "ok";
+      probe.writeDetail = "Saving is allowed";
+    }
+  } catch (e) {
+    probe.write = "fail";
+    probe.writeDetail = (e as Error).message;
+  }
+
+  return probe;
+}
+
+/** Run the whole check. Safe to run at any time — nothing is modified. */
+export async function runDbHealth(): Promise<DbHealthReport> {
+  const session = (await supabaseExternal.auth.getSession()).data.session;
+  const terminal = readTerminalConfig();
+  const relay = await probeRelay();
+
+  const header: HeaderCheck[] = [
+    {
+      label: "Database in use",
+      ok: true,
+      detail: EXTERNAL_SUPABASE_URL,
+    },
+    {
+      label: "Signed in",
+      ok: !!session,
+      detail: session?.user?.email ?? "No staff account signed in on this device",
+    },
+    {
+      label: "Branch assigned",
+      ok: !!terminal?.locationId,
+      detail: terminal?.locationName ?? terminal?.locationId ?? "No branch on this device",
+    },
+    {
+      label: "Server save route",
+      ok: relay.ok,
+      detail: relay.ok
+        ? "Available as a fallback when a direct save is refused"
+        : (relay.error ?? "Unavailable"),
+    },
+    {
+      label: "Fallback allowed here",
+      ok: canRelay(),
+      detail: canRelay()
+        ? hasStaffSession()
+          ? "Yes — signed-in browser session"
+          : "Yes — activated till"
+        : "No — sign in or activate this till",
+    },
+  ];
+
+  const tables: TableProbe[] = [];
+  for (const entry of CORE_TABLES) tables.push(await probeTable(entry));
+
+  return { at: new Date().toISOString(), header, tables };
+}
+
+/** Plain-text version of the report, for pasting into a support message. */
+export function formatReport(report: DbHealthReport): string {
+  const lines = [`Database health — ${new Date(report.at).toLocaleString()}`, ""];
+  for (const h of report.header) lines.push(`${h.ok ? "OK  " : "FAIL"} ${h.label}: ${h.detail}`);
+  lines.push("", "Table                 Read                 Write");
+  for (const t of report.tables) {
+    lines.push(
+      `${t.label.padEnd(22)}${t.read === "ok" ? "OK" : "FAIL"} ${t.readDetail} | ${
+        t.write === "skipped" ? "not tested" : t.write === "ok" ? "OK" : `FAIL ${t.writeDetail}`
+      }`,
+    );
+  }
+  return lines.join("\n");
+}

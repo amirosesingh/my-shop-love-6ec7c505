@@ -4,6 +4,8 @@ import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { readTerminalConfig } from "@/lib/terminal-tokens";
 import { ensureTerminalSession } from "@/lib/terminal-session";
 import { probeRelay } from "@/lib/sync-relay";
+import { isDesktop } from "@/lib/branding";
+import { isNative } from "@/lib/native";
 
 type Check = { label: string; ok: boolean; detail: string };
 
@@ -17,10 +19,17 @@ export function ConnectionCheck() {
     const results: Check[] = [];
 
     const config = readTerminalConfig();
+    // In a plain browser (admins and supervisors sign in with email) no till is
+    // meant to be registered, so this is information, not a fault.
+    const tillExpected = isDesktop() || isNative();
     results.push({
       label: "Terminal registered",
-      ok: !!config,
-      detail: config ? config.locationName || config.locationId : "This till is not activated yet",
+      ok: !!config || !tillExpected,
+      detail: config
+        ? config.locationName || config.locationId
+        : tillExpected
+          ? "This till is not activated yet"
+          : "Browser session — no till registered (not required here)",
     });
 
     const signedIn = await ensureTerminalSession();
@@ -28,7 +37,9 @@ export function ConnectionCheck() {
     results.push({
       label: "Signed in to the central database",
       ok: signedIn || !!session,
-      detail: session?.user?.email ?? "No cloud account on this till",
+      detail:
+        session?.user?.email ??
+        (signedIn ? "Signed in" : "Not signed in — sign in with your staff account"),
     });
 
     const relay = await probeRelay();

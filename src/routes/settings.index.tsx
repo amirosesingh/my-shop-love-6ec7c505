@@ -215,6 +215,12 @@ const GROUPS = [
         blurb: "Findings from deployment scans and the nightly database posture check.",
       },
       {
+        to: "/settings/diagnostics",
+        label: "Database health",
+        icon: Activity,
+        blurb: "Per-table reading and saving status, with the exact reason when one fails.",
+      },
+      {
         to: "/settings/inheritance",
         label: "Settings inheritance",
         icon: RefreshCw,

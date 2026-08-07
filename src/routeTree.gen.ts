@@ -50,6 +50,7 @@ import { Route as SettingsIndexRouteImport } from './routes/settings.index'
 import { Route as SettingsAccountsRouteImport } from './routes/settings.accounts'
 import { Route as SettingsBookingSlipRouteImport } from './routes/settings.booking-slip'
 import { Route as SettingsCatalogRouteImport } from './routes/settings.catalog'
+import { Route as SettingsDiagnosticsRouteImport } from './routes/settings.diagnostics'
 import { Route as SettingsDisplayRouteImport } from './routes/settings.display'
 import { Route as SettingsElementsRouteImport } from './routes/settings.elements'
 import { Route as SettingsIdentityRouteImport } from './routes/settings.identity'
@@ -282,6 +283,11 @@ const SettingsCatalogRoute = SettingsCatalogRouteImport.update({
   path: '/settings/catalog',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsDiagnosticsRoute = SettingsDiagnosticsRouteImport.update({
+  id: '/settings/diagnostics',
+  path: '/settings/diagnostics',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsDisplayRoute = SettingsDisplayRouteImport.update({
   id: '/settings/display',
   path: '/settings/display',
@@ -453,6 +459,7 @@ export interface FileRoutesByFullPath {
   '/settings/accounts': typeof SettingsAccountsRoute
   '/settings/booking-slip': typeof SettingsBookingSlipRoute
   '/settings/catalog': typeof SettingsCatalogRoute
+  '/settings/diagnostics': typeof SettingsDiagnosticsRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
   '/settings/identity': typeof SettingsIdentityRoute
@@ -522,6 +529,7 @@ export interface FileRoutesByTo {
   '/settings/accounts': typeof SettingsAccountsRoute
   '/settings/booking-slip': typeof SettingsBookingSlipRoute
   '/settings/catalog': typeof SettingsCatalogRoute
+  '/settings/diagnostics': typeof SettingsDiagnosticsRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
   '/settings/identity': typeof SettingsIdentityRoute
@@ -592,6 +600,7 @@ export interface FileRoutesById {
   '/settings/accounts': typeof SettingsAccountsRoute
   '/settings/booking-slip': typeof SettingsBookingSlipRoute
   '/settings/catalog': typeof SettingsCatalogRoute
+  '/settings/diagnostics': typeof SettingsDiagnosticsRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
   '/settings/identity': typeof SettingsIdentityRoute
@@ -663,6 +672,7 @@ export interface FileRouteTypes {
     | '/settings/accounts'
     | '/settings/booking-slip'
     | '/settings/catalog'
+    | '/settings/diagnostics'
     | '/settings/display'
     | '/settings/elements'
     | '/settings/identity'
@@ -732,6 +742,7 @@ export interface FileRouteTypes {
     | '/settings/accounts'
     | '/settings/booking-slip'
     | '/settings/catalog'
+    | '/settings/diagnostics'
     | '/settings/display'
     | '/settings/elements'
     | '/settings/identity'
@@ -801,6 +812,7 @@ export interface FileRouteTypes {
     | '/settings/accounts'
     | '/settings/booking-slip'
     | '/settings/catalog'
+    | '/settings/diagnostics'
     | '/settings/display'
     | '/settings/elements'
     | '/settings/identity'
@@ -871,6 +883,7 @@ export interface RootRouteChildren {
   SettingsAccountsRoute: typeof SettingsAccountsRoute
   SettingsBookingSlipRoute: typeof SettingsBookingSlipRoute
   SettingsCatalogRoute: typeof SettingsCatalogRoute
+  SettingsDiagnosticsRoute: typeof SettingsDiagnosticsRoute
   SettingsDisplayRoute: typeof SettingsDisplayRoute
   SettingsElementsRoute: typeof SettingsElementsRoute
   SettingsIdentityRoute: typeof SettingsIdentityRoute
@@ -1188,6 +1201,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsCatalogRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/diagnostics': {
+      id: '/settings/diagnostics'
+      path: '/settings/diagnostics'
+      fullPath: '/settings/diagnostics'
+      preLoaderRoute: typeof SettingsDiagnosticsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/display': {
       id: '/settings/display'
       path: '/settings/display'
@@ -1427,6 +1447,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsAccountsRoute: SettingsAccountsRoute,
   SettingsBookingSlipRoute: SettingsBookingSlipRoute,
   SettingsCatalogRoute: SettingsCatalogRoute,
+  SettingsDiagnosticsRoute: SettingsDiagnosticsRoute,
   SettingsDisplayRoute: SettingsDisplayRoute,
   SettingsElementsRoute: SettingsElementsRoute,
   SettingsIdentityRoute: SettingsIdentityRoute,

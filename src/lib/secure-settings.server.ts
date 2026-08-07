@@ -7,12 +7,22 @@ import { decryptSetting, encryptSetting, maskSetting } from "./settings-crypto.s
 export type SecureSettingKey =
   | "whatsapp_token"
   | "whatsapp_phone_number_id"
-  | "bank_account_number";
+  | "bank_account_number"
+  | "bank_account_name"
+  | "bank_name"
+  | "update_feed_token"
+  | "integration_api_key"
+  | "local_db_password";
 
 export const SECURE_SETTING_KEYS: SecureSettingKey[] = [
   "whatsapp_token",
   "whatsapp_phone_number_id",
   "bank_account_number",
+  "bank_account_name",
+  "bank_name",
+  "update_feed_token",
+  "integration_api_key",
+  "local_db_password",
 ];
 
 /**
