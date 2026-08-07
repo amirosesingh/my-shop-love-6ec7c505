@@ -7,6 +7,7 @@
  */
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { decryptActivation, encryptActivation, type ActivationPayload } from "./terminal-crypto";
+import { clearDeviceSecret, getDeviceSecret, setDeviceSecret } from "./device-secrets";
 
 export const POS_SUPABASE_URL =
   (import.meta.env["VITE_SUPABASE_EXTERNAL_URL"] as string | undefined) ??
@@ -244,19 +245,77 @@ export type TerminalConfig = {
 const CONFIG_KEY = "pos.terminal.config";
 const EVENT = "pos:terminal-config-changed";
 
-export function readTerminalConfig(): TerminalConfig | null {
-  if (typeof window === "undefined") return null;
+/**
+ * The activation is device identity, so it is kept sealed (AES-256-GCM with
+ * the per-device key) instead of readable text, and mirrored into the phone's
+ * persistent store. Readers stay synchronous through this in-memory copy,
+ * which `hydrateTerminalConfig()` fills before the first screen renders.
+ */
+const SEALED_NAME = "terminal.config";
+let cachedConfig: TerminalConfig | null = null;
+let hydrated = false;
+
+const parseConfig = (raw: string | null): TerminalConfig | null => {
+  if (!raw) return null;
   try {
-    const raw = window.localStorage.getItem(CONFIG_KEY);
-    return raw ? (JSON.parse(raw) as TerminalConfig) : null;
+    const parsed = JSON.parse(raw) as TerminalConfig;
+    return parsed?.tokenId ? parsed : null;
   } catch {
     return null;
   }
+};
+
+/** True once the sealed activation has been read back into memory. */
+export const isTerminalConfigHydrated = () => hydrated;
+
+/**
+ * Unseal the saved activation (migrating an older plain copy) so the till
+ * comes back registered after a relaunch, an update or an Android low-memory
+ * restart. Safe to call repeatedly.
+ */
+export async function hydrateTerminalConfig(): Promise<TerminalConfig | null> {
+  if (typeof window === "undefined") return null;
+  if (hydrated) return cachedConfig;
+  const legacy = parseConfig(window.localStorage.getItem(CONFIG_KEY));
+  if (legacy) {
+    cachedConfig = legacy;
+    hydrated = true;
+    // One-time upgrade: seal it and drop the readable copy.
+    try {
+      await setDeviceSecret(SEALED_NAME, legacy);
+      window.localStorage.removeItem(CONFIG_KEY);
+    } catch {
+      /* keep the plain copy rather than losing the activation */
+    }
+    window.dispatchEvent(new CustomEvent(EVENT));
+    return cachedConfig;
+  }
+  try {
+    const sealed = await getDeviceSecret<TerminalConfig>(SEALED_NAME);
+    if (sealed?.tokenId) cachedConfig = sealed;
+  } catch {
+    /* unreadable seal — treat as not activated */
+  }
+  hydrated = true;
+  window.dispatchEvent(new CustomEvent(EVENT));
+  return cachedConfig;
+}
+
+export function readTerminalConfig(): TerminalConfig | null {
+  if (typeof window === "undefined") return null;
+  if (cachedConfig) return cachedConfig;
+  // Before hydration finishes an older plain copy is still authoritative.
+  return parseConfig(window.localStorage.getItem(CONFIG_KEY));
 }
 
 export function writeTerminalConfig(config: TerminalConfig) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+  cachedConfig = config;
+  hydrated = true;
+  void setDeviceSecret(SEALED_NAME, config).catch(() => {
+    // Last resort so the till is not left unregistered after a restart.
+    window.localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+  });
   void desktopBridge()?.writeTerminalConfig(config);
   window.dispatchEvent(new CustomEvent(EVENT));
 }
@@ -264,6 +323,9 @@ export function writeTerminalConfig(config: TerminalConfig) {
 /** Called when a token is revoked — the till loses its credentials entirely. */
 export function clearTerminalConfig() {
   if (typeof window === "undefined") return;
+  cachedConfig = null;
+  hydrated = true;
+  clearDeviceSecret(SEALED_NAME);
   window.localStorage.removeItem(CONFIG_KEY);
   void desktopBridge()?.writeTerminalConfig(null);
   window.dispatchEvent(new CustomEvent(EVENT));
@@ -294,8 +356,7 @@ export async function restoreTerminalConfigFromDisk(): Promise<TerminalConfig | 
     const result = await bridge.readTerminalConfig();
     const config = result?.config;
     if (!config?.tokenId) return null;
-    window.localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
-    window.dispatchEvent(new CustomEvent(EVENT));
+    writeTerminalConfig(config);
     return config;
   } catch {
     return null;

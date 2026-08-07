@@ -152,6 +152,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   if (!ready) return null;
   // Desktop tills and Android terminals both have to register before use.
   if (isDesktop() || isNative()) {
+    // Never ask for a new activation while the saved one is still unsealing.
+    if (terminal.hydrating)
+      return (
+        <div className="flex min-h-screen items-center justify-center">
+          <Loader2 className="size-6 animate-spin text-primary" />
+        </div>
+      );
     if (terminal.revoked) return <TerminalRevokedScreen onReactivate={clearRevocation} />;
     if (!terminal.config) return <TerminalActivation onActivated={() => clearRevocation()} />;
   }

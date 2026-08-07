@@ -8,6 +8,13 @@
  */
 export type CameraCheck = { ok: boolean; reason?: string };
 
+/**
+ * Android relaunches the app when the camera activity takes memory, so the
+ * grant is remembered for the session instead of being re-requested on every
+ * scan (each prompt is another chance for the shell to restart).
+ */
+let granted = false;
+
 export const isNativeApp = () =>
   typeof window !== "undefined" &&
   Boolean(
@@ -24,6 +31,7 @@ const INSECURE =
 /** Ask for camera access, returning a human message when it is not available. */
 export async function ensureCameraPermission(): Promise<CameraCheck> {
   if (typeof window === "undefined") return { ok: false, reason: MISSING };
+  if (granted) return { ok: true };
 
   if (isNativeApp()) {
     try {
@@ -33,7 +41,11 @@ export async function ensureCameraPermission(): Promise<CameraCheck> {
       if (state !== "granted" && state !== "limited") {
         state = (await BarcodeScanner.requestPermissions()).camera;
       }
-      return state === "granted" || state === "limited" ? { ok: true } : { ok: false, reason: DENIED };
+      if (state === "granted" || state === "limited") {
+        granted = true;
+        return { ok: true };
+      }
+      return { ok: false, reason: DENIED };
     } catch {
       /* plugin unavailable — fall through to the browser path */
     }
@@ -46,6 +58,7 @@ export async function ensureCameraPermission(): Promise<CameraCheck> {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
     stream.getTracks().forEach((t) => t.stop());
+    granted = true;
     return { ok: true };
   } catch (e) {
     const name = (e as { name?: string })?.name ?? "";

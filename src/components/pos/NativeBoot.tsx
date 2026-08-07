@@ -10,15 +10,19 @@ import { useEffect, useState } from "react";
 
 import { isNative } from "../../lib/native";
 import { hydrateNativeStorage } from "../../lib/mobile-storage";
+import { hydrateTerminalConfig } from "../../lib/terminal-tokens";
 import { applyPendingWebBundle, startWebBundleChecks } from "../../lib/web-bundle-updates";
 
 export function NativeBoot({ children }: { children: React.ReactNode }) {
-  const [ready, setReady] = useState(() => !isNative());
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     if (ready) return;
     let cancelled = false;
     void hydrateNativeStorage()
+      // The activation is sealed on the device; unseal it before anything can
+      // decide the terminal is not registered.
+      .then(() => hydrateTerminalConfig())
       .then(() => applyPendingWebBundle())
       .finally(() => {
         if (!cancelled) setReady(true);

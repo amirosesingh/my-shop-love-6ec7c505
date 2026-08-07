@@ -12,6 +12,8 @@ import { useEffect, useState } from "react";
 import {
   clearTerminalConfig,
   fetchTokenStatus,
+  hydrateTerminalConfig,
+  isTerminalConfigHydrated,
   readTerminalConfig,
   restoreTerminalConfigFromDisk,
   stampHeartbeat,
@@ -53,6 +55,8 @@ export type RevocationState = {
   revoked: boolean;
   online: boolean;
   lastCheckedAt: string | null;
+  /** still unsealing the saved activation — do not ask for a new code yet */
+  hydrating: boolean;
 };
 
 export function useRevocationCheck(): RevocationState {
@@ -60,8 +64,15 @@ export function useRevocationCheck(): RevocationState {
   const [revoked, setRevoked] = useState(isTerminalRevoked);
   const [online, setOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
   const [lastCheckedAt, setLastCheckedAt] = useState<string | null>(null);
+  const [hydrating, setHydrating] = useState(() => !isTerminalConfigHydrated());
 
   useEffect(() => subscribeTerminalConfig(() => setConfig(readTerminalConfig())), []);
+  useEffect(() => {
+    void hydrateTerminalConfig().finally(() => {
+      setConfig(readTerminalConfig());
+      setHydrating(false);
+    });
+  }, []);
   // After an in-place desktop update the renderer storage can come back empty;
   // the shell keeps a copy of the activation on disk.
   useEffect(() => {
@@ -122,5 +133,5 @@ export function useRevocationCheck(): RevocationState {
     };
   }, [config]);
 
-  return { config, revoked, online, lastCheckedAt };
+  return { config, revoked, online, lastCheckedAt, hydrating };
 }

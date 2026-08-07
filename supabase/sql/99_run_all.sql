@@ -26,3 +26,4 @@
 \i 15_security_and_performance.sql
 \i 16_security_alerts.sql
 \i 17_public_flags_and_grants.sql
+\i 18_shift_notifications.sql
