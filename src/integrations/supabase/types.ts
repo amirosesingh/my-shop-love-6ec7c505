@@ -957,6 +957,24 @@ export type Database = {
           },
         ]
       }
+      public_flags: {
+        Row: {
+          enabled: boolean
+          key: string
+          updated_at: string
+        }
+        Insert: {
+          enabled?: boolean
+          key: string
+          updated_at?: string
+        }
+        Update: {
+          enabled?: boolean
+          key?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       purchase_order_items: {
         Row: {
           barcode: string | null
