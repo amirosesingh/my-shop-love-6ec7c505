@@ -8,6 +8,8 @@
  */
 import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
 import type { Sale, Shift } from "./pos-types";
+import { getPosCallerAuth } from "./pos-caller-auth";
+import { sendWhatsAppBill } from "./whatsapp.functions";
 
 export type ShiftSummary = {
   id: string;
@@ -202,4 +204,45 @@ export async function listShiftSummaries(storeId?: string): Promise<ShiftSummary
   const { data, error } = await query;
   if (error) throw new Error(error.message);
   return ((data ?? []) as Row[]).map(map);
+}
+
+const SEEN_KEY = "pos.alerts.shift.seen";
+
+export function markSummariesSeen(ids: string[]) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(SEEN_KEY, JSON.stringify(ids.slice(0, 100)));
+}
+
+export function readSeenSummaries(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    return JSON.parse(window.localStorage.getItem(SEEN_KEY) ?? "[]") as string[];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Publish the summary and send it on every channel this device has switched
+ * on. Nothing here can stop a shift from closing.
+ */
+export async function dispatchShiftSummary(
+  input: Omit<ShiftSummary, "id">,
+): Promise<string[]> {
+  const settings = readAlertSettings();
+  const quiet = inQuietHours(settings);
+  const channels: string[] = [];
+  if (settings.inApp) channels.push("in_app");
+  if (settings.whatsapp && settings.recipients.length > 0 && !quiet) channels.push("whatsapp");
+  if (settings.push && !quiet) channels.push("push");
+
+  await publishShiftSummary(input, channels);
+
+  if (channels.includes("whatsapp")) {
+    const auth = await getPosCallerAuth();
+    for (const to of settings.recipients) {
+      await sendWhatsAppBill({ data: { ...auth, to, body: input.summary } }).catch(() => null);
+    }
+  }
+  return channels;
 }

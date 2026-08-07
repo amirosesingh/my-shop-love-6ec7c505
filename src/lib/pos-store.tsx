@@ -555,6 +555,16 @@ export function PosProvider({ children }: { children: ReactNode }) {
         closedBy: closed.closedBy,
         overdue: closed.overdue,
       });
+      // Day-end summary goes out on whatever channels this device enabled.
+      void (async () => {
+        const snapshot = stateRef.current;
+        const storeName =
+          snapshot.stores.find((s) => s.id === closed.storeId)?.name ?? closed.storeId;
+        const { buildShiftSummary, dispatchShiftSummary } = await import("./shift-alerts");
+        await dispatchShiftSummary(buildShiftSummary(closed, snapshot.sales, storeName)).catch(
+          () => null,
+        );
+      })();
       return closed;
     },
     [activeShift, user, terminalUser, isAdmin, isSupervisor],
