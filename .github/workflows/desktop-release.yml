@@ -11,11 +11,23 @@ on:
         required: false
         default: ""
 
+# Never let two releases upload over each other.
+concurrency:
+  group: desktop-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
 jobs:
   build:
+    name: Build and publish the Windows installer
     runs-on: windows-latest
     permissions:
       contents: write
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
 
@@ -23,30 +35,60 @@ jobs:
         with:
           node-version: 22
 
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
       - name: Install dependencies
-        run: npm ci
+        run: bun install --frozen-lockfile
+
+      # A failing guardrail must never reach a till.
+      - name: Permission & route-guard tests
+        run: bunx vitest run
+      - name: Lint
+        run: bun run lint
 
       - name: Build installer
         env:
           # Repository variable POS_UPDATE_URL (Settings -> Variables) is the
           # web folder the tills poll; the manual input overrides it.
           POS_UPDATE_URL: ${{ inputs.update_url || vars.POS_UPDATE_URL }}
-        run: npm run desktop:release
+        run: bun run desktop:release
+
+      - name: Read app version
+        id: meta
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
 
       - name: Upload installer + update manifest
         uses: actions/upload-artifact@v4
         with:
-          name: LovablePOS-windows
+          name: LovablePOS-windows-${{ steps.meta.outputs.version }}
           if-no-files-found: error
           path: |
             release/*.exe
             release/latest.yml
             release/*.blockmap
 
+      - name: Deploy installer to Cloudflare R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        run: |
+          if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ] || [ -z "$R2_ENDPOINT" ]; then
+            echo "R2 credentials are not configured; skipping the update-feed upload."
+            exit 0
+          fi
+          aws s3 sync release s3://updatelccms/pos-app \
+            --exclude "*" --include "*.exe" --include "*.blockmap" --include "latest.yml" \
+            --endpoint-url "$R2_ENDPOINT"
+
       - name: Attach to GitHub release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.ref_name }}
           files: |
             release/*.exe
             release/latest.yml
