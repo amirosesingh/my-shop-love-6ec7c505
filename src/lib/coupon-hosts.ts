@@ -5,6 +5,7 @@
  * pages also work on the main domain (handy for testing and for the preview).
  */
 import { useEffect } from "react";
+import { loadPublicFlags } from "./public-flags";
 
 export const MEMBER_HOST = "member.luckycharmsdnbhd.com";
 export const REDEEM_HOST = "redeem.luckycharmsdnbhd.com";
@@ -32,8 +33,10 @@ export function usePublicHostLanding() {
     if (typeof window === "undefined") return;
     const host = window.location.hostname;
     if (window.location.pathname !== "/") return;
-    if (host === MEMBER_HOST || host === REDEEM_HOST) {
-      window.location.replace("/join");
-    }
+    if (host !== MEMBER_HOST && host !== REDEEM_HOST) return;
+    void loadPublicFlags().then((flags) => {
+      const on = host === MEMBER_HOST ? flags.member : flags.redeem;
+      if (on) window.location.replace("/join");
+    });
   }, []);
 }
