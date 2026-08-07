@@ -3,6 +3,7 @@ import { logSync } from "./sync-log";
 import { replayOrder } from "./activity-journal";
 import { isTerminalRevoked } from "./use-revocation-check";
 import { tableSyncAllowed } from "./sync-policy";
+import { canRelay, relayOp } from "./sync-relay";
 import {
   failOp,
   isOnline,
@@ -101,12 +102,21 @@ async function runOne(entry: QueuedOp): Promise<boolean> {
     }
   }
   if (res.error) {
-    const message =
-      res.error.code === "PGRST205"
-        ? `The "${entry.op.table}" table is missing on the database — run supabase/schema14.sql once, then this will sync automatically.`
-        : res.error.code === "42501" || /row-level security/i.test(res.error.message)
-          ? `This terminal is not allowed to write "${entry.op.table}" on the central database — run supabase/schema17.sql once, then this will sync automatically.`
-          : res.error.message;
+    // A till signed in with a username + PIN has no cloud account, so the row
+    // rules refuse the write. Send the very same operation through the server
+    // relay, which proves the till and writes on its behalf.
+    if (isPermissionError(res.error) && canRelay()) {
+      const relayed = await relayOp(entry.op);
+      if (relayed.ok) {
+        resolveOp(entry.id);
+        logSync("push", entry.op.table, true, `${entry.context} (via server)`);
+        return true;
+      }
+      failOp(entry.id, relayed.error ?? "The server could not save this change");
+      logSync("push", entry.op.table, false, `${entry.context}: ${relayed.error ?? "relay failed"}`);
+      return false;
+    }
+    const message = describeError(entry.op.table, res.error);
     failOp(entry.id, message);
     logSync("push", entry.op.table, false, `${entry.context}: ${message}`);
     return false;
@@ -128,8 +138,18 @@ export async function runOpLive(context: string, op: SyncOp): Promise<void> {
     if (drop.length) res = await execute({ ...op, rows: strip(op.rows, drop) } as SyncOp);
   }
   if (res.error) {
-    logSync("push", op.table, false, `${context}: ${res.error.message}`);
-    throw new Error(res.error.message);
+    if (isPermissionError(res.error) && canRelay()) {
+      const relayed = await relayOp(op);
+      if (relayed.ok) {
+        logSync("push", op.table, true, `${context} (via server)`);
+        return;
+      }
+      logSync("push", op.table, false, `${context}: ${relayed.error ?? "relay failed"}`);
+      throw new Error(relayed.error ?? "The server could not save this change");
+    }
+    const message = describeError(op.table, res.error);
+    logSync("push", op.table, false, `${context}: ${message}`);
+    throw new Error(message);
   }
   logSync("push", op.table, true, context);
 }
