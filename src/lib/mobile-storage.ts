@@ -11,7 +11,7 @@
  * when the app is not running inside Capacitor.
  */
 import { isNative } from "./native";
-import { isUiKey } from "./live-mode";
+import { isPersistentKey } from "./live-mode";
 
 const PREFIX = "pos.";
 
@@ -47,11 +47,11 @@ function install(store: Prefs) {
 
   ls.setItem = (key: string, value: string) => {
     setItem(key, value);
-    if (isUiKey(key)) void store.set({ key, value }).catch(() => {});
+    if (isPersistentKey(key)) void store.set({ key, value }).catch(() => {});
   };
   ls.removeItem = (key: string) => {
     removeItem(key);
-    if (isUiKey(key)) void store.remove({ key }).catch(() => {});
+    if (isPersistentKey(key)) void store.remove({ key }).catch(() => {});
   };
   ls.clear = () => {
     const keys = Object.keys(ls).filter((k) => k.startsWith(PREFIX));
@@ -74,7 +74,7 @@ export async function hydrateNativeStorage(): Promise<void> {
   try {
     const { keys } = await store.keys();
     for (const key of keys) {
-      if (!isUiKey(key)) {
+      if (!isPersistentKey(key)) {
         // Left over from the previous offline-first build.
         await store.remove({ key }).catch(() => {});
         continue;
@@ -83,7 +83,7 @@ export async function hydrateNativeStorage(): Promise<void> {
       if (value !== null) window.localStorage.setItem(key, value);
     }
     for (const key of Object.keys(window.localStorage)) {
-      if (!isUiKey(key) || keys.includes(key)) continue;
+      if (!isPersistentKey(key) || keys.includes(key)) continue;
       const value = window.localStorage.getItem(key);
       if (value !== null) await store.set({ key, value });
     }
@@ -99,7 +99,7 @@ export function purgeBusinessKeys() {
   try {
     const ls = window.localStorage;
     for (const key of Object.keys(ls)) {
-      if (isUiKey(key)) continue;
+      if (isPersistentKey(key)) continue;
       if (key.startsWith(PREFIX) || key === "pos-state-v2") ls.removeItem(key);
     }
   } catch {
