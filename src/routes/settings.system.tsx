@@ -24,6 +24,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { usePos } from "@/lib/pos-store";
+import {
+  MEMBER_FLAG,
+  REDEEM_FLAG,
+  setPublicFlag,
+  usePublicFlags,
+} from "@/lib/public-flags";
 import { cn } from "@/lib/utils";
 import {
   clearHealthErrors,
