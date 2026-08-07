@@ -78,6 +78,7 @@ import { DiscountPad } from "@/components/pos/DiscountPad";
 import { ManagerOverrideDialog, type OverrideRequest } from "@/components/pos/ManagerOverrideDialog";
 import { usePosRules } from "@/lib/pos-rules.tsx";
 import { assertShiftClosable } from "@/lib/pos-rules.functions";
+import { parseAmount, parsePositiveAmount } from "@/lib/amount";
 import { getPosCallerAuth } from "@/lib/pos-caller-auth";
 import { evaluatePromotions, focLine } from "@/lib/pos-promotions";
 import { clearCartDraft, loadCartDraft, saveCartDraft } from "@/lib/cart-draft";
