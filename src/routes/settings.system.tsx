@@ -75,14 +75,15 @@ function SystemSettingsPage() {
   const [dnsOpen, setDnsOpen] = useState(false);
   const [memberDomain, setMemberDomain] = useState(integrations.memberDomain);
   const [redeemDomain, setRedeemDomain] = useState(integrations.redeemDomain);
+  const { flags } = usePublicFlags();
 
   const refresh = () => setErrors(listHealthErrors());
 
   const diagnose = () => {
     setBusy(true);
     void runDiagnostics([
-      { url: integrations.memberDomain, label: "Member domain" },
-      { url: integrations.redeemDomain, label: "Redeem domain" },
+      ...(flags.member ? [{ url: integrations.memberDomain, label: "Member domain" }] : []),
+      ...(flags.redeem ? [{ url: integrations.redeemDomain, label: "Redeem domain" }] : []),
     ])
       .then((r) => {
         setChecks(r);
@@ -261,6 +262,20 @@ Both subdomains serve the same build; only the landing path differs.`;
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold">Subdomains & API configuration</h2>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <DomainSwitch
+            label="Member signup subdomain"
+            hint="Turns the public /join page on or off."
+            flagKey={MEMBER_FLAG}
+            enabled={flags.member}
+          />
+          <DomainSwitch
+            label="Voucher redemption subdomain"
+            hint="Turns the public claim and voucher pages on or off."
+            flagKey={REDEEM_FLAG}
+            enabled={flags.redeem}
+          />
+        </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Member domain</Label>
