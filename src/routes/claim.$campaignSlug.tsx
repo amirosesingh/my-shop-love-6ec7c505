@@ -12,6 +12,8 @@ import {
   scopeLabel,
   type Campaign,
 } from "@/lib/coupons";
+import { usePublicFlags } from "@/lib/public-flags";
+import { PublicPageClosed } from "@/components/pos/PublicPageClosed";
 
 export const Route = createFileRoute("/claim/$campaignSlug")({
   head: () => ({
@@ -36,6 +38,7 @@ export const Route = createFileRoute("/claim/$campaignSlug")({
 
 function ClaimPage() {
   const { campaignSlug } = Route.useParams();
+  const { flags, ready: flagsReady } = usePublicFlags();
   const navigate = useNavigate();
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [loading, setLoading] = useState(true);
@@ -93,6 +96,9 @@ function ClaimPage() {
       setBusy(false);
     }
   }
+
+  if (!flagsReady) return <main className="min-h-screen bg-background" />;
+  if (!flags.redeem) return <PublicPageClosed what="Voucher redemption" />;
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
