@@ -1,0 +1,10 @@
+GRANT EXECUTE ON FUNCTION public.is_staff_now() TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.is_supervisor_now() TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.is_staff(uuid) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.is_app_supervisor() TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.has_role(uuid, public.app_role) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.has_perm(text) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.store_visible(text) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.user_store_id() TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.user_cluster_id() TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.campaign_is_live(public.coupon_campaigns) TO anon, authenticated, service_role;

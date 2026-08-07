@@ -54,6 +54,20 @@ GRANT EXECUTE ON FUNCTION public.terminal_token_status(uuid) TO anon, authentica
 GRANT EXECUTE ON FUNCTION public.terminal_token_heartbeat(uuid, boolean) TO anon, authenticated;
 
 -- Signed-in staff actions (each routine re-checks the caller's role)
+-- RLS helper checks: policy expressions run as the calling role, so signed-in
+-- users MUST be able to execute these or every read fails with
+-- "permission denied for function is_staff_now".
+GRANT EXECUTE ON FUNCTION public.is_staff_now() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_supervisor_now() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_staff(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_app_supervisor() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.has_role(uuid, app_role) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.has_perm(text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.store_visible(text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.user_store_id() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.user_cluster_id() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.campaign_is_live(public.coupon_campaigns) TO anon, authenticated;
+
 GRANT EXECUTE ON FUNCTION public.current_app_user() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.list_app_users() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.list_cashiers() TO authenticated;
