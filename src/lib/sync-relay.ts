@@ -31,15 +31,33 @@ async function credentials() {
   };
 }
 
+/** True when a staff account is signed in to the central database in this browser. */
+export function hasStaffSession(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = window.localStorage.getItem("sb-external-auth-token");
+    if (!raw) return false;
+    const parsed = JSON.parse(raw) as { access_token?: string } | null;
+    return !!parsed?.access_token;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Whether the server write relay may be used. Activated tills qualify, and so
+ * does any browser with a signed-in staff account — admins and supervisors work
+ * from Chrome, where no till is registered. The endpoint still proves the
+ * caller before writing, so this never opens an anonymous path.
+ */
 export function canRelay(): boolean {
   if (typeof window === "undefined") return false;
   try {
-    return (
-      !!window.sessionStorage.getItem(TERMINAL_TOKEN_KEY) || !!readTerminalConfig()?.tokenId
-    );
+    if (window.sessionStorage.getItem(TERMINAL_TOKEN_KEY)) return true;
   } catch {
-    return !!readTerminalConfig()?.tokenId;
+    /* session storage unavailable */
   }
+  return !!readTerminalConfig()?.tokenId || hasStaffSession();
 }
 
 /** Push one operation through the relay. */

@@ -3,7 +3,7 @@ import { logSync } from "./sync-log";
 import { replayOrder } from "./activity-journal";
 import { isTerminalRevoked } from "./use-revocation-check";
 import { tableSyncAllowed } from "./sync-policy";
-import { canRelay, relayOp } from "./sync-relay";
+import { canRelay, hasStaffSession, relayOp } from "./sync-relay";
 import {
   failOp,
   isOnline,
@@ -64,7 +64,13 @@ const describeError = (table: string, error: PostgrestError) => {
     return `The "${table}" table is missing on the central database — an administrator needs to run the database setup script once.`;
   }
   if (isPermissionError(error)) {
-    return `This till is not allowed to save "${table}" on the central database yet. Re-activate the terminal or sign in again, and the queued changes will go through.`;
+    if (!hasStaffSession() && !canRelay()) {
+      return `Not signed in to the central database, so "${table}" could not be saved. Sign in again (or activate this till) and the queued changes will go through.`;
+    }
+    if (/permission denied for function/i.test(error.message)) {
+      return `The central database refused a permission check while saving "${table}" (${error.message}). An administrator needs to run supabase/sql/99_fix_grants_and_helpers.sql once.`;
+    }
+    return `The central database's access rules refused to save "${table}" for this account (${error.message}). Check the account's branch assignment and role.`;
   }
   return error.message;
 };
