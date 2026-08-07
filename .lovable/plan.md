@@ -38,8 +38,13 @@ android-apk.yml      tag v* or manual       APK -> R2 + GitHub release
   failing check still cannot ship.
 - Every workflow gets an explicit `permissions` block, a `concurrency` group,
   and consistent Bun install with `--frozen-lockfile`.
-- Release jobs skip the R2 upload with a clear message when the R2 secrets are
-  not configured, instead of failing.
+- Both release jobs publish to the Cloudflare R2 bucket `updatelccms`: the
+  Windows installer plus `latest.yml` and blockmap to `pos-app/`, the APK plus
+  `latest.json` to `pos-app/android/`, and the live web bundle to
+  `pos-app/android/web/` — the exact paths the tills and phones already poll,
+  so updates arrive over the air.
+- The R2 upload skips with a clear message when the R2 secrets are not
+  configured, instead of failing the run.
 - Android release builds run on tags rather than every push to main, so a
   routine code change no longer produces a new APK.
 
