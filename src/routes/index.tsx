@@ -2848,13 +2848,24 @@ function Register() {
               Opened by {activeShift?.cashier} · float {money(activeShift?.openingFloat ?? 0)}
             </p>
             <div className="space-y-1">
-              <Label>Counted cash in drawer</Label>
+              <Label>
+                Counted cash in drawer <span className="text-destructive">*</span>
+              </Label>
               <Input
                 className="numeric"
                 inputMode="decimal"
+                placeholder="0.00"
+                aria-required
                 value={countedCash}
                 onChange={(e) => setCountedCash(e.target.value)}
               />
+              {parseAmount(countedCash) === null ? (
+                <p className="text-[11px] text-destructive">
+                  Enter the cash counted in the drawer to close the shift.
+                </p>
+              ) : parseAmount(countedCash)! < 0 ? (
+                <p className="text-[11px] text-destructive">The amount cannot be negative.</p>
+              ) : null}
             </div>
             {rules.block_shift_close_on_hold && held.length > 0 && (
               <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
@@ -2871,11 +2882,19 @@ function Register() {
               Cancel
             </Button>
             <Button
-              disabled={closing}
+              disabled={
+                closing ||
+                parseAmount(countedCash) === null ||
+                (parseAmount(countedCash) ?? -1) < 0 ||
+                (rules.block_shift_close_on_hold && held.length > 0)
+              }
               onClick={() => {
                 void (async () => {
-                  const amount = Number(countedCash);
-                  const counted = Number.isFinite(amount) && amount >= 0 ? amount : null;
+                  const counted = parsePositiveAmount(countedCash);
+                  if (counted === null) {
+                    toast.error("Enter the counted cash amount");
+                    return;
+                  }
                   setClosing(true);
                   try {
                     // The server re-checks held tickets and the cash count
@@ -2887,10 +2906,6 @@ function Register() {
                     });
                     if (!gate.ok) {
                       toast.error(gate.error);
-                      return;
-                    }
-                    if (counted === null) {
-                      toast.error("Enter the counted cash amount");
                       return;
                     }
                     const closed = closeShift(counted, closeNote.trim());
