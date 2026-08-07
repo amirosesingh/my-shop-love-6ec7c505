@@ -10,23 +10,17 @@ on:
   push:
     tags:
       - "v*"
-    branches:
-      - main
-    paths:
-      - "src/**"
-      - "scripts/mobile-build.cjs"
-      - "vite.config.ts"
-      - "capacitor.config.ts"
-      - "capacitor-shell/**"
-      - "package.json"
-      - ".github/workflows/android-apk.yml"
 
 concurrency:
   group: android-release
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   apk:
+    name: Build and publish the Android APK
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -110,19 +104,18 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: auto
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         run: |
+          if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ] || [ -z "$R2_ENDPOINT" ]; then
+            echo "R2 credentials are not configured; skipping the update-feed upload."
+            exit 0
+          fi
           aws s3 sync android-release s3://updatelccms/pos-app/android \
-            --endpoint-url ${{ secrets.R2_ENDPOINT }}
-
-      - name: Deploy the live web bundle to Cloudflare R2
-        if: ${{ !inputs.app_url }}
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: auto
-        run: |
-          aws s3 sync android-web s3://updatelccms/pos-app/android/web \
-            --endpoint-url ${{ secrets.R2_ENDPOINT }}
+            --endpoint-url "$R2_ENDPOINT"
+          if [ -d android-web ]; then
+            aws s3 sync android-web s3://updatelccms/pos-app/android/web \
+              --endpoint-url "$R2_ENDPOINT"
+          fi
 
       - name: Attach APK to the GitHub release
         if: startsWith(github.ref, 'refs/tags/v')
