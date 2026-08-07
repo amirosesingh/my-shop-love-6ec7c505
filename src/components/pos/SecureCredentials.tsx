@@ -10,7 +10,15 @@ import {
   saveSecureSetting,
 } from "@/lib/secure-settings.functions";
 
-type Key = "whatsapp_token" | "whatsapp_phone_number_id" | "bank_account_number";
+type Key =
+  | "whatsapp_token"
+  | "whatsapp_phone_number_id"
+  | "bank_account_number"
+  | "bank_account_name"
+  | "bank_name"
+  | "update_feed_token"
+  | "integration_api_key"
+  | "local_db_password";
 
 const FIELDS: { key: Key; label: string; hint: string; placeholder: string }[] = [
   {
@@ -30,6 +38,36 @@ const FIELDS: { key: Key; label: string; hint: string; placeholder: string }[] =
     label: "Bank account number (private copy)",
     hint: "Kept encrypted for reconciliation; the display shows the public value only.",
     placeholder: "0001234567",
+  },
+  {
+    key: "bank_account_name",
+    label: "Bank account holder name",
+    hint: "Stored encrypted; shown masked here.",
+    placeholder: "Northwind Sports Sdn Bhd",
+  },
+  {
+    key: "bank_name",
+    label: "Bank name",
+    hint: "Stored encrypted alongside the account details.",
+    placeholder: "Maybank",
+  },
+  {
+    key: "update_feed_token",
+    label: "Update feed token",
+    hint: "Used by the desktop updater to fetch private releases.",
+    placeholder: "ghp_...",
+  },
+  {
+    key: "integration_api_key",
+    label: "Integration API key",
+    hint: "Any third-party key the POS calls on your behalf.",
+    placeholder: "sk_live_...",
+  },
+  {
+    key: "local_db_password",
+    label: "Local SQL Server password",
+    hint: "Never written to the till in plain text; the device copy is sealed too.",
+    placeholder: "••••••••",
   },
 ];
 
