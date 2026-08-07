@@ -401,6 +401,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       /* messaging features stay locked without a terminal token */
     }
+    // Sign the till itself in to the central database (machine account), so
+    // shifts, sessions and sales are accepted instead of being refused.
+    try {
+      const { ensureTerminalSession } = await import("@/lib/terminal-session");
+      void ensureTerminalSession();
+    } catch {
+      /* the server relay still carries the writes */
+    }
     return { ok: true };
   }, []);
 

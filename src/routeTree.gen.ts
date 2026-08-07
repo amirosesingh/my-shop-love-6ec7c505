@@ -73,6 +73,7 @@ import { Route as SettingsUpdatesRouteImport } from './routes/settings.updates'
 import { Route as SettingsVisibilityRouteImport } from './routes/settings.visibility'
 import { Route as SettingsWhatsappRouteImport } from './routes/settings.whatsapp'
 import { Route as ApiPublicSecurityAlertsRouteImport } from './routes/api/public/security-alerts'
+import { Route as ApiPublicSyncRouteImport } from './routes/api/public/sync'
 import { Route as ApiSettingsSyncBatchRouteImport } from './routes/api/settings.sync-batch'
 import { Route as ApiSettingsUpsertRouteImport } from './routes/api/settings.upsert'
 
@@ -396,6 +397,11 @@ const ApiPublicSecurityAlertsRoute = ApiPublicSecurityAlertsRouteImport.update({
   path: '/api/public/security-alerts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicSyncRoute = ApiPublicSyncRouteImport.update({
+  id: '/api/public/sync',
+  path: '/api/public/sync',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSettingsSyncBatchRoute = ApiSettingsSyncBatchRouteImport.update({
   id: '/sync-batch',
   path: '/sync-batch',
@@ -472,6 +478,7 @@ export interface FileRoutesByFullPath {
   '/reports/': typeof ReportsIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
+  '/api/public/sync': typeof ApiPublicSyncRoute
   '/api/settings/sync-batch': typeof ApiSettingsSyncBatchRoute
   '/api/settings/upsert': typeof ApiSettingsUpsertRoute
 }
@@ -540,6 +547,7 @@ export interface FileRoutesByTo {
   '/reports': typeof ReportsIndexRoute
   '/settings': typeof SettingsIndexRoute
   '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
+  '/api/public/sync': typeof ApiPublicSyncRoute
   '/api/settings/sync-batch': typeof ApiSettingsSyncBatchRoute
   '/api/settings/upsert': typeof ApiSettingsUpsertRoute
 }
@@ -609,6 +617,7 @@ export interface FileRoutesById {
   '/reports/': typeof ReportsIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
+  '/api/public/sync': typeof ApiPublicSyncRoute
   '/api/settings/sync-batch': typeof ApiSettingsSyncBatchRoute
   '/api/settings/upsert': typeof ApiSettingsUpsertRoute
 }
@@ -679,6 +688,7 @@ export interface FileRouteTypes {
     | '/reports/'
     | '/settings/'
     | '/api/public/security-alerts'
+    | '/api/public/sync'
     | '/api/settings/sync-batch'
     | '/api/settings/upsert'
   fileRoutesByTo: FileRoutesByTo
@@ -747,6 +757,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/settings'
     | '/api/public/security-alerts'
+    | '/api/public/sync'
     | '/api/settings/sync-batch'
     | '/api/settings/upsert'
   id:
@@ -815,6 +826,7 @@ export interface FileRouteTypes {
     | '/reports/'
     | '/settings/'
     | '/api/public/security-alerts'
+    | '/api/public/sync'
     | '/api/settings/sync-batch'
     | '/api/settings/upsert'
   fileRoutesById: FileRoutesById
@@ -884,6 +896,7 @@ export interface RootRouteChildren {
   ReportsIndexRoute: typeof ReportsIndexRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
   ApiPublicSecurityAlertsRoute: typeof ApiPublicSecurityAlertsRoute
+  ApiPublicSyncRoute: typeof ApiPublicSyncRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1336,6 +1349,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicSecurityAlertsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/sync': {
+      id: '/api/public/sync'
+      path: '/api/public/sync'
+      fullPath: '/api/public/sync'
+      preLoaderRoute: typeof ApiPublicSyncRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/settings/sync-batch': {
       id: '/api/settings/sync-batch'
       path: '/sync-batch'
@@ -1432,17 +1452,8 @@ const rootRouteChildren: RootRouteChildren = {
   ReportsIndexRoute: ReportsIndexRoute,
   SettingsIndexRoute: SettingsIndexRoute,
   ApiPublicSecurityAlertsRoute: ApiPublicSecurityAlertsRoute,
+  ApiPublicSyncRoute: ApiPublicSyncRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

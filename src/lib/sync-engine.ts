@@ -3,6 +3,7 @@ import { logSync } from "./sync-log";
 import { replayOrder } from "./activity-journal";
 import { isTerminalRevoked } from "./use-revocation-check";
 import { tableSyncAllowed } from "./sync-policy";
+import { canRelay, relayOp } from "./sync-relay";
 import {
   failOp,
   isOnline,
@@ -48,6 +49,25 @@ const strip = (rows: Record<string, unknown>[], columns: string[]) =>
     for (const c of columns) delete copy[c];
     return copy;
   });
+
+type PostgrestError = { message: string; code?: string };
+
+/** True when the database refused the write because of who the caller is. */
+const isPermissionError = (error: PostgrestError) =>
+  error.code === "42501" ||
+  error.code === "PGRST301" ||
+  /row-level security|permission denied|jwt/i.test(error.message);
+
+/** Plain-language message for a failed push. */
+const describeError = (table: string, error: PostgrestError) => {
+  if (error.code === "PGRST205") {
+    return `The "${table}" table is missing on the central database — an administrator needs to run the database setup script once.`;
+  }
+  if (isPermissionError(error)) {
+    return `This till is not allowed to save "${table}" on the central database yet. Re-activate the terminal or sign in again, and the queued changes will go through.`;
+  }
+  return error.message;
+};
 
 /** Table names are dynamic here, so the generated row types don't apply. */
 type LooseQuery = {
@@ -101,12 +121,21 @@ async function runOne(entry: QueuedOp): Promise<boolean> {
     }
   }
   if (res.error) {
-    const message =
-      res.error.code === "PGRST205"
-        ? `The "${entry.op.table}" table is missing on the database — run supabase/schema14.sql once, then this will sync automatically.`
-        : res.error.code === "42501" || /row-level security/i.test(res.error.message)
-          ? `This terminal is not allowed to write "${entry.op.table}" on the central database — run supabase/schema17.sql once, then this will sync automatically.`
-          : res.error.message;
+    // A till signed in with a username + PIN has no cloud account, so the row
+    // rules refuse the write. Send the very same operation through the server
+    // relay, which proves the till and writes on its behalf.
+    if (isPermissionError(res.error) && canRelay()) {
+      const relayed = await relayOp(entry.op);
+      if (relayed.ok) {
+        resolveOp(entry.id);
+        logSync("push", entry.op.table, true, `${entry.context} (via server)`);
+        return true;
+      }
+      failOp(entry.id, relayed.error ?? "The server could not save this change");
+      logSync("push", entry.op.table, false, `${entry.context}: ${relayed.error ?? "relay failed"}`);
+      return false;
+    }
+    const message = describeError(entry.op.table, res.error);
     failOp(entry.id, message);
     logSync("push", entry.op.table, false, `${entry.context}: ${message}`);
     return false;
@@ -128,8 +157,18 @@ export async function runOpLive(context: string, op: SyncOp): Promise<void> {
     if (drop.length) res = await execute({ ...op, rows: strip(op.rows, drop) } as SyncOp);
   }
   if (res.error) {
-    logSync("push", op.table, false, `${context}: ${res.error.message}`);
-    throw new Error(res.error.message);
+    if (isPermissionError(res.error) && canRelay()) {
+      const relayed = await relayOp(op);
+      if (relayed.ok) {
+        logSync("push", op.table, true, `${context} (via server)`);
+        return;
+      }
+      logSync("push", op.table, false, `${context}: ${relayed.error ?? "relay failed"}`);
+      throw new Error(relayed.error ?? "The server could not save this change");
+    }
+    const message = describeError(op.table, res.error);
+    logSync("push", op.table, false, `${context}: ${message}`);
+    throw new Error(message);
   }
   logSync("push", op.table, true, context);
 }
