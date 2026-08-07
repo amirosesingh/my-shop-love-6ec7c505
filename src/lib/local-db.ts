@@ -7,6 +7,7 @@
  * localStorage outbox, so the web build behaves exactly as before.
  */
 import type { SyncOp } from "./sync-outbox";
+import { getDeviceSecret, setDeviceSecret } from "./device-secrets";
 
 export type LocalDbConfig = {
   server: string;
@@ -128,22 +129,48 @@ export const localDb = (): PosBridge | null =>
   typeof window === "undefined" ? null : (window.pos ?? null);
 
 const CONFIG_KEY = "pos.localdb.config";
+const SECRET_NAME = "localdb.config";
+
+let cachedConfig: LocalDbConfig | null = null;
 
 export function readLocalDbConfig(): LocalDbConfig {
-  if (typeof window === "undefined") return defaultLocalDbConfig;
-  try {
-    const raw = window.localStorage.getItem(CONFIG_KEY);
-    return raw
-      ? { ...defaultLocalDbConfig, ...(JSON.parse(raw) as Partial<LocalDbConfig>) }
-      : defaultLocalDbConfig;
-  } catch {
-    return defaultLocalDbConfig;
-  }
+  return cachedConfig ?? defaultLocalDbConfig;
 }
 
-/** Credentials never leave the machine; the password is held by the shell. */
-export function writeLocalDbConfig(config: LocalDbConfig) {
+/**
+ * Load the connection details from the sealed device store. Any legacy
+ * plain-text copy is migrated into the encrypted store and removed, so nothing
+ * readable is left behind on the machine.
+ */
+export async function loadLocalDbConfig(): Promise<LocalDbConfig> {
+  if (typeof window === "undefined") return defaultLocalDbConfig;
+  const sealed = await getDeviceSecret<Partial<LocalDbConfig>>(SECRET_NAME);
+  if (sealed) {
+    cachedConfig = { ...defaultLocalDbConfig, ...sealed };
+    return cachedConfig;
+  }
+  try {
+    const raw = window.localStorage.getItem(CONFIG_KEY);
+    if (raw) {
+      const legacy = { ...defaultLocalDbConfig, ...(JSON.parse(raw) as Partial<LocalDbConfig>) };
+      window.localStorage.removeItem(CONFIG_KEY);
+      await setDeviceSecret(SECRET_NAME, legacy);
+      cachedConfig = legacy;
+      return legacy;
+    }
+  } catch {
+    /* unreadable legacy copy — start fresh */
+  }
+  cachedConfig = defaultLocalDbConfig;
+  return cachedConfig;
+}
+
+/**
+ * Credentials never leave the machine, and on the machine they are sealed with
+ * AES-256-GCM, so nobody can read or edit them from browser storage.
+ */
+export async function writeLocalDbConfig(config: LocalDbConfig) {
   if (typeof window === "undefined") return;
-  const { password: _password, ...safe } = config;
-  window.localStorage.setItem(CONFIG_KEY, JSON.stringify(safe));
+  cachedConfig = config;
+  await setDeviceSecret(SECRET_NAME, config);
 }
