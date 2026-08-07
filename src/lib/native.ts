@@ -25,6 +25,20 @@ export function isAndroid(): boolean {
   return cap()?.getPlatform?.() === "android";
 }
 
+/** True inside the Electron desktop shell (its preload exposes `window.pos`). */
+export function isElectron(): boolean {
+  return typeof window !== "undefined" && Boolean((window as { pos?: unknown }).pos);
+}
+
+/**
+ * True only on a real till: the Electron desktop app or the Capacitor mobile
+ * app. Plain browsers are back-office only — cashier PIN sign-in is hidden
+ * there and admins use email + password.
+ */
+export function isTerminalApp(): boolean {
+  return isNative() || isElectron();
+}
+
 /** True when a request to the cloud has any chance of succeeding. */
 export function hasConnection(): boolean {
   if (typeof navigator === "undefined") return true;

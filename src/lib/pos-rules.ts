@@ -11,6 +11,7 @@ export type PosRules = {
   /* A · shift & cash */
   block_shift_close_on_hold: boolean;
   require_daily_sales_for_shift_close: boolean;
+  require_counted_cash_on_close: boolean;
   require_opening_float_count: boolean;
   enable_blind_cash_count: boolean;
   max_drawer_cash_limit: number;
@@ -41,6 +42,7 @@ export type PosRuleKey = keyof PosRules;
 export const DEFAULT_POS_RULES: PosRules = {
   block_shift_close_on_hold: true,
   require_daily_sales_for_shift_close: true,
+  require_counted_cash_on_close: true,
   require_opening_float_count: true,
   enable_blind_cash_count: true,
   max_drawer_cash_limit: 1000,
@@ -96,6 +98,7 @@ export const RULE_GROUPS: RuleGroup[] = [
     fields: [
       { key: "block_shift_close_on_hold", kind: "switch", label: "Block shift close on held bills", blurb: "The shift cannot be closed while tickets are parked." },
       { key: "require_daily_sales_for_shift_close", kind: "switch", label: "Require closing cash count", blurb: "Counted cash must be declared before closing." },
+      { key: "require_counted_cash_on_close", kind: "switch", label: "Require counted cash before shift close", blurb: "The drawer amount must be typed in — an empty box blocks the close." },
       { key: "require_opening_float_count", kind: "switch", label: "Require opening float count", blurb: "Cashier confirms the starting drawer balance." },
       { key: "enable_blind_cash_count", kind: "switch", label: "Blind cash count", blurb: "Hide the expected drawer total while counting." },
       { key: "max_drawer_cash_limit", kind: "number", label: "Max cash in drawer", blurb: "Prompts for a safe drop above this amount." },

@@ -144,10 +144,11 @@ export const assertShiftClosable = createServerFn({ method: "POST" })
         }
       }
       if (
-        rules.require_daily_sales_for_shift_close &&
+        (rules.require_daily_sales_for_shift_close || rules.require_counted_cash_on_close) &&
         (data.countedCash === null ||
           data.countedCash === undefined ||
-          !Number.isFinite(data.countedCash))
+          !Number.isFinite(data.countedCash) ||
+          data.countedCash < 0)
       ) {
         return {
           ok: false as const,

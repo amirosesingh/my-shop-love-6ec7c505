@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { shiftDuration } from "@/lib/shift-hours";
+import { parsePositiveAmount } from "@/lib/amount";
 
 /**
  * Hard terminal lock.
@@ -90,23 +91,34 @@ export function ShiftGuard({ children }: { children: ReactNode }) {
           {mayOpen && (
             <div className="mt-5 space-y-3 text-left">
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Cashier</Label>
+                <Label className="text-xs text-muted-foreground">
+                  Cashier <span className="text-destructive">*</span>
+                </Label>
                 <Input value={cashier} onChange={(e) => setCashier(e.target.value)} />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Opening float</Label>
+                <Label className="text-xs text-muted-foreground">
+                  Opening float <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   className="numeric"
                   inputMode="decimal"
+                  placeholder="0.00"
                   value={float}
                   onChange={(e) => setFloat(e.target.value)}
                 />
+                {parsePositiveAmount(float) === null && (
+                  <p className="text-[11px] text-destructive">
+                    Count the drawer and enter the opening float.
+                  </p>
+                )}
               </div>
               <Button
                 className="w-full"
+                disabled={!cashier.trim() || parsePositiveAmount(float) === null}
                 onClick={() => {
-                  const amount = Number(float);
-                  if (!Number.isFinite(amount) || amount < 0) {
+                  const amount = parsePositiveAmount(float);
+                  if (amount === null) {
                     toast.error("Enter a valid opening float");
                     return;
                   }

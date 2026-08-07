@@ -33,6 +33,9 @@ import { signInsForDay, type SignInEntry } from "@/lib/shift-attendance";
 import { localShiftSessions, mergeSessions } from "@/lib/shift-sessions";
 import { loadShiftSessions } from "@/lib/pos-db";
 import type { ShiftSession } from "@/lib/pos-types";
+import { parseAmount, parsePositiveAmount } from "@/lib/amount";
+import { getPosCallerAuth } from "@/lib/pos-caller-auth";
+import { assertShiftClosable } from "@/lib/pos-rules.functions";
 
 export const Route = createFileRoute("/shifts")({
   head: () => ({
@@ -221,17 +224,22 @@ function Shifts() {
                 <Input value={cashier} onChange={(e) => setCashier(e.target.value)} />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Opening float</Label>
+                <Label className="text-xs text-muted-foreground">
+                  Opening float <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   className="numeric w-32"
+                  inputMode="decimal"
+                  placeholder="0.00"
                   value={float}
                   onChange={(e) => setFloat(e.target.value)}
                 />
               </div>
               <Button
+                disabled={!cashier.trim() || parsePositiveAmount(float) === null}
                 onClick={async () => {
                   if (!(await requirePermission("can_open_drawer"))) return;
-                  openShift(cashier || "Cashier", Number(float) || 0);
+                  openShift(cashier.trim() || "Cashier", parsePositiveAmount(float) ?? 0);
                   openCashDrawer();
                   toast.success("Shift opened");
                 }}
@@ -502,15 +510,25 @@ function Shifts() {
               Expected in drawer: {money(expected)}
             </p>
             <div className="space-y-1">
-              <Label>Counted cash</Label>
+              <Label>
+                Counted cash <span className="text-destructive">*</span>
+              </Label>
               <Input
                 className="numeric h-12 text-xl"
+                inputMode="decimal"
+                placeholder="0.00"
+                aria-required
                 value={counted}
                 onChange={(e) => setCounted(e.target.value)}
               />
+              {(parseAmount(counted) === null || (parseAmount(counted) ?? -1) < 0) && (
+                <p className="text-[11px] text-destructive">
+                  Enter the cash counted in the drawer to close the shift.
+                </p>
+              )}
             </div>
             <p className="numeric text-sm">
-              Variance {money(Number(counted || 0) - expected)}
+              Variance {money((parseAmount(counted) ?? 0) - expected)}
             </p>
             <div className="space-y-1">
               <Label>Note</Label>
@@ -522,8 +540,26 @@ function Shifts() {
               Cancel
             </Button>
             <Button
+              disabled={parsePositiveAmount(counted) === null}
               onClick={async () => {
-                const closed = await closeShift(Number(counted || 0), note);
+                const amount = parsePositiveAmount(counted);
+                if (amount === null) {
+                  toast.error("Enter the counted cash amount");
+                  return;
+                }
+                // The server re-checks held tickets and the cash-count rule.
+                const gate = await assertShiftClosable({
+                  data: {
+                    ...(await getPosCallerAuth()),
+                    storeId: currentStore.id,
+                    countedCash: amount,
+                  },
+                });
+                if (!gate.ok) {
+                  toast.error(gate.error);
+                  return;
+                }
+                const closed = await closeShift(amount, note);
                 if (closed) {
                   printShiftReport(closed, storeSales, "zreport");
                   openCashDrawer();
@@ -533,6 +569,7 @@ function Shifts() {
                 }
                 setCloseOpen(false);
                 setNote("");
+                setCounted("");
               }}
             >
               Close &amp; print Z

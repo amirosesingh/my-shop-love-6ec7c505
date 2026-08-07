@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS public.pos_store_settings (
   -- A · shift & cash
   block_shift_close_on_hold boolean NOT NULL DEFAULT true,
   require_daily_sales_for_shift_close boolean NOT NULL DEFAULT true,
+  require_counted_cash_on_close boolean NOT NULL DEFAULT true,
   require_opening_float_count boolean NOT NULL DEFAULT true,
   enable_blind_cash_count boolean NOT NULL DEFAULT true,
   max_drawer_cash_limit numeric NOT NULL DEFAULT 1000,
@@ -40,6 +41,11 @@ CREATE TABLE IF NOT EXISTS public.pos_store_settings (
 );
 
 DROP TRIGGER IF EXISTS pos_store_settings_touch ON public.pos_store_settings;
+
+-- Additive for databases created before this rule existed.
+ALTER TABLE public.pos_store_settings
+  ADD COLUMN IF NOT EXISTS require_counted_cash_on_close boolean NOT NULL DEFAULT true;
+
 CREATE TRIGGER pos_store_settings_touch BEFORE UPDATE ON public.pos_store_settings
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
@@ -120,6 +126,7 @@ BEGIN
 
   UPDATE public.pos_store_settings p
      SET (block_shift_close_on_hold, require_daily_sales_for_shift_close,
+          require_counted_cash_on_close,
           require_opening_float_count, enable_blind_cash_count, max_drawer_cash_limit,
           require_reason_for_payout, allow_multiple_shifts_per_terminal,
           max_cashier_discount_percent, max_cart_discount_amount, allow_discount_stacking,
@@ -131,6 +138,7 @@ BEGIN
        = (
           coalesce((_patch->>'block_shift_close_on_hold')::boolean, p.block_shift_close_on_hold),
           coalesce((_patch->>'require_daily_sales_for_shift_close')::boolean, p.require_daily_sales_for_shift_close),
+          coalesce((_patch->>'require_counted_cash_on_close')::boolean, p.require_counted_cash_on_close),
           coalesce((_patch->>'require_opening_float_count')::boolean, p.require_opening_float_count),
           coalesce((_patch->>'enable_blind_cash_count')::boolean, p.enable_blind_cash_count),
           coalesce((_patch->>'max_drawer_cash_limit')::numeric, p.max_drawer_cash_limit),
