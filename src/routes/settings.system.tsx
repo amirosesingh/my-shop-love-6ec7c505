@@ -72,6 +72,47 @@ const dot: Record<ServiceState, string> = {
 };
 
 function SystemSettingsPage() {
+  return <SystemSettingsBody />;
+}
+
+/** On/off switch for a public subdomain, saved straight to the database. */
+function DomainSwitch({
+  label,
+  hint,
+  flagKey,
+  enabled,
+}: {
+  label: string;
+  hint: string;
+  flagKey: string;
+  enabled: boolean;
+}) {
+  const [saving, setSaving] = useState(false);
+  return (
+    <div className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
+      <div>
+        <p className="text-sm font-medium">{label}</p>
+        <p className="text-[11px] text-muted-foreground">{hint}</p>
+      </div>
+      <Switch
+        aria-label={label}
+        checked={enabled}
+        disabled={saving}
+        onCheckedChange={(v) => {
+          setSaving(true);
+          void setPublicFlag(flagKey, v)
+            .then(() => toast.success(v ? `${label} is now live` : `${label} is switched off`))
+            .catch((e: unknown) =>
+              toast.error(e instanceof Error ? e.message : "Could not save the switch"),
+            )
+            .finally(() => setSaving(false));
+        }}
+      />
+    </div>
+  );
+}
+
+function SystemSettingsBody() {
   const { state, updateSettings } = usePos();
   const integrations = state.settings.integrations;
   const [checks, setChecks] = useState<ServiceCheck[]>([]);
