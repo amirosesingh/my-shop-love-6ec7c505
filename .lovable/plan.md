@@ -1,69 +1,72 @@
-# Fix web sign-in errors, keep keys out of Git, encrypt sensitive settings, add a database health page
+# Browser sign-in fix, secrets out of the code, encrypted settings, and a database health page
 
-## 1. Make the browser work like the till
+## 1. Shift sign-in works in Chrome for admins and supervisors
 
-Today the "server write relay" (the fallback that saves data when the database refuses a
-direct write) is only allowed for activated tills. From a normal browser it is switched
-off, so shift sign-in fails with "This till is not allowed to save ... on the central
-database".
+Today the fallback that saves data when the database refuses a direct write ("server write
+relay") is only switched on for activated tills. In a plain browser it is off, so any write
+that the access rules refuse ends with "This till is not allowed to save shift_sessions on
+the central database yet", and the connection panel shows a red "This till is not activated
+yet" even though a till was never meant to exist there.
 
-- Allow the relay whenever there is a valid signed-in staff session in the browser, not
-  only for activated tills.
-- The relay endpoint keeps verifying the caller (staff session, cashier session, or
-  terminal token) before writing — no new anonymous access.
-- Replace the confusing message with a clear one that says whether the problem is a
-  missing sign-in, a missing branch assignment, or a genuine access-rule refusal.
+- Turn the relay on whenever there is a valid signed-in staff session in the browser, not
+  only for activated tills. The relay endpoint keeps proving the caller (staff session,
+  cashier session, or terminal token) before writing, so nothing becomes anonymous.
+- In a browser, "Terminal registered" stops being a failure: it shows a neutral
+  "Browser session — no till registered", and the checks that matter become the signed-in
+  account, the branch assignment and the server route.
+- Replace the confusing error with one that says which of these is actually wrong:
+  not signed in, no branch assigned, or a genuine access-rule refusal.
 
-## 2. Keys and secrets out of the repository
+## 2. The service key lives in secrets, never in the repository
 
-Checked the code: the service key is **not** in the codebase. It is read only on the
-server from the `POS_SUPABASE_SERVICE_ROLE_KEY` environment secret, in
-`src/lib/pos-relay.server.ts`. Only the public/publishable key and project URL appear in
-`src/lib/external-supabase-config.ts`, which is safe and designed to be public.
+Checked the code: the service key is **not** in the codebase. It is read on the server only,
+from the `POS_SUPABASE_SERVICE_ROLE_KEY` secret, in `src/lib/pos-relay.server.ts`. What is in
+code is the project URL and the publishable key, which are safe to be public by design.
 
-To make this safe for GitHub:
-- Move the project URL and publishable key to environment variables as the primary
-  source, with a documented `.env.example` (names only, no values).
-- Confirm `.env` is git-ignored and add a short note in `docs/` listing every secret the
-  app expects and where to set it.
-- Add a check to the security test suite that fails if any key-looking string is
-  committed in `src/`.
+To make the repo safe to push to GitHub:
+- Move the project URL and publishable key to environment variables as the primary source,
+  keeping the current values only as a fallback for the published build.
+- Add `.env.example` with names and no values, confirm `.env` is git-ignored, and add a short
+  `docs/secrets.md` listing every secret the app expects and where to set it.
+- Add a test to the security suite that fails the build if a key-looking string is committed
+  anywhere under `src/`.
 
-## 3. Encrypt the sensitive settings
+## 3. Settings stored encrypted, locally and online
 
-The encrypted store already exists (`secure_settings` table + AES-256-GCM helpers).
-Extend it so all sensitive configuration goes through it instead of plain settings rows:
+The encrypted store already exists (`secure_settings` table plus AES-256-GCM helpers).
+Extend it so sensitive configuration no longer sits in plain rows or plain local storage:
 
-- WhatsApp API token / phone ID, bank transfer account details, update-feed tokens, and
-  any integration keys.
-- Values are written encrypted, read back decrypted on the server only, and shown masked
-  in the UI with a "replace value" action.
-- Local device copies continue to use the existing encrypted device-secret store, so
-  nothing sensitive is written to the till in plain text.
+- WhatsApp token and phone ID, bank transfer account details, update-feed tokens, printer and
+  integration keys, and the local SQL Server connection details.
+- Written encrypted, decrypted on the server only, shown masked in the UI with a
+  "replace value" action; no plain value is ever sent back to the screen.
+- On the till, the same values are kept in the existing encrypted device store, so someone
+  with access to the machine cannot read or edit them from a file.
 
 ## 4. New "Database health" page
 
-A new page under System & Settings that runs a read test against every core table
-(products, members, sales, shifts, shift sessions, bookings, stores, settings, coupons,
-vouchers, transfers, audit logs) and shows one row per table:
+A new page under System & Settings that checks every core table (products, members, sales,
+sale items, shifts, shift sessions, bookings, held orders, stores, settings, coupons,
+vouchers, transfers, purchase orders, audit logs) and shows one row per table with:
 
-- green when the read works, with the row count
-- red with the exact reason when it fails (not signed in, no access rule, missing table,
-  network)
-- extra checks: which database the app is pointing at, whether a staff session exists,
+- a read result — green with the row count, or red with the exact reason (not signed in, no
+  access rule, missing table, network)
+- a write result — a harmless no-op write is attempted so you can see whether saving works,
+  both directly and through the server route
+- header checks: which database the app is pointing at, whether a staff session exists,
   branch assignment, and whether the server relay answers
 - a "Copy report" button so the result can be pasted back here
 
 ## Technical notes
 
-- `src/lib/sync-relay.ts` — `canRelay()` also returns true for an active Supabase session.
-- `src/lib/sync-engine.ts` — `describeError()` distinguishes activation vs. permission vs.
-  network failures.
-- New route `src/routes/settings.diagnostics.tsx` + `src/lib/db-health.ts` running
-  `select ... head/count` probes per table.
-- `src/lib/external-supabase-config.ts` — env-first, fallback kept for the published build.
-- Sensitive settings routed through `secure-settings.functions.ts`/`.server.ts`.
-- A SQL script `supabase/sql/99_fix_grants_and_helpers.sql` to run once on your own
-  Supabase project, restoring execute rights on the access-rule helpers
-  (`is_staff_now`, `is_supervisor_now`, `has_perm`, `store_visible`, …) and table grants —
-  this is what causes "permission denied for function is_staff_now".
+- `src/lib/sync-relay.ts` — `canRelay()` also true when a Supabase session exists.
+- `src/lib/sync-engine.ts` — `describeError()` separates activation, permission and network.
+- `src/components/pos/ConnectionCheck.tsx` — browser-aware labels, no false red.
+- New `src/lib/db-health.ts` (per-table `head/count` probe + guarded write probe) and route
+  `src/routes/settings.diagnostics.tsx`, linked from the settings hub.
+- `src/lib/external-supabase-config.ts` — env-first with fallback.
+- Sensitive settings routed through `secure-settings.functions.ts` / `.server.ts`.
+- `supabase/sql/99_fix_grants_and_helpers.sql` — one script to run once on your own Supabase
+  project, restoring execute rights on the access-rule helpers (`is_staff_now`,
+  `is_supervisor_now`, `has_perm`, `store_visible`, …) and table grants. This is what causes
+  "permission denied for function is_staff_now" on the live database.
