@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { joinMember } from "@/lib/coupons";
 import { voucherUrl } from "@/lib/coupon-hosts";
+import { usePublicFlags } from "@/lib/public-flags";
+import { PublicPageClosed } from "@/components/pos/PublicPageClosed";
 
 export const Route = createFileRoute("/join")({
   head: () => ({
@@ -29,6 +31,7 @@ export const Route = createFileRoute("/join")({
 });
 
 function JoinPage() {
+  const { flags, ready } = usePublicFlags();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -55,6 +58,9 @@ function JoinPage() {
       setBusy(false);
     }
   }
+
+  if (!ready) return <main className="min-h-screen bg-background" />;
+  if (!flags.member) return <PublicPageClosed what="Member signup" />;
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-10">

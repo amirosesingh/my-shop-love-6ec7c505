@@ -24,6 +24,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { usePos } from "@/lib/pos-store";
+import {
+  MEMBER_FLAG,
+  REDEEM_FLAG,
+  setPublicFlag,
+  usePublicFlags,
+} from "@/lib/public-flags";
 import { cn } from "@/lib/utils";
 import {
   clearHealthErrors,
@@ -66,6 +72,47 @@ const dot: Record<ServiceState, string> = {
 };
 
 function SystemSettingsPage() {
+  return <SystemSettingsBody />;
+}
+
+/** On/off switch for a public subdomain, saved straight to the database. */
+function DomainSwitch({
+  label,
+  hint,
+  flagKey,
+  enabled,
+}: {
+  label: string;
+  hint: string;
+  flagKey: string;
+  enabled: boolean;
+}) {
+  const [saving, setSaving] = useState(false);
+  return (
+    <div className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
+      <div>
+        <p className="text-sm font-medium">{label}</p>
+        <p className="text-[11px] text-muted-foreground">{hint}</p>
+      </div>
+      <Switch
+        aria-label={label}
+        checked={enabled}
+        disabled={saving}
+        onCheckedChange={(v) => {
+          setSaving(true);
+          void setPublicFlag(flagKey, v)
+            .then(() => toast.success(v ? `${label} is now live` : `${label} is switched off`))
+            .catch((e: unknown) =>
+              toast.error(e instanceof Error ? e.message : "Could not save the switch"),
+            )
+            .finally(() => setSaving(false));
+        }}
+      />
+    </div>
+  );
+}
+
+function SystemSettingsBody() {
   const { state, updateSettings } = usePos();
   const integrations = state.settings.integrations;
   const [checks, setChecks] = useState<ServiceCheck[]>([]);
@@ -75,14 +122,15 @@ function SystemSettingsPage() {
   const [dnsOpen, setDnsOpen] = useState(false);
   const [memberDomain, setMemberDomain] = useState(integrations.memberDomain);
   const [redeemDomain, setRedeemDomain] = useState(integrations.redeemDomain);
+  const { flags } = usePublicFlags();
 
   const refresh = () => setErrors(listHealthErrors());
 
   const diagnose = () => {
     setBusy(true);
     void runDiagnostics([
-      { url: integrations.memberDomain, label: "Member domain" },
-      { url: integrations.redeemDomain, label: "Redeem domain" },
+      ...(flags.member ? [{ url: integrations.memberDomain, label: "Member domain" }] : []),
+      ...(flags.redeem ? [{ url: integrations.redeemDomain, label: "Redeem domain" }] : []),
     ])
       .then((r) => {
         setChecks(r);
@@ -261,6 +309,20 @@ Both subdomains serve the same build; only the landing path differs.`;
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold">Subdomains & API configuration</h2>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <DomainSwitch
+            label="Member signup subdomain"
+            hint="Turns the public /join page on or off."
+            flagKey={MEMBER_FLAG}
+            enabled={flags.member}
+          />
+          <DomainSwitch
+            label="Voucher redemption subdomain"
+            hint="Turns the public claim and voucher pages on or off."
+            flagKey={REDEEM_FLAG}
+            enabled={flags.redeem}
+          />
+        </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Member domain</Label>

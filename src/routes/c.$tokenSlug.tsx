@@ -9,6 +9,8 @@ import {
   type VoucherView,
 } from "@/lib/coupons";
 import { voucherUrl } from "@/lib/coupon-hosts";
+import { usePublicFlags } from "@/lib/public-flags";
+import { PublicPageClosed } from "@/components/pos/PublicPageClosed";
 
 export const Route = createFileRoute("/c/$tokenSlug")({
   head: () => ({
@@ -49,6 +51,7 @@ function countdown(target: Date, now: Date) {
 
 function VoucherPage() {
   const { tokenSlug } = Route.useParams();
+  const { flags, ready: flagsReady } = usePublicFlags();
   const [view, setView] = useState<VoucherView | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -83,6 +86,9 @@ function VoucherPage() {
   const redeemed = view?.voucher.status === "REDEEMED";
   const expired = Boolean(view && !redeemed && expiresAt && !remaining);
   const usable = Boolean(view) && !redeemed && !expired;
+
+  if (!flagsReady) return <main className="min-h-screen bg-background" />;
+  if (!flags.redeem) return <PublicPageClosed what="Voucher redemption" />;
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
