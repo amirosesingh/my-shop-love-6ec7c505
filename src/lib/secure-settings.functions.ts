@@ -1,7 +1,16 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-const KEYS = ["whatsapp_token", "whatsapp_phone_number_id", "bank_account_number"] as const;
+const KEYS = [
+  "whatsapp_token",
+  "whatsapp_phone_number_id",
+  "bank_account_number",
+  "bank_account_name",
+  "bank_name",
+  "update_feed_token",
+  "integration_api_key",
+  "local_db_password",
+] as const;
 
 const saveInput = z.object({
   accessToken: z.string().min(10),
