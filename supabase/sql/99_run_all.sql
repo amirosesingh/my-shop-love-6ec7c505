@@ -27,3 +27,5 @@
 \i 16_security_alerts.sql
 \i 17_public_flags_and_grants.sql
 \i 18_shift_notifications.sql
+\i 19_rules_grants.sql
+\i 20_staff_roles_backfill.sql
