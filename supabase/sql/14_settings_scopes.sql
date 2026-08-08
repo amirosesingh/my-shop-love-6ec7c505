@@ -81,6 +81,18 @@ $function$;
 
 DROP FUNCTION IF EXISTS public.settings_effective(text, text);
 
+-- The settings screen is served by the app server, which may call these
+-- routines with the internal service identity instead of a staff session.
+-- SECURITY DEFINER changes current_user but not the request role, so the
+-- service identity can still be recognised here.
+CREATE OR REPLACE FUNCTION public.settings_caller_is_service()
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE
+AS $function$
+  SELECT coalesce(current_setting('role', true), '') IN ('service_role', 'postgres')
+$function$;
+
 CREATE OR REPLACE FUNCTION public.settings_effective(_scope text, _scope_id text)
  RETURNS TABLE(
    setting_key text,
@@ -99,7 +111,7 @@ DECLARE
   r record;
   gv jsonb; cv jsonb; bv jsonb;
 BEGIN
-  IF NOT public.is_staff(auth.uid()) THEN
+  IF NOT (public.is_staff(auth.uid()) OR public.settings_caller_is_service()) THEN
     RAISE EXCEPTION 'Only staff can read settings';
   END IF;
 
@@ -174,7 +186,7 @@ DECLARE
   keep boolean;
   who text := coalesce(auth.uid()::text, 'system');
 BEGIN
-  IF NOT public.is_app_supervisor() THEN
+  IF NOT (public.is_app_supervisor() OR public.settings_caller_is_service()) THEN
     RAISE EXCEPTION 'Only supervisors can change settings';
   END IF;
   IF _scope NOT IN ('GLOBAL', 'CLUSTER', 'BRANCH') THEN
@@ -221,7 +233,7 @@ DECLARE
   log jsonb := '[]'::jsonb;
   per integer;
 BEGIN
-  IF NOT public.is_app_supervisor() THEN
+  IF NOT (public.is_app_supervisor() OR public.settings_caller_is_service()) THEN
     RAISE EXCEPTION 'Only supervisors can push settings';
   END IF;
   IF _scope NOT IN ('GLOBAL', 'CLUSTER') THEN
@@ -257,10 +269,15 @@ END $function$;
 
 REVOKE ALL ON FUNCTION public.settings_upsert(text, text, jsonb) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.settings_sync_batch(text, text, text[]) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.settings_effective(text, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.settings_effective(text, text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.settings_cluster_of(text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.settings_upsert(text, text, jsonb) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.settings_sync_batch(text, text, text[]) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.settings_effective(text, text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.settings_cluster_of(text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.settings_upsert(text, text, jsonb) TO service_role;
+GRANT EXECUTE ON FUNCTION public.settings_sync_batch(text, text, text[]) TO service_role;
 
 -- ---------- verification ----------
 SELECT t.name AS table_name,
