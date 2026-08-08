@@ -71,8 +71,9 @@ export const Route = createFileRoute("/api/public/sync")({
           return Response.json(
             {
               ok: false,
+              code: "NO_SERVICE_KEY",
               error:
-                "The central database key is not configured on this deployment, so syncing is paused.",
+                "Central database key missing on this server — an administrator needs to re-save it. Work is being queued locally in the meantime.",
             },
             { status: 503 },
           );
