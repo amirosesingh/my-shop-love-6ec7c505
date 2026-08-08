@@ -145,6 +145,7 @@ BEGIN
       AND has_function_privilege('anon', p.oid, 'execute')
       AND p.proname NOT IN ('coupon_claim', 'member_welcome_claim', 'voucher_by_token',
                             'verify_cashier_pin', 'verify_terminal_pin',
+                            'terminal_token_status', 'terminal_token_claim',
                             'terminal_token_heartbeat', 'security_report_findings')
   LOOP
     _found := _found || jsonb_build_object(

@@ -13,6 +13,8 @@ on:
     paths:
       - "src/**"
       - "scripts/mobile-build.cjs"
+      - "scripts/android-permissions.cjs"
+      - "scripts/android-release.cjs"
       - "vite.config.ts"
       - "capacitor.config.ts"
       - "capacitor-shell/**"
@@ -77,14 +79,43 @@ jobs:
         run: |
           npx cap add android || true
           npx cap sync android
+          node scripts/android-permissions.cjs
 
-      - name: Build debug APK
+      - name: Validate Android signing secrets
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then echo "Missing required GitHub secret: $name"; exit 1; fi
+          done
+
+      - name: Configure signed upgrade build
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEYSTORE_FILE: ${{ github.workspace }}/android/release.keystore
+          ANDROID_VERSION_NAME: ${{ steps.meta.outputs.version }}
+          ANDROID_VERSION_CODE: ${{ github.run_number }}
+        run: |
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_FILE"
+          node scripts/android-release.cjs
+
+      - name: Verify generated camera permission
+        run: grep -q 'android.permission.CAMERA' android/app/src/main/AndroidManifest.xml
+
+      - name: Build signed release APK
         working-directory: android
-        run: ./gradlew assembleDebug
-
-      # For a store-ready build: add ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,
-      # ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD as repository secrets, then swap the
-      # step above for `./gradlew assembleRelease` with the signing config wired in.
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEYSTORE_FILE: ${{ github.workspace }}/android/release.keystore
+        run: ./gradlew assembleRelease
 
       - name: Stage the APK and the web bundle
         run: |
@@ -92,7 +123,7 @@ jobs:
           rid="${{ steps.meta.outputs.release_id }}"
           released=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           mkdir -p versioned/android/web latest/android latest/android/web release-assets
-          src=$(ls android/app/build/outputs/apk/debug/*.apk | head -n1)
+          src=$(ls android/app/build/outputs/apk/release/*.apk | head -n1)
           cp "$src" "versioned/android/NorthwindPOS-$v.apk"
           cp "$src" "latest/android/NorthwindPOS-$v.apk"
           cp "$src" "latest/android/NorthwindPOS-latest.apk"
