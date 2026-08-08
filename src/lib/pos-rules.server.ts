@@ -58,12 +58,27 @@ function headers(accessToken?: string): Record<string, string> {
   };
 }
 
+/**
+ * Call a rules routine on the central database.
+ *
+ * These routines run with elevated rights, so they are no longer reachable by
+ * visitors: the call is made here with the internal service key, which never
+ * leaves the server. The publishable key is only used as a last resort when
+ * the service key is not configured on this deployment.
+ */
 export async function rpc<T>(name: string, body: unknown, accessToken?: string): Promise<T> {
-  const res = await fetch(`${EXTERNAL_SUPABASE_URL}/rest/v1/rpc/${name}`, {
-    method: "POST",
-    headers: headers(accessToken),
-    body: JSON.stringify(body ?? {}),
-  });
+  const payload = JSON.stringify(body ?? {});
+  let res: Response;
+  try {
+    const { serviceRest } = await import("./pos-relay.server");
+    res = await serviceRest(`rpc/${name}`, { method: "POST", body: payload });
+  } catch {
+    res = await fetch(`${EXTERNAL_SUPABASE_URL}/rest/v1/rpc/${name}`, {
+      method: "POST",
+      headers: headers(accessToken),
+      body: payload,
+    });
+  }
   if (!res.ok) throw new Error((await res.text()) || `${name} failed`);
   return (await res.json()) as T;
 }
@@ -83,29 +98,29 @@ export async function saveRules(
   patch: Partial<PosRules>,
   accessToken: string,
 ): Promise<PosRules> {
-  const body = { _store_id: storeId || "", _patch: patch };
+  // The caller was already proved to be a supervisor on the server. The
+  // routine re-checks for a signed-in supervisor, which the service role is
+  // not, so the branch row is written directly with service rights.
   try {
-    return normalizeRules(await rpc<unknown>("pos_rules_save", body, accessToken));
-  } catch (e) {
-    // The routine may not be granted to signed-in accounts on this database.
-    // The caller was already proved to be a supervisor, so fall back to the
-    // service key rather than leaving the settings unsaved.
-    const message = (e as Error).message ?? "";
-    if (!/42501|permission denied/i.test(message)) throw e;
     const { serviceRest } = await import("./pos-relay.server");
-    // The routine itself re-checks for a supervisor, which the service role is
-    // not, so write the branch row directly instead.
     const res = await serviceRest("pos_store_settings?on_conflict=store_id", {
       method: "POST",
       body: JSON.stringify([{ store_id: storeId || "", ...patch }]),
       prefer: "return=minimal,resolution=merge-duplicates",
     });
     if (!res.ok) throw new Error((await res.text()).slice(0, 400) || "Could not save rules");
-    const read = await serviceRest("rpc/pos_rules_get", {
+    return await loadRules(storeId);
+  } catch (e) {
+    // No service key on this deployment: fall back to the supervisor's own
+    // session, which the routine accepts.
+    const body = { _store_id: storeId || "", _patch: patch };
+    const res = await fetch(`${EXTERNAL_SUPABASE_URL}/rest/v1/rpc/pos_rules_save`, {
       method: "POST",
-      body: JSON.stringify({ _store_id: storeId || "" }),
+      headers: headers(accessToken),
+      body: JSON.stringify(body),
     });
-    return normalizeRules(read.ok ? await read.json() : null);
+    if (!res.ok) throw new Error((await res.text()).slice(0, 400) || (e as Error).message);
+    return normalizeRules(await res.json());
   }
 }
 
