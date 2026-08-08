@@ -7,7 +7,7 @@
  * but no row is ever changed.
  */
 import { supabaseExternal } from "@/integrations/supabase/external-client";
-import { supabaseConfig().url } from "./external-supabase-config";
+import { supabaseConfig } from "./external-supabase-config";
 import { canRelay, hasStaffSession, probeRelay } from "./sync-relay";
 import { readTerminalConfig } from "./terminal-tokens";
 

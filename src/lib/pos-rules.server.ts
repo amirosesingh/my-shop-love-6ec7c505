@@ -8,10 +8,7 @@
  */
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
-import {
-  supabaseConfig().key,
-  supabaseConfig().url,
-} from "./external-supabase-config";
+import { supabaseConfig } from "./external-supabase-config";
 import { DEFAULT_POS_RULES, normalizeRules, type PosRules } from "./pos-rules";
 
 const GRANT_TTL_MS = 5 * 60 * 1000;

@@ -8,7 +8,7 @@
  * fallback for tills that cannot hold a session.
  */
 import { createHmac } from "node:crypto";
-import { supabaseConfig().url } from "./external-supabase-config";
+import { supabaseConfig } from "./external-supabase-config";
 import { serviceRest, serviceKey } from "./pos-relay.server";
 
 export type TerminalAccount = { email: string; password: string };

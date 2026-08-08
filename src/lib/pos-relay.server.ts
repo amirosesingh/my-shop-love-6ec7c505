@@ -7,10 +7,7 @@
  * session, an active terminal token, or a staff access token) and then performs
  * the write with the service key, which never reaches the browser.
  */
-import {
-  supabaseConfig().key,
-  supabaseConfig().url,
-} from "./external-supabase-config";
+import { supabaseConfig } from "./external-supabase-config";
 
 export type RelayOp =
   | { kind: "insert"; table: string; rows: Record<string, unknown>[] }

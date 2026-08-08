@@ -14,7 +14,7 @@ const input = z.object({
 export const issueCashierSession = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => input.parse(data))
   .handler(async ({ data }) => {
-    const { supabaseConfig().key, supabaseConfig().url } = await import(
+    const { supabaseConfig } = await import(
       "./external-supabase-config"
     );
     const { signCashierSession } = await import("./pos-session.server");

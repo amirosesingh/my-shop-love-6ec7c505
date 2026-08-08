@@ -1,7 +1,4 @@
-import {
-  supabaseConfig().key,
-  supabaseConfig().url,
-} from "./external-supabase-config";
+import { supabaseConfig } from "./external-supabase-config";
 import { decryptSetting, encryptSetting, maskSetting } from "./settings-crypto.server";
 
 export type SecureSettingKey =
