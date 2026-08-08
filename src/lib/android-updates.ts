@@ -22,6 +22,7 @@ export type AndroidUpdateState = {
   installed: string;
   latest: string | null;
   file: string | null;
+  feed: string | null;
   checking: boolean;
   downloading: boolean;
   percent: number;
@@ -34,6 +35,7 @@ const INITIAL: AndroidUpdateState = {
   installed: APP_VERSION,
   latest: null,
   file: null,
+  feed: null,
   checking: false,
   downloading: false,
   percent: 0,
@@ -99,19 +101,20 @@ export function useAndroidUpdates() {
     if (!isNative() || !isAndroid()) return;
     setState((s) => ({ ...s, checking: true, error: null }));
     try {
-      const { version, file } = await fetchLatest();
+      const { version, file, feed } = await fetchLatest();
       setState((s) => ({
         ...s,
         checking: false,
         latest: version,
         file,
+        feed,
         lastChecked: new Date(),
       }));
     } catch (err) {
       setState((s) => ({
         ...s,
         checking: false,
-        error: err instanceof Error ? err.message : String(err),
+        error: describeNetworkError(err),
         lastChecked: new Date(),
       }));
     }
@@ -122,16 +125,18 @@ export function useAndroidUpdates() {
     try {
       const file = state.file;
       if (!file) throw new Error("No update file is available yet.");
-      await downloadAndInstall(file, (percent) => setState((s) => ({ ...s, percent })));
+      await downloadAndInstall(file, state.feed ?? FEEDS[0]!, (percent: number) =>
+        setState((s) => ({ ...s, percent })),
+      );
       setState((s) => ({ ...s, downloading: false, percent: 100 }));
     } catch (err) {
       setState((s) => ({
         ...s,
         downloading: false,
-        error: err instanceof Error ? err.message : String(err),
+        error: describeNetworkError(err),
       }));
     }
-  }, [state.file]);
+  }, [state.file, state.feed]);
 
   useEffect(() => {
     if (!isNative() || !isAndroid()) return;
