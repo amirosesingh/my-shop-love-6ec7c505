@@ -15,9 +15,31 @@ function fromEnv(bag: Record<string, unknown> | undefined, urlName: string, keyN
   return { url: clean(bag?.[urlName]), key: clean(bag?.[keyName]) };
 }
 
+/**
+ * Cloudflare hands the Worker its variables and secrets per request, not
+ * through `process.env` at module load, so the server entry pushes them here.
+ */
+let runtimeEnv: Record<string, unknown> | undefined;
+
+export function setRuntimeEnv(env: unknown): void {
+  if (!env || typeof env !== "object") return;
+  runtimeEnv = env as Record<string, unknown>;
+  cached = undefined;
+}
+
+/** Public values the server printed into the page for the browser to read. */
+function injectedBag(): Record<string, unknown> | undefined {
+  const g = globalThis as unknown as { __POS_CONFIG__?: Record<string, unknown> };
+  const bag = g.__POS_CONFIG__;
+  return bag && typeof bag === "object" ? bag : undefined;
+}
+
 /** Browser build-time values, plus server runtime values where available. */
 function bags(): Record<string, unknown>[] {
   const out: Record<string, unknown>[] = [];
+  const injected = injectedBag();
+  if (injected) out.push(injected);
+  if (runtimeEnv) out.push(runtimeEnv);
   try {
     if (import.meta.env) out.push(import.meta.env as unknown as Record<string, unknown>);
   } catch {
@@ -73,6 +95,25 @@ export function hasSupabaseConfig(): boolean {
     return true;
   } catch {
     return false;
+  }
+}
+
+/** Where the resolved values came from — for the health probe, never throws. */
+export function supabaseConfigSource(): "injected" | "runtime" | "build" | "missing" {
+  const check = (bag: Record<string, unknown> | undefined) =>
+    !!bag && PAIRS.some(([u, k]) => clean(bag[u]) && clean(bag[k]));
+  if (check(injectedBag())) return "injected";
+  if (check(runtimeEnv)) return "runtime";
+  return hasSupabaseConfig() ? "build" : "missing";
+}
+
+/** Only the public half — safe to print into the page for the browser. */
+export function publicSupabaseConfig(): { url: string; key: string } | undefined {
+  try {
+    const { url, key } = supabaseConfig();
+    return { url, key };
+  } catch {
+    return undefined;
   }
 }
 

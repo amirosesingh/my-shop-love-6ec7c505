@@ -20,6 +20,7 @@ import { Toaster } from "../components/ui/sonner";
 import { AuditTracker } from "../components/pos/AuditTracker";
 import { FirstRunSetup } from "../components/pos/FirstRunSetup";
 import { ThemeProvider, themeBootScript } from "../lib/theme";
+import { publicConfigScript } from "../lib/public-config-script";
 import { NativeBoot } from "../components/pos/NativeBoot";
 import { OfflineGate } from "../components/mobile/OfflineGate";
 import { AndroidUpdateBanner } from "../components/pos/AndroidUpdateBanner";
@@ -152,6 +153,7 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="en">
       <head>
         <HeadContent />
+        <script dangerouslySetInnerHTML={{ __html: publicConfigScript() }} />
         <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
       </head>
       <body>

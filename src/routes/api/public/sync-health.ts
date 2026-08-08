@@ -12,11 +12,14 @@ export const Route = createFileRoute("/api/public/sync-health")({
     handlers: {
       GET: async () => {
         const { hasServiceKey } = await import("@/lib/pos-relay.server");
-        const { hasSupabaseConfig } = await import("@/lib/external-supabase-config");
+        const { hasSupabaseConfig, supabaseConfigSource } = await import(
+          "@/lib/external-supabase-config"
+        );
         return Response.json(
           {
             serviceKey: hasServiceKey(),
             posUrl: hasSupabaseConfig(),
+            posUrlSource: supabaseConfigSource(),
             runtime: process.env["NODE_ENV"] === "production" ? "edge" : "dev",
           },
           { headers: { "Cache-Control": "no-store" } },
