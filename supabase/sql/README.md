@@ -26,9 +26,24 @@ files calls. Run `00` then `02` before anything else.
 | `11_audit_and_logs.sql` | Audit trail | `audit_logs`, `sku_audit` |
 | `12_analytics_views.sql` | Reporting views | `v_sale_line_facts`, `v_daily_store_sales`, `v_daily_item_sales` |
 
-`98_drop_unused.sql` is separate and **destructive**: it removes objects no
-part of the app reads any more (`manager_override_events`, `store_groups`).
-Take a backup before running it; it is never included in `99_run_all.sql`.
+`98_drop_unused.sql` is separate and **destructive**, and every statement in it
+is commented out as shipped, so running the file by accident deletes nothing.
+Uncomment a single line only after taking a backup. It is never included in
+`99_run_all.sql`.
+
+## Nothing is deleted by a deploy
+
+Every file listed above is additive: `create table if not exists`,
+`add column if not exists`, `create or replace`. Function and policy drops do
+appear — replacing a routine or an access rule requires them — but they change
+definitions only and never touch rows. No table is dropped by any file in the
+run-all path.
+
+The application deletes rows only when a person asks for it, one record at a
+time: removing a held order, cancelling a transfer line, deleting a coupon
+campaign or category, removing a booking line, revoking a terminal token, and
+clearing a synced entry from the local outbox. None of these run at start-up,
+on deploy, or on a timer.
 
 > The **Live Business Board** (`/analytics`) reads only these three views. If it
 > reports that it cannot read your figures, run `12_analytics_views.sql` (and
