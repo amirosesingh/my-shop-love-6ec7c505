@@ -22,6 +22,25 @@ export type ActivationPayload = {
   supabase_key: string;
 };
 
+/**
+ * Current format. The code an administrator hands out is a single string
+ * `ENC_V1:<iv-base64>:<ciphertext-base64>` wrapping this payload, so a till
+ * learns which database to talk to and which one-time claim id to redeem.
+ */
+export type ActivationPayloadV1 = {
+  supabaseUrl: string;
+  supabaseAnonKey: string;
+  /** one-time claim id (the terminal_tokens row id) */
+  pairToken: string;
+  /** issue time in ms, used for the 15 minute window */
+  ts: number;
+};
+
+export const ENC_V1_PREFIX = "ENC_V1:";
+export const ACTIVATION_TTL_MS = 15 * 60 * 1000;
+
+export const isEncryptedV1 = (code: string) => code.trim().startsWith(ENC_V1_PREFIX);
+
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
@@ -91,5 +110,33 @@ export async function decryptActivation(code: string): Promise<ActivationPayload
   );
   const parsed = JSON.parse(dec.decode(plain)) as ActivationPayload;
   if (!parsed.token_id || !parsed.location_id) throw new Error("Activation code is malformed");
+  return parsed;
+}
+
+/** Encrypt the current payload into an `ENC_V1:<iv>:<data>` activation token. */
+export async function encryptActivationV1(payload: ActivationPayloadV1): Promise<string> {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const cipher = new Uint8Array(
+    await subtle().encrypt(
+      { name: "AES-GCM", iv },
+      await getKey(),
+      enc.encode(JSON.stringify(payload)),
+    ),
+  );
+  return `${ENC_V1_PREFIX}${toBase64(iv)}:${toBase64(cipher)}`;
+}
+
+/** Reverse of {@link encryptActivationV1}. Throws when the code is not ours. */
+export async function decryptActivationV1(code: string): Promise<ActivationPayloadV1> {
+  const body = code.trim().slice(ENC_V1_PREFIX.length);
+  const [ivPart, dataPart] = body.split(":");
+  if (!ivPart || !dataPart) throw new Error("Activation code is incomplete");
+  const plain = await subtle().decrypt(
+    { name: "AES-GCM", iv: fromBase64(ivPart) },
+    await getKey(),
+    fromBase64(dataPart),
+  );
+  const parsed = JSON.parse(dec.decode(plain)) as ActivationPayloadV1;
+  if (!parsed.pairToken || !parsed.supabaseUrl) throw new Error("Activation code is malformed");
   return parsed;
 }

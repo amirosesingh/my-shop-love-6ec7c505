@@ -6,7 +6,13 @@
  * status so management can disconnect a machine remotely.
  */
 import { supabaseExternal } from "@/integrations/supabase/external-client";
-import { decryptActivation, encryptActivation, type ActivationPayload } from "./terminal-crypto";
+import {
+  ACTIVATION_TTL_MS,
+  decryptActivation,
+  decryptActivationV1,
+  encryptActivationV1,
+  isEncryptedV1,
+} from "./terminal-crypto";
 import { clearDeviceSecret, getDeviceSecret, setDeviceSecret } from "./device-secrets";
 
 import { supabaseConfig } from "./external-supabase-config";
@@ -31,6 +37,10 @@ export type TerminalToken = {
   replacedBy: string | null;
   claimedByDevice: string | null;
   claimedAt: string | null;
+  /** single-use flag — true the moment a till redeems the code */
+  isClaimed: boolean;
+  /** the 15 minute redemption deadline */
+  expiresAt: string | null;
 };
 
 /** The table is not in the generated types, so queries go through a loose view. */
@@ -105,14 +115,21 @@ const isMissingColumn = (error: { message?: string; code?: string } | null, colu
   (error.code === "PGRST204" || /schema cache|does not exist/i.test(error.message ?? "")) &&
   (error.message ?? "").includes(column);
 
-/** Insert a token row, retrying without `platform` on legacy databases. */
+/**
+ * Insert a token row, dropping columns an older database does not have yet
+ * (`platform`, `is_claimed`, `expires_at` arrive with schema25/schema26).
+ */
 async function insertTokenRow(row: Record<string, unknown>): Promise<void> {
-  const { error } = await table().insert([row]);
-  if (!error) return;
-  if (!isMissingColumn(error, "platform")) throw error;
-  const { platform: _platform, ...legacy } = row;
-  const retry = await table().insert([legacy]);
-  if (retry.error) throw retry.error;
+  const optional = ["platform", "is_claimed", "expires_at"];
+  const attempt: Record<string, unknown> = { ...row };
+  for (let i = 0; i <= optional.length; i += 1) {
+    const { error } = await table().insert([attempt]);
+    if (!error) return;
+    const missing = optional.find((c) => c in attempt && isMissingColumn(error, c));
+    if (!missing) throw error;
+    delete attempt[missing];
+  }
+  throw new Error("Could not save the activation token");
 }
 
 const rowToToken = (r: Record<string, any>): TerminalToken => ({
@@ -130,6 +147,8 @@ const rowToToken = (r: Record<string, any>): TerminalToken => ({
   replacedBy: r.replaced_by ?? null,
   claimedByDevice: r.claimed_by_device ?? null,
   claimedAt: r.claimed_at ?? null,
+  isClaimed: r.is_claimed === true || asStatus(r.status) === "used",
+  expiresAt: r.expires_at ?? null,
 });
 
 /* ----------------------------- admin surface ---------------------------- */
@@ -153,6 +172,7 @@ export async function issueTerminalToken(input: {
   // Self-healing: guarantee the referenced location row exists.
   await ensureLocations([input.location]);
   const id = input.tokenId || crypto.randomUUID();
+  const issuedAt = Date.now();
   const row = {
     id,
     location_id: input.location.id,
@@ -160,18 +180,21 @@ export async function issueTerminalToken(input: {
     device_name: input.deviceName,
     platform: input.platform ?? "pc",
     status: "active" as const,
-    created_at: new Date().toISOString(),
+    created_at: new Date(issuedAt).toISOString(),
+    is_claimed: false,
+    expires_at: new Date(issuedAt + ACTIVATION_TTL_MS).toISOString(),
   };
   await insertTokenRow(row);
 
-  const payload: ActivationPayload = {
-    token_id: id,
-    location_id: input.location.id,
-    location_name: input.locationName,
-    supabase_url: supabaseConfig().url,
-    supabase_key: supabaseConfig().key,
+  return {
+    token: rowToToken(row),
+    code: await encryptActivationV1({
+      supabaseUrl: supabaseConfig().url,
+      supabaseAnonKey: supabaseConfig().key,
+      pairToken: id,
+      ts: issuedAt,
+    }),
   };
-  return { token: rowToToken(row), code: await encryptActivation(payload) };
 }
 
 export async function revokeTerminalToken(id: string): Promise<void> {
@@ -190,7 +213,8 @@ export async function reissueTerminalToken(
   token: TerminalToken,
 ): Promise<{ token: TerminalToken; code: string }> {
   const id = crypto.randomUUID();
-  const now = new Date().toISOString();
+  const issuedAt = Date.now();
+  const now = new Date(issuedAt).toISOString();
   const row = {
     id,
     location_id: token.locationId,
@@ -200,6 +224,8 @@ export async function reissueTerminalToken(
     status: "active" as const,
     created_at: now,
     reissued_at: now,
+    is_claimed: false,
+    expires_at: new Date(issuedAt + ACTIVATION_TTL_MS).toISOString(),
   };
   await insertTokenRow(row);
 
@@ -208,14 +234,15 @@ export async function reissueTerminalToken(
     .eq("id", token.id);
   if (retireError) throw retireError;
 
-  const payload: ActivationPayload = {
-    token_id: id,
-    location_id: token.locationId ?? "",
-    location_name: token.locationName,
-    supabase_url: supabaseConfig().url,
-    supabase_key: supabaseConfig().key,
+  return {
+    token: rowToToken(row),
+    code: await encryptActivationV1({
+      supabaseUrl: supabaseConfig().url,
+      supabaseAnonKey: supabaseConfig().key,
+      pairToken: id,
+      ts: issuedAt,
+    }),
   };
-  return { token: rowToToken(row), code: await encryptActivation(payload) };
 }
 
 export async function restoreTerminalToken(id: string): Promise<void> {
@@ -375,7 +402,13 @@ export const TERMINAL_CONFIG_EVENT = EVENT;
 /** Look the token up by id. `null` means the network answered "no such token". */
 export async function fetchTokenStatus(
   tokenId: string,
-): Promise<{ status: TokenStatus; locationName: string; locationId: string } | null> {
+): Promise<{
+  status: TokenStatus;
+  locationName: string;
+  locationId: string;
+  isClaimed: boolean;
+  expiresAt: string | null;
+} | null> {
   const { data, error } = await rpc("terminal_token_status", { p_token_id: tokenId });
   if (error) throw error;
   const row = Array.isArray(data) ? data[0] : data;
@@ -384,6 +417,8 @@ export async function fetchTokenStatus(
     status: asStatus(row.status),
     locationName: row.location_name ?? "",
     locationId: row.location_id ?? "",
+    isClaimed: row.is_claimed === true || asStatus(row.status) === "used",
+    expiresAt: row.expires_at ?? null,
   };
 }
 
@@ -427,10 +462,35 @@ function activationFailureMessage(e: unknown): string {
 
 /** Decrypt, verify against the server and register this machine. */
 export async function activateTerminal(code: string): Promise<TerminalConfig> {
-  let payload: ActivationPayload;
+  // Two shapes travel in the wild: the current `ENC_V1:` one-time token and
+  // the older self-contained payload still held by tills not yet re-issued.
+  let payload: {
+    token_id: string;
+    location_id: string;
+    location_name: string;
+    supabase_url: string;
+    supabase_key: string;
+  };
   try {
-    payload = await decryptActivation(code);
-  } catch {
+    if (isEncryptedV1(code)) {
+      const v1 = await decryptActivationV1(code);
+      if (Number.isFinite(v1.ts) && Date.now() - v1.ts > ACTIVATION_TTL_MS) {
+        throw new ActivationError(
+          "This activation code has expired. Ask an administrator to generate a new one.",
+        );
+      }
+      payload = {
+        token_id: v1.pairToken,
+        location_id: "",
+        location_name: "",
+        supabase_url: v1.supabaseUrl,
+        supabase_key: v1.supabaseAnonKey,
+      };
+    } else {
+      payload = await decryptActivation(code);
+    }
+  } catch (e) {
+    if (e instanceof ActivationError) throw e;
     throw new ActivationError("This activation code is not valid.");
   }
 
@@ -444,6 +504,16 @@ export async function activateTerminal(code: string): Promise<TerminalConfig> {
   if (remote.status === "used") {
     throw new ActivationError(
       "This activation code has already been used on another terminal. Ask an administrator to re-issue a code for this till.",
+    );
+  }
+  if (remote.isClaimed) {
+    throw new ActivationError(
+      "This activation code has already been redeemed. Ask an administrator to issue a new code.",
+    );
+  }
+  if (remote.expiresAt && new Date(remote.expiresAt).getTime() < Date.now()) {
+    throw new ActivationError(
+      "This activation code has expired. Ask an administrator to generate a new one.",
     );
   }
 
@@ -463,7 +533,7 @@ export async function activateTerminal(code: string): Promise<TerminalConfig> {
 
   const config: TerminalConfig = {
     tokenId: payload.token_id,
-    locationId: payload.location_id,
+    locationId: payload.location_id || remote.locationId,
     locationName: remote.locationName || payload.location_name,
     supabaseUrl: payload.supabase_url,
     supabaseKey: payload.supabase_key,

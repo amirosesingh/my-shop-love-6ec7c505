@@ -55,6 +55,8 @@ import {
   type TerminalToken,
 } from "@/lib/terminal-tokens";
 import { CameraScanner } from "@/components/pos/CameraScanner";
+import { fetchTokenStatus } from "@/lib/terminal-tokens";
+import { ACTIVATION_TTL_MS } from "@/lib/terminal-crypto";
 
 const qrDataUrl = (value: string) => {
   const qr = qrcode(0, "M");
@@ -80,6 +82,10 @@ export function TerminalTokens({
   const [deviceName, setDeviceName] = useState("");
   const [issuing, setIssuing] = useState(false);
   const [code, setCode] = useState("");
+  const [codeTokenId, setCodeTokenId] = useState("");
+  const [codeIssuedAt, setCodeIssuedAt] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
+  const [claimed, setClaimed] = useState(false);
   const [copied, setCopied] = useState(false);
   const [pendingRevoke, setPendingRevoke] = useState<TerminalToken | null>(null);
   const [pendingReissue, setPendingReissue] = useState<TerminalToken | null>(null);
@@ -133,6 +139,41 @@ export function TerminalTokens({
   }, [stores]);
 
   const qr = useMemo(() => (code ? qrDataUrl(code) : ""), [code]);
+
+  // Live 15-minute countdown for the freshly issued code.
+  const msLeft = codeIssuedAt ? Math.max(0, codeIssuedAt + ACTIVATION_TTL_MS - now) : 0;
+  const expired = Boolean(code) && !claimed && msLeft <= 0;
+  const countdown = `${Math.floor(msLeft / 60000)}:${String(Math.floor((msLeft % 60000) / 1000)).padStart(2, "0")}`;
+
+  useEffect(() => {
+    if (!code || claimed) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [code, claimed]);
+
+  // Watch the issued token until a till redeems it, then celebrate and reload.
+  useEffect(() => {
+    if (!codeTokenId || claimed || expired) return;
+    let stopped = false;
+    const check = async () => {
+      try {
+        const remote = await fetchTokenStatus(codeTokenId);
+        if (!remote || stopped) return;
+        if (remote.isClaimed || remote.status === "used") {
+          setClaimed(true);
+          toast.success("Terminal Activated Successfully!");
+          await refresh();
+        }
+      } catch {
+        /* transient — the next tick tries again */
+      }
+    };
+    const timer = window.setInterval(() => void check(), 3000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [codeTokenId, claimed, expired, refresh]);
   const reissueQr = useMemo(
     () => (reissued ? qrDataUrl(reissued.code) : ""),
     [reissued],
@@ -149,7 +190,7 @@ export function TerminalTokens({
     if (!store) return toast.error("That location is no longer available");
     setIssuing(true);
     try {
-      const { code: issued } = await issueTerminalToken({
+      const { code: issued, token } = await issueTerminalToken({
         location: {
           id: store.id,
           code: store.code,
@@ -163,6 +204,10 @@ export function TerminalTokens({
         ...(pairTokenId ? { tokenId: pairTokenId } : {}),
       });
       setCode(issued);
+      setCodeTokenId(token.id);
+      setCodeIssuedAt(Date.now());
+      setNow(Date.now());
+      setClaimed(false);
       setDeviceName("");
       setPairTokenId("");
       logger.log("settings_change", "Terminal token issued", "terminals", {
@@ -346,24 +391,64 @@ export function TerminalTokens({
           )}
         </div>
 
-        {code && (
+        {code && claimed && (
+          <div className="mt-5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-4">
+            <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+              Terminal Activated Successfully!
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              The code was redeemed and can never be used again. The list below is up to date.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3 h-8 text-xs"
+              onClick={() => {
+                setCode("");
+                setCodeTokenId("");
+                setClaimed(false);
+              }}
+            >
+              Done
+            </Button>
+          </div>
+        )}
+
+        {code && !claimed && (
           <div className="mt-5 grid gap-4 rounded-lg border border-border bg-surface-2 p-4 sm:grid-cols-[auto_minmax(0,1fr)]">
             <img
               src={qr}
               alt="Activation code QR"
-              className="mx-auto size-40 rounded-md bg-white p-2"
+              className={`mx-auto size-40 rounded-md bg-white p-2 ${expired ? "opacity-30" : ""}`}
             />
             <div className="min-w-0 space-y-2">
-              <p className="text-xs text-muted-foreground">
-                Scan this on the till, or copy the block below. It is shown once — regenerate a new
-                token if it gets lost.
-              </p>
+              {expired ? (
+                <p className="text-xs font-medium text-destructive">
+                  This code has expired. Generate a new one to activate the till.
+                </p>
+              ) : (
+                <>
+                  <p className="text-xs text-muted-foreground">
+                    Scan this on the till, or copy the encrypted token below. It can be redeemed
+                    once, by one machine.
+                  </p>
+                  <p className="text-xs font-medium">
+                    Expires in <span className="tabular-nums">{countdown}</span>
+                  </p>
+                </>
+              )}
               <pre className="max-h-32 overflow-auto rounded-md border border-border bg-background p-2 text-[10px] leading-relaxed break-all whitespace-pre-wrap">
                 {code}
               </pre>
-              <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => void copy()}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs"
+                disabled={expired}
+                onClick={() => void copy()}
+              >
                 {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-                {copied ? "Copied" : "Copy activation code"}
+                {copied ? "Copied" : "Copy Encrypted Token"}
               </Button>
             </div>
           </div>
