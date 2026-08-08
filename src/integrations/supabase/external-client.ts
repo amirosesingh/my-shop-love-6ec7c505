@@ -30,13 +30,33 @@ const supabaseFetch: typeof fetch = (input, init) => {
   return fetch(input, { ...init, headers });
 };
 
+const STORAGE_KEY = 'sb-external-auth-token';
+const PROJECT_MARK_KEY = 'sb-external-auth-project';
+
+/**
+ * A saved session only works against the project that issued it. If the app is
+ * now pointed somewhere else, the old token makes every call fail with
+ * "unrecognized JWT kid" — so drop it instead of carrying it over.
+ */
+function dropForeignSession(url: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    const previous = localStorage.getItem(PROJECT_MARK_KEY);
+    if (previous && previous !== url) localStorage.removeItem(STORAGE_KEY);
+    if (previous !== url) localStorage.setItem(PROJECT_MARK_KEY, url);
+  } catch {
+    /* storage unavailable */
+  }
+}
+
 function createExternalClient() {
   const { url, key } = supabaseConfig();
+  dropForeignSession(url);
   return createClient<Database>(url, key, {
     global: { fetch: supabaseFetch },
     auth: {
       storage: typeof window !== 'undefined' ? localStorage : undefined,
-      storageKey: 'sb-external-auth-token',
+      storageKey: STORAGE_KEY,
       persistSession: true,
       autoRefreshToken: true,
     },

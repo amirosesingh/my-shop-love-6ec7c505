@@ -9,6 +9,18 @@
 
 type Source = { url: string; key: string };
 
+/**
+ * The POS tenant this build belongs to. These are public values (the anon /
+ * publishable key is designed to be shipped in client code), and they are the
+ * primary source so the app never drifts onto a different project just
+ * because the hosting platform injected its own SUPABASE_* variables.
+ * An activated terminal's own tenant still overrides this.
+ */
+const POS_PROJECT: Source = {
+  url: "https://qhrufhtbeguxydenzfey.supabase.co",
+  key: "sb_publishable_QwVvttLzDle_xTwP3L7Dyg_A6XM-cC-",
+};
+
 const clean = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
 
 function fromEnv(bag: Record<string, unknown> | undefined, urlName: string, keyName: string): Source {
@@ -117,6 +129,10 @@ export function supabaseConfig(): Source {
   if (cached) return cached;
   if (terminalOverride) {
     cached = terminalOverride;
+    return cached;
+  }
+  if (POS_PROJECT.url && POS_PROJECT.key) {
+    cached = POS_PROJECT;
     return cached;
   }
   for (const bag of bags()) {
