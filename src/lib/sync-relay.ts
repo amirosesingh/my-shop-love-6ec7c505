@@ -100,6 +100,29 @@ export async function relayActiveShift(
   }
 }
 
+/** Protected branch-list read for startup and terminal administration. */
+export async function relayStores(): Promise<{
+  ok: boolean;
+  rows?: Record<string, unknown>[];
+  error?: string;
+}> {
+  try {
+    const res = await fetch("/api/public/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...(await credentials()), read: { kind: "stores" } }),
+    });
+    const body = (await res.json().catch(() => null)) as
+      | { ok?: boolean; rows?: Record<string, unknown>[]; error?: string }
+      | null;
+    if (!res.ok || !body?.ok)
+      return { ok: false, error: body?.error ?? `Relay refused (${res.status})` };
+    return { ok: true, rows: body.rows ?? [] };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
 /** Quick health probe used by the connection check panel. */
 export async function probeRelay(): Promise<{ ok: boolean; error?: string }> {
   try {

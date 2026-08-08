@@ -41,7 +41,10 @@ const bodySchema = z.object({
   accessToken: z.string().max(4000).optional(),
   ops: z.array(opSchema).max(50).optional(),
   read: z
-    .object({ kind: z.literal("activeShift"), storeId: z.string().min(1).max(64) })
+    .discriminatedUnion("kind", [
+      z.object({ kind: z.literal("activeShift"), storeId: z.string().min(1).max(64) }),
+      z.object({ kind: z.literal("stores") }),
+    ])
     .optional(),
 });
 

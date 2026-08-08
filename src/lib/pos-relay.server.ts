@@ -24,7 +24,9 @@ export type RelayOp =
   | { kind: "delete"; table: string; match: Record<string, unknown> };
 
 /** Read requests the relay may answer for a proven till. */
-export type RelayRead = { kind: "activeShift"; storeId: string };
+export type RelayRead =
+  | { kind: "activeShift"; storeId: string }
+  | { kind: "stores" };
 
 /** Only operational tables may be written through the relay. */
 export const RELAY_TABLES = new Set([
@@ -62,8 +64,17 @@ export function serviceKey(): string {
  */
 export async function runRelayRead(
   read: RelayRead,
-): Promise<{ ok: boolean; row?: Record<string, unknown> | null; error?: string }> {
-  if (read.kind !== "activeShift") return { ok: false, error: "Unsupported read" };
+): Promise<{
+  ok: boolean;
+  row?: Record<string, unknown> | null;
+  rows?: Record<string, unknown>[];
+  error?: string;
+}> {
+  if (read.kind === "stores") {
+    const res = await serviceRest("stores?select=id,code,name,address,phone,group_id&order=name");
+    if (!res.ok) return { ok: false, error: (await res.text()).slice(0, 400) };
+    return { ok: true, rows: (await res.json()) as Record<string, unknown>[] };
+  }
   const res = await serviceRest(
     `shifts?store_id=eq.${encodeURIComponent(read.storeId)}&status=eq.OPEN` +
       `&closed_at=is.null&order=opened_at.desc&limit=1`,

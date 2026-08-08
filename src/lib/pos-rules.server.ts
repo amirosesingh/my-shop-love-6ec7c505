@@ -69,15 +69,15 @@ function headers(accessToken?: string): Record<string, string> {
 export async function rpc<T>(name: string, body: unknown, accessToken?: string): Promise<T> {
   const payload = JSON.stringify(body ?? {});
   let res: Response;
-  try {
-    const { serviceRest } = await import("./pos-relay.server");
-    res = await serviceRest(`rpc/${name}`, { method: "POST", body: payload });
-  } catch {
+  if (accessToken) {
     res = await fetch(`${EXTERNAL_SUPABASE_URL}/rest/v1/rpc/${name}`, {
       method: "POST",
       headers: headers(accessToken),
       body: payload,
     });
+  } else {
+    const { serviceRest } = await import("./pos-relay.server");
+    res = await serviceRest(`rpc/${name}`, { method: "POST", body: payload });
   }
   if (!res.ok) throw new Error((await res.text()) || `${name} failed`);
   return (await res.json()) as T;

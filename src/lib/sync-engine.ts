@@ -138,7 +138,7 @@ async function execute(op: SyncOp): Promise<QueryResult> {
 async function runOne(entry: QueuedOp): Promise<boolean> {
   // This account has already been refused on this table — go straight to the
   // relay instead of triggering another refused request.
-  if (refusedTables.has(entry.op.table) && canRelay()) {
+  if ((entry.op.table === "stores" || refusedTables.has(entry.op.table)) && canRelay()) {
     const relayed = await viaRelay(entry.context, entry.op);
     if (relayed.ok) {
       resolveOp(entry.id);
@@ -200,7 +200,7 @@ async function runOne(entry: QueuedOp): Promise<boolean> {
  * report the result. Nothing is stored or retried on the device.
  */
 export async function runOpLive(context: string, op: SyncOp): Promise<void> {
-  if (refusedTables.has(op.table) && canRelay()) {
+  if ((op.table === "stores" || refusedTables.has(op.table)) && canRelay()) {
     const relayed = await viaRelay(context, op);
     if (relayed.ok) return;
     throw new Error(relayed.error ?? "The server could not save this change");

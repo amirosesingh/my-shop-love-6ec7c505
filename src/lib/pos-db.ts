@@ -5,6 +5,7 @@ import { drainOutbox, runOpLive } from "./sync-engine";
 import { electronDb, localDb, readBranch } from "./local-db";
 import { enqueue, listQueue, persisted, type SyncOp } from "./sync-outbox";
 import { isLiveOnly } from "./live-mode";
+import { canRelay, relayStores } from "./sync-relay";
 import { keyset, nextCursor, PAGE_SIZE, type Cursor, type Page } from "./keyset";
 import type {
   AppSettings,
@@ -512,6 +513,10 @@ export async function loadCloudState(): Promise<CloudSlice> {
     // builders are thenables, not Promises, so guard with try/catch.
     (async (): Promise<{ data: Row[] | null }> => {
       try {
+        if (canRelay()) {
+          const relayed = await relayStores();
+          if (relayed.ok) return { data: (relayed.rows as Row[] | undefined) ?? [] };
+        }
         const res = await supabase.from("stores" as never).select("*");
         return { data: (res.data as Row[] | null) ?? null };
       } catch {

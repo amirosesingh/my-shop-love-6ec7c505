@@ -17,9 +17,9 @@ function isNewSupabaseApiKey(value: string): boolean {
 
 // New-format keys are opaque strings, not bearer JWTs — send them as `apikey` only.
 const supabaseFetch: typeof fetch = (input, init) => {
-  const headers = new Headers(
-    typeof Request !== 'undefined' && input instanceof Request ? input.headers : undefined,
-  );
+  const requestHeaders =
+    typeof Request !== 'undefined' && input instanceof Request ? input.headers : undefined;
+  const headers = new Headers(requestHeaders);
   if (init?.headers) {
     new Headers(init.headers).forEach((value, key) => headers.set(key, value));
   }
@@ -30,6 +30,9 @@ const supabaseFetch: typeof fetch = (input, init) => {
     headers.delete('Authorization');
   }
   headers.set('apikey', SUPABASE_PUBLISHABLE_KEY);
+  if (typeof Request !== 'undefined' && input instanceof Request) {
+    return fetch(new Request(input, { ...init, headers }));
+  }
   return fetch(input, { ...init, headers });
 };
 
