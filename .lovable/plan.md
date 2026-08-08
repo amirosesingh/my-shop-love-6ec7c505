@@ -28,10 +28,12 @@ Plan:
 
 - A shared `activeBranchId()` helper (terminal binding → current branch → saved branch) used by every write path: sales, shifts, shift sessions, drawer events, held orders, audit logs, stock adjustments, SKU audit, bookings, transfers.
 - Writes refuse to save a blank branch id where the column is meant to be filled, showing a clear message instead of writing an orphan row.
-- A new `supabase/sql/21_backfill_branch_ids.sql` that fills blank branch columns from the related record (sale → shift → terminal) and, where nothing can be derived, from the single branch when only one exists.
+- A new `supabase/sql/21_backfill_branch_ids.sql` that fills blank branch columns from the related record (sale → shift → terminal) and, where nothing can be derived, from the single branch when only one exists. You run this file against your own database, alongside the other files in `supabase/sql/`.
 - Settings → Diagnostics gains a "Branch id coverage" table: per table, how many rows have no branch id, so the result is visible before and after the backfill.
 
-Note: the row counts cannot be confirmed from here — the operational data lives in the POS database, not the preview one. The diagnostics table is deliberately the first step so we see real numbers before running the backfill.
+## Which database this touches
+
+All of this stays on your own Supabase — the app's `supabaseExternal` client and the server relay that uses your POS service key. Nothing is read from or written to the Lovable-managed database, and no migration is run against it. The row counts cannot be checked from here for the same reason, which is why the diagnostics table comes first: you see the real numbers in your own database before running the backfill.
 
 ## Verification
 
