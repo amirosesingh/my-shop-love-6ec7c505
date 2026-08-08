@@ -39,7 +39,7 @@ bun run mobile:build        # packages the whole POS into capacitor-shell/
 npx cap add android         # first time only
 npx cap sync android
 cd android
-gradlew.bat assembleDebug   # Windows
+gradlew.bat assembleDebug   # Windows development build only
 ```
 
 The APK lands in `android/app/build/outputs/apk/debug/`.
@@ -98,14 +98,23 @@ Repository → **Settings → Secrets and variables → Actions → Variables** 
 `POS_MOBILE_URL` with your POS address (must be `https`). Every later build uses
 it automatically.
 
-## Signing for a Play Store release
+## Permanent signing for install-over updates
 
-1. Create a keystore:
+Every APK published by GitHub must use the same permanent signing key. Android
+then installs the new APK over the old one instead of requiring an uninstall,
+so the encrypted terminal activation stored by the app is retained.
+
+1. Create the keystore once and keep an offline backup:
    `keytool -genkey -v -keystore pos.keystore -alias pos -keyalg RSA -validity 10000`
-2. Add these repository secrets: `ANDROID_KEYSTORE_BASE64` (base64 of the file),
+2. Add these GitHub Actions repository secrets: `ANDROID_KEYSTORE_BASE64`
+   (base64 of the complete keystore file),
    `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`.
-3. In `.github/workflows/android-apk.yml`, swap the debug build step for
-   `./gradlew assembleRelease` (a commented note marks the spot).
+3. Run the Android APK workflow. It patches the camera permission, restores the
+   keystore only for the build, and creates a signed release APK automatically.
+
+Do not replace or regenerate this keystore for later releases. An APK signed by
+a different key cannot upgrade the installed app and would require an uninstall,
+which intentionally removes Android app storage and terminal activation.
 
 ## Bucket upload secrets
 
@@ -125,8 +134,13 @@ The upload step reuses the desktop release secrets: `R2_ACCESS_KEY_ID`,
   failed build. Read the error printed after it to find the actual failure.
 - **Build succeeds but reports missing `dist/server`** — pull the latest
   `vite.config.ts`; phone builds require the explicit `MOBILE_BUILD=1` output.
-- **Camera scanning asks nothing / does nothing** — allow the camera permission
-  for the app in Android settings, then reopen the register.
+- **Camera scanning asks nothing / does nothing** — use an APK produced by the
+  current workflow; it verifies `android.permission.CAMERA` before building.
+  Then allow the camera permission when Android prompts. If permission was
+  denied previously, enable it under Android Settings → Apps → POS → Permissions.
+- **Android asks to uninstall the previous APK** — the APKs were signed with
+  different keys. Restore the original permanent keystore secrets and rebuild;
+  do not uninstall if preserving terminal activation is required.
 
 Desktop-only features (silent receipt printing, cash-drawer kick, the local
 SQL Server database) are hidden automatically on Android.
