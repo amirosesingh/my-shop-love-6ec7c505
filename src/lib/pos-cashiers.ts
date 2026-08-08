@@ -10,7 +10,6 @@ export type CashierRow = {
   id: string;
   username: string;
   full_name: string;
-  store_id: string | null;
   permissions: StaffPermissions;
   is_active: boolean;
   last_login_at: string | null;
@@ -27,7 +26,6 @@ const mapRow = (r: Record<string, unknown>): CashierRow => ({
   id: String(r["id"] ?? ""),
   username: String(r["username"] ?? ""),
   full_name: String(r["full_name"] ?? ""),
-  store_id: (r["store_id"] as string | null) ?? null,
   permissions: normalizePermissions(
     r["permissions"] as Record<string, unknown> | null,
     "cashier",
@@ -47,7 +45,6 @@ export async function upsertCashier(opts: {
   username: string;
   fullName: string;
   pin?: string;
-  storeId?: string | null;
   isActive?: boolean;
 }): Promise<string> {
   const { data, error } = await sb.rpc("upsert_cashier", {
@@ -55,7 +52,6 @@ export async function upsertCashier(opts: {
     p_username: opts.username.trim().toLowerCase(),
     p_full_name: opts.fullName.trim(),
     p_pin: opts.pin ?? "",
-    p_store_id: opts.storeId ?? null,
     p_is_active: opts.isActive ?? true,
   });
   if (error) throw error;
