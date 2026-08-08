@@ -430,6 +430,22 @@ export function subscribeTerminalConfig(cb: () => void) {
 
 export const TERMINAL_CONFIG_EVENT = EVENT;
 
+/**
+ * Forget this machine entirely: the sealed activation, the desktop mirror, the
+ * tenant connection details and the machine account session all go, so the app
+ * comes back on the activation screen.
+ */
+export async function unpairTerminal(): Promise<void> {
+  clearTerminalConfig();
+  clearPairingRequest();
+  clearDeviceSecret("terminal-account");
+  try {
+    await supabaseExternal.auth.signOut();
+  } catch {
+    /* nothing else to clean up */
+  }
+}
+
 /** Look the token up by id. `null` means the network answered "no such token". */
 export async function fetchTokenStatus(
   tokenId: string,
