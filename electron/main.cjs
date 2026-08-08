@@ -525,6 +525,22 @@ function registerIpc() {
 
   ipcMain.handle("terminal:read", () => ({ ok: true, config: terminalStore.read() }));
   ipcMain.handle("terminal:write", (_e, config) => terminalStore.write(config));
+  ipcMain.handle("terminal:secrets:read", () => ({ ok: true, secrets: terminalStore.readSecrets() }));
+  ipcMain.handle("terminal:secrets:write", (_e, secrets) => terminalStore.writeSecrets(secrets));
+
+  // A revoked till wipes everything it holds and the window is locked down.
+  ipcMain.handle("terminal:lock", async (event) => {
+    terminalStore.write(null);
+    terminalStore.writeSecrets(null);
+    const win = BrowserWindow.fromWebContents(event.sender) ?? mainWindow;
+    try {
+      await event.sender.session.clearStorageData({ storages: ["cookies", "localstorage"] });
+    } catch {
+      /* keep locking even if the session refuses to clear */
+    }
+    win?.webContents.send("terminal:locked");
+    return { ok: true };
+  });
 
   /* branding mirror so first-run setup only ever runs once */
   ipcMain.handle("branding:read", () => ({ ok: true, branding: brandingStore.read() }));
