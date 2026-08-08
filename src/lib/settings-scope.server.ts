@@ -24,6 +24,59 @@ type EffectiveRow = {
   parent_inherited_value?: unknown;
 };
 
+type ScopedRow = { scope?: string; scope_id?: string; key?: string; value?: unknown };
+
+async function readWithService(scope: SettingScope, scopeId: string): Promise<EffectiveRow[]> {
+  const { serviceRest } = await import("./pos-relay.server");
+  let cluster = scope === "CLUSTER" ? scopeId : "";
+  if (scope === "BRANCH") {
+    const storeRes = await serviceRest(
+      `stores?id=eq.${encodeURIComponent(scopeId)}&select=group_id&limit=1`,
+    );
+    if (!storeRes.ok) throw new Error((await storeRes.text()).slice(0, 400));
+    const stores = (await storeRes.json()) as { group_id?: string | null }[];
+    cluster = stores[0]?.group_id || "default";
+  }
+
+  const settingsRes = await serviceRest("settings_scoped?select=scope,scope_id,key,value,is_overridden");
+  if (!settingsRes.ok) throw new Error((await settingsRes.text()).slice(0, 400));
+  const rows = (await settingsRes.json()) as (ScopedRow & { is_overridden?: boolean })[];
+  const active = rows.filter((row) => row.is_overridden !== false);
+  const value = (tier: SettingScope, id: string, key: string) =>
+    active.find((row) => row.scope === tier && row.scope_id === id && row.key === key)?.value;
+
+  return SETTING_DEFS.map((def) => {
+    const globalValue = value("GLOBAL", "", def.key);
+    const clusterValue = cluster ? value("CLUSTER", cluster, def.key) : undefined;
+    const branchValue = scope === "BRANCH" ? value("BRANCH", scopeId, def.key) : undefined;
+    const effective =
+      scope === "GLOBAL"
+        ? globalValue
+        : scope === "CLUSTER"
+          ? (clusterValue ?? globalValue)
+          : (branchValue ?? clusterValue ?? globalValue);
+    const source =
+      scope === "BRANCH" && branchValue !== undefined
+        ? "BRANCH"
+        : scope !== "GLOBAL" && clusterValue !== undefined
+          ? "CLUSTER"
+          : "GLOBAL";
+    return {
+      setting_key: def.key,
+      effective_value: effective,
+      source,
+      is_overridden:
+        scope === "GLOBAL"
+          ? globalValue !== undefined
+          : scope === "CLUSTER"
+            ? clusterValue !== undefined
+            : branchValue !== undefined,
+      parent_inherited_value:
+        scope === "GLOBAL" ? null : scope === "CLUSTER" ? globalValue : (clusterValue ?? globalValue),
+    };
+  });
+}
+
 function merge(rows: EffectiveRow[], scope: SettingScope): ResolvedSetting[] {
   const byKey = new Map<string, EffectiveRow>();
   for (const row of rows) if (row?.setting_key) byKey.set(row.setting_key, row);
@@ -62,10 +115,18 @@ export async function readScopedSettings(
     );
     return { settings: merge(Array.isArray(rows) ? rows : [], scope) };
   } catch (e) {
-    return {
-      settings: merge([], scope),
-      warning: (e as Error).message || "Settings hierarchy is not available",
-    };
+    try {
+      const rows = await readWithService(scope, scopeId);
+      return { settings: merge(rows, scope) };
+    } catch (fallbackError) {
+      return {
+        settings: merge([], scope),
+        warning:
+          (fallbackError as Error).message ||
+          (e as Error).message ||
+          "Settings hierarchy is not available",
+      };
+    }
   }
 }
 

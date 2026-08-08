@@ -72,6 +72,9 @@ const from = (table: string) =>
 
 /** Turn a database error into something a shop owner can act on. */
 export function explainError(error: { message: string; code?: string }): string {
+  if (/no api key found|apikey.*not found/i.test(error.message)) {
+    return "The central database request is missing its publishable API header — refresh after updating the app";
+  }
   if (error.code === "PGRST205" || /does not exist/i.test(error.message)) {
     return `Table missing — the setup script has not been run on this database (${error.message})`;
   }
