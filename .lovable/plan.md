@@ -1,49 +1,40 @@
-# Fix the 403 when saving a location
+# Repair central store access and settings inheritance
 
-## What the console shows
+## Goal
+Remove the reported `403 Forbidden` store requests and restore the Global → Cluster → Branch settings hierarchy without weakening row security.
 
-The browser posts the store row straight to the central POS database
-(`/rest/v1/stores?on_conflict=id`) and gets **403 Forbidden**. The app then
-retries the same write through the server relay, so this error can appear even
-when the save eventually succeeds.
+## Implementation
 
-Unconfirmed: whether the relay retry is actually saving the row for your admin
-session. Step 1 verifies that before anything is changed.
+1. **Route store access through the proven server relay**
+   - Add an authenticated/terminal-proven relay read for the branch list.
+   - Replace the direct browser `stores` read used during POS startup with that relay read.
+   - Send store create/update/delete operations directly through the relay when a staff or activated-terminal identity is available, instead of deliberately triggering a denied browser request first.
+   - Update terminal location mirroring to use the same protected path so activation/admin screens do not generate duplicate 403s.
 
-## Why a signed-in admin can still be refused
+2. **Correct settings hierarchy authentication**
+   - Change scoped-settings RPC calls to use the already verified supervisor/staff access token, so `settings_effective`, `settings_upsert`, and batch sync run with the caller identity expected by their database checks.
+   - Do not silently retry privileged settings calls as an anonymous request.
+   - Preserve shipped defaults only for genuine offline/unavailable states and surface a precise access error otherwise.
 
-The `stores` access rules on the POS database allow writes only when
-`is_staff(auth.uid())` is true, and that helper looks the signed-in user up in
-the `user_roles` table on **that** database. An admin who signs in with email
-but has no matching `user_roles` row is treated as a non-staff visitor, so the
-write is refused with 403. This is a likely cause, not yet confirmed — the plan
-confirms it before applying the role fix.
+3. **Add an idempotent central-database repair script**
+   - Restore the minimum table grants required for `stores`, scoped settings, staff-role lookup, and service relay operations.
+   - Restore function execution only for the intended roles; keep visitors unable to call privileged settings routines.
+   - Backfill linked, active email-authenticated staff into the separate `user_roles` table so existing admins/managers satisfy staff policies, without trusting client-supplied roles.
+   - Keep RLS enabled and retain branch/staff policy checks.
 
-## Plan
+4. **Improve failure handling**
+   - Remember access-refused tables for the browser session and avoid repeating known-denied direct requests.
+   - Log both identity verification and relay/database failures clearly in diagnostics, without exposing credentials.
 
-1. **Confirm the outcome.** Check the sync log and the location list after a
-   refresh: did the location that produced the 403 land on the central
-   database, or is it sitting failed in the queue?
-2. **Confirm the cause.** Read the POS database to see whether the signed-in
-   admin's auth user id has a row in `user_roles`, and what `is_staff` returns
-   for it.
-3. **Repair staff identity.** Add a small, idempotent script under
-   `supabase/sql/` that ensures every active admin/manager/staff account in
-   `app_users` with a linked auth user also has the matching `user_roles` row,
-   so `is_staff` and `is_app_supervisor` agree with the staff list. You run it
-   once on the POS database.
-4. **Stop the noisy direct attempt.** In the client sync path, remember per
-   session that a table's direct write was refused for this account and send
-   later writes for that table straight through the server relay. That removes
-   the repeated 403 in the console while keeping the faster direct path for
-   accounts that are allowed.
-5. **Surface a clear message.** If the relay also refuses, show the reason in
-   the sync status / diagnostics page instead of only a console error.
+## Verification
+
+- Test signed-in admin/supervisor branch list, branch create/edit, and POS startup; confirm no direct external `stores` 403 requests appear.
+- Load, edit, save, and refresh Global, Cluster, and Branch settings; confirm inherited values and overrides persist.
+- Test an anonymous browser and confirm privileged settings writes and store mutations remain denied.
+- Run focused tests/type checks and inspect the final network/console output.
+- Report external central-database verification separately; if the repair script has not been applied there, mark that database path as unverified rather than claiming completion.
 
 ## Technical notes
 
-- Files touched: `src/lib/sync-engine.ts` (refusal memo + relay-first), possibly
-  `src/lib/sync-relay.ts`, and a new `supabase/sql/20_staff_roles_backfill.sql`.
-- No change to the Lovable Cloud backend; all SQL targets your separate POS
-  Supabase project and is safe to re-run.
-- The relay endpoint and service key handling stay exactly as they are.
+- The failing database is the separately configured central POS database, not the app’s managed backend, so its grant repair must be retained as repeatable SQL for that database.
+- Service credentials remain server-only; no key or privileged header will be added to browser code.
