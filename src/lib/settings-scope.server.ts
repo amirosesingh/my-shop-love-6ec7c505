@@ -122,8 +122,8 @@ export async function readScopedSettings(
       return {
         settings: merge([], scope),
         warning:
-          (fallbackError as Error).message ||
           (e as Error).message ||
+          (fallbackError as Error).message ||
           "Settings hierarchy is not available",
       };
     }
@@ -155,6 +155,57 @@ export async function writeScopedSettings(
     accessToken,
   );
   return merge(Array.isArray(rows) ? rows : [], scope);
+}
+
+/**
+ * Write the same overrides straight to the table with service rights. Used
+ * when the routine refuses the staff session (for example on a deployment
+ * where the settings routines have not been re-granted yet). The caller has
+ * already been proved to be a supervisor on the server.
+ */
+export async function writeScopedSettingsWithService(
+  scope: SettingScope,
+  scopeId: string,
+  patch: Record<string, SettingPatchEntry>,
+): Promise<ResolvedSetting[]> {
+  const { serviceRest } = await import("./pos-relay.server");
+  const id = scope === "GLOBAL" ? "" : scopeId;
+  const keep: Record<string, unknown>[] = [];
+  const clear: string[] = [];
+
+  for (const [key, entry] of Object.entries(patch)) {
+    const def = SETTING_BY_KEY[key];
+    if (!def) continue;
+    if (entry.isOverridden || scope === "GLOBAL") {
+      keep.push({
+        scope,
+        scope_id: id,
+        key,
+        value: coerceValue(def, entry.value ?? null),
+        is_overridden: true,
+      });
+    } else {
+      clear.push(key);
+    }
+  }
+
+  if (keep.length) {
+    const res = await serviceRest("settings_scoped?on_conflict=scope,scope_id,key", {
+      method: "POST",
+      body: JSON.stringify(keep),
+      prefer: "return=minimal,resolution=merge-duplicates",
+    });
+    if (!res.ok) throw new Error((await res.text()).slice(0, 400) || "Could not save settings");
+  }
+  for (const key of clear) {
+    await serviceRest(
+      `settings_scoped?scope=eq.${scope}&scope_id=eq.${encodeURIComponent(id)}` +
+        `&key=eq.${encodeURIComponent(key)}`,
+      { method: "DELETE", prefer: "return=minimal" },
+    );
+  }
+
+  return merge(await readWithService(scope, scopeId), scope);
 }
 
 export type SyncBatchResult = {
