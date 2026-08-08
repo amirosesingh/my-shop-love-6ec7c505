@@ -166,10 +166,10 @@ jobs:
             --endpoint-url "$R2_ENDPOINT" --cache-control "public,max-age=31536000,immutable"
           # Stable pointers the phones poll.
           aws s3 sync latest/android s3://updatelccms/pos-app/latest/android \
-            --endpoint-url "$R2_ENDPOINT" --cache-control "no-cache"
+            --endpoint-url "$R2_ENDPOINT" --cache-control "no-cache" --delete
           # Legacy paths already-deployed phones read.
           aws s3 sync latest/android s3://updatelccms/pos-app/android \
-            --endpoint-url "$R2_ENDPOINT" --cache-control "no-cache"
+            --endpoint-url "$R2_ENDPOINT" --cache-control "no-cache" --delete
 
       - name: Attach APK to the GitHub release
         if: startsWith(github.ref, 'refs/tags/v')
