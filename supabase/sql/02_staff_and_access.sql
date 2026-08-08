@@ -479,7 +479,11 @@ DROP TRIGGER IF EXISTS cashiers_touch_updated_at ON public.cashiers;
 CREATE TRIGGER cashiers_touch_updated_at BEFORE UPDATE ON public.cashiers FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
 
 -- ---------- grants (Data API access) ----------
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.app_users TO authenticated;
+-- Staff records are never read straight from the data API: every screen goes
+-- through the privileged routines below (current_app_user, list_app_users,
+-- set_app_user_*, verify_terminal_pin) or the service-key relay. The direct
+-- table rights are therefore withdrawn from signed-in accounts.
+REVOKE ALL ON public.app_users FROM anon, authenticated;
 GRANT ALL ON public.app_users TO service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.cashiers TO authenticated;
 GRANT ALL ON public.cashiers TO service_role;
@@ -487,11 +491,17 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_roles TO authenticated;
 GRANT ALL ON public.user_roles TO service_role;
 
 -- ---------- row level security ----------
+ALTER TABLE public.app_users ENABLE ROW LEVEL SECURITY;
+
 ALTER TABLE public.cashiers ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
 
 -- ---------- policies ----------
+DROP POLICY IF EXISTS "Users can read their own staff record" ON public.app_users;
+
+CREATE POLICY "Users can read their own staff record" ON public.app_users FOR SELECT TO authenticated USING (auth_user_id = auth.uid());
+
 DROP POLICY IF EXISTS "Admins manage roles" ON public.user_roles;
 
 CREATE POLICY "Admins manage roles" ON public.user_roles FOR ALL TO authenticated USING (has_role(auth.uid(), 'admin'::app_role)) WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
