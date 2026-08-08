@@ -54,6 +54,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   useEffect(() => {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
   }, [error]);
+  const notConfigured = error.name === "SupabaseConfigError";
 
   const clearAndRestart = () => {
     try {
@@ -69,10 +70,12 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          This page didn't load
+          {notConfigured ? "Database not configured" : "This page didn't load"}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
+          {notConfigured
+            ? "This server has not been told where the database lives. Set SUPABASE_URL and SUPABASE_ANON_KEY in the hosting variables (Cloudflare: Workers → Settings → Variables & Secrets), then reload."
+            : "Something went wrong on our end. You can try refreshing or head back home."}
         </p>
         <p className="mt-2 break-words text-xs text-muted-foreground/80">{error.message}</p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
