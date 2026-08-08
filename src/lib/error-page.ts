@@ -1,4 +1,7 @@
-export function renderErrorPage(): string {
+export function renderErrorPage(message?: string): string {
+  const body =
+    message ??
+    "Something went wrong on our end. You can try refreshing or head back home.";
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -18,8 +21,8 @@ export function renderErrorPage(): string {
   </head>
   <body>
     <div class="card">
-      <h1>This page didn't load</h1>
-      <p>Something went wrong on our end. You can try refreshing or head back home.</p>
+      <h1>${message ? "Database not configured" : "This page didn't load"}</h1>
+      <p>${body}</p>
       <div class="actions">
         <button class="primary" onclick="location.reload()">Try again</button>
         <a class="secondary" href="/">Go home</a>
