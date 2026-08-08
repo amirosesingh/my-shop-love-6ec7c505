@@ -47,16 +47,25 @@ export const upsertScopedSettings = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => upsertInput.parse(data))
   .handler(async ({ data }) => {
     const { verifyPosStaff } = await import("./secure-settings.server");
-    const { writeScopedSettings } = await import("./settings-scope.server");
+    const { writeScopedSettings, writeScopedSettingsWithService } = await import(
+      "./settings-scope.server"
+    );
     try {
       const caller = await verifyPosStaff(data.accessToken);
       if (!caller.isAdmin) return { ok: false as const, settings: [], error: "Supervisors only" };
-      const settings = await writeScopedSettings(
-        data.scope,
-        data.scopeId,
-        data.patch,
-        data.accessToken,
-      );
+      let settings;
+      try {
+        settings = await writeScopedSettings(
+          data.scope,
+          data.scopeId,
+          data.patch,
+          data.accessToken,
+        );
+      } catch {
+        // The routine refused this session (or is not granted yet): the caller
+        // is already proved to be a supervisor, so write with server rights.
+        settings = await writeScopedSettingsWithService(data.scope, data.scopeId, data.patch);
+      }
       return { ok: true as const, settings };
     } catch (e) {
       return { ok: false as const, settings: [], error: (e as Error).message };

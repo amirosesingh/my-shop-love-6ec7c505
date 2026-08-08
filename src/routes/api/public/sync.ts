@@ -62,9 +62,21 @@ export const Route = createFileRoute("/api/public/sync")({
         if (!body.ops?.length && !body.read)
           return Response.json({ ok: false, error: "Nothing to do" }, { status: 400 });
 
-        const { verifyRelayCaller, runRelayOp, runRelayRead } = await import(
+        const { verifyRelayCaller, runRelayOp, runRelayRead, hasServiceKey } = await import(
           "@/lib/pos-relay.server"
         );
+        // Without the internal key the relay cannot do anything: answer with a
+        // readable "temporarily unavailable" instead of a blank server error.
+        if (!hasServiceKey()) {
+          return Response.json(
+            {
+              ok: false,
+              error:
+                "The central database key is not configured on this deployment, so syncing is paused.",
+            },
+            { status: 503 },
+          );
+        }
         try {
           await verifyRelayCaller(body);
         } catch (e) {
@@ -76,7 +88,7 @@ export const Route = createFileRoute("/api/public/sync")({
             const result = await runRelayRead(body.read);
             return Response.json(result, { status: result.ok ? 200 : 500 });
           } catch (e) {
-            return Response.json({ ok: false, error: (e as Error).message }, { status: 500 });
+            return Response.json({ ok: false, error: (e as Error).message }, { status: 503 });
           }
         }
 

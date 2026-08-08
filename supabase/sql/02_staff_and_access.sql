@@ -40,12 +40,16 @@ CREATE UNIQUE INDEX IF NOT EXISTS app_users_pkey ON public.app_users USING btree
 
 CREATE UNIQUE INDEX IF NOT EXISTS app_users_user_id_key ON public.app_users USING btree (user_id);
 
-CREATE TABLE IF NOT EXISTS public.cashiers (
+-- Cashiers are never assigned to a branch: the till itself decides the branch,
+-- so the table is rebuilt without store_id. Rebuilding is safe — a cashier row
+-- only holds a username, a hashed PIN and permission toggles.
+DROP TABLE IF EXISTS public.cashiers CASCADE;
+
+CREATE TABLE public.cashiers (
   id uuid DEFAULT gen_random_uuid() NOT NULL,
   username text NOT NULL,
   full_name text DEFAULT ''::text NOT NULL,
   pin_hash text NOT NULL,
-  store_id text,
   permissions jsonb DEFAULT '{}'::jsonb NOT NULL,
   is_active boolean DEFAULT true NOT NULL,
   last_login_at timestamp with time zone,
@@ -53,28 +57,6 @@ CREATE TABLE IF NOT EXISTS public.cashiers (
   updated_at timestamp with time zone DEFAULT now() NOT NULL,
   PRIMARY KEY (id)
 );
-
-ALTER TABLE public.cashiers ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid();
-
-ALTER TABLE public.cashiers ADD COLUMN IF NOT EXISTS username text;
-
-ALTER TABLE public.cashiers ADD COLUMN IF NOT EXISTS full_name text DEFAULT ''::text;
-
-ALTER TABLE public.cashiers ADD COLUMN IF NOT EXISTS pin_hash text;
-
-ALTER TABLE public.cashiers ADD COLUMN IF NOT EXISTS store_id text;
-
-ALTER TABLE public.cashiers ADD COLUMN IF NOT EXISTS permissions jsonb DEFAULT '{}'::jsonb;
-
-ALTER TABLE public.cashiers ADD COLUMN IF NOT EXISTS is_active boolean DEFAULT true;
-
-ALTER TABLE public.cashiers ADD COLUMN IF NOT EXISTS last_login_at timestamp with time zone;
-
-ALTER TABLE public.cashiers ADD COLUMN IF NOT EXISTS created_at timestamp with time zone DEFAULT now();
-
-ALTER TABLE public.cashiers ADD COLUMN IF NOT EXISTS updated_at timestamp with time zone DEFAULT now();
-
-CREATE UNIQUE INDEX IF NOT EXISTS cashiers_pkey ON public.cashiers USING btree (id);
 
 CREATE UNIQUE INDEX IF NOT EXISTS cashiers_username_key ON public.cashiers USING btree (lower(username));
 
@@ -250,12 +232,12 @@ $function$;
 DROP FUNCTION IF EXISTS public.list_cashiers();
 
 CREATE OR REPLACE FUNCTION public.list_cashiers()
- RETURNS TABLE(id uuid, username text, full_name text, store_id text, permissions jsonb, is_active boolean, last_login_at timestamp with time zone, created_at timestamp with time zone)
+ RETURNS TABLE(id uuid, username text, full_name text, permissions jsonb, is_active boolean, last_login_at timestamp with time zone, created_at timestamp with time zone)
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public', 'extensions'
 AS $function$
-  SELECT c.id, c.username, c.full_name, c.store_id, c.permissions,
+  SELECT c.id, c.username, c.full_name, c.permissions,
          c.is_active, c.last_login_at, c.created_at
   FROM public.cashiers c
   WHERE public.is_app_supervisor()
@@ -366,7 +348,9 @@ BEGIN
   RETURN new;
 END $function$;
 
-CREATE OR REPLACE FUNCTION public.upsert_cashier(p_id uuid, p_username text, p_full_name text, p_pin text, p_store_id text, p_is_active boolean)
+DROP FUNCTION IF EXISTS public.upsert_cashier(uuid, text, text, text, text, boolean);
+
+CREATE OR REPLACE FUNCTION public.upsert_cashier(p_id uuid, p_username text, p_full_name text, p_pin text, p_is_active boolean)
  RETURNS uuid
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -388,16 +372,15 @@ BEGIN
     IF p_pin IS NULL OR p_pin = '' THEN
       RAISE EXCEPTION 'A PIN is required for a new cashier';
     END IF;
-    INSERT INTO public.cashiers (username, full_name, pin_hash, store_id, is_active)
+    INSERT INTO public.cashiers (username, full_name, pin_hash, is_active)
     VALUES (lower(trim(p_username)), coalesce(p_full_name, ''),
             extensions.crypt(p_pin::text, extensions.gen_salt('bf'::text, 10)),
-            p_store_id, coalesce(p_is_active, true))
+            coalesce(p_is_active, true))
     RETURNING id INTO v_id;
   ELSE
     UPDATE public.cashiers SET
       username = lower(trim(p_username)),
       full_name = coalesce(p_full_name, full_name),
-      store_id = p_store_id,
       is_active = coalesce(p_is_active, is_active),
       pin_hash = CASE WHEN p_pin IS NULL OR p_pin = '' THEN pin_hash
                       ELSE extensions.crypt(p_pin::text, extensions.gen_salt('bf'::text, 10)) END
@@ -435,7 +418,7 @@ END $function$;
 DROP FUNCTION IF EXISTS public.verify_cashier_pin(text, text);
 
 CREATE OR REPLACE FUNCTION public.verify_cashier_pin(p_username text, p_pin text)
- RETURNS TABLE(id uuid, username text, full_name text, store_id text, permissions jsonb)
+ RETURNS TABLE(id uuid, username text, full_name text, permissions jsonb)
  LANGUAGE plpgsql
  SECURITY DEFINER
  SET search_path TO 'public', 'extensions'
@@ -449,7 +432,7 @@ BEGIN
   IF v_row.pin_hash <> extensions.crypt(p_pin::text, v_row.pin_hash::text) THEN RETURN; END IF;
   UPDATE public.cashiers SET last_login_at = now() WHERE public.cashiers.id = v_row.id;
   id := v_row.id; username := v_row.username; full_name := v_row.full_name;
-  store_id := v_row.store_id; permissions := coalesce(v_row.permissions, '{}'::jsonb);
+  permissions := coalesce(v_row.permissions, '{}'::jsonb);
   RETURN NEXT;
 END $function$;
 

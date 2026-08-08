@@ -57,6 +57,11 @@ export function serviceKey(): string {
   return key;
 }
 
+/** Whether this deployment can talk to the central database at all. */
+export function hasServiceKey(): boolean {
+  return Boolean(process.env["POS_SUPABASE_SERVICE_ROLE_KEY"]);
+}
+
 /**
  * Answer a read for a proven till. A cashier signs in with a PIN and has no
  * account on the central database, so a direct read is refused by the row

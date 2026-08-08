@@ -359,7 +359,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         userCode: row.username,
         name: row.full_name || row.username,
         role: "staff",
-        storeId: row.store_id,
+        // Cashiers are never assigned a branch — the till they sign in on decides it.
+        storeId: null,
         email: "",
         cashierId: row.id,
         permissions: row.permissions,
@@ -369,7 +370,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         username: row.username,
         cashierId: row.id,
         fullName: row.full_name || row.username,
-        storeId: row.store_id ?? "",
+        storeId: "",
         permissions: row.permissions as unknown as Record<string, boolean>,
       });
     } else if (offline) {
