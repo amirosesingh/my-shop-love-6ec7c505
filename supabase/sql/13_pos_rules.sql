@@ -101,7 +101,10 @@ AS $function$
     ON true
 $function$;
 
-GRANT EXECUTE ON FUNCTION public.pos_rules_get(text) TO anon, authenticated, service_role;
+-- Visitors must never run an elevated routine: the server reads rules with the
+-- internal service key instead of the public key.
+REVOKE ALL ON FUNCTION public.pos_rules_get(text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.pos_rules_get(text) TO authenticated, service_role;
 
 -- ---------- supervisor-only write ----------
 DROP FUNCTION IF EXISTS public.pos_rules_save(text, jsonb);
@@ -164,6 +167,7 @@ BEGIN
   RETURN public.pos_rules_get(v_store);
 END $function$;
 
+REVOKE ALL ON FUNCTION public.pos_rules_save(text, jsonb) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.pos_rules_save(text, jsonb) TO authenticated, service_role;
 
 -- ---------- manager PIN verification (server-side only) ----------
@@ -206,8 +210,10 @@ BEGIN
   RETURN QUERY SELECT u.user_id::text, u.full_name::text, u.role;
 END $function$;
 
+REVOKE ALL ON FUNCTION public.verify_manager_pin(text, text, text, text, text, text, text, text)
+  FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.verify_manager_pin(text, text, text, text, text, text, text, text)
-  TO anon, authenticated, service_role;
+  TO authenticated, service_role;
 
 -- ---------- override audit writer (privileged callers only) ----------
 DROP FUNCTION IF EXISTS public.log_manager_override(text, text, text, text, text, text, text, text);
@@ -258,7 +264,8 @@ AS $function$
    WHERE coalesce(_store_id, '') = '' OR coalesce(h.store_id, '') = _store_id
 $function$;
 
-GRANT EXECUTE ON FUNCTION public.held_orders_open_count(text) TO anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.held_orders_open_count(text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.held_orders_open_count(text) TO authenticated, service_role;
 
 -- ---------- verification ----------
 SELECT t.name AS table_name,
