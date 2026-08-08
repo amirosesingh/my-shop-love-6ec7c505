@@ -56,7 +56,9 @@ export default {
       return await normalizeCatastrophicSsrResponse(response);
     } catch (error) {
       console.error(error);
-      return new Response(renderErrorPage(), {
+      const misconfigured =
+        error instanceof Error && error.name === "SupabaseConfigError" ? error.message : undefined;
+      return new Response(renderErrorPage(misconfigured), {
         status: 500,
         headers: { "content-type": "text/html; charset=utf-8" },
       });
