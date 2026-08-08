@@ -33,3 +33,6 @@ dist-ssr
 *dist-desktop
 *release-desktop
 *release
+# Local env overrides (never commit real values)
+.env.local
+.env.*.local
