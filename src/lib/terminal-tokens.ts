@@ -533,7 +533,7 @@ export async function activateTerminal(code: string): Promise<TerminalConfig> {
 
   const config: TerminalConfig = {
     tokenId: payload.token_id,
-    locationId: payload.location_id,
+    locationId: payload.location_id || remote.locationId,
     locationName: remote.locationName || payload.location_name,
     supabaseUrl: payload.supabase_url,
     supabaseKey: payload.supabase_key,
