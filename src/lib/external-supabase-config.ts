@@ -67,6 +67,15 @@ function bags(): Record<string, unknown>[] {
   const out: Record<string, unknown>[] = [];
   const injected = injectedBag();
   if (injected) out.push(injected);
+  // Vite only inlines STATIC `import.meta.env.VITE_*` reads. In a production
+  // build `import.meta.env` itself is a small object without the VITE_ names,
+  // so a dynamic lookup finds nothing — these static reads are the only way
+  // the browser bundle can carry build-time values.
+  out.push({
+    VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
+    VITE_SUPABASE_ANON_KEY:
+      import.meta.env.VITE_SUPABASE_ANON_KEY ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+  });
   try {
     if (import.meta.env) out.push(import.meta.env as unknown as Record<string, unknown>);
   } catch {
