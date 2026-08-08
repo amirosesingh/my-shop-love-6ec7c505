@@ -230,6 +230,8 @@ Both subdomains serve the same build; only the landing path differs.`;
         </Button>
       </section>
 
+      <UnpairTerminalCard />
+
       {unhealthy && (
         <section className="space-y-3 rounded-md border border-warning/40 bg-warning/5 p-4">
           <h2 className="text-sm font-semibold">Troubleshooting & recovery</h2>
