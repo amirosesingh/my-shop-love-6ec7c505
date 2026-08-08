@@ -45,12 +45,14 @@ function bags(): Record<string, unknown>[] {
   const out: Record<string, unknown>[] = [];
   const injected = injectedBag();
   if (injected) out.push(injected);
-  if (runtimeEnv) out.push(runtimeEnv);
   try {
     if (import.meta.env) out.push(import.meta.env as unknown as Record<string, unknown>);
   } catch {
     /* no import.meta.env in this runtime */
   }
+  // Hosting runtime (Cloudflare vars/secrets) — the only source on a deployed
+  // worker, where nothing was baked in at build time.
+  if (runtimeEnv) out.push(runtimeEnv);
   if (typeof process !== "undefined" && process.env) out.push(process.env as Record<string, unknown>);
   return out;
 }
