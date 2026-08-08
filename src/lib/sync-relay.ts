@@ -124,7 +124,7 @@ export async function relayStores(): Promise<{
 }
 
 /** Quick health probe used by the connection check panel. */
-export async function probeRelay(): Promise<{ ok: boolean; error?: string }> {
+export async function probeRelay(): Promise<{ ok: boolean; error?: string; code?: string }> {
   try {
     const res = await fetch("/api/public/sync", {
       method: "POST",
@@ -135,8 +135,15 @@ export async function probeRelay(): Promise<{ ok: boolean; error?: string }> {
       }),
     });
     if (res.status === 401) return { ok: false, error: "This till is not recognised yet" };
-    const body = (await res.json().catch(() => null)) as { error?: string } | null;
-    if (!res.ok) return { ok: false, error: body?.error ?? `Relay error ${res.status}` };
+    const body = (await res.json().catch(() => null)) as
+      | { error?: string; code?: string }
+      | null;
+    if (!res.ok)
+      return {
+        ok: false,
+        ...(body?.code ? { code: body.code } : {}),
+        error: body?.error ?? `Relay error ${res.status}`,
+      };
     return { ok: true };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
