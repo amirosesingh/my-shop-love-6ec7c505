@@ -1,6 +1,12 @@
 -- ============================================================================
 -- 98_drop_unused.sql  —  OPTIONAL AND DESTRUCTIVE. Read before running.
 --
+-- NOTHING IN THIS FILE RUNS AS SHIPPED. Every destructive statement is
+-- commented out on purpose, so an accidental run (or a copy/paste of the whole
+-- sql folder) can never delete data. Uncomment a single line only when you
+-- have decided, deliberately and with a backup in hand, to remove that object.
+-- This file is never included in 99_run_all.sql and is never run by the app.
+--
 -- Removes objects that no part of the application reads or writes any more.
 -- Take a backup first: everything below is deleted permanently, together with
 -- any rows it still holds.
@@ -10,11 +16,11 @@
 -- ============================================================================
 
 -- 1) Manager override attempts were replaced by the audit trail (`audit_logs`).
-DROP TABLE IF EXISTS public.manager_override_events CASCADE;
+-- DROP TABLE IF EXISTS public.manager_override_events CASCADE;
 
 -- 2) Branch clusters are now a plain `group_id` column on `stores`, so the
 --    separate lookup table is no longer read.
-DROP TABLE IF EXISTS public.store_groups CASCADE;
+-- DROP TABLE IF EXISTS public.store_groups CASCADE;
 
 -- 3) Per-branch settings rows superseded by the settings hierarchy
 --    (`settings_scoped`). Uncomment only after confirming the hierarchy page

@@ -41,11 +41,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS app_users_pkey ON public.app_users USING btree
 CREATE UNIQUE INDEX IF NOT EXISTS app_users_user_id_key ON public.app_users USING btree (user_id);
 
 -- Cashiers are never assigned to a branch: the till itself decides the branch,
--- so the table is rebuilt without store_id. Rebuilding is safe — a cashier row
--- only holds a username, a hashed PIN and permission toggles.
-DROP TABLE IF EXISTS public.cashiers CASCADE;
-
-CREATE TABLE public.cashiers (
+-- so `store_id` is simply ignored. NOTHING IS DROPPED here — re-running this
+-- file on a live database keeps every existing cashier row.
+CREATE TABLE IF NOT EXISTS public.cashiers (
   id uuid DEFAULT gen_random_uuid() NOT NULL,
   username text NOT NULL,
   full_name text DEFAULT ''::text NOT NULL,
@@ -57,6 +55,16 @@ CREATE TABLE public.cashiers (
   updated_at timestamp with time zone DEFAULT now() NOT NULL,
   PRIMARY KEY (id)
 );
+
+-- Additive repairs for databases created by an earlier version of this file.
+ALTER TABLE public.cashiers ADD COLUMN IF NOT EXISTS full_name text DEFAULT ''::text;
+ALTER TABLE public.cashiers ADD COLUMN IF NOT EXISTS permissions jsonb DEFAULT '{}'::jsonb;
+ALTER TABLE public.cashiers ADD COLUMN IF NOT EXISTS is_active boolean DEFAULT true;
+ALTER TABLE public.cashiers ADD COLUMN IF NOT EXISTS last_login_at timestamp with time zone;
+ALTER TABLE public.cashiers ADD COLUMN IF NOT EXISTS created_at timestamp with time zone DEFAULT now();
+ALTER TABLE public.cashiers ADD COLUMN IF NOT EXISTS updated_at timestamp with time zone DEFAULT now();
+-- A legacy branch column is left alone if present; the app never reads it.
+ALTER TABLE public.cashiers ALTER COLUMN store_id DROP NOT NULL;
 
 CREATE UNIQUE INDEX IF NOT EXISTS cashiers_username_key ON public.cashiers USING btree (lower(username));
 
