@@ -58,6 +58,34 @@ const isPermissionError = (error: PostgrestError) =>
   error.code === "PGRST301" ||
   /row-level security|permission denied|jwt/i.test(error.message);
 
+/**
+ * Tables the central database refused for this account in this session.
+ *
+ * Once a direct write is refused there is no point attempting it again — the
+ * answer will not change until the account is signed in again. Remembering the
+ * refusal sends later writes for that table straight through the server relay,
+ * which keeps the console clean and saves a round trip. Accounts that are
+ * allowed keep the faster direct path.
+ */
+const refusedTables = new Set<string>();
+
+/** Relay the operation and report the outcome in plain language. */
+async function viaRelay(
+  context: string,
+  op: SyncOp,
+): Promise<{ ok: boolean; error?: string }> {
+  const relayed = await relayOp(op);
+  logSync(
+    "push",
+    op.table,
+    relayed.ok,
+    relayed.ok
+      ? `${context} (via server)`
+      : `${context}: ${relayed.error ?? "the server could not save this change"}`,
+  );
+  return relayed;
+}
+
 /** Plain-language message for a failed push. */
 const describeError = (table: string, error: PostgrestError) => {
   if (error.code === "PGRST205") {
