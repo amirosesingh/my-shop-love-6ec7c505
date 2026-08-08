@@ -18,6 +18,9 @@ import { AuthProvider } from "@/lib/pos-auth";
 import { PermissionsProvider } from "@/lib/pos-permissions";
 import { Toaster } from "../components/ui/sonner";
 import { AuditTracker } from "../components/pos/AuditTracker";
+import { TerminalActivation } from "@/components/pos/TerminalActivation";
+import { isTerminalApp } from "@/lib/native";
+import { readTerminalConfig } from "@/lib/terminal-tokens";
 import { FirstRunSetup } from "../components/pos/FirstRunSetup";
 import { ThemeProvider, themeBootScript } from "../lib/theme";
 import { publicConfigScript } from "../lib/public-config-script";
@@ -55,6 +58,12 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
   }, [error]);
   const notConfigured = error.name === "SupabaseConfigError";
+
+  // A till that has never been paired has no connection details yet — that is
+  // the normal first-boot state, not a failure. Show the activation screen.
+  if (notConfigured && isTerminalApp() && !readTerminalConfig()) {
+    return <TerminalActivation onActivated={() => window.location.reload()} />;
+  }
 
   const clearAndRestart = () => {
     try {

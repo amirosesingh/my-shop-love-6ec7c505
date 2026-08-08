@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
+import { UnpairTerminalCard } from "@/components/pos/UnpairTerminal";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { TIME_ZONES, effectiveTimeZone } from "@/lib/time-zone";
 import { Button } from "@/components/ui/button";
@@ -228,6 +229,8 @@ Both subdomains serve the same build; only the landing path differs.`;
           {busy ? "Testing services…" : "Run diagnostics / test connection"}
         </Button>
       </section>
+
+      <UnpairTerminalCard />
 
       {unhealthy && (
         <section className="space-y-3 rounded-md border border-warning/40 bg-warning/5 p-4">

@@ -5,15 +5,37 @@
  */
 const fs = require("node:fs");
 const path = require("node:path");
-const { app } = require("electron");
+const { app, safeStorage } = require("electron");
 
 const file = () => path.join(app.getPath("userData"), "terminal-config.json");
+const sealed = () => path.join(app.getPath("userData"), "terminal-config.bin");
+
+const canSeal = () => {
+  try {
+    return safeStorage.isEncryptionAvailable();
+  } catch {
+    return false;
+  }
+};
 
 function read() {
+  // Preferred: the OS vault copy (DPAPI on Windows, Keychain on macOS).
+  if (canSeal()) {
+    try {
+      const buf = fs.readFileSync(sealed());
+      const parsed = JSON.parse(safeStorage.decryptString(buf));
+      if (parsed && parsed.tokenId) return parsed;
+    } catch {
+      /* fall through to the legacy plain copy */
+    }
+  }
   try {
     const raw = fs.readFileSync(file(), "utf8");
     const parsed = JSON.parse(raw);
-    return parsed && parsed.tokenId ? parsed : null;
+    if (!parsed || !parsed.tokenId) return null;
+    // One-time migration of an older unencrypted activation.
+    if (canSeal()) write(parsed);
+    return parsed;
   } catch {
     return null;
   }
@@ -22,6 +44,13 @@ function read() {
 function write(config) {
   try {
     if (!config) {
+      fs.rmSync(file(), { force: true });
+      fs.rmSync(sealed(), { force: true });
+      return { ok: true };
+    }
+    if (canSeal()) {
+      fs.writeFileSync(sealed(), safeStorage.encryptString(JSON.stringify(config)));
+      // The plain copy must not linger once the vault holds the activation.
       fs.rmSync(file(), { force: true });
       return { ok: true };
     }
@@ -32,4 +61,9 @@ function write(config) {
   }
 }
 
-module.exports = { read, write };
+/** Whether the activation is protected by the operating system's vault. */
+function isSecure() {
+  return canSeal();
+}
+
+module.exports = { read, write, isSecure };

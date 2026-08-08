@@ -27,6 +27,28 @@ export function setRuntimeEnv(env: unknown): void {
   cached = undefined;
 }
 
+/**
+ * A registered till carries its tenant's address inside its activation, so the
+ * machine needs no environment variables at all. This override always wins.
+ */
+let terminalOverride: Source | undefined;
+
+export function setTerminalSupabaseOverride(url: string, key: string): void {
+  const next = { url: clean(url), key: clean(key) };
+  if (!next.url || !next.key) return;
+  if (terminalOverride?.url === next.url && terminalOverride?.key === next.key) return;
+  terminalOverride = next;
+  cached = undefined;
+}
+
+export function clearTerminalSupabaseOverride(): void {
+  if (!terminalOverride) return;
+  terminalOverride = undefined;
+  cached = undefined;
+}
+
+export const hasTerminalSupabaseOverride = () => !!terminalOverride;
+
 /** A single value from the hosting runtime's own environment, if it has one. */
 export function runtimeEnvValue(name: string): string | undefined {
   const value = clean(runtimeEnv?.[name]);
@@ -84,6 +106,10 @@ let cached: Source | undefined;
 /** Resolved connection details, or a hard error when nothing is configured. */
 export function supabaseConfig(): Source {
   if (cached) return cached;
+  if (terminalOverride) {
+    cached = terminalOverride;
+    return cached;
+  }
   for (const bag of bags()) {
     for (const [urlName, keyName] of PAIRS) {
       const found = fromEnv(bag, urlName, keyName);

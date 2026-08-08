@@ -3,11 +3,22 @@
  * kill-switch drops in when management revokes the machine.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Camera, KeyRound, Loader2, ScanLine, ShieldAlert, ShieldCheck, Smartphone } from "lucide-react";
+import {
+  Camera,
+  ChevronDown,
+  ClipboardPaste,
+  KeyRound,
+  Loader2,
+  ScanLine,
+  ShieldAlert,
+  ShieldCheck,
+  Smartphone,
+} from "lucide-react";
 import qrcode from "qrcode-generator";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   activateTerminal,
   ActivationError,
@@ -43,6 +54,7 @@ export function TerminalActivation({ onActivated }: { onActivated: (c: TerminalC
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [scanning, setScanning] = useState(false);
+  const [showPairing, setShowPairing] = useState(false);
   // Minted after mount: the id is random, so generating it during SSR would
   // hydrate a different QR than the server drew and blow up the page.
   const [pairing, setPairing] = useState<ReturnType<typeof getPairingRequest> | null>(null);
@@ -116,77 +128,115 @@ export function TerminalActivation({ onActivated }: { onActivated: (c: TerminalC
         the text block below.
       </p>
 
-      <div className="mt-4 rounded-xl border border-slate-700 bg-slate-950/50 p-4">
-        <div className="flex items-center gap-2 text-sm font-medium text-slate-200">
-          <Smartphone className="size-4 text-sky-400" /> Pair with the phone app
-        </div>
-        <p className="mt-1 text-xs text-slate-400">
-          Scan this code from Settings → Terminal activation on the Android app and approve it. This
-          till registers itself — nothing to type or copy.
-        </p>
-        <div className="mt-3 flex items-center gap-3">
-          {pairQr ? (
-            <img
-              src={pairQr}
-              alt="Pairing code for this terminal"
-              className="size-32 rounded-lg bg-white p-1"
-            />
-          ) : (
-            <div className="grid size-32 place-items-center rounded-lg border border-slate-700 bg-slate-900">
-              <Loader2 className="size-5 animate-spin text-slate-500" />
-            </div>
-          )}
-          <div className="text-[11px] text-slate-500">
-            <p className="font-mono break-all text-slate-400">
-              {pairing ? `${pairing.tokenId.slice(0, 8)}…` : "Preparing…"}
-            </p>
-            <p className="mt-2 flex items-center gap-1">
-              <Loader2 className="size-3 animate-spin" /> Waiting for approval…
-            </p>
-          </div>
-        </div>
-      </div>
+      <Tabs defaultValue="scan" className="mt-4">
+        <TabsList className="grid w-full grid-cols-2 bg-slate-800/60">
+          <TabsTrigger value="scan">
+            <Camera className="size-4" /> Scan QR
+          </TabsTrigger>
+          <TabsTrigger value="manual">
+            <KeyRound className="size-4" /> Enter token
+          </TabsTrigger>
+        </TabsList>
 
-      {scanning ? (
-        <div className="mt-4 space-y-2">
-          <CameraScanner
-            onScan={(text) => {
-              setScanning(false);
-              void submit(text);
-            }}
-            onClose={() => setScanning(false)}
+        <TabsContent value="scan" className="mt-4">
+          {scanning ? (
+            <div className="space-y-2">
+              <CameraScanner
+                onScan={(text) => {
+                  setScanning(false);
+                  void submit(text);
+                }}
+                onClose={() => setScanning(false)}
+              />
+              <Button
+                variant="ghost"
+                className="w-full text-slate-300"
+                onClick={() => setScanning(false)}
+              >
+                Cancel scanning
+              </Button>
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              className="w-full border-slate-700 bg-slate-800/60 text-slate-100 hover:bg-slate-800"
+              onClick={() => setScanning(true)}
+            >
+              <Camera className="size-4" /> Scan the activation QR code
+            </Button>
+          )}
+        </TabsContent>
+
+        <TabsContent value="manual" className="mt-4 space-y-2">
+          <Label htmlFor="activation-code" className="text-xs text-slate-400">
+            One-time activation token
+          </Label>
+          <Textarea
+            id="activation-code"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            rows={4}
+            spellCheck={false}
+            placeholder="ENC_V1:…"
+            className="border-slate-700 bg-slate-950/60 font-mono text-xs text-slate-100"
           />
           <Button
             variant="ghost"
             className="w-full text-slate-300"
-            onClick={() => setScanning(false)}
+            onClick={async () => {
+              try {
+                const text = await navigator.clipboard.readText();
+                if (text.trim()) setCode(text.trim());
+              } catch {
+                setError("Could not read the clipboard. Paste the token by hand.");
+              }
+            }}
           >
-            Cancel scanning
+            <ClipboardPaste className="size-4" /> Paste from clipboard
           </Button>
-        </div>
-      ) : (
-        <Button
-          variant="outline"
-          className="mt-4 w-full border-slate-700 bg-slate-800/60 text-slate-100 hover:bg-slate-800"
-          onClick={() => setScanning(true)}
-        >
-          <Camera className="size-4" /> Scan QR code with the camera
-        </Button>
-      )}
+        </TabsContent>
+      </Tabs>
 
-      <div className="mt-4 space-y-2">
-        <Label htmlFor="activation-code" className="text-xs text-slate-400">
-          Activation code
-        </Label>
-        <Textarea
-          id="activation-code"
-          value={code}
-          onChange={(e) => setCode(e.target.value)}
-          rows={4}
-          spellCheck={false}
-          placeholder="Paste the activation code here"
-          className="border-slate-700 bg-slate-950/60 font-mono text-xs text-slate-100"
-        />
+      <div className="mt-4 rounded-xl border border-slate-700 bg-slate-950/50">
+        <button
+          type="button"
+          onClick={() => setShowPairing((v) => !v)}
+          className="flex w-full items-center justify-between p-3 text-sm font-medium text-slate-200"
+        >
+          <span className="flex items-center gap-2">
+            <Smartphone className="size-4 text-sky-400" /> Pair from the phone app
+          </span>
+          <ChevronDown className={`size-4 transition ${showPairing ? "rotate-180" : ""}`} />
+        </button>
+        {showPairing && (
+          <div className="border-t border-slate-800 p-3">
+            <p className="text-xs text-slate-400">
+              Scan this code from Settings → Terminal activation on the Android app and approve it.
+              This till registers itself — nothing to type or copy.
+            </p>
+            <div className="mt-3 flex items-center gap-3">
+              {pairQr ? (
+                <img
+                  src={pairQr}
+                  alt="Pairing code for this terminal"
+                  className="size-32 rounded-lg bg-white p-1"
+                />
+              ) : (
+                <div className="grid size-32 place-items-center rounded-lg border border-slate-700 bg-slate-900">
+                  <Loader2 className="size-5 animate-spin text-slate-500" />
+                </div>
+              )}
+              <div className="text-[11px] text-slate-500">
+                <p className="font-mono break-all text-slate-400">
+                  {pairing ? `${pairing.tokenId.slice(0, 8)}…` : "Preparing…"}
+                </p>
+                <p className="mt-2 flex items-center gap-1">
+                  <Loader2 className="size-3 animate-spin" /> Waiting for approval…
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {error && (
