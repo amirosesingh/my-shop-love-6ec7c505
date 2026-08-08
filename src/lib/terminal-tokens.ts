@@ -333,6 +333,7 @@ export async function hydrateTerminalConfig(): Promise<TerminalConfig | null> {
   if (legacy) {
     cachedConfig = legacy;
     hydrated = true;
+    applyTenantOverride(legacy);
     // One-time upgrade: seal it and drop the readable copy.
     try {
       await setDeviceSecret(SEALED_NAME, legacy);
@@ -345,7 +346,10 @@ export async function hydrateTerminalConfig(): Promise<TerminalConfig | null> {
   }
   try {
     const sealed = await getDeviceSecret<TerminalConfig>(SEALED_NAME);
-    if (sealed?.tokenId) cachedConfig = sealed;
+    if (sealed?.tokenId) {
+      cachedConfig = sealed;
+      applyTenantOverride(sealed);
+    }
   } catch {
     /* unreadable seal — treat as not activated */
   }
@@ -365,6 +369,7 @@ export function writeTerminalConfig(config: TerminalConfig) {
   if (typeof window === "undefined") return;
   cachedConfig = config;
   hydrated = true;
+  applyTenantOverride(config);
   void setDeviceSecret(SEALED_NAME, config).catch(() => {
     // Last resort so the till is not left unregistered after a restart.
     window.localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
@@ -378,6 +383,7 @@ export function clearTerminalConfig() {
   if (typeof window === "undefined") return;
   cachedConfig = null;
   hydrated = true;
+  applyTenantOverride(null);
   clearDeviceSecret(SEALED_NAME);
   window.localStorage.removeItem(CONFIG_KEY);
   void desktopBridge()?.writeTerminalConfig(null);
@@ -519,22 +525,34 @@ export async function activateTerminal(code: string): Promise<TerminalConfig> {
     throw new ActivationError("This activation code is not valid.");
   }
 
-  const remote = await fetchTokenStatus(payload.token_id).catch((e: unknown) => {
+  // The claim runs against the tenant named inside the token, not against
+  // whatever this machine happens to be pointed at — an unprovisioned till has
+  // no connection details at all until this succeeds.
+  const tenant = createTenantClient(payload.supabase_url, payload.supabase_key);
+  const statusOf = async () => {
+    const { data, error } = await rpcOn(tenant, "terminal_token_status", {
+      p_token_id: payload.token_id,
+    });
+    if (error) throw error;
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row) return null;
+    return {
+      status: asStatus(row.status),
+      locationName: row.location_name ?? "",
+      locationId: row.location_id ?? "",
+      isClaimed: row.is_claimed === true || asStatus(row.status) === "used",
+      expiresAt: (row.expires_at ?? null) as string | null,
+    };
+  };
+  const remote = await statusOf().catch((e: unknown) => {
     throw new ActivationError(activationFailureMessage(e));
   });
   if (!remote) throw new ActivationError("This activation code is not recognised.");
   if (remote.status === "revoked") {
     throw new ActivationError("This activation code has been revoked by management.");
   }
-  if (remote.status === "used") {
-    throw new ActivationError(
-      "This activation code has already been used on another terminal. Ask an administrator to re-issue a code for this till.",
-    );
-  }
-  if (remote.isClaimed) {
-    throw new ActivationError(
-      "This activation code has already been redeemed. Ask an administrator to issue a new code.",
-    );
+  if (remote.status === "used" || remote.isClaimed) {
+    throw new ActivationError("This activation token has already been used or expired.");
   }
   if (remote.expiresAt && new Date(remote.expiresAt).getTime() < Date.now()) {
     throw new ActivationError(
@@ -545,15 +563,13 @@ export async function activateTerminal(code: string): Promise<TerminalConfig> {
   // One-time use: only the till that wins this atomic claim may register.
   const deviceName =
     typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 120) : null;
-  const { data: claimed, error: claimError } = await rpc("terminal_token_claim", {
+  const { data: claimed, error: claimError } = await rpcOn(tenant, "terminal_token_claim", {
     p_token_id: payload.token_id,
     p_device: deviceName,
   });
   if (claimError) throw new ActivationError(activationFailureMessage(claimError));
   if (claimed !== true) {
-    throw new ActivationError(
-      "This activation code has already been used on another terminal. Ask an administrator to re-issue a code for this till.",
-    );
+    throw new ActivationError("This activation token has already been used or expired.");
   }
 
   const config: TerminalConfig = {
@@ -565,7 +581,10 @@ export async function activateTerminal(code: string): Promise<TerminalConfig> {
     activatedAt: new Date().toISOString(),
   };
   writeTerminalConfig(config);
-  await rpc("terminal_token_heartbeat", { p_token_id: config.tokenId, p_activate: true });
+  await rpcOn(tenant, "terminal_token_heartbeat", {
+    p_token_id: config.tokenId,
+    p_activate: true,
+  });
   // Give this till its own machine account so its writes are accepted by the
   // central database even when a cashier signs in with a PIN.
   void import("./terminal-session").then((m) => m.provisionTerminalAccount(config.tokenId)).catch(() => null);
