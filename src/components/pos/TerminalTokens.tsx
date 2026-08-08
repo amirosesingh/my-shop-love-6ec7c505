@@ -55,6 +55,8 @@ import {
   type TerminalToken,
 } from "@/lib/terminal-tokens";
 import { CameraScanner } from "@/components/pos/CameraScanner";
+import { fetchTokenStatus } from "@/lib/terminal-tokens";
+import { ACTIVATION_TTL_MS } from "@/lib/terminal-crypto";
 
 const qrDataUrl = (value: string) => {
   const qr = qrcode(0, "M");
@@ -80,6 +82,10 @@ export function TerminalTokens({
   const [deviceName, setDeviceName] = useState("");
   const [issuing, setIssuing] = useState(false);
   const [code, setCode] = useState("");
+  const [codeTokenId, setCodeTokenId] = useState("");
+  const [codeIssuedAt, setCodeIssuedAt] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
+  const [claimed, setClaimed] = useState(false);
   const [copied, setCopied] = useState(false);
   const [pendingRevoke, setPendingRevoke] = useState<TerminalToken | null>(null);
   const [pendingReissue, setPendingReissue] = useState<TerminalToken | null>(null);
@@ -149,7 +155,7 @@ export function TerminalTokens({
     if (!store) return toast.error("That location is no longer available");
     setIssuing(true);
     try {
-      const { code: issued } = await issueTerminalToken({
+      const { code: issued, token } = await issueTerminalToken({
         location: {
           id: store.id,
           code: store.code,
@@ -163,6 +169,10 @@ export function TerminalTokens({
         ...(pairTokenId ? { tokenId: pairTokenId } : {}),
       });
       setCode(issued);
+      setCodeTokenId(token.id);
+      setCodeIssuedAt(Date.now());
+      setNow(Date.now());
+      setClaimed(false);
       setDeviceName("");
       setPairTokenId("");
       logger.log("settings_change", "Terminal token issued", "terminals", {
