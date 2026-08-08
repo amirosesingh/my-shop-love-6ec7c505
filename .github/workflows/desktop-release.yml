@@ -74,6 +74,19 @@ jobs:
         run: |
           node -e "const fs=require('fs');fs.writeFileSync('release/release.json',JSON.stringify({version:'${{ steps.meta.outputs.version }}',tag:'${{ steps.meta.outputs.tag }}',commit:'${{ steps.meta.outputs.commit }}',released:new Date().toISOString(),path:'pos-app/releases/${{ steps.meta.outputs.release_id }}/'},null,2))"
 
+      - name: Stage publishable files only
+        shell: bash
+        run: |
+          # electron-builder also leaves win-unpacked/, builder-debug.yml and
+          # other build scratch in release/. Only the files a till downloads
+          # are copied into the upload folder, so the bucket stays clean.
+          rm -rf upload && mkdir -p upload
+          shopt -s nullglob
+          for f in release/*.exe release/*.exe.blockmap release/latest.yml release/release.json; do
+            cp "$f" upload/
+          done
+          ls -la upload
+
       - name: Deploy to Cloudflare R2
         shell: bash
         env:
@@ -87,14 +100,14 @@ jobs:
           fi
           rid="${{ steps.meta.outputs.release_id }}"
           # Immutable, versioned copy.
-          aws s3 sync release "s3://updatelccms/pos-app/releases/$rid" \
+          aws s3 sync upload "s3://updatelccms/pos-app/releases/$rid" \
             --endpoint-url "$R2_ENDPOINT" \
             --cache-control "public,max-age=31536000,immutable"
           # Stable pointers the tills poll.
-          aws s3 sync release s3://updatelccms/pos-app/latest \
+          # --delete clears anything left behind by earlier releases
+          # (win-unpacked/ and friends) on the next run.
+          aws s3 sync upload s3://updatelccms/pos-app/latest \
             --endpoint-url "$R2_ENDPOINT" --cache-control "no-cache" --delete
-          aws s3 sync release s3://updatelccms/pos-app \
-            --endpoint-url "$R2_ENDPOINT" --cache-control "no-cache"
 
       - name: Attach installer to the GitHub release
         uses: softprops/action-gh-release@v2
