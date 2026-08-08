@@ -18,6 +18,7 @@ import {
   isEncryptedV1,
 } from "./terminal-crypto";
 import { clearDeviceSecret, getDeviceSecret, setDeviceSecret } from "./device-secrets";
+import { recordActivationAttempt } from "./terminal-activation-log";
 
 import {
   clearTerminalSupabaseOverride,
@@ -522,9 +523,18 @@ export async function activateTerminal(code: string): Promise<TerminalConfig> {
     if (isEncryptedV1(code)) {
       const v1 = await decryptActivationV1(code);
       if (Number.isFinite(v1.ts) && Date.now() - v1.ts > ACTIVATION_TTL_MS) {
-        throw new ActivationError(
+        const expired = new ActivationError(
           "This activation code has expired. Ask an administrator to generate a new one.",
         );
+        void recordActivationAttempt(
+          createTenantClient(v1.supabaseUrl, v1.supabaseAnonKey),
+          {
+            outcome: "expired",
+            terminalId: v1.pairToken,
+            reason: expired.message,
+          },
+        );
+        throw expired;
       }
       payload = {
         token_id: v1.pairToken,
@@ -538,6 +548,11 @@ export async function activateTerminal(code: string): Promise<TerminalConfig> {
     }
   } catch (e) {
     if (e instanceof ActivationError) throw e;
+    void recordActivationAttempt(null, {
+      outcome: "invalid_code",
+      terminalId: null,
+      reason: "The activation code could not be read.",
+    });
     throw new ActivationError("This activation code is not valid.");
   }
 
@@ -545,6 +560,18 @@ export async function activateTerminal(code: string): Promise<TerminalConfig> {
   // whatever this machine happens to be pointed at — an unprovisioned till has
   // no connection details at all until this succeeds.
   const tenant = createTenantClient(payload.supabase_url, payload.supabase_key);
+  const note = (
+    outcome: Parameters<typeof recordActivationAttempt>[1]["outcome"],
+    reason: string,
+    branch?: { id?: string | null; name?: string | null },
+  ) =>
+    void recordActivationAttempt(tenant, {
+      outcome,
+      terminalId: payload.token_id,
+      branchId: branch?.id ?? payload.location_id ?? null,
+      branchName: branch?.name ?? payload.location_name ?? null,
+      reason,
+    });
   const statusOf = async () => {
     const { data, error } = await rpcOn(tenant, "terminal_token_status", {
       p_token_id: payload.token_id,
@@ -561,16 +588,25 @@ export async function activateTerminal(code: string): Promise<TerminalConfig> {
     };
   };
   const remote = await statusOf().catch((e: unknown) => {
-    throw new ActivationError(activationFailureMessage(e));
+    const message = activationFailureMessage(e);
+    note("unreachable", message);
+    throw new ActivationError(message);
   });
-  if (!remote) throw new ActivationError("This activation code is not recognised.");
+  if (!remote) {
+    note("invalid_code", "This activation code is not recognised.");
+    throw new ActivationError("This activation code is not recognised.");
+  }
+  const branch = { id: remote.locationId, name: remote.locationName };
   if (remote.status === "revoked") {
+    note("revoked", "This activation code has been revoked by management.", branch);
     throw new ActivationError("This activation code has been revoked by management.");
   }
   if (remote.status === "used" || remote.isClaimed) {
+    note("already_claimed", "This activation token has already been used.", branch);
     throw new ActivationError("This activation token has already been used or expired.");
   }
   if (remote.expiresAt && new Date(remote.expiresAt).getTime() < Date.now()) {
+    note("expired", "This activation code passed its redemption deadline.", branch);
     throw new ActivationError(
       "This activation code has expired. Ask an administrator to generate a new one.",
     );
@@ -583,8 +619,13 @@ export async function activateTerminal(code: string): Promise<TerminalConfig> {
     p_token_id: payload.token_id,
     p_device: deviceName,
   });
-  if (claimError) throw new ActivationError(activationFailureMessage(claimError));
+  if (claimError) {
+    const message = activationFailureMessage(claimError);
+    note("unreachable", message, branch);
+    throw new ActivationError(message);
+  }
   if (claimed !== true) {
+    note("already_claimed", "Another device won the one-time claim.", branch);
     throw new ActivationError("This activation token has already been used or expired.");
   }
 
@@ -597,6 +638,10 @@ export async function activateTerminal(code: string): Promise<TerminalConfig> {
     activatedAt: new Date().toISOString(),
   };
   writeTerminalConfig(config);
+  note("succeeded", "This till claimed the code and registered.", {
+    id: config.locationId,
+    name: config.locationName,
+  });
   await rpcOn(tenant, "terminal_token_heartbeat", {
     p_token_id: config.tokenId,
     p_activate: true,
