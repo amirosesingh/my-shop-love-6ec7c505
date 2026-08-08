@@ -70,9 +70,18 @@ export async function verifyPosStaff(accessToken: string): Promise<{
 
 /* ------------------------- encrypted value store ------------------------- */
 
-async function admin() {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  return supabaseAdmin;
+/**
+ * Encrypted values live on the POS database with everything else, reached with
+ * the POS service key. The key and the plaintext never leave the server.
+ */
+async function posRest(path: string, init: RequestInit & { prefer?: string } = {}) {
+  const { serviceRest } = await import("./pos-relay.server");
+  return serviceRest(path, init);
+}
+
+async function failed(res: Response, action: string): Promise<never> {
+  const text = (await res.text()).slice(0, 300);
+  throw new Error(`${action} failed on the central database: ${text}`);
 }
 
 export async function writeSecureSetting(
@@ -80,47 +89,53 @@ export async function writeSecureSetting(
   plaintext: string,
   updatedBy: string,
 ) {
-  const supabase = await admin();
-  const { error } = await supabase.from("secure_settings").upsert(
-    {
-      key,
-      ciphertext: encryptSetting(plaintext),
-      hint: maskSetting(plaintext),
-      updated_by: updatedBy,
-      updated_at: new Date().toISOString(),
-    } as never,
-    { onConflict: "key" },
-  );
-  if (error) throw error;
+  const res = await posRest("secure_settings?on_conflict=key", {
+    method: "POST",
+    body: JSON.stringify([
+      {
+        key,
+        ciphertext: encryptSetting(plaintext),
+        hint: maskSetting(plaintext),
+        updated_by: updatedBy,
+        updated_at: new Date().toISOString(),
+      },
+    ]),
+    prefer: "return=minimal,resolution=merge-duplicates",
+  });
+  if (!res.ok) await failed(res, "Saving the secure value");
 }
 
 export async function removeSecureSetting(key: SecureSettingKey) {
-  const supabase = await admin();
-  const { error } = await supabase.from("secure_settings").delete().eq("key", key);
-  if (error) throw error;
+  const res = await posRest(`secure_settings?key=eq.${encodeURIComponent(key)}`, {
+    method: "DELETE",
+    prefer: "return=minimal",
+  });
+  if (!res.ok) await failed(res, "Removing the secure value");
 }
 
 /** Masked view for the UI — plaintext never leaves the server. */
 export async function listSecureSettingHints() {
-  const supabase = await admin();
-  const { data, error } = await supabase
-    .from("secure_settings")
-    .select("key, hint, updated_at, updated_by");
-  if (error) throw error;
-  return (data ?? []) as { key: string; hint: string | null; updated_at: string; updated_by: string | null }[];
+  const res = await posRest("secure_settings?select=key,hint,updated_at,updated_by");
+  if (!res.ok) await failed(res, "Reading the secure values");
+  return (await res.json()) as {
+    key: string;
+    hint: string | null;
+    updated_at: string;
+    updated_by: string | null;
+  }[];
 }
 
 /** Server-only plaintext read, used by the handlers that call the provider. */
 export async function readSecureSetting(key: SecureSettingKey): Promise<string | null> {
-  const supabase = await admin();
-  const { data, error } = await supabase
-    .from("secure_settings")
-    .select("ciphertext")
-    .eq("key", key)
-    .maybeSingle();
-  if (error || !data) return null;
+  const res = await posRest(
+    `secure_settings?select=ciphertext&key=eq.${encodeURIComponent(key)}&limit=1`,
+  );
+  if (!res.ok) return null;
+  const rows = (await res.json()) as { ciphertext: string }[];
+  const row = rows[0];
+  if (!row) return null;
   try {
-    return decryptSetting((data as { ciphertext: string }).ciphertext);
+    return decryptSetting(row.ciphertext);
   } catch {
     return null;
   }
