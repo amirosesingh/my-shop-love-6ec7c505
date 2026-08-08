@@ -7,7 +7,7 @@ import { probeRelay } from "@/lib/sync-relay";
 import { isDesktop } from "@/lib/branding";
 import { isNative } from "@/lib/native";
 
-type Check = { label: string; ok: boolean; detail: string };
+type Check = { label: string; ok: boolean; warn?: boolean; detail: string };
 
 /** Tells staff, in plain words, whether this till can save to the cloud. */
 export function ConnectionCheck() {
@@ -43,9 +43,13 @@ export function ConnectionCheck() {
     });
 
     const relay = await probeRelay();
+    // A missing key is a server setup task, not a fault with this till, so it
+    // reads as a warning with a clear instruction instead of a red failure.
+    const keyMissing = relay.code === "NO_SERVICE_KEY";
     results.push({
       label: "Server backup route",
       ok: relay.ok,
+      warn: keyMissing,
       detail: relay.ok ? "Writes can go through the server" : (relay.error ?? "Unavailable"),
     });
 
@@ -69,8 +73,13 @@ export function ConnectionCheck() {
       {checks && (
         <ul className="space-y-1 text-xs">
           {checks.map((c) => (
-            <li key={c.label} className={c.ok ? "text-muted-foreground" : "text-destructive"}>
-              {c.ok ? "✓" : "✕"} {c.label} — {c.detail}
+            <li
+              key={c.label}
+              className={
+                c.ok ? "text-muted-foreground" : c.warn ? "text-amber-600" : "text-destructive"
+              }
+            >
+              {c.ok ? "✓" : c.warn ? "!" : "✕"} {c.label} — {c.detail}
             </li>
           ))}
         </ul>
