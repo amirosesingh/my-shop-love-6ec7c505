@@ -5,6 +5,9 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import {
   computeUiScale,
+  REGISTER_ZOOM_DEFAULT,
+  REGISTER_ZOOM_MAX,
+  REGISTER_ZOOM_MIN,
   setUiScalePrefs,
   useUiScalePrefs,
   type UiDensity,
@@ -37,6 +40,7 @@ export function DisplayScalingSettings({ bare = false }: { bare?: boolean }) {
     typeof window === "undefined" ? 1 : computeUiScale(window.innerWidth, window.innerHeight);
   const effective = prefs.mode === "manual" ? prefs.scale : auto;
   const text = prefs.textScale;
+  const registerZoom = prefs.registerZoom;
 
   return (
     <section className={bare ? "" : "rounded-lg border border-border bg-card p-5"}>
