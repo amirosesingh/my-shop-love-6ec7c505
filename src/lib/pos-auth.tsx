@@ -542,14 +542,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (appUser?.role === "staff" ||
       (session.user.user_metadata?.["role"] as string | undefined) === "warehouse");
 
+  // Branch this PC is registered to. A terminal is bound to one store, so
+  // whoever signs in here trades in that branch — a staff member assigned
+  // elsewhere can no longer pull another branch's data from this till.
+  const [terminalStoreId, setTerminalStoreId] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const read = async () => {
+      const { hydrateTerminalConfig, readTerminalConfig } = await import("@/lib/terminal-tokens");
+      const config = readTerminalConfig() ?? (await hydrateTerminalConfig());
+      if (alive) setTerminalStoreId(config?.locationId?.trim() || null);
+    };
+    void read();
+    return () => {
+      alive = false;
+    };
+  }, [user?.staffId]);
+
   const value = useMemo<AuthCtx>(
     () => ({
       ready,
       user,
       isAdmin: user?.role === "admin",
       isSupervisor: user?.metaRole === "supervisor" || user?.role === "admin",
-      // Admins, "All stores" supervisors and all-store warehouse accounts.
-      canSwitchStores: !!user && !user.storeId && (user.role === "admin" || isWarehouse),
+      terminalStoreId,
+      // A registered till is pinned to its own branch for everyone, including
+      // admins. Unbound browsers keep the old rule.
+      canSwitchStores:
+        !terminalStoreId && !!user && !user.storeId && (user.role === "admin" || isWarehouse),
       isCashier:
         !isWarehouse && (user?.metaRole === "cashier" || (!!user && user.role !== "admin")),
       isWarehouse,
@@ -572,6 +592,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ready,
       user,
       userId,
+      terminalStoreId,
       terminalUser,
       appUser,
       isWarehouse,
