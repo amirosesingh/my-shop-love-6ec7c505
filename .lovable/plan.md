@@ -1,34 +1,39 @@
-# Register zoom preference, no stray scrolling, working Android update check
+# Register zoom, Android updates, and clean R2 releases
 
-## 1. Register zoom lives in Display & sizing, defaults to 70%
+## 1. Register page: no stray scrolling, zoom lives in settings
 
-Right now the zoom control floats on the register itself and resets to a "fit to screen" value every time the page is opened, so the till never keeps the size the operator chose.
+- Remove the floating zoom control from the register page; the register canvas clips overflow instead of producing a second scrollbar when content already fits.
+- Move the zoom control to **Settings → Display & sizing**, next to the existing font scaling controls.
+- Default zoom becomes **70%** and is stored with the other display preferences, so it survives reloads, sign-outs, and app restarts instead of resetting each time the register opens.
 
-- Register zoom becomes a saved terminal preference alongside interface size, text size and density, so it survives reopening the page, navigating away and restarting the app.
-- Default is **70%**, applied on a fresh terminal with no saved choice.
-- Settings → Display & text size gains a **Register zoom** row: slider from 25% to 200% in 5% steps, a numeric box, the live percentage, and a "Fit to screen" option that returns to the automatic fit behaviour.
-- The floating +/−/fit bubble is removed from the register canvas; zoom is set from settings only, as requested.
-- Ctrl/Cmd + wheel and touch pinch keep working on the till for a quick look, and what they land on is saved as the new preference rather than lost on reload.
+## 2. Android "Check for update now" fails to fetch
 
-## 2. No unnecessary scrolling on the register
+The phone checks the update feed with the browser fetch API, which the Android webview blocks as a cross-origin request — that is the "Failed to fetch".
 
-Zooming out currently makes the canvas taller than the window (the content is laid out at the inverse size), which leaves a scrollbar even when everything is already visible.
+- Use the native HTTP bridge for the update-feed read and the APK/web-bundle download when running on Android; keep plain fetch on desktop and web.
+- Show the real reason on failure (network vs. feed missing vs. HTTP status) rather than a bare "Failed to fetch".
+- Point the phone at the stable `latest/android/` pointer, keeping the legacy `android/` path as a fallback so already-installed phones keep working.
 
-- The canvas only scrolls when the content genuinely cannot fit — i.e. when zoomed in past the fitting scale. At or below fit it is clipped to the window with no scrollbar.
-- The inner panels (catalogue list, ticket lines) keep their own scrolling, so the page itself no longer double-scrolls.
+## 3. Clean R2 layout — no unwanted folders
 
-## 3. Android "Check for updates now" — Failed to fetch
+Today the desktop workflow uploads the entire build output directory, so `win-unpacked/`, debug files, and other build leftovers land in the bucket alongside the installer.
 
-On Android the app is served from a local `https://localhost` origin, so the browser-level `fetch` to the update host is a cross-origin request and is rejected before it leaves the device — surfacing as the bare "Failed to fetch".
+Target layout under the `updatelccms` bucket:
 
-- Update checks and downloads on the phone go through Capacitor's native HTTP path instead of the WebView fetch, which is not subject to CORS.
-- Applies to the APK check (`latest.json`), the APK download, and the web-bundle manifest check, so background checks and the update banner all work too.
-- Error text becomes meaningful: which step failed and the HTTP status or network reason, instead of "Failed to fetch".
+```text
+pos-app/
+  latest/                       Windows installer + blockmap + latest.yml + release.json
+  latest/android/               APK + latest.json (+ web/ bundle)
+  releases/<tag>-<sha>/         immutable copy of the same files
+```
+
+- Upload an explicit allowlist of files only: `*.exe`, `*.exe.blockmap`, `latest.yml`, `release.json` for Windows; `*.apk`, `latest.json`, web bundle for Android. Nothing else is copied.
+- Drop the duplicated legacy top-level `pos-app/` copy for Windows once `latest/` is in place (the desktop feed already reads `latest/`), and keep the Android legacy path only as the fallback described above.
+- Sync with delete on the `latest/` prefixes so removed files (including previously uploaded `win-unpacked/`) are cleared from the bucket on the next release.
+- Existing stray folders already in R2 get removed by the first run of the cleaned workflow.
 
 ## Technical notes
 
-- `src/lib/use-ui-scale.ts`: add `zoom: number | "fit"` to `UiScalePrefs` (default `0.7`, clamped 0.25–2) with the existing localStorage persistence.
-- `src/components/pos/ZoomCanvas.tsx`: read/write the preference instead of local state; drop the control bar; wrapper becomes `overflow-hidden` unless `scale > fit`; gesture handlers commit through `setUiScalePrefs`.
-- `src/components/pos/DisplayScalingSettings.tsx`: new Register zoom slider + numeric input + "Fit to screen" toggle; "Reset to automatic" resets zoom to 70%.
-- `src/lib/android-updates.ts` and `src/lib/web-bundle-updates.ts`: use `CapacitorHttp` from `@capacitor/core` when `isNative()`, falling back to `fetch` on web/Electron; APK download uses the native request with a base64 response written straight to cache (progress reported per request rather than per chunk).
-- No backend or schema changes.
+- Files touched: `src/routes/register.tsx`, `src/components/pos/ZoomCanvas.tsx`, the display/sizing settings route and its preference store, `src/lib/android-updates.ts`, `src/lib/web-bundle-updates.ts`, `.github/workflows/desktop-release.yml`, `.github/workflows/android-apk.yml`.
+- Android HTTP uses `CapacitorHttp`; downloads stream to app storage as they do now.
+- No database or schema changes.
