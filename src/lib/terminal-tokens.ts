@@ -5,7 +5,11 @@
  * Activation. The till redeems the code once, then keeps checking the token
  * status so management can disconnect a machine remotely.
  */
-import { supabaseExternal } from "@/integrations/supabase/external-client";
+import {
+  createTenantClient,
+  resetExternalClient,
+  supabaseExternal,
+} from "@/integrations/supabase/external-client";
 import {
   ACTIVATION_TTL_MS,
   decryptActivation,
@@ -15,7 +19,11 @@ import {
 } from "./terminal-crypto";
 import { clearDeviceSecret, getDeviceSecret, setDeviceSecret } from "./device-secrets";
 
-import { supabaseConfig } from "./external-supabase-config";
+import {
+  clearTerminalSupabaseOverride,
+  setTerminalSupabaseOverride,
+  supabaseConfig,
+} from "./external-supabase-config";
 
 export type TokenStatus = "active" | "used" | "revoked";
 
@@ -66,6 +74,23 @@ const rpc = (fn: string, args: Record<string, unknown>) =>
     fn,
     args,
   );
+
+/** Same helper against a throwaway client for a tenant we are not paired to. */
+const rpcOn = (client: unknown, fn: string, args: Record<string, unknown>) =>
+  (client as { rpc: (n: string, a: unknown) => PromiseLike<any> }).rpc(fn, args);
+
+/**
+ * Point every later call at the tenant this till was activated against, so a
+ * packaged terminal needs no environment variables of its own.
+ */
+function applyTenantOverride(config: TerminalConfig | null): void {
+  if (config?.supabaseUrl && config?.supabaseKey) {
+    setTerminalSupabaseOverride(config.supabaseUrl, config.supabaseKey);
+  } else {
+    clearTerminalSupabaseOverride();
+  }
+  resetExternalClient();
+}
 
 export type TokenLocation = {
   id: string;
