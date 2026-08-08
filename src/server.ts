@@ -2,6 +2,7 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { setRuntimeEnv } from "./lib/external-supabase-config";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -47,12 +48,17 @@ function isH3SwallowedErrorBody(body: string): boolean {
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      // Cloudflare passes variables and secrets per request, so hand them to
+      // the configuration module before anything tries to reach the database.
+      setRuntimeEnv(env);
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);
     } catch (error) {
       console.error(error);
-      return new Response(renderErrorPage(), {
+      const misconfigured =
+        error instanceof Error && error.name === "SupabaseConfigError" ? error.message : undefined;
+      return new Response(renderErrorPage(misconfigured), {
         status: 500,
         headers: { "content-type": "text/html; charset=utf-8" },
       });
