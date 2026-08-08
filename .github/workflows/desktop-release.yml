@@ -108,6 +108,27 @@ jobs:
           # (win-unpacked/ and friends) on the next run.
           aws s3 sync upload s3://updatelccms/pos-app/latest \
             --endpoint-url "$R2_ENDPOINT" --cache-control "no-cache" --delete
+          # Tills already in the field read the top-level path, so the same
+          # allowlisted files are mirrored there (without --delete, which
+          # would wipe releases/ and latest/).
+          aws s3 sync upload s3://updatelccms/pos-app \
+            --endpoint-url "$R2_ENDPOINT" --cache-control "no-cache"
+
+      - name: Remove build scratch left in the bucket by earlier releases
+        shell: bash
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        run: |
+          if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$R2_ENDPOINT" ]; then exit 0; fi
+          for stray in win-unpacked builder-debug.yml builder-effective-config.yaml .icon-ico .cache; do
+            aws s3 rm "s3://updatelccms/pos-app/$stray" --recursive \
+              --endpoint-url "$R2_ENDPOINT" || true
+            aws s3 rm "s3://updatelccms/pos-app/latest/$stray" --recursive \
+              --endpoint-url "$R2_ENDPOINT" || true
+          done
 
       - name: Attach installer to the GitHub release
         uses: softprops/action-gh-release@v2
