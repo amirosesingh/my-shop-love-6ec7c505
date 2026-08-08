@@ -62,12 +62,12 @@ export const Route = createFileRoute("/api/public/sync")({
         if (!body.ops?.length && !body.read)
           return Response.json({ ok: false, error: "Nothing to do" }, { status: 400 });
 
-        const { verifyRelayCaller, runRelayOp, runRelayRead } = await import(
+        const { verifyRelayCaller, runRelayOp, runRelayRead, hasServiceKey } = await import(
           "@/lib/pos-relay.server"
         );
         // Without the internal key the relay cannot do anything: answer with a
         // readable "temporarily unavailable" instead of a blank server error.
-        if (!process.env["POS_SUPABASE_SERVICE_ROLE_KEY"]) {
+        if (!hasServiceKey()) {
           return Response.json(
             {
               ok: false,
