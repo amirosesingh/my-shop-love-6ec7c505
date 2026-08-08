@@ -15,6 +15,7 @@ import { WindowControls } from "@/components/pos/WindowControls";
 import { SystemStatusPill } from "@/components/pos/SystemStatusPill";
 import { SecurityAlertBell } from "@/components/pos/SecurityAlertBell";
 import { ShiftGuard } from "@/components/pos/ShiftGuard";
+import { PermissionDenied } from "@/components/pos/PermissionGate";
 import { LiveClock } from "@/components/pos/LiveClock";
 import { ThemeToggle } from "@/components/pos/ThemeToggle";
 import { startSyncEngine } from "@/lib/sync-engine";
@@ -103,7 +104,7 @@ function requiredPermission(pathname: string): PermissionFlag | null | "unknown"
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { activeShift, stores, currentStore, setCurrentStore, state, ready: dataReady } = usePos();
-  const { ready, user, isAdmin, canSwitchStores, logout, lock, can } = useAuth();
+  const { ready, user, isAdmin, canSwitchStores, terminalStoreId, logout, lock, can } = useAuth();
   const [collapsed, setCollapsed] = useSidebarCollapsed();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const branding = useBranding();
@@ -142,12 +143,12 @@ export function AppShell({ children }: { children: ReactNode }) {
     setPrintSettings(state.settings.receipt, state.settings.tax);
   }, [state.settings]);
 
-  // Anyone with a single assigned branch is pinned to it — no manual switching.
+  // A registered till fixes the branch for everyone signed in on it; otherwise
+  // an account with a single assigned branch is pinned to that one.
   useEffect(() => {
-    if (user && !canSwitchStores && user.storeId && currentStore.id !== user.storeId) {
-      setCurrentStore(user.storeId);
-    }
-  }, [user, canSwitchStores, currentStore.id, setCurrentStore]);
+    const pinned = terminalStoreId ?? (canSwitchStores ? null : (user?.storeId ?? null));
+    if (user && pinned && currentStore.id !== pinned) setCurrentStore(pinned);
+  }, [user, canSwitchStores, terminalStoreId, currentStore.id, setCurrentStore]);
 
   if (!ready) return null;
   // Desktop tills and Android terminals both have to register before use.
@@ -407,19 +408,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             const allowed =
               required === null ? true : required === "unknown" ? isAdmin : can(required);
             if (allowed) return children;
-            return (
-              <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 p-8 text-center">
-                <Lock className="size-8 text-muted-foreground" />
-                <h1 className="text-lg font-semibold">Access restricted</h1>
-                <p className="max-w-sm text-sm text-muted-foreground">
-                  Your account does not have permission to open this screen. Ask an administrator to
-                  enable it in Staff Management.
-                </p>
-                <Button asChild variant="outline" size="sm">
-                  <Link to="/">Back to the register</Link>
-                </Button>
-              </div>
-            );
+            return <PermissionDenied flag={required === "unknown" ? null : required} />;
           })()}
         </main>
       </div>

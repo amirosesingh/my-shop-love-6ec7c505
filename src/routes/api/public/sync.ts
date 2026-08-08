@@ -39,7 +39,10 @@ const bodySchema = z.object({
   cashierToken: z.string().max(2000).optional(),
   terminalToken: z.string().max(200).optional(),
   accessToken: z.string().max(4000).optional(),
-  ops: z.array(opSchema).min(1).max(50),
+  ops: z.array(opSchema).max(50).optional(),
+  read: z
+    .object({ kind: z.literal("activeShift"), storeId: z.string().min(1).max(64) })
+    .optional(),
 });
 
 export const Route = createFileRoute("/api/public/sync")({
@@ -53,15 +56,29 @@ export const Route = createFileRoute("/api/public/sync")({
           return Response.json({ ok: false, error: "Malformed request" }, { status: 400 });
         }
 
-        const { verifyRelayCaller, runRelayOp } = await import("@/lib/pos-relay.server");
+        if (!body.ops?.length && !body.read)
+          return Response.json({ ok: false, error: "Nothing to do" }, { status: 400 });
+
+        const { verifyRelayCaller, runRelayOp, runRelayRead } = await import(
+          "@/lib/pos-relay.server"
+        );
         try {
           await verifyRelayCaller(body);
         } catch (e) {
           return Response.json({ ok: false, error: (e as Error).message }, { status: 401 });
         }
 
+        if (body.read) {
+          try {
+            const result = await runRelayRead(body.read);
+            return Response.json(result, { status: result.ok ? 200 : 500 });
+          } catch (e) {
+            return Response.json({ ok: false, error: (e as Error).message }, { status: 500 });
+          }
+        }
+
         const results: { ok: boolean; error?: string }[] = [];
-        for (const op of body.ops) {
+        for (const op of body.ops ?? []) {
           try {
             results.push(await runRelayOp(op));
           } catch (e) {
