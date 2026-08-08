@@ -8,7 +8,7 @@
  * fallback for tills that cannot hold a session.
  */
 import { createHmac } from "node:crypto";
-import { EXTERNAL_SUPABASE_URL } from "./external-supabase-config";
+import { supabaseConfig().url } from "./external-supabase-config";
 import { serviceRest, serviceKey } from "./pos-relay.server";
 
 export type TerminalAccount = { email: string; password: string };
@@ -30,7 +30,7 @@ async function adminFetch(path: string, init: RequestInit = {}) {
     ...((init.headers as Record<string, string>) ?? {}),
   };
   if (!key.startsWith("sb_")) headers["Authorization"] = `Bearer ${key}`;
-  return fetch(`${EXTERNAL_SUPABASE_URL}/auth/v1/${path}`, { ...init, headers });
+  return fetch(`${supabaseConfig().url}/auth/v1/${path}`, { ...init, headers });
 }
 
 /**

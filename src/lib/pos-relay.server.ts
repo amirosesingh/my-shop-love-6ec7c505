@@ -8,8 +8,8 @@
  * the write with the service key, which never reaches the browser.
  */
 import {
-  EXTERNAL_SUPABASE_PUBLISHABLE_KEY,
-  EXTERNAL_SUPABASE_URL,
+  supabaseConfig().key,
+  supabaseConfig().url,
 } from "./external-supabase-config";
 
 export type RelayOp =
@@ -125,7 +125,7 @@ export async function serviceRest(
 ): Promise<Response> {
   const headers = { ...serviceHeaders(), ...((init.headers as Record<string, string>) ?? {}) };
   if (init.prefer) headers["Prefer"] = init.prefer;
-  return fetch(`${EXTERNAL_SUPABASE_URL}/rest/v1/${path}`, { ...init, headers });
+  return fetch(`${supabaseConfig().url}/rest/v1/${path}`, { ...init, headers });
 }
 
 const encodeValue = (value: unknown) =>
@@ -216,9 +216,9 @@ export async function verifyRelayCaller(input: {
   }
 
   if (input.accessToken) {
-    const res = await fetch(`${EXTERNAL_SUPABASE_URL}/auth/v1/user`, {
+    const res = await fetch(`${supabaseConfig().url}/auth/v1/user`, {
       headers: {
-        apikey: EXTERNAL_SUPABASE_PUBLISHABLE_KEY,
+        apikey: supabaseConfig().key,
         Authorization: `Bearer ${input.accessToken}`,
       },
     });

@@ -14,15 +14,15 @@ const input = z.object({
 export const issueCashierSession = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => input.parse(data))
   .handler(async ({ data }) => {
-    const { EXTERNAL_SUPABASE_PUBLISHABLE_KEY, EXTERNAL_SUPABASE_URL } = await import(
+    const { supabaseConfig().key, supabaseConfig().url } = await import(
       "./external-supabase-config"
     );
     const { signCashierSession } = await import("./pos-session.server");
     try {
-      const res = await fetch(`${EXTERNAL_SUPABASE_URL}/rest/v1/rpc/verify_cashier_pin`, {
+      const res = await fetch(`${supabaseConfig().url}/rest/v1/rpc/verify_cashier_pin`, {
         method: "POST",
         headers: {
-          apikey: EXTERNAL_SUPABASE_PUBLISHABLE_KEY,
+          apikey: supabaseConfig().key,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({

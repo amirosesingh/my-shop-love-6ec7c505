@@ -9,8 +9,8 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
 import {
-  EXTERNAL_SUPABASE_PUBLISHABLE_KEY,
-  EXTERNAL_SUPABASE_URL,
+  supabaseConfig().key,
+  supabaseConfig().url,
 } from "./external-supabase-config";
 import { DEFAULT_POS_RULES, normalizeRules, type PosRules } from "./pos-rules";
 
@@ -52,7 +52,7 @@ export function verifyOverrideGrant(token: string | undefined, action: string): 
 
 function headers(accessToken?: string): Record<string, string> {
   return {
-    apikey: EXTERNAL_SUPABASE_PUBLISHABLE_KEY,
+    apikey: supabaseConfig().key,
     "Content-Type": "application/json",
     ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
   };
@@ -70,7 +70,7 @@ export async function rpc<T>(name: string, body: unknown, accessToken?: string):
   const payload = JSON.stringify(body ?? {});
   let res: Response;
   if (accessToken) {
-    res = await fetch(`${EXTERNAL_SUPABASE_URL}/rest/v1/rpc/${name}`, {
+    res = await fetch(`${supabaseConfig().url}/rest/v1/rpc/${name}`, {
       method: "POST",
       headers: headers(accessToken),
       body: payload,
@@ -114,7 +114,7 @@ export async function saveRules(
     // No service key on this deployment: fall back to the supervisor's own
     // session, which the routine accepts.
     const body = { _store_id: storeId || "", _patch: patch };
-    const res = await fetch(`${EXTERNAL_SUPABASE_URL}/rest/v1/rpc/pos_rules_save`, {
+    const res = await fetch(`${supabaseConfig().url}/rest/v1/rpc/pos_rules_save`, {
       method: "POST",
       headers: headers(accessToken),
       body: JSON.stringify(body),
