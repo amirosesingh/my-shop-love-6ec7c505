@@ -63,8 +63,11 @@ ALTER TABLE public.cashiers ADD COLUMN IF NOT EXISTS is_active boolean DEFAULT t
 ALTER TABLE public.cashiers ADD COLUMN IF NOT EXISTS last_login_at timestamp with time zone;
 ALTER TABLE public.cashiers ADD COLUMN IF NOT EXISTS created_at timestamp with time zone DEFAULT now();
 ALTER TABLE public.cashiers ADD COLUMN IF NOT EXISTS updated_at timestamp with time zone DEFAULT now();
--- A legacy branch column is left alone if present; the app never reads it.
-ALTER TABLE public.cashiers ALTER COLUMN store_id DROP NOT NULL;
+-- A legacy branch column is left in place if present; the app never reads it,
+-- so it only needs to stop blocking new rows.
+DO $$ BEGIN
+  ALTER TABLE public.cashiers ALTER COLUMN store_id DROP NOT NULL;
+EXCEPTION WHEN others THEN NULL; END $$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS cashiers_username_key ON public.cashiers USING btree (lower(username));
 
