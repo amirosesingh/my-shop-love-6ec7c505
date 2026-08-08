@@ -169,7 +169,7 @@ function StaffManagement() {
         full_name: c.full_name,
         email: "",
         role: "cashier" as StaffRole,
-        store_id: c.store_id,
+        store_id: null,
         is_active: c.is_active,
         last_login_at: c.last_login_at,
         permissions: c.permissions as unknown as Record<string, boolean>,
@@ -211,7 +211,6 @@ function StaffManagement() {
           id: row.id,
           username: row.user_id,
           fullName: row.full_name,
-          storeId: row.store_id,
           isActive: row.is_active,
         });
         toast.success("Profile saved");
@@ -298,7 +297,6 @@ function StaffManagement() {
             username,
             fullName: form.full_name.trim() || username,
             pin: form.pin,
-            storeId: formStoreId(form.store_id),
             isActive: true,
           });
         } catch (e) {
@@ -376,7 +374,6 @@ function StaffManagement() {
           username: row.user_id,
           fullName: row.full_name,
           pin: passwordReset,
-          storeId: row.store_id,
           isActive: row.is_active,
         });
         setPasswordReset("");
@@ -490,7 +487,6 @@ function StaffManagement() {
           username,
           fullName: row.full_name || username,
           pin: creds.pin,
-          storeId: row.store_id,
           isActive: row.is_active,
         });
         await setCashierPermissions(cashierId, permissions);
