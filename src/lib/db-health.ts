@@ -31,6 +31,34 @@ export type DbHealthReport = {
   tables: TableProbe[];
 };
 
+/** Tables that must carry a branch id on every row. */
+export const BRANCH_TABLES: { table: string; label: string; column: string }[] = [
+  { table: "sales", label: "Sales", column: "store_id" },
+  { table: "shifts", label: "Shifts", column: "store_id" },
+  { table: "shift_sessions", label: "Shift sign-ins", column: "store_id" },
+  { table: "held_orders", label: "Held bills", column: "store_id" },
+  { table: "bookings", label: "Bookings", column: "store_id" },
+  { table: "drawer_events", label: "Drawer events", column: "store_id" },
+  { table: "stock_adjustments", label: "Stock adjustments", column: "store_id" },
+  { table: "sku_audit", label: "SKU changes", column: "store_id" },
+  { table: "issued_vouchers", label: "Issued vouchers", column: "store_id" },
+];
+
+export type BranchCoverage = {
+  table: string;
+  label: string;
+  total: number | null;
+  missing: number | null;
+  error: string | null;
+};
+
+export type RecentRows = {
+  table: string;
+  label: string;
+  rows: Record<string, unknown>[];
+  error: string | null;
+};
+
 /** Core tables the POS cannot work without. */
 export const CORE_TABLES: { table: string; label: string; writable: boolean }[] = [
   { table: "products", label: "Products", writable: true },
@@ -69,6 +97,71 @@ type Loose = {
 
 const from = (table: string) =>
   (supabaseExternal as unknown as { from: (t: string) => Loose }).from(table);
+
+type AnyQuery = {
+  from: (t: string) => {
+    select: (cols: string, opts?: Record<string, unknown>) => any;
+  };
+};
+const anyFrom = (table: string) => (supabaseExternal as unknown as AnyQuery).from(table);
+
+/** How many rows in each branch-scoped table have no branch id. */
+export async function runBranchCoverage(): Promise<BranchCoverage[]> {
+  const out: BranchCoverage[] = [];
+  for (const entry of BRANCH_TABLES) {
+    const row: BranchCoverage = {
+      table: entry.table,
+      label: entry.label,
+      total: null,
+      missing: null,
+      error: null,
+    };
+    try {
+      const total = await anyFrom(entry.table).select("*", { count: "exact", head: true });
+      if (total.error) throw total.error;
+      row.total = total.count ?? 0;
+
+      const blank = await anyFrom(entry.table)
+        .select("*", { count: "exact", head: true })
+        .or(`${entry.column}.is.null,${entry.column}.eq.`);
+      if (blank.error) throw blank.error;
+      row.missing = blank.count ?? 0;
+    } catch (e) {
+      row.error = explainError(e as { message: string; code?: string });
+    }
+    out.push(row);
+  }
+  return out;
+}
+
+/** The newest rows the till actually wrote, for eyeballing the real data. */
+export async function loadRecentRows(
+  table: string,
+  columns: string,
+  limit = 10,
+): Promise<RecentRows> {
+  const label = [...CORE_TABLES, ...BRANCH_TABLES].find((t) => t.table === table)?.label ?? table;
+  try {
+    const res = await anyFrom(table)
+      .select(columns)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    if (res.error) throw res.error;
+    return { table, label, rows: (res.data ?? []) as Record<string, unknown>[], error: null };
+  } catch (e) {
+    return { table, label, rows: [], error: explainError(e as { message: string; code?: string }) };
+  }
+}
+
+/** Operational tables shown in the data inspector. */
+export const INSPECTOR_TABLES: { table: string; label: string; columns: string }[] = [
+  { table: "sales", label: "Sales", columns: "bill_number, store_id, cashier_name, total_amount, payment_type, created_at" },
+  { table: "shifts", label: "Shifts", columns: "store_id, terminal_name, opened_by_name, status, opened_at, closed_at" },
+  { table: "shift_sessions", label: "Shift sign-ins", columns: "store_id, staff_name, role, signed_in_at, signed_out_at" },
+  { table: "drawer_events", label: "Drawer events", columns: "store_id, staff_name, reason, created_at" },
+  { table: "held_orders", label: "Held bills", columns: "id, store_id, label, total, held_by, held_at" },
+  { table: "audit_logs", label: "Activity log", columns: "user_name, action_category, action_name, target_module, created_at" },
+];
 
 /** Turn a database error into something a shop owner can act on. */
 export function explainError(error: { message: string; code?: string }): string {
