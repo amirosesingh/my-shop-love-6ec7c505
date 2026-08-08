@@ -1,7 +1,4 @@
-import {
-  EXTERNAL_SUPABASE_PUBLISHABLE_KEY,
-  EXTERNAL_SUPABASE_URL,
-} from "./external-supabase-config";
+import { supabaseConfig } from "./external-supabase-config";
 import { decryptSetting, encryptSetting, maskSetting } from "./settings-crypto.server";
 
 export type SecureSettingKey =
@@ -37,16 +34,16 @@ export async function verifyPosStaff(accessToken: string): Promise<{
   isAdmin: boolean;
 }> {
   const headers = {
-    apikey: EXTERNAL_SUPABASE_PUBLISHABLE_KEY,
+    apikey: supabaseConfig().key,
     Authorization: `Bearer ${accessToken}`,
     "Content-Type": "application/json",
   };
 
-  const userRes = await fetch(`${EXTERNAL_SUPABASE_URL}/auth/v1/user`, { headers });
+  const userRes = await fetch(`${supabaseConfig().url}/auth/v1/user`, { headers });
   if (!userRes.ok) throw new Error("Not signed in");
   const user = (await userRes.json()) as { id: string };
 
-  const rpc = await fetch(`${EXTERNAL_SUPABASE_URL}/rest/v1/rpc/current_app_user`, {
+  const rpc = await fetch(`${supabaseConfig().url}/rest/v1/rpc/current_app_user`, {
     method: "POST",
     headers,
     body: "{}",

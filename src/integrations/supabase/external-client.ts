@@ -2,14 +2,7 @@
 // Publishable keys are safe to ship in client code.
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
-
-const SUPABASE_URL =
-  (import.meta.env['VITE_SUPABASE_EXTERNAL_URL'] as string | undefined) ??
-  'https://qhrufhtbeguxydenzfey.supabase.co';
-
-const SUPABASE_PUBLISHABLE_KEY =
-  (import.meta.env['VITE_SUPABASE_EXTERNAL_PUBLISHABLE_KEY'] as string | undefined) ??
-  'sb_publishable_QwVvttLzDle_xTwP3L7Dyg_A6XM-cC-';
+import { supabaseConfig } from '@/lib/external-supabase-config';
 
 function isNewSupabaseApiKey(value: string): boolean {
   return value.startsWith('sb_publishable_') || value.startsWith('sb_secret_');
@@ -17,6 +10,7 @@ function isNewSupabaseApiKey(value: string): boolean {
 
 // New-format keys are opaque strings, not bearer JWTs — send them as `apikey` only.
 const supabaseFetch: typeof fetch = (input, init) => {
+  const SUPABASE_PUBLISHABLE_KEY = supabaseConfig().key;
   const requestHeaders =
     typeof Request !== 'undefined' && input instanceof Request ? input.headers : undefined;
   const headers = new Headers(requestHeaders);
@@ -37,7 +31,8 @@ const supabaseFetch: typeof fetch = (input, init) => {
 };
 
 function createExternalClient() {
-  return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  const { url, key } = supabaseConfig();
+  return createClient<Database>(url, key, {
     global: { fetch: supabaseFetch },
     auth: {
       storage: typeof window !== 'undefined' ? localStorage : undefined,

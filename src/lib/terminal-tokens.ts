@@ -9,13 +9,7 @@ import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { decryptActivation, encryptActivation, type ActivationPayload } from "./terminal-crypto";
 import { clearDeviceSecret, getDeviceSecret, setDeviceSecret } from "./device-secrets";
 
-export const POS_SUPABASE_URL =
-  (import.meta.env["VITE_SUPABASE_EXTERNAL_URL"] as string | undefined) ??
-  "https://qhrufhtbeguxydenzfey.supabase.co";
-
-export const POS_SUPABASE_KEY =
-  (import.meta.env["VITE_SUPABASE_EXTERNAL_PUBLISHABLE_KEY"] as string | undefined) ??
-  "sb_publishable_QwVvttLzDle_xTwP3L7Dyg_A6XM-cC-";
+import { supabaseConfig } from "./external-supabase-config";
 
 export type TokenStatus = "active" | "used" | "revoked";
 
@@ -174,8 +168,8 @@ export async function issueTerminalToken(input: {
     token_id: id,
     location_id: input.location.id,
     location_name: input.locationName,
-    supabase_url: POS_SUPABASE_URL,
-    supabase_key: POS_SUPABASE_KEY,
+    supabase_url: supabaseConfig().url,
+    supabase_key: supabaseConfig().key,
   };
   return { token: rowToToken(row), code: await encryptActivation(payload) };
 }
@@ -218,8 +212,8 @@ export async function reissueTerminalToken(
     token_id: id,
     location_id: token.locationId ?? "",
     location_name: token.locationName,
-    supabase_url: POS_SUPABASE_URL,
-    supabase_key: POS_SUPABASE_KEY,
+    supabase_url: supabaseConfig().url,
+    supabase_key: supabaseConfig().key,
   };
   return { token: rowToToken(row), code: await encryptActivation(payload) };
 }
@@ -606,8 +600,8 @@ export async function activateWithTokenId(tokenId: string): Promise<TerminalConf
     tokenId,
     locationId: remote.locationId,
     locationName: remote.locationName,
-    supabaseUrl: POS_SUPABASE_URL,
-    supabaseKey: POS_SUPABASE_KEY,
+    supabaseUrl: supabaseConfig().url,
+    supabaseKey: supabaseConfig().key,
     activatedAt: new Date().toISOString(),
   };
   writeTerminalConfig(config);

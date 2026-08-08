@@ -7,7 +7,7 @@
  * but no row is ever changed.
  */
 import { supabaseExternal } from "@/integrations/supabase/external-client";
-import { EXTERNAL_SUPABASE_URL } from "./external-supabase-config";
+import { supabaseConfig } from "./external-supabase-config";
 import { canRelay, hasStaffSession, probeRelay } from "./sync-relay";
 import { readTerminalConfig } from "./terminal-tokens";
 
@@ -246,7 +246,7 @@ export async function runDbHealth(): Promise<DbHealthReport> {
     {
       label: "Database in use",
       ok: true,
-      detail: EXTERNAL_SUPABASE_URL,
+      detail: supabaseConfig().url,
     },
     {
       label: "Signed in",
