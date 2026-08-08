@@ -51,15 +51,33 @@ export const RELAY_TABLES = new Set([
   "stores",
 ]);
 
+/**
+ * Names the service key may be bound under. Deployments have historically used
+ * more than one, so the first one present wins rather than failing outright.
+ */
+const SERVICE_KEY_NAMES = [
+  "POS_SUPABASE_SERVICE_ROLE_KEY",
+  "POS_SERVICE_ROLE_KEY",
+] as const;
+
+/** Read the key at call time: some runtimes inject env per request. */
+function readServiceKey(): string | undefined {
+  for (const name of SERVICE_KEY_NAMES) {
+    const value = process.env[name];
+    if (value) return value;
+  }
+  return undefined;
+}
+
 export function serviceKey(): string {
-  const key = process.env["POS_SUPABASE_SERVICE_ROLE_KEY"];
+  const key = readServiceKey();
   if (!key) throw new Error("The central database service key is not configured");
   return key;
 }
 
 /** Whether this deployment can talk to the central database at all. */
 export function hasServiceKey(): boolean {
-  return Boolean(process.env["POS_SUPABASE_SERVICE_ROLE_KEY"]);
+  return Boolean(readServiceKey());
 }
 
 /**
