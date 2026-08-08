@@ -104,7 +104,7 @@ function requiredPermission(pathname: string): PermissionFlag | null | "unknown"
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { activeShift, stores, currentStore, setCurrentStore, state, ready: dataReady } = usePos();
-  const { ready, user, isAdmin, canSwitchStores, logout, lock, can } = useAuth();
+  const { ready, user, isAdmin, canSwitchStores, terminalStoreId, logout, lock, can } = useAuth();
   const [collapsed, setCollapsed] = useSidebarCollapsed();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const branding = useBranding();
@@ -143,12 +143,12 @@ export function AppShell({ children }: { children: ReactNode }) {
     setPrintSettings(state.settings.receipt, state.settings.tax);
   }, [state.settings]);
 
-  // Anyone with a single assigned branch is pinned to it — no manual switching.
+  // A registered till fixes the branch for everyone signed in on it; otherwise
+  // an account with a single assigned branch is pinned to that one.
   useEffect(() => {
-    if (user && !canSwitchStores && user.storeId && currentStore.id !== user.storeId) {
-      setCurrentStore(user.storeId);
-    }
-  }, [user, canSwitchStores, currentStore.id, setCurrentStore]);
+    const pinned = terminalStoreId ?? (canSwitchStores ? null : (user?.storeId ?? null));
+    if (user && pinned && currentStore.id !== pinned) setCurrentStore(pinned);
+  }, [user, canSwitchStores, terminalStoreId, currentStore.id, setCurrentStore]);
 
   if (!ready) return null;
   // Desktop tills and Android terminals both have to register before use.
