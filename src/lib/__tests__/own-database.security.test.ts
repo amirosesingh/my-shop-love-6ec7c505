@@ -29,11 +29,26 @@ function walk(dir: string): string[] {
   });
 }
 
+const HARDCODED = [
+  // A project endpoint or publishable key must never be baked into source.
+  /https:\/\/[a-z0-9-]+\.supabase\.co/,
+  /sb_publishable_[A-Za-z0-9_-]{10,}/,
+  /sb_secret_[A-Za-z0-9_-]{10,}/,
+];
+
 describe("database ownership", () => {
   it("no application file imports the Lovable-managed database client", () => {
     const offenders = walk(ROOT).filter((file) => {
       const source = readFileSync(file, "utf8");
       return FORBIDDEN.some((pattern) => pattern.test(source));
+    });
+    expect(offenders).toEqual([]);
+  });
+
+  it("no source file hardcodes a Supabase project URL or key", () => {
+    const offenders = walk(ROOT).filter((file) => {
+      const source = readFileSync(file, "utf8");
+      return HARDCODED.some((pattern) => pattern.test(source));
     });
     expect(offenders).toEqual([]);
   });
