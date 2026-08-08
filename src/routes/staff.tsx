@@ -697,27 +697,32 @@ function StaffManagement() {
                       </div>
                     </>
                   )}
-                  <div className="space-y-1">
-                    <Label>Assigned store</Label>
-                    <Select
-                      value={form.store_id}
-                      onValueChange={(v) => setForm({ ...form, store_id: v })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select store" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {form.role !== "cashier" && (
+                  {form.role === "cashier" ? (
+                    <p className="text-xs text-muted-foreground">
+                      Cashiers are not assigned to a branch — they trade in the branch of the
+                      till they sign in on.
+                    </p>
+                  ) : (
+                    <div className="space-y-1">
+                      <Label>Assigned store</Label>
+                      <Select
+                        value={form.store_id}
+                        onValueChange={(v) => setForm({ ...form, store_id: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select store" />
+                        </SelectTrigger>
+                        <SelectContent>
                           <SelectItem value="none">All stores</SelectItem>
-                        )}
-                        {stores.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
-                            {s.code} · {s.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                          {stores.map((s) => (
+                            <SelectItem key={s.id} value={s.id}>
+                              {s.code} · {s.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
                 <DialogFooter>
                   <Button onClick={() => void createUser()} disabled={creating}>
@@ -869,27 +874,36 @@ function StaffManagement() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="space-y-1">
-                      <Label>Assigned store</Label>
-                      <Select
-                        value={selected.store_id ?? "none"}
-                        onValueChange={(v) =>
-                          patchRow(selected.user_id, { store_id: v === "none" ? null : v })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">All stores</SelectItem>
-                          {stores.map((s) => (
-                            <SelectItem key={s.id} value={s.id}>
-                              {s.code} · {s.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    {selected.kind === "cashier" ? (
+                      <div className="space-y-1">
+                        <Label>Assigned store</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Set by the till this cashier signs in on.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <Label>Assigned store</Label>
+                        <Select
+                          value={selected.store_id ?? "none"}
+                          onValueChange={(v) =>
+                            patchRow(selected.user_id, { store_id: v === "none" ? null : v })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">All stores</SelectItem>
+                            {stores.map((s) => (
+                              <SelectItem key={s.id} value={s.id}>
+                                {s.code} · {s.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                     <div className="flex items-end gap-3">
                       <label className="flex items-center gap-2 text-sm">
                         <Switch
