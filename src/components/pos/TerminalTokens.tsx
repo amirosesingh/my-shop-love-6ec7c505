@@ -139,6 +139,41 @@ export function TerminalTokens({
   }, [stores]);
 
   const qr = useMemo(() => (code ? qrDataUrl(code) : ""), [code]);
+
+  // Live 15-minute countdown for the freshly issued code.
+  const msLeft = codeIssuedAt ? Math.max(0, codeIssuedAt + ACTIVATION_TTL_MS - now) : 0;
+  const expired = Boolean(code) && !claimed && msLeft <= 0;
+  const countdown = `${Math.floor(msLeft / 60000)}:${String(Math.floor((msLeft % 60000) / 1000)).padStart(2, "0")}`;
+
+  useEffect(() => {
+    if (!code || claimed) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [code, claimed]);
+
+  // Watch the issued token until a till redeems it, then celebrate and reload.
+  useEffect(() => {
+    if (!codeTokenId || claimed || expired) return;
+    let stopped = false;
+    const check = async () => {
+      try {
+        const remote = await fetchTokenStatus(codeTokenId);
+        if (!remote || stopped) return;
+        if (remote.isClaimed || remote.status === "used") {
+          setClaimed(true);
+          toast.success("Terminal Activated Successfully!");
+          await refresh();
+        }
+      } catch {
+        /* transient — the next tick tries again */
+      }
+    };
+    const timer = window.setInterval(() => void check(), 3000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [codeTokenId, claimed, expired, refresh]);
   const reissueQr = useMemo(
     () => (reissued ? qrDataUrl(reissued.code) : ""),
     [reissued],
