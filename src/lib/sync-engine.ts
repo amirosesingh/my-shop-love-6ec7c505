@@ -136,6 +136,18 @@ async function execute(op: SyncOp): Promise<QueryResult> {
 }
 
 async function runOne(entry: QueuedOp): Promise<boolean> {
+  // This account has already been refused on this table — go straight to the
+  // relay instead of triggering another refused request.
+  if (refusedTables.has(entry.op.table) && canRelay()) {
+    const relayed = await viaRelay(entry.context, entry.op);
+    if (relayed.ok) {
+      resolveOp(entry.id);
+      return true;
+    }
+    failOp(entry.id, relayed.error ?? "The server could not save this change");
+    return false;
+  }
+
   let res = await execute(entry.op);
   // PGRST204 = column missing from the schema cache. Older databases simply do
   // not have the newer columns yet, so drop whichever column the error names
@@ -159,14 +171,18 @@ async function runOne(entry: QueuedOp): Promise<boolean> {
     // rules refuse the write. Send the very same operation through the server
     // relay, which proves the till and writes on its behalf.
     if (isPermissionError(res.error) && canRelay()) {
-      const relayed = await relayOp(entry.op);
+      refusedTables.add(entry.op.table);
+      const relayed = await viaRelay(entry.context, entry.op);
       if (relayed.ok) {
         resolveOp(entry.id);
-        logSync("push", entry.op.table, true, `${entry.context} (via server)`);
         return true;
       }
-      failOp(entry.id, relayed.error ?? "The server could not save this change");
-      logSync("push", entry.op.table, false, `${entry.context}: ${relayed.error ?? "relay failed"}`);
+      failOp(
+        entry.id,
+        relayed.error
+          ? `The central database refused this change and the server relay could not save it either: ${relayed.error}`
+          : "The server could not save this change",
+      );
       return false;
     }
     const message = describeError(entry.op.table, res.error);
@@ -184,6 +200,12 @@ async function runOne(entry: QueuedOp): Promise<boolean> {
  * report the result. Nothing is stored or retried on the device.
  */
 export async function runOpLive(context: string, op: SyncOp): Promise<void> {
+  if (refusedTables.has(op.table) && canRelay()) {
+    const relayed = await viaRelay(context, op);
+    if (relayed.ok) return;
+    throw new Error(relayed.error ?? "The server could not save this change");
+  }
+
   let res = await execute(op);
   if ((op.kind === "upsert" || op.kind === "insert") && res.error?.code === "PGRST204") {
     const named = missingColumn(res.error.message);
@@ -192,13 +214,14 @@ export async function runOpLive(context: string, op: SyncOp): Promise<void> {
   }
   if (res.error) {
     if (isPermissionError(res.error) && canRelay()) {
-      const relayed = await relayOp(op);
-      if (relayed.ok) {
-        logSync("push", op.table, true, `${context} (via server)`);
-        return;
-      }
-      logSync("push", op.table, false, `${context}: ${relayed.error ?? "relay failed"}`);
-      throw new Error(relayed.error ?? "The server could not save this change");
+      refusedTables.add(op.table);
+      const relayed = await viaRelay(context, op);
+      if (relayed.ok) return;
+      throw new Error(
+        relayed.error
+          ? `The central database refused this change and the server relay could not save it either: ${relayed.error}`
+          : "The server could not save this change",
+      );
     }
     const message = describeError(op.table, res.error);
     logSync("push", op.table, false, `${context}: ${message}`);
