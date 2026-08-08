@@ -156,6 +156,8 @@ type AuthCtx = {
   /** Branch this PC is registered to. When set, every account signed in here
    *  trades in this branch — the staff record's own store never applies. */
   terminalStoreId: string | null;
+  /** Human name of the branch this PC is registered to, for lock messages. */
+  terminalStoreName: string | null;
   /** cashier accounts are limited to the POS terminal */
   isCashier: boolean;
   /** warehouse account — stock/receiving user driven purely by its toggles */
@@ -546,12 +548,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // whoever signs in here trades in that branch — a staff member assigned
   // elsewhere can no longer pull another branch's data from this till.
   const [terminalStoreId, setTerminalStoreId] = useState<string | null>(null);
+  const [terminalStoreName, setTerminalStoreName] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
     const read = async () => {
       const { hydrateTerminalConfig, readTerminalConfig } = await import("@/lib/terminal-tokens");
       const config = readTerminalConfig() ?? (await hydrateTerminalConfig());
-      if (alive) setTerminalStoreId(config?.locationId?.trim() || null);
+      if (!alive) return;
+      setTerminalStoreId(config?.locationId?.trim() || null);
+      setTerminalStoreName(config?.locationName?.trim() || null);
     };
     void read();
     return () => {
@@ -566,6 +571,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAdmin: user?.role === "admin",
       isSupervisor: user?.metaRole === "supervisor" || user?.role === "admin",
       terminalStoreId,
+      terminalStoreName,
       // A registered till is pinned to its own branch for everyone, including
       // admins. Unbound browsers keep the old rule.
       canSwitchStores:
@@ -593,6 +599,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       userId,
       terminalStoreId,
+      terminalStoreName,
       terminalUser,
       appUser,
       isWarehouse,

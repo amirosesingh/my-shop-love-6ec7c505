@@ -56,12 +56,27 @@ export const getPosRules = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => callerInput.parse(data))
   .handler(async ({ data }) => {
     const { loadRules } = await import("./pos-rules.server");
+    // Reading rules must never fail before sign-in: an unauthenticated caller
+    // gets the global defaults chain (global row, then built-in defaults).
+    if (!data.accessToken && !data.terminalToken) {
+      return { ok: true as const, anonymous: true as const, rules: await loadRules("") };
+    }
     try {
       await assertCaller(data);
-      return { ok: true as const, rules: await loadRules(data.storeId ?? "") };
+      return {
+        ok: true as const,
+        anonymous: false as const,
+        rules: await loadRules(data.storeId ?? ""),
+      };
     } catch (e) {
-      const { DEFAULT_POS_RULES } = await import("./pos-rules");
-      return { ok: false as const, error: (e as Error).message, rules: DEFAULT_POS_RULES };
+      // A partially initialised session falls back to the branch/global chain
+      // instead of raising into the UI.
+      return {
+        ok: false as const,
+        anonymous: true as const,
+        error: (e as Error).message,
+        rules: await loadRules(""),
+      };
     }
   });
 

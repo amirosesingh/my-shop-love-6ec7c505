@@ -35,9 +35,14 @@ export function PosRulesProvider({
     refetchOnWindowFocus: true,
     queryFn: async () => {
       const auth = await getPosCallerAuth();
-      if (!auth.accessToken && !auth.terminalToken) return DEFAULT_POS_RULES;
-      const res = await getPosRules({ data: { ...auth, storeId: storeId ?? "" } });
-      return res.rules as PosRules;
+      // Works signed in or not: without credentials the server answers with
+      // the global defaults rather than an error.
+      try {
+        const res = await getPosRules({ data: { ...auth, storeId: storeId ?? "" } });
+        return res.rules as PosRules;
+      } catch {
+        return DEFAULT_POS_RULES;
+      }
     },
   });
 

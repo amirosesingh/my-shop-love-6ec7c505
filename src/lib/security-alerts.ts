@@ -97,3 +97,23 @@ export async function runSecuritySelfCheck(): Promise<{ new: number; resolved: n
   const out = (data ?? {}) as Record<string, number>;
   return { new: Number(out["new"] ?? 0), resolved: Number(out["resolved"] ?? 0) };
 }
+
+/**
+ * Live view of the posture: re-runs the diagnostic first, so anything that no
+ * longer holds is closed automatically and only active issues come back.
+ */
+export async function assessSecurityFindings(
+  includeResolved = false,
+): Promise<{ findings: SecurityFinding[]; checkedAt: string; retested: boolean }> {
+  let retested = true;
+  try {
+    await runSecuritySelfCheck();
+  } catch {
+    retested = false;
+  }
+  return {
+    findings: await listSecurityFindings(includeResolved),
+    checkedAt: new Date().toISOString(),
+    retested,
+  };
+}

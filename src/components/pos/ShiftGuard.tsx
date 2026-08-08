@@ -27,13 +27,17 @@ import { permissionMessage } from "@/components/pos/PermissionGate";
  */
 export function ShiftGuard({ children }: { children: ReactNode }) {
   const { activeShift, openShift, currentStore, shiftReadError } = usePos();
-  const { user, lock, can } = useAuth();
+  const { user, lock, can, terminalStoreName } = useAuth();
   const [cashier, setCashier] = useState(user?.name ?? "Cashier");
   const [float, setFloat] = useState("150");
   const [opening, setOpening] = useState(false);
 
   const bypass = can("can_bypass_shift_lock");
   const mayOpen = can("can_open_shift");
+  // Never hardcode a branch: the terminal's registered branch wins, then the
+  // active store, then a neutral phrase while the store list is still loading.
+  const branchLabel =
+    terminalStoreName?.trim() || currentStore?.name?.trim() || "this terminal";
 
   if (activeShift) {
     const opened = new Date(activeShift.openedAt);
@@ -62,7 +66,7 @@ export function ShiftGuard({ children }: { children: ReactNode }) {
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-warning/30 bg-warning/10 px-4 py-1.5 text-[11px] text-warning-foreground">
           <Lock className="size-3" />
-          <span className="font-semibold">No shift open at {currentStore.name}</span>
+          <span className="font-semibold">No shift open at {branchLabel}</span>
           <span>Your account can use the terminal without one.</span>
         </div>
         <div className="flex min-h-0 flex-1">{children}</div>
@@ -89,7 +93,7 @@ export function ShiftGuard({ children }: { children: ReactNode }) {
           </div>
           <h1 className="text-lg font-semibold">Terminal locked</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            No shift is open for {currentStore.name}.{" "}
+            No shift is open for {branchLabel}.{" "}
             {mayOpen
               ? "Enter the opening cash float to start trading on this terminal."
               : permissionMessage("can_open_shift")}

@@ -508,9 +508,15 @@ export function PosProvider({ children }: { children: ReactNode }) {
   const openShift = useCallback(
     async (cashier: string, openingFloat: number) => {
       const terminal = readTerminalConfig();
+      // The branch follows the terminal, never the staff record.
+      const bound = terminal?.locationId?.trim() ?? "";
+      const storeId =
+        bound && stateRef.current.stores.some((s) => s.id === bound)
+          ? bound
+          : stateRef.current.currentStoreId;
       const shift: Shift = {
         id: crypto.randomUUID(),
-        storeId: stateRef.current.currentStoreId,
+        storeId,
         cashier,
         openedAt: new Date().toISOString(),
         closedAt: null,
@@ -531,7 +537,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       logger.log("sale_event", "Shift opened", "shifts", {
         cashier,
         openingFloat,
-        storeId: stateRef.current.currentStoreId,
+        storeId,
         terminal: terminal?.locationName ?? "This PC",
       });
       setState((s) => ({ ...s, shifts: [shift, ...s.shifts] }));
@@ -539,6 +545,11 @@ export function PosProvider({ children }: { children: ReactNode }) {
       setShiftReadError(null);
       setDbShift(shift);
       setShiftChecked(true);
+      // The lock screen keys off the store in view — make sure it is the
+      // terminal's branch so the guard clears the instant the shift is stored.
+      if (storeId !== stateRef.current.currentStoreId) {
+        setState((s) => ({ ...s, currentStoreId: storeId }));
+      }
     },
     [user, terminalUser, authUserId],
   );
