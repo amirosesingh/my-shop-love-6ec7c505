@@ -49,6 +49,28 @@ Server-only runtime values go to the Worker, not the repo:
 bunx wrangler secret put SECURITY_ALERT_INGEST_SECRET
 ```
 
+### Worker variables and secrets (and why they used to disappear)
+
+`wrangler deploy` replaces the Worker's entire variable set with whatever the
+config file declares, so anything typed into the dashboard was wiped on the
+next deploy. `wrangler.jsonc` now sets `"keep_vars": true`, which keeps
+dashboard values across deploys. The two public values are deliberately not
+written into the config file, because a value there would overwrite the
+dashboard one on every deploy.
+
+Workers > your Worker > Settings > Variables & Secrets:
+
+| Name | Kind | Purpose |
+| --- | --- | --- |
+| `SUPABASE_URL` | plain variable | Which database the app talks to |
+| `SUPABASE_ANON_KEY` | plain variable | Publishable key (browser-visible by design) |
+| `POS_SUPABASE_SERVICE_ROLE_KEY` | secret | Server write relay |
+| `SETTINGS_ENCRYPTION_KEY` | secret | Encrypts stored credentials |
+
+After any deploy, open `https://pos.luckycharmsdnbhd.com/api/public/sync-health`
+— the `cloudflare` block reports `true`/`false` for each of the four names
+(presence only, never a value), so a missing one is visible at a glance.
+
 ## 3. Deploys
 
 Push to `main` -> `.github/workflows/deploy.yml` runs tests, lint, a
