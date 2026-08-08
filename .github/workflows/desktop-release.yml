@@ -1,39 +1,34 @@
-name: Build & Deploy POS App to Cloudflare R2
+name: Desktop release (Windows)
 
 on:
   push:
-    branches:
-      - main
-    tags:
-      - 'v*'
+    branches: [main]
+    tags: ["v*"]
   workflow_dispatch:
 
-# Never let two releases upload over each other.
 concurrency:
   group: desktop-release
   cancel-in-progress: false
+
+permissions:
+  contents: write
 
 jobs:
   build-windows:
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
     runs-on: windows-latest
-    permissions:
-      contents: write
-
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: 'npm'
+          cache: npm
 
-      - name: Install Dependencies
+      - name: Install dependencies
         run: npm install
 
       # Every push to main ships a new build, so the patch digit goes up first.
@@ -51,25 +46,62 @@ jobs:
           git tag "v$version"
           git push origin HEAD --tags
 
-      - name: Build Electron (.exe)
+      - name: Resolve release identity
+        id: meta
+        shell: bash
+        run: |
+          version=$(node -p "require('./package.json').version")
+          short=$(echo "$GITHUB_SHA" | cut -c1-7)
+          if [ "${{ startsWith(github.ref, 'refs/tags/') }}" = "true" ]; then
+            tag="${{ github.ref_name }}"
+          else
+            tag="v$version"
+          fi
+          {
+            echo "version=$version"
+            echo "tag=$tag"
+            echo "commit=$GITHUB_SHA"
+            echo "release_id=$tag-$short"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build Electron installer
         env:
           POS_UPDATE_URL: ${{ vars.POS_UPDATE_URL }}
         run: npm run desktop:release
 
+      - name: Write release manifest
+        shell: bash
+        run: |
+          node -e "const fs=require('fs');fs.writeFileSync('release/release.json',JSON.stringify({version:'${{ steps.meta.outputs.version }}',tag:'${{ steps.meta.outputs.tag }}',commit:'${{ steps.meta.outputs.commit }}',released:new Date().toISOString(),path:'pos-app/releases/${{ steps.meta.outputs.release_id }}/'},null,2))"
+
       - name: Deploy to Cloudflare R2
-        shell: powershell
+        shell: bash
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: auto
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         run: |
-          aws s3 sync release s3://updatelccms/pos-app --endpoint-url ${{ secrets.R2_ENDPOINT }}
+          if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ] || [ -z "$R2_ENDPOINT" ]; then
+            echo "R2 credentials are not configured; skipping upload."; exit 0
+          fi
+          rid="${{ steps.meta.outputs.release_id }}"
+          # Immutable, versioned copy.
+          aws s3 sync release "s3://updatelccms/pos-app/releases/$rid" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --cache-control "public,max-age=31536000,immutable"
+          # Stable pointers the tills poll.
+          aws s3 sync release s3://updatelccms/pos-app/latest \
+            --endpoint-url "$R2_ENDPOINT" --cache-control "no-cache" --delete
+          aws s3 sync release s3://updatelccms/pos-app \
+            --endpoint-url "$R2_ENDPOINT" --cache-control "no-cache"
 
-      - name: Attach installer to a GitHub release
+      - name: Attach installer to the GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.bump.outputs.version || github.ref_name }}
+          tag_name: ${{ steps.meta.outputs.tag }}
           files: |
             release/*.exe
             release/latest.yml
             release/*.blockmap
+            release/release.json
