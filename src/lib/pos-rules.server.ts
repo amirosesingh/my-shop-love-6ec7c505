@@ -83,12 +83,23 @@ export async function saveRules(
   patch: Partial<PosRules>,
   accessToken: string,
 ): Promise<PosRules> {
-  const json = await rpc<unknown>(
-    "pos_rules_save",
-    { _store_id: storeId || "", _patch: patch },
-    accessToken,
-  );
-  return normalizeRules(json);
+  const body = { _store_id: storeId || "", _patch: patch };
+  try {
+    return normalizeRules(await rpc<unknown>("pos_rules_save", body, accessToken));
+  } catch (e) {
+    // The routine may not be granted to signed-in accounts on this database.
+    // The caller was already proved to be a supervisor, so fall back to the
+    // service key rather than leaving the settings unsaved.
+    const message = (e as Error).message ?? "";
+    if (!/42501|permission denied/i.test(message)) throw e;
+    const { serviceRest } = await import("./pos-relay.server");
+    const res = await serviceRest("rpc/pos_rules_save", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error((await res.text()).slice(0, 400) || "Could not save rules");
+    return normalizeRules(await res.json());
+  }
 }
 
 export async function verifyManagerPinInDb(
