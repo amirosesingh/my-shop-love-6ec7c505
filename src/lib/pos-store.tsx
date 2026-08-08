@@ -38,6 +38,7 @@ import { clearSnapshot, readSnapshot, writeSnapshot } from "./offline-snapshot";
 import { isLiveOnly } from "./live-mode";
 import { useAuth } from "@/lib/pos-auth";
 import { readTerminalConfig } from "./terminal-tokens";
+import { activeBranchId, requireBranchId } from "./active-branch";
 import { isShiftOverdue, localTerminalId } from "./shift-hours";
 import { beginShiftSession, endShiftSessions } from "./shift-sessions";
 import { branchPolicy } from "./branch-policy";
@@ -138,6 +139,8 @@ type Ctx = {
   activeShift: Shift | null;
   /** Set when the last open-shift read failed; the till keeps trading. */
   shiftReadError: string | null;
+  /** False until the first open-shift read has answered. */
+  shiftChecked: boolean;
   recordSale: (sale: Omit<Sale, "id" | "receiptNo" | "createdAt">) => Promise<Sale>;
   refundSale: (saleId: string) => void;
   changeSalePayment: (saleId: string, method: PaymentMethod, reason?: string) => void;
@@ -203,9 +206,14 @@ function applyCloud(s: PosState, cloud: CloudSlice): PosState {
     // Locations are central now; the local list is the fallback until
     // the directory has been populated (and gets pushed up below).
     stores: cloudStores.length ? cloudStores : s.stores,
-    currentStoreId: cloudStores.length
-      ? (cloudStores.find((x) => x.id === s.currentStoreId)?.id ?? cloudStores[0].id)
-      : s.currentStoreId,
+    // A registered till never drifts to another branch: if the terminal is
+    // bound and that branch exists centrally, it wins over anything saved.
+    currentStoreId: (() => {
+      const bound = activeBranchId(null);
+      if (bound && cloudStores.some((x) => x.id === bound)) return bound;
+      if (!cloudStores.length) return s.currentStoreId;
+      return cloudStores.find((x) => x.id === s.currentStoreId)?.id ?? cloudStores[0].id;
+    })(),
     settings: {
       tax: { ...defaultSettings.tax, ...cloudSettings?.tax },
       receipt: { ...defaultSettings.receipt, ...cloudSettings?.receipt },
@@ -369,7 +377,9 @@ export function PosProvider({ children }: { children: ReactNode }) {
   const justOpenedRef = useRef<{ shift: Shift; at: number } | null>(null);
 
   const refreshActiveShift = useCallback(async () => {
-    const storeId = stateRef.current.currentStoreId;
+    // The terminal's registered branch wins, so the read always matches the
+    // branch the shift was opened against.
+    const storeId = activeBranchId(stateRef.current.currentStoreId) ?? stateRef.current.currentStoreId;
     try {
       const found = await loadActiveShift(storeId);
       const fresh = justOpenedRef.current;
@@ -424,6 +434,18 @@ export function PosProvider({ children }: { children: ReactNode }) {
     void refreshActiveShift();
   }, [signedIn, currentStore.id, refreshActiveShift]);
 
+  // A registered till trades in its own branch — pin the view to it as soon as
+  // that branch exists in the directory, before any shift read runs.
+  useEffect(() => {
+    const bound = activeBranchId(null);
+    if (!bound) return;
+    setState((s) =>
+      s.currentStoreId === bound || !s.stores.some((x) => x.id === bound)
+        ? s
+        : { ...s, currentStoreId: bound },
+    );
+  }, [state.stores, signedIn]);
+
   // Android holds nothing locally, so coming back to the app must re-read the
   // catalogue, members, prices and shift from the backend.
   useEffect(() => {
@@ -446,11 +468,12 @@ export function PosProvider({ children }: { children: ReactNode }) {
   }, [signedIn, refreshActiveShift]);
 
   const activeShift = useMemo(() => {
-    if (dbShift && dbShift.storeId === currentStore.id && !dbShift.closedAt) return dbShift;
+    const branch = activeBranchId(currentStore.id) ?? currentStore.id;
+    if (dbShift && dbShift.storeId === branch && !dbShift.closedAt) return dbShift;
     if (shiftChecked) return null;
     return (
       state.shifts.find(
-        (s) => s.storeId === currentStore.id && s.status !== "CLOSED" && !s.closedAt,
+        (s) => s.storeId === branch && s.status !== "CLOSED" && !s.closedAt,
       ) ?? null
     );
   }, [dbShift, shiftChecked, state.shifts, currentStore.id]);
@@ -509,11 +532,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     async (cashier: string, openingFloat: number) => {
       const terminal = readTerminalConfig();
       // The branch follows the terminal, never the staff record.
-      const bound = terminal?.locationId?.trim() ?? "";
-      const storeId =
-        bound && stateRef.current.stores.some((s) => s.id === bound)
-          ? bound
-          : stateRef.current.currentStoreId;
+      const storeId = requireBranchId(stateRef.current.currentStoreId);
       const shift: Shift = {
         id: crypto.randomUUID(),
         storeId,
@@ -611,7 +630,10 @@ export function PosProvider({ children }: { children: ReactNode }) {
   const recordSale = useCallback(async (input: Omit<Sale, "id" | "receiptNo" | "createdAt">) => {
     const snapshot = stateRef.current;
     const counter = snapshot.counter + 1;
-    const store = snapshot.stores.find((x) => x.id === input.storeId);
+    // Never write a bill without a branch — the terminal's branch is authoritative.
+    const branchId = requireBranchId(input.storeId || snapshot.currentStoreId);
+    input = { ...input, storeId: branchId };
+    const store = snapshot.stores.find((x) => x.id === branchId);
     const sale: Sale = {
       ...input,
       // Stamp the cost price of every line at the moment of sale so margin
@@ -1488,6 +1510,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     removeStore,
     activeShift,
     shiftReadError,
+    shiftChecked,
     openShift,
     closeShift,
     recordSale,

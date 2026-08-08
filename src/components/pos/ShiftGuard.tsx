@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Lock, LogOut, WifiOff } from "lucide-react";
+import { Loader2, Lock, LogOut, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 import { money, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
@@ -26,7 +26,7 @@ import { permissionMessage } from "@/components/pos/PermissionGate";
  * are never locked.
  */
 export function ShiftGuard({ children }: { children: ReactNode }) {
-  const { activeShift, openShift, currentStore, shiftReadError } = usePos();
+  const { activeShift, openShift, currentStore, shiftReadError, shiftChecked } = usePos();
   const { user, lock, can, terminalStoreName } = useAuth();
   const [cashier, setCashier] = useState(user?.name ?? "Cashier");
   const [float, setFloat] = useState("150");
@@ -68,6 +68,20 @@ export function ShiftGuard({ children }: { children: ReactNode }) {
           <Lock className="size-3" />
           <span className="font-semibold">No shift open at {branchLabel}</span>
           <span>Your account can use the terminal without one.</span>
+        </div>
+        <div className="flex min-h-0 flex-1">{children}</div>
+      </div>
+    );
+  }
+
+  // Until the database has actually answered, the terminal is not "locked" —
+  // it is still asking. Showing the lock here is what caused the flash.
+  if (!shiftChecked) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-border bg-muted/40 px-4 py-1.5 text-[11px] text-muted-foreground">
+          <Loader2 className="size-3 animate-spin" />
+          <span>Checking the open shift at {branchLabel}…</span>
         </div>
         <div className="flex min-h-0 flex-1">{children}</div>
       </div>

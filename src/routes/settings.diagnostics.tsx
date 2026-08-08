@@ -3,7 +3,16 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
 import { Button } from "@/components/ui/button";
-import { formatReport, runDbHealth, type DbHealthReport } from "@/lib/db-health";
+import {
+  formatReport,
+  runDbHealth,
+  runBranchCoverage,
+  loadRecentRows,
+  INSPECTOR_TABLES,
+  type BranchCoverage,
+  type DbHealthReport,
+  type RecentRows,
+} from "@/lib/db-health";
 
 export const Route = createFileRoute("/settings/diagnostics")({
   head: () => ({
@@ -32,15 +41,29 @@ const dot = (ok: boolean) =>
 function DiagnosticsPage() {
   const [report, setReport] = useState<DbHealthReport | null>(null);
   const [busy, setBusy] = useState(false);
+  const [coverage, setCoverage] = useState<BranchCoverage[] | null>(null);
+  const [peek, setPeek] = useState<RecentRows | null>(null);
+  const [peeking, setPeeking] = useState<string | null>(null);
 
   const run = async () => {
     setBusy(true);
     try {
-      setReport(await runDbHealth());
+      const [health, cover] = await Promise.all([runDbHealth(), runBranchCoverage()]);
+      setReport(health);
+      setCoverage(cover);
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
       setBusy(false);
+    }
+  };
+
+  const inspect = async (table: string, columns: string) => {
+    setPeeking(table);
+    try {
+      setPeek(await loadRecentRows(table, columns));
+    } finally {
+      setPeeking(null);
     }
   };
 
@@ -132,6 +155,106 @@ function DiagnosticsPage() {
           </div>
         </div>
       )}
+
+      {coverage && (
+        <section className="space-y-2">
+          <h2 className="text-sm font-semibold">Branch id coverage</h2>
+          <p className="text-xs text-muted-foreground">
+            Rows saved without a branch cannot be found by branch reports. Run{" "}
+            <code>supabase/sql/21_backfill_branch_ids.sql</code> on your database to repair
+            older rows.
+          </p>
+          <div className="overflow-x-auto rounded-md border border-border">
+            <table className="w-full text-xs">
+              <thead className="bg-muted/50">
+                <tr className="text-left">
+                  <th className="px-3 py-2 font-medium">Table</th>
+                  <th className="px-3 py-2 font-medium">Rows</th>
+                  <th className="px-3 py-2 font-medium">Without a branch</th>
+                </tr>
+              </thead>
+              <tbody>
+                {coverage.map((c) => (
+                  <tr key={c.table} className="border-t border-border">
+                    <td className="px-3 py-2">
+                      <div className="font-medium">{c.label}</div>
+                      <div className="text-muted-foreground">{c.table}</div>
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground">{c.total ?? "—"}</td>
+                    <td className="px-3 py-2">
+                      {c.error ? (
+                        <span className="text-destructive">{c.error}</span>
+                      ) : (
+                        <span
+                          className={c.missing ? "font-semibold text-destructive" : "text-muted-foreground"}
+                        >
+                          {c.missing ?? "—"}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold">What is stored right now</h2>
+        <p className="text-xs text-muted-foreground">
+          The newest rows straight from your own database, read the same way the till reads
+          them.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {INSPECTOR_TABLES.map((t) => (
+            <Button
+              key={t.table}
+              size="sm"
+              variant={peek?.table === t.table ? "default" : "outline"}
+              disabled={peeking === t.table}
+              onClick={() => void inspect(t.table, t.columns)}
+            >
+              {peeking === t.table ? "Loading…" : t.label}
+            </Button>
+          ))}
+        </div>
+
+        {peek && (
+          <div className="overflow-x-auto rounded-md border border-border">
+            {peek.error ? (
+              <p className="p-3 text-xs text-destructive">{peek.error}</p>
+            ) : peek.rows.length === 0 ? (
+              <p className="p-3 text-xs text-muted-foreground">
+                No rows in {peek.label} yet.
+              </p>
+            ) : (
+              <table className="w-full text-xs">
+                <thead className="bg-muted/50">
+                  <tr className="text-left">
+                    {Object.keys(peek.rows[0]).map((k) => (
+                      <th key={k} className="px-3 py-2 font-medium">
+                        {k}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {peek.rows.map((row, i) => (
+                    <tr key={i} className="border-t border-border">
+                      {Object.keys(peek.rows[0]).map((k) => (
+                        <td key={k} className="whitespace-nowrap px-3 py-2 text-muted-foreground">
+                          {row[k] == null ? "—" : String(row[k])}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+      </section>
     </SettingsFrame>
   );
 }
