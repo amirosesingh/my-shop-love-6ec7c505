@@ -12,8 +12,11 @@
  */
 import { APP_VERSION } from "./app-updates";
 import { isNative } from "./native";
+import { httpGetBase64, httpGetJson } from "./native-http";
 
-const FEED = "https://updatecms.luckycharmsdnbhd.com/pos-app/android/web/latest.json";
+const BASE = "https://updatecms.luckycharmsdnbhd.com/pos-app";
+/** Current layout first, legacy path second, for phones on older releases. */
+const WEB_FEEDS = [`${BASE}/latest/android/web`, `${BASE}/android/web`];
 const SIX_HOURS = 6 * 60 * 60 * 1000;
 const STATE_KEY = "pos.ui.webBundle";
 
@@ -71,18 +74,23 @@ export async function applyPendingWebBundle(): Promise<void> {
 export async function checkWebBundle(): Promise<string | null> {
   if (typeof window === "undefined" || !isNative() || !navigator.onLine) return null;
   try {
-    const res = await fetch(`${FEED}?t=${Date.now()}`, { cache: "no-store" });
-    if (!res.ok) return null;
-    const manifest = (await res.json()) as Manifest;
+    let manifest: Manifest | null = null;
+    let feed = WEB_FEEDS[0]!;
+    for (const candidate of WEB_FEEDS) {
+      try {
+        manifest = await httpGetJson<Manifest>(`${candidate}/latest.json`);
+        feed = candidate;
+        break;
+      } catch {
+        /* try the next path */
+      }
+    }
     const current = readState()?.version ?? APP_VERSION;
     if (!manifest?.version || !isNewerBundle(manifest.version, current)) return null;
 
-    const url =
-      manifest.url ?? `https://updatecms.luckycharmsdnbhd.com/pos-app/android/web/${manifest.file}`;
-    const zip = await fetch(url);
-    if (!zip.ok) return null;
-    const bytes = new Uint8Array(await zip.arrayBuffer());
-    if (!bytes.byteLength) return null;
+    const url = manifest.url ?? `${feed}/${manifest.file}`;
+    const base64 = await httpGetBase64(url);
+    if (!base64) return null;
 
     const { Filesystem, Directory } = (await import("@capacitor/filesystem")) as unknown as {
       Filesystem: {
@@ -95,11 +103,9 @@ export async function checkWebBundle(): Promise<string | null> {
       };
       Directory: { Data: string };
     };
-    let binary = "";
-    for (const b of bytes) binary += String.fromCharCode(b);
     const written = await Filesystem.writeFile({
       path: `web/${manifest.version}/${manifest.file}`,
-      data: btoa(binary),
+      data: base64,
       directory: Directory.Data,
       recursive: true,
     });

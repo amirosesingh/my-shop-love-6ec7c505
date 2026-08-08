@@ -18,10 +18,21 @@ export type UiScalePrefs = {
   /** Font-only multiplier, layered on top of the interface scale. */
   textScale: number;
   density: UiDensity;
+  /** Register canvas zoom, set from Display & sizing and kept across sessions. */
+  registerZoom: number;
 };
 
 const KEY = "pos.ui-scale";
-const DEFAULTS: UiScalePrefs = { mode: "auto", scale: 1, textScale: 1, density: "comfortable" };
+export const REGISTER_ZOOM_MIN = 0.4;
+export const REGISTER_ZOOM_MAX = 1.5;
+export const REGISTER_ZOOM_DEFAULT = 0.7;
+const DEFAULTS: UiScalePrefs = {
+  mode: "auto",
+  scale: 1,
+  textScale: 1,
+  density: "comfortable",
+  registerZoom: REGISTER_ZOOM_DEFAULT,
+};
 
 let prefs: UiScalePrefs = DEFAULTS;
 const listeners = new Set<() => void>();
@@ -38,6 +49,11 @@ function load(): UiScalePrefs {
       scale: clamp(Number(parsed.scale) || 1, 0.85, 1.5),
       textScale: clamp(Number(parsed.textScale) || 1, 0.9, 1.6),
       density: parsed.density === "compact" ? "compact" : "comfortable",
+      registerZoom: clamp(
+        Number(parsed.registerZoom) || REGISTER_ZOOM_DEFAULT,
+        REGISTER_ZOOM_MIN,
+        REGISTER_ZOOM_MAX,
+      ),
     };
   } catch {
     return DEFAULTS;

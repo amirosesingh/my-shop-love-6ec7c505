@@ -5,6 +5,9 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import {
   computeUiScale,
+  REGISTER_ZOOM_DEFAULT,
+  REGISTER_ZOOM_MAX,
+  REGISTER_ZOOM_MIN,
   setUiScalePrefs,
   useUiScalePrefs,
   type UiDensity,
@@ -37,6 +40,7 @@ export function DisplayScalingSettings({ bare = false }: { bare?: boolean }) {
     typeof window === "undefined" ? 1 : computeUiScale(window.innerWidth, window.innerHeight);
   const effective = prefs.mode === "manual" ? prefs.scale : auto;
   const text = prefs.textScale;
+  const registerZoom = prefs.registerZoom;
 
   return (
     <section className={bare ? "" : "rounded-lg border border-border bg-card p-5"}>
@@ -186,6 +190,55 @@ export function DisplayScalingSettings({ bare = false }: { bare?: boolean }) {
             </div>
             <p className="text-[10px] text-muted-foreground">
               Font size only — works independently of the display size.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs text-muted-foreground">Register zoom</Label>
+              <span className="numeric text-xs">{Math.round(registerZoom * 100)}%</span>
+            </div>
+            <Slider
+              aria-label="Register zoom"
+              min={Math.round(REGISTER_ZOOM_MIN * 100)}
+              max={Math.round(REGISTER_ZOOM_MAX * 100)}
+              step={5}
+              value={[Math.round(registerZoom * 100)]}
+              onValueChange={([v]) =>
+                setUiScalePrefs({ registerZoom: (v ?? REGISTER_ZOOM_DEFAULT * 100) / 100 })
+              }
+            />
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+              <Input
+                type="number"
+                min={Math.round(REGISTER_ZOOM_MIN * 100)}
+                max={Math.round(REGISTER_ZOOM_MAX * 100)}
+                step={1}
+                aria-label="Register zoom percentage"
+                value={Math.round(registerZoom * 100)}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  if (!Number.isFinite(v)) return;
+                  const pct = Math.min(
+                    REGISTER_ZOOM_MAX * 100,
+                    Math.max(REGISTER_ZOOM_MIN * 100, v),
+                  );
+                  setUiScalePrefs({ registerZoom: pct / 100 });
+                }}
+                className="numeric h-9 min-w-0 text-xs"
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="shrink-0"
+                onClick={() => setUiScalePrefs({ registerZoom: REGISTER_ZOOM_DEFAULT })}
+              >
+                Reset
+              </Button>
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              How much of the register screen fits at once. Saved for this terminal, so it stays
+              the same each time the till is reopened.
             </p>
           </div>
 
