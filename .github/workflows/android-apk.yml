@@ -8,10 +8,8 @@ on:
         required: false
         default: ""
   push:
-    tags:
-      - "v*"
-    branches:
-      - main
+    branches: [main]
+    tags: ["v*"]
     paths:
       - "src/**"
       - "scripts/mobile-build.cjs"
@@ -25,21 +23,20 @@ concurrency:
   group: android-release
   cancel-in-progress: false
 
+permissions:
+  contents: write
+
 jobs:
   apk:
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
+          node-version: 24
+          cache: npm
 
       - uses: actions/setup-java@v4
         with:
@@ -49,15 +46,28 @@ jobs:
       - uses: android-actions/setup-android@v3
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: npm install
 
-      - name: Read app version
+      - name: Resolve release identity
         id: meta
-        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+        run: |
+          version=$(node -p "require('./package.json').version")
+          short=$(echo "$GITHUB_SHA" | cut -c1-7)
+          if [ "${{ startsWith(github.ref, 'refs/tags/') }}" = "true" ]; then
+            tag="${{ github.ref_name }}"
+          else
+            tag="v$version"
+          fi
+          {
+            echo "version=$version"
+            echo "tag=$tag"
+            echo "commit=$GITHUB_SHA"
+            echo "release_id=$tag-$short"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Build the offline app bundle
         if: ${{ !inputs.app_url }}
-        run: bun run mobile:build
+        run: npm run mobile:build
 
       - name: Add Android platform
         env:
@@ -76,56 +86,65 @@ jobs:
       # ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD as repository secrets, then swap the
       # step above for `./gradlew assembleRelease` with the signing config wired in.
 
-      - name: Stage APK for upload
-        id: stage
+      - name: Stage the APK and the web bundle
         run: |
-          mkdir -p android-release
+          v="${{ steps.meta.outputs.version }}"
+          rid="${{ steps.meta.outputs.release_id }}"
+          released=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          mkdir -p versioned/android/web latest/android latest/android/web release-assets
           src=$(ls android/app/build/outputs/apk/debug/*.apk | head -n1)
-          v="${{ steps.meta.outputs.version }}"
-          cp "$src" "android-release/NorthwindPOS-$v.apk"
-          cp "$src" "android-release/NorthwindPOS-latest.apk"
-          printf '{"version":"%s","file":"NorthwindPOS-%s.apk","released":"%s"}\n' \
-            "$v" "$v" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > android-release/latest.json
-          echo "version=$v" >> "$GITHUB_OUTPUT"
-
-      - name: Stage the live web bundle
-        if: ${{ !inputs.app_url }}
-        run: |
-          mkdir -p android-web
-          v="${{ steps.meta.outputs.version }}"
-          (cd capacitor-shell && zip -qr "../android-web/web-$v.zip" .)
-          printf '{"version":"%s","file":"web-%s.zip","released":"%s"}\n' \
-            "$v" "$v" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > android-web/latest.json
+          cp "$src" "versioned/android/NorthwindPOS-$v.apk"
+          cp "$src" "latest/android/NorthwindPOS-$v.apk"
+          cp "$src" "latest/android/NorthwindPOS-latest.apk"
+          cp "$src" "release-assets/NorthwindPOS-$v.apk"
+          manifest=$(printf '{"version":"%s","file":"NorthwindPOS-%s.apk","tag":"%s","commit":"%s","released":"%s","path":"pos-app/releases/%s/android/"}\n' \
+            "$v" "$v" "${{ steps.meta.outputs.tag }}" "${{ steps.meta.outputs.commit }}" "$released" "$rid")
+          echo "$manifest" > latest/android/latest.json
+          echo "$manifest" > versioned/android/latest.json
+          echo "$manifest" > release-assets/latest.json
+          if [ -z "${{ inputs.app_url }}" ]; then
+            (cd capacitor-shell && zip -qr "$GITHUB_WORKSPACE/versioned/android/web/web-$v.zip" .)
+            cp "versioned/android/web/web-$v.zip" "latest/android/web/web-$v.zip"
+            cp "versioned/android/web/web-$v.zip" "latest/android/web/web-latest.zip"
+            web=$(printf '{"version":"%s","file":"web-%s.zip","tag":"%s","commit":"%s","released":"%s"}\n' \
+              "$v" "$v" "${{ steps.meta.outputs.tag }}" "${{ steps.meta.outputs.commit }}" "$released")
+            echo "$web" > latest/android/web/latest.json
+            echo "$web" > versioned/android/web/latest.json
+          fi
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: NorthwindPOS-android
           if-no-files-found: error
-          path: android-release/*.apk
+          path: release-assets/*.apk
 
-      - name: Deploy APK to Cloudflare R2
+      - name: Deploy to Cloudflare R2
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: auto
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         run: |
-          aws s3 sync android-release s3://updatelccms/pos-app/android \
-            --endpoint-url ${{ secrets.R2_ENDPOINT }}
-
-      - name: Deploy the live web bundle to Cloudflare R2
-        if: ${{ !inputs.app_url }}
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: auto
-        run: |
-          aws s3 sync android-web s3://updatelccms/pos-app/android/web \
-            --endpoint-url ${{ secrets.R2_ENDPOINT }}
+          if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ] || [ -z "$R2_ENDPOINT" ]; then
+            echo "R2 credentials are not configured; skipping upload."; exit 0
+          fi
+          rid="${{ steps.meta.outputs.release_id }}"
+          # Immutable, versioned copy.
+          aws s3 sync versioned/android "s3://updatelccms/pos-app/releases/$rid/android" \
+            --endpoint-url "$R2_ENDPOINT" --cache-control "public,max-age=31536000,immutable"
+          # Stable pointers the phones poll.
+          aws s3 sync latest/android s3://updatelccms/pos-app/latest/android \
+            --endpoint-url "$R2_ENDPOINT" --cache-control "no-cache"
+          # Legacy paths already-deployed phones read.
+          aws s3 sync latest/android s3://updatelccms/pos-app/android \
+            --endpoint-url "$R2_ENDPOINT" --cache-control "no-cache"
 
       - name: Attach APK to the GitHub release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          files: android-release/*.apk
+          files: |
+            release-assets/*.apk
+            release-assets/latest.json

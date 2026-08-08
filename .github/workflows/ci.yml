@@ -5,24 +5,32 @@ on:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
   guardrails:
     name: Role & permission regression checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
         with:
-          bun-version: latest
-      - run: bun install --frozen-lockfile
+          node-version: 24
+          cache: npm
+      - run: npm install
       - name: Permission & route-guard tests
-        run: bunx vitest run
+        run: npx vitest run
       - name: Lint
-        run: bun run lint
+        run: npm run lint
       - name: Typecheck & build
-        run: bun run build
+        run: npm run build
       - name: Dependency vulnerability audit
-        run: bunx --bun npm audit --audit-level=high || exit 1
+        run: npm audit --audit-level=high
       - name: Report findings to the app
         if: always() && github.ref == 'refs/heads/main'
         env:
