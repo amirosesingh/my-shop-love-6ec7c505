@@ -45,6 +45,39 @@ function createExternalClient() {
 
 let _client: ReturnType<typeof createExternalClient> | undefined;
 
+/**
+ * Rebuild the client against a different tenant — used the moment a terminal
+ * is activated (or unpaired) so no restart is needed.
+ */
+export function resetExternalClient(): void {
+  _client = undefined;
+}
+
+/** A throwaway client for a tenant this machine is not registered to yet. */
+export function createTenantClient(url: string, key: string) {
+  return createClient<Database>(url, key, {
+    global: {
+      fetch: (input, init) => {
+        const requestHeaders =
+          typeof Request !== 'undefined' && input instanceof Request ? input.headers : undefined;
+        const headers = new Headers(requestHeaders);
+        if (init?.headers) {
+          new Headers(init.headers).forEach((value, k) => headers.set(k, value));
+        }
+        if (isNewSupabaseApiKey(key) && headers.get('Authorization') === `Bearer ${key}`) {
+          headers.delete('Authorization');
+        }
+        headers.set('apikey', key);
+        if (typeof Request !== 'undefined' && input instanceof Request) {
+          return fetch(new Request(input, { ...init, headers }));
+        }
+        return fetch(input, { ...init, headers });
+      },
+    },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
 export const supabaseExternal = new Proxy({} as ReturnType<typeof createExternalClient>, {
   get(_, prop, receiver) {
     if (!_client) _client = createExternalClient();
