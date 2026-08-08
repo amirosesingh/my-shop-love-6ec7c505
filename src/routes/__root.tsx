@@ -56,6 +56,12 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   }, [error]);
   const notConfigured = error.name === "SupabaseConfigError";
 
+  // A till that has never been paired has no connection details yet — that is
+  // the normal first-boot state, not a failure. Show the activation screen.
+  if (notConfigured && isTerminalApp() && !readTerminalConfig()) {
+    return <TerminalActivation onActivated={() => window.location.reload()} />;
+  }
+
   const clearAndRestart = () => {
     try {
       window.localStorage.removeItem("pos.offline.snapshot.v1");
