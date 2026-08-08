@@ -9,8 +9,7 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/pos-auth";
 import {
-  listSecurityFindings,
-  runSecuritySelfCheck,
+  assessSecurityFindings,
   setFindingStatus,
   SEVERITY_TONE,
   SOURCE_LABEL,
@@ -28,9 +27,13 @@ function SecurityAlertsPage() {
   const [rows, setRows] = useState<SecurityFinding[]>([]);
   const [showResolved, setShowResolved] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [checkedAt, setCheckedAt] = useState<string>("");
 
   const load = useCallback(async () => {
-    setRows(await listSecurityFindings(showResolved));
+    // Every visit re-tests the current conditions instead of trusting flags.
+    const res = await assessSecurityFindings(showResolved);
+    setRows(res.findings);
+    setCheckedAt(res.retested ? res.checkedAt : "");
   }, [showResolved]);
 
   useEffect(() => {
@@ -49,13 +52,8 @@ function SecurityAlertsPage() {
   async function scanNow() {
     setBusy(true);
     try {
-      const out = await runSecuritySelfCheck();
-      toast.success(
-        out.new > 0
-          ? `${out.new} new finding${out.new > 1 ? "s" : ""} raised`
-          : "Check complete — no new findings",
-      );
       await load();
+      toast.success("Re-tested — the list shows only conditions still true");
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -108,6 +106,9 @@ function SecurityAlertsPage() {
           <RefreshCw className={cn("size-3.5", busy && "animate-spin")} /> Run check now
         </Button>
       </div>
+      <p className="mt-2 text-[11px] text-muted-foreground">
+        {checkedAt ? `Last re-tested ${when(checkedAt)}` : "Showing the last stored results."}
+      </p>
 
       <div className="mt-4 space-y-2">
         {rows.length === 0 && (

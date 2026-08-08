@@ -11,7 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/pos-auth";
 import {
-  listSecurityFindings,
+  assessSecurityFindings,
   SEVERITY_TONE,
   SOURCE_LABEL,
   type SecurityFinding,
@@ -35,7 +35,8 @@ export function SecurityAlertBell({ compact }: { compact?: boolean }) {
   const [open, setOpen] = useState(false);
 
   const refresh = useCallback(async () => {
-    const rows = (await listSecurityFindings()).filter((f) => f.status === "open");
+    // Re-test the live posture first so fixed conditions clear themselves.
+    const rows = (await assessSecurityFindings()).findings.filter((f) => f.status === "open");
     setFindings(rows);
     if (typeof window === "undefined") return;
     const seen = readSeen();
