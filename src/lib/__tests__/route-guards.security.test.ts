@@ -59,7 +59,9 @@ describe("route guards", () => {
   it("denies unmapped routes instead of falling through to open access", () => {
     expect(APP_SHELL).toContain("const PUBLIC_ROUTES = new Set([\"/\", \"/display\"])");
     expect(APP_SHELL).toContain('return ROUTE_PERMISSIONS[key] ?? "unknown"');
-    expect(APP_SHELL).toContain("Access restricted");
+    // The denial screen (which names the missing permission) renders instead
+    // of the page body.
+    expect(APP_SHELL).toContain("<PermissionDenied");
     // The old post-render redirect guard must not come back.
     expect(APP_SHELL).not.toContain("useNavigate");
   });
