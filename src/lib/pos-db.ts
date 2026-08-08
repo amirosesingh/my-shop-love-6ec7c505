@@ -555,16 +555,31 @@ export async function loadCloudState(): Promise<CloudSlice> {
  * something explicitly closes it. No date or time filtering here, ever.
  */
 export async function loadActiveShift(storeId: string): Promise<Shift | null> {
-  const res = await supabase
-    .from("shifts" as never)
-    .select("*")
-    .eq("store_id", storeId)
-    .eq("status", "OPEN")
-    .order("opened_at", { ascending: false })
-    .limit(1);
-  if (res.error) throw res.error;
-  const rows = (res.data as Row[] | null) ?? [];
-  return rows.length ? rowToShift(rows[0]) : null;
+  // A cashier signed in with a PIN has no account on the central database, so
+  // the direct read is refused or filtered out. The proven server relay answers
+  // for those tills — without it the register would flip back to "locked"
+  // moments after a shift was opened.
+  const { hasStaffSession, canRelay, relayActiveShift } = await import("./sync-relay");
+
+  if (hasStaffSession()) {
+    const res = await supabase
+      .from("shifts" as never)
+      .select("*")
+      .eq("store_id", storeId)
+      .eq("status", "OPEN")
+      .order("opened_at", { ascending: false })
+      .limit(1);
+    if (!res.error) {
+      const rows = (res.data as Row[] | null) ?? [];
+      return rows.length ? rowToShift(rows[0]) : null;
+    }
+    if (!canRelay()) throw res.error;
+  }
+
+  if (!canRelay()) throw new Error("This till cannot read the central database yet");
+  const relayed = await relayActiveShift(storeId);
+  if (!relayed.ok) throw new Error(relayed.error ?? "Could not read the open shift");
+  return relayed.row ? rowToShift(relayed.row as Row) : null;
 }
 
 /**

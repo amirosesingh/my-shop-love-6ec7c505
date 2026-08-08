@@ -15,6 +15,7 @@ import { WindowControls } from "@/components/pos/WindowControls";
 import { SystemStatusPill } from "@/components/pos/SystemStatusPill";
 import { SecurityAlertBell } from "@/components/pos/SecurityAlertBell";
 import { ShiftGuard } from "@/components/pos/ShiftGuard";
+import { PermissionDenied } from "@/components/pos/PermissionGate";
 import { LiveClock } from "@/components/pos/LiveClock";
 import { ThemeToggle } from "@/components/pos/ThemeToggle";
 import { startSyncEngine } from "@/lib/sync-engine";
@@ -407,19 +408,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             const allowed =
               required === null ? true : required === "unknown" ? isAdmin : can(required);
             if (allowed) return children;
-            return (
-              <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 p-8 text-center">
-                <Lock className="size-8 text-muted-foreground" />
-                <h1 className="text-lg font-semibold">Access restricted</h1>
-                <p className="max-w-sm text-sm text-muted-foreground">
-                  Your account does not have permission to open this screen. Ask an administrator to
-                  enable it in Staff Management.
-                </p>
-                <Button asChild variant="outline" size="sm">
-                  <Link to="/">Back to the register</Link>
-                </Button>
-              </div>
-            );
+            return <PermissionDenied flag={required === "unknown" ? null : required} />;
           })()}
         </main>
       </div>

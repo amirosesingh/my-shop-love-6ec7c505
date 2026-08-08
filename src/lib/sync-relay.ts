@@ -80,6 +80,27 @@ export async function relayOp(op: SyncOp): Promise<{ ok: boolean; error?: string
 }
 
 /** Quick health probe used by the connection check panel. */
+export async function relayActiveShift(
+  storeId: string,
+): Promise<{ ok: boolean; row?: Record<string, unknown> | null; error?: string }> {
+  try {
+    const res = await fetch("/api/public/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...(await credentials()), read: { kind: "activeShift", storeId } }),
+    });
+    const body = (await res.json().catch(() => null)) as
+      | { ok?: boolean; row?: Record<string, unknown> | null; error?: string }
+      | null;
+    if (!res.ok || !body?.ok)
+      return { ok: false, error: body?.error ?? `Relay refused (${res.status})` };
+    return { ok: true, row: body.row ?? null };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+/** Quick health probe used by the connection check panel. */
 export async function probeRelay(): Promise<{ ok: boolean; error?: string }> {
   try {
     const res = await fetch("/api/public/sync", {

@@ -136,6 +136,8 @@ type Ctx = {
   openShift: (cashier: string, openingFloat: number) => Promise<void>;
   closeShift: (countedCash: number, note: string) => Promise<Shift | null>;
   activeShift: Shift | null;
+  /** Set when the last open-shift read failed; the till keeps trading. */
+  shiftReadError: string | null;
   recordSale: (sale: Omit<Sale, "id" | "receiptNo" | "createdAt">) => Promise<Sale>;
   refundSale: (saleId: string) => void;
   changeSalePayment: (saleId: string, method: PaymentMethod, reason?: string) => void;
@@ -361,11 +363,27 @@ export function PosProvider({ children }: { children: ReactNode }) {
   // status-driven: a shift opened days ago stays active until it is closed.
   const [dbShift, setDbShift] = useState<Shift | null>(null);
   const [shiftChecked, setShiftChecked] = useState(false);
+  const [shiftReadError, setShiftReadError] = useState<string | null>(null);
+  // A shift opened on this till a moment ago is trusted even if the next read
+  // has not caught up yet — a slow replica must never re-lock the register.
+  const justOpenedRef = useRef<{ shift: Shift; at: number } | null>(null);
 
   const refreshActiveShift = useCallback(async () => {
     const storeId = stateRef.current.currentStoreId;
     try {
       const found = await loadActiveShift(storeId);
+      const fresh = justOpenedRef.current;
+      if (
+        !found &&
+        fresh &&
+        fresh.shift.storeId === storeId &&
+        Date.now() - fresh.at < 120_000
+      ) {
+        setShiftReadError(null);
+        setDbShift(fresh.shift);
+        return;
+      }
+      setShiftReadError(null);
       setDbShift(found);
       setState((s) => ({
         ...s,
@@ -379,12 +397,18 @@ export function PosProvider({ children }: { children: ReactNode }) {
                 : x,
             ),
       }));
-    } catch {
-      // Offline or unreachable: keep whatever the cached list knows.
+    } catch (e) {
+      // Offline, refused or unreachable: never downgrade a trading till to
+      // "locked" — keep the last known open shift and say we are reconnecting.
+      setShiftReadError((e as Error).message || "Could not reach the central database");
       setDbShift(
-        stateRef.current.shifts.find(
-          (s) => s.storeId === storeId && s.status !== "CLOSED" && !s.closedAt,
-        ) ?? null,
+        (prev) =>
+          (prev && prev.storeId === storeId && !prev.closedAt ? prev : null) ??
+          justOpenedRef.current?.shift ??
+          stateRef.current.shifts.find(
+            (s) => s.storeId === storeId && s.status !== "CLOSED" && !s.closedAt,
+          ) ??
+          null,
       );
     } finally {
       setShiftChecked(true);
@@ -511,6 +535,8 @@ export function PosProvider({ children }: { children: ReactNode }) {
         terminal: terminal?.locationName ?? "This PC",
       });
       setState((s) => ({ ...s, shifts: [shift, ...s.shifts] }));
+      justOpenedRef.current = { shift, at: Date.now() };
+      setShiftReadError(null);
       setDbShift(shift);
       setShiftChecked(true);
     },
@@ -544,6 +570,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
         ...s,
         shifts: s.shifts.map((x) => (x.id === closed.id ? closed : x)),
       }));
+      justOpenedRef.current = null;
       setDbShift(null);
       setShiftChecked(true);
       logger.log("sale_event", "Shift closed", "shifts", {
@@ -1449,6 +1476,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     upsertStore,
     removeStore,
     activeShift,
+    shiftReadError,
     openShift,
     closeShift,
     recordSale,

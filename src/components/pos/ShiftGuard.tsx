@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Lock, LogOut } from "lucide-react";
+import { Lock, LogOut, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 import { money, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { shiftDuration } from "@/lib/shift-hours";
 import { parsePositiveAmount } from "@/lib/amount";
+import { permissionMessage } from "@/components/pos/PermissionGate";
 
 /**
  * Hard terminal lock.
@@ -25,10 +26,11 @@ import { parsePositiveAmount } from "@/lib/amount";
  * are never locked.
  */
 export function ShiftGuard({ children }: { children: ReactNode }) {
-  const { activeShift, openShift, currentStore } = usePos();
+  const { activeShift, openShift, currentStore, shiftReadError } = usePos();
   const { user, lock, can } = useAuth();
   const [cashier, setCashier] = useState(user?.name ?? "Cashier");
   const [float, setFloat] = useState("150");
+  const [opening, setOpening] = useState(false);
 
   const bypass = can("can_bypass_shift_lock");
   const mayOpen = can("can_open_shift");
@@ -44,6 +46,11 @@ export function ShiftGuard({ children }: { children: ReactNode }) {
           </span>
           <span>Float {money(activeShift.openingFloat)}</span>
           <span>Running {shiftDuration(activeShift)}</span>
+          {shiftReadError && (
+            <span className="flex items-center gap-1 text-warning-foreground">
+              <WifiOff className="size-3" /> Reconnecting — trading continues
+            </span>
+          )}
         </div>
         <div className="flex min-h-0 flex-1">{children}</div>
       </div>
@@ -85,7 +92,7 @@ export function ShiftGuard({ children }: { children: ReactNode }) {
             No shift is open for {currentStore.name}.{" "}
             {mayOpen
               ? "Enter the opening cash float to start trading on this terminal."
-              : "Ask a supervisor to open the shift, or sign in with an account that can."}
+              : permissionMessage("can_open_shift")}
           </p>
 
           {mayOpen && (
@@ -115,18 +122,27 @@ export function ShiftGuard({ children }: { children: ReactNode }) {
               </div>
               <Button
                 className="w-full"
-                disabled={!cashier.trim() || parsePositiveAmount(float) === null}
-                onClick={() => {
+                disabled={opening || !cashier.trim() || parsePositiveAmount(float) === null}
+                onClick={async () => {
                   const amount = parsePositiveAmount(float);
                   if (amount === null) {
                     toast.error("Enter a valid opening float");
                     return;
                   }
-                  openShift(cashier.trim() || "Cashier", amount);
-                  toast.success("Shift opened");
+                  setOpening(true);
+                  try {
+                    await openShift(cashier.trim() || "Cashier", amount);
+                    toast.success("Shift opened");
+                  } catch (e) {
+                    toast.error("Could not open the shift", {
+                      description: (e as Error).message,
+                    });
+                  } finally {
+                    setOpening(false);
+                  }
                 }}
               >
-                Open shift
+                {opening ? "Opening…" : "Open shift"}
               </Button>
             </div>
           )}
