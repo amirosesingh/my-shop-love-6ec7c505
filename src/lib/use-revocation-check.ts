@@ -122,6 +122,7 @@ export function useRevocationCheck(): RevocationState {
         // reloading). Only a positive revoked verdict may wipe activation.
         if (!remote) return;
         if (remote.status === "revoked") {
+          void import("./terminal-listener").then((m) => m.triggerImmediateLockdown());
           setBlocked(true);
           clearTerminalConfig();
           return;
