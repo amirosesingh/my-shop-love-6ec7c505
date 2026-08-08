@@ -124,7 +124,7 @@ export async function relayStores(): Promise<{
 }
 
 /** Quick health probe used by the connection check panel. */
-export async function probeRelay(): Promise<{ ok: boolean; error?: string }> {
+export async function probeRelay(): Promise<{ ok: boolean; error?: string; code?: string }> {
   try {
     const res = await fetch("/api/public/sync", {
       method: "POST",
