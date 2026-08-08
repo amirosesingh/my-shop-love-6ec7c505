@@ -1,6 +1,7 @@
 // Account provisioning helpers. All accounts (cashiers, supervisors, admins)
 // live in Supabase Authentication; the role is stored in user_metadata.role.
 import { createClient } from "@supabase/supabase-js";
+import { supabaseConfig } from "./external-supabase-config";
 
 export type MetaRole = "cashier" | "warehouse" | "supervisor" | "admin";
 
@@ -8,15 +9,8 @@ export type MetaRole = "cashier" | "warehouse" | "supervisor" | "admin";
 // with a server-side hashed PIN verified through the verify_cashier_pin RPC,
 // so no login password is ever derived from the low-entropy PIN.
 
-const SUPABASE_URL =
-  (import.meta.env["VITE_SUPABASE_EXTERNAL_URL"] as string | undefined) ??
-  "https://qhrufhtbeguxydenzfey.supabase.co";
-
-const SUPABASE_PUBLISHABLE_KEY =
-  (import.meta.env["VITE_SUPABASE_EXTERNAL_PUBLISHABLE_KEY"] as string | undefined) ??
-  "sb_publishable_QwVvttLzDle_xTwP3L7Dyg_A6XM-cC-";
-
 const signupFetch: typeof fetch = (input, init) => {
+  const SUPABASE_PUBLISHABLE_KEY = supabaseConfig().key;
   const headers = new Headers(
     typeof Request !== "undefined" && input instanceof Request ? input.headers : undefined,
   );
@@ -33,7 +27,8 @@ const signupFetch: typeof fetch = (input, init) => {
  * never replaces the supervisor's own session.
  */
 function provisioningClient() {
-  return createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  const { url, key } = supabaseConfig();
+  return createClient(url, key, {
     global: { fetch: signupFetch },
     auth: { persistSession: false, autoRefreshToken: false, storage: undefined },
   });

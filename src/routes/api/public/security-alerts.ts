@@ -49,14 +49,14 @@ async function handle({ request }: { request: Request }) {
   }
   if (!parsed.success) return Response.json({ error: "Invalid payload" }, { status: 400 });
 
-  const url =
-    process.env["SUPABASE_EXTERNAL_URL"] ??
-    import.meta.env["VITE_SUPABASE_EXTERNAL_URL"] ??
-    "https://qhrufhtbeguxydenzfey.supabase.co";
-  const key =
-    process.env["SUPABASE_EXTERNAL_PUBLISHABLE_KEY"] ??
-    import.meta.env["VITE_SUPABASE_EXTERNAL_PUBLISHABLE_KEY"] ??
-    "sb_publishable_QwVvttLzDle_xTwP3L7Dyg_A6XM-cC-";
+  let url: string;
+  let key: string;
+  try {
+    const { supabaseConfig } = await import("@/lib/external-supabase-config");
+    ({ url, key } = supabaseConfig());
+  } catch (e) {
+    return Response.json({ error: (e as Error).message }, { status: 500 });
+  }
 
   const res = await fetch(`${url}/rest/v1/rpc/security_report_findings`, {
     method: "POST",
