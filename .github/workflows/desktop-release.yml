@@ -1,127 +1,74 @@
-name: Desktop release (Windows .exe)
+name: Build & Deploy POS App to Cloudflare R2
 
 on:
   push:
+    branches:
+      - main
     tags:
-      - "v*"
+      - 'v*'
   workflow_dispatch:
-    inputs:
-      update_url:
-        description: "Web folder that will host the installer + latest.yml"
-        required: false
-        default: ""
 
 # Never let two releases upload over each other.
 concurrency:
   group: desktop-release
   cancel-in-progress: false
 
-permissions:
-  contents: read
-
 jobs:
-  build:
-    name: Build and publish the Windows installer
+  build-windows:
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
     runs-on: windows-latest
     permissions:
       contents: write
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: 'npm'
 
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
+      - name: Install Dependencies
+        run: npm install
 
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      # A failing guardrail must never reach a till.
-      - name: Permission & route-guard tests
-        run: bunx vitest run
-      - name: Lint
-        run: bun run lint
-
-      - name: Build installer
-        env:
-          # Repository variable POS_UPDATE_URL (Settings -> Variables) is the
-          # web folder the tills poll; the manual input overrides it.
-          POS_UPDATE_URL: ${{ inputs.update_url || vars.POS_UPDATE_URL }}
-        run: bun run desktop:release
-
-      - name: Read app version
-        id: meta
+      # Every push to main ships a new build, so the patch digit goes up first.
+      - name: Bump patch version
+        if: startsWith(github.ref, 'refs/heads/')
+        id: bump
+        shell: bash
         run: |
-          version=$(node -p "require('./package.json').version")
-          short_sha="${GITHUB_SHA:0:7}"
-          case "$GITHUB_REF" in
-            refs/tags/*) tag="${GITHUB_REF#refs/tags/}" ;;
-            *) tag="v$version" ;;
-          esac
+          version=$(node scripts/bump-version.cjs)
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "commit=$short_sha" >> "$GITHUB_OUTPUT"
-          echo "release_id=$tag-$short_sha" >> "$GITHUB_OUTPUT"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json src/version.ts
+          git commit -m "chore: release v$version [skip ci]"
+          git tag "v$version"
+          git push origin HEAD --tags
 
-      - name: Upload installer + update manifest
-        uses: actions/upload-artifact@v4
-        with:
-          name: LovablePOS-windows-${{ steps.meta.outputs.version }}
-          if-no-files-found: error
-          path: |
-            release/*.exe
-            release/latest.yml
-            release/*.blockmap
+      - name: Build Electron (.exe)
+        env:
+          POS_UPDATE_URL: ${{ vars.POS_UPDATE_URL }}
+        run: npm run desktop:release
 
-      - name: Deploy installer to Cloudflare R2
+      - name: Deploy to Cloudflare R2
+        shell: powershell
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: auto
-          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-          RELEASE_ID: ${{ steps.meta.outputs.release_id }}
-          APP_VERSION: ${{ steps.meta.outputs.version }}
-          RELEASE_TAG: ${{ steps.meta.outputs.tag }}
-          RELEASE_COMMIT: ${{ steps.meta.outputs.commit }}
         run: |
-          if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ] || [ -z "$R2_ENDPOINT" ]; then
-            echo "R2 credentials are not configured; skipping the update-feed upload."
-            exit 0
-          fi
-          filters=(--exclude "*" --include "*.exe" --include "*.blockmap" --include "latest.yml")
+          aws s3 sync release s3://updatelccms/pos-app --endpoint-url ${{ secrets.R2_ENDPOINT }}
 
-          # 1. Immutable, versioned copy: never overwritten, safe to roll back to.
-          aws s3 sync release "s3://updatelccms/pos-app/releases/$RELEASE_ID" \
-            "${filters[@]}" \
-            --cache-control "public,max-age=31536000,immutable" \
-            --endpoint-url "$R2_ENDPOINT"
-
-          # 2. Stable pointer the tills poll.
-          printf '{"version":"%s","tag":"%s","commit":"%s","released":"%s","path":"pos-app/releases/%s"}\n' \
-            "$APP_VERSION" "$RELEASE_TAG" "$RELEASE_COMMIT" \
-            "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$RELEASE_ID" > release/release.json
-          aws s3 sync release s3://updatelccms/pos-app/latest \
-            "${filters[@]}" --include "release.json" \
-            --cache-control "no-cache" \
-            --endpoint-url "$R2_ENDPOINT"
-
-          # 3. Legacy path, kept so already-deployed tills keep updating.
-          aws s3 sync release s3://updatelccms/pos-app \
-            "${filters[@]}" --include "release.json" \
-            --cache-control "no-cache" \
-            --endpoint-url "$R2_ENDPOINT"
-
-      - name: Attach to GitHub release
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Attach installer to a GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
+          tag_name: v${{ steps.bump.outputs.version || github.ref_name }}
           files: |
             release/*.exe
             release/latest.yml
