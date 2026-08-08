@@ -8,7 +8,6 @@
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { decryptActivation, encryptActivation, type ActivationPayload } from "./terminal-crypto";
 import { clearDeviceSecret, getDeviceSecret, setDeviceSecret } from "./device-secrets";
-import { canRelay, relayOp } from "./sync-relay";
 
 export const POS_SUPABASE_URL =
   (import.meta.env["VITE_SUPABASE_EXTERNAL_URL"] as string | undefined) ??
@@ -86,6 +85,7 @@ export async function ensureLocations(locations: TokenLocation[]): Promise<void>
     address: l.address || null,
     phone: l.phone || null,
   }));
+  const { canRelay, relayOp } = await import("./sync-relay");
   if (canRelay()) {
     const relayed = await relayOp({ kind: "upsert", table: "stores", rows, onConflict: "id" });
     if (!relayed.ok) throw new Error(relayed.error ?? "Could not save branch locations");

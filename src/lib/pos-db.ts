@@ -517,8 +517,10 @@ export async function loadCloudState(): Promise<CloudSlice> {
           const relayed = await relayStores();
           if (relayed.ok) return { data: (relayed.rows as Row[] | undefined) ?? [] };
         }
-        const res = await supabase.from("stores" as never).select("*");
-        return { data: (res.data as Row[] | null) ?? null };
+        // Branches are protected operational data. Without a proven staff or
+        // terminal identity, keep the local snapshot instead of issuing a
+        // browser request that row security is expected to refuse.
+        return { data: null };
       } catch {
         return { data: null };
       }
