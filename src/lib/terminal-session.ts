@@ -4,35 +4,20 @@
  * normally instead of being refused by the row rules.
  */
 import { supabaseExternal } from "@/integrations/supabase/external-client";
-import { claimTerminalToken } from "./terminal-account.functions";
-import { getDeviceSecret, setDeviceSecret, clearDeviceSecret } from "./device-secrets";
+import { getTerminalAccount } from "./terminal-account.functions";
+import { getDeviceSecret, setDeviceSecret } from "./device-secrets";
 import { readTerminalConfig } from "./terminal-tokens";
-import { deviceMeta, readDeviceProof } from "./terminal-proof";
-import { readDesktopCredentials, writeDesktopCredentials } from "./terminal-desktop-store";
 
 type Account = { email: string; password: string };
 
 const SECRET = "terminal-account";
 
-export function clearTerminalCredentials(): void {
-  clearDeviceSecret(SECRET);
-  void writeDesktopCredentials(null);
-}
-
-/**
- * Fetch (once) and remember this terminal's machine account, encrypted.
- * Requires the one-time device proof kept from the claim.
- */
+/** Fetch (once) and remember this terminal's machine account, encrypted. */
 export async function provisionTerminalAccount(tokenId: string): Promise<Account | null> {
-  const deviceProof = await readDeviceProof();
-  if (!deviceProof) return null;
-  const res = await claimTerminalToken({
-    data: { tokenId, deviceProof, device: deviceMeta() },
-  }).catch(() => null);
+  const res = await getTerminalAccount({ data: { tokenId } }).catch(() => null);
   if (!res?.ok) return null;
   const account: Account = { email: res.email, password: res.password };
   await setDeviceSecret(SECRET, account);
-  void writeDesktopCredentials(account);
   return account;
 }
 
@@ -51,12 +36,6 @@ export async function ensureTerminalSession(): Promise<boolean> {
     if (!tokenId) return false;
 
     let account = await getDeviceSecret<Account>(SECRET);
-    // An installer refresh can wipe renderer storage; the desktop shell keeps
-    // its own protected copy so the till does not have to be paired again.
-    if (!account) {
-      account = await readDesktopCredentials();
-      if (account) await setDeviceSecret(SECRET, account);
-    }
     if (!account) account = await provisionTerminalAccount(tokenId);
     if (!account) return false;
 

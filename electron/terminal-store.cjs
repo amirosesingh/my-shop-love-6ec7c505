@@ -5,10 +5,9 @@
  */
 const fs = require("node:fs");
 const path = require("node:path");
-const { app, safeStorage } = require("electron");
+const { app } = require("electron");
 
 const file = () => path.join(app.getPath("userData"), "terminal-config.json");
-const secretsFile = () => path.join(app.getPath("userData"), "terminal-secrets.bin");
 
 function read() {
   try {
@@ -34,38 +33,3 @@ function write(config) {
 }
 
 module.exports = { read, write };
-
-/* ---- machine credentials, protected by the OS secret store when it exists -- */
-
-function readSecrets() {
-  try {
-    const raw = fs.readFileSync(secretsFile());
-    const text = safeStorage.isEncryptionAvailable()
-      ? safeStorage.decryptString(raw)
-      : raw.toString("utf8");
-    const parsed = JSON.parse(text);
-    return parsed && parsed.email ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeSecrets(secrets) {
-  try {
-    if (!secrets) {
-      fs.rmSync(secretsFile(), { force: true });
-      return { ok: true };
-    }
-    const text = JSON.stringify(secrets);
-    const body = safeStorage.isEncryptionAvailable()
-      ? safeStorage.encryptString(text)
-      : Buffer.from(text, "utf8");
-    fs.writeFileSync(secretsFile(), body);
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
-  }
-}
-
-module.exports.readSecrets = readSecrets;
-module.exports.writeSecrets = writeSecrets;

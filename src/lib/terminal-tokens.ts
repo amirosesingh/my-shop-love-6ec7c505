@@ -450,15 +450,9 @@ export async function activateTerminal(code: string): Promise<TerminalConfig> {
   // One-time use: only the till that wins this atomic claim may register.
   const deviceName =
     typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 120) : null;
-  const { mintDeviceProof, deviceMeta } = await import("./terminal-proof");
-  const meta = deviceMeta();
-  const { hash } = await mintDeviceProof();
   const { data: claimed, error: claimError } = await rpc("terminal_token_claim", {
     p_token_id: payload.token_id,
     p_device: deviceName,
-    p_proof_hash: hash,
-    p_platform: meta.platform,
-    p_os: meta.os,
   });
   if (claimError) throw new ActivationError(activationFailureMessage(claimError));
   if (claimed !== true) {
@@ -594,15 +588,9 @@ export async function activateWithTokenId(tokenId: string): Promise<TerminalConf
     );
   }
   const deviceName = typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 120) : null;
-  const { mintDeviceProof, deviceMeta } = await import("./terminal-proof");
-  const meta = deviceMeta();
-  const { hash } = await mintDeviceProof();
   const { data: claimed, error } = await rpc("terminal_token_claim", {
     p_token_id: tokenId,
     p_device: deviceName,
-    p_proof_hash: hash,
-    p_platform: meta.platform,
-    p_os: meta.os,
   });
   if (error) throw new ActivationError(activationFailureMessage(error));
   if (claimed !== true) {

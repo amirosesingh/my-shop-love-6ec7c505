@@ -49,11 +49,6 @@ export function clearRevocation() {
   setBlocked(false);
 }
 
-/** Confirmed revocation, from the poll or from the live change feed. */
-export function markTerminalRevoked() {
-  setBlocked(true);
-}
-
 export type RevocationState = {
   config: TerminalConfig | null;
   /** the token was confirmed revoked — lock the screen */
@@ -105,12 +100,6 @@ export function useRevocationCheck(): RevocationState {
     if (!config) return;
     let cancelled = false;
 
-    // Live feed: locks the till the instant the token is revoked.
-    let stopWatching: (() => void) | undefined;
-    void import("./terminal-listener").then((m) => {
-      if (!cancelled) stopWatching = m.watchTerminalRevocation(config.tokenId);
-    });
-
     const check = async () => {
       // No link, no verdict: the till keeps selling exactly as it was.
       if (typeof navigator !== "undefined" && !navigator.onLine) return;
@@ -122,7 +111,6 @@ export function useRevocationCheck(): RevocationState {
         // reloading). Only a positive revoked verdict may wipe activation.
         if (!remote) return;
         if (remote.status === "revoked") {
-          void import("./terminal-listener").then((m) => m.triggerImmediateLockdown());
           setBlocked(true);
           clearTerminalConfig();
           return;
@@ -140,7 +128,6 @@ export function useRevocationCheck(): RevocationState {
     window.addEventListener("online", onOnline);
     return () => {
       cancelled = true;
-      stopWatching?.();
       window.clearInterval(timer);
       window.removeEventListener("online", onOnline);
     };

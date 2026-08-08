@@ -7,12 +7,11 @@
  * so ordinary writes succeed under the normal row rules. The relay stays as a
  * fallback for tills that cannot hold a session.
  */
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac } from "node:crypto";
 import { supabaseConfig } from "./external-supabase-config";
 import { serviceRest, serviceKey } from "./pos-relay.server";
 
 export type TerminalAccount = { email: string; password: string };
-export type DeviceMeta = { platform: "web" | "mobile" | "electron"; os: string };
 
 const emailFor = (tokenId: string) => `terminal.${tokenId}@pos.local`;
 
@@ -34,78 +33,22 @@ async function adminFetch(path: string, init: RequestInit = {}) {
   return fetch(`${supabaseConfig().url}/auth/v1/${path}`, { ...init, headers });
 }
 
-const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
-
-const sameHash = (a: string, b: string) => {
-  const left = Buffer.from(a);
-  const right = Buffer.from(b);
-  return left.length === right.length && timingSafeEqual(left, right);
-};
-
-/** Append a line to the shop-readable trail. Never blocks the caller. */
-async function logTerminalEvent(
-  action: string,
-  details: Record<string, unknown>,
-): Promise<void> {
-  try {
-    await serviceRest("audit_logs", {
-      method: "POST",
-      prefer: "return=minimal",
-      body: JSON.stringify([
-        {
-          user_name: "Terminal",
-          action_category: "security",
-          action_name: action,
-          target_module: "Terminal activation",
-          details,
-        },
-      ]),
-    });
-  } catch {
-    /* logging must never break activation */
-  }
-}
-
 /**
- * Release the machine account for an activated terminal to the machine that
- * won the claim. The caller must present the one-time device proof; a bare
- * token id is refused.
+ * Create (or repair) the machine account for an activated terminal and return
+ * the credentials the till should keep encrypted on the device.
  */
-export async function issueTerminalAccount(
-  tokenId: string,
-  deviceProof: string,
-  device: DeviceMeta,
-): Promise<TerminalAccount> {
+export async function ensureTerminalAccount(tokenId: string): Promise<TerminalAccount> {
   const tokenRes = await serviceRest(
-    `terminal_tokens?id=eq.${encodeURIComponent(tokenId)}&select=id,status,location_id,location_name,claim_secret_hash`,
+    `terminal_tokens?id=eq.${encodeURIComponent(tokenId)}&select=id,status,location_id,location_name`,
   );
   if (!tokenRes.ok) throw new Error("Could not reach the central database");
   const token = ((await tokenRes.json()) as {
     status?: string;
     location_id?: string | null;
     location_name?: string | null;
-    claim_secret_hash?: string | null;
   }[])[0];
   if (!token || (token.status !== "active" && token.status !== "used")) {
-    await logTerminalEvent("Terminal credential request refused", {
-      terminal: tokenId,
-      reason: token ? `token is ${token.status}` : "unknown token",
-      platform: device.platform,
-      os: device.os,
-    });
     throw new Error("This terminal is not activated");
-  }
-
-  if (!token.claim_secret_hash || !sameHash(token.claim_secret_hash, sha256(deviceProof))) {
-    await logTerminalEvent("Terminal credential request refused", {
-      terminal: tokenId,
-      reason: token.claim_secret_hash
-        ? "device proof did not match"
-        : "terminal was never claimed with a device proof",
-      platform: device.platform,
-      os: device.os,
-    });
-    throw new Error("This device is not the terminal that claimed this code");
   }
 
   const email = emailFor(tokenId);
@@ -164,23 +107,6 @@ export async function issueTerminalAccount(
       body: JSON.stringify([{ user_id: userId, role: "staff" }]),
     });
   }
-
-  await serviceRest(`terminal_tokens?id=eq.${encodeURIComponent(tokenId)}`, {
-    method: "PATCH",
-    prefer: "return=minimal",
-    body: JSON.stringify({
-      credentials_issued_at: new Date().toISOString(),
-      device_platform: device.platform,
-      device_os: device.os.slice(0, 120),
-    }),
-  }).catch(() => null);
-
-  await logTerminalEvent("Terminal credentials issued", {
-    terminal: tokenId,
-    branch: token.location_name ?? token.location_id ?? "",
-    platform: device.platform,
-    os: device.os,
-  });
 
   return { email, password };
 }
