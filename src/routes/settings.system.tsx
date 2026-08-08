@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
+import { UnpairTerminalCard } from "@/components/pos/UnpairTerminal";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { TIME_ZONES, effectiveTimeZone } from "@/lib/time-zone";
 import { Button } from "@/components/ui/button";
