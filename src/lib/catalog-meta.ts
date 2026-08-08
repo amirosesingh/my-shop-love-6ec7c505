@@ -1,13 +1,16 @@
 /**
  * Catalogue metadata — categories, sub-categories and units of measure.
  *
- * Both lists live in the cloud (`product_categories`, `uom_units`) but are
- * mirrored to localStorage so a till that boots offline still shows the
- * pickers it had yesterday.
+ * Both lists live on the POS database (`product_categories`, `uom_units`)
+ * alongside the rest of the catalogue, and are mirrored to localStorage so a
+ * till that boots offline still shows the pickers it had yesterday.
  */
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseExternal } from "@/integrations/supabase/external-client";
 import type { ProductCategory, UomUnit } from "./pos-types";
+
+/** Table names are shared with the POS project's generated types. */
+const supabase = supabaseExternal;
 
 const CAT_KEY = "pos.catalog.categories";
 const UOM_KEY = "pos.catalog.units";
