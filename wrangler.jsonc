@@ -18,12 +18,9 @@
   // wiped values typed into the dashboard. `keep_vars` stops that: variables
   // and secrets set in the dashboard survive each deploy.
   "keep_vars": true,
-  // Public values only — both are browser-visible by design. Leave them empty
-  // here and set them in the dashboard, or fill them in for a fresh Worker.
-  "vars": {
-    "SUPABASE_URL": "",
-    "SUPABASE_ANON_KEY": ""
-  },
+  // The two public values (SUPABASE_URL, SUPABASE_ANON_KEY) are set as plain
+  // variables in the dashboard. They are deliberately NOT listed here: a value
+  // written in this file would overwrite the dashboard one on every deploy.
   // One Worker serves the back office and both public storefront hosts.
   // Cloudflare Access rules decide which of them require a login.
   "routes": [
