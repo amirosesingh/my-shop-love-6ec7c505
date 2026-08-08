@@ -153,6 +153,9 @@ type AuthCtx = {
   isSupervisor: boolean;
   /** admin, or a supervisor assigned to "All stores" — may switch branches */
   canSwitchStores: boolean;
+  /** Branch this PC is registered to. When set, every account signed in here
+   *  trades in this branch — the staff record's own store never applies. */
+  terminalStoreId: string | null;
   /** cashier accounts are limited to the POS terminal */
   isCashier: boolean;
   /** warehouse account — stock/receiving user driven purely by its toggles */
