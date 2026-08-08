@@ -27,6 +27,12 @@ export function setRuntimeEnv(env: unknown): void {
   cached = undefined;
 }
 
+/** A single value from the hosting runtime's own environment, if it has one. */
+export function runtimeEnvValue(name: string): string | undefined {
+  const value = clean(runtimeEnv?.[name]);
+  return value || undefined;
+}
+
 /** Public values the server printed into the page for the browser to read. */
 function injectedBag(): Record<string, unknown> | undefined {
   const g = globalThis as unknown as { __POS_CONFIG__?: Record<string, unknown> };
