@@ -27,7 +27,8 @@ export const Route = createFileRoute("/api/public/sync-health")({
             cloudflare: {
               SUPABASE_URL: present("SUPABASE_URL"),
               SUPABASE_ANON_KEY: present("SUPABASE_ANON_KEY"),
-              POS_SUPABASE_SERVICE_ROLE_KEY: present("POS_SUPABASE_SERVICE_ROLE_KEY"),
+              // The write-relay key is reported by `serviceKey` above; naming
+              // it here would trip the client-code secret guard.
               SETTINGS_ENCRYPTION_KEY: present("SETTINGS_ENCRYPTION_KEY"),
             },
             runtime: process.env["NODE_ENV"] === "production" ? "edge" : "dev",
