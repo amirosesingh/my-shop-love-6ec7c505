@@ -60,7 +60,9 @@ const SERVICE_KEY_NAMES = [
 /** Read the key at call time: some runtimes inject env per request. */
 function readServiceKey(): string | undefined {
   for (const name of SERVICE_KEY_NAMES) {
-    const value = process.env[name];
+    // Cloudflare hands secrets to the worker per request, so check what the
+    // server entry captured before falling back to the process environment.
+    const value = runtimeEnvValue(name) ?? process.env[name];
     if (value) return value;
   }
   return undefined;
