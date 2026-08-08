@@ -14,6 +14,16 @@
   "observability": {
     "enabled": true
   },
+  // Cloudflare replaces the Worker's whole variable set on every deploy, which
+  // wiped values typed into the dashboard. `keep_vars` stops that: variables
+  // and secrets set in the dashboard survive each deploy.
+  "keep_vars": true,
+  // Public values only — both are browser-visible by design. Leave them empty
+  // here and set them in the dashboard, or fill them in for a fresh Worker.
+  "vars": {
+    "SUPABASE_URL": "",
+    "SUPABASE_ANON_KEY": ""
+  },
   // One Worker serves the back office and both public storefront hosts.
   // Cloudflare Access rules decide which of them require a login.
   "routes": [
@@ -21,6 +31,8 @@
     { "pattern": "member.luckycharmsdnbhd.com", "custom_domain": true },
     { "pattern": "redeem.luckycharmsdnbhd.com", "custom_domain": true }
   ]
-  // Runtime values (backend URL, publishable key, ingest secret) are Worker
-  // secrets set with `wrangler secret put NAME` — never committed here.
+  // Server-only values stay encrypted secrets, never committed here:
+  //   wrangler secret put POS_SUPABASE_SERVICE_ROLE_KEY
+  //   wrangler secret put SETTINGS_ENCRYPTION_KEY
+  //   wrangler secret put SECURITY_ALERT_INGEST_SECRET
 }

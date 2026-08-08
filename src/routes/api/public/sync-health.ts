@@ -12,14 +12,24 @@ export const Route = createFileRoute("/api/public/sync-health")({
     handlers: {
       GET: async () => {
         const { hasServiceKey } = await import("@/lib/pos-relay.server");
-        const { hasSupabaseConfig, supabaseConfigSource } = await import(
+        const { hasSupabaseConfig, supabaseConfigSource, runtimeEnvValue } = await import(
           "@/lib/external-supabase-config"
         );
+        // Presence only — never a value, a length or a prefix. After a deploy
+        // this shows at a glance whether Cloudflare still holds all four.
+        const present = (name: string) =>
+          Boolean(runtimeEnvValue(name) ?? process.env[name]);
         return Response.json(
           {
             serviceKey: hasServiceKey(),
             posUrl: hasSupabaseConfig(),
             posUrlSource: supabaseConfigSource(),
+            cloudflare: {
+              SUPABASE_URL: present("SUPABASE_URL"),
+              SUPABASE_ANON_KEY: present("SUPABASE_ANON_KEY"),
+              POS_SUPABASE_SERVICE_ROLE_KEY: present("POS_SUPABASE_SERVICE_ROLE_KEY"),
+              SETTINGS_ENCRYPTION_KEY: present("SETTINGS_ENCRYPTION_KEY"),
+            },
             runtime: process.env["NODE_ENV"] === "production" ? "edge" : "dev",
           },
           { headers: { "Cache-Control": "no-store" } },
