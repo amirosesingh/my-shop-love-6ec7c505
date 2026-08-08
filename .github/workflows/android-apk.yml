@@ -10,17 +10,23 @@ on:
   push:
     tags:
       - "v*"
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "scripts/mobile-build.cjs"
+      - "vite.config.ts"
+      - "capacitor.config.ts"
+      - "capacitor-shell/**"
+      - "package.json"
+      - ".github/workflows/android-apk.yml"
 
 concurrency:
   group: android-release
   cancel-in-progress: false
 
-permissions:
-  contents: read
-
 jobs:
   apk:
-    name: Build and publish the Android APK
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -47,17 +53,7 @@ jobs:
 
       - name: Read app version
         id: meta
-        run: |
-          version=$(node -p "require('./package.json').version")
-          short_sha="${GITHUB_SHA:0:7}"
-          case "$GITHUB_REF" in
-            refs/tags/*) tag="${GITHUB_REF#refs/tags/}" ;;
-            *) tag="v$version" ;;
-          esac
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "commit=$short_sha" >> "$GITHUB_OUTPUT"
-          echo "release_id=$tag-$short_sha" >> "$GITHUB_OUTPUT"
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
 
       - name: Build the offline app bundle
         if: ${{ !inputs.app_url }}
@@ -71,7 +67,6 @@ jobs:
         run: |
           npx cap add android || true
           npx cap sync android
-          node scripts/android-permissions.cjs
 
       - name: Build debug APK
         working-directory: android
@@ -83,36 +78,24 @@ jobs:
 
       - name: Stage APK for upload
         id: stage
-        env:
-          RELEASE_ID: ${{ steps.meta.outputs.release_id }}
-          RELEASE_TAG: ${{ steps.meta.outputs.tag }}
-          RELEASE_COMMIT: ${{ steps.meta.outputs.commit }}
         run: |
-          mkdir -p android-release android-versioned
+          mkdir -p android-release
           src=$(ls android/app/build/outputs/apk/debug/*.apk | head -n1)
           v="${{ steps.meta.outputs.version }}"
           cp "$src" "android-release/NorthwindPOS-$v.apk"
           cp "$src" "android-release/NorthwindPOS-latest.apk"
-          cp "$src" "android-versioned/NorthwindPOS-$v.apk"
-          printf '{"version":"%s","file":"NorthwindPOS-%s.apk","released":"%s","tag":"%s","commit":"%s","path":"pos-app/releases/%s/android"}\n' \
-            "$v" "$v" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$RELEASE_TAG" "$RELEASE_COMMIT" "$RELEASE_ID" \
-            > android-release/latest.json
+          printf '{"version":"%s","file":"NorthwindPOS-%s.apk","released":"%s"}\n' \
+            "$v" "$v" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > android-release/latest.json
           echo "version=$v" >> "$GITHUB_OUTPUT"
 
       - name: Stage the live web bundle
         if: ${{ !inputs.app_url }}
-        env:
-          RELEASE_ID: ${{ steps.meta.outputs.release_id }}
-          RELEASE_TAG: ${{ steps.meta.outputs.tag }}
-          RELEASE_COMMIT: ${{ steps.meta.outputs.commit }}
         run: |
           mkdir -p android-web
           v="${{ steps.meta.outputs.version }}"
           (cd capacitor-shell && zip -qr "../android-web/web-$v.zip" .)
-          cp "android-web/web-$v.zip" android-web/web-latest.zip
-          printf '{"version":"%s","file":"web-%s.zip","released":"%s","tag":"%s","commit":"%s","path":"pos-app/releases/%s/android/web"}\n' \
-            "$v" "$v" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$RELEASE_TAG" "$RELEASE_COMMIT" "$RELEASE_ID" \
-            > android-web/latest.json
+          printf '{"version":"%s","file":"web-%s.zip","released":"%s"}\n' \
+            "$v" "$v" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > android-web/latest.json
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -126,41 +109,19 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: auto
-          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-          RELEASE_ID: ${{ steps.meta.outputs.release_id }}
         run: |
-          if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ] || [ -z "$R2_ENDPOINT" ]; then
-            echo "R2 credentials are not configured; skipping the update-feed upload."
-            exit 0
-          fi
-          base="s3://updatelccms/pos-app"
-
-          # 1. Immutable, versioned copies.
-          aws s3 sync android-versioned "$base/releases/$RELEASE_ID/android" \
-            --cache-control "public,max-age=31536000,immutable" \
-            --endpoint-url "$R2_ENDPOINT"
-
-          # 2. Stable pointers the phones poll.
-          aws s3 sync android-release "$base/latest/android" \
-            --cache-control "no-cache" \
-            --endpoint-url "$R2_ENDPOINT"
-
-          # 3. Legacy path, kept for already-deployed devices.
           aws s3 sync android-release s3://updatelccms/pos-app/android \
-            --cache-control "no-cache" \
-            --endpoint-url "$R2_ENDPOINT"
-          if [ -d android-web ]; then
-            aws s3 sync android-web "$base/releases/$RELEASE_ID/android/web" \
-              --exclude "web-latest.zip" \
-              --cache-control "public,max-age=31536000,immutable" \
-              --endpoint-url "$R2_ENDPOINT"
-            aws s3 sync android-web "$base/latest/android/web" \
-              --cache-control "no-cache" \
-              --endpoint-url "$R2_ENDPOINT"
-            aws s3 sync android-web s3://updatelccms/pos-app/android/web \
-              --cache-control "no-cache" \
-              --endpoint-url "$R2_ENDPOINT"
-          fi
+            --endpoint-url ${{ secrets.R2_ENDPOINT }}
+
+      - name: Deploy the live web bundle to Cloudflare R2
+        if: ${{ !inputs.app_url }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          aws s3 sync android-web s3://updatelccms/pos-app/android/web \
+            --endpoint-url ${{ secrets.R2_ENDPOINT }}
 
       - name: Attach APK to the GitHub release
         if: startsWith(github.ref, 'refs/tags/v')
