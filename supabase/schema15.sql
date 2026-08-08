@@ -30,13 +30,13 @@ ALTER TABLE public.terminal_tokens
 
 -- An unregistered till can inspect only the exact token id in its code.
 CREATE OR REPLACE FUNCTION public.terminal_token_status(p_token_id uuid)
-RETURNS TABLE (status text, location_name text)
+RETURNS TABLE (status text, location_name text, location_id text)
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, pg_temp
 AS $$
-  SELECT t.status, coalesce(t.location_name, '')
+  SELECT t.status, coalesce(t.location_name, ''), coalesce(t.location_id, '')
   FROM public.terminal_tokens t
   WHERE t.id = p_token_id
 $$;
@@ -50,7 +50,7 @@ RETURNS void
 LANGUAGE sql
 VOLATILE
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, pg_temp
 AS $$
   UPDATE public.terminal_tokens
   SET last_seen_at = now(),
@@ -70,14 +70,14 @@ RETURNS boolean
 LANGUAGE plpgsql
 VOLATILE
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, pg_temp
 AS $$
 DECLARE
   claimed boolean;
 BEGIN
   UPDATE public.terminal_tokens
   SET status = 'used',
-      claimed_by_device = coalesce(p_device, claimed_by_device),
+      claimed_by_device = left(coalesce(p_device, claimed_by_device), 120),
       claimed_at = now(),
       activated_at = coalesce(activated_at, now()),
       last_seen_at = now()
@@ -88,9 +88,14 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.terminal_token_status(uuid) FROM public;
-REVOKE ALL ON FUNCTION public.terminal_token_heartbeat(uuid, boolean) FROM public;
-REVOKE ALL ON FUNCTION public.terminal_token_claim(uuid, text) FROM public;
+REVOKE ALL ON FUNCTION public.terminal_token_status(uuid) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.terminal_token_heartbeat(uuid, boolean) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.terminal_token_claim(uuid, text) FROM PUBLIC, anon, authenticated;
+
+-- Visitors activate only through the narrow routines above; they must never be
+-- able to enumerate activation rows through the Data API.
+REVOKE ALL ON TABLE public.terminal_tokens FROM anon;
+GRANT ALL ON TABLE public.terminal_tokens TO service_role;
 
 GRANT EXECUTE ON FUNCTION public.terminal_token_status(uuid)
   TO anon, authenticated, service_role;

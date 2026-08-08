@@ -120,14 +120,14 @@ CREATE OR REPLACE FUNCTION public.terminal_token_claim(p_token_id uuid, p_device
  RETURNS boolean
  LANGUAGE plpgsql
  SECURITY DEFINER
- SET search_path TO 'public'
+ SET search_path TO 'public', 'pg_temp'
 AS $function$
 DECLARE
   claimed boolean;
 BEGIN
   UPDATE public.terminal_tokens
   SET status = 'used',
-      claimed_by_device = coalesce(p_device, claimed_by_device),
+       claimed_by_device = left(coalesce(p_device, claimed_by_device), 120),
       claimed_at = now(),
       activated_at = coalesce(activated_at, now()),
       last_seen_at = now()
@@ -142,7 +142,7 @@ CREATE OR REPLACE FUNCTION public.terminal_token_heartbeat(p_token_id uuid, p_ac
  RETURNS void
  LANGUAGE sql
  SECURITY DEFINER
- SET search_path TO 'public'
+ SET search_path TO 'public', 'pg_temp'
 AS $function$
   UPDATE public.terminal_tokens
   SET last_seen_at = now(),
@@ -156,7 +156,7 @@ CREATE OR REPLACE FUNCTION public.terminal_token_status(p_token_id uuid)
  RETURNS TABLE(status text, location_name text, location_id text)
  LANGUAGE sql
  STABLE SECURITY DEFINER
- SET search_path TO 'public'
+ SET search_path TO 'public', 'pg_temp'
 AS $function$
   SELECT t.status, coalesce(t.location_name, ''), coalesce(t.location_id, '')
   FROM public.terminal_tokens t
@@ -174,6 +174,13 @@ GRANT ALL ON public.stores TO service_role;
 GRANT SELECT ON public.stores TO anon;  -- public claim / storefront pages
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.terminal_tokens TO authenticated;
 GRANT ALL ON public.terminal_tokens TO service_role;
+
+REVOKE ALL ON FUNCTION public.terminal_token_status(uuid) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.terminal_token_heartbeat(uuid, boolean) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.terminal_token_claim(uuid, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.terminal_token_status(uuid) TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.terminal_token_heartbeat(uuid, boolean) TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.terminal_token_claim(uuid, text) TO anon, authenticated, service_role;
 
 -- ---------- row level security ----------
 ALTER TABLE public.stores ENABLE ROW LEVEL SECURITY;
