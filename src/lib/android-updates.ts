@@ -9,8 +9,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { APP_VERSION } from "./app-updates";
 import { isNative, isAndroid } from "./native";
+import { describeNetworkError, httpGetBase64, httpGetJson } from "./native-http";
 
-const FEED = "https://updatecms.luckycharmsdnbhd.com/pos-app/android";
+const BASE = "https://updatecms.luckycharmsdnbhd.com/pos-app";
+/** Current layout first, legacy path second, for phones on older releases. */
+const FEEDS = [`${BASE}/latest/android`, `${BASE}/android`];
 const SIX_HOURS = 6 * 60 * 60 * 1000;
 const DISMISS_KEY = "pos.android.update.dismissed";
 
@@ -50,43 +53,36 @@ export function isNewer(candidate: string, current: string): boolean {
   return false;
 }
 
-async function fetchLatest(): Promise<{ version: string; file: string }> {
-  const res = await fetch(`${FEED}/latest.json?t=${Date.now()}`, { cache: "no-store" });
-  if (!res.ok) throw new Error(`Update check failed (HTTP ${res.status})`);
-  const data = (await res.json()) as { version?: string; file?: string };
-  if (!data.version) throw new Error("The update feed did not report a version.");
-  return { version: data.version, file: data.file || `NorthwindPOS-${data.version}.apk` };
+async function fetchLatest(): Promise<{ version: string; file: string; feed: string }> {
+  let last: unknown = new Error("No update feed is reachable.");
+  for (const feed of FEEDS) {
+    try {
+      const data = await httpGetJson<{ version?: string; file?: string }>(`${feed}/latest.json`);
+      if (!data?.version) throw new Error("The update feed did not report a version.");
+      return {
+        version: data.version,
+        file: data.file || `NorthwindPOS-${data.version}.apk`,
+        feed,
+      };
+    } catch (err) {
+      last = err;
+    }
+  }
+  throw new Error(describeNetworkError(last));
 }
 
 /** Download the APK into app storage and open Android's package installer. */
-async function downloadAndInstall(file: string, onProgress: (pct: number) => void) {
+async function downloadAndInstall(
+  file: string,
+  feed: string,
+  onProgress: (pct: number) => void,
+) {
   const [{ Filesystem, Directory }, { FileOpener }] = await Promise.all([
     import("@capacitor/filesystem"),
     import("@capacitor-community/file-opener"),
   ]);
 
-  const res = await fetch(`${FEED}/${encodeURIComponent(file)}`);
-  if (!res.ok || !res.body) throw new Error(`Download failed (HTTP ${res.status})`);
-  const total = Number(res.headers.get("content-length") || 0);
-  const reader = res.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let received = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (value) {
-      chunks.push(value);
-      received += value.length;
-      if (total) onProgress(Math.round((received / total) * 100));
-    }
-  }
-  const blob = new Blob(chunks as BlobPart[], { type: "application/vnd.android.package-archive" });
-  const base64 = await new Promise<string>((resolve, reject) => {
-    const fr = new FileReader();
-    fr.onerror = () => reject(new Error("Could not read the downloaded file."));
-    fr.onload = () => resolve(String(fr.result).split(",")[1] ?? "");
-    fr.readAsDataURL(blob);
-  });
+  const base64 = await httpGetBase64(`${feed}/${encodeURIComponent(file)}`, onProgress);
 
   await Filesystem.writeFile({ path: file, data: base64, directory: Directory.Cache });
   const { uri } = await Filesystem.getUri({ path: file, directory: Directory.Cache });
