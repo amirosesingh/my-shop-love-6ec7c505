@@ -1,7 +1,7 @@
 import { createStart, createCsrfMiddleware, createMiddleware } from "@tanstack/react-start";
 
 import { renderErrorPage } from "./lib/error-page";
-// Auth helpers target the external Supabase project (qhrufhtbeguxydenzfey),
+// Auth helpers target the Supabase project named by the environment,
 // not the managed Cloud backend.
 import { attachExternalSupabaseAuth } from "@/integrations/supabase/external-auth-attacher";
 import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
