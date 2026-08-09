@@ -168,6 +168,8 @@ type Ctx = {
   restoreProducts: (ids: string[]) => void;
   mergeProducts: (masterId: string, duplicateIds: string[]) => Promise<BlockedDelete[]>;
   adjustStock: (id: string, delta: number, storeId?: string) => void;
+  /** Re-read the given products from the database into local state. */
+  syncProducts: (ids: string[]) => Promise<void>;
   applyStockCount: (
     entries: { productId: string; counted: number }[],
     reason: StockAdjustmentReason,
@@ -409,18 +411,18 @@ export function PosProvider({ children }: { children: ReactNode }) {
       }
       setShiftReadError(null);
       setDbShift(found);
-      setState((s) => ({
-        ...s,
-        shifts: found
-          ? s.shifts.some((x) => x.id === found.id)
-            ? s.shifts.map((x) => (x.id === found.id ? found : x))
-            : [found, ...s.shifts]
-          : s.shifts.map((x) =>
-              x.storeId === storeId && !x.closedAt
-                ? { ...x, status: "CLOSED" as const, closedAt: x.closedAt ?? new Date().toISOString() }
-                : x,
-            ),
-      }));
+      // Only a real close ends a shift. An empty read never rewrites the
+      // cached shift to CLOSED — the database row stays OPEN, and marking it
+      // closed locally is what used to lock a trading till after a sign-out.
+      if (found) {
+        const row = found;
+        setState((s) => ({
+          ...s,
+          shifts: s.shifts.some((x) => x.id === row.id)
+            ? s.shifts.map((x) => (x.id === row.id ? row : x))
+            : [row, ...s.shifts],
+        }));
+      }
     } catch (e) {
       // Offline, refused or unreachable: never downgrade a trading till to
       // "locked" — keep the last known open shift and say we are reconnecting.
@@ -441,7 +443,8 @@ export function PosProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!signedIn) {
-      setDbShift(null);
+      // Signing out never closes the shift: keep the last known open shift so
+      // the next cashier walks straight back into it while the re-read runs.
       setShiftChecked(false);
       return;
     }
@@ -1205,6 +1208,28 @@ export function PosProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /**
+   * Pull the authoritative quantities back from the database for a handful of
+   * products. Called right after receiving stock so the grid and the register
+   * show the same number the backend holds, never a stale cached one.
+   */
+  const syncProducts = useCallback(async (ids: string[]) => {
+    const wanted = [...new Set(ids.filter(Boolean))];
+    if (!wanted.length) return;
+    try {
+      const { loadProductsByIds } = await import("./pos-db");
+      const fresh = await loadProductsByIds(wanted);
+      if (!fresh.length) return;
+      const byId = new Map(fresh.map((p) => [p.id, p]));
+      setState((s) => ({
+        ...s,
+        products: s.products.map((p) => byId.get(p.id) ?? p),
+      }));
+    } catch {
+      /* offline — the local figures stay as they are and sync later */
+    }
+  }, []);
+
+  /**
    * Commits a physical stock count / adjustment: absolute counted quantities
    * replace the system figure and every variance is written to the trail with
    * a reason, so calibration differences can be audited later.
@@ -1576,6 +1601,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     setBookingJobStatus,
     upsertProduct,
     removeProduct,
+    syncProducts,
     removeProducts,
     patchProducts,
     archiveProducts,
