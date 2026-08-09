@@ -42,6 +42,8 @@ import { TablePagination, usePagination } from "@/components/pos/TablePagination
 import { Switch } from "@/components/ui/switch";
 import { BulkImportDialog } from "@/components/pos/BulkImportDialog";
 import { MergeProductsDialog } from "@/components/pos/MergeProductsDialog";
+import { ProductDeleteBlockedDialog } from "@/components/pos/ProductDeleteBlockedDialog";
+import type { BlockedDelete } from "@/lib/product-delete";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { exportProductsXlsx } from "@/lib/product-export";
 import { subCategoriesOf, topCategories, useCategories, useUnits } from "@/lib/catalog-meta";
@@ -106,6 +108,7 @@ function Inventory() {
   const [selected, setSelected] = useState<string[]>([]);
   const [importOpen, setImportOpen] = useState(false);
   const [mergeOpen, setMergeOpen] = useState(false);
+  const [blocked, setBlocked] = useState<BlockedDelete[]>([]);
   const [catFilter, setCatFilter] = useState("all");
   const [subFilter, setSubFilter] = useState("all");
   const [bulkCategory, setBulkCategory] = useState("");
@@ -507,16 +510,18 @@ function Inventory() {
                 <Button
                   size="sm"
                   variant="destructive"
-                  onClick={() => {
+                  onClick={async () => {
                     if (
                       !window.confirm(
                         `Delete ${selected.length} product${selected.length > 1 ? "s" : ""}? This cannot be undone.`,
                       )
                     )
                       return;
-                    removeProducts(selected);
-                    toast.success(`${selected.length} products deleted`);
-                    setSelected([]);
+                    const failed = await removeProducts(selected);
+                    const done = selected.length - failed.length;
+                    if (done) toast.success(`${done} product${done > 1 ? "s" : ""} deleted`);
+                    setSelected(failed.map((f) => f.id));
+                    if (failed.length) setBlocked(failed);
                   }}
                 >
                   <Trash2 className="size-4" /> Delete selected
@@ -646,9 +651,10 @@ function Inventory() {
                     <Button
                       size="icon"
                       variant="ghost"
-                      onClick={() => {
-                        removeProduct(p.id);
-                        toast.success("Product removed");
+                      onClick={async () => {
+                        const failed = await removeProduct(p.id);
+                        if (failed.length) setBlocked(failed);
+                        else toast.success("Product removed");
                       }}
                     >
                       <Trash2 className="size-4 text-destructive" />
