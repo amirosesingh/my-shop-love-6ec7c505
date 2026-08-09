@@ -540,6 +540,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, [logout]);
 
+  // Boot / resume check: before the dashboard trusts what it has, ask the
+  // server whether this device's token is still live and its branch still
+  // exists. Only a definite refusal signs anyone out — offline stays working.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let alive = true;
+    const check = async () => {
+      if (document.visibilityState === "hidden") return;
+      try {
+        const creds = await readCredentials();
+        if (!creds.cashierToken && !creds.terminalToken && !creds.accessToken) return;
+        const { verifySession } = await import("@/lib/session-verify.functions");
+        const res = await verifySession({ data: creds });
+        if (!alive || res.ok) return;
+        if (res.reason === "revoked" || res.reason === "branch_missing") {
+          const { notifySessionExpired } = await import("@/lib/session-expiry");
+          notifySessionExpired();
+        }
+      } catch {
+        /* a failed check is a connectivity problem, never a sign-out */
+      }
+    };
+    void check();
+    const onVisible = () => void check();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      alive = false;
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [user?.staffId]);
+
   const isWarehouse =
     !!session?.user &&
     !terminalUser?.cashierId &&
