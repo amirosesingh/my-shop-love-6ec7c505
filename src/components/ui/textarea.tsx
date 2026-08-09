@@ -1,9 +1,18 @@
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
+import { resolveFieldIdentity } from "@/lib/field-name";
 
 const Textarea = React.forwardRef<HTMLTextAreaElement, React.ComponentProps<"textarea">>(
   ({ className, ...props }, ref) => {
+    const reactId = React.useId();
+    const identity = resolveFieldIdentity({
+      id: props.id,
+      name: props.name,
+      ariaLabel: props["aria-label"],
+      placeholder: props.placeholder,
+      fallbackId: reactId,
+    });
     return (
       <textarea
         className={cn(
@@ -12,6 +21,8 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, React.ComponentProps<"tex
         )}
         ref={ref}
         {...props}
+        id={identity.id}
+        name={identity.name}
       />
     );
   },
