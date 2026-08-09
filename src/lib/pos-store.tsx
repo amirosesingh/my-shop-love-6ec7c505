@@ -160,10 +160,10 @@ type Ctx = {
   cancelBooking: (id: string, reason: string) => void;
   deleteBooking: (id: string, reason: string) => Promise<void>;
   upsertProduct: (product: Product) => void;
-  removeProduct: (id: string) => void;
-  removeProducts: (ids: string[]) => void;
+  removeProduct: (id: string) => Promise<BlockedDelete[]>;
+  removeProducts: (ids: string[]) => Promise<BlockedDelete[]>;
   patchProducts: (ids: string[], patch: Partial<Product>) => void;
-  mergeProducts: (masterId: string, duplicateIds: string[]) => void;
+  mergeProducts: (masterId: string, duplicateIds: string[]) => Promise<BlockedDelete[]>;
   adjustStock: (id: string, delta: number, storeId?: string) => void;
   applyStockCount: (
     entries: { productId: string; counted: number }[],
