@@ -925,23 +925,33 @@ function StaffManagement() {
                     <div className="space-y-1">
                       <Label>Role</Label>
                       <Select
-                        value={selected.role}
+                        value={selected.role_slug ?? selected.role}
                         onValueChange={(v) => {
-                          const role = v as StaffRole;
-                          if (role !== selected.role) setRoleChange({ row: selected, target: role });
+                          const def = roles.find((r) => r.slug === v);
+                          if (def && v !== (selected.role_slug ?? selected.role)) {
+                            void assignRole(selected, def);
+                          }
                         }}
                       >
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {STAFF_ROLES.map((r) => (
-                            <SelectItem key={r} value={r} className="capitalize">
-                              {r}
+                          {roles.map((r) => (
+                            <SelectItem key={r.slug} value={r.slug}>
+                              {r.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
+                      <p className="text-[11px] text-muted-foreground">
+                        {
+                          describeAssignment(
+                            roles.find((r) => r.slug === (selected.role_slug ?? selected.role)),
+                            selected.permissions as never,
+                          ).label
+                        }
+                      </p>
                     </div>
                     {selected.kind === "cashier" ? (
                       <div className="space-y-1">
@@ -1015,6 +1025,34 @@ function StaffManagement() {
                       Credentials are stored securely and can never be read back.
                     </p>
                   </div>
+
+                  {selected.kind === "account" && (
+                    <div className="flex flex-wrap items-end gap-3 rounded-md border border-border p-3">
+                      <div className="space-y-1">
+                        <Label className="flex items-center gap-1 text-xs">
+                          <KeyRound className="size-3.5" /> Manager PIN (4-6 digits)
+                        </Label>
+                        <Input
+                          className="w-48"
+                          type="password"
+                          inputMode="numeric"
+                          maxLength={6}
+                          autoComplete="off"
+                          value={managerPin}
+                          onChange={(e) =>
+                            setManagerPin(e.target.value.replace(/\D/g, "").slice(0, 6))
+                          }
+                        />
+                      </div>
+                      <Button variant="outline" onClick={() => void saveManagerPin(selected)}>
+                        Set manager PIN
+                      </Button>
+                      <p className="text-[11px] text-muted-foreground">
+                        Used to authorise gated actions at the till. Administrators are never
+                        prompted — their approval is recorded automatically.
+                      </p>
+                    </div>
+                  )}
 
                   <Button onClick={() => void saveProfile(selected)} disabled={saving}>
                     {saving && <Loader2 className="size-4 animate-spin" />} Save profile
