@@ -1,9 +1,24 @@
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
+import { resolveFieldIdentity } from "@/lib/field-name";
+
+// Types where an auto-generated name could change form semantics.
+const UNMANAGED_TYPES = new Set(["hidden", "file", "submit", "button", "reset", "radio", "checkbox", "image"]);
 
 const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
   ({ className, type, ...props }, ref) => {
+    const reactId = React.useId();
+    const managed = !UNMANAGED_TYPES.has(type ?? "text");
+    const identity = managed
+      ? resolveFieldIdentity({
+          id: props.id,
+          name: props.name,
+          ariaLabel: props["aria-label"],
+          placeholder: props.placeholder,
+          fallbackId: reactId,
+        })
+      : { id: props.id, name: props.name };
     return (
       <input
         type={type}
@@ -13,6 +28,8 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
         )}
         ref={ref}
         {...props}
+        id={identity.id}
+        name={identity.name}
       />
     );
   },
