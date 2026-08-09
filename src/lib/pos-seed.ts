@@ -107,7 +107,12 @@ export const defaultSettings: AppSettings = {
   visibility: { hidden: {} },
 };
 
-export const seedPromotions: Promotion[] = [
+/**
+ * Sample content. NOTHING in this file is written to the database on start-up:
+ * an empty database stays empty. The only way these rows reach the database is
+ * the explicit "Load sample data" button on the diagnostics page.
+ */
+export const samplePromotions: Promotion[] = [
   {
     id: "promo-points",
     name: "Standard point policy",
@@ -150,7 +155,7 @@ export const seedPromotions: Promotion[] = [
   },
 ];
 
-export const seedStores: Store[] = [
+export const sampleStores: Store[] = [
   {
     id: "s1",
     code: "HRB",
@@ -198,15 +203,15 @@ const p = (
   taxRate: 0.05,
 });
 
-export const seedState: PosState = {
-  stores: seedStores,
+export const sampleState: PosState = {
+  stores: sampleStores,
   currentStoreId: "s1",
   counter: 1042,
   transferCounter: 24,
   bookingCounter: 0,
   transfers: [],
   bookings: [],
-  promotions: seedPromotions,
+  promotions: samplePromotions,
   settings: defaultSettings,
   products: [
     p("p1", "Espresso Beans 250g", "Coffee", 12.5, 7.2, 34),
@@ -266,6 +271,26 @@ export const seedState: PosState = {
       birthday: "1996-11-23",
     },
   ],
+  sales: [],
+  shifts: [],
+};
+
+/**
+ * What the till starts from before the database answers. Deliberately empty so
+ * a deleted record can never reappear from a stale first paint.
+ */
+export const emptyState: PosState = {
+  stores: [],
+  currentStoreId: "",
+  counter: 1,
+  transferCounter: 1,
+  bookingCounter: 0,
+  transfers: [],
+  bookings: [],
+  promotions: [],
+  settings: defaultSettings,
+  products: [],
+  members: [],
   sales: [],
   shifts: [],
 };

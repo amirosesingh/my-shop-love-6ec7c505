@@ -87,32 +87,11 @@ export type PosUser = {
   permissions: StaffPermissions;
 };
 
-const SEED_STAFF: StaffMember[] = [
-  {
-    id: "u1",
-    name: "John Carter",
-    staffId: "EMP-101",
-    email: "",
-    storeId: "s1",
-    permissions: { ...DEFAULT_PERMISSIONS, can_view_sales_reports: true, can_add_new_product: true },
-  },
-  {
-    id: "u2",
-    name: "Maya Lin",
-    staffId: "EMP-102",
-    email: "",
-    storeId: "s2",
-    permissions: { ...DEFAULT_PERMISSIONS, can_view_sales_reports: true },
-  },
-  {
-    id: "u3",
-    name: "Sofia Reyes",
-    staffId: "EMP-103",
-    email: "",
-    storeId: "s3",
-    permissions: { ...DEFAULT_PERMISSIONS },
-  },
-];
+/**
+ * No demo staff. Records only ever appear because someone created them, so a
+ * deleted person never comes back after a restart.
+ */
+const SEED_STAFF: StaffMember[] = [];
 
 const STAFF_KEY = "pos-staff-v1";
 /** Terminal identity of the cashier at the till. Never stores the PIN. */

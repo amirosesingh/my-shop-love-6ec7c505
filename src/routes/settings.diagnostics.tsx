@@ -13,6 +13,7 @@ import {
   type DbHealthReport,
   type RecentRows,
 } from "@/lib/db-health";
+import { importSampleData } from "@/lib/pos-db";
 
 export const Route = createFileRoute("/settings/diagnostics")({
   head: () => ({
@@ -44,6 +45,21 @@ function DiagnosticsPage() {
   const [coverage, setCoverage] = useState<BranchCoverage[] | null>(null);
   const [peek, setPeek] = useState<RecentRows | null>(null);
   const [peeking, setPeeking] = useState<string | null>(null);
+  const [seeding, setSeeding] = useState(false);
+
+  /** Demo catalogue, on request only — nothing is ever inserted automatically. */
+  const loadSample = async () => {
+    if (!window.confirm("Add the demo products, members and promotions to the central database?")) return;
+    setSeeding(true);
+    try {
+      await importSampleData();
+      toast.success("Sample data added");
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setSeeding(false);
+    }
+  };
 
   const run = async () => {
     setBusy(true);
@@ -86,6 +102,9 @@ function DiagnosticsPage() {
         </Button>
         <Button size="sm" variant="outline" disabled={!report} onClick={() => void copy()}>
           Copy report
+        </Button>
+        <Button size="sm" variant="outline" disabled={seeding} onClick={() => void loadSample()}>
+          {seeding ? "Adding…" : "Load sample data"}
         </Button>
         {report && (
           <span className="text-xs text-muted-foreground">

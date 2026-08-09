@@ -8,7 +8,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
-import { defaultSettings, seedState } from "./pos-seed";
+import { defaultSettings, emptyState } from "./pos-seed";
 import type {
   AppSettings,
   Booking,
@@ -233,7 +233,7 @@ function applyCloud(s: PosState, cloud: CloudSlice): PosState {
 }
 
 export function PosProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<PosState>(seedState);
+  const [state, setState] = useState<PosState>(emptyState);
   const [ready, setReady] = useState(false);
   const { authUserId, terminalUser, user, isAdmin, isSupervisor, ready: authReady } = useAuth();
   // Nothing is fetched from the cloud until a cashier or supervisor session
@@ -307,7 +307,8 @@ export function PosProvider({ children }: { children: ReactNode }) {
         if (cancelled) return;
         writeSnapshot(cloud);
         setState((s) => applyCloud(s, cloud));
-        if (!cloud.stores.length) db.upsertStores(stateRef.current.stores);
+        // No backfill here on purpose: an empty branch list means the operator
+        // deleted them, and re-creating them would undo that.
         // Bookings and racket job cards live in the cloud so every till and
         // the phone see the same list.
         try {
@@ -1498,7 +1499,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const reset = useCallback(() => setState(seedState), []);
+  const reset = useCallback(() => setState(emptyState), []);
 
   const value: Ctx = {
     ready,

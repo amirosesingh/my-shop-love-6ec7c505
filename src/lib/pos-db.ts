@@ -1,6 +1,6 @@
 import { toast } from "sonner";
 import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
-import { defaultSettings, seedState } from "./pos-seed";
+import { defaultSettings, sampleState } from "./pos-seed";
 import { drainOutbox, runOpLive } from "./sync-engine";
 import { electronDb, localDb, readBranch } from "./local-db";
 import { enqueue, listQueue, persisted, type SyncOp } from "./sync-outbox";
@@ -458,22 +458,26 @@ const tierName = (id: string | null): MemberTier => (id && tierNameById[id]) || 
 
 /* ------------------------------ bootstrap ------------------------------ */
 
-/** First run: copy the built-in demo catalogue into the empty database. */
-async function seedCloud() {
+/**
+ * Copy the built-in sample catalogue into the database. Never called on start
+ * up — only from the explicit "Load sample data" action, so deleted records
+ * stay deleted.
+ */
+export async function importSampleData() {
   const idMap = new Map<string, string>();
-  const products = seedState.products.map((p) => {
+  const products = sampleState.products.map((p) => {
     const id = crypto.randomUUID();
     idMap.set(p.id, id);
     return productToRow({ ...p, id });
   });
   await supabase.from("products").insert(products as never);
 
-  const members = seedState.members.map((m) =>
+  const members = sampleState.members.map((m) =>
     memberToRow({ ...m, id: crypto.randomUUID() }, tierId),
   );
   await supabase.from("members").insert(members as never);
 
-  const promotions = seedState.promotions.map((p) =>
+  const promotions = sampleState.promotions.map((p) =>
     promotionToRow({
       ...p,
       id: crypto.randomUUID(),
@@ -493,10 +497,6 @@ export async function loadCloudState(): Promise<CloudSlice> {
     tierIdByName[t.name] = t.id;
     tierNameById[t.id] = t.name as MemberTier;
   }
-
-  const first = await supabase.from("products").select("id").limit(1);
-  if (first.error) throw first.error;
-  if (!first.data?.length) await seedCloud();
 
   const [products, members, sales, promotions, settings, stores, shifts] = await Promise.all([
     supabase.from("products").select("*").order("name"),
