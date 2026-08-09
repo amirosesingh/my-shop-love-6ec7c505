@@ -12,8 +12,8 @@ import type { BlockedDelete } from "@/lib/product-delete";
 
 /**
  * Explains, in shop language, why an item could not be removed and offers the
- * safe alternative: hide it from the till and the web catalogue instead of
- * breaking the records that point at it.
+ * safe alternative: archive it, so it leaves the till and the web catalogue
+ * while every receipt and report that mentions it stays intact.
  */
 export function ProductDeleteBlockedDialog({
   blocked,
@@ -33,12 +33,12 @@ export function ProductDeleteBlockedDialog({
           <AlertDialogTitle>
             {many
               ? `${blocked.length} products could not be deleted`
-              : `Cannot delete “${first?.name}”`}
+              : "Product cannot be deleted"}
           </AlertDialogTitle>
           <AlertDialogDescription>
             {many
               ? "These items are still used by records that would break if they were removed:"
-              : `This item cannot be removed because ${first?.reason}. Deleting it would break those records.`}
+              : `“${first?.name}” has sales or paperwork recorded in previous shifts or past transactions — ${first?.reason}. Deleting it would distort historical sales reports and receipts.`}
           </AlertDialogDescription>
         </AlertDialogHeader>
 
@@ -54,14 +54,14 @@ export function ProductDeleteBlockedDialog({
         )}
 
         <p className="text-sm text-muted-foreground">
-          You can hide {many ? "them" : "it"} from the till and the web catalogue instead — the
-          history stays intact.
+          You can archive {many ? "them" : "it"} instead: {many ? "they leave" : "it leaves"} the
+          till and the web catalogue, and every past receipt and report stays exactly as it was.
         </p>
 
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={onClose}>Close</AlertDialogCancel>
+          <AlertDialogCancel onClick={onClose}>Cancel</AlertDialogCancel>
           <AlertDialogAction onClick={() => onHide(blocked.map((b) => b.id))}>
-            {many ? "Hide the blocked ones" : "Hide instead"}
+            {many ? "Archive the blocked ones" : "Deactivate / archive product"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

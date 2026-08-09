@@ -91,6 +91,8 @@ function Inventory() {
     removeProduct,
     removeProducts,
     patchProducts,
+    archiveProducts,
+    restoreProducts,
     adjustStock,
   } = usePos();
   const { can } = useAuth();
@@ -109,6 +111,8 @@ function Inventory() {
   const [importOpen, setImportOpen] = useState(false);
   const [mergeOpen, setMergeOpen] = useState(false);
   const [blocked, setBlocked] = useState<BlockedDelete[]>([]);
+  const [deleting, setDeleting] = useState<string[]>([]);
+  const [showArchived, setShowArchived] = useState(false);
   const [catFilter, setCatFilter] = useState("all");
   const [subFilter, setSubFilter] = useState("all");
   const [bulkCategory, setBulkCategory] = useState("");
@@ -139,6 +143,7 @@ function Inventory() {
     (p) =>
       // Items owned by a private-catalogue branch stay at that branch.
       productVisibleAt(state.settings, p.id, state.currentStoreId) &&
+      (showArchived ? p.archived === true : p.archived !== true) &&
       (catFilter === "all" || p.category === catFilter) &&
       (subFilter === "all" || (p.subCategory ?? "") === subFilter) &&
       `${p.name} ${p.sku} ${p.barcode} ${(p.barcodes ?? []).join(" ")} ${p.category} ${p.subCategory ?? ""}`

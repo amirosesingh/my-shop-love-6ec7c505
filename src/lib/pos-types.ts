@@ -37,6 +37,8 @@ export type Product = {
   ecomPrice?: number;
   /** visible on the e-commerce website */
   ecomVisible?: boolean;
+  /** archived items keep their history but leave the till and web catalogue */
+  archived?: boolean;
   /** stock per store id */
   stockByStore: Record<string, number>;
   reorderLevel: number;

@@ -262,3 +262,8 @@ CREATE POLICY "Staff can read units" ON public.uom_units FOR SELECT TO authentic
 SELECT t.name AS table_name,
        CASE WHEN to_regclass('public.' || t.name) IS NULL THEN 'MISSING' ELSE 'OK' END AS status
 FROM (VALUES ('products'),('product_categories'),('uom_units'),('suppliers')) AS t(name);
+
+-- Archived products stay in history but leave the till and web catalogue.
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS is_archived boolean NOT NULL DEFAULT false;
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS archived_at timestamptz;
+CREATE INDEX IF NOT EXISTS idx_products_is_archived ON public.products (is_archived);

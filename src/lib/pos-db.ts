@@ -7,6 +7,11 @@ import { enqueue, listQueue, persisted, type SyncOp } from "./sync-outbox";
 import { isLiveOnly } from "./live-mode";
 import { canRelay, relayStores } from "./sync-relay";
 import { keyset, nextCursor, PAGE_SIZE, type Cursor, type Page } from "./keyset";
+import {
+  isLinkedRecordError,
+  usageBlock,
+  type ProductUsage,
+} from "./product-delete";
 import type {
   AppSettings,
   Member,
@@ -42,6 +47,39 @@ export function dbError(context: string, error: unknown) {
 
 const num = (v: unknown, fallback = 0) => (v == null ? fallback : Number(v));
 
+/**
+ * Which records still point at a product. Uses the database guard routine and
+ * falls back to direct counts when that routine has not been installed yet.
+ */
+async function productDeleteBlock(id: string): Promise<{ code: string; reason: string } | null> {
+  try {
+    const rpc = (await (
+      supabase as unknown as {
+        rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
+      }
+    ).rpc("product_delete_guard", { _product_id: id })) as { data: unknown; error: unknown };
+    if (!rpc.error && rpc.data) return usageBlock(rpc.data as ProductUsage);
+  } catch {
+    /* fall through to the direct counts below */
+  }
+  try {
+    const probe = async (table: string, column: string) => {
+      const res = await supabase.from(table as never).select("id").eq(column, id).limit(1);
+      return !res.error && Array.isArray(res.data) && res.data.length > 0;
+    };
+    const [sales, purchases, transfers, adjustments, promotions] = await Promise.all([
+      probe("sale_items", "product_id"),
+      probe("purchase_order_items", "product_id"),
+      probe("stock_transfer_items", "product_id"),
+      probe("stock_adjustments", "product_id"),
+      probe("promotions", "foc_product_id"),
+    ]);
+    return usageBlock({ sales, purchases, transfers, adjustments, promotions });
+  } catch {
+    return null;
+  }
+}
+
 /* ------------------------------- mappers ------------------------------- */
 
 export const rowToProduct = (r: Row): Product => ({
@@ -58,6 +96,7 @@ export const rowToProduct = (r: Row): Product => ({
   cost: num(r.cost_price),
   ecomPrice: r.ecom_price == null ? undefined : num(r.ecom_price),
   ecomVisible: r.ecom_visible ?? true,
+  archived: r.is_archived === true,
   stockByStore: (r.stock_by_store ?? {}) as Record<string, number>,
   reorderLevel: num(r.reorder_level),
   taxRate: num(r.tax_rate),
@@ -78,6 +117,8 @@ export const productToRow = (p: Product): Row => ({
   selling_price: p.price ?? 0,
   ecom_price: p.ecomPrice ?? null,
   ecom_visible: p.ecomVisible ?? true,
+  is_archived: p.archived === true,
+  archived_at: p.archived ? new Date().toISOString() : null,
   stock_quantity: Object.values(p.stockByStore ?? {}).reduce((a, b) => a + (b || 0), 0),
   stock_by_store: p.stockByStore ?? {},
   reorder_level: p.reorderLevel ?? 0,
@@ -740,6 +781,12 @@ export const db = {
   deleteProduct: (id: string) =>
     queue("Deleting product", { kind: "delete", table: "products", match: { id } }),
   /**
+   * Asks the database which records still point at a product before anything
+   * is deleted, so the screen can explain the refusal instead of relying on a
+   * raw constraint error. A guard that cannot be reached returns null and the
+   * delete goes ahead — the foreign keys are still the final word.
+   */
+  /**
    * Delete a product and wait for the answer.
    *
    * Unlike the queued version this surfaces a refusal from the database (for
@@ -756,9 +803,12 @@ export const db = {
       return;
     }
     try {
+      const block = await productDeleteBlock(id);
+      if (block) throw new Error(`${block.code}: ${block.reason}`);
       await runOpLive("Deleting product", op);
     } catch (e) {
       const message = (e as { message?: string })?.message ?? String(e);
+      if (isLinkedRecordError(message)) throw e instanceof Error ? e : new Error(message);
       const offline = typeof navigator !== "undefined" && !navigator.onLine;
       if (!isLiveOnly() && (offline || /failed to fetch|network|timeout/i.test(message))) {
         enqueue("Deleting product", op);

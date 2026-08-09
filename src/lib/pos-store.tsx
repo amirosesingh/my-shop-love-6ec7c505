@@ -164,6 +164,8 @@ type Ctx = {
   removeProduct: (id: string) => Promise<BlockedDelete[]>;
   removeProducts: (ids: string[]) => Promise<BlockedDelete[]>;
   patchProducts: (ids: string[], patch: Partial<Product>) => void;
+  archiveProducts: (ids: string[]) => void;
+  restoreProducts: (ids: string[]) => void;
   mergeProducts: (masterId: string, duplicateIds: string[]) => Promise<BlockedDelete[]>;
   adjustStock: (id: string, delta: number, storeId?: string) => void;
   applyStockCount: (
@@ -1110,6 +1112,22 @@ export function PosProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /**
+   * Takes items off the till and the web catalogue without touching a single
+   * record that points at them, so receipts and reports stay exactly as they
+   * were rung up.
+   */
+  const archiveProducts = useCallback(
+    (ids: string[]) => patchProducts(ids, { archived: true, ecomVisible: false }),
+    [patchProducts],
+  );
+
+  /** Brings an archived item back into the catalogue. */
+  const restoreProducts = useCallback(
+    (ids: string[]) => patchProducts(ids, { archived: false }),
+    [patchProducts],
+  );
+
+  /**
    * Folds duplicate product records into one master: branch stock is added
    * together and every losing barcode/SKU becomes an alias on the master, so
    * scanning the old code still finds the item.
@@ -1560,6 +1578,8 @@ export function PosProvider({ children }: { children: ReactNode }) {
     removeProduct,
     removeProducts,
     patchProducts,
+    archiveProducts,
+    restoreProducts,
     mergeProducts,
     adjustStock,
     applyStockCount,
