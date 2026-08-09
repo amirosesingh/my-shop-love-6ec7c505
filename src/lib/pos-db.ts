@@ -793,7 +793,17 @@ export const db = {
       return;
     }
     const res = await supabase.from("pos_settings").upsert(settingsToRow(s) as never);
-    if (res.error) throw new Error(res.error.message);
+    if (!res.error) return;
+    // The database is missing a newer column: drop it and save the rest, so a
+    // single missing field never blocks the whole settings record.
+    const col = unknownSettingsColumn(res.error.message);
+    if (!col) throw new Error(res.error.message);
+    missingSettingsColumns.add(col);
+    const retry = await supabase.from("pos_settings").upsert(settingsToRow(s) as never);
+    if (retry.error) throw new Error(retry.error.message);
+    console.warn(
+      `[settings] this database has no "${col}" column on pos_settings — saved everything else. Run supabase/schema27.sql to add it.`,
+    );
   },
 
   /** Persist a completed bill, its lines, the stock movement and member points. */
