@@ -34,6 +34,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
   clearHealthErrors,
+  disposeRealtimeProbe,
   listHealthErrors,
   overallState,
   runDiagnostics,
@@ -142,6 +143,7 @@ function SystemSettingsBody() {
 
   useEffect(() => {
     diagnose();
+    return () => disposeRealtimeProbe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
