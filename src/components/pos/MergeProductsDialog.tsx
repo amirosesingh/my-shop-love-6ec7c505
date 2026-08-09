@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { Label } from "@/components/ui/label";
 import { money, stockAt, usePos } from "@/lib/pos-store";
+import type { BlockedDelete } from "@/lib/product-delete";
 import type { Product } from "@/lib/pos-types";
 
 /**
@@ -25,11 +26,13 @@ export function MergeProductsDialog({
   products,
   onOpenChange,
   onMerged,
+  onBlocked,
 }: {
   open: boolean;
   products: Product[];
   onOpenChange: (open: boolean) => void;
   onMerged?: () => void;
+  onBlocked?: (blocked: BlockedDelete[]) => void;
 }) {
   const { mergeProducts, currentStore } = usePos();
   const [masterId, setMasterId] = useState(products[0]?.id ?? "");
@@ -112,14 +115,15 @@ export function MergeProductsDialog({
           </Button>
           <Button
             disabled={products.length < 2 || !masterId}
-            onClick={() => {
-              mergeProducts(
+            onClick={async () => {
+              const blocked = await mergeProducts(
                 masterId,
                 losers.map((p) => p.id),
               );
               toast.success(`Merged ${losers.length + 1} records into ${master?.name}`);
               onOpenChange(false);
               onMerged?.();
+              if (blocked.length) onBlocked?.(blocked);
             }}
           >
             Merge products
