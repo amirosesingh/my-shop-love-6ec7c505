@@ -296,6 +296,57 @@ function StaffManagement() {
     }
   };
 
+  /**
+   * Assign a role. When the base level differs the account kind may have to
+   * change, so the existing conversion dialog takes over; otherwise the role's
+   * preset is applied and every switch stays editable afterwards.
+   */
+  const assignRole = async (row: StaffRow, def: RoleDef) => {
+    if (def.baseLevel !== row.role) {
+      setRoleChange({ row, target: def.baseLevel });
+      return;
+    }
+    const preset = def.permissions as unknown as Record<string, boolean>;
+    patchRow(row.user_id, { role_slug: def.slug, permissions: { ...preset } });
+    try {
+      if (row.kind === "cashier") {
+        await setCashierRoleSlug(row.id, def.slug);
+        await setCashierPermissions(row.id, preset);
+      } else {
+        await sb.rpc("set_app_user_role_slug", {
+          p_user_id: row.user_id,
+          p_role_slug: def.slug,
+        });
+        await sb.rpc("set_app_user_permissions", {
+          p_user_id: row.user_id,
+          p_permissions: preset,
+        });
+      }
+      toast.success(`${def.name} preset applied`);
+    } catch (e) {
+      toast.error("Could not change role", { description: errText(e) });
+      void load();
+    }
+  };
+
+  /** 4-6 digit manager PIN used to authorise gated actions at the till. */
+  const saveManagerPin = async (row: StaffRow) => {
+    if (!/^\d{4,6}$/.test(managerPin)) {
+      toast.error("Manager PIN must be 4 to 6 digits");
+      return;
+    }
+    const { error } = await sb.rpc("set_app_user_pin", {
+      p_user_id: row.user_id,
+      p_pin: managerPin,
+    });
+    setManagerPin("");
+    if (error) {
+      toast.error("Could not set the manager PIN", { description: error.message });
+      return;
+    }
+    toast.success("Manager PIN updated");
+  };
+
   const createUser = async () => {
     // (role presets are applied from the role list below)
     setCreating(true);
