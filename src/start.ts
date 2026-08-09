@@ -5,6 +5,7 @@ import { renderErrorPage } from "./lib/error-page";
 // not the managed Cloud backend.
 import { attachExternalSupabaseAuth } from "@/integrations/supabase/external-auth-attacher";
 import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
+import { sessionExpiryMiddleware } from "@/lib/session-expiry.middleware";
 
 const errorMiddleware = createMiddleware().server(async ({ next }) => {
   try {
@@ -29,6 +30,6 @@ const csrfMiddleware = createCsrfMiddleware({
 });
 
 export const startInstance = createStart(() => ({
-  functionMiddleware: [attachSupabaseAuth, attachExternalSupabaseAuth],
+  functionMiddleware: [attachSupabaseAuth, attachExternalSupabaseAuth, sessionExpiryMiddleware],
   requestMiddleware: [errorMiddleware, csrfMiddleware],
 }));

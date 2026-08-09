@@ -36,6 +36,15 @@ const closeInput = z.object({
   grantToken: z.string().optional(),
 });
 
+const bypassInput = z.object({
+  accessToken: z.string().min(10),
+  action: z.string().min(1).max(64),
+  ruleKey: z.string().max(64).optional(),
+  storeId: z.string().max(64).optional(),
+  terminalId: z.string().max(64).optional(),
+  detail: z.string().max(400).optional(),
+});
+
 /** Any signed-in till user: a Supabase staff account or a cashier session. */
 async function assertCaller(data: { accessToken?: string; terminalToken?: string }) {
   if (data.accessToken) {
@@ -139,6 +148,46 @@ export const verifyManagerPin = createServerFn({ method: "POST" })
  * Server-side gate for closing a shift: held tickets and the closing count
  * are checked against the database rules, not the browser's copy.
  */
+
+/**
+ * Admin bypass. An administrator never types a PIN, but the approval is still
+ * proved on the server (their own session) and written to the override log, so
+ * the audit trail is identical to a PIN-approved action.
+ */
+export const authorizeAsAdmin = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => bypassInput.parse(data))
+  .handler(async ({ data }) => {
+    const { signOverrideGrant, logOverride } = await import("./pos-rules.server");
+    try {
+      const { verifyPosStaff } = await import("./secure-settings.server");
+      const caller = await verifyPosStaff(data.accessToken);
+      if (caller.role !== "admin") {
+        return { ok: false as const, error: "Administrators only" };
+      }
+      await logOverride({
+        action: data.action,
+        ruleKey: data.ruleKey ?? null,
+        requestedBy: caller.userId,
+        approvedBy: caller.userId,
+        approvedRole: "admin",
+        storeId: data.storeId ?? null,
+        terminalId: data.terminalId ?? null,
+        detail: `${data.detail ?? ""} (auto-approved: administrator)`.trim(),
+      });
+      return {
+        ok: true as const,
+        manager: { id: caller.userId, name: caller.userId, role: "admin" },
+        grantToken: signOverrideGrant({
+          action: data.action,
+          approvedBy: caller.userId,
+          role: "admin",
+        }),
+      };
+    } catch (e) {
+      return { ok: false as const, error: (e as Error).message };
+    }
+  });
+
 export const assertShiftClosable = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => closeInput.parse(data))
   .handler(async ({ data }) => {
