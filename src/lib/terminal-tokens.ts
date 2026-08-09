@@ -618,6 +618,9 @@ export async function activateTerminal(code: string): Promise<TerminalConfig> {
   const { data: claimed, error: claimError } = await rpcOn(tenant, "terminal_token_claim", {
     p_token_id: payload.token_id,
     p_device: deviceName,
+    p_proof_hash: null,
+    p_platform: claimPlatform(),
+    p_os: claimOs(),
   });
   if (claimError) {
     const message = activationFailureMessage(claimError);
@@ -766,6 +769,9 @@ export async function activateWithTokenId(tokenId: string): Promise<TerminalConf
   const { data: claimed, error } = await rpc("terminal_token_claim", {
     p_token_id: tokenId,
     p_device: deviceName,
+    p_proof_hash: null,
+    p_platform: claimPlatform(),
+    p_os: claimOs(),
   });
   if (error) throw new ActivationError(activationFailureMessage(error));
   if (claimed !== true) {
