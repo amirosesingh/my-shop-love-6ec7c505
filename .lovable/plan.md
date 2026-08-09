@@ -1,38 +1,47 @@
-# Auth, roles, permissions and terminal PIN authorisation
+# Persistent data, terminal kill switch, roles and manager PIN gates
 
-Four connected changes: sessions that end themselves when the server says the token is dead, admin-managed custom roles, a per-branch "needs a manager PIN" list, and a PIN prompt that admins skip.
+Five connected changes: stop the app re-creating deleted records, keep writes behind proven callers, give admins a remote terminal reset, add custom roles with smart permission presets, and a per-action "Require Manager PIN" list with an admin bypass.
 
-## 1. Session ends when the token is rejected
+## 1. Deleted data stays deleted
 
-- Every call to the central database and every server function passes through one shared response check.
-- A 401 or 403 answer (token missing, revoked, or no longer matching the database) clears the saved session and local sign-in data and returns the terminal to the login screen with a short "Your session ended, please sign in again" note.
-- Timeouts, offline moments and 5xx server errors never sign anyone out. They raise the existing connectivity warning banner and the till keeps working.
-- Terminal activation stays untouched — a revoked *terminal* still uses today's kill-switch.
+- Confirmed cause: on every load, when the products table comes back empty the app copies the built-in demo catalogue (products, members, promotions) straight back in (`loadCloudState` -> `seedCloud` in `src/lib/pos-db.ts`). A second path pushes the built-in store list back whenever the stores table is empty (`src/lib/pos-store.tsx`).
+- Both are removed. An empty database stays empty and the screens show their normal empty states.
+- The demo content becomes an explicit, admin-only "Load sample data" button on the diagnostics page, so it can never run by itself.
+- The in-memory starting state no longer carries demo products, members or promotions, so a first paint before the database answers cannot look seeded or be written back by a later save.
+- A regression test asserts nothing performs a bulk insert during load.
 
-## 2. Roles and staff management
+## 2. Writes only from proven callers
 
-- Built-in roles stay: Cashier, Warehouse Supervisor, Admin (plus the existing Supervisor). These cannot be deleted or renamed.
-- New **Role Management** panel inside Staff Management: create a custom role with a name, a base level (Cashier / Warehouse / Supervisor) and its own default permission checklist; delete custom roles only. Deleting is blocked while staff are still assigned to that role.
-- The permission checklist covers all existing capability groups (drawer & shift, sales approvals, sales, inventory, members, reports, system).
-- Smart presets: choosing a role ticks that role's default boxes; the moment any single box is changed by hand the assignment label switches to "Custom permissions", and a "Reset to role defaults" button puts it back.
-- Staff create and edit forms gain a **Manager PIN** field (4-6 digits) for every account. It is sent to the server and stored hashed — never held in the browser, never shown back. Editing shows "PIN set" with a "Change PIN" action.
+- Every table write goes through the till relay or a signed-in session; the relay's caller check is tightened so an unproven caller writes nothing and the failure is surfaced instead of silently retried.
+- The public sync endpoints keep working for tills but reject any request that cannot prove a cashier session, an active terminal token, or a staff token.
+- Row rules are reviewed per table so delete and update require signed-in staff or a supervisor, never a visitor.
 
-## 3. Feature security settings
+## 3. Session ends when the token is rejected, plus a remote kill switch
 
-- New **Manager PIN requirements** section in the admin security settings, listing sensitive actions: refunds, voids / cart void, line delete, quantity reduce, manual discounts, price override, no-sale drawer open, stock adjustment, shift close, tender edit.
-- Each has a Require Manager PIN switch saved in the database, per branch, following the existing Global to Cluster to Branch inheritance used by the current rules page.
-- The legacy toggles already on the rules page (refund PIN, drawer PIN) fold into this list so there is one place to look.
+- One shared response check wraps the central-database client and server-function calls. A 401 or 403 clears the saved session and returns the terminal to the login screen with "Your session ended, please sign in again."
+- Timeouts, offline moments and 5xx errors never sign anyone out; they raise the existing connectivity alert and the till keeps working.
+- New **Active terminals & sessions** panel (admin only) listing each activated terminal and each open staff session: branch, device, staff name, last seen, status.
+- Each row gets **Remote reset**: it revokes that terminal's token and ends its open sessions in the database. The remote till drops out on its next call or its five-minute check, wipes its saved activation and returns to the activation/login screen.
 
-## 4. Authorisation flow
+## 4. Roles and staff management
 
-- Toggle OFF: the action runs straight away if the user's own permissions allow it.
-- Toggle ON and the user is an Admin: no prompt, the action runs and is still written to the override audit log as "auto-approved (admin)".
-- Toggle ON and the user is not an Admin: the Manager Authorisation PIN modal appears. The PIN is checked on the server against manager and admin accounts only; a wrong PIN is rejected with an attempt recorded.
+- Built-in roles stay: Cashier, Warehouse Supervisor, Supervisor, Admin — not renameable or deletable.
+- New **Role management** panel in Staff Management: create a custom role (name, base level, own default permission checklist) and delete custom roles only; deletion is blocked while staff are assigned.
+- Choosing a role ticks that role's defaults; changing any single box switches the label to "Custom permissions", with a "Reset to role defaults" action.
+- Staff create/edit forms gain a 4-6 digit **Manager PIN** field, sent to the server and stored hashed, never shown back. Editing shows "PIN set" with "Change PIN".
+
+## 5. Manager PIN toggles and authorisation flow
+
+- New **Manager PIN requirements** section in admin security settings: refunds, cart void, line delete, quantity reduce, manual discount, price override, no-sale drawer open, stock adjustment, shift close, tender edit. Each switch is saved per branch using the existing Global -> Cluster -> Branch inheritance; the legacy refund/drawer PIN toggles fold into this list.
+- OFF: the action runs immediately if the user's own permissions allow it.
+- ON and the user is an Admin: no prompt; the action runs and is still written to the override audit log as "auto-approved (admin)".
+- ON and not an Admin: the Manager Authorisation PIN modal appears; the PIN is checked on the server against manager and admin accounts only, and rejected attempts are recorded.
 
 ## Technical notes
 
-- Database: `staff_roles` table (slug, name, base level, default permissions JSONB, is_core flag) with grants + RLS, admin-write / staff-read; `pin_hash` already exists on `app_users` and `cashiers` so the Manager PIN reuses it via the existing upsert routines. Feature toggles are added as boolean keys on the existing `pos_rules` scoped rows, so branch inheritance comes for free.
-- `src/integrations/supabase/external-client.ts`: wrap the shared `fetch` to detect 401/403 and dispatch a single `session-expired` event; a listener in `src/lib/pos-auth.tsx` performs sign-out + redirect. Server-function calls get the same treatment through a client middleware in `src/start.ts`. 5xx and timeouts route to the existing connectivity alert instead.
-- `src/lib/permissions.ts`: replace the hardcoded `STAFF_ROLES` array with a role registry loaded from the database, keeping the current presets as the core-role seed and `toDbRole` mapping from the role's base level.
-- `src/lib/pos-rules.ts` / `pos-rules.server.ts`: add the `require_pin_*` keys, and a `requireManagerAuth(action)` helper used by the register that resolves toggle to admin bypass to `ManagerOverrideDialog`, replacing the ad-hoc checks now scattered across the till.
-- `src/routes/staff.tsx`: Role Management tab, PIN field, preset/custom classification. `src/routes/settings.rules.tsx` (or a new security section) renders the new toggle list.
+- `src/lib/pos-db.ts`: delete `seedCloud` and its call site; `src/lib/pos-store.tsx`: drop the empty-stores backfill and start from an empty state; `src/lib/pos-seed.ts` keeps the sample arrays only for the explicit import button.
+- New SQL file `supabase/sql/22_roles_pin_gates_and_sessions.sql`: `staff_roles` table (slug, name, base level, default permissions JSONB, is_core) with grants + RLS (admin write, staff read); `role_slug` on `app_users`/`cashiers`; `set_app_user_pin` / `verify_manager_pin`; `terminal_session_revoke(token_id)`; `require_pin_*` keys on the scoped rules rows. Added to `99_run_all.sql`; nothing is dropped.
+- `src/lib/session-expiry.ts` plus a wrapped `fetch` in `src/integrations/supabase/external-client.ts` and a client middleware in `src/start.ts` raise one `session-expired` event; `src/lib/pos-auth.tsx` listens and signs out. 5xx and timeouts route to the connectivity alert.
+- `src/lib/manager-gate.tsx` (`ManagerGateProvider` / `useManagerGate`) resolves toggle -> admin bypass -> `ManagerOverrideDialog`, replacing the ad-hoc checks in the register.
+- `src/lib/staff-roles.ts` role registry loaded from the database with the current presets as the core seed; `src/routes/staff.tsx` gains the role panel and PIN field; new `src/routes/settings.sessions.tsx` for the kill switch; `src/routes/settings.rules.tsx` renders the toggle list.
+- The new SQL file must be run once against your database for the roles, PIN and revoke routines.
