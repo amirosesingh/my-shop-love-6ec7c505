@@ -65,6 +65,7 @@ import { Route as SettingsRegionRouteImport } from './routes/settings.region'
 import { Route as SettingsRulesRouteImport } from './routes/settings.rules'
 import { Route as SettingsSecurityAlertsRouteImport } from './routes/settings.security-alerts'
 import { Route as SettingsServicesRouteImport } from './routes/settings.services'
+import { Route as SettingsSessionsRouteImport } from './routes/settings.sessions'
 import { Route as SettingsShiftAlertsRouteImport } from './routes/settings.shift-alerts'
 import { Route as SettingsSkuRouteImport } from './routes/settings.sku'
 import { Route as SettingsSyncRouteImport } from './routes/settings.sync'
@@ -362,6 +363,11 @@ const SettingsServicesRoute = SettingsServicesRouteImport.update({
   path: '/settings/services',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsSessionsRoute = SettingsSessionsRouteImport.update({
+  id: '/settings/sessions',
+  path: '/settings/sessions',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsShiftAlertsRoute = SettingsShiftAlertsRouteImport.update({
   id: '/settings/shift-alerts',
   path: '/settings/shift-alerts',
@@ -498,6 +504,7 @@ export interface FileRoutesByFullPath {
   '/settings/rules': typeof SettingsRulesRoute
   '/settings/security-alerts': typeof SettingsSecurityAlertsRoute
   '/settings/services': typeof SettingsServicesRoute
+  '/settings/sessions': typeof SettingsSessionsRoute
   '/settings/shift-alerts': typeof SettingsShiftAlertsRoute
   '/settings/sku': typeof SettingsSkuRoute
   '/settings/sync': typeof SettingsSyncRoute
@@ -572,6 +579,7 @@ export interface FileRoutesByTo {
   '/settings/rules': typeof SettingsRulesRoute
   '/settings/security-alerts': typeof SettingsSecurityAlertsRoute
   '/settings/services': typeof SettingsServicesRoute
+  '/settings/sessions': typeof SettingsSessionsRoute
   '/settings/shift-alerts': typeof SettingsShiftAlertsRoute
   '/settings/sku': typeof SettingsSkuRoute
   '/settings/sync': typeof SettingsSyncRoute
@@ -647,6 +655,7 @@ export interface FileRoutesById {
   '/settings/rules': typeof SettingsRulesRoute
   '/settings/security-alerts': typeof SettingsSecurityAlertsRoute
   '/settings/services': typeof SettingsServicesRoute
+  '/settings/sessions': typeof SettingsSessionsRoute
   '/settings/shift-alerts': typeof SettingsShiftAlertsRoute
   '/settings/sku': typeof SettingsSkuRoute
   '/settings/sync': typeof SettingsSyncRoute
@@ -723,6 +732,7 @@ export interface FileRouteTypes {
     | '/settings/rules'
     | '/settings/security-alerts'
     | '/settings/services'
+    | '/settings/sessions'
     | '/settings/shift-alerts'
     | '/settings/sku'
     | '/settings/sync'
@@ -797,6 +807,7 @@ export interface FileRouteTypes {
     | '/settings/rules'
     | '/settings/security-alerts'
     | '/settings/services'
+    | '/settings/sessions'
     | '/settings/shift-alerts'
     | '/settings/sku'
     | '/settings/sync'
@@ -871,6 +882,7 @@ export interface FileRouteTypes {
     | '/settings/rules'
     | '/settings/security-alerts'
     | '/settings/services'
+    | '/settings/sessions'
     | '/settings/shift-alerts'
     | '/settings/sku'
     | '/settings/sync'
@@ -946,6 +958,7 @@ export interface RootRouteChildren {
   SettingsRulesRoute: typeof SettingsRulesRoute
   SettingsSecurityAlertsRoute: typeof SettingsSecurityAlertsRoute
   SettingsServicesRoute: typeof SettingsServicesRoute
+  SettingsSessionsRoute: typeof SettingsSessionsRoute
   SettingsShiftAlertsRoute: typeof SettingsShiftAlertsRoute
   SettingsSkuRoute: typeof SettingsSkuRoute
   SettingsSyncRoute: typeof SettingsSyncRoute
@@ -1358,6 +1371,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsServicesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/sessions': {
+      id: '/settings/sessions'
+      path: '/settings/sessions'
+      fullPath: '/settings/sessions'
+      preLoaderRoute: typeof SettingsSessionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/shift-alerts': {
       id: '/settings/shift-alerts'
       path: '/settings/shift-alerts'
@@ -1542,6 +1562,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRulesRoute: SettingsRulesRoute,
   SettingsSecurityAlertsRoute: SettingsSecurityAlertsRoute,
   SettingsServicesRoute: SettingsServicesRoute,
+  SettingsSessionsRoute: SettingsSessionsRoute,
   SettingsShiftAlertsRoute: SettingsShiftAlertsRoute,
   SettingsSkuRoute: SettingsSkuRoute,
   SettingsSyncRoute: SettingsSyncRoute,

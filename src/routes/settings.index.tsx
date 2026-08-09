@@ -59,6 +59,13 @@ const GROUPS = [
         blurb: "Phones and tablets running the POS, managed separately from the tills.",
         cloudOnly: true,
       },
+      {
+        to: "/settings/sessions",
+        label: "Active sessions",
+        icon: MonitorSmartphone,
+        blurb: "Everyone signed in right now, with an instant remote sign-out.",
+        cloudOnly: true,
+      },
     ],
   },
   {
