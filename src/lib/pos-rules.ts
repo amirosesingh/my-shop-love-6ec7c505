@@ -34,6 +34,15 @@ export type PosRules = {
   auto_lock_timeout_seconds: number;
   require_manager_pin_for_cash_drawer_open: boolean;
   enable_manager_pin_audit_log: boolean;
+  /* E · which actions need a manager PIN */
+  require_pin_void_cart: boolean;
+  require_pin_void_line: boolean;
+  require_pin_reduce_qty: boolean;
+  require_pin_manual_discount: boolean;
+  require_pin_price_override: boolean;
+  require_pin_stock_adjustment: boolean;
+  require_pin_shift_close: boolean;
+  require_pin_edit_tenders: boolean;
 };
 
 export type PosRuleKey = keyof PosRules;
@@ -62,6 +71,14 @@ export const DEFAULT_POS_RULES: PosRules = {
   auto_lock_timeout_seconds: 90,
   require_manager_pin_for_cash_drawer_open: true,
   enable_manager_pin_audit_log: true,
+  require_pin_void_cart: true,
+  require_pin_void_line: false,
+  require_pin_reduce_qty: false,
+  require_pin_manual_discount: true,
+  require_pin_price_override: true,
+  require_pin_stock_adjustment: true,
+  require_pin_shift_close: false,
+  require_pin_edit_tenders: false,
 };
 
 /** Coerce an untrusted payload (API row) into a complete rule set. */
@@ -126,7 +143,6 @@ export const RULE_GROUPS: RuleGroup[] = [
     fields: [
       { key: "prevent_negative_stock_sale", kind: "switch", label: "Prevent negative stock sale", blurb: "Block adding an out-of-stock item." },
       { key: "require_receipt_for_refund", kind: "switch", label: "Require receipt for refund", blurb: "The original bill must be looked up." },
-      { key: "require_manager_pin_for_refund", kind: "switch", label: "Manager PIN for refunds", blurb: "Every refund needs authorisation." },
       { key: "max_refund_days_limit", kind: "number", label: "Refund window (days)", blurb: "Older purchases cannot be refunded." },
       { key: "track_item_voids", kind: "switch", label: "Track item voids", blurb: "Log line removals; manager PIN after 3." },
     ],
@@ -137,11 +153,63 @@ export const RULE_GROUPS: RuleGroup[] = [
     blurb: "Locking the screen and guarding the drawer.",
     fields: [
       { key: "auto_lock_timeout_seconds", kind: "number", label: "Auto-lock after (seconds)", blurb: "0 disables the idle lock." },
-      { key: "require_manager_pin_for_cash_drawer_open", kind: "switch", label: "Manager PIN for no-sale drawer open", blurb: "Manual drawer opens need approval." },
       { key: "enable_manager_pin_audit_log", kind: "switch", label: "Manager override audit log", blurb: "Record who approved what, and when." },
     ],
   },
+  {
+    id: "pin-gates",
+    label: "Manager PIN requirements",
+    blurb:
+      "Switch on the actions that need a manager's authorisation. Admins are never prompted — their approval is recorded automatically.",
+    fields: [
+      { key: "require_manager_pin_for_refund", kind: "switch", label: "Refunds", blurb: "Returning money to a customer." },
+      { key: "require_pin_void_cart", kind: "switch", label: "Void the whole cart", blurb: "Abandoning a ticket in progress." },
+      { key: "require_pin_void_line", kind: "switch", label: "Void / delete a line", blurb: "Removing an item already scanned." },
+      { key: "require_pin_reduce_qty", kind: "switch", label: "Reduce a quantity", blurb: "Lowering the count on a scanned line." },
+      { key: "require_pin_manual_discount", kind: "switch", label: "Manual discounts", blurb: "Any hand-typed line or bill discount." },
+      { key: "require_pin_price_override", kind: "switch", label: "Price override", blurb: "Typing a different price at the till." },
+      { key: "require_manager_pin_for_cash_drawer_open", kind: "switch", label: "No-sale drawer open", blurb: "Opening the drawer without a sale." },
+      { key: "require_pin_stock_adjustment", kind: "switch", label: "Stock adjustment", blurb: "Recounting or writing off stock." },
+      { key: "require_pin_shift_close", kind: "switch", label: "Close a shift", blurb: "Running the Z-report and handing back the till." },
+      { key: "require_pin_edit_tenders", kind: "switch", label: "Edit split payments", blurb: "Changing tenders on a bill." },
+    ],
+  },
 ];
+
+// --------------------------------------------------------------------------
+// Named actions the till can ask authorisation for, and the toggle that
+// decides whether a manager PIN is needed.
+// --------------------------------------------------------------------------
+export type GateAction =
+  | "refund"
+  | "void_cart"
+  | "void_line"
+  | "reduce_qty"
+  | "manual_discount"
+  | "discount_over_limit"
+  | "price_override"
+  | "no_sale_drawer"
+  | "stock_adjustment"
+  | "shift_close"
+  | "edit_tenders";
+
+export const GATE_RULE_KEY: Record<GateAction, PosRuleKey> = {
+  refund: "require_manager_pin_for_refund",
+  void_cart: "require_pin_void_cart",
+  void_line: "require_pin_void_line",
+  reduce_qty: "require_pin_reduce_qty",
+  manual_discount: "require_pin_manual_discount",
+  discount_over_limit: "require_pin_manual_discount",
+  price_override: "require_pin_price_override",
+  no_sale_drawer: "require_manager_pin_for_cash_drawer_open",
+  stock_adjustment: "require_pin_stock_adjustment",
+  shift_close: "require_pin_shift_close",
+  edit_tenders: "require_pin_edit_tenders",
+};
+
+/** Does this action need a manager's PIN under the current branch rules? */
+export const requiresManagerPin = (rules: PosRules, action: GateAction): boolean =>
+  Boolean(rules[GATE_RULE_KEY[action]]);
 
 /** Voided lines above this count in one ticket need a manager. */
 export const VOID_PIN_THRESHOLD = 3;
