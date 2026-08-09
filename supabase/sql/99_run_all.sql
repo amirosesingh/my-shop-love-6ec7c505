@@ -29,3 +29,5 @@
 \i 18_shift_notifications.sql
 \i 19_rules_grants.sql
 \i 20_staff_roles_backfill.sql
+\i 21_backfill_branch_ids.sql
+\i 22_roles_and_pin_gates.sql

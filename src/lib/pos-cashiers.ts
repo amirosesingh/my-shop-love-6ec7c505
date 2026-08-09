@@ -10,6 +10,8 @@ export type CashierRow = {
   id: string;
   username: string;
   full_name: string;
+  /** Assigned role (built-in or custom). Older databases return nothing. */
+  role_slug: string | null;
   permissions: StaffPermissions;
   is_active: boolean;
   last_login_at: string | null;
@@ -26,6 +28,7 @@ const mapRow = (r: Record<string, unknown>): CashierRow => ({
   id: String(r["id"] ?? ""),
   username: String(r["username"] ?? ""),
   full_name: String(r["full_name"] ?? ""),
+  role_slug: (r["role_slug"] as string | null) ?? null,
   permissions: normalizePermissions(
     r["permissions"] as Record<string, unknown> | null,
     "cashier",
