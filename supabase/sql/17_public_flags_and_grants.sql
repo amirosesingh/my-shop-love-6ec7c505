@@ -83,7 +83,7 @@ GRANT EXECUTE ON FUNCTION public.coupon_issue_manual(text, text, text, timestamp
 GRANT EXECUTE ON FUNCTION public.voucher_redeem(text, text, text, text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.voucher_set_status(text, text, text, text, text, text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.stock_transfer_receive(uuid, text, boolean) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.terminal_token_claim(uuid, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.terminal_token_claim(uuid, text, text, text, text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.security_selfcheck() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.security_set_finding_status(uuid, text, text) TO authenticated;
 
