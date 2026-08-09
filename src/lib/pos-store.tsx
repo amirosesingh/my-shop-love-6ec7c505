@@ -1499,7 +1499,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const reset = useCallback(() => setState(seedState), []);
+  const reset = useCallback(() => setState(emptyState), []);
 
   const value: Ctx = {
     ready,
