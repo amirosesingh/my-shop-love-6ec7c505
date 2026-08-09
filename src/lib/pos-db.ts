@@ -844,7 +844,7 @@ export const db = {
       details: Record<string, unknown>;
     }[],
   ) {
-    const { error } = await supabase.from("audit_logs").insert(
+    const { error } = await supabase.from("audit_logs").upsert(
       rows.map((r) => ({
         id: r.id,
         user_name: r.staffName,
@@ -854,6 +854,7 @@ export const db = {
         details: r.details as never,
         created_at: r.at,
       })) as never,
+      { onConflict: "id", ignoreDuplicates: true },
     );
     if (error) throw error;
     return rows.map((r) => r.id);
