@@ -1,42 +1,82 @@
-# Staff management overhaul + fixing the "till could not prove who it is" error
+# Unified session tracking, secure token storage and one auth interceptor
 
-## Part A — Staff, roles and permissions
+## 1. One place that holds the till's credentials
 
-### 1. Add New Staff workflow
-The Staff screen already has an "Add staff" dialog. Changes:
-- Role dropdown in the create dialog lists **every** role (built-in Cashier, Warehouse Supervisor, Supervisor, Admin **and** custom roles created in Role Management), not just the four base levels.
-- The default selection stays **Cashier** so nobody is created as an admin by accident.
-- Picking a custom role creates the account at that role's base level and stores the role slug plus its permission preset on the new record.
-- Optional **Manager PIN** (4-6 digits) field in the create form, saved with the record right after creation instead of only being settable later.
+Today the cashier session token lives only in `sessionStorage`, and the reader sends it
+under the wrong name (`terminalToken` instead of `cashierToken`) — which is why saves fail
+with "This till could not prove who it is". Fix:
 
-### 2. Staff table columns
-Replace the current narrow master list with a proper table:
+- A single credential store used by every caller (server functions, the sync relay,
+  background sync): cashier session token, terminal activation token, staff access token.
+- Storage per platform:
+  - Web: encrypted browser storage (the existing device-secret helper), not `sessionStorage`,
+    so a reload or update does not lose or keep a stale sign-in.
+  - Electron: the existing `safeStorage`-backed terminal store.
+  - Android: the existing native secure store.
+- The reader always labels each credential correctly, so the server can verify it.
 
-| Name | Email / Username | Assigned role | Access category | Manager PIN | Status / Actions |
+Note on HttpOnly cookies: the till talks to the central database directly from the client,
+so the access token must be readable by the app to sign those calls. Tokens will be kept in
+platform-encrypted storage rather than cookies; the same protection applies without breaking
+direct database access.
 
-- **Assigned role** shows the role name (built-in or custom), or "Custom permissions" when the toggles no longer match the preset.
-- **Access category** is derived: Cashier and Warehouse -> "Operational staff"; Supervisor and Admin -> "Admin / Supervisor".
-- **Manager PIN** shows Set / Not set.
-- **Status / Actions** keeps the active toggle, select-to-edit and remove.
-- Search and the existing detail panel stay; the table replaces the list column and rows stay clickable.
+## 2. Boot and resume verification
 
-### 3. Role preset auto-assignment
-- Selecting a role (create form or detail panel) ticks that role's whole permission checklist automatically.
-- Manually flipping any single toggle immediately relabels the person as **Custom permissions**, shown in the table too.
-- Admins can always re-pick a role to reset back to the preset, or change it later.
+- New `verify-session` server call: given whatever credentials the device holds, it answers
+  active / revoked / unknown, plus the branch the caller belongs to.
+- It runs before the dashboard renders and before branch data loads, on app launch, on
+  resume from background, and before privileged saves.
+- Checks both: the token is still active (cashier session valid, terminal token not revoked,
+  staff account live) AND the linked branch still exists.
+- Failure (401/403/404, revoked token, deleted branch) purges all stored session data and
+  redirects to Sign In with: "Your session or branch is no longer active. Please sign in again."
 
-## Part B — "This till could not prove who it is"
+## 3. Backend checks on every request
 
-Confirmed cause in the code: after a cashier signs in with username + PIN, the signed session token is saved in `sessionStorage` under `pos-terminal-token-v1`. The sync path sends it correctly as `cashierToken`, but `getPosCallerAuth()` — used by every other privileged server call — sends the same value as **`terminalToken`**. The server then tries to look it up as an activation token id in `terminal_tokens`, finds nothing, and throws that message. Cashiers therefore hit the error on saves even though they are signed in.
+- `/api/public/sync` and the other privileged handlers run the same verification helper:
+  token active + branch exists. An unproven or branch-less caller is refused with 401 and a
+  clear reason code, never a blank error.
+- Deleting a branch, or "Remote Reset" on a terminal, marks that terminal's token revoked and
+  ends its open staff sessions, so the remote till drops out on its next call.
+- The sync engine attaches `Authorization: Bearer <access_token>` on every request that has a
+  staff session, in addition to the credential body.
 
-Fixes:
-1. **Correct the credential shape** — `getPosCallerAuth()` returns `cashierToken` for a signed cashier session and `terminalToken` only for a real activation token id; every server function taking caller credentials accepts all three (`cashierToken`, `terminalToken`, `accessToken`).
-2. **Survive restarts** — persist the cashier/terminal token where it outlives a relaunch (localStorage on web, the existing secure device store on Electron/Android) instead of `sessionStorage` only.
-3. **Re-validate on boot and before mutations** — a lightweight session check on app launch/resume and before privileged saves; if the token is dead, sign out cleanly instead of failing mid-save.
-4. **Global interceptor** — the existing `session-expiry` inspector already distinguishes dead tokens from connectivity problems; wire the privileged server-function path into it so a genuine 401/invalid-token clears stored session state and redirects to Sign In with an explanatory message, while timeouts and 5xx only raise the temporary connectivity warning.
-5. **Database grants** — a new SQL file re-asserting `SECURITY DEFINER` + `GRANT EXECUTE ... TO authenticated` on the permission helpers (`is_staff`, `is_staff_now`, `is_supervisor_now`, `is_app_supervisor`, `has_role`, `has_perm`) so save actions never fail on a permission-denied check. Grants only, nothing dropped.
+## 4. One global interceptor
+
+- The existing session-expiry inspector becomes the only decision point, wired into the
+  central-database client, all server-function calls and the sync/relay fetches.
+- Genuine token rejection (401, or a 403/404 naming a dead token or missing branch) clears
+  stored tokens and returns to Sign In with the message above.
+- Timeouts, offline moments and 5xx keep the till working and only raise the temporary
+  connectivity alert. Sync failures never crash a screen; they queue and retry.
+
+## 5. Unified staff matrix and admin bypass
+
+- Cashier, Warehouse Supervisor, Supervisor/Manager and Admin are all rows in the one staff
+  table — no separate account types.
+- The permission matrix shows an individual toggle for every capability, grouped by area
+  (register, inventory, staff, reports, settings).
+- Admin: every toggle on and read-only (an admin cannot be reduced below full authority), and
+  every Manager PIN prompt is bypassed automatically on web, Windows and Android — the action
+  is still written to the override log as auto-approved.
+- Supervisor and Cashier: act on their own toggles; protected actions with "Require Manager
+  PIN" ON show the authorisation modal, validated server-side against manager/admin accounts.
 
 ## Technical notes
-- Files: `src/routes/staff.tsx` (table, create dialog, role presets), `src/lib/pos-caller-auth.ts` (token shape and durable storage), `src/lib/pos-auth.tsx` (store/clear tokens, boot re-validation), `src/lib/sync-relay.ts` (share the same reader), the server functions that take caller credentials, and a new `supabase/schema28.sql` for the grants.
-- Manager PIN status needs `list_app_users` / `list_cashiers` to return a boolean `pin_set`; added in the same SQL file — no PIN hashes are ever returned.
-- No table drops, no seeding, no data deletion.
+
+- New `src/lib/pos-credentials.ts` (platform-aware read/write/clear) replacing the
+  `sessionStorage` reads in `src/lib/pos-caller-auth.ts`, `src/lib/sync-relay.ts` and
+  `src/lib/pos-auth.tsx`.
+- New `src/lib/session-verify.functions.ts` + `.server.ts` for `verify-session`; called from
+  a boot gate in `src/lib/pos-auth.tsx` and before privileged mutations.
+- `src/lib/pos-relay.server.ts`: `verifyRelayCaller` also confirms the caller's branch still
+  exists and the terminal token is not revoked; `src/routes/api/public/sync.ts` returns the
+  reason code.
+- `src/lib/session-expiry.middleware.ts` extended to cover 404-branch-missing, and the relay
+  fetches routed through `inspectResponse`.
+- New `supabase/schema28.sql`: `SECURITY DEFINER` + `GRANT EXECUTE ... TO authenticated` on
+  `is_staff`, `is_staff_now`, `is_supervisor_now`, `is_app_supervisor`, `has_role`, `has_perm`;
+  a `terminal_sessions_revoke_for_branch(branch_id)` routine used by branch delete and Remote
+  Reset. Grants and additions only — nothing dropped, no seeding.
+- `src/routes/staff.tsx` / `src/lib/pos-permissions.tsx`: full toggle matrix, admin locked to
+  all-on; `src/lib/manager-gate.tsx` keeps the admin bypass consistent across platforms.
