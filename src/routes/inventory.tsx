@@ -515,6 +515,7 @@ function Inventory() {
                 <Button
                   size="sm"
                   variant="destructive"
+                  disabled={deleting.length > 0}
                   onClick={async () => {
                     if (
                       !window.confirm(
@@ -522,14 +523,20 @@ function Inventory() {
                       )
                     )
                       return;
-                    const failed = await removeProducts(selected);
-                    const done = selected.length - failed.length;
-                    if (done) toast.success(`${done} product${done > 1 ? "s" : ""} deleted`);
-                    setSelected(failed.map((f) => f.id));
-                    if (failed.length) setBlocked(failed);
+                    setDeleting(selected);
+                    try {
+                      const failed = await removeProducts(selected);
+                      const done = selected.length - failed.length;
+                      if (done) toast.success(`${done} product${done > 1 ? "s" : ""} deleted`);
+                      setSelected(failed.map((f) => f.id));
+                      if (failed.length) setBlocked(failed);
+                    } finally {
+                      setDeleting([]);
+                    }
                   }}
                 >
-                  <Trash2 className="size-4" /> Delete selected
+                  <Trash2 className="size-4" />{" "}
+                  {deleting.length > 1 ? "Checking sales history…" : "Delete selected"}
                 </Button>
               )}
             </div>
@@ -656,14 +663,30 @@ function Inventory() {
                     <Button
                       size="icon"
                       variant="ghost"
+                      disabled={deleting.includes(p.id)}
+                      title={deleting.includes(p.id) ? "Checking sales history…" : "Delete"}
                       onClick={async () => {
-                        const failed = await removeProduct(p.id);
-                        if (failed.length) setBlocked(failed);
-                        else toast.success("Product removed");
+                        setDeleting((d) => [...d, p.id]);
+                        try {
+                          const failed = await removeProduct(p.id);
+                          if (failed.length) setBlocked(failed);
+                          else toast.success("Product removed");
+                        } finally {
+                          setDeleting((d) => d.filter((id) => id !== p.id));
+                        }
                       }}
                     >
-                      <Trash2 className="size-4 text-destructive" />
+                      {deleting.includes(p.id) ? (
+                        <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                      ) : (
+                        <Trash2 className="size-4 text-destructive" />
+                      )}
                     </Button>
+                    )}
+                    {canEdit && p.archived && (
+                      <Button size="sm" variant="outline" onClick={() => restoreProducts([p.id])}>
+                        Restore
+                      </Button>
                     )}
                   </TableCell>
                 </TableRow>
@@ -697,9 +720,9 @@ function Inventory() {
         blocked={blocked}
         onClose={() => setBlocked([])}
         onHide={(ids) => {
-          patchProducts(ids, { ecomVisible: false });
+          archiveProducts(ids);
           setBlocked([]);
-          toast.success(`${ids.length > 1 ? "Products" : "Product"} hidden from the catalogue`);
+          toast.success(`${ids.length > 1 ? "Products" : "Product"} archived — history kept`);
         }}
       />
       {canAdjust && (
