@@ -14,6 +14,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { PosProvider } from "@/lib/pos-store";
 import { usePos } from "@/lib/pos-store";
 import { PosRulesProvider } from "@/lib/pos-rules.tsx";
+import { ManagerGateProvider } from "@/lib/manager-gate";
 import { AuthProvider } from "@/lib/pos-auth";
 import { PermissionsProvider } from "@/lib/pos-permissions";
 import { Toaster } from "../components/ui/sonner";
@@ -191,6 +192,7 @@ function RootComponent() {
         <PermissionsProvider>
         <PosProvider>
           <RulesBridge>
+          <ManagerGateProvider>
           {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
           <AuditTracker />
           <FirstRunSetup>
@@ -198,6 +200,7 @@ function RootComponent() {
           </FirstRunSetup>
           <AndroidUpdateBanner />
           <Toaster position="top-center" />
+          </ManagerGateProvider>
           </RulesBridge>
         </PosProvider>
         </PermissionsProvider>
