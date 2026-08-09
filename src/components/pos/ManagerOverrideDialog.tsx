@@ -92,6 +92,8 @@ export function ManagerOverrideDialog({
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Manager ID</Label>
             <Input
+              name="manager-id"
+              autoComplete="off"
               value={managerId}
               autoFocus
               onChange={(e) => setManagerId(e.target.value)}
@@ -101,6 +103,8 @@ export function ManagerOverrideDialog({
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Manager PIN</Label>
             <Input
+              name="manager-pin"
+              autoComplete="one-time-code"
               className="numeric"
               type="password"
               inputMode="numeric"
