@@ -8,6 +8,7 @@
 import { hasServiceKey, serviceRest, verifyRelayCaller } from "./pos-relay.server";
 
 export type VerifyInput = {
+  sessionToken?: string;
   cashierToken?: string;
   terminalToken?: string;
   accessToken?: string;
@@ -32,7 +33,7 @@ export async function branchExists(storeId: string): Promise<boolean> {
 
 export async function verifySessionServer(input: VerifyInput): Promise<VerifyResult> {
   if (!hasServiceKey()) return { ok: true, reason: "unavailable" };
-  if (!input.cashierToken && !input.terminalToken && !input.accessToken)
+  if (!input.sessionToken && !input.cashierToken && !input.terminalToken && !input.accessToken)
     return { ok: false, reason: "unknown" };
 
   let caller: Awaited<ReturnType<typeof verifyRelayCaller>>;
