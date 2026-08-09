@@ -75,7 +75,7 @@ import { NO_SALE_REASON_MAX, NO_SALE_REASON_MIN, recordNoSale } from "@/lib/draw
 import { buildBookingMessage, buildSaleMessage, sendBillOnWhatsApp } from "@/lib/whatsapp";
 import { logger } from "@/lib/audit-log";
 import { DiscountPad } from "@/components/pos/DiscountPad";
-import { ManagerOverrideDialog, type OverrideRequest } from "@/components/pos/ManagerOverrideDialog";
+import { useManagerGate, type GateRequest } from "@/lib/manager-gate";
 import { usePosRules } from "@/lib/pos-rules.tsx";
 import { assertShiftClosable } from "@/lib/pos-rules.functions";
 import { parseAmount, parsePositiveAmount } from "@/lib/amount";
@@ -114,18 +114,18 @@ function Register() {
   const { visible } = useVisibility();
   /** Server-loaded operational rules. Never read from browser storage. */
   const { rules } = usePosRules();
-  /** Pending manager-approval request and the work it unblocks. */
-  const [override, setOverride] = useState<OverrideRequest | null>(null);
-  const overrideResolve = useRef<((grant: string | null) => void) | null>(null);
   /**
-   * Opens the manager PIN dialog and resolves with the signed grant token the
-   * server issued, or null when the cashier backs out.
+   * Shared authorisation path: the branch rules decide whether a manager PIN
+   * is needed at all, admins are approved without a prompt, and everyone else
+   * gets the dialog. Resolves with the signed grant token, or null when the
+   * action was refused.
    */
-  const askManager = (request: OverrideRequest) =>
-    new Promise<string | null>((resolve) => {
-      overrideResolve.current = resolve;
-      setOverride(request);
-    });
+  const { authorize } = useManagerGate();
+  const askManager = async (request: GateRequest) => {
+    const res = await authorize(request);
+    // A gate that is switched off returns ok with no token — still a "go".
+    return res.ok ? (res.grantToken ?? "") : null;
+  };
   const [closeShiftOpen, setCloseShiftOpen] = useState(false);
   const [countedCash, setCountedCash] = useState("");
   const [closing, setClosing] = useState(false);
