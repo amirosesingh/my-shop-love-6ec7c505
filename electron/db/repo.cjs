@@ -115,6 +115,18 @@ async function updateRows(tx, table, values, match) {
 async function deleteRows(tx, table, match) {
   assertTable(table);
   const request = new sql.Request(tx);
+  // Offline tills refuse the same deletes the central database refuses, so a
+  // product that appears on a past bill can never be removed here either.
+  if (table === "products" && match && match.id) {
+    const guard = new sql.Request(tx);
+    bind(guard, "pid", match.id);
+    const used = await guard.query(
+      "SELECT TOP 1 1 AS hit FROM dbo.[sale_items] WHERE [product_id] = @pid;",
+    );
+    if (used.recordset && used.recordset.length) {
+      throw new Error("PRODUCT_HAS_SALES_HISTORY: it appears on past sales");
+    }
+  }
   const wheres = [];
   for (const [key, value] of Object.entries(match)) {
     bind(request, `w_${key}`, value);
