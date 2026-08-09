@@ -33,6 +33,7 @@ import { Route as StaffRouteImport } from './routes/staff'
 import { Route as StoresRouteImport } from './routes/stores'
 import { Route as SuppliersRouteImport } from './routes/suppliers'
 import { Route as TransfersRouteImport } from './routes/transfers'
+import { Route as ApiCashierLoginRouteImport } from './routes/api/cashier-login'
 import { Route as ApiSettingsRouteImport } from './routes/api/settings'
 import { Route as CTokenSlugRouteImport } from './routes/c.$tokenSlug'
 import { Route as ClaimCampaignSlugRouteImport } from './routes/claim.$campaignSlug'
@@ -199,6 +200,11 @@ const SuppliersRoute = SuppliersRouteImport.update({
 const TransfersRoute = TransfersRouteImport.update({
   id: '/transfers',
   path: '/transfers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCashierLoginRoute = ApiCashierLoginRouteImport.update({
+  id: '/api/cashier-login',
+  path: '/api/cashier-login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSettingsRoute = ApiSettingsRouteImport.update({
@@ -462,6 +468,7 @@ export interface FileRoutesByFullPath {
   '/stores': typeof StoresRoute
   '/suppliers': typeof SuppliersRoute
   '/transfers': typeof TransfersRoute
+  '/api/cashier-login': typeof ApiCashierLoginRoute
   '/api/settings': typeof ApiSettingsRouteWithChildren
   '/c/$tokenSlug': typeof CTokenSlugRoute
   '/claim/$campaignSlug': typeof ClaimCampaignSlugRoute
@@ -535,6 +542,7 @@ export interface FileRoutesByTo {
   '/stores': typeof StoresRoute
   '/suppliers': typeof SuppliersRoute
   '/transfers': typeof TransfersRoute
+  '/api/cashier-login': typeof ApiCashierLoginRoute
   '/api/settings': typeof ApiSettingsRouteWithChildren
   '/c/$tokenSlug': typeof CTokenSlugRoute
   '/claim/$campaignSlug': typeof ClaimCampaignSlugRoute
@@ -609,6 +617,7 @@ export interface FileRoutesById {
   '/stores': typeof StoresRoute
   '/suppliers': typeof SuppliersRoute
   '/transfers': typeof TransfersRoute
+  '/api/cashier-login': typeof ApiCashierLoginRoute
   '/api/settings': typeof ApiSettingsRouteWithChildren
   '/c/$tokenSlug': typeof CTokenSlugRoute
   '/claim/$campaignSlug': typeof ClaimCampaignSlugRoute
@@ -684,6 +693,7 @@ export interface FileRouteTypes {
     | '/stores'
     | '/suppliers'
     | '/transfers'
+    | '/api/cashier-login'
     | '/api/settings'
     | '/c/$tokenSlug'
     | '/claim/$campaignSlug'
@@ -757,6 +767,7 @@ export interface FileRouteTypes {
     | '/stores'
     | '/suppliers'
     | '/transfers'
+    | '/api/cashier-login'
     | '/api/settings'
     | '/c/$tokenSlug'
     | '/claim/$campaignSlug'
@@ -830,6 +841,7 @@ export interface FileRouteTypes {
     | '/stores'
     | '/suppliers'
     | '/transfers'
+    | '/api/cashier-login'
     | '/api/settings'
     | '/c/$tokenSlug'
     | '/claim/$campaignSlug'
@@ -904,6 +916,7 @@ export interface RootRouteChildren {
   StoresRoute: typeof StoresRoute
   SuppliersRoute: typeof SuppliersRoute
   TransfersRoute: typeof TransfersRoute
+  ApiCashierLoginRoute: typeof ApiCashierLoginRoute
   ApiSettingsRoute: typeof ApiSettingsRouteWithChildren
   CTokenSlugRoute: typeof CTokenSlugRoute
   ClaimCampaignSlugRoute: typeof ClaimCampaignSlugRoute
@@ -1119,6 +1132,13 @@ declare module '@tanstack/react-router' {
       path: '/transfers'
       fullPath: '/transfers'
       preLoaderRoute: typeof TransfersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/cashier-login': {
+      id: '/api/cashier-login'
+      path: '/api/cashier-login'
+      fullPath: '/api/cashier-login'
+      preLoaderRoute: typeof ApiCashierLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/settings': {
@@ -1492,6 +1512,7 @@ const rootRouteChildren: RootRouteChildren = {
   StoresRoute: StoresRoute,
   SuppliersRoute: SuppliersRoute,
   TransfersRoute: TransfersRoute,
+  ApiCashierLoginRoute: ApiCashierLoginRoute,
   ApiSettingsRoute: ApiSettingsRouteWithChildren,
   CTokenSlugRoute: CTokenSlugRoute,
   ClaimCampaignSlugRoute: ClaimCampaignSlugRoute,

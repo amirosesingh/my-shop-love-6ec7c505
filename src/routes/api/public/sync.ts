@@ -60,6 +60,17 @@ export const Route = createFileRoute("/api/public/sync")({
           return Response.json({ ok: false, error: "Malformed request" }, { status: 400 });
         }
 
+        // Every till attaches its raw session token as a bearer. Use it when
+        // the body did not carry one, so the header is a first-class proof.
+        const bearer = (request.headers.get("authorization") ?? "")
+          .replace(/^Bearer\s+/i, "")
+          .trim();
+        if (bearer && !body.sessionToken && bearer.length <= 400) {
+          body = { ...body, sessionToken: bearer };
+        } else if (bearer && !body.accessToken && bearer.length > 400) {
+          body = { ...body, accessToken: bearer.slice(0, 4000) };
+        }
+
         if (!body.ops?.length && !body.read)
           return Response.json({ ok: false, error: "Nothing to do" }, { status: 400 });
 
