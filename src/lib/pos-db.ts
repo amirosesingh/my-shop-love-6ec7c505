@@ -119,8 +119,15 @@ export const productToRow = (p: Product): Row => ({
   ecom_visible: p.ecomVisible ?? true,
   is_archived: p.archived === true,
   archived_at: p.archived ? new Date().toISOString() : null,
-  stock_quantity: Object.values(p.stockByStore ?? {}).reduce((a, b) => a + (b || 0), 0),
-  stock_by_store: p.stockByStore ?? {},
+  // Stock is only ever written when the caller actually carries the per-branch
+  // map. A product saved without it (a price or name edit, a partial import)
+  // must never zero the quantity that is already banked in the database.
+  ...(p.stockByStore && typeof p.stockByStore === "object"
+    ? {
+        stock_quantity: Object.values(p.stockByStore).reduce((a, b) => a + (b || 0), 0),
+        stock_by_store: p.stockByStore,
+      }
+    : {}),
   reorder_level: p.reorderLevel ?? 0,
   tax_rate: p.taxRate ?? 0,
   custom_points: p.customPoints ?? null,
@@ -686,6 +693,131 @@ export async function loadShiftSessions(storeId: string, limit = 200): Promise<S
   return ((res.data as Row[] | null) ?? []).map(rowToShiftSession);
 }
 
+/* --------------------- receiving invoices (purchase orders) -------------- */
+
+export type ReceivingLine = {
+  id: string;
+  productId: string | null;
+  barcode: string;
+  sku: string;
+  name: string;
+  cost: number;
+  price: number;
+  qty: number;
+};
+
+export type ReceivingInvoice = {
+  id: string;
+  invoiceNo: string;
+  supplier: string;
+  supplierId: string | null;
+  operator: string;
+  storeId: string | null;
+  storeCode: string | null;
+  invoiceDate: string | null;
+  entryDate: string;
+  totalCost: number;
+  itemCount: number;
+  createdAt: string;
+  lines: ReceivingLine[];
+};
+
+const rowToReceivingLine = (r: Row): ReceivingLine => ({
+  id: r.id,
+  productId: r.product_id ?? null,
+  barcode: r.barcode ?? "",
+  sku: r.sku ?? r.barcode ?? "",
+  name: r.product_name ?? "",
+  cost: num(r.cost_price),
+  price: num(r.selling_price),
+  qty: num(r.quantity_received),
+});
+
+const rowToReceivingInvoice = (r: Row): ReceivingInvoice => ({
+  id: r.id,
+  invoiceNo: r.po_number ?? "",
+  supplier: r.supplier_name ?? "",
+  supplierId: r.supplier_id ?? null,
+  operator: r.operator_name ?? "",
+  storeId: r.store_id ?? null,
+  storeCode: r.store_code ?? null,
+  invoiceDate: r.invoice_date ?? null,
+  entryDate: r.invoice_entry_date ?? r.created_at ?? new Date().toISOString(),
+  totalCost: num(r.total_cost),
+  itemCount: num(r.total_items_count),
+  createdAt: r.created_at ?? new Date().toISOString(),
+  lines: (Array.isArray(r.purchase_order_items) ? (r.purchase_order_items as Row[]) : []).map(
+    rowToReceivingLine,
+  ),
+});
+
+const invoiceRow = (inv: ReceivingInvoice): Row => ({
+  id: inv.id,
+  po_number: inv.invoiceNo,
+  supplier_name: inv.supplier,
+  supplier_id: inv.supplierId,
+  operator_name: inv.operator,
+  store_id: inv.storeId,
+  store_code: inv.storeCode,
+  invoice_date: inv.invoiceDate,
+  invoice_entry_date: inv.entryDate,
+  total_cost: inv.totalCost,
+  total_items_count: inv.itemCount,
+});
+
+const invoiceLineRow = (poId: string, l: ReceivingLine): Row => ({
+  id: l.id,
+  po_id: poId,
+  product_id: l.productId,
+  barcode: l.barcode,
+  sku: l.sku || l.barcode || null,
+  product_name: l.name,
+  cost_price: l.cost,
+  selling_price: l.price,
+  quantity_received: l.qty,
+  subtotal_cost: Number((l.cost * l.qty).toFixed(2)),
+});
+
+/**
+ * Receiving invoices for a branch, newest first, with their lines.
+ *
+ * Invoices saved before this screen carried a branch have no `store_id`; they
+ * are included so nothing that was already recorded disappears from view.
+ */
+export async function loadReceivingInvoices(
+  storeId: string | null,
+  limit = 100,
+): Promise<ReceivingInvoice[]> {
+  let q = supabase
+    .from("purchase_orders" as never)
+    .select("*, purchase_order_items(*)")
+    .order("invoice_entry_date", { ascending: false })
+    .limit(limit);
+  if (storeId) q = q.or(`store_id.eq.${storeId},store_id.is.null`) as typeof q;
+  const res = await q;
+  if (res.error) throw res.error;
+  return ((res.data as Row[] | null) ?? []).map(rowToReceivingInvoice);
+}
+
+/** True when another invoice already uses this number (the column is unique). */
+export async function invoiceNumberTaken(invoiceNo: string, exceptId?: string): Promise<boolean> {
+  const res = await supabase
+    .from("purchase_orders" as never)
+    .select("id")
+    .eq("po_number", invoiceNo)
+    .limit(2);
+  if (res.error) return false; // offline: the unique index is still the last word
+  return ((res.data as Row[] | null) ?? []).some((r) => r.id !== exceptId);
+}
+
+/** Latest catalogue rows for a set of products, straight from the database. */
+export async function loadProductsByIds(ids: string[]): Promise<Product[]> {
+  if (!ids.length) return [];
+  const res = await supabase.from("products").select("*").in("id", ids);
+  if (res.error) throw res.error;
+  return ((res.data as Row[] | null) ?? []).map(rowToProduct);
+}
+
 /**
  * Writes never hit the network directly.
  *
@@ -1053,6 +1185,49 @@ export const db = {
       })),
     });
   },
+
+  /**
+   * Store a receiving invoice and its lines, and wait until they are safe
+   * (cloud, local database or the durable outbox). Nothing on screen is
+   * cleared until this resolves, so an invoice can no longer vanish.
+   */
+  commitReceivingInvoice: (inv: ReceivingInvoice) =>
+    commitOps("Saving receiving invoice", [
+      { kind: "upsert", table: "purchase_orders", rows: [invoiceRow(inv)] },
+      ...(inv.lines.length
+        ? [
+            {
+              kind: "upsert" as const,
+              table: "purchase_order_items",
+              rows: inv.lines.map((l) => invoiceLineRow(inv.id, l)),
+            },
+          ]
+        : []),
+    ]),
+
+  /**
+   * Save corrections to an existing invoice in place. Removed lines are
+   * deleted by id; everything else is updated, so history and the invoice id
+   * survive the edit.
+   */
+  updateReceivingInvoice: (inv: ReceivingInvoice, removedLineIds: string[]) =>
+    commitOps("Updating receiving invoice", [
+      { kind: "upsert", table: "purchase_orders", rows: [invoiceRow(inv)] },
+      ...(inv.lines.length
+        ? [
+            {
+              kind: "upsert" as const,
+              table: "purchase_order_items",
+              rows: inv.lines.map((l) => invoiceLineRow(inv.id, l)),
+            },
+          ]
+        : []),
+      ...removedLineIds.map((id) => ({
+        kind: "delete" as const,
+        table: "purchase_order_items",
+        match: { id },
+      })),
+    ]),
 
   /* --------------------- awaited, confirmed versions --------------------- */
 

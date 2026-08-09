@@ -5,6 +5,7 @@ import {
   FileSpreadsheet,
   Download,
   PackagePlus,
+  Pencil,
   ScanBarcode,
   ShieldAlert,
   Trash2,
@@ -12,7 +13,12 @@ import {
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { AppShell } from "@/components/pos/AppShell";
-import { db } from "@/lib/pos-db";
+import {
+  db,
+  invoiceNumberTaken,
+  loadReceivingInvoices,
+  type ReceivingInvoice,
+} from "@/lib/pos-db";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -69,30 +75,29 @@ type Line = {
   qty: number;
 };
 
-type InvoiceLog = {
-  id: string;
-  invoiceNo: string;
-  supplier: string;
-  invoiceDate: string;
-  uniqueItems: number;
-  totalUnits: number;
-  totalCost: number;
-  at: string;
-  operator: string;
-  storeCode: string;
-};
-
 const today = () => new Date().toISOString().slice(0, 10);
+const localDateTime = (iso: string) => {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+const units = (inv: ReceivingInvoice) => inv.lines.reduce((a, l) => a + l.qty, 0);
 
 function Purchasing() {
-  const { state, currentStore, upsertProduct, adjustStock } = usePos();
-  const { can, user } = useAuth();
+  const { state, currentStore, upsertProduct, adjustStock, syncProducts } = usePos();
+  const { can, user, isAdmin, isSupervisor } = useAuth();
   const [invoiceNo, setInvoiceNo] = useState("");
   const [supplier, setSupplier] = useState("");
   const [invoiceDate, setInvoiceDate] = useState(today());
+  const [entryDate, setEntryDate] = useState(() => localDateTime(new Date().toISOString()));
   const [scan, setScan] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
-  const [history, setHistory] = useState<InvoiceLog[]>([]);
+  const [history, setHistory] = useState<ReceivingInvoice[]>([]);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState<ReceivingInvoice | null>(null);
+  const [removedLineIds, setRemovedLineIds] = useState<string[]>([]);
+  const [savingEdit, setSavingEdit] = useState(false);
   const [draft, setDraft] = useState<Product | null>(null);
   const [draftQty, setDraftQty] = useState("1");
   const scanRef = useRef<HTMLInputElement>(null);
@@ -114,6 +119,22 @@ function Purchasing() {
   useEffect(() => {
     void loadSuppliers().then(setSuppliers);
   }, []);
+
+  /** Invoice history is a database read, so it survives reloads and restarts. */
+  const refreshHistory = async () => {
+    try {
+      const rows = await loadReceivingInvoices(currentStore.id);
+      setHistory(rows);
+      setHistoryError(null);
+    } catch (e) {
+      setHistoryError((e as Error).message || "Could not read the invoice history");
+    }
+  };
+
+  useEffect(() => {
+    void refreshHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStore.id]);
 
   if (!can("can_receive_purchase_order")) {
     return (
@@ -286,74 +307,205 @@ function Purchasing() {
     scanRef.current?.focus();
   }
 
-  function finalize() {
+  /**
+   * Finalize the invoice.
+   *
+   * The invoice is stored (cloud, local database or the durable outbox) BEFORE
+   * the form is cleared, so a receiving order can never be lost. Stock is
+   * posted once per line, and any cost change is merged into the product as it
+   * stands after that posting — writing back a pre-adjustment snapshot is what
+   * used to silently undo the quantity that had just been received.
+   */
+  async function finalize() {
     const ref = invoiceNo.trim();
     if (!ref) return toast.error("Invoice number is required");
     if (!supplier.trim()) return toast.error("Supplier name is required");
     if (!lines.length) return toast.error("Scan at least one item into the invoice");
+    if (saving) return;
 
-    const movements = lines.map((l) => {
-      const before = state.products.find((p) => p.id === l.productId);
-      const previousStock = before ? stockAt(before, currentStore.id) : 0;
-      adjustStock(l.productId, l.qty, currentStore.id);
-      // Cost changes captured on the line are written back to the catalog.
-      if (before && before.cost !== l.cost) upsertProduct({ ...before, cost: l.cost });
-      return {
-        productId: l.productId,
-        barcode: l.barcode,
-        name: l.name,
-        qty: l.qty,
-        unitCost: l.cost,
-        lineCost: Number((l.cost * l.qty).toFixed(2)),
-        previousStock,
-        updatedStock: previousStock + l.qty,
+    setSaving(true);
+    try {
+      if (await invoiceNumberTaken(ref)) {
+        toast.error(`Invoice ${ref} already exists`, {
+          description: "Open it in the history below to correct it, or use a different number.",
+        });
+        return;
+      }
+
+      const picked = suppliers.find((s) => s.name === supplier.trim());
+      const invoice: ReceivingInvoice = {
+        id: crypto.randomUUID(),
+        invoiceNo: ref,
+        supplier: supplier.trim(),
+        supplierId: picked?.id ?? null,
+        operator: user?.name ?? "—",
         storeId: currentStore.id,
-      };
-    });
-
-    const record: InvoiceLog = {
-      id: crypto.randomUUID(),
-      invoiceNo: ref,
-      supplier: supplier.trim(),
-      invoiceDate,
-      uniqueItems: lines.length,
-      totalUnits: totals.units,
-      totalCost: totals.cost,
-      at: new Date().toISOString(),
-      operator: user?.name ?? "—",
-      storeCode: currentStore.code,
-    };
-    setHistory((h) => [record, ...h]);
-
-    void db.recordPurchaseOrder(
-      {
-        poNumber: ref,
-        supplier: record.supplier,
-        operator: record.operator,
+        storeCode: currentStore.code,
+        invoiceDate,
+        entryDate: new Date(entryDate).toISOString(),
         totalCost: totals.cost,
         itemCount: lines.length,
+        createdAt: new Date().toISOString(),
+        lines: lines.map((l) => ({
+          id: crypto.randomUUID(),
+          productId: l.productId,
+          barcode: l.barcode,
+          sku: l.barcode,
+          name: l.name,
+          cost: l.cost,
+          price: l.price,
+          qty: l.qty,
+        })),
+      };
+
+      await db.commitReceivingInvoice(invoice);
+
+      const movements = lines.map((l) => {
+        const previousStock = stockAt(
+          state.products.find((p) => p.id === l.productId) ?? ({ stockByStore: {} } as Product),
+          currentStore.id,
+        );
+        applyLineToStock(l.productId, l.qty, l.cost, l.price);
+        return {
+          productId: l.productId,
+          barcode: l.barcode,
+          name: l.name,
+          qty: l.qty,
+          unitCost: l.cost,
+          lineCost: Number((l.cost * l.qty).toFixed(2)),
+          previousStock,
+          updatedStock: previousStock + l.qty,
+          storeId: currentStore.id,
+        };
+      });
+
+      logger.log("inventory_edit", "Receiving order finalized", "purchasing", {
+        invoiceNo: ref,
+        supplier: invoice.supplier,
+        invoiceDate,
+        entryDate: invoice.entryDate,
+        uniqueItems: lines.length,
+        totalUnits: totals.units,
+        totalCost: totals.cost,
+        operator: invoice.operator,
+        storeCode: currentStore.code,
+        stockMovements: movements,
+      });
+
+      toast.success(`Invoice ${ref} received · ${totals.units} units · ${money(totals.cost)}`);
+      setInvoiceNo("");
+      setSupplier("");
+      setInvoiceDate(today());
+      setEntryDate(localDateTime(new Date().toISOString()));
+      setLines([]);
+      await syncProducts(lines.map((l) => l.productId));
+      await refreshHistory();
+      scanRef.current?.focus();
+    } catch (e) {
+      toast.error("The invoice was not saved", { description: (e as Error).message });
+    } finally {
+      setSaving(false);
+      scanRef.current?.focus();
+    }
+  }
+
+  /**
+   * Post a stock delta for one line and merge cost/price into the product as
+   * it is *after* the movement, never a stale copy.
+   */
+  function applyLineToStock(productId: string, delta: number, cost: number, price?: number) {
+    if (delta) adjustStock(productId, delta, currentStore.id);
+    const current = state.products.find((p) => p.id === productId);
+    if (!current) return;
+    const nextCost = cost;
+    const nextPrice = price ?? current.price;
+    if (current.cost === nextCost && current.price === nextPrice) return;
+    upsertProduct({
+      ...current,
+      cost: nextCost,
+      price: nextPrice,
+      // Take the quantity we just posted with us — never the pre-adjust map.
+      stockByStore: {
+        ...current.stockByStore,
+        [currentStore.id]: stockAt(current, currentStore.id) + delta,
       },
-      lines.map((l) => ({
-        productId: l.productId,
-        barcode: l.barcode,
-        name: l.name,
-        cost: l.cost,
-        price: l.price,
-        qty: l.qty,
-      })),
-    );
-
-    logger.log("inventory_edit", "Receiving order finalized", "purchasing", {
-      ...record,
-      stockMovements: movements,
     });
+  }
 
-    toast.success(`Invoice ${ref} received · ${totals.units} units · ${money(totals.cost)}`);
-    setInvoiceNo("");
-    setSupplier("");
-    setInvoiceDate(today());
-    setLines([]);
-    scanRef.current?.focus();
+  /** Save corrections to an already-received invoice, applying stock deltas. */
+  // Line-level corrections are a supervisor action; anyone may fix the header.
+  const mayEditLines = isAdmin || isSupervisor;
+
+  function patchEditLine(index: number, patch: Partial<ReceivingInvoice["lines"][number]>) {
+    setEditing((inv) =>
+      inv
+        ? { ...inv, lines: inv.lines.map((l, i) => (i === index ? { ...l, ...patch } : l)) }
+        : inv,
+    );
+  }
+
+  async function saveEdit() {
+    if (!editing) return;
+    const ref = editing.invoiceNo.trim();
+    if (!ref) return toast.error("Invoice number is required");
+    if (!editing.supplier.trim()) return toast.error("Supplier name is required");
+    setSavingEdit(true);
+    try {
+      if (await invoiceNumberTaken(ref, editing.id)) {
+        toast.error(`Invoice ${ref} is already used by another receiving order`);
+        return;
+      }
+      const original = history.find((h) => h.id === editing.id);
+      const cost = Number(
+        editing.lines.reduce((a, l) => a + l.cost * l.qty, 0).toFixed(2),
+      );
+      const next: ReceivingInvoice = {
+        ...editing,
+        invoiceNo: ref,
+        supplier: editing.supplier.trim(),
+        supplierId: suppliers.find((s) => s.name === editing.supplier.trim())?.id ?? null,
+        totalCost: cost,
+        itemCount: editing.lines.length,
+      };
+      await db.updateReceivingInvoice(next, removedLineIds);
+
+      // Deltas only: nothing is removed and re-added, so history stays intact.
+      const deltas: Record<string, number> = {};
+      for (const l of original?.lines ?? []) {
+        if (l.productId) deltas[l.productId] = (deltas[l.productId] ?? 0) - l.qty;
+      }
+      for (const l of next.lines) {
+        if (l.productId) deltas[l.productId] = (deltas[l.productId] ?? 0) + l.qty;
+      }
+      for (const l of next.lines) {
+        if (!l.productId) continue;
+        applyLineToStock(l.productId, deltas[l.productId] ?? 0, l.cost, l.price);
+        deltas[l.productId] = 0;
+      }
+      for (const [productId, delta] of Object.entries(deltas)) {
+        if (delta) adjustStock(productId, delta, currentStore.id);
+      }
+
+      logger.log("inventory_edit", "Receiving invoice corrected", "purchasing", {
+        invoiceId: next.id,
+        invoiceNo: next.invoiceNo,
+        supplier: next.supplier,
+        entryDate: next.entryDate,
+        removedLines: removedLineIds.length,
+        stockDeltas: deltas,
+        storeCode: currentStore.code,
+      });
+
+      toast.success(`Invoice ${next.invoiceNo} updated`);
+      setEditing(null);
+      setRemovedLineIds([]);
+      await syncProducts(next.lines.map((l) => l.productId ?? "").filter(Boolean));
+      await refreshHistory();
+    } catch (e) {
+      toast.error("The correction was not saved", { description: (e as Error).message });
+    } finally {
+      setSavingEdit(false);
+    }
   }
 
   return (
@@ -409,6 +561,17 @@ function Purchasing() {
                 type="date"
                 value={invoiceDate}
                 onChange={(e) => setInvoiceDate(e.target.value)}
+                className="numeric h-11"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">
+                Entry date &amp; time (defaults to now)
+              </Label>
+              <Input
+                type="datetime-local"
+                value={entryDate}
+                onChange={(e) => setEntryDate(e.target.value)}
                 className="numeric h-11"
               />
             </div>
@@ -529,14 +692,22 @@ function Purchasing() {
               total cost{" "}
               <span className="numeric font-semibold text-foreground">{money(totals.cost)}</span>
             </div>
-            <Button className="h-11" onClick={finalize}>
-              <PackagePlus className="size-4" /> Finalize &amp; receive stock
+            <Button className="h-11" disabled={saving} onClick={() => void finalize()}>
+              <PackagePlus className="size-4" />{" "}
+              {saving ? "Saving invoice…" : "Finalize & receive stock"}
             </Button>
           </div>
         </section>
 
         <section className="rounded-lg border border-border bg-card">
-          <h2 className="px-5 py-3 text-sm font-semibold">Invoices received history</h2>
+          <div className="flex items-center justify-between px-5 py-3">
+            <h2 className="text-sm font-semibold">Invoices received history</h2>
+            {historyError && (
+              <span className="text-xs text-warning-foreground">
+                Offline — showing what this terminal could read
+              </span>
+            )}
+          </div>
           <Separator />
           <Table>
             <TableHeader>
@@ -544,11 +715,13 @@ function Purchasing() {
                 <TableHead>Invoice no.</TableHead>
                 <TableHead>Supplier</TableHead>
                 <TableHead>Invoice date</TableHead>
+                <TableHead>Entry date</TableHead>
                 <TableHead className="text-right">Unique items</TableHead>
                 <TableHead className="text-right">Total units</TableHead>
                 <TableHead className="text-right">Total cost</TableHead>
                 <TableHead>Operator</TableHead>
                 <TableHead className="text-right">Branch</TableHead>
+                <TableHead />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -556,19 +729,36 @@ function Purchasing() {
                 <TableRow key={h.id}>
                   <TableCell className="numeric font-medium">{h.invoiceNo}</TableCell>
                   <TableCell>{h.supplier}</TableCell>
-                  <TableCell className="numeric text-muted-foreground">{h.invoiceDate}</TableCell>
-                  <TableCell className="numeric text-right">{h.uniqueItems}</TableCell>
-                  <TableCell className="numeric text-right">{h.totalUnits}</TableCell>
+                  <TableCell className="numeric text-muted-foreground">
+                    {h.invoiceDate ?? "—"}
+                  </TableCell>
+                  <TableCell className="numeric text-muted-foreground">
+                    {new Date(h.entryDate).toLocaleString()}
+                  </TableCell>
+                  <TableCell className="numeric text-right">{h.lines.length}</TableCell>
+                  <TableCell className="numeric text-right">{units(h)}</TableCell>
                   <TableCell className="numeric text-right">{money(h.totalCost)}</TableCell>
                   <TableCell>{h.operator}</TableCell>
                   <TableCell className="numeric text-right text-muted-foreground">
-                    {h.storeCode}
+                    {h.storeCode ?? "—"}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setRemovedLineIds([]);
+                        setEditing(structuredClone(h));
+                      }}
+                    >
+                      <Pencil className="size-3.5" /> Edit
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
               {!history.length && (
                 <TableRow>
-                  <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                  <TableCell colSpan={10} className="py-10 text-center text-muted-foreground">
                     No invoices received yet.
                   </TableCell>
                 </TableRow>
@@ -577,6 +767,173 @@ function Purchasing() {
           </Table>
         </section>
       </div>
+
+      <Dialog
+        open={!!editing}
+        onOpenChange={(o) => {
+          if (!o) {
+            setEditing(null);
+            setRemovedLineIds([]);
+          }
+        }}
+      >
+        <DialogContent className="max-h-[88vh] max-w-4xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Correct receiving invoice</DialogTitle>
+            <DialogDescription>
+              Changing a quantity moves stock by the difference only — nothing is deleted and
+              re-added, so the history stays intact.
+            </DialogDescription>
+          </DialogHeader>
+          {editing && (
+            <div className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-4">
+                <Field label="Invoice number">
+                  <Input
+                    className="numeric"
+                    value={editing.invoiceNo}
+                    onChange={(e) => setEditing({ ...editing, invoiceNo: e.target.value })}
+                  />
+                </Field>
+                <Field label="Supplier">
+                  <Input
+                    value={editing.supplier}
+                    onChange={(e) => setEditing({ ...editing, supplier: e.target.value })}
+                  />
+                </Field>
+                <Field label="Invoice date">
+                  <Input
+                    type="date"
+                    className="numeric"
+                    value={editing.invoiceDate ?? ""}
+                    onChange={(e) => setEditing({ ...editing, invoiceDate: e.target.value })}
+                  />
+                </Field>
+                <Field label="Entry date & time">
+                  <Input
+                    type="datetime-local"
+                    className="numeric"
+                    value={localDateTime(editing.entryDate)}
+                    onChange={(e) =>
+                      setEditing({
+                        ...editing,
+                        entryDate: new Date(e.target.value).toISOString(),
+                      })
+                    }
+                  />
+                </Field>
+              </div>
+
+              {!mayEditLines && (
+                <p className="rounded-md border border-warning/40 bg-warning/10 p-2 text-xs text-warning-foreground">
+                  Only a manager or admin can change the lines of an invoice that has already been
+                  received.
+                </p>
+              )}
+
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Item number / SKU</TableHead>
+                    <TableHead>Product</TableHead>
+                    <TableHead className="w-28 text-right">Cost</TableHead>
+                    <TableHead className="w-28 text-right">Selling</TableHead>
+                    <TableHead className="w-24 text-right">Qty</TableHead>
+                    <TableHead className="text-right">Subtotal</TableHead>
+                    <TableHead />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {editing.lines.map((l, i) => (
+                    <TableRow key={l.id}>
+                      <TableCell>
+                        <Input
+                          className="numeric h-9"
+                          disabled={!mayEditLines}
+                          value={l.sku}
+                          onChange={(e) => patchEditLine(i, { sku: e.target.value })}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          className="h-9"
+                          disabled={!mayEditLines}
+                          value={l.name}
+                          onChange={(e) => patchEditLine(i, { name: e.target.value })}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          className="numeric h-9 text-right"
+                          disabled={!mayEditLines}
+                          value={l.cost}
+                          onChange={(e) =>
+                            patchEditLine(i, { cost: Number(e.target.value) || 0 })
+                          }
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          className="numeric h-9 text-right"
+                          disabled={!mayEditLines}
+                          value={l.price}
+                          onChange={(e) =>
+                            patchEditLine(i, { price: Number(e.target.value) || 0 })
+                          }
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          className="numeric h-9 text-right"
+                          disabled={!mayEditLines}
+                          value={l.qty}
+                          onChange={(e) =>
+                            patchEditLine(i, { qty: Math.max(0, Number(e.target.value) || 0) })
+                          }
+                        />
+                      </TableCell>
+                      <TableCell className="numeric text-right font-medium">
+                        {money(l.cost * l.qty)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Remove line"
+                          disabled={!mayEditLines}
+                          onClick={() => {
+                            setRemovedLineIds((ids) => [...ids, l.id]);
+                            setEditing({
+                              ...editing,
+                              lines: editing.lines.filter((x) => x.id !== l.id),
+                            });
+                          }}
+                        >
+                          <Trash2 className="size-4 text-destructive" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEditing(null);
+                setRemovedLineIds([]);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button disabled={savingEdit} onClick={() => void saveEdit()}>
+              {savingEdit ? "Saving…" : "Save corrections"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!draft} onOpenChange={(o) => !o && setDraft(null)}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">

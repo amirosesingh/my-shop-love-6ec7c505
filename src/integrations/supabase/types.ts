@@ -986,7 +986,9 @@ export type Database = {
           product_name: string | null
           quantity_received: number
           selling_price: number
+          sku: string | null
           subtotal_cost: number
+          updated_at: string
         }
         Insert: {
           barcode?: string | null
@@ -998,7 +1000,9 @@ export type Database = {
           product_name?: string | null
           quantity_received?: number
           selling_price?: number
+          sku?: string | null
           subtotal_cost?: number
+          updated_at?: string
         }
         Update: {
           barcode?: string | null
@@ -1010,7 +1014,9 @@ export type Database = {
           product_name?: string | null
           quantity_received?: number
           selling_price?: number
+          sku?: string | null
           subtotal_cost?: number
+          updated_at?: string
         }
         Relationships: [
           {
@@ -1033,32 +1039,47 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          invoice_date: string | null
+          invoice_entry_date: string | null
           operator_name: string | null
           po_number: string
+          store_code: string | null
+          store_id: string | null
           supplier_id: string | null
           supplier_name: string | null
           total_cost: number
           total_items_count: number
+          updated_at: string
         }
         Insert: {
           created_at?: string
           id?: string
+          invoice_date?: string | null
+          invoice_entry_date?: string | null
           operator_name?: string | null
           po_number: string
+          store_code?: string | null
+          store_id?: string | null
           supplier_id?: string | null
           supplier_name?: string | null
           total_cost?: number
           total_items_count?: number
+          updated_at?: string
         }
         Update: {
           created_at?: string
           id?: string
+          invoice_date?: string | null
+          invoice_entry_date?: string | null
           operator_name?: string | null
           po_number?: string
+          store_code?: string | null
+          store_id?: string | null
           supplier_id?: string | null
           supplier_name?: string | null
           total_cost?: number
           total_items_count?: number
+          updated_at?: string
         }
         Relationships: [
           {
