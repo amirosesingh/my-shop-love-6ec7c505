@@ -28,6 +28,26 @@ import {
 
 export type TokenStatus = "active" | "used" | "revoked";
 
+/** Which shell is claiming the code — recorded for troubleshooting. */
+function claimPlatform(): string {
+  if (typeof window === "undefined") return "server";
+  const cap = (window as { Capacitor?: { getPlatform?: () => string } }).Capacitor;
+  if (cap?.getPlatform) return cap.getPlatform();
+  return (window as { pos?: unknown }).pos ? "electron" : "web";
+}
+
+/** Best-effort operating system name from the browser/shell. */
+function claimOs(): string {
+  if (typeof navigator === "undefined") return "unknown";
+  const ua = navigator.userAgent;
+  if (/Android/i.test(ua)) return "android";
+  if (/iPhone|iPad|iOS/i.test(ua)) return "ios";
+  if (/Windows/i.test(ua)) return "windows";
+  if (/Mac OS/i.test(ua)) return "macos";
+  if (/Linux/i.test(ua)) return "linux";
+  return "unknown";
+}
+
 /** Which kind of machine the code was issued for. */
 export type TerminalPlatform = "pc" | "mobile";
 
