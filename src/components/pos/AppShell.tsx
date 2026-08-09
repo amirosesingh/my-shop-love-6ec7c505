@@ -46,6 +46,7 @@ import { reportAppReady } from "@/lib/app-health";
 const ROUTE_PERMISSIONS: Record<string, PermissionFlag> = {
   "/settings/terminals": "can_manage_terminals",
   "/settings/mobile-terminals": "can_manage_terminals",
+  "/settings/sessions": "can_manage_terminals",
   "/settings/sync": "can_manage_sync_backup",
   "/settings": "can_access_pos_settings",
   "/staff": "can_manage_staff",
@@ -83,6 +84,7 @@ const SECTION_HUBS = new Set(["/sales", "/inventory-hub", "/customers", "/admin"
 const DESKTOP_BLOCKED = [
   "/settings/terminals",
   "/settings/mobile-terminals",
+  "/settings/sessions",
   "/settings/whatsapp",
   "/staff",
   "/stores",
