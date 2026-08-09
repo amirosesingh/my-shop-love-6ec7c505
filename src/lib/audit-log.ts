@@ -332,8 +332,14 @@ async function flushBatch() {
       })),
     );
   } catch (e) {
-    console.error("[audit] sync failed", e);
-    return;
+    // A duplicate key means these entries already reached the cloud — treat
+    // them as delivered so the queue is not blocked behind them forever.
+    const code = (e as { code?: string } | null)?.code;
+    if (code !== "23505") {
+      console.error("[audit] sync failed", e);
+      return;
+    }
+    batch = slice.map((l) => l.id);
   }
   const at = new Date().toISOString();
   logs = logs.map((l) => (batch.includes(l.id) ? { ...l, synced_to_cloud: true, syncedAt: at } : l));
