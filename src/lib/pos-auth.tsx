@@ -17,6 +17,7 @@ import { verifyCashierPin } from "@/lib/pos-cashiers";
 import { cacheCredential, verifyCachedPin } from "@/lib/offline-credentials";
 import { recordSignIn } from "@/lib/shift-attendance";
 import { endShiftSessions } from "@/lib/shift-sessions";
+import { onSessionExpired } from "@/lib/session-expiry";
 import {
   CASHIER_PERMISSIONS,
   FULL_PERMISSIONS,
@@ -537,6 +538,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role: user.metaRole ?? user.role,
     });
   }, [user?.staffId, user?.name, user?.role, user?.metaRole]);
+
+  // The server rejected our token (missing, stale or revoked): end the session
+  // here rather than leaving a signed-out screen that still looks signed in.
+  // Connectivity problems never reach this listener.
+  useEffect(() => {
+    return onSessionExpired(() => {
+      void (async () => {
+        await logout();
+        void import("sonner").then(({ toast }) =>
+          toast.error("Session ended", {
+            id: "pos-session-expired",
+            description: "Your sign-in is no longer valid. Please sign in again.",
+          }),
+        );
+      })();
+    });
+  }, [logout]);
 
   const isWarehouse =
     !!session?.user &&
