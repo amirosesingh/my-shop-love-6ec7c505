@@ -410,13 +410,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Signed terminal session so privileged server functions can verify the
     // cashier — the PIN is re-checked server-side when minting it.
     try {
-      const issued = await issueCashierSession({ data: { username: code, pin } });
-      if (issued.ok) {
-        await saveCashierToken(issued.token);
+      // Preferred path: the server endpoint checks the PIN with the internal
+      // key and opens the device session in one call.
+      let cashierToken = "";
+      let sessionToken = "";
+      try {
+        const res = await fetch("/api/public/cashier-login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: code,
+            pin,
+            platform: typeof navigator === "undefined" ? "web" : navigator.platform || "web",
+          }),
+        });
+        const payload = (await res.json()) as {
+          ok?: boolean;
+          cashierToken?: string;
+          sessionToken?: string;
+        };
+        if (res.ok && payload.ok) {
+          cashierToken = payload.cashierToken ?? "";
+          sessionToken = payload.sessionToken ?? "";
+        }
+      } catch {
+        /* fall back to the server function below */
+      }
+
+      if (!cashierToken) {
+        const issued = await issueCashierSession({ data: { username: code, pin } });
+        if (issued.ok) cashierToken = issued.token;
+      }
+
+      if (cashierToken) {
+        await saveCashierToken(cashierToken);
+        if (sessionToken) {
+          await saveSessionToken(sessionToken);
+        } else {
         const started = await startDeviceSession({
           data: {
             kind: "cashier",
-            cashierToken: issued.token,
+            cashierToken,
             label: next.name,
             staffUserId: next.userCode,
             ...(next.cashierId ? { cashierId: next.cashierId } : {}),
@@ -425,6 +459,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           },
         });
         if (started.ok) await saveSessionToken(started.token);
+        }
       }
     } catch {
       /* messaging features stay locked without a terminal token */

@@ -33,6 +33,7 @@ import { Route as StaffRouteImport } from './routes/staff'
 import { Route as StoresRouteImport } from './routes/stores'
 import { Route as SuppliersRouteImport } from './routes/suppliers'
 import { Route as TransfersRouteImport } from './routes/transfers'
+import { Route as ApiCashierLoginRouteImport } from './routes/api/cashier-login'
 import { Route as ApiSettingsRouteImport } from './routes/api/settings'
 import { Route as CTokenSlugRouteImport } from './routes/c.$tokenSlug'
 import { Route as ClaimCampaignSlugRouteImport } from './routes/claim.$campaignSlug'
@@ -64,6 +65,7 @@ import { Route as SettingsRegionRouteImport } from './routes/settings.region'
 import { Route as SettingsRulesRouteImport } from './routes/settings.rules'
 import { Route as SettingsSecurityAlertsRouteImport } from './routes/settings.security-alerts'
 import { Route as SettingsServicesRouteImport } from './routes/settings.services'
+import { Route as SettingsSessionsRouteImport } from './routes/settings.sessions'
 import { Route as SettingsShiftAlertsRouteImport } from './routes/settings.shift-alerts'
 import { Route as SettingsSkuRouteImport } from './routes/settings.sku'
 import { Route as SettingsSyncRouteImport } from './routes/settings.sync'
@@ -74,6 +76,7 @@ import { Route as SettingsTypeRouteImport } from './routes/settings.type'
 import { Route as SettingsUpdatesRouteImport } from './routes/settings.updates'
 import { Route as SettingsVisibilityRouteImport } from './routes/settings.visibility'
 import { Route as SettingsWhatsappRouteImport } from './routes/settings.whatsapp'
+import { Route as ApiPublicCashierLoginRouteImport } from './routes/api/public/cashier-login'
 import { Route as ApiPublicSecurityAlertsRouteImport } from './routes/api/public/security-alerts'
 import { Route as ApiPublicSyncRouteImport } from './routes/api/public/sync'
 import { Route as ApiPublicSyncHealthRouteImport } from './routes/api/public/sync-health'
@@ -198,6 +201,11 @@ const SuppliersRoute = SuppliersRouteImport.update({
 const TransfersRoute = TransfersRouteImport.update({
   id: '/transfers',
   path: '/transfers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCashierLoginRoute = ApiCashierLoginRouteImport.update({
+  id: '/api/cashier-login',
+  path: '/api/cashier-login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSettingsRoute = ApiSettingsRouteImport.update({
@@ -355,6 +363,11 @@ const SettingsServicesRoute = SettingsServicesRouteImport.update({
   path: '/settings/services',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsSessionsRoute = SettingsSessionsRouteImport.update({
+  id: '/settings/sessions',
+  path: '/settings/sessions',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsShiftAlertsRoute = SettingsShiftAlertsRouteImport.update({
   id: '/settings/shift-alerts',
   path: '/settings/shift-alerts',
@@ -403,6 +416,11 @@ const SettingsVisibilityRoute = SettingsVisibilityRouteImport.update({
 const SettingsWhatsappRoute = SettingsWhatsappRouteImport.update({
   id: '/settings/whatsapp',
   path: '/settings/whatsapp',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicCashierLoginRoute = ApiPublicCashierLoginRouteImport.update({
+  id: '/api/public/cashier-login',
+  path: '/api/public/cashier-login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicSecurityAlertsRoute = ApiPublicSecurityAlertsRouteImport.update({
@@ -456,6 +474,7 @@ export interface FileRoutesByFullPath {
   '/stores': typeof StoresRoute
   '/suppliers': typeof SuppliersRoute
   '/transfers': typeof TransfersRoute
+  '/api/cashier-login': typeof ApiCashierLoginRoute
   '/api/settings': typeof ApiSettingsRouteWithChildren
   '/c/$tokenSlug': typeof CTokenSlugRoute
   '/claim/$campaignSlug': typeof ClaimCampaignSlugRoute
@@ -485,6 +504,7 @@ export interface FileRoutesByFullPath {
   '/settings/rules': typeof SettingsRulesRoute
   '/settings/security-alerts': typeof SettingsSecurityAlertsRoute
   '/settings/services': typeof SettingsServicesRoute
+  '/settings/sessions': typeof SettingsSessionsRoute
   '/settings/shift-alerts': typeof SettingsShiftAlertsRoute
   '/settings/sku': typeof SettingsSkuRoute
   '/settings/sync': typeof SettingsSyncRoute
@@ -497,6 +517,7 @@ export interface FileRoutesByFullPath {
   '/settings/whatsapp': typeof SettingsWhatsappRoute
   '/reports/': typeof ReportsIndexRoute
   '/settings/': typeof SettingsIndexRoute
+  '/api/public/cashier-login': typeof ApiPublicCashierLoginRoute
   '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
   '/api/public/sync': typeof ApiPublicSyncRoute
   '/api/public/sync-health': typeof ApiPublicSyncHealthRoute
@@ -528,6 +549,7 @@ export interface FileRoutesByTo {
   '/stores': typeof StoresRoute
   '/suppliers': typeof SuppliersRoute
   '/transfers': typeof TransfersRoute
+  '/api/cashier-login': typeof ApiCashierLoginRoute
   '/api/settings': typeof ApiSettingsRouteWithChildren
   '/c/$tokenSlug': typeof CTokenSlugRoute
   '/claim/$campaignSlug': typeof ClaimCampaignSlugRoute
@@ -557,6 +579,7 @@ export interface FileRoutesByTo {
   '/settings/rules': typeof SettingsRulesRoute
   '/settings/security-alerts': typeof SettingsSecurityAlertsRoute
   '/settings/services': typeof SettingsServicesRoute
+  '/settings/sessions': typeof SettingsSessionsRoute
   '/settings/shift-alerts': typeof SettingsShiftAlertsRoute
   '/settings/sku': typeof SettingsSkuRoute
   '/settings/sync': typeof SettingsSyncRoute
@@ -569,6 +592,7 @@ export interface FileRoutesByTo {
   '/settings/whatsapp': typeof SettingsWhatsappRoute
   '/reports': typeof ReportsIndexRoute
   '/settings': typeof SettingsIndexRoute
+  '/api/public/cashier-login': typeof ApiPublicCashierLoginRoute
   '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
   '/api/public/sync': typeof ApiPublicSyncRoute
   '/api/public/sync-health': typeof ApiPublicSyncHealthRoute
@@ -601,6 +625,7 @@ export interface FileRoutesById {
   '/stores': typeof StoresRoute
   '/suppliers': typeof SuppliersRoute
   '/transfers': typeof TransfersRoute
+  '/api/cashier-login': typeof ApiCashierLoginRoute
   '/api/settings': typeof ApiSettingsRouteWithChildren
   '/c/$tokenSlug': typeof CTokenSlugRoute
   '/claim/$campaignSlug': typeof ClaimCampaignSlugRoute
@@ -630,6 +655,7 @@ export interface FileRoutesById {
   '/settings/rules': typeof SettingsRulesRoute
   '/settings/security-alerts': typeof SettingsSecurityAlertsRoute
   '/settings/services': typeof SettingsServicesRoute
+  '/settings/sessions': typeof SettingsSessionsRoute
   '/settings/shift-alerts': typeof SettingsShiftAlertsRoute
   '/settings/sku': typeof SettingsSkuRoute
   '/settings/sync': typeof SettingsSyncRoute
@@ -642,6 +668,7 @@ export interface FileRoutesById {
   '/settings/whatsapp': typeof SettingsWhatsappRoute
   '/reports/': typeof ReportsIndexRoute
   '/settings/': typeof SettingsIndexRoute
+  '/api/public/cashier-login': typeof ApiPublicCashierLoginRoute
   '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
   '/api/public/sync': typeof ApiPublicSyncRoute
   '/api/public/sync-health': typeof ApiPublicSyncHealthRoute
@@ -675,6 +702,7 @@ export interface FileRouteTypes {
     | '/stores'
     | '/suppliers'
     | '/transfers'
+    | '/api/cashier-login'
     | '/api/settings'
     | '/c/$tokenSlug'
     | '/claim/$campaignSlug'
@@ -704,6 +732,7 @@ export interface FileRouteTypes {
     | '/settings/rules'
     | '/settings/security-alerts'
     | '/settings/services'
+    | '/settings/sessions'
     | '/settings/shift-alerts'
     | '/settings/sku'
     | '/settings/sync'
@@ -716,6 +745,7 @@ export interface FileRouteTypes {
     | '/settings/whatsapp'
     | '/reports/'
     | '/settings/'
+    | '/api/public/cashier-login'
     | '/api/public/security-alerts'
     | '/api/public/sync'
     | '/api/public/sync-health'
@@ -747,6 +777,7 @@ export interface FileRouteTypes {
     | '/stores'
     | '/suppliers'
     | '/transfers'
+    | '/api/cashier-login'
     | '/api/settings'
     | '/c/$tokenSlug'
     | '/claim/$campaignSlug'
@@ -776,6 +807,7 @@ export interface FileRouteTypes {
     | '/settings/rules'
     | '/settings/security-alerts'
     | '/settings/services'
+    | '/settings/sessions'
     | '/settings/shift-alerts'
     | '/settings/sku'
     | '/settings/sync'
@@ -788,6 +820,7 @@ export interface FileRouteTypes {
     | '/settings/whatsapp'
     | '/reports'
     | '/settings'
+    | '/api/public/cashier-login'
     | '/api/public/security-alerts'
     | '/api/public/sync'
     | '/api/public/sync-health'
@@ -819,6 +852,7 @@ export interface FileRouteTypes {
     | '/stores'
     | '/suppliers'
     | '/transfers'
+    | '/api/cashier-login'
     | '/api/settings'
     | '/c/$tokenSlug'
     | '/claim/$campaignSlug'
@@ -848,6 +882,7 @@ export interface FileRouteTypes {
     | '/settings/rules'
     | '/settings/security-alerts'
     | '/settings/services'
+    | '/settings/sessions'
     | '/settings/shift-alerts'
     | '/settings/sku'
     | '/settings/sync'
@@ -860,6 +895,7 @@ export interface FileRouteTypes {
     | '/settings/whatsapp'
     | '/reports/'
     | '/settings/'
+    | '/api/public/cashier-login'
     | '/api/public/security-alerts'
     | '/api/public/sync'
     | '/api/public/sync-health'
@@ -892,6 +928,7 @@ export interface RootRouteChildren {
   StoresRoute: typeof StoresRoute
   SuppliersRoute: typeof SuppliersRoute
   TransfersRoute: typeof TransfersRoute
+  ApiCashierLoginRoute: typeof ApiCashierLoginRoute
   ApiSettingsRoute: typeof ApiSettingsRouteWithChildren
   CTokenSlugRoute: typeof CTokenSlugRoute
   ClaimCampaignSlugRoute: typeof ClaimCampaignSlugRoute
@@ -921,6 +958,7 @@ export interface RootRouteChildren {
   SettingsRulesRoute: typeof SettingsRulesRoute
   SettingsSecurityAlertsRoute: typeof SettingsSecurityAlertsRoute
   SettingsServicesRoute: typeof SettingsServicesRoute
+  SettingsSessionsRoute: typeof SettingsSessionsRoute
   SettingsShiftAlertsRoute: typeof SettingsShiftAlertsRoute
   SettingsSkuRoute: typeof SettingsSkuRoute
   SettingsSyncRoute: typeof SettingsSyncRoute
@@ -933,6 +971,7 @@ export interface RootRouteChildren {
   SettingsWhatsappRoute: typeof SettingsWhatsappRoute
   ReportsIndexRoute: typeof ReportsIndexRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
+  ApiPublicCashierLoginRoute: typeof ApiPublicCashierLoginRoute
   ApiPublicSecurityAlertsRoute: typeof ApiPublicSecurityAlertsRoute
   ApiPublicSyncRoute: typeof ApiPublicSyncRoute
   ApiPublicSyncHealthRoute: typeof ApiPublicSyncHealthRoute
@@ -1106,6 +1145,13 @@ declare module '@tanstack/react-router' {
       path: '/transfers'
       fullPath: '/transfers'
       preLoaderRoute: typeof TransfersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/cashier-login': {
+      id: '/api/cashier-login'
+      path: '/api/cashier-login'
+      fullPath: '/api/cashier-login'
+      preLoaderRoute: typeof ApiCashierLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/settings': {
@@ -1325,6 +1371,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsServicesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/sessions': {
+      id: '/settings/sessions'
+      path: '/settings/sessions'
+      fullPath: '/settings/sessions'
+      preLoaderRoute: typeof SettingsSessionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/shift-alerts': {
       id: '/settings/shift-alerts'
       path: '/settings/shift-alerts'
@@ -1393,6 +1446,13 @@ declare module '@tanstack/react-router' {
       path: '/settings/whatsapp'
       fullPath: '/settings/whatsapp'
       preLoaderRoute: typeof SettingsWhatsappRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/cashier-login': {
+      id: '/api/public/cashier-login'
+      path: '/api/public/cashier-login'
+      fullPath: '/api/public/cashier-login'
+      preLoaderRoute: typeof ApiPublicCashierLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/security-alerts': {
@@ -1472,6 +1532,7 @@ const rootRouteChildren: RootRouteChildren = {
   StoresRoute: StoresRoute,
   SuppliersRoute: SuppliersRoute,
   TransfersRoute: TransfersRoute,
+  ApiCashierLoginRoute: ApiCashierLoginRoute,
   ApiSettingsRoute: ApiSettingsRouteWithChildren,
   CTokenSlugRoute: CTokenSlugRoute,
   ClaimCampaignSlugRoute: ClaimCampaignSlugRoute,
@@ -1501,6 +1562,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRulesRoute: SettingsRulesRoute,
   SettingsSecurityAlertsRoute: SettingsSecurityAlertsRoute,
   SettingsServicesRoute: SettingsServicesRoute,
+  SettingsSessionsRoute: SettingsSessionsRoute,
   SettingsShiftAlertsRoute: SettingsShiftAlertsRoute,
   SettingsSkuRoute: SettingsSkuRoute,
   SettingsSyncRoute: SettingsSyncRoute,
@@ -1513,6 +1575,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsWhatsappRoute: SettingsWhatsappRoute,
   ReportsIndexRoute: ReportsIndexRoute,
   SettingsIndexRoute: SettingsIndexRoute,
+  ApiPublicCashierLoginRoute: ApiPublicCashierLoginRoute,
   ApiPublicSecurityAlertsRoute: ApiPublicSecurityAlertsRoute,
   ApiPublicSyncRoute: ApiPublicSyncRoute,
   ApiPublicSyncHealthRoute: ApiPublicSyncHealthRoute,
