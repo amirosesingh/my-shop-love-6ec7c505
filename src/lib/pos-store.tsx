@@ -344,8 +344,18 @@ export function PosProvider({ children }: { children: ReactNode }) {
     }
   }, [state, ready]);
 
+  // A brand-new database has no branches yet. Fall back to a blank branch so
+  // every screen keeps rendering instead of crashing on an undefined store.
   const currentStore = useMemo(
-    () => state.stores.find((s) => s.id === state.currentStoreId) ?? state.stores[0],
+    () =>
+      state.stores.find((s) => s.id === state.currentStoreId) ??
+      state.stores[0] ?? {
+        id: "",
+        code: "",
+        name: "No branch yet",
+        address: "",
+        phone: "",
+      },
     [state.stores, state.currentStoreId],
   );
 
@@ -524,7 +534,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       return {
         ...s,
         stores,
-        currentStoreId: s.currentStoreId === id ? stores[0].id : s.currentStoreId,
+        currentStoreId: s.currentStoreId === id ? (stores[0]?.id ?? "") : s.currentStoreId,
       };
     });
   }, []);
