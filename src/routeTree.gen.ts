@@ -74,6 +74,7 @@ import { Route as SettingsTypeRouteImport } from './routes/settings.type'
 import { Route as SettingsUpdatesRouteImport } from './routes/settings.updates'
 import { Route as SettingsVisibilityRouteImport } from './routes/settings.visibility'
 import { Route as SettingsWhatsappRouteImport } from './routes/settings.whatsapp'
+import { Route as ApiPublicCashierLoginRouteImport } from './routes/api/public/cashier-login'
 import { Route as ApiPublicSecurityAlertsRouteImport } from './routes/api/public/security-alerts'
 import { Route as ApiPublicSyncRouteImport } from './routes/api/public/sync'
 import { Route as ApiPublicSyncHealthRouteImport } from './routes/api/public/sync-health'
@@ -405,6 +406,11 @@ const SettingsWhatsappRoute = SettingsWhatsappRouteImport.update({
   path: '/settings/whatsapp',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicCashierLoginRoute = ApiPublicCashierLoginRouteImport.update({
+  id: '/api/public/cashier-login',
+  path: '/api/public/cashier-login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicSecurityAlertsRoute = ApiPublicSecurityAlertsRouteImport.update({
   id: '/api/public/security-alerts',
   path: '/api/public/security-alerts',
@@ -497,6 +503,7 @@ export interface FileRoutesByFullPath {
   '/settings/whatsapp': typeof SettingsWhatsappRoute
   '/reports/': typeof ReportsIndexRoute
   '/settings/': typeof SettingsIndexRoute
+  '/api/public/cashier-login': typeof ApiPublicCashierLoginRoute
   '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
   '/api/public/sync': typeof ApiPublicSyncRoute
   '/api/public/sync-health': typeof ApiPublicSyncHealthRoute
@@ -569,6 +576,7 @@ export interface FileRoutesByTo {
   '/settings/whatsapp': typeof SettingsWhatsappRoute
   '/reports': typeof ReportsIndexRoute
   '/settings': typeof SettingsIndexRoute
+  '/api/public/cashier-login': typeof ApiPublicCashierLoginRoute
   '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
   '/api/public/sync': typeof ApiPublicSyncRoute
   '/api/public/sync-health': typeof ApiPublicSyncHealthRoute
@@ -642,6 +650,7 @@ export interface FileRoutesById {
   '/settings/whatsapp': typeof SettingsWhatsappRoute
   '/reports/': typeof ReportsIndexRoute
   '/settings/': typeof SettingsIndexRoute
+  '/api/public/cashier-login': typeof ApiPublicCashierLoginRoute
   '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
   '/api/public/sync': typeof ApiPublicSyncRoute
   '/api/public/sync-health': typeof ApiPublicSyncHealthRoute
@@ -716,6 +725,7 @@ export interface FileRouteTypes {
     | '/settings/whatsapp'
     | '/reports/'
     | '/settings/'
+    | '/api/public/cashier-login'
     | '/api/public/security-alerts'
     | '/api/public/sync'
     | '/api/public/sync-health'
@@ -788,6 +798,7 @@ export interface FileRouteTypes {
     | '/settings/whatsapp'
     | '/reports'
     | '/settings'
+    | '/api/public/cashier-login'
     | '/api/public/security-alerts'
     | '/api/public/sync'
     | '/api/public/sync-health'
@@ -860,6 +871,7 @@ export interface FileRouteTypes {
     | '/settings/whatsapp'
     | '/reports/'
     | '/settings/'
+    | '/api/public/cashier-login'
     | '/api/public/security-alerts'
     | '/api/public/sync'
     | '/api/public/sync-health'
@@ -933,6 +945,7 @@ export interface RootRouteChildren {
   SettingsWhatsappRoute: typeof SettingsWhatsappRoute
   ReportsIndexRoute: typeof ReportsIndexRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
+  ApiPublicCashierLoginRoute: typeof ApiPublicCashierLoginRoute
   ApiPublicSecurityAlertsRoute: typeof ApiPublicSecurityAlertsRoute
   ApiPublicSyncRoute: typeof ApiPublicSyncRoute
   ApiPublicSyncHealthRoute: typeof ApiPublicSyncHealthRoute
@@ -1395,6 +1408,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsWhatsappRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/cashier-login': {
+      id: '/api/public/cashier-login'
+      path: '/api/public/cashier-login'
+      fullPath: '/api/public/cashier-login'
+      preLoaderRoute: typeof ApiPublicCashierLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/security-alerts': {
       id: '/api/public/security-alerts'
       path: '/api/public/security-alerts'
@@ -1513,6 +1533,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsWhatsappRoute: SettingsWhatsappRoute,
   ReportsIndexRoute: ReportsIndexRoute,
   SettingsIndexRoute: SettingsIndexRoute,
+  ApiPublicCashierLoginRoute: ApiPublicCashierLoginRoute,
   ApiPublicSecurityAlertsRoute: ApiPublicSecurityAlertsRoute,
   ApiPublicSyncRoute: ApiPublicSyncRoute,
   ApiPublicSyncHealthRoute: ApiPublicSyncHealthRoute,
