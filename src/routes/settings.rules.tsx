@@ -14,6 +14,7 @@ import { usePosRules } from "@/lib/pos-rules.tsx";
 import { RULE_GROUPS, type PosRules, type PosRuleKey } from "@/lib/pos-rules";
 import { savePosRules } from "@/lib/pos-rules.functions";
 import { getPosCallerAuth } from "@/lib/pos-caller-auth";
+import { getIdleTimeout, saveIdleTimeout } from "@/lib/idle-timeout.functions";
 
 export const Route = createFileRoute("/settings/rules")({
   head: () => ({
@@ -44,6 +45,32 @@ function RulesSettings() {
 
   const [draft, setDraft] = useState<PosRules>(rules);
   const [saving, setSaving] = useState(false);
+  const [idle, setIdle] = useState(30);
+  const [savingIdle, setSavingIdle] = useState(false);
+
+  useEffect(() => {
+    void getIdleTimeout({ data: { storeId: currentStore.id } })
+      .then((r) => setIdle(r.minutes))
+      .catch(() => undefined);
+  }, [currentStore.id]);
+
+  async function saveIdle() {
+    setSavingIdle(true);
+    try {
+      const auth = await getPosCallerAuth();
+      if (!auth.accessToken) {
+        toast.error("Sign in with a supervisor account to change this");
+        return;
+      }
+      const res = await saveIdleTimeout({
+        data: { accessToken: auth.accessToken, storeId: currentStore.id, minutes: idle },
+      });
+      if (!res.ok) toast.error(res.error || "Could not save the idle limit");
+      else toast.success("Idle limit saved");
+    } finally {
+      setSavingIdle(false);
+    }
+  }
 
   // Rules live in the database; the draft only mirrors the last server read.
   useEffect(() => setDraft(rules), [rules]);
@@ -150,6 +177,33 @@ function RulesSettings() {
             </div>
           </section>
         ))}
+
+        <section className="space-y-4 rounded-lg border border-border bg-card p-5">
+          <div>
+            <h2 className="text-sm font-semibold">Idle session timeout</h2>
+            <p className="text-xs text-muted-foreground">
+              How long a till may sit untouched before it signs itself out. Individual people can
+              be given their own limit in Staff Management.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 border-t border-border/60 pt-3">
+            <Label className="text-sm">Minutes of inactivity</Label>
+            <Input
+              aria-label="Idle session timeout in minutes"
+              className="numeric h-8 w-28"
+              inputMode="numeric"
+              disabled={!mayEdit}
+              value={String(idle)}
+              onChange={(e) => setIdle(Math.max(1, Math.min(1440, Number(e.target.value) || 0)))}
+            />
+            {mayEdit && (
+              <Button size="sm" variant="outline" disabled={savingIdle} onClick={() => void saveIdle()}>
+                {savingIdle ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                Save limit
+              </Button>
+            )}
+          </div>
+        </section>
 
         {mayEdit && (
           <div className="sticky bottom-0 -mx-6 flex items-center gap-3 border-t border-border bg-background/95 px-6 py-3 backdrop-blur">
