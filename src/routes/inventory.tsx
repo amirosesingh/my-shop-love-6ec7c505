@@ -685,8 +685,18 @@ function Inventory() {
           products={selectedProducts}
           onOpenChange={setMergeOpen}
           onMerged={() => setSelected([])}
+          onBlocked={setBlocked}
         />
       )}
+      <ProductDeleteBlockedDialog
+        blocked={blocked}
+        onClose={() => setBlocked([])}
+        onHide={(ids) => {
+          patchProducts(ids, { ecomVisible: false });
+          setBlocked([]);
+          toast.success(`${ids.length > 1 ? "Products" : "Product"} hidden from the catalogue`);
+        }}
+      />
       {canAdjust && (
         <>
           <StockAdjustDialog
