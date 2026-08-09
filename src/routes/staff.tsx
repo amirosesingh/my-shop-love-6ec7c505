@@ -297,6 +297,7 @@ function StaffManagement() {
   };
 
   const createUser = async () => {
+    // (role presets are applied from the role list below)
     setCreating(true);
     try {
       if (form.role === "cashier") {
