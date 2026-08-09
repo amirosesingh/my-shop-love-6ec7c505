@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 const schema = z.object({
+  sessionToken: z.string().max(400).optional(),
   cashierToken: z.string().max(2000).optional(),
   terminalToken: z.string().max(200).optional(),
   accessToken: z.string().max(4000).optional(),

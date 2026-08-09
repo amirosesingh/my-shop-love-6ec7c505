@@ -16,11 +16,15 @@ import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { clearDeviceSecret, getDeviceSecret, setDeviceSecret } from "./device-secrets";
 
 const SECRET = "cashier-session";
+/** The raw session token minted at sign-in; only its hash reaches the database. */
+const SESSION_SECRET = "pos-session-token";
 /** Legacy location; read once so an existing sign-in survives the upgrade. */
 export const TERMINAL_TOKEN_KEY = "pos-terminal-token-v1";
 
 let cached: string | null = null;
 let loaded = false;
+let sessionCached: string | null = null;
+let sessionLoaded = false;
 
 function legacyToken(): string | null {
   try {
@@ -65,10 +69,32 @@ export async function saveCashierToken(token: string): Promise<void> {
   await setDeviceSecret(SECRET, token).catch(() => undefined);
 }
 
+/** Read the raw session token from the device's secure store. */
+export async function loadSessionToken(): Promise<string | null> {
+  if (typeof window === "undefined") return null;
+  if (sessionLoaded) return sessionCached;
+  sessionLoaded = true;
+  sessionCached = (await getDeviceSecret<string>(SESSION_SECRET)) ?? null;
+  return sessionCached;
+}
+
+/** Last known session token without waiting on the encrypted store. */
+export function sessionTokenSync(): string | null {
+  return typeof window === "undefined" ? null : sessionCached;
+}
+
+export async function saveSessionToken(token: string): Promise<void> {
+  sessionCached = token;
+  sessionLoaded = true;
+  await setDeviceSecret(SESSION_SECRET, token).catch(() => undefined);
+}
+
 /** Wipe every stored credential on this device. */
 export function clearStoredCredentials(): void {
   cached = null;
   loaded = true;
+  sessionCached = null;
+  sessionLoaded = true;
   if (typeof window === "undefined") return;
   try {
     window.sessionStorage.removeItem(TERMINAL_TOKEN_KEY);
@@ -76,9 +102,11 @@ export function clearStoredCredentials(): void {
     /* ignore */
   }
   clearDeviceSecret(SECRET);
+  clearDeviceSecret(SESSION_SECRET);
 }
 
 export type PosCredentials = {
+  sessionToken?: string;
   cashierToken?: string;
   terminalToken?: string;
   accessToken?: string;
@@ -88,6 +116,7 @@ export type PosCredentials = {
 export async function readCredentials(): Promise<PosCredentials> {
   if (typeof window === "undefined") return {};
   const cashierToken = (await loadCashierToken()) ?? undefined;
+  const sessionToken = (await loadSessionToken()) ?? undefined;
   let accessToken: string | undefined;
   try {
     accessToken = (await supabaseExternal.auth.getSession()).data.session?.access_token;
@@ -102,6 +131,7 @@ export async function readCredentials(): Promise<PosCredentials> {
     /* no till registered */
   }
   return {
+    ...(sessionToken ? { sessionToken } : {}),
     ...(cashierToken ? { cashierToken } : {}),
     ...(terminalToken ? { terminalToken } : {}),
     ...(accessToken ? { accessToken } : {}),
@@ -110,6 +140,9 @@ export async function readCredentials(): Promise<PosCredentials> {
 
 /** Headers for a call to our own server: the bearer travels with every request. */
 export async function authHeaders(): Promise<Record<string, string>> {
-  const { accessToken } = await readCredentials();
-  return accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+  const { accessToken, sessionToken } = await readCredentials();
+  // The raw session token is the primary bearer; the account token is the
+  // fallback for browser admins who have no device session yet.
+  const bearer = sessionToken ?? accessToken;
+  return bearer ? { Authorization: `Bearer ${bearer}` } : {};
 }
