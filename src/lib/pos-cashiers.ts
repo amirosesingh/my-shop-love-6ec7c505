@@ -72,6 +72,15 @@ export async function setCashierPermissions(
   if (error) throw error;
 }
 
+/** Assign a built-in or custom role to a cashier. */
+export async function setCashierRoleSlug(id: string, roleSlug: string) {
+  const { error } = await sb.rpc("set_cashier_role_slug", {
+    p_id: id,
+    p_role_slug: roleSlug,
+  });
+  if (error) throw error;
+}
+
 export async function deleteCashier(id: string) {
   const { error } = await sb.rpc("delete_cashier", { p_id: id });
   if (error) throw error;
