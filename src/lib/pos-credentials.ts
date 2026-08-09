@@ -78,18 +78,6 @@ export function clearStoredCredentials(): void {
   clearDeviceSecret(SECRET);
 }
 
-/** Activation token id of the till this app is registered to, if any. */
-export function terminalTokenSync(): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    // Imported lazily through the module cache to avoid a cycle at load time.
-    const mod = require("./terminal-tokens") as typeof import("./terminal-tokens");
-    return mod.readTerminalConfig()?.tokenId ?? null;
-  } catch {
-    return null;
-  }
-}
-
 export type PosCredentials = {
   cashierToken?: string;
   terminalToken?: string;
