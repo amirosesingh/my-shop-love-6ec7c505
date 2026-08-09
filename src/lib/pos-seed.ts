@@ -274,3 +274,23 @@ export const sampleState: PosState = {
   sales: [],
   shifts: [],
 };
+
+/**
+ * What the till starts from before the database answers. Deliberately empty so
+ * a deleted record can never reappear from a stale first paint.
+ */
+export const emptyState: PosState = {
+  stores: [],
+  currentStoreId: "",
+  counter: 1,
+  transferCounter: 1,
+  bookingCounter: 0,
+  transfers: [],
+  bookings: [],
+  promotions: [],
+  settings: defaultSettings,
+  products: [],
+  members: [],
+  sales: [],
+  shifts: [],
+};
