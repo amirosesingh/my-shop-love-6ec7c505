@@ -434,6 +434,19 @@ function Inventory() {
 
         <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border p-3">
           <div className="space-y-1">
+            <Label className="text-xs">View</Label>
+            <Button
+              size="sm"
+              variant={showArchived ? "default" : "outline"}
+              onClick={() => {
+                setShowArchived((v) => !v);
+                setSelected([]);
+              }}
+            >
+              {showArchived ? "Showing archived" : "Show archived"}
+            </Button>
+          </div>
+          <div className="space-y-1">
             <Label className="text-xs">Category</Label>
             <ThemedSelect
               value={catFilter}
