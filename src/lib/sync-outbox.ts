@@ -121,29 +121,18 @@ export function persisted(ids: string[]): boolean {
 }
 
 export function failOp(id: string, message: string) {
-  const readable = humaniseSyncError(message);
   write(
     read().map((q) =>
       q.id === id
         ? {
             ...q,
             attempts: q.attempts + 1,
-            lastError: readable,
+            lastError: message,
             quarantined: q.attempts + 1 >= MAX_ATTEMPTS,
           }
         : q,
     ),
   );
-}
-
-/** Turn raw database complaints into wording a shop user can act on. */
-export function humaniseSyncError(message: string): string {
-  if (/violates foreign key constraint/i.test(message)) {
-    if (/sale_items|purchase_order_items|stock_transfer_items|stock_adjustments/i.test(message))
-      return "This product has already been used on sales or stock paperwork, so it cannot be removed. Set its stock to zero and hide it from the catalogue instead.";
-    return "This record is still linked to other records, so it cannot be removed yet.";
-  }
-  return message;
 }
 
 export function retryQuarantined() {
