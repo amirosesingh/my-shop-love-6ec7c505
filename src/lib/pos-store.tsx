@@ -1043,32 +1043,52 @@ export function PosProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
-  const removeProduct = useCallback((id: string) => {
-    const product = stateRef.current.products.find((p) => p.id === id);
-    logger.log("inventory_edit", "Product deleted", "inventory", {
-      productId: id,
-      name: product?.name ?? null,
-      barcode: product?.barcode ?? null,
-    });
-    void db.deleteProduct(id);
-    setState((s) => ({ ...s, products: s.products.filter((p) => p.id !== id) }));
-  }, []);
-
-  /** Bulk delete from the inventory selection — one trail entry per item. */
-  const removeProducts = useCallback((ids: string[]) => {
-    const set = new Set(ids);
+  /**
+   * Deletes products that the database will actually let go of.
+   *
+   * Anything still referenced by past bills or paperwork is kept on screen and
+   * returned with the reason, so the caller can explain it to the user.
+   */
+  const deleteProductIds = useCallback(async (ids: string[], bulk: boolean) => {
+    const removed: string[] = [];
+    const blocked: BlockedDelete[] = [];
     for (const id of ids) {
       const product = stateRef.current.products.find((p) => p.id === id);
-      logger.log("inventory_edit", "Product deleted", "inventory", {
-        productId: id,
-        name: product?.name ?? null,
-        barcode: product?.barcode ?? null,
-        bulk: true,
-      });
-      void db.deleteProduct(id);
+      try {
+        await db.deleteProductNow(id);
+        removed.push(id);
+        logger.log("inventory_edit", "Product deleted", "inventory", {
+          productId: id,
+          name: product?.name ?? null,
+          barcode: product?.barcode ?? null,
+          ...(bulk ? { bulk: true } : {}),
+        });
+      } catch (e) {
+        const message = (e as { message?: string })?.message ?? String(e);
+        blocked.push({
+          id,
+          name: product?.name ?? "This product",
+          reason: describeDeleteBlock(message),
+        });
+      }
     }
-    setState((s) => ({ ...s, products: s.products.filter((p) => !set.has(p.id)) }));
+    if (removed.length) {
+      const gone = new Set(removed);
+      setState((s) => ({ ...s, products: s.products.filter((p) => !gone.has(p.id)) }));
+    }
+    return blocked;
   }, []);
+
+  const removeProduct = useCallback(
+    (id: string) => deleteProductIds([id], false),
+    [deleteProductIds],
+  );
+
+  /** Bulk delete from the inventory selection — one trail entry per item. */
+  const removeProducts = useCallback(
+    (ids: string[]) => deleteProductIds(ids, true),
+    [deleteProductIds],
+  );
 
   /** Bulk field edit (category, tax, web visibility…) across a selection. */
   const patchProducts = useCallback((ids: string[], patch: Partial<Product>) => {
@@ -1093,12 +1113,13 @@ export function PosProvider({ children }: { children: ReactNode }) {
    * together and every losing barcode/SKU becomes an alias on the master, so
    * scanning the old code still finds the item.
    */
-  const mergeProducts = useCallback((masterId: string, duplicateIds: string[]) => {
+  const mergeProducts = useCallback(
+    async (masterId: string, duplicateIds: string[]): Promise<BlockedDelete[]> => {
     const all = stateRef.current.products;
     const master = all.find((p) => p.id === masterId);
-    if (!master) return;
+    if (!master) return [];
     const losers = all.filter((p) => duplicateIds.includes(p.id) && p.id !== masterId);
-    if (!losers.length) return;
+    if (!losers.length) return [];
 
     const stockByStore = { ...master.stockByStore };
     const aliases = new Set([...(master.barcodes ?? [])]);
@@ -1120,16 +1141,17 @@ export function PosProvider({ children }: { children: ReactNode }) {
     });
 
     void db.upsertProduct(merged);
-    for (const loser of losers) void db.deleteProduct(loser.id);
-
-    const gone = new Set(losers.map((l) => l.id));
     setState((s) => ({
       ...s,
-      products: s.products
-        .filter((p) => !gone.has(p.id))
-        .map((p) => (p.id === masterId ? merged : p)),
+      products: s.products.map((p) => (p.id === masterId ? merged : p)),
     }));
-  }, []);
+    return deleteProductIds(
+      losers.map((l) => l.id),
+      true,
+    );
+    },
+    [deleteProductIds],
+  );
 
   const adjustStock = useCallback((id: string, delta: number, storeId?: string) => {
     const target = storeId ?? stateRef.current.currentStoreId;
