@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { defaultSettings, emptyState } from "./pos-seed";
+import { describeDeleteBlock, type BlockedDelete } from "./product-delete";
 import type {
   AppSettings,
   Booking,
