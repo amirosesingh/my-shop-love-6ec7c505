@@ -237,7 +237,20 @@ const rowToSettings = (r: Row | null): AppSettings =>
       }
     : defaultSettings;
 
-const settingsToRow = (s: AppSettings): Row => ({
+/**
+ * Columns this database does not have (older POS schema). Once the API tells
+ * us a column is unknown we stop sending it, so the rest of the settings keep
+ * saving instead of the whole record failing.
+ */
+const missingSettingsColumns = new Set<string>();
+
+/** "Could not find the 'x' column of 'pos_settings' in the schema cache" */
+const unknownSettingsColumn = (message: string): string | null => {
+  const m = /could not find the '([^']+)' column/i.exec(message);
+  return m?.[1] ?? null;
+};
+
+const buildSettingsRow = (s: AppSettings): Row => ({
   id: 1,
   tax_percentage: s.tax.rate,
   enable_tax: s.tax.enabled,
@@ -273,6 +286,12 @@ const settingsToRow = (s: AppSettings): Row => ({
   integration_settings: s.integrations ?? {},
   updated_at: new Date().toISOString(),
 });
+
+const settingsToRow = (s: AppSettings): Row => {
+  const row = buildSettingsRow(s);
+  missingSettingsColumns.forEach((col) => delete (row as Record<string, unknown>)[col]);
+  return row;
+};
 
 const rowToShift = (r: Row): Shift => ({
   id: r.id,
