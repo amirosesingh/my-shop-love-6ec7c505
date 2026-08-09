@@ -534,7 +534,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       return {
         ...s,
         stores,
-        currentStoreId: s.currentStoreId === id ? stores[0].id : s.currentStoreId,
+        currentStoreId: s.currentStoreId === id ? (stores[0]?.id ?? "") : s.currentStoreId,
       };
     });
   }, []);
