@@ -11,7 +11,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { usePos } from "@/lib/pos-store";
 import {
-  disposeRealtimeProbe,
   overallState,
   runDiagnostics,
   STATE_LABEL,
@@ -61,7 +60,6 @@ export function SystemStatusPill({ compact }: { compact?: boolean }) {
     return () => {
       live = false;
       window.clearInterval(t);
-      disposeRealtimeProbe();
     };
   }, [integrations.memberDomain, integrations.redeemDomain]);
 

@@ -163,15 +163,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    // The theme boot script sets class / colour tokens on the shell before
-    // hydration, so server and client markup differ here on purpose.
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en">
       <head>
         <HeadContent />
         <script dangerouslySetInnerHTML={{ __html: publicConfigScript() }} />
         <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
       </head>
-      <body suppressHydrationWarning>
+      <body>
         {children}
         <Scripts />
       </body>

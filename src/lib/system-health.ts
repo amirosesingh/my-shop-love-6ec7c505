@@ -97,36 +97,17 @@ export async function checkDatabase(): Promise<ServiceCheck> {
   }
 }
 
-/**
- * One long-lived probe channel per page. Opening and closing a fresh channel
- * on every poll tears the socket down mid-handshake, which is what produced
- * "WebSocket is closed before the connection is established".
- */
-let probeChannel: ReturnType<typeof supabaseExternal.channel> | null = null;
-let probeSubscribed = false;
-
-/** Remove the probe channel — call this when the health surface unmounts. */
-export function disposeRealtimeProbe() {
-  if (!probeChannel) return;
-  const channel = probeChannel;
-  probeChannel = null;
-  probeSubscribed = false;
-  try {
-    void supabaseExternal.removeChannel(channel);
-  } catch {
-    /* already gone */
-  }
-}
-
-/** Prove the websocket is alive, reusing a single diagnostic channel. */
+/** Open a throwaway realtime channel to prove the websocket is alive. */
 export function checkRealtime(timeoutMs = 6000): Promise<ServiceCheck> {
   return new Promise((resolve) => {
     const started = Date.now();
-    let settled = false;
     const finish = (state: ServiceState, detail: string) => {
-      if (settled) return;
-      settled = true;
       window.clearTimeout(timer);
+      try {
+        void supabaseExternal.removeChannel(channel);
+      } catch {
+        /* already gone */
+      }
       if (state !== "ok") recordError("realtime", "WS_NOT_CONNECTED", detail);
       resolve({
         id: "realtime",
@@ -137,27 +118,15 @@ export function checkRealtime(timeoutMs = 6000): Promise<ServiceCheck> {
         at: now(),
       });
     };
-
+    const channel = supabaseExternal.channel(`health-${crypto.randomUUID()}`);
     const timer = window.setTimeout(
       () => finish("degraded", "Websocket did not connect in time — updates may lag."),
       timeoutMs,
     );
-
-    // Already connected from an earlier poll — no socket work needed.
-    if (probeChannel && probeSubscribed) {
-      finish("ok", "Instant voucher and stock updates live.");
-      return;
-    }
-
-    if (!probeChannel) probeChannel = supabaseExternal.channel("pos-health-probe");
-    probeChannel.subscribe((status) => {
-      if (status === "SUBSCRIBED") {
-        probeSubscribed = true;
-        finish("ok", "Instant voucher and stock updates live.");
-      } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-        probeSubscribed = false;
+    channel.subscribe((status) => {
+      if (status === "SUBSCRIBED") finish("ok", "Instant voucher and stock updates live.");
+      else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT")
         finish("down", `Websocket status ${status}.`);
-      }
     });
   });
 }
