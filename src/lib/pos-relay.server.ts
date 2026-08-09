@@ -191,10 +191,27 @@ export type RelayCaller = {
  * Establish who is pushing. Fails closed: an unproven caller writes nothing.
  */
 export async function verifyRelayCaller(input: {
+  sessionToken?: string;
   cashierToken?: string;
   terminalToken?: string;
   accessToken?: string;
 }): Promise<RelayCaller> {
+  // A cryptographic session record is the strongest proof: it can be revoked
+  // centrally and expires when the till has been left idle.
+  if (input.sessionToken) {
+    const { touchSession } = await import("./session-guard.server");
+    const check = await touchSession(input.sessionToken);
+    if (check.ok) {
+      const s = check.session;
+      const kind: RelayCaller["kind"] =
+        s.kind === "cashier" ? "cashier" : s.kind === "terminal" ? "terminal" : "staff";
+      return { kind, label: s.label ?? s.staff_user_id ?? "session", storeId: s.branch_id ?? null };
+    }
+    if (check.reason === "revoked" || check.reason === "idle") {
+      throw new Error("Your session has ended — please sign in again.");
+    }
+  }
+
   if (input.cashierToken) {
     const { verifyCashierSession } = await import("./pos-session.server");
     const session = verifyCashierSession(input.cashierToken);
