@@ -237,7 +237,20 @@ const rowToSettings = (r: Row | null): AppSettings =>
       }
     : defaultSettings;
 
-const settingsToRow = (s: AppSettings): Row => ({
+/**
+ * Columns this database does not have (older POS schema). Once the API tells
+ * us a column is unknown we stop sending it, so the rest of the settings keep
+ * saving instead of the whole record failing.
+ */
+const missingSettingsColumns = new Set<string>();
+
+/** "Could not find the 'x' column of 'pos_settings' in the schema cache" */
+const unknownSettingsColumn = (message: string): string | null => {
+  const m = /could not find the '([^']+)' column/i.exec(message);
+  return m?.[1] ?? null;
+};
+
+const buildSettingsRow = (s: AppSettings): Row => ({
   id: 1,
   tax_percentage: s.tax.rate,
   enable_tax: s.tax.enabled,
@@ -273,6 +286,12 @@ const settingsToRow = (s: AppSettings): Row => ({
   integration_settings: s.integrations ?? {},
   updated_at: new Date().toISOString(),
 });
+
+const settingsToRow = (s: AppSettings): Row => {
+  const row = buildSettingsRow(s);
+  missingSettingsColumns.forEach((col) => delete (row as Record<string, unknown>)[col]);
+  return row;
+};
 
 const rowToShift = (r: Row): Shift => ({
   id: r.id,
@@ -774,7 +793,17 @@ export const db = {
       return;
     }
     const res = await supabase.from("pos_settings").upsert(settingsToRow(s) as never);
-    if (res.error) throw new Error(res.error.message);
+    if (!res.error) return;
+    // The database is missing a newer column: drop it and save the rest, so a
+    // single missing field never blocks the whole settings record.
+    const col = unknownSettingsColumn(res.error.message);
+    if (!col) throw new Error(res.error.message);
+    missingSettingsColumns.add(col);
+    const retry = await supabase.from("pos_settings").upsert(settingsToRow(s) as never);
+    if (retry.error) throw new Error(retry.error.message);
+    console.warn(
+      `[settings] this database has no "${col}" column on pos_settings — saved everything else. Run supabase/schema27.sql to add it.`,
+    );
   },
 
   /** Persist a completed bill, its lines, the stock movement and member points. */
