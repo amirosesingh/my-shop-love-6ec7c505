@@ -11,6 +11,7 @@ import {
   Scale,
   Search,
   Trash2,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
@@ -91,6 +92,8 @@ function Inventory() {
     removeProduct,
     removeProducts,
     patchProducts,
+    archiveProducts,
+    restoreProducts,
     adjustStock,
   } = usePos();
   const { can } = useAuth();
@@ -109,6 +112,8 @@ function Inventory() {
   const [importOpen, setImportOpen] = useState(false);
   const [mergeOpen, setMergeOpen] = useState(false);
   const [blocked, setBlocked] = useState<BlockedDelete[]>([]);
+  const [deleting, setDeleting] = useState<string[]>([]);
+  const [showArchived, setShowArchived] = useState(false);
   const [catFilter, setCatFilter] = useState("all");
   const [subFilter, setSubFilter] = useState("all");
   const [bulkCategory, setBulkCategory] = useState("");
@@ -139,6 +144,7 @@ function Inventory() {
     (p) =>
       // Items owned by a private-catalogue branch stay at that branch.
       productVisibleAt(state.settings, p.id, state.currentStoreId) &&
+      (showArchived ? p.archived === true : p.archived !== true) &&
       (catFilter === "all" || p.category === catFilter) &&
       (subFilter === "all" || (p.subCategory ?? "") === subFilter) &&
       `${p.name} ${p.sku} ${p.barcode} ${(p.barcodes ?? []).join(" ")} ${p.category} ${p.subCategory ?? ""}`
@@ -428,6 +434,19 @@ function Inventory() {
 
         <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border p-3">
           <div className="space-y-1">
+            <Label className="text-xs">View</Label>
+            <Button
+              size="sm"
+              variant={showArchived ? "default" : "outline"}
+              onClick={() => {
+                setShowArchived((v) => !v);
+                setSelected([]);
+              }}
+            >
+              {showArchived ? "Showing archived" : "Show archived"}
+            </Button>
+          </div>
+          <div className="space-y-1">
             <Label className="text-xs">Category</Label>
             <ThemedSelect
               value={catFilter}
@@ -510,6 +529,7 @@ function Inventory() {
                 <Button
                   size="sm"
                   variant="destructive"
+                  disabled={deleting.length > 0}
                   onClick={async () => {
                     if (
                       !window.confirm(
@@ -517,14 +537,20 @@ function Inventory() {
                       )
                     )
                       return;
-                    const failed = await removeProducts(selected);
-                    const done = selected.length - failed.length;
-                    if (done) toast.success(`${done} product${done > 1 ? "s" : ""} deleted`);
-                    setSelected(failed.map((f) => f.id));
-                    if (failed.length) setBlocked(failed);
+                    setDeleting(selected);
+                    try {
+                      const failed = await removeProducts(selected);
+                      const done = selected.length - failed.length;
+                      if (done) toast.success(`${done} product${done > 1 ? "s" : ""} deleted`);
+                      setSelected(failed.map((f) => f.id));
+                      if (failed.length) setBlocked(failed);
+                    } finally {
+                      setDeleting([]);
+                    }
                   }}
                 >
-                  <Trash2 className="size-4" /> Delete selected
+                  <Trash2 className="size-4" />{" "}
+                  {deleting.length > 1 ? "Checking sales history…" : "Delete selected"}
                 </Button>
               )}
             </div>
@@ -651,14 +677,30 @@ function Inventory() {
                     <Button
                       size="icon"
                       variant="ghost"
+                      disabled={deleting.includes(p.id)}
+                      title={deleting.includes(p.id) ? "Checking sales history…" : "Delete"}
                       onClick={async () => {
-                        const failed = await removeProduct(p.id);
-                        if (failed.length) setBlocked(failed);
-                        else toast.success("Product removed");
+                        setDeleting((d) => [...d, p.id]);
+                        try {
+                          const failed = await removeProduct(p.id);
+                          if (failed.length) setBlocked(failed);
+                          else toast.success("Product removed");
+                        } finally {
+                          setDeleting((d) => d.filter((id) => id !== p.id));
+                        }
                       }}
                     >
-                      <Trash2 className="size-4 text-destructive" />
+                      {deleting.includes(p.id) ? (
+                        <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                      ) : (
+                        <Trash2 className="size-4 text-destructive" />
+                      )}
                     </Button>
+                    )}
+                    {canEdit && p.archived && (
+                      <Button size="sm" variant="outline" onClick={() => restoreProducts([p.id])}>
+                        Restore
+                      </Button>
                     )}
                   </TableCell>
                 </TableRow>
@@ -692,9 +734,9 @@ function Inventory() {
         blocked={blocked}
         onClose={() => setBlocked([])}
         onHide={(ids) => {
-          patchProducts(ids, { ecomVisible: false });
+          archiveProducts(ids);
           setBlocked([]);
-          toast.success(`${ids.length > 1 ? "Products" : "Product"} hidden from the catalogue`);
+          toast.success(`${ids.length > 1 ? "Products" : "Product"} archived — history kept`);
         }}
       />
       {canAdjust && (
