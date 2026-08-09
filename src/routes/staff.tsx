@@ -1060,6 +1060,12 @@ function StaffManagement() {
                 </TabsContent>
 
                 <TabsContent value="permissions" className="space-y-5 pt-4">
+                  {selected.role === "admin" && (
+                    <p className="rounded-md border border-border bg-muted/40 px-4 py-2 text-xs text-muted-foreground">
+                      Administrators hold full authority: every capability is on and cannot be
+                      reduced, and manager PIN prompts are bypassed on web, Windows and Android.
+                    </p>
+                  )}
                   {PERMISSION_GROUPS.map((group) => (
                     <div key={group.id} className="rounded-md border border-border">
                       <div className="flex items-center gap-2 px-4 py-2">
@@ -1069,6 +1075,7 @@ function StaffManagement() {
                             size="sm"
                             variant="ghost"
                             className="h-7 text-[11px]"
+                            disabled={selected.role === "admin"}
                             onClick={() => void setGroup(selected, group.keys, true)}
                           >
                             All on
@@ -1077,6 +1084,7 @@ function StaffManagement() {
                             size="sm"
                             variant="ghost"
                             className="h-7 text-[11px]"
+                            disabled={selected.role === "admin"}
                             onClick={() => void setGroup(selected, group.keys, false)}
                           >
                             All off
@@ -1092,7 +1100,8 @@ function StaffManagement() {
                           >
                             <span>{PERMISSION_LABELS[key as PermissionKey]}</span>
                             <Switch
-                              checked={!!selected.permissions[key]}
+                              checked={selected.role === "admin" || !!selected.permissions[key]}
+                              disabled={selected.role === "admin"}
                               onCheckedChange={(v) =>
                                 void togglePermission(selected, key as PermissionKey, v)
                               }
