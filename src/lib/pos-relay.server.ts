@@ -203,12 +203,17 @@ export async function verifyRelayCaller(input: {
 
   if (input.terminalToken) {
     const res = await serviceRest(
-      `terminal_tokens?id=eq.${encodeURIComponent(input.terminalToken)}&select=id,status,location_id`,
+      `terminal_tokens?id=eq.${encodeURIComponent(input.terminalToken)}&select=id,status,location_id,revoked_at`,
     );
     if (res.ok) {
-      const rows = (await res.json()) as { status?: string; location_id?: string | null }[];
+      const rows = (await res.json()) as {
+        status?: string;
+        location_id?: string | null;
+        revoked_at?: string | null;
+      }[];
       const row = rows[0];
-      if (row && (row.status === "active" || row.status === "used")) {
+      // A revoked token (remote reset, branch removed) never proves anything.
+      if (row && !row.revoked_at && (row.status === "active" || row.status === "used")) {
         return { kind: "terminal", label: input.terminalToken, storeId: row.location_id ?? null };
       }
     }

@@ -11,7 +11,11 @@ import {
 import type { Session } from "@supabase/supabase-js";
 import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
 import { type MetaRole } from "@/lib/pos-users";
-import { TERMINAL_TOKEN_KEY } from "@/lib/pos-caller-auth";
+import {
+  clearStoredCredentials,
+  readCredentials,
+  saveCashierToken,
+} from "@/lib/pos-credentials";
 import { issueCashierSession } from "@/lib/pos-session.functions";
 import { verifyCashierPin } from "@/lib/pos-cashiers";
 import { cacheCredential, verifyCachedPin } from "@/lib/offline-credentials";
@@ -383,7 +387,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // cashier — the PIN is re-checked server-side when minting it.
     try {
       const issued = await issueCashierSession({ data: { username: code, pin } });
-      if (issued.ok) window.sessionStorage.setItem(TERMINAL_TOKEN_KEY, issued.token);
+      if (issued.ok) await saveCashierToken(issued.token);
     } catch {
       /* messaging features stay locked without a terminal token */
     }
@@ -420,10 +424,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setTerminalUser(null);
     try {
       window.sessionStorage.removeItem(TERMINAL_KEY);
-      window.sessionStorage.removeItem(TERMINAL_TOKEN_KEY);
     } catch {
       /* ignore */
     }
+    clearStoredCredentials();
   }, []);
 
   // Resolved fresh from the staff list so a duty change applies immediately.
@@ -528,12 +532,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         void import("sonner").then(({ toast }) =>
           toast.error("Session ended", {
             id: "pos-session-expired",
-            description: "Your sign-in is no longer valid. Please sign in again.",
+            description:
+              "Your session or branch is no longer active. Please sign in again.",
           }),
         );
       })();
     });
   }, [logout]);
+
+  // Boot / resume check: before the dashboard trusts what it has, ask the
+  // server whether this device's token is still live and its branch still
+  // exists. Only a definite refusal signs anyone out — offline stays working.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let alive = true;
+    const check = async () => {
+      if (document.visibilityState === "hidden") return;
+      try {
+        const creds = await readCredentials();
+        if (!creds.cashierToken && !creds.terminalToken && !creds.accessToken) return;
+        const { verifySession } = await import("@/lib/session-verify.functions");
+        const res = await verifySession({ data: creds });
+        if (!alive || res.ok) return;
+        if (res.reason === "revoked" || res.reason === "branch_missing") {
+          const { notifySessionExpired } = await import("@/lib/session-expiry");
+          notifySessionExpired();
+        }
+      } catch {
+        /* a failed check is a connectivity problem, never a sign-out */
+      }
+    };
+    void check();
+    const onVisible = () => void check();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      alive = false;
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [user?.staffId]);
 
   const isWarehouse =
     !!session?.user &&
