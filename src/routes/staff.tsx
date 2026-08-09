@@ -61,6 +61,13 @@ import {
   upsertCashier,
 } from "@/lib/pos-cashiers";
 import { cn } from "@/lib/utils";
+import {
+  CORE_ROLES,
+  describeAssignment,
+  listStaffRoles,
+  type RoleDef,
+} from "@/lib/staff-roles";
+import { setCashierRoleSlug } from "@/lib/pos-cashiers";
 
 export const Route = createFileRoute("/staff")({
   head: () => ({
@@ -106,6 +113,8 @@ type StaffRow = {
   is_active: boolean;
   last_login_at: string | null;
   permissions: Record<string, boolean>;
+  /** Assigned role (built-in or custom). */
+  role_slug: string | null;
 };
 
 const NEW_USER = {
@@ -136,6 +145,12 @@ function StaffManagement() {
   const [roleChange, setRoleChange] = useState<{ row: StaffRow; target: StaffRole } | null>(
     null,
   );
+  const [roles, setRoles] = useState<RoleDef[]>(CORE_ROLES);
+  const [managerPin, setManagerPin] = useState("");
+
+  useEffect(() => {
+    void listStaffRoles().then(setRoles);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -153,6 +168,7 @@ function StaffManagement() {
         store_id: (r["store_id"] as string | null) ?? null,
         is_active: r["is_active"] !== false,
         last_login_at: (r["last_login_at"] as string | null) ?? null,
+        role_slug: (r["role_slug"] as string | null) ?? role,
         permissions: normalizePermissions(
           r["permissions"] as Record<string, unknown> | null,
           role,
@@ -172,6 +188,7 @@ function StaffManagement() {
         store_id: null,
         is_active: c.is_active,
         last_login_at: c.last_login_at,
+        role_slug: c.role_slug ?? "cashier",
         permissions: c.permissions as unknown as Record<string, boolean>,
       }));
     } catch (e) {
