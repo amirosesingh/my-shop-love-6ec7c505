@@ -116,27 +116,9 @@ BEGIN
   END LOOP;
 END $guard$;
 
-CREATE OR REPLACE FUNCTION public.terminal_token_claim(p_token_id uuid, p_device text DEFAULT NULL::text)
- RETURNS boolean
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public', 'pg_temp'
-AS $function$
-DECLARE
-  claimed boolean;
-BEGIN
-  UPDATE public.terminal_tokens
-  SET status = 'used',
-       claimed_by_device = left(coalesce(p_device, claimed_by_device), 120),
-      claimed_at = now(),
-      activated_at = coalesce(activated_at, now()),
-      last_seen_at = now()
-  WHERE id = p_token_id AND status = 'active'
-  RETURNING true INTO claimed;
-
-  RETURN coalesce(claimed, false);
-END;
-$function$;
+-- The single claim routine lives at the end of this file, in its final
+-- five-argument shape. Defining a two-argument copy here would leave two
+-- overloads behind and make every activation ambiguous.
 
 CREATE OR REPLACE FUNCTION public.terminal_token_heartbeat(p_token_id uuid, p_activate boolean DEFAULT false)
  RETURNS void
@@ -177,10 +159,8 @@ GRANT ALL ON public.terminal_tokens TO service_role;
 
 REVOKE ALL ON FUNCTION public.terminal_token_status(uuid) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.terminal_token_heartbeat(uuid, boolean) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.terminal_token_claim(uuid, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.terminal_token_status(uuid) TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.terminal_token_heartbeat(uuid, boolean) TO anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.terminal_token_claim(uuid, text) TO anon, authenticated, service_role;
 
 -- ---------- row level security ----------
 ALTER TABLE public.stores ENABLE ROW LEVEL SECURITY;
@@ -228,7 +208,20 @@ FROM (VALUES ('stores'),('terminal_tokens')) AS t(name);
 -- ---------- terminal is bound to exactly one branch ----------
 -- The branch follows the terminal, not the person signing in, so a token can
 -- only be claimed once it carries a location and the claim returns it.
-CREATE OR REPLACE FUNCTION public.terminal_token_claim(p_token_id uuid, p_device text DEFAULT NULL::text)
+ALTER TABLE public.terminal_tokens
+  ADD COLUMN IF NOT EXISTS claimed_proof_hash text,
+  ADD COLUMN IF NOT EXISTS claimed_platform text,
+  ADD COLUMN IF NOT EXISTS claimed_os text;
+
+DROP FUNCTION IF EXISTS public.terminal_token_claim(uuid, text);
+
+CREATE OR REPLACE FUNCTION public.terminal_token_claim(
+  p_token_id uuid,
+  p_device text DEFAULT NULL::text,
+  p_proof_hash text DEFAULT NULL::text,
+  p_platform text DEFAULT NULL::text,
+  p_os text DEFAULT NULL::text
+)
 RETURNS boolean
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -248,6 +241,9 @@ BEGIN
   UPDATE public.terminal_tokens
   SET status = 'used',
       claimed_by_device = left(coalesce(p_device, claimed_by_device), 120),
+      claimed_proof_hash = left(coalesce(p_proof_hash, claimed_proof_hash), 200),
+      claimed_platform = left(coalesce(p_platform, claimed_platform), 40),
+      claimed_os = left(coalesce(p_os, claimed_os), 40),
       claimed_at = now(),
       activated_at = coalesce(activated_at, now()),
       last_seen_at = now()
@@ -258,5 +254,6 @@ BEGIN
 END;
 $function$;
 
-REVOKE ALL ON FUNCTION public.terminal_token_claim(uuid, text) FROM public;
-GRANT EXECUTE ON FUNCTION public.terminal_token_claim(uuid, text) TO anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.terminal_token_claim(uuid, text, text, text, text) FROM public;
+GRANT EXECUTE ON FUNCTION public.terminal_token_claim(uuid, text, text, text, text)
+  TO anon, authenticated, service_role;
