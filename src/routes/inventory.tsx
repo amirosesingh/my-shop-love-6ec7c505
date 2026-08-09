@@ -11,6 +11,7 @@ import {
   Scale,
   Search,
   Trash2,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
