@@ -42,7 +42,7 @@ export function UnpairTerminalCard() {
       reason: "Removing the saved activation from this machine",
       ...(config?.locationId ? { storeId: config.locationId } : {}),
       ...(config?.tokenId ? { terminalId: config.tokenId } : {}),
-      ...(auth?.user?.userId ? { requestedBy: auth.user.userId } : {}),
+      ...(auth?.user?.staffId ? { requestedBy: auth.user.staffId } : {}),
     });
     if (res.ok) setConfirming(true);
   };
