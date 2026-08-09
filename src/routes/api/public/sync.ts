@@ -78,10 +78,29 @@ export const Route = createFileRoute("/api/public/sync")({
             { status: 503 },
           );
         }
+        // Every request re-checks the caller: token live AND its branch still
+        // present. A caller whose branch was deleted is refused with a reason
+        // the till can act on instead of a blank failure.
         try {
-          await verifyRelayCaller(body);
+          const caller = await verifyRelayCaller(body);
+          if (caller.storeId) {
+            const { branchExists } = await import("@/lib/session-verify.server");
+            if (!(await branchExists(caller.storeId))) {
+              return Response.json(
+                {
+                  ok: false,
+                  code: "BRANCH_MISSING",
+                  error: "Your session or branch is no longer active. Please sign in again.",
+                },
+                { status: 401 },
+              );
+            }
+          }
         } catch (e) {
-          return Response.json({ ok: false, error: (e as Error).message }, { status: 401 });
+          return Response.json(
+            { ok: false, code: "SESSION_INVALID", error: (e as Error).message },
+            { status: 401 },
+          );
         }
 
         if (body.read) {
