@@ -43,6 +43,7 @@ export type PosRules = {
   require_pin_stock_adjustment: boolean;
   require_pin_shift_close: boolean;
   require_pin_edit_tenders: boolean;
+  require_pin_terminal_reset: boolean;
 };
 
 export type PosRuleKey = keyof PosRules;
@@ -79,6 +80,7 @@ export const DEFAULT_POS_RULES: PosRules = {
   require_pin_stock_adjustment: true,
   require_pin_shift_close: false,
   require_pin_edit_tenders: false,
+  require_pin_terminal_reset: true,
 };
 
 /** Coerce an untrusted payload (API row) into a complete rule set. */
@@ -172,6 +174,7 @@ export const RULE_GROUPS: RuleGroup[] = [
       { key: "require_pin_stock_adjustment", kind: "switch", label: "Stock adjustment", blurb: "Recounting or writing off stock." },
       { key: "require_pin_shift_close", kind: "switch", label: "Close a shift", blurb: "Running the Z-report and handing back the till." },
       { key: "require_pin_edit_tenders", kind: "switch", label: "Edit split payments", blurb: "Changing tenders on a bill." },
+      { key: "require_pin_terminal_reset", kind: "switch", label: "Unpair / reset a terminal", blurb: "Sending this machine back to the activation screen." },
     ],
   },
 ];
@@ -191,7 +194,8 @@ export type GateAction =
   | "no_sale_drawer"
   | "stock_adjustment"
   | "shift_close"
-  | "edit_tenders";
+  | "edit_tenders"
+  | "terminal_unpair";
 
 export const GATE_RULE_KEY: Record<GateAction, PosRuleKey> = {
   refund: "require_manager_pin_for_refund",
@@ -205,6 +209,7 @@ export const GATE_RULE_KEY: Record<GateAction, PosRuleKey> = {
   stock_adjustment: "require_pin_stock_adjustment",
   shift_close: "require_pin_shift_close",
   edit_tenders: "require_pin_edit_tenders",
+  terminal_unpair: "require_pin_terminal_reset",
 };
 
 /** Does this action need a manager's PIN under the current branch rules? */

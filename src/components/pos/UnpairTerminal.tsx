@@ -17,22 +17,35 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ManagerOverrideDialog, type OverrideRequest } from "@/components/pos/ManagerOverrideDialog";
 import { isTerminalApp } from "@/lib/native";
 import { readTerminalConfig, unpairTerminal } from "@/lib/terminal-tokens";
-
-const REQUEST: OverrideRequest = {
-  action: "terminal_unpair",
-  title: "Unpair this terminal",
-  reason: "Removing the saved activation from this machine",
-};
+import { useManagerGate } from "@/lib/manager-gate";
+import { useAuthOptional } from "@/lib/pos-auth";
 
 export function UnpairTerminalCard() {
-  const [asking, setAsking] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const { authorize } = useManagerGate();
+  const auth = useAuthOptional();
   const config = readTerminalConfig();
 
   if (!isTerminalApp()) return null;
+
+  /**
+   * One authorisation path: administrators go straight through (the approval
+   * is recorded server-side), everyone else meets the manager PIN dialog when
+   * the branch rules ask for it.
+   */
+  const ask = async () => {
+    const res = await authorize({
+      action: "terminal_unpair",
+      title: "Unpair this terminal",
+      reason: "Removing the saved activation from this machine",
+      ...(config?.locationId ? { storeId: config.locationId } : {}),
+      ...(config?.tokenId ? { terminalId: config.tokenId } : {}),
+      ...(auth?.user?.userId ? { requestedBy: auth.user.userId } : {}),
+    });
+    if (res.ok) setConfirming(true);
+  };
 
   const run = async () => {
     await unpairTerminal();
@@ -57,18 +70,9 @@ export function UnpairTerminalCard() {
           · token {config.tokenId.slice(0, 8)}…
         </p>
       )}
-      <Button size="sm" variant="destructive" onClick={() => setAsking(true)}>
+      <Button size="sm" variant="destructive" onClick={() => void ask()}>
         <Unplug className="size-4" /> Unpair / reset terminal
       </Button>
-
-      <ManagerOverrideDialog
-        request={asking ? REQUEST : null}
-        onClose={() => setAsking(false)}
-        onApproved={() => {
-          setAsking(false);
-          setConfirming(true);
-        }}
-      />
 
       <AlertDialog open={confirming} onOpenChange={setConfirming}>
         <AlertDialogContent>
