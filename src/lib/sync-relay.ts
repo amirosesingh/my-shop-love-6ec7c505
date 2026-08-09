@@ -5,30 +5,26 @@
  * no cloud account (cashier PIN sign-in), the same operation is posted to
  * `/api/public/sync`, which proves the caller and writes with service rights.
  */
-import { supabaseExternal } from "@/integrations/supabase/external-client";
-import { TERMINAL_TOKEN_KEY } from "./pos-caller-auth";
+import { authHeaders, cashierTokenSync, readCredentials } from "./pos-credentials";
 import { readTerminalConfig } from "./terminal-tokens";
 import type { SyncOp } from "./sync-outbox";
 
-async function credentials() {
-  let cashierToken: string | undefined;
-  try {
-    cashierToken = window.sessionStorage.getItem(TERMINAL_TOKEN_KEY) ?? undefined;
-  } catch {
-    /* session storage unavailable */
-  }
-  let accessToken: string | undefined;
-  try {
-    accessToken = (await supabaseExternal.auth.getSession()).data.session?.access_token;
-  } catch {
-    /* offline */
-  }
-  const terminalToken = readTerminalConfig()?.tokenId;
-  return {
-    ...(cashierToken ? { cashierToken } : {}),
-    ...(accessToken ? { accessToken } : {}),
-    ...(terminalToken ? { terminalToken } : {}),
-  };
+const credentials = readCredentials;
+
+/** Every relay call carries the bearer token as well as the credential body. */
+async function relayHeaders(): Promise<Record<string, string>> {
+  return { "Content-Type": "application/json", ...(await authHeaders()) };
+}
+
+/**
+ * One place that reacts to the relay refusing a caller: a dead token or a
+ * deleted branch ends the session, anything else is left to the caller.
+ */
+async function inspectRelay(res: Response, body: { code?: string } | null): Promise<void> {
+  if (res.status !== 401 && res.status !== 403) return;
+  const { notifySessionExpired } = await import("./session-expiry");
+  if (body?.code === "SESSION_INVALID" || body?.code === "BRANCH_MISSING" || res.status === 401)
+    notifySessionExpired();
 }
 
 /** True when a staff account is signed in to the central database in this browser. */
@@ -52,11 +48,7 @@ export function hasStaffSession(): boolean {
  */
 export function canRelay(): boolean {
   if (typeof window === "undefined") return false;
-  try {
-    if (window.sessionStorage.getItem(TERMINAL_TOKEN_KEY)) return true;
-  } catch {
-    /* session storage unavailable */
-  }
+  if (cashierTokenSync()) return true;
   return !!readTerminalConfig()?.tokenId || hasStaffSession();
 }
 
@@ -65,12 +57,13 @@ export async function relayOp(op: SyncOp): Promise<{ ok: boolean; error?: string
   try {
     const res = await fetch("/api/public/sync", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await relayHeaders(),
       body: JSON.stringify({ ...(await credentials()), ops: [op] }),
     });
     const body = (await res.json().catch(() => null)) as
-      | { ok?: boolean; error?: string; results?: { ok: boolean; error?: string }[] }
+      | { ok?: boolean; error?: string; code?: string; results?: { ok: boolean; error?: string }[] }
       | null;
+    await inspectRelay(res, body);
     if (!res.ok) return { ok: false, error: body?.error ?? `Relay refused (${res.status})` };
     const first = body?.results?.[0];
     return first ?? { ok: !!body?.ok };
@@ -86,12 +79,13 @@ export async function relayActiveShift(
   try {
     const res = await fetch("/api/public/sync", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await relayHeaders(),
       body: JSON.stringify({ ...(await credentials()), read: { kind: "activeShift", storeId } }),
     });
     const body = (await res.json().catch(() => null)) as
-      | { ok?: boolean; row?: Record<string, unknown> | null; error?: string }
+      | { ok?: boolean; row?: Record<string, unknown> | null; error?: string; code?: string }
       | null;
+    await inspectRelay(res, body);
     if (!res.ok || !body?.ok)
       return { ok: false, error: body?.error ?? `Relay refused (${res.status})` };
     return { ok: true, row: body.row ?? null };
@@ -109,12 +103,13 @@ export async function relayStores(): Promise<{
   try {
     const res = await fetch("/api/public/sync", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await relayHeaders(),
       body: JSON.stringify({ ...(await credentials()), read: { kind: "stores" } }),
     });
     const body = (await res.json().catch(() => null)) as
-      | { ok?: boolean; rows?: Record<string, unknown>[]; error?: string }
+      | { ok?: boolean; rows?: Record<string, unknown>[]; error?: string; code?: string }
       | null;
+    await inspectRelay(res, body);
     if (!res.ok || !body?.ok)
       return { ok: false, error: body?.error ?? `Relay refused (${res.status})` };
     return { ok: true, rows: body.rows ?? [] };
@@ -128,16 +123,22 @@ export async function probeRelay(): Promise<{ ok: boolean; error?: string; code?
   try {
     const res = await fetch("/api/public/sync", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await relayHeaders(),
       body: JSON.stringify({
         ...(await credentials()),
         ops: [{ kind: "update", table: "shift_sessions", values: {}, match: { id: "probe" } }],
       }),
     });
-    if (res.status === 401) return { ok: false, error: "This till is not recognised yet" };
     const body = (await res.json().catch(() => null)) as
       | { error?: string; code?: string }
       | null;
+    await inspectRelay(res, body);
+    if (res.status === 401)
+      return {
+        ok: false,
+        ...(body?.code ? { code: body.code } : {}),
+        error: body?.error ?? "This till is not recognised yet",
+      };
     if (!res.ok)
       return {
         ok: false,
