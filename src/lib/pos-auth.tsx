@@ -17,6 +17,11 @@ import {
   saveCashierToken,
 } from "@/lib/pos-credentials";
 import { issueCashierSession } from "@/lib/pos-session.functions";
+import {
+  startDeviceSession,
+  endDeviceSession,
+} from "@/lib/user-sessions.functions";
+import { loadSessionToken, saveSessionToken } from "@/lib/pos-credentials";
 import { verifyCashierPin } from "@/lib/pos-cashiers";
 import { cacheCredential, verifyCachedPin } from "@/lib/offline-credentials";
 import { recordSignIn } from "@/lib/shift-attendance";
@@ -315,11 +320,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (email: string, password: string) => {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
-      return error ? { ok: false, error: error.message } : { ok: true };
+      if (error) return { ok: false, error: error.message };
+      // Register this device so it can be listed and reset remotely, and so
+      // it signs itself out once it has been left idle for too long.
+      try {
+        const token = data.session?.access_token;
+        if (token) {
+          const started = await startDeviceSession({
+            data: {
+              kind: "staff",
+              accessToken: token,
+              label: data.user?.email ?? email.trim(),
+              platform: typeof navigator === "undefined" ? "web" : navigator.platform || "web",
+            },
+          });
+          if (started.ok) await saveSessionToken(started.token);
+        }
+      } catch {
+        /* the account token still works on its own */
+      }
+      return { ok: true };
     },
     [],
   );
@@ -387,7 +411,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // cashier — the PIN is re-checked server-side when minting it.
     try {
       const issued = await issueCashierSession({ data: { username: code, pin } });
-      if (issued.ok) await saveCashierToken(issued.token);
+      if (issued.ok) {
+        await saveCashierToken(issued.token);
+        const started = await startDeviceSession({
+          data: {
+            kind: "cashier",
+            cashierToken: issued.token,
+            label: next.name,
+            staffUserId: next.userCode,
+            ...(next.cashierId ? { cashierId: next.cashierId } : {}),
+            ...(next.storeId ? { branchId: next.storeId } : {}),
+            platform: typeof navigator === "undefined" ? "web" : navigator.platform || "web",
+          },
+        });
+        if (started.ok) await saveSessionToken(started.token);
+      }
     } catch {
       /* messaging features stay locked without a terminal token */
     }
@@ -418,6 +456,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     // Stamp the sign-out time on this user's open shift sessions first.
     endShiftSessions({});
+    // End the session record so the token stops working everywhere at once.
+    try {
+      const sessionToken = await loadSessionToken();
+      if (sessionToken) await endDeviceSession({ data: { sessionToken } });
+    } catch {
+      /* offline — the local purge below still applies */
+    }
     await supabase.auth.signOut();
     setSession(null);
     setRoles([]);
