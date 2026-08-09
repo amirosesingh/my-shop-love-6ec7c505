@@ -739,6 +739,35 @@ export const db = {
   },
   deleteProduct: (id: string) =>
     queue("Deleting product", { kind: "delete", table: "products", match: { id } }),
+  /**
+   * Delete a product and wait for the answer.
+   *
+   * Unlike the queued version this surfaces a refusal from the database (for
+   * example the item is on past bills) so the screen can explain it instead of
+   * silently dropping the row. A plain connectivity failure still falls back to
+   * the durable queue.
+   */
+  deleteProductNow: async (id: string): Promise<void> => {
+    const op: SyncOp = { kind: "delete", table: "products", match: { id } };
+    const bridge = localDb();
+    if (bridge) {
+      const res = await bridge.write("Deleting product", op);
+      if (!res.ok) throw new Error(res.error ?? "Deleting product failed");
+      return;
+    }
+    try {
+      await runOpLive("Deleting product", op);
+    } catch (e) {
+      const message = (e as { message?: string })?.message ?? String(e);
+      const offline = typeof navigator !== "undefined" && !navigator.onLine;
+      if (!isLiveOnly() && (offline || /failed to fetch|network|timeout/i.test(message))) {
+        enqueue("Deleting product", op);
+        void drainOutbox();
+        return;
+      }
+      throw e instanceof Error ? e : new Error(message);
+    }
+  },
 
   upsertStore: (s: Store) =>
     queue("Saving location", { kind: "upsert", table: "stores", rows: [storeToRow(s)] }),
