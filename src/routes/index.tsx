@@ -2978,7 +2978,6 @@ function Register() {
             if (overLimit) {
               const grant = await askManager({
                 action: "discount_over_limit",
-                ruleKey: t === "percent" ? "max_cashier_discount_percent" : "max_cart_discount_amount",
                 title: "Discount above cashier limit",
                 reason:
                   t === "percent"
@@ -2997,21 +2996,6 @@ function Register() {
               patchLine(target, { discount: v, discountType: t });
             }
           })();
-        }}
-      />
-
-      {/* Shared manager PIN gate — the PIN is only ever checked server-side. */}
-      <ManagerOverrideDialog
-        request={override}
-        onClose={() => {
-          overrideResolve.current?.(null);
-          overrideResolve.current = null;
-          setOverride(null);
-        }}
-        onApproved={(grantToken) => {
-          overrideResolve.current?.(grantToken);
-          overrideResolve.current = null;
-          setOverride(null);
         }}
       />
     </AppShell>
