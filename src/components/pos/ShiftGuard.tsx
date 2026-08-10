@@ -10,6 +10,7 @@ import { shiftDuration } from "@/lib/shift-hours";
 import { parsePositiveAmount } from "@/lib/amount";
 import { permissionMessage } from "@/components/pos/PermissionGate";
 import { notifyError } from "@/lib/notify";
+import { commitLabel } from "@/lib/pos-db";
 
 /**
  * Hard terminal lock.
@@ -150,8 +151,9 @@ export function ShiftGuard({ children }: { children: ReactNode }) {
                   }
                   setOpening(true);
                   try {
-                    await openShift(cashier.trim() || "Cashier", amount);
-                    toast.success("Shift opened");
+                    const target = await openShift(cashier.trim() || "Cashier", amount);
+                    // Only announced once the shift is confirmed stored.
+                    toast.success(`Shift opened — ${commitLabel(target).toLowerCase()}`);
                   } catch (e) {
                     notifyError(e, "Opening the shift");
                   } finally {
