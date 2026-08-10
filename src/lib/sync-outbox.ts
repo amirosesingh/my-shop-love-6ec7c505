@@ -25,6 +25,8 @@ export type QueuedOp = {
   createdAt: string;
   attempts: number;
   lastError?: string;
+  /** where this entry stands: waiting, sent and confirmed, or refused */
+  status?: "pending" | "synced" | "failed";
   /** repeatedly failing ops are parked so they cannot block the queue */
   quarantined?: boolean;
   /** branch the write happened at (multi-branch replay) */
@@ -95,6 +97,7 @@ export function enqueue(context: string, op: SyncOp): QueuedOp {
     op,
     createdAt: new Date().toISOString(),
     attempts: 0,
+    status: "pending",
     branchId: s.branchId,
     terminalId: s.terminalId,
     seq: s.seq,
@@ -128,6 +131,7 @@ export function failOp(id: string, message: string) {
             ...q,
             attempts: q.attempts + 1,
             lastError: message,
+            status: "failed",
             quarantined: q.attempts + 1 >= MAX_ATTEMPTS,
           }
         : q,
@@ -136,11 +140,59 @@ export function failOp(id: string, message: string) {
 }
 
 export function retryQuarantined() {
-  write(read().map((q) => (q.quarantined ? { ...q, attempts: 0, quarantined: false } : q)));
+  write(
+    read().map((q) =>
+      q.quarantined ? { ...q, attempts: 0, quarantined: false, status: "pending" as const } : q,
+    ),
+  );
 }
 
 export function discardQuarantined() {
   write(read().filter((q) => !q.quarantined));
+}
+
+/** Put one refused change back in line for another attempt. */
+export function retryOp(id: string) {
+  write(
+    read().map((q) =>
+      q.id === id
+        ? {
+            ...q,
+            attempts: 0,
+            quarantined: false,
+            status: "pending" as const,
+            lastError: undefined,
+          }
+        : q,
+    ),
+  );
+}
+
+/** Drop one change for good. Only ever called from an explicit confirmation. */
+export function discardOp(id: string) {
+  write(read().filter((q) => q.id !== id));
+}
+
+/** What the queue looks like to a person: state, reason and next attempt. */
+export type QueueView = QueuedOp & {
+  state: "waiting" | "retrying" | "refused";
+  reason: string | null;
+  nextAttemptAt: string | null;
+};
+
+/** The queue with every entry described for the Sync & backup screen. */
+export function queueView(): QueueView[] {
+  return read().map((q) => {
+    // The same backoff the sync engine applies: 0s, 5s, 20s, 45s …
+    const wait = q.attempts ** 2 * 5000;
+    const due = new Date(q.createdAt).getTime() + wait;
+    return {
+      ...q,
+      state: q.quarantined ? "refused" : q.attempts > 0 ? "retrying" : "waiting",
+      reason: q.lastError ?? null,
+      nextAttemptAt: q.quarantined || !wait ? null : new Date(due).toISOString(),
+    };
+  });
 }
 
 /* --------------------------- online sync toggle --------------------------- */
