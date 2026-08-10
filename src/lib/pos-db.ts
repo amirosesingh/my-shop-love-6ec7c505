@@ -15,6 +15,7 @@ import {
 } from "./db-mode";
 import { notifyError, showNotification } from "./notify";
 import { canRelay, relayStores } from "./sync-relay";
+import { isOperationalTable } from "./pos-auth-route";
 import { keyset, nextCursor, PAGE_SIZE, type Cursor, type Page } from "./keyset";
 import {
   isLinkedRecordError,
@@ -852,6 +853,12 @@ const queue = (context: string, op: SyncOp) => {
     });
     return;
   }
+  // Operational business data is never parked in browser storage: it goes to
+  // the central database (directly or through the relay) or it fails loudly.
+  if (isOperationalTable(op.table)) {
+    void runOpLive(context, op).catch((e) => dbError(context, e));
+    return;
+  }
   enqueue(context, op);
   void drainOutbox();
 };
@@ -873,7 +880,12 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
 
   // Android / live-only: the backend is the single source of truth.
   if (isLiveOnly()) {
-    for (const op of ops) await runOpLive(context, op);
+    try {
+      for (const op of ops) await runOpLive(context, op);
+    } catch (e) {
+      if (isConnectionError(e)) throw new AllTargetsFailed(context, e);
+      throw e;
+    }
     return noteCommitTarget("cloud");
   }
 
@@ -905,6 +917,23 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
   // Browser: queue to disk first (durable), then try to push it up now.
   // In "Online only" mode the central database is tried first; the queue is
   // still used the moment that attempt cannot reach the server.
+  const operational = ops.every((op) => isOperationalTable(op.table));
+  // Sales, shifts, drawer logs and stock movements must reach a real database
+  // engine. With no local SQL server on this device that means the central
+  // database — never the browser queue.
+  if (operational) {
+    try {
+      for (const op of ops) await runOpLive(context, op);
+      noteConnectionRestored();
+      setCloudDirect(true);
+      return noteCommitTarget("cloud");
+    } catch (cloud) {
+      if (!isConnectionError(cloud)) throw cloud;
+      noteConnectionLost();
+      throw new AllTargetsFailed(context, cloud);
+    }
+  }
+
   if (effectiveDatabaseMode() === "online") {
     try {
       for (const op of ops) await runOpLive(context, op);
