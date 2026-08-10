@@ -1290,6 +1290,27 @@ export const db = {
   commitShift: (s: Shift) =>
     commitOps("Saving shift", [{ kind: "upsert", table: "shifts", rows: [shiftToRow(s)] }]),
 
+  /**
+   * Read a shift straight back from the central database.
+   *
+   * Used after opening a shift so the till only unlocks once the row really
+   * exists — a cashier must never be told "Shift opened" on a write the
+   * database quietly refused.
+   */
+  async shiftExists(id: string): Promise<boolean> {
+    try {
+      const res = await supabase
+        .from("shifts" as never)
+        .select("id")
+        .eq("id", id)
+        .limit(1);
+      if (res.error) return false;
+      return Array.isArray(res.data) && res.data.length > 0;
+    } catch {
+      return false;
+    }
+  },
+
   /** Log a manual drawer open and wait until it is stored somewhere. */
   commitDrawerEvent: (row: {
     id: string;
