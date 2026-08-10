@@ -497,6 +497,37 @@ export function PosProvider({ children }: { children: ReactNode }) {
     };
   }, [signedIn, refreshActiveShift]);
 
+  // Pull sync: tills and desktops refresh the master data (catalogue, prices,
+  // members, branches, settings) from the cloud on a timer and whenever the
+  // connection comes back, so register search and barcode scans stay current
+  // even when the machine later goes offline again.
+  useEffect(() => {
+    if (isLiveOnly() || !signedIn) return;
+    let cancelled = false;
+    const pull = () => {
+      if (typeof navigator !== "undefined" && !navigator.onLine) return;
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      void loadCloudState()
+        .then((cloud) => {
+          if (cancelled) return;
+          writeSnapshot(cloud);
+          // Only master data is replaced; anything created on this till that
+          // has not synced yet stays untouched by applyCloud's merge.
+          setState((s) => applyCloud(s, cloud));
+        })
+        .catch(() => {
+          /* offline or refused — the local copy keeps the till trading */
+        });
+    };
+    const timer = window.setInterval(pull, 5 * 60 * 1000);
+    window.addEventListener("online", pull);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener("online", pull);
+    };
+  }, [signedIn]);
+
   const activeShift = useMemo(() => {
     const branch = activeBranchId(currentStore.id) ?? currentStore.id;
     if (dbShift && dbShift.storeId === branch && !dbShift.closedAt) return dbShift;
