@@ -21,6 +21,9 @@ const listeners = new Set<Listener>();
 /** Set while an online-mode write could not reach the central database. */
 let failingOver = false;
 
+/** Set while this till is writing straight to the cloud because the local store failed. */
+let cloudDirect = false;
+
 const isBrowser = () => typeof window !== "undefined";
 
 const notify = () => {
@@ -57,6 +60,32 @@ export const databaseModeLocked = (): boolean => isLiveOnly();
 /** Has the app dropped to local working because the connection failed? */
 export const isFailingOver = (): boolean => failingOver;
 
+/** Is the till bypassing local storage and writing straight to the cloud? */
+export const isCloudDirect = (): boolean => cloudDirect;
+
+export function setCloudDirect(on: boolean) {
+  if (cloudDirect === on) return;
+  cloudDirect = on;
+  notify();
+}
+
+/**
+ * Raised only when neither this terminal nor the central database would take
+ * the change. Nothing was written; the caller must stop and tell the operator.
+ */
+export class AllTargetsFailed extends Error {
+  readonly context: string;
+  constructor(context: string, cause?: unknown) {
+    super(
+      "Database Connection Required: Unable to connect to local storage or online database. " +
+        "Please check your internet connection or browser storage settings to continue.",
+    );
+    this.name = "AllTargetsFailed";
+    this.context = context;
+    if (cause !== undefined) (this as { cause?: unknown }).cause = cause;
+  }
+}
+
 /** Called when an online write could not reach the central database. */
 export function noteConnectionLost() {
   if (failingOver) return;
@@ -85,6 +114,7 @@ export function effectiveDatabaseMode(): DatabaseMode {
 
 /** Short wording for the status pill. */
 export function databaseModeLabel(): string {
+  if (cloudDirect) return "Cloud direct";
   if (databaseModeLocked()) return "Online";
   if (preferredDatabaseMode() === "local") return "Local";
   return effectiveDatabaseMode() === "local" ? "Online (local failover)" : "Online";

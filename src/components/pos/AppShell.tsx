@@ -20,6 +20,7 @@ import { LiveClock } from "@/components/pos/LiveClock";
 import { ThemeToggle } from "@/components/pos/ThemeToggle";
 import { startSyncEngine } from "@/lib/sync-engine";
 import { startDatabaseModeWatch } from "@/lib/db-mode";
+import { DbConnectionModal } from "@/components/pos/DbConnectionModal";
 import type { NavItem } from "@/components/pos/nav-config";
 import { setPrintStore, setPrintSettings } from "@/lib/pos-print";
 import { Badge } from "@/components/ui/badge";
@@ -276,6 +277,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="pos-scaled flex h-screen flex-col overflow-hidden bg-background text-foreground">
+      <DbConnectionModal />
       {/* Frameless desktop shell: draggable strip under the native window buttons. */}
       {isDesktop() && (
         <div className="app-drag flex h-[34px] shrink-0 items-center gap-2 border-b border-border bg-sidebar pl-3">

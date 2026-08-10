@@ -9,6 +9,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import type { Store, Transfer, TransferItem, TransferKind, TransferStatus } from "./pos-types";
+import { commitOps } from "./pos-db";
 
 const sb = supabaseExternal as unknown as SupabaseClient;
 
@@ -92,7 +93,10 @@ export type SaveTransferInput = {
   products: { id: string; name: string; barcode?: string; sku?: string; cost?: number }[];
 };
 
-/** Write the note and its lines. Called right after the local state updates. */
+/**
+ * Write the note and its lines through the durable gate, so a transfer raised
+ * with no connection is stored on the till and pushed up later.
+ */
 export async function saveTransfer({ transfer, from, to, products }: SaveTransferInput) {
   const head = {
     id: transfer.id,
@@ -109,9 +113,6 @@ export async function saveTransfer({ transfer, from, to, products }: SaveTransfe
     note: transfer.note ?? "",
     created_by: transfer.createdBy || null,
   };
-  const saved = await sb.from("stock_transfers").upsert(head as never);
-  if (saved.error) throw new Error(saved.error.message);
-
   const lines = transfer.items.map((i: TransferItem) => {
     const p = products.find((x) => x.id === i.productId);
     return {
@@ -124,11 +125,13 @@ export async function saveTransfer({ transfer, from, to, products }: SaveTransfe
       unit_cost: p?.cost ?? 0,
     };
   });
-  await sb.from("stock_transfer_items").delete().eq("transfer_id", transfer.id);
-  if (lines.length) {
-    const res = await sb.from("stock_transfer_items").insert(lines as never);
-    if (res.error) throw new Error(res.error.message);
-  }
+  return commitOps("Saving transfer", [
+    { kind: "upsert", table: "stock_transfers", rows: [head] },
+    { kind: "delete", table: "stock_transfer_items", match: { transfer_id: transfer.id } },
+    ...(lines.length
+      ? [{ kind: "insert" as const, table: "stock_transfer_items", rows: lines }]
+      : []),
+  ]);
 }
 
 /** Approve / reject / cancel: a plain status change with an audit stamp. */
@@ -144,8 +147,9 @@ export async function setTransferStatus(
     patch.approved_at = new Date().toISOString();
   }
   if (status === "rejected" || status === "cancelled") patch.rejected_reason = reason ?? null;
-  const res = await sb.from("stock_transfers").update(patch as never).eq("id", id);
-  if (res.error) throw new Error(res.error.message);
+  return commitOps("Updating transfer", [
+    { kind: "update", table: "stock_transfers", values: patch, match: { id } },
+  ]);
 }
 
 /**

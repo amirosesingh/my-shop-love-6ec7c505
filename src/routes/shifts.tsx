@@ -31,7 +31,8 @@ import { useUserPermissions } from "@/lib/pos-permissions";
 import { openCashDrawer, printSaleReceipt, printShiftReport } from "@/lib/pos-print";
 import { signInsForDay, type SignInEntry } from "@/lib/shift-attendance";
 import { localShiftSessions, mergeSessions } from "@/lib/shift-sessions";
-import { loadShiftSessions } from "@/lib/pos-db";
+import { commitLabel, loadShiftSessions } from "@/lib/pos-db";
+import { notifyError } from "@/lib/notify";
 import type { ShiftSession } from "@/lib/pos-types";
 import { parseAmount, parsePositiveAmount } from "@/lib/amount";
 import { getPosCallerAuth } from "@/lib/pos-caller-auth";
@@ -221,7 +222,8 @@ function Shifts() {
             <div className="flex flex-wrap items-end gap-3">
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Cashier</Label>
-                <Input value={cashier} onChange={(e) => setCashier(e.target.value)} />
+                {/* Locked to the signed-in user — a shift is always theirs. */}
+                <Input value={user?.name ?? cashier} readOnly disabled />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">
@@ -239,9 +241,16 @@ function Shifts() {
                 disabled={!cashier.trim() || parsePositiveAmount(float) === null}
                 onClick={async () => {
                   if (!(await requirePermission("can_open_drawer"))) return;
-                  openShift(cashier.trim() || "Cashier", parsePositiveAmount(float) ?? 0);
-                  openCashDrawer();
-                  toast.success("Shift opened");
+                  try {
+                    const target = await openShift(
+                      (user?.name ?? cashier).trim() || "Cashier",
+                      parsePositiveAmount(float) ?? 0,
+                    );
+                    openCashDrawer();
+                    toast.success(`Shift opened — ${commitLabel(target).toLowerCase()}`);
+                  } catch (e) {
+                    notifyError(e, "Opening the shift");
+                  }
                 }}
               >
                 Open shift

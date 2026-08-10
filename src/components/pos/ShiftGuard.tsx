@@ -30,7 +30,8 @@ import { commitLabel } from "@/lib/pos-db";
 export function ShiftGuard({ children }: { children: ReactNode }) {
   const { activeShift, openShift, currentStore, shiftReadError, shiftChecked } = usePos();
   const { user, lock, can, terminalStoreName } = useAuth();
-  const [cashier, setCashier] = useState(user?.name ?? "Cashier");
+  // The cashier is whoever is signed in — never typed in by hand.
+  const cashier = user?.name ?? "Cashier";
   const [float, setFloat] = useState("150");
   const [opening, setOpening] = useState(false);
 
@@ -121,7 +122,7 @@ export function ShiftGuard({ children }: { children: ReactNode }) {
                 <Label className="text-xs text-muted-foreground">
                   Cashier <span className="text-destructive">*</span>
                 </Label>
-                <Input value={cashier} onChange={(e) => setCashier(e.target.value)} />
+                <Input value={cashier} readOnly disabled />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">
