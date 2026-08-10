@@ -2882,6 +2882,11 @@ function Register() {
               Opened by {activeShift?.cashier} · float {money(activeShift?.openingFloat ?? 0)}
             </p>
             <div className="space-y-1">
+              <Label>Cashier</Label>
+              {/* Locked to the signed-in user — a closure is always theirs. */}
+              <Input value={user?.name ?? activeShift?.cashier ?? ""} readOnly disabled />
+            </div>
+            <div className="space-y-1">
               <Label>
                 Counted cash in drawer <span className="text-destructive">*</span>
               </Label>
