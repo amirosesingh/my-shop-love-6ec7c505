@@ -53,7 +53,9 @@ export function canRelay(): boolean {
 }
 
 /** Push one operation through the relay. */
-export async function relayOp(op: SyncOp): Promise<{ ok: boolean; error?: string }> {
+export async function relayOp(
+  op: SyncOp,
+): Promise<{ ok: boolean; error?: string; code?: string }> {
   try {
     const res = await fetch("/api/public/sync", {
       method: "POST",
@@ -64,7 +66,12 @@ export async function relayOp(op: SyncOp): Promise<{ ok: boolean; error?: string
       | { ok?: boolean; error?: string; code?: string; results?: { ok: boolean; error?: string }[] }
       | null;
     await inspectRelay(res, body);
-    if (!res.ok) return { ok: false, error: body?.error ?? `Relay refused (${res.status})` };
+    if (!res.ok)
+      return {
+        ok: false,
+        error: body?.error ?? `Relay refused (${res.status})`,
+        ...(body?.code ? { code: body.code } : {}),
+      };
     const first = body?.results?.[0];
     return first ?? { ok: !!body?.ok };
   } catch (e) {
