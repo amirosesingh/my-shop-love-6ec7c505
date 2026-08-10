@@ -18,6 +18,19 @@ CREATE TABLE dbo.sync_state (
 );
 GO
 
+/*
+  Device settings that must live in the branch database rather than browser
+  storage: the terminal activation token, the branch it is bound to and the
+  local database connection details.
+*/
+IF OBJECT_ID('dbo.system_settings', 'U') IS NULL
+CREATE TABLE dbo.system_settings (
+  [key]      NVARCHAR(120)  NOT NULL PRIMARY KEY,
+  [value]    NVARCHAR(MAX)  NULL,
+  updated_at DATETIME2(3)   NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
 IF OBJECT_ID('dbo.products', 'U') IS NULL
 CREATE TABLE dbo.products (
   id               UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
