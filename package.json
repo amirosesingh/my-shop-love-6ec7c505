@@ -113,7 +113,7 @@
     "vitest": "^4.1.10",
     "wrangler": "^4.119.0"
   },
-  "version": "1.2.51",
+  "version": "1.2.52",
   "build": {
     "appId": "app.lovable.pos",
     "productName": "LovablePOS",
