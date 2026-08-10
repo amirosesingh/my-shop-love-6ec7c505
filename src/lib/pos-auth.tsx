@@ -581,7 +581,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       /* the server relay still carries the writes */
     }
     return { ok: true };
-  }, []);
+  }, [finishAccountPinSignIn]);
 
   const signUp = useCallback(async (email: string, password: string, fullName: string) => {
     const { data, error } = await supabase.auth.signUp({
