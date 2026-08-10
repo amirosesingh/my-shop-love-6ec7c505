@@ -12,6 +12,12 @@ import { join } from "node:path";
 
 const ROOT = join(process.cwd(), "src");
 const GENERATED = join(ROOT, "integrations", "supabase");
+/**
+ * The one file allowed to name the operator's project: it is the single
+ * resolver every other module goes through, and the operator pinned their
+ * project there deliberately. Only its public half may appear.
+ */
+const CONFIG_OWNER = join(ROOT, "lib", "external-supabase-config.ts");
 
 const FORBIDDEN = [
   /from\s+["']@\/integrations\/supabase\/client["']/,
@@ -47,9 +53,16 @@ describe("database ownership", () => {
 
   it("no source file hardcodes a Supabase project URL or key", () => {
     const offenders = walk(ROOT).filter((file) => {
+      if (file === CONFIG_OWNER) return false;
       const source = readFileSync(file, "utf8");
       return HARDCODED.some((pattern) => pattern.test(source));
     });
     expect(offenders).toEqual([]);
+  });
+
+  it("the config owner never carries a secret key", () => {
+    const source = readFileSync(CONFIG_OWNER, "utf8");
+    expect(/sb_secret_[A-Za-z0-9_-]{10,}/.test(source)).toBe(false);
+    expect(/SERVICE_ROLE_KEY\s*[:=]\s*["']/.test(source)).toBe(false);
   });
 });

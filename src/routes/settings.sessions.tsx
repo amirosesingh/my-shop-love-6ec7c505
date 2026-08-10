@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
 import { listDeviceSessions, revokeDeviceSessions } from "@/lib/user-sessions.functions";
 
 type Row = {
