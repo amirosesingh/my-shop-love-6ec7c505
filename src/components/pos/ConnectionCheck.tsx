@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { readTerminalConfig } from "@/lib/terminal-tokens";
 import { ensureTerminalSession } from "@/lib/terminal-session";
-import { probeRelay } from "@/lib/sync-relay";
+import { probeRelay, syncHealth } from "@/lib/sync-relay";
 import { isDesktop } from "@/lib/branding";
 import { isNative } from "@/lib/native";
 
@@ -51,6 +51,20 @@ export function ConnectionCheck() {
       ok: relay.ok,
       warn: keyMissing,
       detail: relay.ok ? "Writes can go through the server" : (relay.error ?? "Unavailable"),
+    });
+
+    // Say which server answered and whether it holds the central database key,
+    // so a setup problem is not mistaken for a problem with this till.
+    const health = await syncHealth();
+    results.push({
+      label: "Server setup",
+      ok: !!health?.serviceKey,
+      warn: !health?.serviceKey,
+      detail: !health
+        ? "Could not reach the setup check on this server"
+        : health.serviceKey
+          ? `Key present on ${health.host}`
+          : `Key missing on ${health.host} — an administrator needs to re-save it`,
     });
 
     setChecks(results);
