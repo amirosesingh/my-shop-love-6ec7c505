@@ -14,12 +14,29 @@ import { readTerminalConfig } from "./terminal-tokens";
 
 const clean = (v: string | null | undefined) => (v ?? "").trim() || null;
 
+/**
+ * Branch directory as last loaded. A single-branch business needs no explicit
+ * assignment anywhere: the one branch that exists is the branch in use.
+ */
+let knownBranchIds: string[] = [];
+
+/** Publish the loaded branch directory so the resolver can use it. */
+export function setKnownBranches(ids: Array<string | null | undefined>) {
+  knownBranchIds = ids.map((id) => (id ?? "").trim()).filter(Boolean);
+}
+
+/** The only branch this business has, or null when there are none or many. */
+export function soleBranchId(): string | null {
+  return knownBranchIds.length === 1 ? knownBranchIds[0] : null;
+}
+
 /** Branch id for this till, or null when nothing knows one yet. */
 export function activeBranchId(inView?: string | null): string | null {
   return (
     clean(readTerminalConfig()?.locationId) ??
     clean(inView) ??
-    clean(readBranch().branchId)
+    clean(readBranch().branchId) ??
+    soleBranchId()
   );
 }
 
