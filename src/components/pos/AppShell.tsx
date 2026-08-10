@@ -19,6 +19,7 @@ import { PermissionDenied } from "@/components/pos/PermissionGate";
 import { LiveClock } from "@/components/pos/LiveClock";
 import { ThemeToggle } from "@/components/pos/ThemeToggle";
 import { startSyncEngine } from "@/lib/sync-engine";
+import { startDatabaseModeWatch } from "@/lib/db-mode";
 import type { NavItem } from "@/components/pos/nav-config";
 import { setPrintStore, setPrintSettings } from "@/lib/pos-print";
 import { Badge } from "@/components/ui/badge";
@@ -120,6 +121,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   // Background outbox drain: keeps offline sales flowing once the link returns.
   useEffect(() => startSyncEngine(), []);
+  // Keeps the database-mode pill and the automatic local failover honest.
+  useEffect(() => startDatabaseModeWatch(), []);
 
   // Tells the desktop shell this build actually started, so it never falls
   // back into safe mode after a healthy launch.
