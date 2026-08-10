@@ -1368,6 +1368,18 @@ export const db = {
       { kind: "upsert", table: "members", rows: [memberToRow(m, tierId)] },
     ]),
 
+  /** Save one product and wait until it is stored somewhere. */
+  commitProduct: (p: Product) =>
+    commitOps("Saving product", [
+      { kind: "upsert", table: "products", rows: [productToRow(p)] },
+    ]),
+
+  /** Save a promotion and wait until it is stored somewhere. */
+  commitPromotion: (p: Promotion) =>
+    commitOps("Saving promotion", [
+      { kind: "upsert", table: "promotions", rows: [promotionToRow(p)] },
+    ]),
+
   /* ------------------------- held tickets ------------------------- */
 
   /** Park a ticket in the database so it survives a reload or a swapped till. */
