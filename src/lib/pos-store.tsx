@@ -165,7 +165,7 @@ type Ctx = {
   ) => Promise<{ booking: Booking; sale: Sale } | null>;
   cancelBooking: (id: string, reason: string) => void;
   deleteBooking: (id: string, reason: string) => Promise<void>;
-  upsertProduct: (product: Product) => void;
+  upsertProduct: (product: Product) => Promise<CommitTarget>;
   removeProduct: (id: string) => Promise<BlockedDelete[]>;
   removeProducts: (ids: string[]) => Promise<BlockedDelete[]>;
   patchProducts: (ids: string[], patch: Partial<Product>) => void;
@@ -181,9 +181,9 @@ type Ctx = {
     note?: string,
     storeId?: string,
   ) => void;
-  upsertMember: (member: Member) => void;
+  upsertMember: (member: Member) => Promise<CommitTarget>;
   removeMember: (id: string) => void;
-  upsertPromotion: (promotion: Promotion) => void;
+  upsertPromotion: (promotion: Promotion) => Promise<CommitTarget>;
   removePromotion: (id: string) => void;
   togglePromotion: (id: string, active: boolean) => void;
   updateSettings: (patch: Partial<AppSettings>) => void;
