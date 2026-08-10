@@ -368,7 +368,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (row) {
       // The till decides the branch: its activation claim first, then the
       // cashier's own record, then the only branch this business has.
-      const bound = activeBranchId(null);
+      const bound = bindTerminalBranch() ?? activeBranchId(null);
       next = {
         userCode: row.username,
         name: row.full_name || row.username,
