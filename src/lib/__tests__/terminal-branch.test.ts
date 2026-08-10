@@ -1,7 +1,15 @@
-/**
- * @vitest-environment jsdom
- */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+// A minimal browser storage stand-in so the resolver can persist a branch.
+const store = new Map<string, string>();
+(globalThis as unknown as { window: unknown }).window = {
+  localStorage: {
+    getItem: (k: string) => store.get(k) ?? null,
+    setItem: (k: string, v: string) => void store.set(k, v),
+    removeItem: (k: string) => void store.delete(k),
+    clear: () => store.clear(),
+  },
+};
 
 vi.mock("../terminal-tokens", () => ({ readTerminalConfig: () => null }));
 vi.mock("../local-db", () => ({ readBranch: () => ({ branchId: null, branchName: null }) }));
@@ -11,7 +19,7 @@ import { describeError } from "../notify";
 
 describe("terminal branch binding", () => {
   beforeEach(() => {
-    window.localStorage.clear();
+    store.clear();
     setKnownBranches([]);
   });
 
