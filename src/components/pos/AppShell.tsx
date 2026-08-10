@@ -36,6 +36,7 @@ import { useUiScale } from "@/lib/use-ui-scale";
 import { useBranding, isDesktop } from "@/lib/branding";
 import { isNative } from "@/lib/native";
 import { setBranchId } from "@/lib/activity-journal";
+import { soleBranchId } from "@/lib/active-branch";
 import { flushWhatsAppQueue } from "@/lib/whatsapp";
 import { reportAppReady } from "@/lib/app-health";
 
