@@ -71,12 +71,36 @@ const isPermissionError = (error: PostgrestError) =>
  */
 const refusedTables = new Set<string>();
 
+/**
+ * Wording for a server that has lost the central database key. It is a server
+ * setup task, not something the person at the till can fix.
+ */
+const KEY_MISSING =
+  "Syncing paused — an administrator must re-save the central database key on the server. " +
+  "Your work is saved on this device and will upload automatically.";
+
 /** Relay the operation and report the outcome in plain language. */
 async function viaRelay(
   context: string,
   op: SyncOp,
 ): Promise<{ ok: boolean; error?: string }> {
   const relayed = await relayOp(op);
+  // The server relay cannot write without its key. Anyone signed in with a real
+  // staff account still can, using their own session, so try that before giving
+  // up and leaving the change in the queue.
+  if (!relayed.ok && relayed.code === "NO_SERVICE_KEY") {
+    if (hasStaffSession()) {
+      const direct = await execute(op);
+      if (!direct.error) {
+        logSync("push", op.table, true, `${context} (direct — server key missing)`);
+        return { ok: true };
+      }
+      logSync("push", op.table, false, `${context}: ${describeError(op.table, direct.error)}`);
+      return { ok: false, error: describeError(op.table, direct.error) };
+    }
+    logSync("push", op.table, false, `${context}: ${KEY_MISSING}`);
+    return { ok: false, error: KEY_MISSING };
+  }
   logSync(
     "push",
     op.table,
