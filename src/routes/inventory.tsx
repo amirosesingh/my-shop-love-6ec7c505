@@ -417,10 +417,15 @@ function Inventory() {
                       const sku =
                         draft.sku.trim() ||
                         (autoSku ? nextSku(state.products.map((p) => p.sku)) : "");
-                      upsertProduct({ ...draft, sku });
-                      setDraft(null);
-                      setSkuOverride(false);
-                      toast.success("Product saved");
+                      try {
+                        // Saved only once the write is confirmed stored.
+                        const target = await upsertProduct({ ...draft, sku });
+                        setDraft(null);
+                        setSkuOverride(false);
+                        toast.success(`Product saved — ${commitLabel(target).toLowerCase()}`);
+                      } catch (e) {
+                        notifyError(e, "Saving the product");
+                      }
                     }}
                   >
                     Save product
@@ -616,11 +621,15 @@ function Inventory() {
                     <TableCell className="text-center">
                       <Switch
                         checked={!!p.ecomVisible}
-                        onCheckedChange={(v) => {
-                          upsertProduct({ ...p, ecomVisible: v });
-                          toast.success(
-                            `${p.name} ${v ? "published to" : "hidden from"} the web store`,
-                          );
+                        onCheckedChange={async (v) => {
+                          try {
+                            await upsertProduct({ ...p, ecomVisible: v });
+                            toast.success(
+                              `${p.name} ${v ? "published to" : "hidden from"} the web store`,
+                            );
+                          } catch (e) {
+                            notifyError(e, "Updating the web store visibility");
+                          }
                         }}
                         aria-label={`E-commerce visibility for ${p.name}`}
                       />
