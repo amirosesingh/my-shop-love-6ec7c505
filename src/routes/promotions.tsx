@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { Crown, Gift, Percent, Plus, Sparkles, Trash2, Trophy } from "lucide-react";
 import { toast } from "sonner";
+import { notifyError } from "@/lib/notify";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { AppShell } from "@/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
@@ -412,7 +413,7 @@ function Promotions() {
           )}
           <DialogFooter>
             <Button
-              onClick={() => {
+              onClick={async () => {
                 if (!draft) return;
                 if (!draft.name.trim()) {
                   toast.error("Rule name is required");
