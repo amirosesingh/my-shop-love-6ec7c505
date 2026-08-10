@@ -365,7 +365,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (row) {
       // The till decides the branch: its activation claim first, then the
       // cashier's own record, then the only branch this business has.
-      const bound = activeBranchId(null) ?? (row.store_id?.trim() || null);
+      const bound = activeBranchId(null);
       next = {
         userCode: row.username,
         name: row.full_name || row.username,
@@ -407,8 +407,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // The branch is in place before the register mounts, so nothing renders
     // against an unresolved branch.
     try {
-      const { saveBranch } = await import("@/lib/local-db");
-      if (next.storeId) saveBranch({ branchId: next.storeId, branchName: activeBranchName(null) });
+      const { writeBranch } = await import("@/lib/local-db");
+      if (next.storeId)
+        writeBranch({ branchId: next.storeId, branchName: activeBranchName(null) });
     } catch {
       /* branch mirroring is best-effort */
     }
