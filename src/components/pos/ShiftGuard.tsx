@@ -152,9 +152,7 @@ export function ShiftGuard({ children }: { children: ReactNode }) {
                     await openShift(cashier.trim() || "Cashier", amount);
                     toast.success("Shift opened");
                   } catch (e) {
-                    toast.error("Could not open the shift", {
-                      description: (e as Error).message,
-                    });
+                    notifyError(e, "Opening the shift");
                   } finally {
                     setOpening(false);
                   }

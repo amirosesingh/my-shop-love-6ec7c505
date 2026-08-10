@@ -466,6 +466,8 @@ export function PosProvider({ children }: { children: ReactNode }) {
   // A registered till trades in its own branch — pin the view to it as soon as
   // that branch exists in the directory, before any shift read runs.
   useEffect(() => {
+    // Persist the terminal's branch first, so every later read has one source.
+    bindTerminalBranch();
     const bound = activeBranchId(null);
     if (!bound) return;
     // The branch is pinned even before the directory arrives — a registered
