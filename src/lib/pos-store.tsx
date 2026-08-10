@@ -34,7 +34,7 @@ import type {
 import { bookingBalance, lineUnitDiscount, r2, type DiscountType } from "./pos-types";
 import { logger } from "./audit-log";
 import { db, dbError, loadActiveShift, loadCloudState } from "./pos-db";
-import type { CloudSlice } from "./pos-db";
+import type { CloudSlice, CommitTarget } from "./pos-db";
 import { clearSnapshot, readSnapshot, writeSnapshot } from "./offline-snapshot";
 import { isLiveOnly } from "./live-mode";
 import { useAuth } from "@/lib/pos-auth";
@@ -140,7 +140,7 @@ type Ctx = {
   setCurrentStore: (id: string) => void;
   upsertStore: (store: Store) => void;
   removeStore: (id: string) => void;
-  openShift: (cashier: string, openingFloat: number) => Promise<void>;
+  openShift: (cashier: string, openingFloat: number) => Promise<CommitTarget>;
   closeShift: (countedCash: number, note: string) => Promise<Shift | null>;
   activeShift: Shift | null;
   /** Set when the last open-shift read failed; the till keeps trading. */
@@ -582,7 +582,15 @@ export function PosProvider({ children }: { children: ReactNode }) {
         userId: authUserId ?? null,
       };
       // Nothing opens until the shift is stored (cloud, local DB or offline queue).
-      await db.commitShift(shift);
+      const target = await db.commitShift(shift);
+      // When it claims to have reached the central database, prove it: read the
+      // row back before unlocking the till. Cashiers sign in by PIN, so a
+      // silently refused insert must surface as an error, not a success toast.
+      if (target === "cloud" && !(await db.shiftExists(shift.id))) {
+        throw new Error(
+          "The shift was not found in the database after saving. Nothing was opened — try again, or check this account's branch and role.",
+        );
+      }
       logger.log("sale_event", "Shift opened", "shifts", {
         cashier,
         openingFloat,
@@ -599,6 +607,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       if (storeId !== stateRef.current.currentStoreId) {
         setState((s) => ({ ...s, currentStoreId: storeId }));
       }
+      return target;
     },
     [user, terminalUser, authUserId],
   );
