@@ -349,20 +349,29 @@ export function PosProvider({ children }: { children: ReactNode }) {
     }
   }, [state, ready]);
 
-  // A brand-new database has no branches yet. Fall back to a blank branch so
-  // every screen keeps rendering instead of crashing on an undefined store.
-  const currentStore = useMemo(
-    () =>
-      state.stores.find((s) => s.id === state.currentStoreId) ??
-      state.stores[0] ?? {
-        id: "",
-        code: "",
-        name: "No branch yet",
-        address: "",
-        phone: "",
-      },
-    [state.stores, state.currentStoreId],
-  );
+  // The directory may not have loaded yet (a cashier signs in with a PIN and
+  // has no central-database account of their own). The terminal's own
+  // activation claim still knows the branch, so use it rather than showing a
+  // placeholder that reads "No branch yet" and locks the register.
+  const currentStore = useMemo(() => {
+    const found =
+      state.stores.find((s) => s.id === state.currentStoreId) ?? state.stores[0];
+    if (found) return found;
+    const terminal = readTerminalConfig();
+    const boundId = (terminal?.locationId ?? "").trim() || state.currentStoreId.trim();
+    return {
+      id: boundId,
+      code: "",
+      name: (terminal?.locationName ?? "").trim() || (boundId ? "This branch" : "No branch yet"),
+      address: "",
+      phone: "",
+    };
+  }, [state.stores, state.currentStoreId]);
+
+  // Let the shared branch resolver fall back to the only branch that exists.
+  useEffect(() => {
+    setKnownBranches(state.stores.map((s) => s.id));
+  }, [state.stores]);
 
   // Publish the branch's sync switches to the outbox drainer and the region
   // clock to every formatter, so both follow the saved settings.
