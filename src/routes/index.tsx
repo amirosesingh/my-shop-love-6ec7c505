@@ -2743,7 +2743,9 @@ function Register() {
               <Label>
                 Cashier <span className="text-destructive">*</span>
               </Label>
-              <Input value={cashier} onChange={(e) => setCashier(e.target.value)} />
+              {/* Locked to the signed-in user: a shift is always attributed to
+                  whoever is at the terminal, so it cannot be typed over. */}
+              <Input value={user?.name ?? cashier} readOnly disabled />
             </div>
             <div className="space-y-1">
               <Label>
@@ -2770,15 +2772,23 @@ function Register() {
                 !cashier.trim() ||
                 (rules.require_opening_float_count && parsePositiveAmount(float) === null)
               }
-              onClick={() => {
+              onClick={async () => {
                 if (!can("can_open_shift")) {
                   toast.error("You are not allowed to open a shift");
                   return;
                 }
-                openShift(cashier.trim() || "Cashier", parsePositiveAmount(float) ?? 0);
-                openCashDrawer();
-                setOpenShiftOpen(false);
-                toast.success("Shift opened");
+                try {
+                  // Nothing is announced or unlocked until the shift is stored.
+                  const target = await openShift(
+                    (user?.name ?? cashier).trim() || "Cashier",
+                    parsePositiveAmount(float) ?? 0,
+                  );
+                  openCashDrawer();
+                  setOpenShiftOpen(false);
+                  toast.success(`Shift opened — ${commitLabel(target).toLowerCase()}`);
+                } catch (e) {
+                  notifyError(e, "Opening the shift");
+                }
               }}
             >
               Open shift
