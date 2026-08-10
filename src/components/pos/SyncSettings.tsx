@@ -9,6 +9,7 @@ import { LocalDatabaseSettings } from "@/components/pos/LocalDatabaseSettings";
 import { ConnectionCheck } from "@/components/pos/ConnectionCheck";
 import { SyncLogViewer } from "@/components/SyncLogViewer";
 import { logSync } from "@/lib/sync-log";
+import { describeError, showNotification } from "@/lib/notify";
 import { localDb } from "@/lib/local-db";
 import {
   discardQuarantined,
