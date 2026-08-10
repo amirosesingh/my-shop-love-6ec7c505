@@ -22,7 +22,6 @@ import {
   endDeviceSession,
 } from "@/lib/user-sessions.functions";
 import { loadSessionToken, saveSessionToken } from "@/lib/pos-credentials";
-import { verifyCashierPin } from "@/lib/pos-cashiers";
 import { preparePinAccount } from "@/lib/staff-admin";
 import { activeBranchId, activeBranchName, bindTerminalBranch } from "@/lib/active-branch";
 import { cacheCredential, verifyCachedPin } from "@/lib/offline-credentials";
@@ -426,7 +425,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const code = userId.trim().toLowerCase();
     if (!code) return { ok: false, error: "Enter your username" };
     if (!/^\d{4,6}$/.test(pin)) return { ok: false, error: "Enter your PIN" };
-    let row: Awaited<ReturnType<typeof verifyCashierPin>> = null;
     let offline = false;
     if (typeof navigator !== "undefined" && !navigator.onLine) offline = true;
 
@@ -450,37 +448,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    if (!offline) {
-      try {
-        row = await verifyCashierPin(code, pin);
-      } catch {
-        offline = true;
-      }
-    }
-
     let next: TerminalUser;
-    if (row) {
-      // The till decides the branch: its activation claim first, then the
-      // cashier's own record, then the only branch this business has.
-      const bound = bindTerminalBranch() ?? activeBranchId(null);
-      next = {
-        userCode: row.username,
-        name: row.full_name || row.username,
-        role: "staff",
-        storeId: bound,
-        email: "",
-        cashierId: row.id,
-        permissions: row.permissions,
-      };
-      // Remember this employee so the till still opens with no connection.
-      void cacheCredential(pin, {
-        username: row.username,
-        cashierId: row.id,
-        fullName: row.full_name || row.username,
-        storeId: bound ?? "",
-        permissions: row.permissions as unknown as Record<string, boolean>,
-      });
-    } else if (offline) {
+    if (offline) {
       const cached = await verifyCachedPin(code, pin);
       if (!cached)
         return {

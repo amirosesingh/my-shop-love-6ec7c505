@@ -56,13 +56,6 @@ import {
   createStaffAccount,
   staffUserId,
 } from "@/lib/pos-users";
-import {
-  cashierErrText,
-  deleteCashier,
-  listCashiers,
-  setCashierPermissions,
-  upsertCashier,
-} from "@/lib/pos-cashiers";
 import { cn } from "@/lib/utils";
 import {
   CORE_ROLES,
@@ -70,7 +63,7 @@ import {
   listStaffRoles,
   type RoleDef,
 } from "@/lib/staff-roles";
-import { setCashierRoleSlug } from "@/lib/pos-cashiers";
+import { createStaffMember } from "@/lib/staff-admin";
 
 export const Route = createFileRoute("/staff")({
   head: () => ({
@@ -104,10 +97,6 @@ const errText = (e: unknown): string => {
 };
 
 type StaffRow = {
-  /** cashiers live in public.cashiers, everyone else in public.app_users */
-  kind: "account" | "cashier";
-  /** cashiers.id (uuid) — empty for account rows */
-  id: string;
   user_id: string;
   full_name: string;
   email: string;
@@ -163,8 +152,6 @@ function StaffManagement() {
     const accounts = ((data ?? []) as Record<string, unknown>[]).map((r) => {
       const role = fromDbRole(r["role"] as string | null);
       return {
-        kind: "account" as const,
-        id: "",
         user_id: String(r["user_id"] ?? ""),
         full_name: String(r["full_name"] ?? ""),
         email: String(r["email"] ?? ""),
@@ -178,28 +165,9 @@ function StaffManagement() {
           role,
         ),
       } satisfies StaffRow;
-    }).filter((r) => r.role !== "cashier");
+    });
 
-    let cashiers: StaffRow[] = [];
-    try {
-      cashiers = (await listCashiers()).map((c) => ({
-        kind: "cashier" as const,
-        id: c.id,
-        user_id: c.username,
-        full_name: c.full_name,
-        email: "",
-        role: "cashier" as StaffRole,
-        store_id: null,
-        is_active: c.is_active,
-        last_login_at: c.last_login_at,
-        role_slug: c.role_slug ?? "cashier",
-        permissions: c.permissions as unknown as Record<string, boolean>,
-      }));
-    } catch (e) {
-      toast.error("Could not load cashiers", { description: cashierErrText(e) });
-    }
-
-    const mapped = [...accounts, ...cashiers];
+    const mapped = accounts;
     setRows(mapped);
     setSelectedId((prev) => prev ?? mapped[0]?.user_id ?? null);
     setLoading(false);
@@ -226,22 +194,6 @@ function StaffManagement() {
 
   const saveProfile = async (row: StaffRow) => {
     setSaving(true);
-    if (row.kind === "cashier") {
-      try {
-        await upsertCashier({
-          id: row.id,
-          username: row.user_id,
-          fullName: row.full_name,
-          isActive: row.is_active,
-        });
-        toast.success("Profile saved");
-      } catch (e) {
-        toast.error("Could not save profile", { description: cashierErrText(e) });
-      } finally {
-        setSaving(false);
-      }
-      return;
-    }
     const { error } = await sb.rpc("set_app_user_profile", {
       p_user_id: row.user_id,
       p_full_name: row.full_name,
@@ -259,15 +211,6 @@ function StaffManagement() {
 
   const togglePermission = async (row: StaffRow, key: PermissionKey, value: boolean) => {
     patchRow(row.user_id, { permissions: { ...row.permissions, [key]: value } });
-    if (row.kind === "cashier") {
-      try {
-        await setCashierPermissions(row.id, { [key]: value });
-      } catch (e) {
-        toast.error("Could not update permission", { description: cashierErrText(e) });
-        void load();
-      }
-      return;
-    }
     const { error } = await sb.rpc("set_app_user_permissions", {
       p_user_id: row.user_id,
       p_permissions: { [key]: value },
@@ -281,15 +224,6 @@ function StaffManagement() {
   const setGroup = async (row: StaffRow, keys: readonly string[], value: boolean) => {
     const patch = Object.fromEntries(keys.map((k) => [k, value]));
     patchRow(row.user_id, { permissions: { ...row.permissions, ...patch } });
-    if (row.kind === "cashier") {
-      try {
-        await setCashierPermissions(row.id, patch);
-      } catch (e) {
-        toast.error("Could not update permissions", { description: cashierErrText(e) });
-        void load();
-      }
-      return;
-    }
     const { error } = await sb.rpc("set_app_user_permissions", {
       p_user_id: row.user_id,
       p_permissions: patch,
@@ -301,9 +235,9 @@ function StaffManagement() {
   };
 
   /**
-   * Assign a role. When the base level differs the account kind may have to
-   * change, so the existing conversion dialog takes over; otherwise the role's
-   * preset is applied and every switch stays editable afterwards.
+   * Assign a role. A different base level goes through the confirmation
+   * dialog; otherwise the role's preset is applied and every switch stays
+   * editable afterwards.
    */
   const assignRole = async (row: StaffRow, def: RoleDef) => {
     if (def.baseLevel !== row.role) {
@@ -313,19 +247,14 @@ function StaffManagement() {
     const preset = def.permissions as unknown as Record<string, boolean>;
     patchRow(row.user_id, { role_slug: def.slug, permissions: { ...preset } });
     try {
-      if (row.kind === "cashier") {
-        await setCashierRoleSlug(row.id, def.slug);
-        await setCashierPermissions(row.id, preset);
-      } else {
-        await sb.rpc("set_app_user_role_slug", {
-          p_user_id: row.user_id,
-          p_role_slug: def.slug,
-        });
-        await sb.rpc("set_app_user_permissions", {
-          p_user_id: row.user_id,
-          p_permissions: preset,
-        });
-      }
+      await sb.rpc("set_app_user_role_slug", {
+        p_user_id: row.user_id,
+        p_role_slug: def.slug,
+      });
+      await sb.rpc("set_app_user_permissions", {
+        p_user_id: row.user_id,
+        p_permissions: preset,
+      });
       toast.success(`${def.name} preset applied`);
     } catch (e) {
       toast.error("Could not change role", { description: errText(e) });
@@ -361,19 +290,22 @@ function StaffManagement() {
           toast.error("Enter a username (3+ characters, letters/numbers)");
           return;
         }
-        if (!/^\d{6}$/.test(form.pin)) {
-          toast.error("PIN must be exactly 6 digits");
+        if (!/^\d{4,6}$/.test(form.pin)) {
+          toast.error("PIN must be 4 to 6 digits");
           return;
         }
         try {
-          await upsertCashier({
+          await createStaffMember({
+            displayName: form.full_name.trim() || username,
             username,
-            fullName: form.full_name.trim() || username,
             pin: form.pin,
-            isActive: true,
+            branchId: formStoreId(form.store_id),
+            roleSlug: "cashier",
+            baseRole: "cashier",
+            active: true,
           });
         } catch (e) {
-          toast.error("Could not create cashier", { description: cashierErrText(e) });
+          toast.error("Could not create cashier", { description: errText(e) });
           return;
         }
         toast.success(`Cashier ${username} created`);
@@ -436,23 +368,25 @@ function StaffManagement() {
   };
 
   const resetPassword = async (row: StaffRow) => {
-    if (row.kind === "cashier") {
-      if (!/^\d{6}$/.test(passwordReset)) {
-        toast.error("PIN must be exactly 6 digits");
+    if (row.role === "cashier") {
+      if (!/^\d{4,6}$/.test(passwordReset)) {
+        toast.error("PIN must be 4 to 6 digits");
         return;
       }
       try {
-        await upsertCashier({
-          id: row.id,
+        await createStaffMember({
+          displayName: row.full_name || row.user_id,
           username: row.user_id,
-          fullName: row.full_name,
           pin: passwordReset,
-          isActive: row.is_active,
+          branchId: row.store_id,
+          roleSlug: row.role_slug ?? "cashier",
+          baseRole: "cashier",
+          active: row.is_active,
         });
         setPasswordReset("");
         toast.success("PIN updated");
       } catch (e) {
-        toast.error("Could not update PIN", { description: cashierErrText(e) });
+        toast.error("Could not update PIN", { description: errText(e) });
       }
       return;
     }
@@ -478,18 +412,6 @@ function StaffManagement() {
   };
 
   const removeUser = async (row: StaffRow) => {
-    if (row.kind === "cashier") {
-      try {
-        await deleteCashier(row.id);
-      } catch (e) {
-        toast.error("Delete failed", { description: cashierErrText(e) });
-        return;
-      }
-      setSelectedId(null);
-      toast.success(`${row.full_name || row.user_id} removed`);
-      void load();
-      return;
-    }
     const { error } = await sb.rpc("delete_terminal_user", { p_user_id: row.user_id });
     if (error) {
       notifyError(error, "Delete failed");
@@ -501,15 +423,13 @@ function StaffManagement() {
   };
 
   /**
-   * Applies a role change. Cashiers (username + PIN, public.cashiers) and
-   * staff accounts (email + password, public.app_users) live in different
-   * tables, so crossing that boundary creates the new record first and only
-   * deletes the old one once the new one exists.
+   * Applies a role change. Everyone now holds one account, so a change of
+   * level is a plain profile update — nobody has to be re-created and no
+   * login is thrown away.
    */
   const convertRole = async (
     row: StaffRow,
     target: StaffRole,
-    creds: { username: string; pin: string; email: string; password: string },
     permsMode: "defaults" | "keep",
   ): Promise<boolean> => {
     const permissions = (
@@ -518,115 +438,29 @@ function StaffManagement() {
         : row.permissions
     ) as Record<string, boolean>;
 
-    // --- same family: plain app_users role update ---------------------------
-    if (row.kind === "account" && target !== "cashier") {
-      const { error } = await sb.rpc("set_app_user_profile", {
-        p_user_id: row.user_id,
-        p_full_name: row.full_name,
-        p_role: toDbRole(target),
-        p_store_id: row.store_id,
-        p_is_active: row.is_active,
-      });
-      if (error) {
-        toast.error("Could not change role", { description: errText(error) });
-        return false;
-      }
-      if (permsMode === "defaults") {
-        await sb.rpc("set_app_user_permissions", {
-          p_user_id: row.user_id,
-          p_permissions: permissions,
-        });
-      }
-      toast.success(`Role changed to ${target}`);
-      setSelectedId(row.user_id);
-      void load();
-      return true;
-    }
-
-    // --- account -> cashier -------------------------------------------------
-    if (target === "cashier") {
-      const username = creds.username.trim().toLowerCase();
-      if (!/^[a-z0-9._-]{3,}$/.test(username)) {
-        toast.error("Enter a username (3+ characters, letters/numbers)");
-        return false;
-      }
-      if (!/^\d{6}$/.test(creds.pin)) {
-        toast.error("PIN must be exactly 6 digits");
-        return false;
-      }
-      let cashierId = "";
-      try {
-        cashierId = await upsertCashier({
-          username,
-          fullName: row.full_name || username,
-          pin: creds.pin,
-          isActive: row.is_active,
-        });
-        await setCashierPermissions(cashierId, permissions);
-      } catch (e) {
-        toast.error("Could not create the cashier login", { description: cashierErrText(e) });
-        return false;
-      }
-      const { error } = await sb.rpc("delete_terminal_user", { p_user_id: row.user_id });
-      if (error) {
-        toast.error("Cashier created, but the old account could not be removed", {
-          description: errText(error),
-        });
-      }
-      toast.success(`${row.full_name || username} is now a cashier`);
-      setSelectedId(username);
-      void load();
-      return true;
-    }
-
-    // --- cashier -> warehouse / supervisor / admin --------------------------
-    const email = creds.email.trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      toast.error("Enter a valid email address");
-      return false;
-    }
-    if (creds.password.length < 6) {
-      toast.error("Password must be at least 6 characters");
-      return false;
-    }
-    const auth = await createStaffAccount({
-      email,
-      fullName: row.full_name || email,
-      password: creds.password,
-      role: target === "admin" ? "admin" : target === "warehouse" ? "warehouse" : "supervisor",
-      storeId: row.store_id,
-    });
-    if (!auth.ok && !/already/i.test(auth.error ?? "")) {
-      toast.error("Could not create the login account", { description: auth.error });
-      return false;
-    }
-    const newUserId = staffUserId(email);
-    const { error } = await sb.rpc("upsert_terminal_user", {
-      p_user_id: newUserId,
-      p_full_name: row.full_name || email,
+    const { error } = await sb.rpc("set_app_user_profile", {
+      p_user_id: row.user_id,
+      p_full_name: row.full_name,
       p_role: toDbRole(target),
       p_store_id: row.store_id,
-      p_email: email,
-      p_pin: String(Math.floor(1000 + Math.random() * 9000)),
-      p_password: creds.password,
+      p_is_active: row.is_active,
     });
     if (error) {
-      toast.error("Could not save the new staff profile", { description: errText(error) });
+      toast.error("Could not change role", { description: errText(error) });
       return false;
     }
-    await sb.rpc("set_app_user_permissions", {
-      p_user_id: newUserId,
-      p_permissions: permissions,
+    await sb.rpc("set_app_user_role_slug", {
+      p_user_id: row.user_id,
+      p_role_slug: target,
     });
-    try {
-      await deleteCashier(row.id);
-    } catch (e) {
-      toast.error("Account created, but the old cashier record remains", {
-        description: cashierErrText(e),
+    if (permsMode === "defaults") {
+      await sb.rpc("set_app_user_permissions", {
+        p_user_id: row.user_id,
+        p_permissions: permissions,
       });
     }
-    toast.success(`${row.full_name || email} is now a ${target}`);
-    setSelectedId(newUserId);
+    toast.success(`Role changed to ${target}`);
+    setSelectedId(row.user_id);
     void load();
     return true;
   };

@@ -32,3 +32,4 @@
 \i 21_backfill_branch_ids.sql
 \i 22_roles_and_pin_gates.sql
 \i 23_unified_staff_accounts.sql
+\i 24_staff_management.sql
