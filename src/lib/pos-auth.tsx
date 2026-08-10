@@ -363,12 +363,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     let next: TerminalUser;
     if (row) {
+      // The till decides the branch: its activation claim first, then the
+      // cashier's own record, then the only branch this business has.
+      const bound = activeBranchId(null) ?? (row.store_id?.trim() || null);
       next = {
         userCode: row.username,
         name: row.full_name || row.username,
         role: "staff",
-        // Cashiers are never assigned a branch — the till they sign in on decides it.
-        storeId: null,
+        storeId: bound,
         email: "",
         cashierId: row.id,
         permissions: row.permissions,
@@ -378,7 +380,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         username: row.username,
         cashierId: row.id,
         fullName: row.full_name || row.username,
-        storeId: "",
+        storeId: bound ?? "",
         permissions: row.permissions as unknown as Record<string, boolean>,
       });
     } else if (offline) {
@@ -393,7 +395,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         userCode: cached.username,
         name: cached.fullName,
         role: "staff",
-        storeId: cached.storeId,
+        storeId: activeBranchId(null) ?? (cached.storeId?.trim() || null),
         email: "",
         cashierId: cached.cashierId,
         permissions: cached.permissions as unknown as TerminalUser["permissions"],
@@ -402,6 +404,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { ok: false, error: "Invalid username or PIN" };
     }
     setTerminalUser(next);
+    // The branch is in place before the register mounts, so nothing renders
+    // against an unresolved branch.
+    try {
+      const { saveBranch } = await import("@/lib/local-db");
+      if (next.storeId) saveBranch({ branchId: next.storeId, branchName: activeBranchName(null) });
+    } catch {
+      /* branch mirroring is best-effort */
+    }
     try {
       window.sessionStorage.setItem(TERMINAL_KEY, JSON.stringify(next));
     } catch {
