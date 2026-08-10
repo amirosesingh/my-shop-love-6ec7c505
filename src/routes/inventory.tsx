@@ -43,6 +43,8 @@ import { TablePagination, usePagination } from "@/components/pos/TablePagination
 import { Switch } from "@/components/ui/switch";
 import { BulkImportDialog } from "@/components/pos/BulkImportDialog";
 import { MergeProductsDialog } from "@/components/pos/MergeProductsDialog";
+import { commitLabel } from "@/lib/pos-db";
+import { notifyError } from "@/lib/notify";
 import { ProductDeleteBlockedDialog } from "@/components/pos/ProductDeleteBlockedDialog";
 import type { BlockedDelete } from "@/lib/product-delete";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
@@ -409,7 +411,7 @@ function Inventory() {
                 )}
                 <DialogFooter>
                   <Button
-                    onClick={() => {
+                    onClick={async () => {
                       if (!draft?.name.trim()) {
                         toast.error("Product name is required");
                         return;
