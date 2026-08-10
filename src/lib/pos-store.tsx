@@ -39,7 +39,7 @@ import { clearSnapshot, readSnapshot, writeSnapshot } from "./offline-snapshot";
 import { isLiveOnly } from "./live-mode";
 import { useAuth } from "@/lib/pos-auth";
 import { readTerminalConfig } from "./terminal-tokens";
-import { activeBranchId, requireBranchId } from "./active-branch";
+import { activeBranchId, requireBranchId, setKnownBranches } from "./active-branch";
 import { isShiftOverdue, localTerminalId } from "./shift-hours";
 import { beginShiftSession, endShiftSessions } from "./shift-sessions";
 import { branchPolicy } from "./branch-policy";
