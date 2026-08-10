@@ -214,14 +214,18 @@ function Members() {
           )}
           <DialogFooter>
             <Button
-              onClick={() => {
+              onClick={async () => {
                 if (!draft?.name.trim()) {
                   toast.error("Member name is required");
                   return;
                 }
-                upsertMember(draft);
-                setDraft(null);
-                toast.success("Member saved");
+                try {
+                  await upsertMember(draft);
+                  setDraft(null);
+                  toast.success("Member saved");
+                } catch (e) {
+                  notifyError(e, "Saving the member");
+                }
               }}
             >
               Save member
