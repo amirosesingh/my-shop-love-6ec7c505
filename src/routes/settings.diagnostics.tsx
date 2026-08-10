@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
+import { notifyError } from "@/lib/notify";
 import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
 import { Button } from "@/components/ui/button";
 import {
@@ -55,7 +56,7 @@ function DiagnosticsPage() {
       await importSampleData();
       toast.success("Sample data added");
     } catch (e) {
-      toast.error((e as Error).message);
+      notifyError(e);
     } finally {
       setSeeding(false);
     }
@@ -68,7 +69,7 @@ function DiagnosticsPage() {
       setReport(health);
       setCoverage(cover);
     } catch (e) {
-      toast.error((e as Error).message);
+      notifyError(e);
     } finally {
       setBusy(false);
     }

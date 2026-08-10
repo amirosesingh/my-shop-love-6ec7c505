@@ -5,6 +5,7 @@ import { drainOutbox, runOpLive } from "./sync-engine";
 import { electronDb, localDb, readBranch } from "./local-db";
 import { enqueue, listQueue, persisted, type SyncOp } from "./sync-outbox";
 import { isLiveOnly } from "./live-mode";
+import { notifyError, showNotification } from "./notify";
 import { canRelay, relayStores } from "./sync-relay";
 import { keyset, nextCursor, PAGE_SIZE, type Cursor, type Page } from "./keyset";
 import {
@@ -38,11 +39,14 @@ export type CloudSlice = Pick<
 type Row = Record<string, any>;
 
 export function dbError(context: string, error: unknown) {
-  const message = (error as { message?: string })?.message ?? String(error);
   console.error(`[db] ${context}:`, error);
-  // Offline is a normal state for a till — the outbox will retry.
-  if (typeof navigator !== "undefined" && !navigator.onLine) return;
-  toast.error(`${context} failed`, { description: message });
+  // Offline is a normal state for a till: the change is already stored here
+  // and will sync later. Say so rather than failing silently.
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    showNotification(`${context} saved on this terminal — it will sync when the connection is back.`, "info");
+    return;
+  }
+  notifyError(error, context);
 }
 
 const num = (v: unknown, fallback = 0) => (v == null ? fallback : Number(v));

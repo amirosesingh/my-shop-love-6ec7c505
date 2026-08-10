@@ -686,8 +686,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Persist the terminal's branch so every sign-in on this device inherits
       // it, even before the store directory or the user's record arrives.
       bindTerminalBranch(config?.locationId, config?.locationName);
-      setTerminalStoreId(activeBranchId(null));
-      setTerminalStoreName(activeBranchName(null));
+      setTerminalStoreId(config?.locationId?.trim() || null);
+      setTerminalStoreName(config?.locationName?.trim() || null);
     };
     void read();
     return () => {

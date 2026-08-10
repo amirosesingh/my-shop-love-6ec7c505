@@ -3,10 +3,8 @@
  *
  * Order of truth:
  *   1. the branch this terminal is registered to (hardware binding),
- *   2. the branch bound at start-up / sign-in on this device,
- *   3. the branch currently in view,
- *   4. the branch mirrored locally by the desktop shell,
- *   5. the only branch this business has.
+ *   2. the branch currently in view,
+ *   3. the branch mirrored locally by the desktop shell.
  *
  * Every write path uses this so a record can never be saved without a branch
  * while the terminal actually knows one.
@@ -16,7 +14,7 @@ import { readTerminalConfig } from "./terminal-tokens";
 
 const clean = (v: string | null | undefined) => (v ?? "").trim() || null;
 
-/** Where the terminal's own branch is kept between launches. */
+/** Where this terminal's own branch is kept between launches. */
 const BOUND_ID_KEY = "terminal_branch_id";
 const BOUND_NAME_KEY = "terminal_branch_name";
 
@@ -53,10 +51,7 @@ export function boundBranchName(): string | null {
  * activation claim and again on every sign-in, so whoever uses this till
  * trades in the terminal's branch even when their own record has none.
  */
-export function bindTerminalBranch(
-  id?: string | null,
-  name?: string | null,
-): string | null {
+export function bindTerminalBranch(id?: string | null, name?: string | null): string | null {
   const config = readTerminalConfig();
   const nextId = clean(config?.locationId) ?? clean(id) ?? boundBranchId();
   const nextName = clean(config?.locationName) ?? clean(name) ?? boundBranchName();

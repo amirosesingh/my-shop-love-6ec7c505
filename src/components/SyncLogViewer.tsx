@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { notifyError } from "@/lib/notify";
 import { ArrowDownToLine, ArrowUpFromLine, HardDriveDownload, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -70,7 +71,7 @@ export function SyncLogViewer() {
       if (failed) toast.error(`Sync stopped after ${pushed} change(s) — see the log below`);
       else toast.success(pushed ? `Pushed ${pushed} change(s)` : "Everything is already up to date");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Branch sync failed");
+      notifyError(err, "Branch sync failed");
     } finally {
       void refreshPending();
       setBusy(false);

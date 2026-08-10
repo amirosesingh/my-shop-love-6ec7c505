@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Ban, Gift, Printer, ReceiptText, Search, ScrollText, Wallet } from "lucide-react";
 import { toast } from "sonner";
+import { notifyError } from "@/lib/notify";
 import { AppShell } from "@/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -105,7 +106,7 @@ function ReceiptVault() {
       setCursor(page.cursor);
       if (!page.hasMore) setExhausted(true);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not load older receipts.");
+      notifyError(e, "Could not load older receipts.");
     } finally {
       setLoadingOlder(false);
     }

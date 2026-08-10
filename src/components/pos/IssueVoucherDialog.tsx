@@ -2,6 +2,7 @@
 import { useMemo, useState } from "react";
 import { Copy, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { notifyError } from "@/lib/notify";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -68,7 +69,7 @@ export function IssueVoucherDialog({
       toast.success("Voucher issued");
       onIssued();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not issue the voucher");
+      notifyError(e, "Could not issue the voucher");
     } finally {
       setBusy(false);
     }

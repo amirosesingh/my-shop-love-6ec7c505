@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Loader2, Save, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
+import { notifyError } from "@/lib/notify";
 
 import { AppShell } from "@/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
@@ -102,7 +103,7 @@ function RulesSettings() {
       refresh();
       toast.success("Rules saved");
     } catch (e) {
-      toast.error((e as Error).message || "Could not save rules");
+      notifyError(e, "Could not save rules");
     } finally {
       setSaving(false);
     }

@@ -31,6 +31,7 @@ import {
   ChefHat,
 } from "lucide-react";
 import { toast } from "sonner";
+import { notifyError } from "@/lib/notify";
 import { AppShell } from "@/components/pos/AppShell";
 import { ActionButton } from "@/components/pos/ActionButton";
 import { CatalogPanel } from "@/components/pos/CatalogPanel";
@@ -893,7 +894,7 @@ function Register() {
         saleId: sale.receiptNo,
         storeId: sale.storeId,
         staff: activeCashier,
-      }).catch((e: unknown) => toast.error(e instanceof Error ? e.message : "Could not lock the voucher"));
+      }).catch((e: unknown) => notifyError(e, "Could not lock the voucher"));
       setVoucherToken(null);
     }
     if (splitting || payments.some((p) => p.bankName)) {
@@ -1188,7 +1189,7 @@ function Register() {
       });
       toast.success(`${campaign.name} applied`);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not read that voucher");
+      notifyError(e, "Could not read that voucher");
     }
   }
 

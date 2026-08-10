@@ -28,6 +28,11 @@ describe("terminal branch binding", () => {
     expect(activeBranchId(null)).toBe("branch-1");
   });
 
+  it("prefers the bound branch over the branch merely in view", () => {
+    bindTerminalBranch("branch-1", "Main Street");
+    expect(activeBranchId("other-branch")).toBe("branch-1");
+  });
+
   it("uses the only branch that exists when nothing is bound", () => {
     setKnownBranches(["only-branch"]);
     expect(activeBranchId(null)).toBe("only-branch");
@@ -43,7 +48,13 @@ describe("error messages", () => {
     expect(message).toContain("other records still point at this entry");
   });
 
-  it("says an offline action was queued", () => {
+  it("says an offline action is stored and will sync", () => {
     expect(describeError(new Error("Failed to fetch"), "Saving the sale")).toContain("sync");
+  });
+
+  it("turns an access-rule refusal into an actionable sentence", () => {
+    expect(describeError({ code: "42501", message: "permission denied for table sales" })).toContain(
+      "not allowed for this account",
+    );
   });
 });

@@ -415,7 +415,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       const fresh = justOpenedRef.current;
       // A shift opened on this till stays open until it is closed here. A read
       // that cannot see it yet (replica lag, offline queue) must never re-lock
-      // the register, no matter how long ago it was opened.
+      // the register, however long ago it was opened.
       if (!found && fresh && fresh.shift.storeId === storeId) {
         setShiftReadError(null);
         setDbShift(fresh.shift);
@@ -466,7 +466,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
   // A registered till trades in its own branch — pin the view to it as soon as
   // that branch exists in the directory, before any shift read runs.
   useEffect(() => {
-    // Persist the terminal's branch first so every later read has one source.
+    // Persist the terminal's branch first, so every later read has one source.
     bindTerminalBranch();
     const bound = activeBranchId(null);
     if (!bound) return;

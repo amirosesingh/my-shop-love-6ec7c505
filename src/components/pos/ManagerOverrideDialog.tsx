@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
+import { notifyError } from "@/lib/notify";
 
 import {
   Dialog,
@@ -73,7 +74,7 @@ export function ManagerOverrideDialog({
       setPin("");
       onClose();
     } catch (e) {
-      toast.error((e as Error).message || "Authorisation failed");
+      notifyError(e, "Authorisation failed");
     } finally {
       setBusy(false);
     }

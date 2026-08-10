@@ -1,9 +1,9 @@
 /**
  * Catch-all popup for failures nothing else handled.
  *
- * A rejected promise or a thrown render error used to leave the till looking
- * fine while the action silently did nothing. Everything that escapes now
- * arrives here and is shown as a plain-language toast.
+ * A rejected promise or a thrown handler used to leave the till looking fine
+ * while the action silently did nothing. Everything that escapes now arrives
+ * here and is shown as a plain-language toast.
  */
 import { useEffect } from "react";
 

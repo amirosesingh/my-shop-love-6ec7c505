@@ -26,7 +26,7 @@ export function describeError(error: unknown, action = "That action"): string {
 
   if (!raw) return `${action} could not be completed.`;
 
-  if (/failed to fetch|networkerror|load failed|offline/i.test(raw))
+  if (/failed to fetch|networkerror|load failed|offline|network request failed/i.test(raw))
     return `${action} could not reach the central database. It is saved on this terminal and will sync when the connection is back.`;
 
   if (code === "23503" || /foreign key constraint/i.test(raw))
@@ -38,11 +38,15 @@ export function describeError(error: unknown, action = "That action"): string {
   if (code === "23502" || /null value in column/i.test(raw))
     return `${action} is missing a required field.`;
 
-  if (code === "42501" || code === "PGRST301" || /row-level security|permission denied|not authorized|unauthorized/i.test(raw))
+  if (
+    code === "42501" ||
+    code === "PGRST301" ||
+    /row-level security|permission denied|not authori[sz]ed|unauthorized|forbidden/i.test(raw)
+  )
     return `${action} is not allowed for this account. Ask a manager or admin to do it.`;
 
-  if (/jwt|session|401/i.test(raw))
-    return `Your session has ended. Sign in again to continue.`;
+  if (/jwt|session expired|\b401\b/i.test(raw))
+    return "Your session has ended. Sign in again to continue.";
 
   if (/PGRST20\d|schema cache|could not find the/i.test(raw))
     return `${action} failed because the database is missing a field this version expects. Run the latest database script.`;
