@@ -65,6 +65,17 @@ export function showNotification(message: string, kind: NotifyKind = "info", des
 
 /** Report a caught failure as a readable popup and return the message shown. */
 export function notifyError(error: unknown, action = "That action"): string {
+  // Neither this terminal nor the central database would take the change:
+  // that needs a modal the operator has to acknowledge, not a passing toast.
+  if ((error as { name?: string } | null)?.name === "AllTargetsFailed") {
+    const message = (error as Error).message;
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("pos:db-unreachable", { detail: { message, action } }),
+      );
+    }
+    return message;
+  }
   const message = describeError(error, action);
   showNotification(message, "error");
   return message;
