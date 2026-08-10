@@ -354,15 +354,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const cashierLogin = useCallback(async (userId: string, pin: string) => {
     const code = userId.trim().toLowerCase();
     if (!code) return { ok: false, error: "Enter your username" };
-    if (!/^\d{6}$/.test(pin)) return { ok: false, error: "Enter your 6-digit PIN" };
+    if (!/^\d{4,6}$/.test(pin)) return { ok: false, error: "Enter your PIN" };
     let row: Awaited<ReturnType<typeof verifyCashierPin>> = null;
     let offline = false;
-    try {
-      row = await verifyCashierPin(code, pin);
-    } catch {
-      offline = true;
-    }
     if (typeof navigator !== "undefined" && !navigator.onLine) offline = true;
+
+    // Preferred path: the PIN is the password of this person's own account,
+    // so a successful entry leaves the till holding a real, verified session.
+    if (!offline) {
+      try {
+        const prepared = await preparePinAccount(code, pin);
+        if (prepared.ok) {
+          const { error } = await supabase.auth.signInWithPassword({
+            email: prepared.email,
+            password: pin,
+          });
+          if (!error) {
+            const signedIn = await finishAccountPinSignIn(code, pin);
+            if (signedIn) return signedIn;
+          }
+        }
+      } catch {
+        offline = true;
+      }
+    }
+
+    if (!offline) {
+      try {
+        row = await verifyCashierPin(code, pin);
+      } catch {
+        offline = true;
+      }
+    }
 
     let next: TerminalUser;
     if (row) {
