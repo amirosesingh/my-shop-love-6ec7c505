@@ -34,6 +34,9 @@ contextBridge.exposeInMainWorld("pos", {
   /* activation mirror that survives updates */
   readTerminalConfig: () => invoke("terminal:read"),
   writeTerminalConfig: (config) => invoke("terminal:write", config),
+  /* device settings held in the branch SQL database */
+  getSetting: (key) => invoke("settings:get", key),
+  setSetting: (key, value) => invoke("settings:set", key, value),
   /* branding mirror — survives updates and cleared browser storage */
   readBranding: () => invoke("branding:read"),
   writeBranding: (branding) => invoke("branding:write", branding),

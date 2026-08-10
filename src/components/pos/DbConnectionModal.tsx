@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { DatabaseZap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { unreachableMessage } from "@/lib/db-mode";
 
 /**
  * Shown only when a change could not be stored on this terminal *or* in the
@@ -14,10 +15,7 @@ export function DbConnectionModal() {
   useEffect(() => {
     const onFail = (e: Event) => {
       const detail = (e as CustomEvent<{ message?: string }>).detail;
-      setMessage(
-        detail?.message ??
-          "Unable to connect to local storage or online database. Please check your internet connection or browser storage settings to continue.",
-      );
+      setMessage(detail?.message ?? unreachableMessage());
     };
     window.addEventListener("pos:db-unreachable", onFail);
     return () => window.removeEventListener("pos:db-unreachable", onFail);

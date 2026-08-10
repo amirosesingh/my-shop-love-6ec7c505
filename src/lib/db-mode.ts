@@ -70,16 +70,26 @@ export function setCloudDirect(on: boolean) {
 }
 
 /**
+ * Wording for a total failure, in the operator's terms for this platform.
+ *
+ * The phone is a live client of the central server, so there is no local
+ * database to mention; Windows and the browser have both targets.
+ */
+export function unreachableMessage(): string {
+  return isLiveOnly()
+    ? "Shift cannot be opened: Central server relay is offline. Please contact an administrator."
+    : "Database Connection Required: Unable to reach the local database server or online database. " +
+        "Please check your network connection.";
+}
+
+/**
  * Raised only when neither this terminal nor the central database would take
  * the change. Nothing was written; the caller must stop and tell the operator.
  */
 export class AllTargetsFailed extends Error {
   readonly context: string;
   constructor(context: string, cause?: unknown) {
-    super(
-      "Database Connection Required: Unable to connect to local storage or online database. " +
-        "Please check your internet connection or browser storage settings to continue.",
-    );
+    super(unreachableMessage());
     this.name = "AllTargetsFailed";
     this.context = context;
     if (cause !== undefined) (this as { cause?: unknown }).cause = cause;

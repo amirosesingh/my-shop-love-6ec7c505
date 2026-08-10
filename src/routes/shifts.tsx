@@ -519,6 +519,11 @@ function Shifts() {
               Expected in drawer: {money(expected)}
             </p>
             <div className="space-y-1">
+              <Label>Cashier</Label>
+              {/* Locked to the signed-in user — a closure is always theirs. */}
+              <Input value={user?.name ?? activeShift?.cashier ?? ""} readOnly disabled />
+            </div>
+            <div className="space-y-1">
               <Label>
                 Counted cash <span className="text-destructive">*</span>
               </Label>

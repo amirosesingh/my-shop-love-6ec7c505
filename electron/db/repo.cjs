@@ -275,6 +275,31 @@ async function setState(key, value) {
 }
 
 /**
+ * Device settings kept in the branch database (activation token, bound branch,
+ * connection details) so they survive a cleared browser and an app update.
+ */
+async function getSetting(key) {
+  const res = await getPool()
+    .request()
+    .input("key", sql.NVarChar(120), key)
+    .query("SELECT [value] FROM dbo.system_settings WHERE [key] = @key;");
+  return res.recordset[0]?.value ?? null;
+}
+
+async function setSetting(key, value) {
+  await getPool()
+    .request()
+    .input("key", sql.NVarChar(120), key)
+    .input("value", sql.NVarChar(sql.MAX), value == null ? null : String(value))
+    .query(`
+      MERGE dbo.system_settings AS t
+      USING (SELECT @key AS [key], @value AS [value]) AS s ON t.[key] = s.[key]
+      WHEN MATCHED THEN UPDATE SET t.[value] = s.[value], t.updated_at = SYSUTCDATETIME()
+      WHEN NOT MATCHED THEN INSERT ([key], [value]) VALUES (s.[key], s.[value]);
+    `);
+}
+
+/**
  * Commits a completed bill to the local branch database in one transaction:
  * the sale header, every line, the stock movement and the member update all
  * land together or not at all. Rows are stamped `is_synced = 0` so the
@@ -354,5 +379,7 @@ module.exports = {
   stats,
   getState,
   setState,
+  getSetting,
+  setSetting,
   toCloudRow,
 };

@@ -4,6 +4,7 @@ import { replayOrder } from "./activity-journal";
 import { isTerminalRevoked } from "./use-revocation-check";
 import { tableSyncAllowed } from "./sync-policy";
 import { canRelay, hasStaffSession, relayOp } from "./sync-relay";
+import { preferRelay } from "./pos-auth-route";
 import { isConnectionError, noteConnectionLost, noteConnectionRestored } from "./db-mode";
 import {
   failOp,
@@ -139,7 +140,11 @@ async function execute(op: SyncOp): Promise<QueryResult> {
 async function runOne(entry: QueuedOp): Promise<boolean> {
   // This account has already been refused on this table — go straight to the
   // relay instead of triggering another refused request.
-  if ((entry.op.table === "stores" || refusedTables.has(entry.op.table)) && canRelay()) {
+  // A PIN sign-in never holds a cloud account, so it always takes the relay.
+  if (
+    (entry.op.table === "stores" || refusedTables.has(entry.op.table) || preferRelay()) &&
+    canRelay()
+  ) {
     const relayed = await viaRelay(entry.context, entry.op);
     if (relayed.ok) {
       resolveOp(entry.id);
@@ -202,7 +207,7 @@ async function runOne(entry: QueuedOp): Promise<boolean> {
  * report the result. Nothing is stored or retried on the device.
  */
 export async function runOpLive(context: string, op: SyncOp): Promise<void> {
-  if ((op.table === "stores" || refusedTables.has(op.table)) && canRelay()) {
+  if ((op.table === "stores" || refusedTables.has(op.table) || preferRelay()) && canRelay()) {
     const relayed = await viaRelay(context, op);
     if (relayed.ok) return;
     throw new Error(relayed.error ?? "The server could not save this change");

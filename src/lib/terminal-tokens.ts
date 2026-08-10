@@ -391,11 +391,14 @@ export function writeTerminalConfig(config: TerminalConfig) {
   cachedConfig = config;
   hydrated = true;
   applyTenantOverride(config);
+  // The desktop mirror writes the token and the bound branch into the branch
+  // SQL database; the sealed browser store is the fallback for a machine with
+  // no local database engine.
+  void desktopBridge()?.writeTerminalConfig(config);
   void setDeviceSecret(SEALED_NAME, config).catch(() => {
     // Last resort so the till is not left unregistered after a restart.
     window.localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
   });
-  void desktopBridge()?.writeTerminalConfig(config);
   window.dispatchEvent(new CustomEvent(EVENT));
 }
 

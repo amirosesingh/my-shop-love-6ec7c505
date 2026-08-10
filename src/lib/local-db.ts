@@ -56,6 +56,12 @@ export type PosBridge = {
   setSyncEnabled: (on: boolean) => Promise<void>;
   backup: (path?: string) => Promise<{ ok: boolean; path?: string; error?: string }>;
   retryErrored: () => Promise<{ ok: boolean }>;
+  /** Device settings stored in the branch SQL database. */
+  getSetting?: (key: string) => Promise<{ ok: boolean; value?: string | null; error?: string }>;
+  setSetting?: (
+    key: string,
+    value: string | null,
+  ) => Promise<{ ok: boolean; error?: string }>;
   onStatus: (cb: (s: LocalSyncStatus) => void) => () => void;
 };
 
@@ -125,6 +131,33 @@ export function writeBranch(branch: BranchInfo) {
 /** True when running inside the Windows desktop shell. */
 export const hasLocalDb = (): boolean => typeof window !== "undefined" && !!window.pos;
 
+/** True when a real local SQL engine is reachable through the desktop shell. */
+export const hasLocalSqlEngine = (): boolean =>
+  typeof window !== "undefined" && typeof window.pos?.setSetting === "function";
+
+/** Read a device setting from the branch SQL database, if there is one. */
+export async function readLocalSetting(key: string): Promise<string | null> {
+  const bridge = localDb();
+  if (!bridge?.getSetting) return null;
+  try {
+    const res = await bridge.getSetting(key);
+    return res.ok ? (res.value ?? null) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Store a device setting in the branch SQL database when one is present. */
+export async function writeLocalSetting(key: string, value: string | null): Promise<boolean> {
+  const bridge = localDb();
+  if (!bridge?.setSetting) return false;
+  try {
+    return (await bridge.setSetting(key, value)).ok;
+  } catch {
+    return false;
+  }
+}
+
 export const localDb = (): PosBridge | null =>
   typeof window === "undefined" ? null : (window.pos ?? null);
 
@@ -173,4 +206,10 @@ export async function writeLocalDbConfig(config: LocalDbConfig) {
   if (typeof window === "undefined") return;
   cachedConfig = config;
   await setDeviceSecret(SECRET_NAME, config);
+  // Mirror the connection details into the branch database so a rebuilt or
+  // cleared browser profile does not lose them.
+  await writeLocalSetting(
+    "local_db_config",
+    JSON.stringify({ ...config, password: config.password ? "__stored__" : "" }),
+  );
 }
