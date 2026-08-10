@@ -523,8 +523,49 @@ function registerIpc() {
   ipcMain.handle("update:install", () => updater.install());
   ipcMain.handle("app:version", () => app.getVersion());
 
-  ipcMain.handle("terminal:read", () => ({ ok: true, config: terminalStore.read() }));
-  ipcMain.handle("terminal:write", (_e, config) => terminalStore.write(config));
+  /**
+   * The branch database is the home for the activation token and the branch it
+   * binds this machine to. The sealed file store stays as the fallback for a
+   * machine whose SQL Server is not up yet.
+   */
+  ipcMain.handle("terminal:read", async () => {
+    const sealed = terminalStore.read();
+    if (sealed) return { ok: true, config: sealed };
+    try {
+      const raw = await repo.getSetting("terminal_config");
+      if (raw) return { ok: true, config: JSON.parse(raw) };
+    } catch {
+      /* local database unavailable — the sealed store is the answer */
+    }
+    return { ok: true, config: null };
+  });
+  ipcMain.handle("terminal:write", async (_e, config) => {
+    const result = terminalStore.write(config);
+    try {
+      await repo.setSetting("terminal_config", config ? JSON.stringify(config) : null);
+      await repo.setSetting("terminal_branch_id", config?.locationId ?? null);
+      await repo.setSetting("activation_token_id", config?.tokenId ?? null);
+    } catch {
+      /* local database unavailable — the sealed store already has it */
+    }
+    return result;
+  });
+
+  ipcMain.handle("settings:get", async (_e, key) => {
+    try {
+      return { ok: true, value: await repo.getSetting(String(key)) };
+    } catch (error) {
+      return { ok: false, error: error.message };
+    }
+  });
+  ipcMain.handle("settings:set", async (_e, key, value) => {
+    try {
+      await repo.setSetting(String(key), value == null ? null : String(value));
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error.message };
+    }
+  });
 
   /* branding mirror so first-run setup only ever runs once */
   ipcMain.handle("branding:read", () => ({ ok: true, branding: brandingStore.read() }));
