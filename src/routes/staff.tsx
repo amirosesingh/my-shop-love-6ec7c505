@@ -993,7 +993,7 @@ function StaffManagement() {
         onCancel={() => setRoleChange(null)}
         onConfirm={async (creds, mode) => {
           if (!roleChange) return;
-          const ok = await convertRole(roleChange.row, roleChange.target, creds, mode);
+          const ok = await convertRole(roleChange.row, roleChange.target, mode);
           if (ok) setRoleChange(null);
         }}
       />
@@ -1027,7 +1027,8 @@ function ChangeRoleDialog({
   if (!request) return null;
   const { row, target } = request;
   const toCashier = target === "cashier";
-  const crossing = toCashier || row.kind === "cashier";
+  void toCashier;
+  const crossing = false;
 
   const submit = async () => {
     setBusy(true);
