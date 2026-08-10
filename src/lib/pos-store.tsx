@@ -1028,7 +1028,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const upsertProduct = useCallback((product: Product) => {
+  const upsertProduct = useCallback(async (product: Product): Promise<CommitTarget> => {
     const prev = stateRef.current.products.find((p) => p.id === product.id);
     // The catalog is shared by every branch: make sure the product exists at
     // all stores (starting at zero) so it shows up everywhere after sync.
@@ -1051,7 +1051,8 @@ export function PosProvider({ children }: { children: ReactNode }) {
         ecomPrice: record.ecomPrice,
       },
     });
-    void db.upsertProduct(record);
+    // Store it before anything on screen says it was saved.
+    const target = await db.commitProduct(record);
     // A branch that keeps a private catalogue owns whatever it creates, so
     // the item never shows up at the other shops.
     if (!prev && branchPolicy(stateRef.current.settings, stateRef.current.currentStoreId).privateCatalogue) {
@@ -1325,7 +1326,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const upsertMember = useCallback((member: Member) => {
+  const upsertMember = useCallback(async (member: Member): Promise<CommitTarget> => {
     const prev = stateRef.current.members.find((m) => m.id === member.id);
     logger.log("member_event", prev ? "Member profile edited" : "Member created", "members", {
       memberId: member.id,
@@ -1335,13 +1336,14 @@ export function PosProvider({ children }: { children: ReactNode }) {
       updated: { points: member.points, tier: member.tier, phone: member.phone },
       pointsDelta: prev ? member.points - prev.points : member.points,
     });
-    void db.upsertMember(member);
+    const target = await db.commitMember(member);
     setState((s) => ({
       ...s,
       members: s.members.some((m) => m.id === member.id)
         ? s.members.map((m) => (m.id === member.id ? member : m))
         : [member, ...s.members],
     }));
+    return target;
   }, []);
 
   const removeMember = useCallback((id: string) => {
@@ -1355,20 +1357,21 @@ export function PosProvider({ children }: { children: ReactNode }) {
     setState((s) => ({ ...s, members: s.members.filter((m) => m.id !== id) }));
   }, []);
 
-  const upsertPromotion = useCallback((promotion: Promotion) => {
+  const upsertPromotion = useCallback(async (promotion: Promotion): Promise<CommitTarget> => {
     const previous = stateRef.current.promotions.find((p) => p.id === promotion.id);
     logger.log("promotion", previous ? "Promotion updated" : "Promotion created", "promotions", {
       promotionId: promotion.id,
       name: promotion.name,
       active: promotion.active,
     });
-    void db.upsertPromotion(promotion);
+    const target = await db.commitPromotion(promotion);
     setState((s) => ({
       ...s,
       promotions: s.promotions.some((p) => p.id === promotion.id)
         ? s.promotions.map((p) => (p.id === promotion.id ? promotion : p))
         : [promotion, ...s.promotions],
     }));
+    return target;
   }, []);
 
   const removePromotion = useCallback((id: string) => {
