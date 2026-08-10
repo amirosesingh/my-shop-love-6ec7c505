@@ -39,7 +39,12 @@ import { clearSnapshot, readSnapshot, writeSnapshot } from "./offline-snapshot";
 import { isLiveOnly } from "./live-mode";
 import { useAuth } from "@/lib/pos-auth";
 import { readTerminalConfig } from "./terminal-tokens";
-import { activeBranchId, requireBranchId, setKnownBranches } from "./active-branch";
+import {
+  activeBranchId,
+  bindTerminalBranch,
+  requireBranchId,
+  setKnownBranches,
+} from "./active-branch";
 import { isShiftOverdue, localTerminalId } from "./shift-hours";
 import { beginShiftSession, endShiftSessions } from "./shift-sessions";
 import { branchPolicy } from "./branch-policy";
@@ -408,12 +413,10 @@ export function PosProvider({ children }: { children: ReactNode }) {
     try {
       const found = await loadActiveShift(storeId);
       const fresh = justOpenedRef.current;
-      if (
-        !found &&
-        fresh &&
-        fresh.shift.storeId === storeId &&
-        Date.now() - fresh.at < 120_000
-      ) {
+      // A shift opened on this till stays open until it is closed here. A read
+      // that cannot see it yet (replica lag, offline queue) must never re-lock
+      // the register, however long ago it was opened.
+      if (!found && fresh && fresh.shift.storeId === storeId) {
         setShiftReadError(null);
         setDbShift(fresh.shift);
         return;
