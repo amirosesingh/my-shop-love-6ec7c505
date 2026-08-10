@@ -351,6 +351,76 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  /**
+   * Finish a PIN sign-in that produced a real account session: read the
+   * person's profile, pin the branch, and remember them for offline use.
+   */
+  const finishAccountPinSignIn = useCallback(
+    async (
+      code: string,
+      pin: string,
+    ): Promise<{ ok: boolean; error?: string } | null> => {
+      const { data } = await supabase.rpc("current_app_user");
+      const profile = (Array.isArray(data) ? data[0] : null) as
+        | Record<string, unknown>
+        | null;
+      if (profile && profile["is_active"] === false) {
+        await supabase.auth.signOut();
+        return { ok: false, error: "Account deactivated. Please contact an administrator." };
+      }
+      const dbRole = String(profile?.["role"] ?? "staff");
+      const permissions = normalizePermissions(
+        (profile?.["permissions"] as Record<string, unknown> | null) ?? null,
+        fromDbRole(dbRole),
+      );
+      const bound =
+        bindTerminalBranch() ??
+        activeBranchId((profile?.["store_id"] as string | null) ?? null);
+      const next: TerminalUser = {
+        userCode: String(profile?.["user_id"] ?? code),
+        name: String(profile?.["full_name"] ?? code),
+        role: dbRole === "admin" ? "admin" : dbRole === "manager" ? "manager" : "staff",
+        storeId: bound,
+        email: String(profile?.["email"] ?? ""),
+        permissions,
+      };
+      setTerminalUser(next);
+      try {
+        window.sessionStorage.setItem(TERMINAL_KEY, JSON.stringify(next));
+      } catch {
+        /* session storage unavailable */
+      }
+      // Same PIN opens this till again with no connection.
+      void cacheCredential(pin, {
+        username: next.userCode,
+        cashierId: "",
+        fullName: next.name,
+        storeId: bound ?? "",
+        permissions: permissions as unknown as Record<string, boolean>,
+      });
+      try {
+        const { data: sess } = await supabase.auth.getSession();
+        const token = sess.session?.access_token;
+        if (token) {
+          const started = await startDeviceSession({
+            data: {
+              kind: "staff",
+              accessToken: token,
+              label: next.name,
+              platform:
+                typeof navigator === "undefined" ? "web" : navigator.platform || "web",
+            },
+          });
+          if (started.ok) await saveSessionToken(started.token);
+        }
+      } catch {
+        /* the account session still works on its own */
+      }
+      return { ok: true };
+    },
+    [],
+  );
+
   const cashierLogin = useCallback(async (userId: string, pin: string) => {
     const code = userId.trim().toLowerCase();
     if (!code) return { ok: false, error: "Enter your username" };
