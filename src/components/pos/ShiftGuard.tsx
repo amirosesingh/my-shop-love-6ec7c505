@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { shiftDuration } from "@/lib/shift-hours";
 import { parsePositiveAmount } from "@/lib/amount";
 import { permissionMessage } from "@/components/pos/PermissionGate";
+import { notifyError } from "@/lib/notify";
 
 /**
  * Hard terminal lock.
