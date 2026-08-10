@@ -11,6 +11,29 @@ import type { SyncOp } from "./sync-outbox";
 
 const credentials = readCredentials;
 
+/** Answer from the server setup probe: presence only, never key material. */
+export type SyncHealth = { serviceKey: boolean; posUrl: boolean; host: string };
+
+/**
+ * Ask the server that is actually answering this browser whether it holds the
+ * central database key. Used by the connection check so an administrator can
+ * tell a server setup problem apart from a till problem.
+ */
+export async function syncHealth(): Promise<SyncHealth | null> {
+  try {
+    const res = await fetch("/api/public/sync-health", { cache: "no-store" });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { serviceKey?: boolean; posUrl?: boolean };
+    return {
+      serviceKey: !!body.serviceKey,
+      posUrl: !!body.posUrl,
+      host: typeof window === "undefined" ? "" : window.location.host,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** Every relay call carries the bearer token as well as the credential body. */
 async function relayHeaders(): Promise<Record<string, string>> {
   return { "Content-Type": "application/json", ...(await authHeaders()) };
