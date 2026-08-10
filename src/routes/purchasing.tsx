@@ -11,6 +11,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { notifyError } from "@/lib/notify";
 import * as XLSX from "xlsx";
 import { AppShell } from "@/components/pos/AppShell";
 import {
@@ -402,7 +403,7 @@ function Purchasing() {
       await refreshHistory();
       scanRef.current?.focus();
     } catch (e) {
-      toast.error("The invoice was not saved", { description: (e as Error).message });
+      notifyError(e, "The invoice was not saved");
     } finally {
       setSaving(false);
       scanRef.current?.focus();
@@ -502,7 +503,7 @@ function Purchasing() {
       await syncProducts(next.lines.map((l) => l.productId ?? "").filter(Boolean));
       await refreshHistory();
     } catch (e) {
-      toast.error("The correction was not saved", { description: (e as Error).message });
+      notifyError(e, "The correction was not saved");
     } finally {
       setSavingEdit(false);
     }

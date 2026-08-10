@@ -11,6 +11,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import { toast } from "sonner";
+import { notifyError } from "@/lib/notify";
 import { AppShell } from "@/components/pos/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -155,7 +156,7 @@ function StaffManagement() {
   const load = useCallback(async () => {
     setLoading(true);
     const { data, error } = await sb.rpc("list_app_users");
-    if (error) toast.error("Could not load staff", { description: error.message });
+    if (error) notifyError(error, "Could not load staff");
     const accounts = ((data ?? []) as Record<string, unknown>[]).map((r) => {
       const role = fromDbRole(r["role"] as string | null);
       return {
@@ -247,7 +248,7 @@ function StaffManagement() {
     });
     setSaving(false);
     if (error) {
-      toast.error("Could not save profile", { description: error.message });
+      notifyError(error, "Could not save profile");
       return;
     }
     toast.success("Profile saved");
@@ -269,7 +270,7 @@ function StaffManagement() {
       p_permissions: { [key]: value },
     });
     if (error) {
-      toast.error("Could not update permission", { description: error.message });
+      notifyError(error, "Could not update permission");
       void load();
     }
   };
@@ -291,7 +292,7 @@ function StaffManagement() {
       p_permissions: patch,
     });
     if (error) {
-      toast.error("Could not update permissions", { description: error.message });
+      notifyError(error, "Could not update permissions");
       void load();
     }
   };
@@ -341,7 +342,7 @@ function StaffManagement() {
     });
     setManagerPin("");
     if (error) {
-      toast.error("Could not set the manager PIN", { description: error.message });
+      notifyError(error, "Could not set the manager PIN");
       return;
     }
     toast.success("Manager PIN updated");
@@ -467,7 +468,7 @@ function StaffManagement() {
     });
     setPasswordReset("");
     if (error) {
-      toast.error("Could not update password", { description: error.message });
+      notifyError(error, "Could not update password");
       return;
     }
     toast.success("Password updated for the next sign-in sync");
@@ -488,7 +489,7 @@ function StaffManagement() {
     }
     const { error } = await sb.rpc("delete_terminal_user", { p_user_id: row.user_id });
     if (error) {
-      toast.error("Delete failed", { description: error.message });
+      notifyError(error, "Delete failed");
       return;
     }
     setSelectedId(null);

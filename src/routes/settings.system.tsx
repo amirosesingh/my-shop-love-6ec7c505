@@ -10,6 +10,7 @@ import {
   WifiOff,
 } from "lucide-react";
 import { toast } from "sonner";
+import { notifyError } from "@/lib/notify";
 import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
 import { UnpairTerminalCard } from "@/components/pos/UnpairTerminal";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
@@ -104,7 +105,7 @@ function DomainSwitch({
           void setPublicFlag(flagKey, v)
             .then(() => toast.success(v ? `${label} is now live` : `${label} is switched off`))
             .catch((e: unknown) =>
-              toast.error(e instanceof Error ? e.message : "Could not save the switch"),
+              notifyError(e, "Could not save the switch"),
             )
             .finally(() => setSaving(false));
         }}

@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Copy, Link2, Loader2, Plus, Send, TicketPercent, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { notifyError } from "@/lib/notify";
 import { AppShell } from "@/components/pos/AppShell";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { Badge } from "@/components/ui/badge";
@@ -169,7 +170,7 @@ function CouponsPage() {
       setDraft(null);
       await refresh();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not save the campaign");
+      notifyError(e, "Could not save the campaign");
     } finally {
       setSaving(false);
     }
@@ -182,7 +183,7 @@ function CouponsPage() {
       toast.success("Campaign deleted");
       await refresh();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not delete the campaign");
+      notifyError(e, "Could not delete the campaign");
     }
   }
 

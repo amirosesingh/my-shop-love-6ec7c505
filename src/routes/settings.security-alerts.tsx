@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { RefreshCw, ShieldAlert, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
+import { notifyError } from "@/lib/notify";
 import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -45,7 +46,7 @@ function SecurityAlertsPage() {
       await setFindingStatus(f.id, status, user?.name ?? user?.staffId ?? "admin");
       await load();
     } catch (e) {
-      toast.error((e as Error).message);
+      notifyError(e);
     }
   }
 
@@ -55,7 +56,7 @@ function SecurityAlertsPage() {
       await load();
       toast.success("Re-tested — the list shows only conditions still true");
     } catch (e) {
-      toast.error((e as Error).message);
+      notifyError(e);
     } finally {
       setBusy(false);
     }

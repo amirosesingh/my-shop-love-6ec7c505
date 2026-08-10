@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Layers, Loader2, RefreshCw, Save, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
+import { notifyError } from "@/lib/notify";
 
 import { AppShell } from "@/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
@@ -174,7 +175,7 @@ function InheritanceSettings() {
       setDraft(rows);
       toast.success(`Saved for ${label}`);
     } catch (e) {
-      toast.error((e as Error).message || "Could not save settings");
+      notifyError(e, "Could not save settings");
     } finally {
       setSaving(false);
     }
