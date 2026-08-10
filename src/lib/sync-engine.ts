@@ -4,6 +4,7 @@ import { replayOrder } from "./activity-journal";
 import { isTerminalRevoked } from "./use-revocation-check";
 import { tableSyncAllowed } from "./sync-policy";
 import { canRelay, hasStaffSession, relayOp } from "./sync-relay";
+import { isConnectionError, noteConnectionLost, noteConnectionRestored } from "./db-mode";
 import {
   failOp,
   isOnline,
@@ -186,6 +187,7 @@ async function runOne(entry: QueuedOp): Promise<boolean> {
       return false;
     }
     const message = describeError(entry.op.table, res.error);
+    if (isConnectionError(res.error)) noteConnectionLost();
     failOp(entry.id, message);
     logSync("push", entry.op.table, false, `${entry.context}: ${message}`);
     return false;
@@ -264,6 +266,8 @@ export async function drainOutbox(): Promise<{ pushed: number; failed: number }>
       }
     }
     if (pushed) markSynced();
+    // A successful push proves the connection is back, so online mode resumes.
+    if (pushed) noteConnectionRestored();
   } finally {
     draining = false;
   }
