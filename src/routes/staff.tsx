@@ -38,6 +38,8 @@ import {
 } from "@/components/ui/select";
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { usePos } from "@/lib/pos-store";
+import { RoleManager } from "@/components/admin/RoleManager";
+import { StaffManager } from "@/components/admin/StaffManager";
 import { useAuth } from "@/lib/pos-auth";
 import {
   PERMISSION_GROUPS,
@@ -134,6 +136,7 @@ const formStoreId = (v: string) => (v && v !== "none" ? v : null);
 function StaffManagement() {
   const { isAdmin } = useAuth();
   const { stores } = usePos();
+  const [view, setView] = useState<"directory" | "accounts" | "roles">("directory");
   const [rows, setRows] = useState<StaffRow[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -804,6 +807,30 @@ function StaffManagement() {
           </div>
         </header>
 
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              ["directory", "Directory"],
+              ["accounts", "Accounts"],
+              ["roles", "Roles & permissions"],
+            ] as const
+          ).map(([id, label]) => (
+            <Button
+              key={id}
+              size="sm"
+              variant={view === id ? "default" : "outline"}
+              onClick={() => setView(id)}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
+
+        {view === "accounts" ? (
+          <StaffManager />
+        ) : view === "roles" ? (
+          <RoleManager />
+        ) : (
         <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
           {/* Master list */}
           <section className="rounded-lg border border-border bg-card">
@@ -1121,6 +1148,7 @@ function StaffManagement() {
             </section>
           )}
         </div>
+        )}
       </div>
 
       <ChangeRoleDialog
