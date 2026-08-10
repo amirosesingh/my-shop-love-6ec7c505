@@ -1070,6 +1070,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
         ? s.products.map((p) => (p.id === record.id ? record : p))
         : [record, ...s.products],
     }));
+    return target;
   }, []);
 
   /**
