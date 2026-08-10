@@ -23,7 +23,7 @@ import {
 } from "@/lib/user-sessions.functions";
 import { loadSessionToken, saveSessionToken } from "@/lib/pos-credentials";
 import { verifyCashierPin } from "@/lib/pos-cashiers";
-import { activeBranchId, activeBranchName } from "@/lib/active-branch";
+import { activeBranchId, activeBranchName, bindTerminalBranch } from "@/lib/active-branch";
 import { cacheCredential, verifyCachedPin } from "@/lib/offline-credentials";
 import { recordSignIn } from "@/lib/shift-attendance";
 import { endShiftSessions } from "@/lib/shift-sessions";
@@ -326,6 +326,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password,
       });
       if (error) return { ok: false, error: error.message };
+      // Whoever signs in on this device trades in the terminal's branch.
+      bindTerminalBranch();
       // Register this device so it can be listed and reset remotely, and so
       // it signs itself out once it has been left idle for too long.
       try {
@@ -681,8 +683,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { hydrateTerminalConfig, readTerminalConfig } = await import("@/lib/terminal-tokens");
       const config = readTerminalConfig() ?? (await hydrateTerminalConfig());
       if (!alive) return;
-      setTerminalStoreId(config?.locationId?.trim() || null);
-      setTerminalStoreName(config?.locationName?.trim() || null);
+      // Persist the terminal's branch so every sign-in on this device inherits
+      // it, even before the store directory or the user's record arrives.
+      bindTerminalBranch(config?.locationId, config?.locationName);
+      setTerminalStoreId(activeBranchId(null));
+      setTerminalStoreName(activeBranchName(null));
     };
     void read();
     return () => {
