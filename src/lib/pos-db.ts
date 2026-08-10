@@ -6,10 +6,12 @@ import { electronDb, localDb, readBranch } from "./local-db";
 import { enqueue, listQueue, persisted, type SyncOp } from "./sync-outbox";
 import { isLiveOnly } from "./live-mode";
 import {
+  AllTargetsFailed,
   effectiveDatabaseMode,
   isConnectionError,
   noteConnectionLost,
   noteConnectionRestored,
+  setCloudDirect,
 } from "./db-mode";
 import { notifyError, showNotification } from "./notify";
 import { canRelay, relayStores } from "./sync-relay";
@@ -876,13 +878,28 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
   }
 
   // Windows desktop: the local SQL Server instance is the source of truth.
+  // If it is unreachable or refuses the write, the cloud is tried before the
+  // action is allowed to fail.
   const bridge = localDb();
   if (bridge) {
-    for (const op of ops) {
-      const res = await bridge.write(context, op);
-      if (!res.ok) throw new Error(res.error ?? `${context} could not be stored locally`);
+    try {
+      for (const op of ops) {
+        const res = await bridge.write(context, op);
+        if (!res.ok) throw new Error(res.error ?? `${context} could not be stored locally`);
+      }
+      setCloudDirect(false);
+      return noteCommitTarget("local");
+    } catch (local) {
+      try {
+        for (const op of ops) await runOpLive(context, op);
+        setCloudDirect(true);
+        noteConnectionRestored();
+        return noteCommitTarget("cloud");
+      } catch (cloud) {
+        if (!isConnectionError(cloud)) throw cloud;
+        throw new AllTargetsFailed(context, local);
+      }
     }
-    return noteCommitTarget("local");
   }
 
   // Browser: queue to disk first (durable), then try to push it up now.
@@ -892,6 +909,7 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
     try {
       for (const op of ops) await runOpLive(context, op);
       noteConnectionRestored();
+      setCloudDirect(false);
       return noteCommitTarget("cloud");
     } catch (e) {
       if (!isConnectionError(e)) throw e;
@@ -899,10 +917,25 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
       /* fall through: store it locally so nothing is lost */
     }
   }
-  const ids = ops.map((op) => enqueue(context, op).id);
-  if (!persisted(ids)) {
-    throw new Error(`${context} could not be stored on this device — nothing was saved`);
+  let ids: string[] = [];
+  try {
+    ids = ops.map((op) => enqueue(context, op).id);
+  } catch {
+    ids = [];
   }
+  if (!persisted(ids) || !ids.length) {
+    // The on-disk queue would not take it (storage full or unavailable): try
+    // the central database directly before giving up on the action.
+    try {
+      for (const op of ops) await runOpLive(context, op);
+      setCloudDirect(true);
+      return noteCommitTarget("cloud");
+    } catch (cloud) {
+      if (!isConnectionError(cloud)) throw cloud;
+      throw new AllTargetsFailed(context, cloud);
+    }
+  }
+  setCloudDirect(false);
   try {
     await drainOutbox();
   } catch {
