@@ -465,11 +465,10 @@ export function PosProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const bound = activeBranchId(null);
     if (!bound) return;
-    setState((s) =>
-      s.currentStoreId === bound || !s.stores.some((x) => x.id === bound)
-        ? s
-        : { ...s, currentStoreId: bound },
-    );
+    // The branch is pinned even before the directory arrives — a registered
+    // till knows its own branch, and waiting for the store list is what left
+    // the register on "No branch yet".
+    setState((s) => (s.currentStoreId === bound ? s : { ...s, currentStoreId: bound }));
   }, [state.stores, signedIn]);
 
   // Android holds nothing locally, so coming back to the app must re-read the
