@@ -144,8 +144,18 @@ const from = (table: string) =>
 
 async function execute(op: SyncOp): Promise<QueryResult> {
   switch (op.kind) {
-    case "insert":
-      return from(op.table).insert(op.rows);
+    case "insert": {
+      // Replaying a queued insert must never create a second copy: when every
+      // row carries its own id, that id is the idempotency key, so a retry on
+      // a flaky link lands on the same row instead of duplicating a sale or a
+      // shift.
+      const keyed =
+        op.rows.length > 0 &&
+        op.rows.every((r) => typeof (r as { id?: unknown }).id === "string" && (r as { id: string }).id);
+      return keyed
+        ? from(op.table).upsert(op.rows, { onConflict: "id" })
+        : from(op.table).insert(op.rows);
+    }
     case "upsert":
       return from(op.table).upsert(op.rows, { onConflict: op.onConflict ?? "id" });
     case "update": {
