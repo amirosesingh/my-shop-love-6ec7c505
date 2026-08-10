@@ -12,6 +12,14 @@ import { logSync } from "@/lib/sync-log";
 import { describeError, showNotification } from "@/lib/notify";
 import { localDb } from "@/lib/local-db";
 import {
+  databaseModeLabel,
+  databaseModeLocked,
+  effectiveDatabaseMode,
+  preferredDatabaseMode,
+  setPreferredDatabaseMode,
+  subscribeDatabaseMode,
+} from "@/lib/db-mode";
+import {
   discardQuarantined,
   discardOp,
   isOnline,
@@ -33,14 +41,18 @@ export function SyncSettings() {
   const bump = () => force((n) => n + 1);
   useEffect(() => {
     const off = subscribeOutbox(bump);
+    const offMode = subscribeDatabaseMode(bump);
     return () => {
       off();
+      offMode();
     };
   }, []);
 
   const queue = listQueue();
   const quarantined = queue.filter((q) => q.quarantined);
   const last = lastSyncedAt();
+  const localMode = preferredDatabaseMode() === "local";
+  const locked = databaseModeLocked();
 
   return (
     <div className="space-y-3">
@@ -49,6 +61,27 @@ export function SyncSettings() {
         working with no internet. Queued changes are pushed to the cloud automatically as soon as
         the connection returns.
       </p>
+
+      <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+        <div>
+          <p className="text-sm">Local database mode</p>
+          <p className="text-xs text-muted-foreground">
+            {locked
+              ? "This device is a live client: everything is read from and written to the central database."
+              : "On: every sale, shift and stock change is stored on this machine first and pushed up in the background. Off: changes go straight to the central database, and this terminal switches to local automatically if the connection drops."}
+          </p>
+        </div>
+        <Switch
+          aria-label="Local database mode"
+          disabled={locked}
+          checked={locked ? false : localMode}
+          onCheckedChange={(v) => {
+            setPreferredDatabaseMode(v ? "local" : "online");
+            bump();
+            if (!v) void drainOutbox();
+          }}
+        />
+      </div>
 
       <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
         <div>
@@ -78,6 +111,14 @@ export function SyncSettings() {
         <Stat label="Connection" value={isOnline() ? "Online" : "Offline"} />
         <Stat label="Queued changes" value={String(queue.length)} />
         <Stat label="Last synced" value={last ? new Date(last).toLocaleString() : "Never"} />
+      </div>
+
+      <div className="grid gap-2 rounded-md border border-border px-3 py-2 text-sm sm:grid-cols-2">
+        <Stat label="Database mode" value={databaseModeLabel()} />
+        <Stat
+          label="Writing to"
+          value={effectiveDatabaseMode() === "local" ? "This terminal" : "Central database"}
+        />
       </div>
 
       <div className="flex flex-wrap gap-2">
