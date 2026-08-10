@@ -36,6 +36,7 @@ import { useUiScale } from "@/lib/use-ui-scale";
 import { useBranding, isDesktop } from "@/lib/branding";
 import { isNative } from "@/lib/native";
 import { setBranchId } from "@/lib/activity-journal";
+import { soleBranchId } from "@/lib/active-branch";
 import { flushWhatsAppQueue } from "@/lib/whatsapp";
 import { reportAppReady } from "@/lib/app-health";
 
@@ -148,7 +149,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   // A registered till fixes the branch for everyone signed in on it; otherwise
   // an account with a single assigned branch is pinned to that one.
   useEffect(() => {
-    const pinned = terminalStoreId ?? (canSwitchStores ? null : (user?.storeId ?? null));
+    const pinned =
+      terminalStoreId ?? (canSwitchStores ? null : (user?.storeId ?? soleBranchId()));
     if (user && pinned && currentStore.id !== pinned) setCurrentStore(pinned);
   }, [user, canSwitchStores, terminalStoreId, currentStore.id, setCurrentStore]);
 
