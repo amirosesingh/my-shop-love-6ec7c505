@@ -422,9 +422,13 @@ function Promotions() {
                   toast.error("Select the free product for this rule");
                   return;
                 }
-                upsertPromotion(draft);
-                setDraft(null);
-                toast.success("Promotion saved");
+                try {
+                  await upsertPromotion(draft);
+                  setDraft(null);
+                  toast.success("Promotion saved");
+                } catch (e) {
+                  notifyError(e, "Saving the promotion");
+                }
               }}
             >
               Save promotion
