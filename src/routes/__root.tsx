@@ -18,6 +18,7 @@ import { ManagerGateProvider } from "@/lib/manager-gate";
 import { AuthProvider } from "@/lib/pos-auth";
 import { PermissionsProvider } from "@/lib/pos-permissions";
 import { Toaster } from "../components/ui/sonner";
+import { ErrorNotifier } from "../components/pos/ErrorNotifier";
 import { AuditTracker } from "../components/pos/AuditTracker";
 import { TerminalActivation } from "@/components/pos/TerminalActivation";
 import { isTerminalApp } from "@/lib/native";
