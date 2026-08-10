@@ -23,6 +23,7 @@ import {
 } from "@/lib/user-sessions.functions";
 import { loadSessionToken, saveSessionToken } from "@/lib/pos-credentials";
 import { verifyCashierPin } from "@/lib/pos-cashiers";
+import { preparePinAccount } from "@/lib/staff-admin";
 import { activeBranchId, activeBranchName, bindTerminalBranch } from "@/lib/active-branch";
 import { cacheCredential, verifyCachedPin } from "@/lib/offline-credentials";
 import { recordSignIn } from "@/lib/shift-attendance";
