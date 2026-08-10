@@ -39,7 +39,12 @@ import { clearSnapshot, readSnapshot, writeSnapshot } from "./offline-snapshot";
 import { isLiveOnly } from "./live-mode";
 import { useAuth } from "@/lib/pos-auth";
 import { readTerminalConfig } from "./terminal-tokens";
-import { activeBranchId, requireBranchId, setKnownBranches } from "./active-branch";
+import {
+  activeBranchId,
+  bindTerminalBranch,
+  requireBranchId,
+  setKnownBranches,
+} from "./active-branch";
 import { isShiftOverdue, localTerminalId } from "./shift-hours";
 import { beginShiftSession, endShiftSessions } from "./shift-sessions";
 import { branchPolicy } from "./branch-policy";
@@ -408,12 +413,10 @@ export function PosProvider({ children }: { children: ReactNode }) {
     try {
       const found = await loadActiveShift(storeId);
       const fresh = justOpenedRef.current;
-      if (
-        !found &&
-        fresh &&
-        fresh.shift.storeId === storeId &&
-        Date.now() - fresh.at < 120_000
-      ) {
+      // A shift opened on this till stays open until it is closed here. A read
+      // that cannot see it yet (replica lag, offline queue) must never re-lock
+      // the register, no matter how long ago it was opened.
+      if (!found && fresh && fresh.shift.storeId === storeId) {
         setShiftReadError(null);
         setDbShift(fresh.shift);
         return;
@@ -463,6 +466,8 @@ export function PosProvider({ children }: { children: ReactNode }) {
   // A registered till trades in its own branch — pin the view to it as soon as
   // that branch exists in the directory, before any shift read runs.
   useEffect(() => {
+    // Persist the terminal's branch first so every later read has one source.
+    bindTerminalBranch();
     const bound = activeBranchId(null);
     if (!bound) return;
     // The branch is pinned even before the directory arrives — a registered
