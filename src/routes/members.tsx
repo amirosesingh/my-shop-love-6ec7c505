@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { History, Plus, Printer, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { notifyError } from "@/lib/notify";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { AppShell } from "@/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
