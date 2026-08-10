@@ -200,6 +200,7 @@ function RootComponent() {
           </FirstRunSetup>
           <AndroidUpdateBanner />
           <Toaster position="top-center" />
+          <ErrorNotifier />
           </ManagerGateProvider>
           </RulesBridge>
         </PosProvider>
