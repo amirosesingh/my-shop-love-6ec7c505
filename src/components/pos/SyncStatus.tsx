@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { CloudOff, RefreshCw, CloudCheck, TriangleAlert } from "lucide-react";
+import { CloudOff, RefreshCw, CloudCheck, TriangleAlert, Database } from "lucide-react";
 import { drainOutbox } from "@/lib/sync-engine";
+import { databaseModeLabel, effectiveDatabaseMode, subscribeDatabaseMode } from "@/lib/db-mode";
 import {
   conflictCount,
   isOnline,
@@ -16,11 +17,13 @@ export function SyncStatus({ className = "" }: { className?: string }) {
 
   useEffect(() => {
     const off = subscribeOutbox(bump);
+    const offMode = subscribeDatabaseMode(bump);
     window.addEventListener("online", bump);
     window.addEventListener("offline", bump);
     const timer = window.setInterval(bump, 10000);
     return () => {
       off();
+      offMode();
       window.removeEventListener("online", bump);
       window.removeEventListener("offline", bump);
       window.clearInterval(timer);
@@ -70,6 +73,15 @@ export function SyncStatus({ className = "" }: { className?: string }) {
         <CloudCheck className={`h-3.5 w-3.5 ${tone}`} />
       )}
       <span className={tone}>{label}</span>
+      <span
+        className="flex items-center gap-1 border-l border-border pl-1.5 text-muted-foreground"
+        title={`Database mode: ${databaseModeLabel()}`}
+      >
+        <Database
+          className={`h-3.5 w-3.5 ${effectiveDatabaseMode() === "local" ? "text-warning" : ""}`}
+        />
+        {databaseModeLabel()}
+      </span>
     </button>
   );
 }
