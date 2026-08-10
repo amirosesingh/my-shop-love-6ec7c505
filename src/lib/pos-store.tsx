@@ -586,7 +586,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       // When it claims to have reached the central database, prove it: read the
       // row back before unlocking the till. Cashiers sign in by PIN, so a
       // silently refused insert must surface as an error, not a success toast.
-      if (target === "cloud" && !(await db.shiftExists(shift.id))) {
+      if (target === "cloud" && (await db.shiftExists(shift.id)) === "no") {
         throw new Error(
           "The shift was not found in the database after saving. Nothing was opened — try again, or check this account's branch and role.",
         );
