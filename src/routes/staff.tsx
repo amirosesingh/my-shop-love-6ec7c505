@@ -681,8 +681,11 @@ function StaffManagement() {
             <ul className="max-h-[70vh] overflow-y-auto">
               {(
                 [
-                  ["Supervisors, warehouse & admins", filtered.filter((r) => r.kind === "account")],
-                  ["Cashiers", filtered.filter((r) => r.kind === "cashier")],
+                  [
+                    "Supervisors, warehouse & admins",
+                    filtered.filter((r) => r.role !== "cashier"),
+                  ],
+                  ["Cashiers", filtered.filter((r) => r.role === "cashier")],
                 ] as const
               ).flatMap(([label, group]) => [
                 <li
@@ -692,7 +695,7 @@ function StaffManagement() {
                   {label} · {group.length}
                 </li>,
                 ...group.map((r) => (
-                <li key={`${r.kind}-${r.user_id}`}>
+                <li key={r.user_id}>
                   <button
                     type="button"
                     onClick={() => setSelectedId(r.user_id)}
