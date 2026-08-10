@@ -55,6 +55,7 @@ export const RELAY_TABLES = new Set([
 const SERVICE_KEY_NAMES = [
   "POS_SUPABASE_SERVICE_ROLE_KEY",
   "POS_SERVICE_ROLE_KEY",
+  "SUPABASE_POS_SERVICE_ROLE_KEY",
 ] as const;
 
 /** Read the key at call time: some runtimes inject env per request. */
