@@ -773,10 +773,10 @@ function StaffManagement() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label>{selected.kind === "cashier" ? "Username" : "User ID"}</Label>
+                      <Label>{selected.role === "cashier" ? "Username" : "User ID"}</Label>
                       <Input className="numeric" value={selected.user_id} readOnly />
                     </div>
-                    {selected.kind === "cashier" ? (
+                    {selected.role === "cashier" ? (
                       <div className="space-y-1">
                         <Label>Login</Label>
                         <Input value="Username + 6-digit PIN" readOnly />
@@ -818,7 +818,7 @@ function StaffManagement() {
                         }
                       </p>
                     </div>
-                    {selected.kind === "cashier" ? (
+                    {selected.role === "cashier" ? (
                       <div className="space-y-1">
                         <Label>Assigned store</Label>
                         <p className="text-sm text-muted-foreground">
@@ -865,18 +865,18 @@ function StaffManagement() {
                     <div className="space-y-1">
                       <Label className="flex items-center gap-1 text-xs">
                         <KeyRound className="size-3.5" />{" "}
-                        {selected.kind === "cashier" ? "Set new 6-digit PIN" : "Set new password"}
+                        {selected.role === "cashier" ? "Set new 6-digit PIN" : "Set new password"}
                       </Label>
                       <Input
                         className="w-48"
                         type="password"
-                        inputMode={selected.kind === "cashier" ? "numeric" : undefined}
-                        maxLength={selected.kind === "cashier" ? 6 : undefined}
+                        inputMode={selected.role === "cashier" ? "numeric" : undefined}
+                        maxLength={selected.role === "cashier" ? 6 : undefined}
                         autoComplete="new-password"
                         value={passwordReset}
                         onChange={(e) =>
                           setPasswordReset(
-                            selected.kind === "cashier"
+                            selected.role === "cashier"
                               ? e.target.value.replace(/\D/g, "").slice(0, 6)
                               : e.target.value,
                           )
@@ -884,14 +884,14 @@ function StaffManagement() {
                       />
                     </div>
                     <Button variant="outline" onClick={() => void resetPassword(selected)}>
-                      {selected.kind === "cashier" ? "Update PIN" : "Update password"}
+                      {selected.role === "cashier" ? "Update PIN" : "Update password"}
                     </Button>
                     <p className="text-[11px] text-muted-foreground">
                       Credentials are stored securely and can never be read back.
                     </p>
                   </div>
 
-                  {selected.kind === "account" && (
+                  {selected.role !== "cashier" && (
                     <div className="flex flex-wrap items-end gap-3 rounded-md border border-border p-3">
                       <div className="space-y-1">
                         <Label className="flex items-center gap-1 text-xs">
