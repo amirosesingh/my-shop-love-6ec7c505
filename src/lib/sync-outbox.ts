@@ -25,6 +25,8 @@ export type QueuedOp = {
   createdAt: string;
   attempts: number;
   lastError?: string;
+  /** where this entry stands: waiting, sent and confirmed, or refused */
+  status?: "pending" | "synced" | "failed";
   /** repeatedly failing ops are parked so they cannot block the queue */
   quarantined?: boolean;
   /** branch the write happened at (multi-branch replay) */
@@ -95,6 +97,7 @@ export function enqueue(context: string, op: SyncOp): QueuedOp {
     op,
     createdAt: new Date().toISOString(),
     attempts: 0,
+    status: "pending",
     branchId: s.branchId,
     terminalId: s.terminalId,
     seq: s.seq,
@@ -128,6 +131,7 @@ export function failOp(id: string, message: string) {
             ...q,
             attempts: q.attempts + 1,
             lastError: message,
+            status: "failed",
             quarantined: q.attempts + 1 >= MAX_ATTEMPTS,
           }
         : q,
@@ -136,7 +140,11 @@ export function failOp(id: string, message: string) {
 }
 
 export function retryQuarantined() {
-  write(read().map((q) => (q.quarantined ? { ...q, attempts: 0, quarantined: false } : q)));
+  write(
+    read().map((q) =>
+      q.quarantined ? { ...q, attempts: 0, quarantined: false, status: "pending" as const } : q,
+    ),
+  );
 }
 
 export function discardQuarantined() {
