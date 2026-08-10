@@ -1297,17 +1297,18 @@ export const db = {
    * exists — a cashier must never be told "Shift opened" on a write the
    * database quietly refused.
    */
-  async shiftExists(id: string): Promise<boolean> {
+  async shiftExists(id: string): Promise<"yes" | "no" | "unknown"> {
     try {
       const res = await supabase
         .from("shifts" as never)
         .select("id")
         .eq("id", id)
         .limit(1);
-      if (res.error) return false;
-      return Array.isArray(res.data) && res.data.length > 0;
+      // A refused or failed read tells us nothing about the write itself.
+      if (res.error) return "unknown";
+      return Array.isArray(res.data) && res.data.length > 0 ? "yes" : "no";
     } catch {
-      return false;
+      return "unknown";
     }
   },
 
