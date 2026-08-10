@@ -148,7 +148,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   // A registered till fixes the branch for everyone signed in on it; otherwise
   // an account with a single assigned branch is pinned to that one.
   useEffect(() => {
-    const pinned = terminalStoreId ?? (canSwitchStores ? null : (user?.storeId ?? null));
+    const pinned =
+      terminalStoreId ?? (canSwitchStores ? null : (user?.storeId ?? soleBranchId()));
     if (user && pinned && currentStore.id !== pinned) setCurrentStore(pinned);
   }, [user, canSwitchStores, terminalStoreId, currentStore.id, setCurrentStore]);
 
