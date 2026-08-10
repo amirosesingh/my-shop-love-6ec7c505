@@ -5,6 +5,12 @@ import { drainOutbox, runOpLive } from "./sync-engine";
 import { electronDb, localDb, readBranch } from "./local-db";
 import { enqueue, listQueue, persisted, type SyncOp } from "./sync-outbox";
 import { isLiveOnly } from "./live-mode";
+import {
+  effectiveDatabaseMode,
+  isConnectionError,
+  noteConnectionLost,
+  noteConnectionRestored,
+} from "./db-mode";
 import { notifyError, showNotification } from "./notify";
 import { canRelay, relayStores } from "./sync-relay";
 import { keyset, nextCursor, PAGE_SIZE, type Cursor, type Page } from "./keyset";
@@ -880,6 +886,19 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
   }
 
   // Browser: queue to disk first (durable), then try to push it up now.
+  // In "Online only" mode the central database is tried first; the queue is
+  // still used the moment that attempt cannot reach the server.
+  if (effectiveDatabaseMode() === "online") {
+    try {
+      for (const op of ops) await runOpLive(context, op);
+      noteConnectionRestored();
+      return noteCommitTarget("cloud");
+    } catch (e) {
+      if (!isConnectionError(e)) throw e;
+      noteConnectionLost();
+      /* fall through: store it locally so nothing is lost */
+    }
+  }
   const ids = ops.map((op) => enqueue(context, op).id);
   if (!persisted(ids)) {
     throw new Error(`${context} could not be stored on this device — nothing was saved`);
