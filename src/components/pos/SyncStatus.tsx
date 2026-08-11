@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { CloudOff, RefreshCw, CloudCheck, TriangleAlert, Database } from "lucide-react";
 import { drainOutbox } from "@/lib/sync-engine";
+import { subscribeSyncState, syncState } from "@/lib/sync-status";
 import { databaseModeLabel, effectiveDatabaseMode, subscribeDatabaseMode } from "@/lib/db-mode";
 import {
   conflictCount,
@@ -18,12 +19,14 @@ export function SyncStatus({ className = "" }: { className?: string }) {
   useEffect(() => {
     const off = subscribeOutbox(bump);
     const offMode = subscribeDatabaseMode(bump);
+    const offSync = subscribeSyncState(bump);
     window.addEventListener("online", bump);
     window.addEventListener("offline", bump);
     const timer = window.setInterval(bump, 10000);
     return () => {
       off();
       offMode();
+      offSync();
       window.removeEventListener("online", bump);
       window.removeEventListener("offline", bump);
       window.clearInterval(timer);
@@ -34,14 +37,20 @@ export function SyncStatus({ className = "" }: { className?: string }) {
   const syncOn = isOnlineSyncEnabled();
   const pending = pendingCount();
   const conflicts = conflictCount();
+  const phase = syncState().phase;
+  const busy = phase === "syncing";
 
   const label = !online
     ? "Offline"
     : !syncOn
       ? "Sync paused"
-      : pending
-        ? `${pending} pending`
-        : "Synced";
+      : busy
+        ? pending
+          ? `Syncing ${pending}…`
+          : "Syncing…"
+        : pending
+          ? `${pending} pending`
+          : "Synced";
 
   const tone =
     !online || !syncOn
@@ -67,8 +76,8 @@ export function SyncStatus({ className = "" }: { className?: string }) {
         <TriangleAlert className={`h-3.5 w-3.5 ${tone}`} />
       ) : !online || !syncOn ? (
         <CloudOff className={`h-3.5 w-3.5 ${tone}`} />
-      ) : pending ? (
-        <RefreshCw className={`h-3.5 w-3.5 ${tone}`} />
+      ) : busy || pending ? (
+        <RefreshCw className={`h-3.5 w-3.5 ${tone} ${busy ? "animate-spin" : ""}`} />
       ) : (
         <CloudCheck className={`h-3.5 w-3.5 ${tone}`} />
       )}
