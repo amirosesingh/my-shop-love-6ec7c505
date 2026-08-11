@@ -26,6 +26,7 @@ import { AppShell } from "@/components/pos/AppShell";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/pos-auth";
 import { isDesktop } from "@/lib/branding";
+import { useVisibility } from "@/lib/ui-visibility";
 
 /** Settings live in categories: printer options with printing, messaging with
  *  messaging, and so on — nothing sits in an unrelated page any more. */
@@ -298,12 +299,15 @@ export const Route = createFileRoute("/settings/")({
 
 function SettingsHub() {
   const { isAdmin, can } = useAuth();
+  const { visibleRoute } = useVisibility();
   const allowed = isAdmin || can("can_access_pos_settings");
   const [desktop, setDesktop] = useState(false);
   useEffect(() => setDesktop(isDesktop()), []);
   const groups = GROUPS.map((g) => ({
     ...g,
-    pages: (g.pages as readonly SettingsPage[]).filter((p) => !(p.cloudOnly && desktop)),
+    pages: (g.pages as readonly SettingsPage[]).filter(
+      (p) => !(p.cloudOnly && desktop) && visibleRoute(p.to),
+    ),
   })).filter((g) => g.pages.length > 0);
   const [openId, setOpenId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
