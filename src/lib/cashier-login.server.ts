@@ -8,6 +8,7 @@
 import { signCashierSession } from "./pos-session.server";
 import { serviceRest } from "./pos-relay.server";
 import { startSession } from "./session-guard.server";
+import { writeSystemAudit } from "./system-audit.server";
 
 export type CashierLoginResult =
   | {
@@ -54,7 +55,20 @@ export async function cashierLoginServer(input: {
       }[]
     | null;
   const row = Array.isArray(rows) ? rows[0] : null;
-  if (!row) return { ok: false, error: "Invalid username or PIN" };
+  if (!row) {
+    // A failed sign-in is recorded too — repeated failures are the signal.
+    await writeSystemAudit({
+      actorId: username,
+      actorName: username,
+      actorRole: "unknown",
+      actionType: "auth.sign_in_failed",
+      entityAffected: "app_users",
+      entityId: username,
+      terminalId: input.terminalId ?? null,
+      note: "Invalid username or PIN",
+    });
+    return { ok: false, error: "Invalid username or PIN" };
+  }
 
   const profileResponse = await serviceRest(
     `app_users?user_id=eq.${encodeURIComponent(row.user_id)}&select=id,user_id,full_name,store_id,permissions,is_active&limit=1`,
@@ -87,6 +101,18 @@ export async function cashierLoginServer(input: {
     branchId: cashier.store_id,
     terminalId: input.terminalId ?? null,
     platform: input.platform ?? null,
+  });
+
+  await writeSystemAudit({
+    actorId: cashier.username,
+    actorName: cashier.full_name,
+    actorRole: "cashier",
+    actionType: "auth.sign_in",
+    entityAffected: "app_users",
+    entityId: cashier.username,
+    terminalId: input.terminalId ?? null,
+    storeId: cashier.store_id,
+    note: input.platform ?? null,
   });
 
   return {
