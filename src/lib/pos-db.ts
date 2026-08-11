@@ -908,6 +908,24 @@ const queue = (context: string, op: SyncOp) => {
 export type CommitTarget = "cloud" | "local" | "outbox";
 
 /**
+ * Copy rows that are already safe centrally onto this terminal, in the
+ * background. A failure here is only written to the sync log: the sale is
+ * finished and the operator must never be interrupted for it.
+ */
+export async function mirrorToLocal(context: string, ops: SyncOp[]) {
+  const bridge = localDb();
+  if (!bridge) return;
+  for (const op of ops) {
+    try {
+      const res = await bridge.write(context, op);
+      if (!res.ok) logSync("push", op.table, false, res.error ?? `${context}: local copy failed`);
+    } catch (e) {
+      logSync("push", op.table, false, `${context}: ${(e as Error)?.message ?? String(e)}`);
+    }
+  }
+}
+
+/**
  * Store a group of writes and only resolve once they are safe somewhere:
  * the cloud database, the local desktop database, or the on-disk outbox.
  *
