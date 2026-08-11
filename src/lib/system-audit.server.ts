@@ -54,8 +54,9 @@ export type SystemAuditRow = {
   action_type: string;
   entity_affected: string | null;
   entity_id: string | null;
-  old_value: Record<string, unknown> | null;
-  new_value: Record<string, unknown> | null;
+  /** Serialised so the row travels safely to the browser. */
+  old_value: string | null;
+  new_value: string | null;
   terminal_id: string | null;
   ip_address: string | null;
   store_id: string | null;
@@ -68,5 +69,11 @@ export async function readSystemAudit(limit = 200): Promise<SystemAuditRow[]> {
     `system_audit_logs?select=*&order=created_at.desc&limit=${Math.min(Math.max(limit, 1), 1000)}`,
   );
   if (!res.ok) return [];
-  return (await res.json()) as SystemAuditRow[];
+  const rows = (await res.json()) as (Omit<SystemAuditRow, "old_value" | "new_value"> & {
+    old_value?: unknown;
+    new_value?: unknown;
+  })[];
+  const text = (v: unknown) =>
+    v === null || v === undefined ? null : typeof v === "string" ? v : JSON.stringify(v);
+  return rows.map((r) => ({ ...r, old_value: text(r.old_value), new_value: text(r.new_value) }));
 }
