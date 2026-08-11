@@ -54,8 +54,8 @@ export type SystemAuditRow = {
   action_type: string;
   entity_affected: string | null;
   entity_id: string | null;
-  old_value: unknown;
-  new_value: unknown;
+  old_value: Record<string, unknown> | null;
+  new_value: Record<string, unknown> | null;
   terminal_id: string | null;
   ip_address: string | null;
   store_id: string | null;
