@@ -1,13 +1,10 @@
-/**
- * Staff accounts as one roster: create people, switch them on or off, and
- * bring any leftover old cashier records onto real accounts.
- */
-import { useCallback, useEffect, useState } from "react";
-import { KeyRound, Loader2, RefreshCw, UserPlus, Users } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { KeyRound, Loader2, Pencil, Plus, RefreshCw, Search, Trash2, UserX } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -28,47 +25,85 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { supabaseExternal } from "@/integrations/supabase/external-client";
-import { usePos } from "@/lib/pos-store";
 import { notifyError } from "@/lib/notify";
+import {
+  PERMISSION_GROUPS,
+  PERMISSION_LABELS,
+  fromDbRole,
+  normalizePermissions,
+  rolePermissions,
+  type PermissionKey,
+  type StaffPermissions,
+  type StaffRole,
+} from "@/lib/permissions";
+import { useAuth } from "@/lib/pos-auth";
+import { usePos } from "@/lib/pos-store";
+import { getRolesWithPermissions, type RoleDef } from "@/lib/role-admin";
 import {
   createStaffMember,
   looksLikeEmail,
-  migrateLegacyCashiers,
+  permanentlyDeleteStaffMember,
   toggleStaffStatus,
+  updateStaffMember,
 } from "@/lib/staff-admin";
-import { getRolesWithPermissions, type RoleDef } from "@/lib/role-admin";
 
 type Row = {
+  auth_user_id: string | null;
   user_id: string;
   full_name: string;
-  role: string;
+  role: StaffRole;
   role_slug: string;
   email: string;
   store_id: string | null;
   is_active: boolean;
+  permissions: StaffPermissions;
+  pin_length: number;
+  last_login_at: string | null;
 };
 
-const EMPTY = {
+type Form = {
+  displayName: string;
+  username: string;
+  credential: string;
+  roleSlug: string;
+  branchId: string;
+  active: boolean;
+};
+
+const EMPTY: Form = {
   displayName: "",
   username: "",
-  pin: "",
-  password: "",
+  credential: "",
   roleSlug: "cashier",
   branchId: "none",
   active: true,
 };
 
+const friendlyError = (error: unknown): string => {
+  const raw = error instanceof Error ? error.message : String(error ?? "Unexpected error");
+  if (raw.includes("DEACTIVATE_ACCOUNT_FIRST")) return "Deactivate this account before deleting it.";
+  if (raw.includes("CANNOT_DELETE_CURRENT_ACCOUNT")) return "You cannot delete the account currently signed in.";
+  if (raw.includes("CANNOT_DELETE_LAST_ADMIN")) return "The last active administrator cannot be deleted.";
+  if (raw.includes("duplicate") || raw.includes("already")) return "That username or email is already in use.";
+  if (raw.includes("STAFF_NAME_REQUIRED")) return "Display name is required.";
+  if (raw.includes("STAFF_ROLE_REQUIRED")) return "Choose a valid role.";
+  return raw;
+};
+
 export function StaffManager() {
   const { stores } = usePos();
+  const { authUserId } = useAuth();
   const [rows, setRows] = useState<Row[]>([]);
   const [roles, setRoles] = useState<RoleDef[]>([]);
+  const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
-  const [open, setOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ ...EMPTY });
-  const [pinFor, setPinFor] = useState<Row | null>(null);
-  const [newPin, setNewPin] = useState("");
+  const [form, setForm] = useState<Form>({ ...EMPTY });
+  const [editing, setEditing] = useState<Row | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [permissionsFor, setPermissionsFor] = useState<Row | null>(null);
+  const [deleteFor, setDeleteFor] = useState<Row | null>(null);
+  const [confirmation, setConfirmation] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -79,352 +114,235 @@ export function StaffManager() {
       ]);
       if (error) throw error;
       setRoles(roleList);
-      setRows(
-        ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+      setRows(((data ?? []) as Record<string, unknown>[]).map((r) => {
+        const role = fromDbRole(String(r["role"] ?? "staff"));
+        return {
+          auth_user_id: (r["auth_user_id"] as string | null) ?? null,
           user_id: String(r["user_id"] ?? ""),
           full_name: String(r["full_name"] ?? ""),
-          role: String(r["role"] ?? "staff"),
-          role_slug: String(r["role_slug"] ?? r["role"] ?? "cashier"),
+          role,
+          role_slug: String(r["role_slug"] ?? role),
           email: String(r["email"] ?? ""),
           store_id: (r["store_id"] as string | null) ?? null,
           is_active: r["is_active"] !== false,
-        })),
-      );
-    } catch (e) {
-      notifyError(e, "The staff roster could not be loaded");
+          permissions: normalizePermissions(r["permissions"] as Record<string, unknown> | null, role),
+          pin_length: Number(r["pin_length"] ?? 0),
+          last_login_at: (r["last_login_at"] as string | null) ?? null,
+        };
+      }));
+    } catch (error) {
+      notifyError(error, "Could not load staff accounts");
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
-  const create = async () => {
-    const role = roles.find((r) => r.slug === form.roleSlug);
-    setSaving(true);
-    try {
-      await createStaffMember({
-        displayName: form.displayName.trim(),
-        username: form.username.trim().toLowerCase(),
-        pin: form.pin,
-        password: form.password,
-        branchId: form.branchId === "none" ? null : form.branchId,
-        roleSlug: form.roleSlug,
-        baseRole: role?.baseLevel ?? "cashier",
-        active: form.active,
-      });
-      toast.success(
-        emailMode
-          ? `${form.displayName || form.username} will receive a confirmation email`
-          : `${form.displayName || form.username} can now sign in with their PIN`,
-      );
-      setOpen(false);
-      setForm({ ...EMPTY });
-      void load();
-    } catch (e) {
-      notifyError(e, "The account could not be created");
-    } finally {
-      setSaving(false);
-    }
+  const filtered = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return rows.filter((row) => `${row.full_name} ${row.user_id} ${row.email} ${row.role_slug}`.toLowerCase().includes(needle));
+  }, [query, rows]);
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm({ ...EMPTY });
+    setFormOpen(true);
   };
 
-  /** Re-set someone's PIN without ever showing the old one. */
-  const changePin = async () => {
-    if (!pinFor) return;
-    const role = roles.find((r) => r.slug === pinFor.role_slug);
-    setSaving(true);
+  const openEdit = (row: Row) => {
+    setEditing(row);
+    setForm({
+      displayName: row.full_name,
+      username: row.user_id,
+      credential: "",
+      roleSlug: row.role_slug,
+      branchId: row.store_id ?? "none",
+      active: row.is_active,
+    });
+    setFormOpen(true);
+  };
+
+  const selectedRole = roles.find((role) => role.slug === form.roleSlug);
+  const emailMode = editing ? !editing.email.endsWith("@pos-internal.local") : looksLikeEmail(form.username);
+  const nameValid = form.displayName.trim().length > 0;
+  const identifierValid = emailMode
+    ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.username.trim())
+    : /^[a-z0-9._-]{2,40}$/.test(form.username.trim().toLowerCase());
+  const credentialValid = editing && !form.credential
+    ? true
+    : emailMode
+      ? form.credential.length >= 8
+      : /^\d{4,6}$/.test(form.credential);
+  const canSave = nameValid && identifierValid && credentialValid && !!selectedRole;
+
+  const save = async () => {
+    if (!canSave || !selectedRole) return;
+    setBusy("save");
     try {
-      await createStaffMember({
-        displayName: pinFor.full_name || pinFor.user_id,
-        username: pinFor.user_id,
-        pin: newPin,
-        branchId: pinFor.store_id,
-        roleSlug: role?.slug ?? "cashier",
-        baseRole: role?.baseLevel ?? "cashier",
-        active: pinFor.is_active,
+      if (editing) {
+        await updateStaffMember({
+          username: editing.user_id,
+          displayName: form.displayName.trim(),
+          branchId: form.branchId === "none" ? null : form.branchId,
+          roleSlug: selectedRole.slug,
+          baseRole: selectedRole.baseLevel,
+          active: form.active,
+          ...(form.credential ? { credential: form.credential } : {}),
+        });
+        if (editing.role_slug !== selectedRole.slug) {
+          const permissions = selectedRole.permissions ?? rolePermissions(selectedRole.baseLevel);
+          const { error } = await supabaseExternal.rpc("set_app_user_permissions", {
+            p_user_id: editing.user_id,
+            p_permissions: permissions,
+          });
+          if (error) throw error;
+        }
+        toast.success("Account updated");
+      } else {
+        await createStaffMember({
+          displayName: form.displayName.trim(),
+          username: form.username.trim().toLowerCase(),
+          ...(emailMode ? { password: form.credential } : { pin: form.credential }),
+          branchId: form.branchId === "none" ? null : form.branchId,
+          roleSlug: selectedRole.slug,
+          baseRole: selectedRole.baseLevel,
+          active: form.active,
+        });
+        toast.success("Account created");
+      }
+      setFormOpen(false);
+      setForm({ ...EMPTY });
+      await load();
+    } catch (error) {
+      toast.error(editing ? "Account could not be updated" : "Account could not be created", {
+        description: friendlyError(error),
       });
-      toast.success("The new PIN is ready to use");
-      setPinFor(null);
-      setNewPin("");
-    } catch (e) {
-      notifyError(e, "That PIN could not be changed");
     } finally {
-      setSaving(false);
+      setBusy("");
     }
   };
 
   const setActive = async (row: Row, active: boolean) => {
     setBusy(row.user_id);
-    setRows((rs) => rs.map((r) => (r.user_id === row.user_id ? { ...r, is_active: active } : r)));
     try {
       await toggleStaffStatus(row.user_id, active);
-    } catch (e) {
-      notifyError(e, "That account could not be updated");
-      void load();
+      toast.success(active ? "Account activated" : "Account deactivated");
+      await load();
+    } catch (error) {
+      toast.error("Account status could not be changed", { description: friendlyError(error) });
     } finally {
       setBusy("");
     }
   };
 
-  const migrate = async () => {
-    setBusy("migrate");
+  const savePermissions = async () => {
+    if (!permissionsFor) return;
+    setBusy("permissions");
+    const { error } = await supabaseExternal.rpc("set_app_user_permissions", {
+      p_user_id: permissionsFor.user_id,
+      p_permissions: permissionsFor.permissions,
+    });
+    setBusy("");
+    if (error) {
+      notifyError(error, "Could not save permissions");
+      return;
+    }
+    setRows((current) => current.map((row) => row.user_id === permissionsFor.user_id ? permissionsFor : row));
+    setPermissionsFor(null);
+    toast.success("Permissions updated");
+  };
+
+  const remove = async () => {
+    if (!deleteFor || confirmation !== deleteFor.user_id) return;
+    setBusy("delete");
     try {
-      const n = await migrateLegacyCashiers();
-      toast.success(n ? `${n} cashier account(s) brought across` : "Everyone already has an account");
-      void load();
-    } catch (e) {
-      notifyError(e, "The old cashier records could not be brought across");
+      await permanentlyDeleteStaffMember(deleteFor.user_id);
+      toast.success("Inactive account permanently deleted");
+      setDeleteFor(null);
+      setConfirmation("");
+      await load();
+    } catch (error) {
+      toast.error("Account could not be deleted", { description: friendlyError(error) });
     } finally {
       setBusy("");
     }
   };
-
-  const identifier = form.username.trim().toLowerCase();
-  const emailMode = looksLikeEmail(identifier);
-  const pinValid = /^\d{4,6}$/.test(form.pin);
-  const canCreate = emailMode ? form.password.length >= 8 : pinValid && identifier.length >= 2;
 
   return (
-    <section className="space-y-4 rounded-lg border border-border bg-card p-5">
+    <section className="space-y-4 rounded-lg border border-border bg-card p-4 sm:p-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold">Staff accounts</h2>
-          <p className="text-xs text-muted-foreground">
-            Everyone signs in with their own verified account — cashiers with a 4-digit PIN.
-          </p>
+          <h2 className="text-sm font-semibold">Accounts</h2>
+          <p className="text-xs text-muted-foreground">Create, edit, deactivate and manage every staff sign-in.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => void migrate()} disabled={!!busy}>
-            {busy === "migrate" ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Users className="size-4" />
-            )}
-            Bring old cashiers across
-          </Button>
+        <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
-            {loading ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <RefreshCw className="size-4" />
-            )}
-            Refresh
+            {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />} Refresh
           </Button>
-          <Button size="sm" onClick={() => setOpen(true)}>
-            <UserPlus className="size-4" /> New staff
-          </Button>
+          <Button size="sm" onClick={openCreate}><Plus className="size-4" /> New account</Button>
         </div>
       </header>
-
       <Separator />
-
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
+        <Input className="pl-9" placeholder="Search name, username, email or role" value={query} onChange={(e) => setQuery(e.target.value)} />
+      </div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[560px] text-sm">
-          <thead>
-            <tr className="border-b border-border text-left text-xs text-muted-foreground">
-              <th className="py-2">Name</th>
-              <th className="py-2">Username / email</th>
-              <th className="py-2">Level</th>
-              <th className="py-2">Branch</th>
-              <th className="py-2">Sign-in</th>
-              <th className="py-2 text-right">Active</th>
-            </tr>
-          </thead>
+        <table className="w-full min-w-[860px] text-sm">
+          <thead><tr className="border-b border-border text-left text-xs text-muted-foreground">
+            <th className="py-2">Staff</th><th>Sign-in</th><th>Role</th><th>Branch</th><th>Last login</th><th>Status</th><th className="text-right">Actions</th>
+          </tr></thead>
           <tbody>
-            {rows.map((r) => (
-              <tr key={r.user_id} className="border-b border-border/60">
-                <td className="py-2 pr-2">{r.full_name || r.user_id}</td>
-                <td className="numeric py-2 pr-2 text-muted-foreground">{r.user_id}</td>
-                <td className="py-2 pr-2">
-                  <Badge variant="outline" className="text-[10px] capitalize">
-                    {r.role}
-                  </Badge>
-                </td>
-                <td className="py-2 pr-2 text-muted-foreground">
-                  {stores.find((s) => s.id === r.store_id)?.name ?? "All branches"}
-                </td>
-                <td className="py-2 pr-2">
-                  {r.email && !r.email.endsWith("@pos-internal.local") ? (
-                    <span className="text-xs text-muted-foreground">Email &amp; password</span>
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 text-[11px]"
-                      onClick={() => {
-                        setPinFor(r);
-                        setNewPin("");
-                      }}
-                    >
-                      <KeyRound className="size-3.5" /> PIN set · Change
-                    </Button>
-                  )}
-                </td>
-                <td className="py-2 text-right">
-                  <Switch
-                    checked={r.is_active}
-                    disabled={busy === r.user_id}
-                    onCheckedChange={(v) => void setActive(r, v)}
-                    aria-label={`${r.full_name || r.user_id} active`}
-                  />
-                </td>
-              </tr>
-            ))}
-            {!loading && !rows.length && (
-              <tr>
-                <td colSpan={6} className="py-6 text-center text-muted-foreground">
-                  No staff accounts yet.
-                </td>
-              </tr>
-            )}
+            {filtered.map((row) => {
+              const terminal = row.email.endsWith("@pos-internal.local");
+              return <tr key={row.user_id} className="border-b border-border/60">
+                <td className="py-3 pr-3"><p className="font-medium">{row.full_name}</p><p className="text-xs text-muted-foreground">{row.user_id}</p></td>
+                <td className="pr-3"><Badge variant="outline">{terminal ? `PIN · ${row.pin_length || 4} digits` : "Email & password"}</Badge></td>
+                <td className="pr-3">{roles.find((role) => role.slug === row.role_slug)?.name ?? row.role_slug}</td>
+                <td className="pr-3">{stores.find((store) => store.id === row.store_id)?.name ?? "All branches"}</td>
+                <td className="pr-3 text-xs text-muted-foreground">{row.last_login_at ? new Date(row.last_login_at).toLocaleString() : "Never"}</td>
+                <td className="pr-3"><Switch checked={row.is_active} disabled={busy === row.user_id || row.auth_user_id === authUserId} onCheckedChange={(active) => void setActive(row, active)} aria-label={`${row.full_name} active`} /></td>
+                <td><div className="flex justify-end gap-1">
+                  <Button size="icon" variant="ghost" title="Edit account" onClick={() => openEdit(row)}><Pencil className="size-4" /></Button>
+                  <Button size="icon" variant="ghost" title="Edit permissions" onClick={() => setPermissionsFor({ ...row, permissions: { ...row.permissions } })}><KeyRound className="size-4" /></Button>
+                  {!row.is_active && <Button size="icon" variant="ghost" title="Delete inactive account" disabled={row.auth_user_id === authUserId} onClick={() => { setDeleteFor(row); setConfirmation(""); }}><Trash2 className="size-4 text-destructive" /></Button>}
+                </div></td>
+              </tr>;
+            })}
+            {!loading && filtered.length === 0 && <tr><td colSpan={7} className="py-8 text-center text-muted-foreground">No matching staff accounts.</td></tr>}
           </tbody>
         </table>
       </div>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>New staff member</DialogTitle>
-            <DialogDescription>
-              A username creates a till account that signs in with a PIN straight away. A real
-              email address creates a back-office account with its own password and a
-              confirmation email.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <Label htmlFor="sm-name">Display name</Label>
-              <Input
-                id="sm-name"
-                value={form.displayName}
-                onChange={(e) => setForm({ ...form, displayName: e.target.value })}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="sm-user">Username or email address</Label>
-              <Input
-                id="sm-user"
-                placeholder="cashier101 or owner@store.com"
-                value={form.username}
-                onChange={(e) =>
-                  setForm({ ...form, username: e.target.value.replace(/\s+/g, "") })
-                }
-              />
-              <p className="text-[11px] text-muted-foreground">
-                {emailMode
-                  ? "This person signs in with their email address and password, and must confirm the email first."
-                  : "No “@” means a till account: the person taps their name and PIN on the terminal."}
-              </p>
-            </div>
-            {emailMode ? (
-              <div className="space-y-1">
-                <Label htmlFor="sm-password">Password</Label>
-                <Input
-                  id="sm-password"
-                  type="password"
-                  autoComplete="new-password"
-                  value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
-                />
-                <p className="text-[11px] text-muted-foreground">At least 8 characters.</p>
-              </div>
-            ) : (
-              <div className="space-y-1">
-                <Label htmlFor="sm-pin">PIN (4 to 6 digits)</Label>
-                <Input
-                  id="sm-pin"
-                  type="password"
-                  inputMode="numeric"
-                  maxLength={6}
-                  autoComplete="new-password"
-                  value={form.pin}
-                  onChange={(e) =>
-                    setForm({ ...form, pin: e.target.value.replace(/\D/g, "").slice(0, 6) })
-                  }
-                />
-              </div>
-            )}
-            <div className="space-y-1">
-              <Label>Role</Label>
-              <Select
-                value={form.roleSlug}
-                onValueChange={(v) => setForm({ ...form, roleSlug: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {roles.map((r) => (
-                    <SelectItem key={r.slug} value={r.slug}>
-                      {r.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Branch</Label>
-              <Select
-                value={form.branchId}
-                onValueChange={(v) => setForm({ ...form, branchId: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">All branches</SelectItem>
-                  {stores.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.code} · {s.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <label className="flex items-center justify-between rounded-md border border-border p-3 text-sm">
-              Activate immediately
-              <Switch
-                checked={form.active}
-                onCheckedChange={(v) => setForm({ ...form, active: v })}
-              />
-            </label>
+      <Dialog open={formOpen} onOpenChange={(open) => { if (!busy) setFormOpen(open); }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader><DialogTitle>{editing ? "Edit account" : "Create account"}</DialogTitle><DialogDescription>{editing ? "Update profile, access and credentials. Leave the credential blank to keep it unchanged." : "Use a username for terminal PIN sign-in or a real email for password sign-in."}</DialogDescription></DialogHeader>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1 sm:col-span-2"><Label htmlFor="staff-name">Display name *</Label><Input id="staff-name" maxLength={120} value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} aria-invalid={!nameValid} />{!nameValid && <p className="text-xs text-destructive">Display name is required.</p>}</div>
+            <div className="space-y-1"><Label htmlFor="staff-identifier">Username or email *</Label><Input id="staff-identifier" disabled={!!editing} value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value.replace(/\s+/g, "") })} aria-invalid={!identifierValid} />{!identifierValid && <p className="text-xs text-destructive">Enter a valid username or email.</p>}</div>
+            <div className="space-y-1"><Label htmlFor="staff-credential">{emailMode ? "Password" : "PIN (4–6 digits)"}{editing ? "" : " *"}</Label><Input id="staff-credential" type="password" inputMode={emailMode ? undefined : "numeric"} maxLength={emailMode ? 200 : 6} autoComplete="new-password" value={form.credential} onChange={(e) => setForm({ ...form, credential: emailMode ? e.target.value : e.target.value.replace(/\D/g, "").slice(0, 6) })} aria-invalid={!credentialValid} />{!credentialValid && <p className="text-xs text-destructive">{emailMode ? "Use at least 8 characters." : "Use 4 to 6 digits."}</p>}</div>
+            <div className="space-y-1"><Label>Role *</Label><Select value={form.roleSlug} onValueChange={(roleSlug) => setForm({ ...form, roleSlug })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{roles.map((role) => <SelectItem key={role.slug} value={role.slug}>{role.name}</SelectItem>)}</SelectContent></Select></div>
+            <div className="space-y-1"><Label>Branch</Label><Select value={form.branchId} onValueChange={(branchId) => setForm({ ...form, branchId })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">All branches</SelectItem>{stores.map((store) => <SelectItem key={store.id} value={store.id}>{store.code} · {store.name}</SelectItem>)}</SelectContent></Select></div>
+            <label className="flex items-center justify-between rounded-md border border-border p-3 text-sm sm:col-span-2">Active immediately<Switch checked={form.active} onCheckedChange={(active) => setForm({ ...form, active })} /></label>
           </div>
-          <DialogFooter>
-            <Button onClick={() => void create()} disabled={saving || !canCreate}>
-              {saving && <Loader2 className="size-4 animate-spin" />} Create account
-            </Button>
-          </DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setFormOpen(false)} disabled={busy === "save"}>Cancel</Button><Button onClick={() => void save()} disabled={!canSave || busy === "save"}>{busy === "save" && <Loader2 className="size-4 animate-spin" />}{editing ? "Save changes" : "Create account"}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!pinFor} onOpenChange={(v) => !v && setPinFor(null)}>
-        <DialogContent className="sm:max-w-xs">
-          <DialogHeader>
-            <DialogTitle>Change PIN</DialogTitle>
-            <DialogDescription>
-              {pinFor?.full_name || pinFor?.user_id} will use the new PIN at the next sign-in.
-              Existing PINs are never shown.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-1">
-            <Label htmlFor="sm-newpin">New PIN (4 to 6 digits)</Label>
-            <Input
-              id="sm-newpin"
-              type="password"
-              inputMode="numeric"
-              maxLength={6}
-              autoComplete="new-password"
-              value={newPin}
-              onChange={(e) => setNewPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
-            />
-          </div>
-          <DialogFooter>
-            <Button onClick={() => void changePin()} disabled={saving || !/^\d{4,6}$/.test(newPin)}>
-              {saving && <Loader2 className="size-4 animate-spin" />} Save PIN
-            </Button>
-          </DialogFooter>
+      <Dialog open={!!permissionsFor} onOpenChange={(open) => { if (!open && busy !== "permissions") setPermissionsFor(null); }}>
+        <DialogContent className="max-h-[86vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader><DialogTitle>Permissions · {permissionsFor?.full_name}</DialogTitle><DialogDescription>Changes apply to this account only. Administrators always retain full access.</DialogDescription></DialogHeader>
+          <div className="space-y-3">{permissionsFor && PERMISSION_GROUPS.map((group) => <section key={group.id} className="rounded-md border border-border"><h3 className="border-b border-border px-3 py-2 text-sm font-semibold">{group.label}</h3><div className="grid gap-2 p-3 sm:grid-cols-2">{group.keys.map((key) => <label key={key} className="flex items-center gap-2 text-sm"><Checkbox checked={permissionsFor.role === "admin" || permissionsFor.permissions[key as PermissionKey]} disabled={permissionsFor.role === "admin"} onCheckedChange={(checked) => setPermissionsFor({ ...permissionsFor, permissions: { ...permissionsFor.permissions, [key]: checked === true } })} /><span>{PERMISSION_LABELS[key as PermissionKey]}</span></label>)}</div></section>)}</div>
+          <DialogFooter><Button variant="outline" onClick={() => setPermissionsFor(null)}>Cancel</Button><Button onClick={() => void savePermissions()} disabled={busy === "permissions"}>{busy === "permissions" && <Loader2 className="size-4 animate-spin" />}Save permissions</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!deleteFor} onOpenChange={(open) => { if (!open && busy !== "delete") setDeleteFor(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Permanently delete account?</DialogTitle><DialogDescription>This inactive account and its login identity will be removed. Sales and audit history keep their recorded staff name.</DialogDescription></DialogHeader>
+          <div className="space-y-2"><Label htmlFor="delete-confirm">Type <span className="font-mono font-semibold">{deleteFor?.user_id}</span> to confirm</Label><Input id="delete-confirm" value={confirmation} onChange={(e) => setConfirmation(e.target.value)} /></div>
+          <DialogFooter><Button variant="outline" onClick={() => setDeleteFor(null)}>Cancel</Button><Button variant="destructive" onClick={() => void remove()} disabled={!deleteFor || confirmation !== deleteFor.user_id || busy === "delete"}>{busy === "delete" ? <Loader2 className="size-4 animate-spin" /> : <UserX className="size-4" />}Delete permanently</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </section>
