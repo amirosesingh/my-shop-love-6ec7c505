@@ -18,6 +18,7 @@ import { SecurityAlertBell } from "@/components/pos/SecurityAlertBell";
 import { ShiftGuard } from "@/components/pos/ShiftGuard";
 import { PermissionDenied } from "@/components/pos/PermissionGate";
 import { useVisibility } from "@/lib/ui-visibility";
+import { roleHasTag, tagOfPermission, type StaffRole } from "@/lib/permissions";
 import { LiveClock } from "@/components/pos/LiveClock";
 import { ThemeToggle } from "@/components/pos/ThemeToggle";
 import { startSyncEngine } from "@/lib/sync-engine";
