@@ -401,6 +401,29 @@ IF COL_LENGTH('dbo.sale_items', 'unit_cost') IS NULL
   ALTER TABLE dbo.sale_items ADD unit_cost DECIMAL(18, 4) NOT NULL DEFAULT 0;
 GO
 
+/* ------------------------------------------------------------------
+   Bill identity — one checkout attempt, one bill. The attempt id is
+   written by the till before the save, so a retry after a network drop
+   updates the same row instead of creating a second bill. Both keys are
+   unique here exactly as they are in the central database.
+   ------------------------------------------------------------------ */
+IF COL_LENGTH('dbo.sales', 'client_transaction_id') IS NULL
+  ALTER TABLE dbo.sales ADD client_transaction_id NVARCHAR(80) NULL;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UX_sales_client_txn'
+                 AND object_id = OBJECT_ID('dbo.sales'))
+  CREATE UNIQUE INDEX UX_sales_client_txn ON dbo.sales (client_transaction_id)
+    WHERE client_transaction_id IS NOT NULL;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UX_sales_bill_number'
+                 AND object_id = OBJECT_ID('dbo.sales'))
+   AND NOT EXISTS (SELECT 1 FROM (SELECT bill_number FROM dbo.sales
+                                   GROUP BY bill_number HAVING COUNT(*) > 1) d)
+  CREATE UNIQUE INDEX UX_sales_bill_number ON dbo.sales (bill_number);
+GO
+
 /* Friendly branch-facing names used by the offline checkout path.
    Single-table views, so INSERT/UPDATE flow straight through. */
 IF OBJECT_ID('dbo.BranchSales', 'V') IS NOT NULL DROP VIEW dbo.BranchSales;

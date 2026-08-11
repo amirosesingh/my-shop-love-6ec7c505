@@ -41,6 +41,31 @@ function assertTable(table) {
   return table;
 }
 
+/**
+ * Which columns each local table really has. The cloud schema moves ahead of
+ * an installed terminal, so a write carrying a newer column must drop it here
+ * rather than fail the whole sale.
+ */
+const columnCache = new Map();
+
+async function tableColumns(table) {
+  if (columnCache.has(table)) return columnCache.get(table);
+  const res = await getPool()
+    .request()
+    .input("t", sql.NVarChar, table)
+    .query(
+      "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = @t;",
+    );
+  const set = new Set(res.recordset.map((r) => r.COLUMN_NAME.toLowerCase()));
+  columnCache.set(table, set);
+  return set;
+}
+
+/** Called after schema.sql runs so newly added columns become visible. */
+function forgetColumnCache() {
+  columnCache.clear();
+}
+
 /** Picks a driver type so values bind safely instead of being interpolated. */
 function bind(request, name, value) {
   if (value === null || value === undefined) return request.input(name, sql.NVarChar, null);
@@ -85,7 +110,10 @@ function parseJsonColumns(table, row) {
 async function upsertRow(tx, table, row, { markPending = true } = {}) {
   assertTable(table);
   const record = normaliseRow(table, row);
-  const columns = Object.keys(record).filter((c) => !SYNC_COLUMNS.has(c));
+  const known = await tableColumns(table);
+  const columns = Object.keys(record).filter(
+    (c) => !SYNC_COLUMNS.has(c) && known.has(c.toLowerCase()),
+  );
   if (!columns.includes("id")) columns.unshift("id");
 
   const request = new sql.Request(tx);
@@ -113,12 +141,15 @@ async function upsertRow(tx, table, row, { markPending = true } = {}) {
 
 async function updateRows(tx, table, values, match) {
   assertTable(table);
+  const known = await tableColumns(table);
   const request = new sql.Request(tx);
   const sets = [];
   for (const [key, value] of Object.entries(values)) {
+    if (!known.has(key.toLowerCase())) continue;
     bind(request, `set_${key}`, value);
     sets.push(`[${key}] = @set_${key}`);
   }
+  if (!sets.length) return;
   const wheres = [];
   for (const [key, value] of Object.entries(match)) {
     bind(request, `w_${key}`, value);

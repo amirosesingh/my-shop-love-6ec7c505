@@ -40,6 +40,7 @@ import { clearSnapshot, readSnapshot, writeSnapshot } from "./offline-snapshot";
 import { isLiveOnly } from "./live-mode";
 import { useAuth } from "@/lib/pos-auth";
 import { readTerminalConfig } from "./terminal-tokens";
+import { nextBillNumber } from "./bill-number";
 import { loadCashierToken, loadSessionToken } from "./pos-credentials";
 import {
   activeBranchId,
@@ -262,6 +263,11 @@ export function PosProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+    // A read that never answers must not keep the till on the loader: after
+    // this the app opens on whatever data it already has.
+    const watchdog = window.setTimeout(() => {
+      if (!cancelled) setReady(true);
+    }, 15000);
     // Local-only slices (stores, shifts, transfers, counters) stay on the
     // terminal; catalogue, members, bills, promos and settings come from cloud.
     try {
@@ -346,6 +352,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
 
     return () => {
       cancelled = true;
+      window.clearTimeout(watchdog);
     };
   }, [signedIn, authReady]);
 
@@ -743,9 +750,13 @@ export function PosProvider({ children }: { children: ReactNode }) {
           0,
       })),
       id: crypto.randomUUID(),
-      receiptNo: `${(store?.receiptPrefix?.trim() || store?.code || "R").toUpperCase()}-${String(
-        counter,
-      ).padStart(6, "0")}`,
+      // Branch + platform + terminal + day + sequence, so two registers can
+      // never mint the same bill number, online or off.
+      receiptNo: nextBillNumber(
+        store?.receiptPrefix?.trim() || store?.code || "R",
+        snapshot.sales.map((s) => s.receiptNo),
+      ),
+      clientTxnId: input.clientTxnId ?? crypto.randomUUID(),
       createdAt: new Date().toISOString(),
     };
 

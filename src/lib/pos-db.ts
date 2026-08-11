@@ -443,7 +443,7 @@ const shiftSessionToRow = (s: ShiftSession): Row => ({
  * schema that grows new columns never inflates the payload of every read.
  */
 const SALE_COLUMNS =
-  "id, bill_number, store_id, shift_id, cashier_name, member_id, subtotal_amount, " +
+  "id, bill_number, client_transaction_id, store_id, shift_id, cashier_name, member_id, subtotal_amount, " +
   "discount_amount, tax_amount, total_amount, paid_amount, change_amount, payment_type, " +
   "payments, points_earned, is_refunded, original_bill_number, exchanged_to_bill_number, " +
   "exchange_credit, coupon_code, coupon_promo_id, coupon_scope, coupon_discount, created_at, " +
@@ -453,6 +453,7 @@ const SALE_COLUMNS =
 const rowToSale = (r: Row): Sale => ({
   id: r.id,
   receiptNo: r.bill_number,
+  clientTxnId: r.client_transaction_id ?? undefined,
   storeId: r.store_id ?? "",
   shiftId: r.shift_id ?? "",
   lines: ((r.sale_items ?? []) as Row[]).map((l) => ({
@@ -495,6 +496,7 @@ const rowToSale = (r: Row): Sale => ({
 const saleToRow = (s: Sale): Row => ({
   id: s.id,
   bill_number: s.receiptNo,
+  client_transaction_id: s.clientTxnId ?? null,
   member_id: s.memberId,
   store_id: s.storeId,
   shift_id: s.shiftId,
@@ -1395,6 +1397,10 @@ export const db = {
 
   /** Save a completed bill and wait until it is stored somewhere. */
   async commitSale(sale: Sale, products: Product[], member: Member | null): Promise<CommitTarget> {
+    // A retried checkout (double click, network drop) must never bill twice:
+    // if this attempt already reached the central database, stop here.
+    if (sale.clientTxnId && (await db.saleAttemptExists(sale.clientTxnId)) === "yes")
+      return "cloud";
     const ops: SyncOp[] = [
       { kind: "insert", table: "sales", rows: [saleToRow(sale)] },
       { kind: "insert", table: "sale_items", rows: saleItemRows(sale) },
@@ -1410,6 +1416,25 @@ export const db = {
         match: { bill_number: sale.exchangeOfReceiptNo },
       });
     return commitOps("Saving sale", ops);
+  },
+
+  /**
+   * Has this checkout attempt already been stored centrally? "unknown" when
+   * the read itself failed — the caller then saves as usual, and the unique
+   * index on the attempt id is the final guard against a duplicate.
+   */
+  async saleAttemptExists(clientTxnId: string): Promise<"yes" | "no" | "unknown"> {
+    try {
+      const res = await supabase
+        .from("sales" as never)
+        .select("id")
+        .eq("client_transaction_id", clientTxnId)
+        .limit(1);
+      if (res.error) return "unknown";
+      return Array.isArray(res.data) && res.data.length > 0 ? "yes" : "no";
+    } catch {
+      return "unknown";
+    }
   },
 
   /** Save a shift open/close and wait until it is stored somewhere. */
