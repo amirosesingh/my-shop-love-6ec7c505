@@ -1,44 +1,38 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-const input = z.object({
-  username: z.string().min(1).max(64),
-  pin: z.string().regex(/^\d{6}$/),
-});
-
 /**
  * Mints a signed terminal session for a cashier after the PIN has been
  * verified server-side. Privileged server functions accept this token in
  * place of a Supabase access token.
  */
 export const issueCashierSession = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => input.parse(data))
+  .inputValidator((data: unknown) =>
+    z.object({
+      username: z.string().min(1).max(64),
+      pin: z.string().regex(/^\d{4,6}$/),
+    }).parse(data),
+  )
   .handler(async ({ data }) => {
-    const { supabaseConfig } = await import(
-      "./external-supabase-config"
-    );
     const { signCashierSession } = await import("./pos-session.server");
+    const { serviceRest } = await import("./pos-relay.server");
     try {
-      const res = await fetch(`${supabaseConfig().url}/rest/v1/rpc/verify_cashier_pin`, {
+      const res = await serviceRest("rpc/verify_terminal_pin", {
         method: "POST",
-        headers: {
-          apikey: supabaseConfig().key,
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({
-          p_username: data.username.trim().toLowerCase(),
+          p_user_id: data.username.trim().toLowerCase(),
           p_pin: data.pin,
         }),
       });
       if (!res.ok) return { ok: false as const, error: "Sign in failed" };
       const rows = (await res.json()) as unknown;
       const row = (Array.isArray(rows) ? rows[0] : rows) as
-        | { id?: string; username?: string }
+        | { user_id?: string }
         | null;
-      if (!row?.id) return { ok: false as const, error: "Invalid username or PIN" };
+      if (!row?.user_id) return { ok: false as const, error: "Invalid username or PIN" };
       return {
         ok: true as const,
-        token: signCashierSession({ id: String(row.id), username: String(row.username ?? "") }),
+        token: signCashierSession({ id: String(row.user_id), username: String(row.user_id) }),
       };
     } catch {
       return { ok: false as const, error: "Sign in failed" };

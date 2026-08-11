@@ -88,13 +88,27 @@ GRANT EXECUTE ON FUNCTION public.staff_role_delete(text) TO authenticated, servi
 -- 2 · Which role a person is assigned, on both kinds of account
 -- ------------------------------------------------------------
 ALTER TABLE public.app_users ADD COLUMN IF NOT EXISTS role_slug text;
-ALTER TABLE public.cashiers  ADD COLUMN IF NOT EXISTS role_slug text;
+
+-- `cashiers` is a legacy table. Fresh unified-account databases do not have it.
+DO $legacy_cashier_column$
+BEGIN
+  IF to_regclass('public.cashiers') IS NOT NULL THEN
+    ALTER TABLE public.cashiers ADD COLUMN IF NOT EXISTS role_slug text;
+  END IF;
+END
+$legacy_cashier_column$;
 
 UPDATE public.app_users SET role_slug = CASE role WHEN 'admin' THEN 'admin'
                                                   WHEN 'manager' THEN 'supervisor'
                                                   ELSE 'cashier' END
  WHERE role_slug IS NULL;
-UPDATE public.cashiers SET role_slug = 'cashier' WHERE role_slug IS NULL;
+DO $legacy_cashier_backfill$
+BEGIN
+  IF to_regclass('public.cashiers') IS NOT NULL THEN
+    UPDATE public.cashiers SET role_slug = 'cashier' WHERE role_slug IS NULL;
+  END IF;
+END
+$legacy_cashier_backfill$;
 
 CREATE OR REPLACE FUNCTION public.set_app_user_role_slug(p_user_id text, p_role_slug text)
 RETURNS void
@@ -117,8 +131,10 @@ BEGIN
   IF NOT public.is_app_supervisor() THEN
     RAISE EXCEPTION 'Only supervisors can change roles';
   END IF;
+  IF to_regclass('public.cashiers') IS NULL THEN RETURN; END IF;
   UPDATE public.cashiers SET role_slug = nullif(trim(coalesce(p_role_slug, '')), '')
    WHERE id = p_id;
+EXCEPTION WHEN undefined_table OR undefined_column THEN RETURN;
 END $function$;
 
 REVOKE ALL ON FUNCTION public.set_app_user_role_slug(text, text) FROM PUBLIC, anon;
@@ -175,13 +191,18 @@ DROP FUNCTION IF EXISTS public.list_cashiers();
 CREATE OR REPLACE FUNCTION public.list_cashiers()
  RETURNS TABLE(id uuid, username text, full_name text, role_slug text, permissions jsonb,
                is_active boolean, last_login_at timestamptz, created_at timestamptz)
- LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public', 'extensions'
+ LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path TO 'public', 'extensions', 'pg_temp'
 AS $function$
-  SELECT c.id, c.username, c.full_name, c.role_slug::text, c.permissions,
-         c.is_active, c.last_login_at, c.created_at
-  FROM public.cashiers c
-  WHERE public.is_app_supervisor()
-  ORDER BY c.username
+BEGIN
+  IF to_regclass('public.cashiers') IS NULL THEN RETURN; END IF;
+  RETURN QUERY
+    SELECT c.id, c.username, c.full_name, c.role_slug::text, c.permissions,
+           c.is_active, c.last_login_at, c.created_at
+      FROM public.cashiers c
+     WHERE public.is_app_supervisor()
+     ORDER BY c.username;
+EXCEPTION WHEN undefined_table OR undefined_column THEN RETURN;
+END
 $function$;
 
 REVOKE ALL ON FUNCTION public.list_cashiers() FROM PUBLIC, anon;
@@ -190,15 +211,21 @@ GRANT EXECUTE ON FUNCTION public.list_cashiers() TO authenticated, service_role;
 -- ------------------------------------------------------------
 -- 5 · Per-action "require manager PIN" switches
 -- ------------------------------------------------------------
-ALTER TABLE public.pos_store_settings
-  ADD COLUMN IF NOT EXISTS require_pin_void_cart       boolean NOT NULL DEFAULT true,
-  ADD COLUMN IF NOT EXISTS require_pin_void_line       boolean NOT NULL DEFAULT false,
-  ADD COLUMN IF NOT EXISTS require_pin_reduce_qty      boolean NOT NULL DEFAULT false,
-  ADD COLUMN IF NOT EXISTS require_pin_manual_discount boolean NOT NULL DEFAULT true,
-  ADD COLUMN IF NOT EXISTS require_pin_price_override  boolean NOT NULL DEFAULT true,
-  ADD COLUMN IF NOT EXISTS require_pin_stock_adjustment boolean NOT NULL DEFAULT true,
-  ADD COLUMN IF NOT EXISTS require_pin_shift_close     boolean NOT NULL DEFAULT false,
-  ADD COLUMN IF NOT EXISTS require_pin_edit_tenders    boolean NOT NULL DEFAULT false;
+DO $optional_pos_rules$
+BEGIN
+  IF to_regclass('public.pos_store_settings') IS NOT NULL THEN
+    ALTER TABLE public.pos_store_settings
+      ADD COLUMN IF NOT EXISTS require_pin_void_cart       boolean NOT NULL DEFAULT true,
+      ADD COLUMN IF NOT EXISTS require_pin_void_line       boolean NOT NULL DEFAULT false,
+      ADD COLUMN IF NOT EXISTS require_pin_reduce_qty      boolean NOT NULL DEFAULT false,
+      ADD COLUMN IF NOT EXISTS require_pin_manual_discount boolean NOT NULL DEFAULT true,
+      ADD COLUMN IF NOT EXISTS require_pin_price_override  boolean NOT NULL DEFAULT true,
+      ADD COLUMN IF NOT EXISTS require_pin_stock_adjustment boolean NOT NULL DEFAULT true,
+      ADD COLUMN IF NOT EXISTS require_pin_shift_close     boolean NOT NULL DEFAULT false,
+      ADD COLUMN IF NOT EXISTS require_pin_edit_tenders    boolean NOT NULL DEFAULT false;
+  END IF;
+END
+$optional_pos_rules$;
 
 -- Generic saver: any column of pos_store_settings present in the patch is
 -- written, so future switches need no further changes here.

@@ -1,9 +1,9 @@
 /**
  * Server-side write relay for the POS database.
  *
- * A cashier who signs in with a username + PIN has no account on the central
- * database, so a direct write from the till is refused by the row rules. The
- * relay accepts the same operation, proves who the caller is (a signed cashier
+ * Terminal staff normally hold a backend Auth session after username + PIN
+ * sign-in. The relay also supports offline/compatibility operation: it proves
+ * who the caller is (a signed cashier
  * session, an active terminal token, or a staff access token) and then performs
  * the write with the service key, which never reaches the browser.
  */
@@ -81,9 +81,8 @@ export function hasServiceKey(): boolean {
 }
 
 /**
- * Answer a read for a proven till. A cashier signs in with a PIN and has no
- * account on the central database, so a direct read is refused by the row
- * rules — the register would then believe no shift is open and lock itself.
+ * Answer a read for a proven till. This keeps offline/compatibility sessions
+ * working when no live backend Auth session is available.
  */
 export async function runRelayRead(
   read: RelayRead,

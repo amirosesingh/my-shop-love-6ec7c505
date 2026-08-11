@@ -35,30 +35,43 @@ export async function cashierLoginServer(input: {
   if (!username) return { ok: false, error: "Enter your username" };
   if (!/^\d{4,6}$/.test(input.pin)) return { ok: false, error: "Enter your PIN" };
 
-  const res = await serviceRest("rpc/verify_cashier_pin", {
+  const res = await serviceRest("rpc/verify_terminal_pin", {
     method: "POST",
-    body: JSON.stringify({ p_username: username, p_pin: input.pin }),
+    body: JSON.stringify({ p_user_id: username, p_pin: input.pin }),
   });
   if (!res.ok) return { ok: false, error: "Could not reach the central database" };
 
   const rows = (await res.json()) as
     | {
-        id: string;
-        username: string;
+        user_id: string;
         full_name: string;
         store_id: string | null;
-        permissions: Record<string, boolean> | null;
       }[]
     | null;
   const row = Array.isArray(rows) ? rows[0] : null;
   if (!row) return { ok: false, error: "Invalid username or PIN" };
 
+  const profileResponse = await serviceRest(
+    `app_users?user_id=eq.${encodeURIComponent(row.user_id)}&select=id,user_id,full_name,store_id,permissions,is_active&limit=1`,
+  );
+  if (!profileResponse.ok) return { ok: false, error: "Could not load this staff account" };
+  const profiles = (await profileResponse.json()) as {
+    id: string;
+    user_id: string;
+    full_name: string;
+    store_id: string | null;
+    permissions: Record<string, boolean> | null;
+    is_active: boolean;
+  }[];
+  const profile = profiles[0];
+  if (!profile?.is_active) return { ok: false, error: "Account deactivated" };
+
   const cashier = {
-    id: row.id,
-    username: row.username,
-    full_name: row.full_name || row.username,
-    store_id: row.store_id ?? null,
-    permissions: row.permissions ?? {},
+    id: profile.id,
+    username: profile.user_id,
+    full_name: profile.full_name || profile.user_id,
+    store_id: profile.store_id ?? row.store_id ?? null,
+    permissions: profile.permissions ?? {},
   };
 
   const session = await startSession({

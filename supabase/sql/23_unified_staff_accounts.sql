@@ -190,8 +190,9 @@ CREATE OR REPLACE FUNCTION public.staff_account_adopt_legacy(p_username text)
 RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public', 'pg_temp'
 AS $function$
-DECLARE c public.cashiers%rowtype;
+DECLARE c record;
 BEGIN
+  IF to_regclass('public.cashiers') IS NULL THEN RETURN; END IF;
   SELECT * INTO c FROM public.cashiers WHERE lower(username) = lower(trim(p_username));
   IF NOT FOUND THEN RETURN; END IF;
 

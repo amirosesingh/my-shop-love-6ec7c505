@@ -5,9 +5,8 @@ import { supabaseConfig } from "./external-supabase-config";
 
 export type MetaRole = "cashier" | "warehouse" | "supervisor" | "admin";
 
-// Cashiers do NOT get a Supabase Auth account. They live in public.cashiers
-// with a server-side hashed PIN verified through the verify_cashier_pin RPC,
-// so no login password is ever derived from the low-entropy PIN.
+// Every staff member gets a backend Auth account. Terminal usernames map to
+// internal addresses; their PIN is verified against app_users before sign-in.
 
 const signupFetch: typeof fetch = (input, init) => {
   const SUPABASE_PUBLISHABLE_KEY = supabaseConfig().key;

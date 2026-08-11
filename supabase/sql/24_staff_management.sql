@@ -33,17 +33,39 @@ $rescue$;
 -- Keep direct staff tables private. Management goes through guarded routines.
 REVOKE ALL ON public.app_users FROM anon, authenticated;
 GRANT ALL ON public.app_users TO service_role;
-REVOKE ALL ON public.cashiers FROM anon, authenticated;
-GRANT ALL ON public.cashiers TO service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_roles TO authenticated;
 GRANT ALL ON public.user_roles TO service_role;
 GRANT SELECT ON public.staff_roles TO authenticated;
 GRANT ALL ON public.staff_roles TO service_role;
 
 ALTER TABLE public.app_users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.cashiers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.staff_roles ENABLE ROW LEVEL SECURITY;
+
+-- PIN lookup is never an anonymous browser capability. Terminal login calls
+-- it through the trusted server; signed-in supervisors retain manager-PIN use.
+DO $pin_rpc_grants$
+BEGIN
+  IF to_regprocedure('public.verify_terminal_pin(text,text)') IS NOT NULL THEN
+    REVOKE EXECUTE ON FUNCTION public.verify_terminal_pin(text, text) FROM PUBLIC, anon;
+    GRANT EXECUTE ON FUNCTION public.verify_terminal_pin(text, text) TO authenticated, service_role;
+  END IF;
+  IF to_regprocedure('public.verify_cashier_pin(text,text)') IS NOT NULL THEN
+    REVOKE EXECUTE ON FUNCTION public.verify_cashier_pin(text, text) FROM PUBLIC, anon, authenticated;
+    GRANT EXECUTE ON FUNCTION public.verify_cashier_pin(text, text) TO service_role;
+  END IF;
+END
+$pin_rpc_grants$;
+
+DO $legacy_cashier_security$
+BEGIN
+  IF to_regclass('public.cashiers') IS NOT NULL THEN
+    REVOKE ALL ON public.cashiers FROM anon, authenticated;
+    GRANT ALL ON public.cashiers TO service_role;
+    ALTER TABLE public.cashiers ENABLE ROW LEVEL SECURITY;
+  END IF;
+END
+$legacy_cashier_security$;
 
 DROP POLICY IF EXISTS "Users can read their own staff record" ON public.app_users;
 CREATE POLICY "Users can read their own staff record" ON public.app_users
@@ -63,8 +85,21 @@ CREATE POLICY "Admins manage roles" ON public.user_roles
   USING (public.has_role((SELECT auth.uid()), 'admin'::public.app_role))
   WITH CHECK (public.has_role((SELECT auth.uid()), 'admin'::public.app_role));
 
-SELECT 'legacy cashier compatibility retained' AS verification,
-       to_regprocedure('public.verify_cashier_pin(text,text)') IS NOT NULL AS login_available,
-       (SELECT count(*) FROM public.cashiers c
-         WHERE NOT EXISTS (SELECT 1 FROM public.app_users a
-                            WHERE lower(a.user_id) = lower(c.username))) AS rows_left_to_copy;
+DO $legacy_cashier_verification$
+DECLARE rows_left bigint := 0;
+BEGIN
+  IF to_regclass('public.cashiers') IS NOT NULL THEN
+    EXECUTE 'SELECT count(*) FROM public.cashiers c
+              WHERE NOT EXISTS (SELECT 1 FROM public.app_users a
+                                 WHERE lower(a.user_id) = lower(c.username))'
+      INTO rows_left;
+  END IF;
+  RAISE NOTICE 'legacy cashier compatibility: table=%, login=%, rows_left_to_copy=%',
+    to_regclass('public.cashiers') IS NOT NULL,
+    to_regprocedure('public.verify_cashier_pin(text,text)') IS NOT NULL,
+    rows_left;
+END
+$legacy_cashier_verification$;
+
+SELECT 'unified staff management ready' AS verification,
+       to_regprocedure('public.verify_terminal_pin(text,text)') IS NOT NULL AS login_available;
