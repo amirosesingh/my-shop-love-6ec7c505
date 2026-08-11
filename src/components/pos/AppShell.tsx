@@ -447,10 +447,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             if (allowed && visibleRoute(location.pathname)) return children;
             if (allowed)
               return (
-                <PermissionDenied
-                  title="Hidden for your role"
-                  flag={required === "unknown" ? null : required}
-                />
+                <PermissionDenied title="Hidden for your role" flag={null} />
               );
             return <PermissionDenied flag={required === "unknown" ? null : required} />;
           })()}
