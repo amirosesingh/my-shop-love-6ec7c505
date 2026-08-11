@@ -67,26 +67,60 @@ async function findUserId(email: string): Promise<string | null> {
 
 export type StaffPayload = {
   displayName: string;
+  /** what the admin typed: a plain username, or a real email address */
   username: string;
-  pin: string;
+  /** 4-6 digits — required for username (terminal) accounts */
+  pin?: string;
+  /** password — required for real-email accounts */
+  password?: string;
   branchId?: string | null;
   roleSlug: string;
   baseRole: "admin" | "manager" | "staff";
   active: boolean;
 };
 
+/** A real address is anything with an "@" that is not our own hidden domain. */
+export const isRealEmail = (input: string) => {
+  const v = input.trim().toLowerCase();
+  return v.includes("@") && !v.endsWith(`@${INTERNAL_EMAIL_DOMAIN}`);
+};
+
 /**
  * Create (or repair) the account behind a staff member and mirror the profile
- * into public.app_users. `email_confirm` means nothing is ever emailed.
+ * into public.app_users.
+ *
+ * A plain username becomes a hidden internal address, is confirmed on the spot
+ * and uses the PIN as its password, so the till can sign in immediately.
+ * A real email address is kept as typed, uses its own password, and is left
+ * unconfirmed so the person receives the usual verification email.
  */
 export async function provisionStaffAccount(payload: StaffPayload): Promise<{ userId: string }> {
-  const username = payload.username.trim().toLowerCase();
-  if (!/^[a-z0-9._-]{2,40}$/.test(username)) {
-    throw new Error("A username may only use letters, numbers, dot, dash or underscore");
-  }
-  if (!/^\d{4,6}$/.test(payload.pin)) throw new Error("A PIN must be 4 to 6 digits");
+  const typed = payload.username.trim().toLowerCase();
+  if (!typed) throw new Error("Enter a username or an email address");
+  if (!payload.roleSlug?.trim()) throw new Error("Choose a role for this person");
+  const emailMode = isRealEmail(typed);
+  const pin = (payload.pin ?? "").trim();
+  const password = payload.password ?? "";
 
-  const email = internalEmail(username);
+  let username: string;
+  let email: string;
+  let secret: string;
+  if (emailMode) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(typed)) throw new Error("That email address is not valid");
+    if (password.length < 8) throw new Error("A password must be at least 8 characters");
+    email = typed;
+    secret = password;
+    username = (typed.split("@")[0] ?? "").replace(/[^a-z0-9._-]/g, "").slice(0, 40) || "user";
+  } else {
+    username = typed;
+    if (!/^[a-z0-9._-]{2,40}$/.test(username)) {
+      throw new Error("A username may only use letters, numbers, dot, dash or underscore");
+    }
+    if (!/^\d{4,6}$/.test(pin)) throw new Error("A PIN must be 4 to 6 digits");
+    email = internalEmail(username);
+    secret = pin;
+  }
+
   const metadata = {
     username,
     full_name: payload.displayName.trim() || username,
@@ -100,8 +134,8 @@ export async function provisionStaffAccount(payload: StaffPayload): Promise<{ us
     method: "POST",
     body: JSON.stringify({
       email,
-      password: payload.pin,
-      email_confirm: true,
+      password: secret,
+      email_confirm: !emailMode,
       user_metadata: metadata,
     }),
   });
@@ -117,8 +151,8 @@ export async function provisionStaffAccount(payload: StaffPayload): Promise<{ us
     await adminFetch(`admin/users/${userId}`, {
       method: "PUT",
       body: JSON.stringify({
-        password: payload.pin,
-        email_confirm: true,
+        password: secret,
+        ...(emailMode ? {} : { email_confirm: true }),
         user_metadata: metadata,
       }),
     });
@@ -132,8 +166,8 @@ export async function provisionStaffAccount(payload: StaffPayload): Promise<{ us
     p_role_slug: payload.roleSlug,
     p_store_id: payload.branchId ?? null,
     p_is_active: payload.active,
-    p_pin: payload.pin,
-    p_pin_length: payload.pin.length,
+    p_pin: emailMode ? "" : pin,
+    p_pin_length: emailMode ? 0 : pin.length,
     p_auth_user_id: userId,
     p_permissions: null,
   });
