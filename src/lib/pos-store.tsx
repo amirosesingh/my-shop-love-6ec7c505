@@ -40,6 +40,7 @@ import { clearSnapshot, readSnapshot, writeSnapshot } from "./offline-snapshot";
 import { isLiveOnly } from "./live-mode";
 import { useAuth } from "@/lib/pos-auth";
 import { readTerminalConfig } from "./terminal-tokens";
+import { loadCashierToken, loadSessionToken } from "./pos-credentials";
 import {
   activeBranchId,
   bindTerminalBranch,
@@ -314,6 +315,9 @@ export function PosProvider({ children }: { children: ReactNode }) {
         return;
       }
       try {
+        // The PIN/session proofs live in encrypted device storage. Load them
+        // before branch discovery decides whether the protected relay exists.
+        await Promise.all([loadCashierToken(), loadSessionToken()]);
         const cloud = await loadCloudState();
         if (cancelled) return;
         writeSnapshot(cloud);

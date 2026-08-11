@@ -118,6 +118,12 @@ function Transfers() {
 
   // Prefilled multi-item basket handed over from the inventory page.
   useEffect(() => {
+    if (!others.some((store) => store.id === otherStoreId)) {
+      setOtherStoreId(others[0]?.id ?? "");
+    }
+  }, [others, otherStoreId]);
+
+  useEffect(() => {
     if (!search.items) return;
     const ids = search.items.split(",").filter(Boolean);
     if (!ids.length) return;
@@ -580,6 +586,13 @@ function Transfers() {
                   ))}
                 </SelectContent>
               </Select>
+              {!others.length && (
+                <p className="text-xs text-muted-foreground">
+                  {stores.length <= 1
+                    ? "No other branch is available in the central directory."
+                    : "No other branch currently allows stock transfers."}
+                </p>
+              )}
             </div>
             {crossGroup && (
               <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs">

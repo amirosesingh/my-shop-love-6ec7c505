@@ -111,6 +111,9 @@ function applyTenantOverride(config: TerminalConfig | null): void {
     clearTerminalSupabaseOverride();
   }
   resetExternalClient();
+  // A probe made for the previous tenant must never make the newly activated
+  // tenant look offline for the cache window.
+  void import("./connection-health").then(({ resetHealthCache }) => resetHealthCache());
 }
 
 export type TokenLocation = {
