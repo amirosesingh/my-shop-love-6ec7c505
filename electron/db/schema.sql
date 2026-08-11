@@ -422,12 +422,12 @@ GO
 /* Pending work is read constantly by the sync engine; index it once. */
 DECLARE @it SYSNAME, @sqlIx NVARCHAR(MAX);
 DECLARE ixtbl CURSOR FOR
-  SELECT name FROM sys.tables
-   WHERE COL_LENGTH('dbo.' + name, 'pending_sync') IS NOT NULL
+  SELECT t.name FROM sys.tables AS t
+   WHERE COL_LENGTH('dbo.' + t.name, 'pending_sync') IS NOT NULL
      AND NOT EXISTS (
        SELECT 1 FROM sys.indexes i
-        WHERE i.object_id = OBJECT_ID('dbo.' + sys.tables.name)
-          AND i.name = 'IX_' + sys.tables.name + '_pending_sync');
+        WHERE i.object_id = t.object_id
+          AND i.name = 'IX_' + t.name + '_pending_sync');
 OPEN ixtbl;
 FETCH NEXT FROM ixtbl INTO @it;
 WHILE @@FETCH_STATUS = 0
