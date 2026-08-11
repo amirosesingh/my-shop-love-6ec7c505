@@ -33,7 +33,7 @@ import type {
 } from "./pos-types";
 import { bookingBalance, lineUnitDiscount, r2, type DiscountType } from "./pos-types";
 import { logger } from "./audit-log";
-import { db, dbError, loadActiveShift, loadCloudState } from "./pos-db";
+import { db, dbError, loadActiveShift, loadCloudState, openShiftOnServer } from "./pos-db";
 import type { CloudSlice, CommitTarget } from "./pos-db";
 import { clearSnapshot, readSnapshot, writeSnapshot } from "./offline-snapshot";
 import { isLiveOnly } from "./live-mode";
@@ -612,15 +612,20 @@ export function PosProvider({ children }: { children: ReactNode }) {
         closingFloat: null,
         userId: authUserId ?? null,
       };
-      // Nothing opens until the shift is stored (cloud, local DB or offline queue).
-      const target = await db.commitShift(shift);
-      // When it claims to have reached the central database, prove it: read the
-      // row back before unlocking the till. Cashiers sign in by PIN, so a
-      // silently refused insert must surface as an error, not a success toast.
-      if (target === "cloud" && (await db.shiftExists(shift.id)) === "no") {
-        throw new Error(
-          "The shift was not found in the database after saving. Nothing was opened — try again, or check this account's branch and role.",
-        );
+      // The central database stores the shift and hands the stored row back in
+      // one call, so nothing has to be read again through the access rules.
+      const stored = await openShiftOnServer(shift);
+      let target: CommitTarget = "cloud";
+      if (stored) {
+        Object.assign(shift, stored);
+      } else {
+        // Offline, local SQL or queued: nothing opens until it is stored.
+        target = await db.commitShift(shift);
+        if (target === "cloud" && (await db.shiftExists(shift.id)) === "no") {
+          throw new Error(
+            "The shift was not found in the database after saving. Nothing was opened — try again, or check this account's branch and role.",
+          );
+        }
       }
       logger.log("sale_event", "Shift opened", "shifts", {
         cashier,
