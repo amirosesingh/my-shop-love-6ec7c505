@@ -12,7 +12,8 @@ import {
   setSyncState,
   syncState,
 } from "./sync-status";
-import { writeSnapshot, readSnapshot } from "./offline-snapshot";
+import { writeSnapshot } from "./offline-snapshot";
+import { loadCloudState } from "./pos-db";
 import {
   failOp,
   isOnline,
@@ -343,33 +344,33 @@ export async function pullDelta(): Promise<{ merged: number }> {
   pulling = true;
   const since = lastSuccessfulPull() ?? "1970-01-01T00:00:00.000Z";
   const startedAt = new Date().toISOString();
-  let merged = 0;
+  let changed = 0;
   try {
-    const snapshot = readSnapshot();
-    if (!snapshot) return { merged: 0 };
-    const next: Record<string, unknown> = { ...(snapshot as Record<string, unknown>) };
     for (const table of PULL_TABLES) {
       if (!tableSyncAllowed(table)) continue;
-      let { data, error } = await supabaseExternal
+      // Only ask how many rows moved; the full refresh below does the reading.
+      let { count, error } = await supabaseExternal
         .from(table)
-        .select("*")
+        .select("id", { count: "exact", head: true })
         .gt("updated_at", since);
       if (error)
-        ({ data, error } = await supabaseExternal.from(table).select("*").gt("created_at", since));
+        ({ count, error } = await supabaseExternal
+          .from(table)
+          .select("id", { count: "exact", head: true })
+          .gt("created_at", since));
       if (error) {
         logSync("pull", table, false, error.message);
         continue;
       }
-      const rows = (data ?? []) as { id?: string }[];
-      if (!rows.length) continue;
-      const existing = Array.isArray(next[table]) ? (next[table] as { id?: string }[]) : [];
-      const byId = new Map(existing.map((r) => [r.id, r]));
-      for (const row of rows) byId.set(row.id, { ...byId.get(row.id), ...row });
-      next[table] = [...byId.values()];
-      merged += rows.length;
-      logSync("pull", table, true, `${rows.length} row(s)`);
+      if (!count) continue;
+      changed += count;
+      logSync("pull", table, true, `${count} row(s) changed centrally`);
     }
-    if (merged) writeSnapshot(next as never);
+    // Something moved centrally: refresh the local copy in one consistent read.
+    if (changed) {
+      writeSnapshot(await loadCloudState());
+      window.dispatchEvent(new CustomEvent("pos:cloud-refreshed"));
+    }
     setLastSuccessfulPull(startedAt);
     setSyncState({ lastSyncAt: startedAt });
   } catch (e) {
@@ -377,7 +378,7 @@ export async function pullDelta(): Promise<{ merged: number }> {
   } finally {
     pulling = false;
   }
-  return { merged };
+  return { merged: changed };
 }
 
 let started = false;
