@@ -439,6 +439,7 @@ module.exports = {
   SETTINGS_ID,
   applyOp,
   createSale,
+  forgetColumnCache,
   getProducts,
   snapshot,
   pendingSyncCount,
