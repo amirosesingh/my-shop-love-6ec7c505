@@ -105,6 +105,73 @@ export const VISIBILITY_ELEMENTS: VisibilityElement[] = [
   },
 ];
 
+/** Whole settings pages an administrator can hide from a role. */
+export const SETTINGS_VISIBILITY_ELEMENTS: VisibilityElement[] = (
+  [
+    ["/settings/display", "Display & text size", "Interface scale, density and theme.", "cashier-visible"],
+    ["/settings/updates", "Software updates", "App version and background updates.", "admin-only"],
+    ["/settings/terminals", "Terminal activation", "Register tills and activation codes.", "admin-only"],
+    ["/settings/mobile-terminals", "Mobile terminals", "Phones and tablets running the POS.", "admin-only"],
+    ["/settings/sessions", "Active sessions", "Who is signed in, with remote sign-out.", "admin-only"],
+    ["/settings/printer", "Receipt printer", "Device, margins, drawer pin, test print.", "cashier-visible"],
+    ["/settings/elements", "Receipt elements", "Paper size, logo, points and barcode.", "admin-only"],
+    ["/settings/type", "Receipt typography", "Fonts, sizes and spacing on slips.", "admin-only"],
+    ["/settings/lines", "Receipt extra lines", "Policy notes and opening hours.", "admin-only"],
+    ["/settings/qr", "Receipt QR code", "QR payload, size and placement.", "admin-only"],
+    ["/settings/booking-slip", "Booking slip wording", "Terms and the signature line.", "admin-only"],
+    ["/settings/identity", "Business identity", "Company name, tax numbers, header.", "admin-only"],
+    ["/settings/tax", "Tax & pricing", "Global tax rate and inclusive pricing.", "admin-only"],
+    ["/settings/rules", "POS rules & enforcement", "Shift, discount and refund limits.", "admin-only"],
+    ["/settings/sku", "SKU numbering", "Automatic product codes.", "inventory-access"],
+    ["/settings/numbering", "Bill numbering", "Branch, till and running number.", "admin-only"],
+    ["/settings/catalog", "Categories & units", "Category groups and units of measure.", "inventory-access"],
+    ["/settings/region", "Region & time", "Country, time zone and clock format.", "admin-only"],
+    ["/settings/visibility", "Screen visibility", "What each role can see.", "admin-only"],
+    ["/settings/payment", "Bank transfer details", "Bank account and payment QR.", "admin-only"],
+    ["/settings/accounts", "Payment accounts", "Card machines, banks and e-wallets.", "admin-only"],
+    ["/settings/services", "Booking services", "Jobs and their default fee.", "supervisor-only"],
+    ["/settings/whatsapp", "WhatsApp bills", "Send receipts over WhatsApp.", "admin-only"],
+    ["/settings/sync", "Sync & backup", "Branch identity, queue and backups.", "admin-only"],
+    ["/settings/system", "System status & integrations", "Connection health and public domains.", "admin-only"],
+    ["/settings/security-alerts", "Security alerts", "Scan findings and posture checks.", "admin-only"],
+    ["/settings/diagnostics", "Database health", "Per-table reading and saving status.", "admin-only"],
+    ["/settings/shift-alerts", "Shift alerts", "How the day-end summary is delivered.", "supervisor-only"],
+    ["/settings/inheritance", "Settings inheritance", "Global, cluster and branch tiers.", "admin-only"],
+  ] as const
+).map(([route, label, blurb, tag]) => ({
+  key: `route:${route}`,
+  label,
+  blurb,
+  group: "Settings pages",
+  route,
+  tag: tag as PermissionTag,
+}));
+
+VISIBILITY_ELEMENTS.push(...SETTINGS_VISIBILITY_ELEMENTS);
+
+const ROUTE_ELEMENTS = SETTINGS_VISIBILITY_ELEMENTS.filter((e) => e.route);
+
+const roleOf = (role: string | null): StaffRole =>
+  role === "admin" || role === "supervisor" || role === "warehouse" ? (role as StaffRole) : "cashier";
+
+/**
+ * Can someone holding `role` open `path`? Combines the admin's hidden map with
+ * the tag the screen declares. Administrators are never blocked.
+ */
+export function isRouteVisibleFor(
+  hidden: VisibilityMap,
+  path: string,
+  role: string | null,
+): boolean {
+  if (!role || role === "admin") return true;
+  const match = ROUTE_ELEMENTS.filter(
+    (e) => path === e.route || path.startsWith(`${e.route}/`),
+  ).sort((a, b) => (b.route?.length ?? 0) - (a.route?.length ?? 0))[0];
+  if (!match) return true;
+  if (match.tag && !roleHasTag(roleOf(role), match.tag)) return false;
+  return isVisibleFor(hidden, match.key, role);
+}
+
 export const VISIBILITY_GROUPS = Array.from(new Set(VISIBILITY_ELEMENTS.map((e) => e.group)));
 
 export type VisibilityMap = Record<string, string[]>;
