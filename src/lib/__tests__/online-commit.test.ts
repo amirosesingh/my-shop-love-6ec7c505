@@ -69,10 +69,9 @@ describe("commitOps in online mode with a local database present", () => {
       [],
       null,
     );
-    // This file runs without a browser, so the desktop default mode is local;
-    // the important regression is that commitOps handles the write rather
+    // Completed desktop sales use the shared cloud-first commit path rather
     // than the removed createSale-only branch.
-    expect(target).toBe("local");
+    expect(target).toBe("cloud");
     expect(localWrite).toHaveBeenCalled();
     expect(legacyCreateSale).not.toHaveBeenCalled();
   });

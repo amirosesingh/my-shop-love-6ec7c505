@@ -1013,7 +1013,7 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
           if (!res.ok) throw new Error(res.error ?? `${context} could not be stored locally`);
         }
         setCloudDirect(false);
-        void bridge.push();
+        if (bridge.push) void bridge.push();
         return noteCommitTarget("local");
       } catch (local) {
         throw new AllTargetsFailed(context, local);
