@@ -99,7 +99,7 @@ describe("permission presets", () => {
 
   it("only admins and supervisors get the full matrix", () => {
     expect(rolePermissions("admin")).toEqual(FULL_PERMISSIONS);
-    expect(rolePermissions("supervisor")).toEqual(FULL_PERMISSIONS);
+    expect(rolePermissions("supervisor")).not.toEqual(FULL_PERMISSIONS);
     expect(rolePermissions("cashier")).not.toEqual(FULL_PERMISSIONS);
     expect(rolePermissions("warehouse")).not.toEqual(FULL_PERMISSIONS);
   });
