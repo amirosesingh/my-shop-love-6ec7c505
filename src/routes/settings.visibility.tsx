@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
+import { SettingsSections } from "@/components/pos/settings/SettingsSection";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/lib/pos-auth";
 import {
@@ -45,10 +46,14 @@ function VisibilitySettingsPage() {
         </p>
       ) : (
         <div className="space-y-6">
-          {VISIBILITY_GROUPS.map((group) => (
-            <section key={group} className="space-y-2">
-              <h2 className="text-sm font-semibold">{group}</h2>
-              <div className="overflow-x-auto rounded-lg border border-border">
+          <SettingsSections
+            storageKey="visibility"
+            items={VISIBILITY_GROUPS.map((group) => ({
+              id: group,
+              title: group,
+              blurb: `${VISIBILITY_ELEMENTS.filter((e) => e.group === group).length} elements`,
+              content: (
+                <div className="overflow-x-auto rounded-lg border border-border">
                 <table className="w-full text-sm">
                   <thead className="bg-muted/50 text-xs text-muted-foreground">
                     <tr>
@@ -83,9 +88,10 @@ function VisibilitySettingsPage() {
                     ))}
                   </tbody>
                 </table>
-              </div>
-            </section>
-          ))}
+                </div>
+              ),
+            }))}
+          />
           <p className="text-[11px] text-muted-foreground">
             A switch that is on means the role can see that element. Hiding an element only
             removes it from the screen — the permission matrix still controls what may be done.
