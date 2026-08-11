@@ -6,8 +6,9 @@ const token = z.string().min(10).max(4000);
 const staffInput = z.object({
   accessToken: token,
   displayName: z.string().min(1).max(120),
-  username: z.string().min(2).max(40),
-  pin: z.string().regex(/^\d{4,6}$/),
+  username: z.string().min(2).max(160),
+  pin: z.string().regex(/^\d{4,6}$/).optional(),
+  password: z.string().min(8).max(200).optional(),
   branchId: z.string().max(60).nullable().optional(),
   roleSlug: z.string().min(2).max(60),
   baseRole: z.enum(["admin", "manager", "staff"]),
@@ -24,7 +25,8 @@ export const saveStaffAccount = createServerFn({ method: "POST" })
       await mod.provisionStaffAccount({
         displayName: data.displayName,
         username: data.username,
-        pin: data.pin,
+        pin: data.pin ?? "",
+        password: data.password ?? "",
         branchId: data.branchId ?? null,
         roleSlug: data.roleSlug,
         baseRole: data.baseRole,
