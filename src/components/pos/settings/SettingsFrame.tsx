@@ -9,9 +9,10 @@
  */
 import { Link } from "@tanstack/react-router";
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ArrowLeft, Check, Eye, Loader2, RotateCcw, Save, TriangleAlert } from "lucide-react";
+import { ArrowLeft, Eye, Loader2, RotateCcw, Save } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
+import { SaveIndicator } from "@/components/pos/settings/SaveIndicator";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
