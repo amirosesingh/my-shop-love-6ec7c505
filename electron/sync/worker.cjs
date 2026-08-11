@@ -19,12 +19,32 @@ let timer = null;
 let running = false;
 let notify = () => {};
 const attempts = new Map(); // `${table}:${id}` -> failed attempts
+let credentials = {};
 
-function init({ url, key, onChange }) {
+function init({ url, key, accessToken, cashierToken, terminalTokenId, branchId, onChange }) {
   supabase = createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
+    global: accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : undefined,
   });
+  credentials = { cashierToken, terminalTokenId, branchId };
   if (onChange) notify = onChange;
+}
+
+async function cloudRequest(table, method, body) {
+  const headers = {
+    "Content-Type": "application/json",
+    apikey: supabase.supabaseKey,
+    ...(credentials.cashierToken ? { "x-cashier-session": credentials.cashierToken } : {}),
+    ...(credentials.terminalTokenId ? { "x-terminal-token-id": credentials.terminalTokenId } : {}),
+    ...(credentials.branchId ? { "x-branch-id": credentials.branchId } : {}),
+  };
+  const response = await fetch(`${supabase.supabaseUrl}/rest/v1/${table}${method === "GET" ? "?select=*" : ""}`, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!response.ok) throw new Error((await response.text()) || `Cloud ${method} failed (${response.status})`);
+  return response.status === 204 ? [] : response.json();
 }
 
 function setEnabled(on) {
@@ -68,7 +88,12 @@ async function push() {
 
     const ids = rows.map((r) => r.id);
     const payload = rows.map((r) => repo.toCloudRow(table, r));
-    const { error } = await supabase.from(table).upsert(payload, { onConflict: "id" });
+    let error = null;
+    try {
+      await cloudRequest(table, "POST", payload);
+    } catch (err) {
+      error = err;
+    }
 
     if (error) {
       failed += ids.length;
