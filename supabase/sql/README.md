@@ -32,6 +32,7 @@ files calls. Run `00` then `02` before anything else.
 | `26_staff_upgrade_22_25.sql` | Consolidated staff upgrade runner | Runs files 22–25, 27 and 28 in order with psql |
 | `27_staff_credentials_and_ids.sql` | Generated staff ids and 4–32 character credentials | Fixes `null value in column "id"`, widens PIN/passcode length |
 | `28_app_users_id_link.sql` | Removes the legacy link between the staff id and the sign-in account id | Fixes `violates foreign key constraint "app_users_id_fkey"` |
+| `29_shift_access_and_rpcs.sql` | Cashier shift access plus open/read routines | Fixes shift permission errors; adds `shift_open` and `shift_active_for_branch` |
 
 `98_drop_unused.sql` is separate and **destructive**, and every statement in it
 is commented out as shipped, so running the file by accident deletes nothing.

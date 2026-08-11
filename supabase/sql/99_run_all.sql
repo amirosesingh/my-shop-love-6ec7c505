@@ -34,3 +34,6 @@
 \i 23_unified_staff_accounts.sql
 \i 24_staff_management.sql
 \i 25_staff_account_lifecycle.sql
+\i 27_staff_credentials_and_ids.sql
+\i 28_app_users_id_link.sql
+\i 29_shift_access_and_rpcs.sql

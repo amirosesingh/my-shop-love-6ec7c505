@@ -23,4 +23,4 @@ SELECT 'staff upgrade 22-25 complete' AS verification,
        to_regclass('public.app_users') IS NOT NULL AS app_users_ready,
        to_regclass('public.staff_roles') IS NOT NULL AS staff_roles_ready,
        to_regprocedure('public.staff_account_upsert(text,text,text,app_role,text,text,boolean,text,smallint,uuid,jsonb)') IS NOT NULL AS provisioning_ready,
-       to_regprocedure('public.verify_terminal_pin(text,text)') IS NOT NULL AS pin_login_ready;
+       to_regprocedure('public.verify_terminal_pin(text,text)') IS NOT NULL AS pin_login_ready;\i 29_shift_access_and_rpcs.sql
