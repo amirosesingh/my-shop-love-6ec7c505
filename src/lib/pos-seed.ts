@@ -81,8 +81,8 @@ export const defaultTradingHours: TradingHours = {
 
 /** Public domains and operational switches, editable in System & Integrations. */
 export const defaultIntegrations: AppSettings["integrations"] = {
-  memberDomain: "https://member.luckycharmsdnbhd.com",
-  redeemDomain: "https://redeem.luckycharmsdnbhd.com",
+  memberDomain: "",
+  redeemDomain: "",
   requireTransferApproval: true,
   autoIssueWelcome: false,
   offlineMode: false,
