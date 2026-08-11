@@ -8,6 +8,7 @@
 import { signCashierSession } from "./pos-session.server";
 import { serviceRest } from "./pos-relay.server";
 import { startSession } from "./session-guard.server";
+import { writeSystemAudit } from "./system-audit.server";
 
 export type CashierLoginResult =
   | {
@@ -33,11 +34,16 @@ export async function cashierLoginServer(input: {
 }): Promise<CashierLoginResult> {
   const username = input.username.trim().toLowerCase();
   if (!username) return { ok: false, error: "Enter your username" };
-  if (!/^\d{4,6}$/.test(input.pin)) return { ok: false, error: "Enter your PIN" };
+  // Accounts are provisioned with a 4-32 character credential, so the login
+  // must accept the same range — a longer or alphanumeric passcode is valid.
+  const secret = input.pin;
+  if (secret.length < 4 || secret.length > 32) {
+    return { ok: false, error: "Enter your PIN or passcode" };
+  }
 
   const res = await serviceRest("rpc/verify_terminal_pin", {
     method: "POST",
-    body: JSON.stringify({ p_user_id: username, p_pin: input.pin }),
+    body: JSON.stringify({ p_user_id: username, p_pin: secret }),
   });
   if (!res.ok) return { ok: false, error: "Could not reach the central database" };
 
@@ -49,7 +55,20 @@ export async function cashierLoginServer(input: {
       }[]
     | null;
   const row = Array.isArray(rows) ? rows[0] : null;
-  if (!row) return { ok: false, error: "Invalid username or PIN" };
+  if (!row) {
+    // A failed sign-in is recorded too — repeated failures are the signal.
+    await writeSystemAudit({
+      actorId: username,
+      actorName: username,
+      actorRole: "unknown",
+      actionType: "auth.sign_in_failed",
+      entityAffected: "app_users",
+      entityId: username,
+      terminalId: input.terminalId ?? null,
+      note: "Invalid username or PIN",
+    });
+    return { ok: false, error: "Invalid username or PIN" };
+  }
 
   const profileResponse = await serviceRest(
     `app_users?user_id=eq.${encodeURIComponent(row.user_id)}&select=id,user_id,full_name,store_id,permissions,is_active&limit=1`,
@@ -82,6 +101,18 @@ export async function cashierLoginServer(input: {
     branchId: cashier.store_id,
     terminalId: input.terminalId ?? null,
     platform: input.platform ?? null,
+  });
+
+  await writeSystemAudit({
+    actorId: cashier.username,
+    actorName: cashier.full_name,
+    actorRole: "cashier",
+    actionType: "auth.sign_in",
+    entityAffected: "app_users",
+    entityId: cashier.username,
+    terminalId: input.terminalId ?? null,
+    storeId: cashier.store_id,
+    note: input.platform ?? null,
   });
 
   return {

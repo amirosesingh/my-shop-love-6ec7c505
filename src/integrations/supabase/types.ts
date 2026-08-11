@@ -1815,6 +1815,57 @@ export type Database = {
         }
         Relationships: []
       }
+      system_audit_logs: {
+        Row: {
+          action_type: string
+          actor_id: string | null
+          actor_name: string | null
+          actor_role: string | null
+          created_at: string
+          entity_affected: string | null
+          entity_id: string | null
+          id: string
+          ip_address: string | null
+          new_value: Json | null
+          note: string | null
+          old_value: Json | null
+          store_id: string | null
+          terminal_id: string | null
+        }
+        Insert: {
+          action_type: string
+          actor_id?: string | null
+          actor_name?: string | null
+          actor_role?: string | null
+          created_at?: string
+          entity_affected?: string | null
+          entity_id?: string | null
+          id?: string
+          ip_address?: string | null
+          new_value?: Json | null
+          note?: string | null
+          old_value?: Json | null
+          store_id?: string | null
+          terminal_id?: string | null
+        }
+        Update: {
+          action_type?: string
+          actor_id?: string | null
+          actor_name?: string | null
+          actor_role?: string | null
+          created_at?: string
+          entity_affected?: string | null
+          entity_id?: string | null
+          id?: string
+          ip_address?: string | null
+          new_value?: Json | null
+          note?: string | null
+          old_value?: Json | null
+          store_id?: string | null
+          terminal_id?: string | null
+        }
+        Relationships: []
+      }
       terminal_tokens: {
         Row: {
           activated_at: string | null

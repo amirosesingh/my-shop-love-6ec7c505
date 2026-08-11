@@ -186,6 +186,18 @@ export async function provisionStaffAccount(payload: StaffPayload): Promise<{ us
 }
 
 /** Turn an account on or off everywhere at once. */
+/** Snapshot of an account, kept so the edit history can show before/after. */
+export async function readStaffSnapshot(
+  username: string,
+): Promise<Record<string, unknown> | null> {
+  const res = await serviceRest(
+    `app_users?user_id=eq.${encodeURIComponent(username.toLowerCase())}&select=user_id,full_name,email,role,role_slug,store_id,is_active&limit=1`,
+  );
+  if (!res.ok) return null;
+  const rows = (await res.json()) as Record<string, unknown>[];
+  return rows[0] ?? null;
+}
+
 export async function setStaffActive(username: string, active: boolean): Promise<void> {
   const profile = await staffProfile(username);
   const userId = profile?.auth_user_id ?? null;

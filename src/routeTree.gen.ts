@@ -42,6 +42,7 @@ import { Route as ReportsActivityRouteImport } from './routes/reports.activity'
 import { Route as ReportsAnalyticsRouteImport } from './routes/reports.analytics'
 import { Route as ReportsCatalogRouteImport } from './routes/reports.catalog'
 import { Route as ReportsCouponsRouteImport } from './routes/reports.coupons'
+import { Route as ReportsHistoryRouteImport } from './routes/reports.history'
 import { Route as ReportsItemsRouteImport } from './routes/reports.items'
 import { Route as ReportsPaymentsRouteImport } from './routes/reports.payments'
 import { Route as ReportsSalesRouteImport } from './routes/reports.sales'
@@ -247,6 +248,11 @@ const ReportsCatalogRoute = ReportsCatalogRouteImport.update({
 const ReportsCouponsRoute = ReportsCouponsRouteImport.update({
   id: '/reports/coupons',
   path: '/reports/coupons',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsHistoryRoute = ReportsHistoryRouteImport.update({
+  id: '/reports/history',
+  path: '/reports/history',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReportsItemsRoute = ReportsItemsRouteImport.update({
@@ -488,6 +494,7 @@ export interface FileRoutesByFullPath {
   '/reports/analytics': typeof ReportsAnalyticsRoute
   '/reports/catalog': typeof ReportsCatalogRoute
   '/reports/coupons': typeof ReportsCouponsRoute
+  '/reports/history': typeof ReportsHistoryRoute
   '/reports/items': typeof ReportsItemsRoute
   '/reports/payments': typeof ReportsPaymentsRoute
   '/reports/sales': typeof ReportsSalesRoute
@@ -564,6 +571,7 @@ export interface FileRoutesByTo {
   '/reports/analytics': typeof ReportsAnalyticsRoute
   '/reports/catalog': typeof ReportsCatalogRoute
   '/reports/coupons': typeof ReportsCouponsRoute
+  '/reports/history': typeof ReportsHistoryRoute
   '/reports/items': typeof ReportsItemsRoute
   '/reports/payments': typeof ReportsPaymentsRoute
   '/reports/sales': typeof ReportsSalesRoute
@@ -641,6 +649,7 @@ export interface FileRoutesById {
   '/reports/analytics': typeof ReportsAnalyticsRoute
   '/reports/catalog': typeof ReportsCatalogRoute
   '/reports/coupons': typeof ReportsCouponsRoute
+  '/reports/history': typeof ReportsHistoryRoute
   '/reports/items': typeof ReportsItemsRoute
   '/reports/payments': typeof ReportsPaymentsRoute
   '/reports/sales': typeof ReportsSalesRoute
@@ -719,6 +728,7 @@ export interface FileRouteTypes {
     | '/reports/analytics'
     | '/reports/catalog'
     | '/reports/coupons'
+    | '/reports/history'
     | '/reports/items'
     | '/reports/payments'
     | '/reports/sales'
@@ -795,6 +805,7 @@ export interface FileRouteTypes {
     | '/reports/analytics'
     | '/reports/catalog'
     | '/reports/coupons'
+    | '/reports/history'
     | '/reports/items'
     | '/reports/payments'
     | '/reports/sales'
@@ -871,6 +882,7 @@ export interface FileRouteTypes {
     | '/reports/analytics'
     | '/reports/catalog'
     | '/reports/coupons'
+    | '/reports/history'
     | '/reports/items'
     | '/reports/payments'
     | '/reports/sales'
@@ -948,6 +960,7 @@ export interface RootRouteChildren {
   ReportsAnalyticsRoute: typeof ReportsAnalyticsRoute
   ReportsCatalogRoute: typeof ReportsCatalogRoute
   ReportsCouponsRoute: typeof ReportsCouponsRoute
+  ReportsHistoryRoute: typeof ReportsHistoryRoute
   ReportsItemsRoute: typeof ReportsItemsRoute
   ReportsPaymentsRoute: typeof ReportsPaymentsRoute
   ReportsSalesRoute: typeof ReportsSalesRoute
@@ -1221,6 +1234,13 @@ declare module '@tanstack/react-router' {
       path: '/reports/coupons'
       fullPath: '/reports/coupons'
       preLoaderRoute: typeof ReportsCouponsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports/history': {
+      id: '/reports/history'
+      path: '/reports/history'
+      fullPath: '/reports/history'
+      preLoaderRoute: typeof ReportsHistoryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reports/items': {
@@ -1560,6 +1580,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReportsAnalyticsRoute: ReportsAnalyticsRoute,
   ReportsCatalogRoute: ReportsCatalogRoute,
   ReportsCouponsRoute: ReportsCouponsRoute,
+  ReportsHistoryRoute: ReportsHistoryRoute,
   ReportsItemsRoute: ReportsItemsRoute,
   ReportsPaymentsRoute: ReportsPaymentsRoute,
   ReportsSalesRoute: ReportsSalesRoute,

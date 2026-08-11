@@ -50,6 +50,7 @@ import {
 } from "./active-branch";
 import { isShiftOverdue, localTerminalId } from "./shift-hours";
 import { beginShiftSession, endShiftSessions } from "./shift-sessions";
+import { setPublicHosts } from "./coupon-hosts";
 import { branchPolicy } from "./branch-policy";
 import { setActiveBranchSyncPolicy } from "./sync-policy";
 import { setPosFormats, setPosTimeZone } from "./time-zone";
@@ -395,6 +396,14 @@ export function PosProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setActiveBranchSyncPolicy(branchPolicy(state.settings, state.currentStoreId));
   }, [state.settings, state.currentStoreId]);
+
+  // Public member / redeem domains are admin-configured, never hardcoded.
+  useEffect(() => {
+    setPublicHosts(
+      state.settings.integrations.memberDomain,
+      state.settings.integrations.redeemDomain,
+    );
+  }, [state.settings.integrations.memberDomain, state.settings.integrations.redeemDomain]);
 
   useEffect(() => {
     setPosTimeZone(state.settings.integrations.timeZone);

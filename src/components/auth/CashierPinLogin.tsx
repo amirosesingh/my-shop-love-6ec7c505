@@ -70,12 +70,17 @@ export function CashierPinLogin({
   const storedLength = picked?.pinLength ?? 0;
   // A numeric PIN is 4-6 digits. Anything longer is a typed passcode, which
   // gets a plain field with no length cap and no auto-submit.
-  const passcodeAccount = storedLength > 6;
+  const passcodeAccount = storedLength > 12;
   // Known account: submit as soon as the expected digit lands. Unknown
-  // (typed) username: allow up to 6 digits and wait for an explicit Sign in.
-  const knownLength = storedLength >= 4 && storedLength <= 6 ? storedLength : 0;
-  const pinLength = knownLength || 6;
+  // (typed) username: allow up to 12 digits and wait for an explicit Sign in.
+  const knownLength = storedLength >= 4 && storedLength <= 12 ? storedLength : 0;
+  const pinLength = knownLength || 12;
   const keypadMode = !typing && !passcodeAccount;
+
+  // Someone whose credential is a long passcode never sees the keypad.
+  useEffect(() => {
+    if (passcodeAccount) setTyping(true);
+  }, [passcodeAccount]);
 
   const submit = useCallback(
     async (value: string) => {

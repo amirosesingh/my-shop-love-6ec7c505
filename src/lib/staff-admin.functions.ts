@@ -1,6 +1,33 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+/**
+ * Records a supervisor action in the permanent edit history. Written with the
+ * internal service key so the entry cannot be altered or skipped by a till.
+ */
+async function audit(entry: {
+  accessToken: string;
+  actionType: string;
+  entityAffected: string;
+  entityId: string;
+  oldValue?: unknown;
+  newValue?: unknown;
+}) {
+  const { describeAccessToken } = await import("./system-audit-access.server");
+  const { writeSystemAudit } = await import("./system-audit.server");
+  const actor = await describeAccessToken(entry.accessToken);
+  await writeSystemAudit({
+    actorId: actor.id,
+    actorName: actor.name,
+    actorRole: actor.role,
+    actionType: entry.actionType,
+    entityAffected: entry.entityAffected,
+    entityId: entry.entityId,
+    oldValue: entry.oldValue,
+    newValue: entry.newValue,
+  });
+}
+
 /** Create or update a staff member and the account behind them. */
 export const saveStaffAccount = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
@@ -30,6 +57,19 @@ export const saveStaffAccount = createServerFn({ method: "POST" })
         baseRole: data.baseRole,
         active: data.active,
       });
+      await audit({
+        accessToken: data.accessToken,
+        actionType: "staff.account_created",
+        entityAffected: "app_users",
+        entityId: data.username,
+        newValue: {
+          displayName: data.displayName,
+          roleSlug: data.roleSlug,
+          baseRole: data.baseRole,
+          branchId: data.branchId ?? null,
+          active: data.active,
+        },
+      });
       return { ok: true };
     } catch (e) {
       return { ok: false, error: (e as Error).message };
@@ -48,6 +88,13 @@ export const setStaffAccountActive = createServerFn({ method: "POST" })
       const mod = await import("./staff-admin.server");
       await mod.requireSupervisor(data.accessToken);
       await mod.setStaffActive(data.username, data.active);
+      await audit({
+        accessToken: data.accessToken,
+        actionType: data.active ? "staff.account_enabled" : "staff.account_disabled",
+        entityAffected: "app_users",
+        entityId: data.username,
+        newValue: { active: data.active },
+      });
       return { ok: true };
     } catch (e) {
       return { ok: false, error: (e as Error).message };
@@ -116,7 +163,23 @@ export const updateStaffAccount = createServerFn({ method: "POST" })
     try {
       const mod = await import("./staff-admin.server");
       await mod.requireSupervisor(data.accessToken);
+      const before = await mod.readStaffSnapshot(data.username);
       await mod.updateStaffProfile(data);
+      await audit({
+        accessToken: data.accessToken,
+        actionType: "staff.account_updated",
+        entityAffected: "app_users",
+        entityId: data.username,
+        oldValue: before,
+        newValue: {
+          displayName: data.displayName,
+          roleSlug: data.roleSlug,
+          baseRole: data.baseRole,
+          branchId: data.branchId,
+          active: data.active,
+          credentialChanged: Boolean(data.credential),
+        },
+      });
       return { ok: true };
     } catch (e) {
       return { ok: false, error: (e as Error).message };
@@ -133,7 +196,15 @@ export const deleteStaffAccount = createServerFn({ method: "POST" })
     try {
       const mod = await import("./staff-admin.server");
       await mod.requireSupervisor(data.accessToken);
+      const removed = await mod.readStaffSnapshot(data.username);
       await mod.permanentlyDeleteStaff(data.username, data.accessToken);
+      await audit({
+        accessToken: data.accessToken,
+        actionType: "staff.account_deleted",
+        entityAffected: "app_users",
+        entityId: data.username,
+        oldValue: removed,
+      });
       return { ok: true };
     } catch (e) {
       return { ok: false, error: (e as Error).message };
