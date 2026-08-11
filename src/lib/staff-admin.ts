@@ -16,12 +16,20 @@ import type { StaffRole } from "@/lib/permissions";
 
 export type StaffAccountInput = {
   displayName: string;
+  /** username, or a real email address */
   username: string;
-  pin: string;
+  pin?: string;
+  password?: string;
   branchId?: string | null;
   roleSlug: string;
   baseRole: StaffRole;
   active: boolean;
+};
+
+/** A real address is anything with an "@" outside our own hidden domain. */
+export const looksLikeEmail = (input: string) => {
+  const v = input.trim().toLowerCase();
+  return v.includes("@") && !v.endsWith("@pos-internal.local");
 };
 
 /** Built-in levels map onto the three access tiers the database understands. */
@@ -37,12 +45,21 @@ async function accessToken(): Promise<string> {
 
 /** Create a staff member, or update the one that already holds this username. */
 export async function createStaffMember(input: StaffAccountInput): Promise<void> {
+  const identifier = input.username.trim().toLowerCase();
+  const emailMode = looksLikeEmail(identifier);
+  if (!input.roleSlug) throw new Error("Choose a role for this person");
+  if (emailMode) {
+    if ((input.password ?? "").length < 8)
+      throw new Error("Set a password of at least 8 characters for an email account");
+  } else if (!/^\d{4,6}$/.test(input.pin ?? "")) {
+    throw new Error("A PIN must be 4 to 6 digits");
+  }
   const res = await saveStaffAccount({
     data: {
       accessToken: await accessToken(),
       displayName: input.displayName,
-      username: input.username,
-      pin: input.pin,
+      username: identifier,
+      ...(emailMode ? { password: input.password ?? "" } : { pin: input.pin ?? "" }),
       branchId: input.branchId ?? null,
       roleSlug: input.roleSlug,
       baseRole: dbBaseRole(input.baseRole),
