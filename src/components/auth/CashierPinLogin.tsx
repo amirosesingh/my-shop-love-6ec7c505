@@ -179,6 +179,11 @@ export function CashierPinLogin({ onAdminLogin }: { onAdminLogin?: () => void })
             className="h-11 text-center"
           />
         </div>
+        {onAdminLogin && (
+          <Button type="button" variant="ghost" className="w-full text-xs" onClick={onAdminLogin}>
+            Administrator sign in with email and password
+          </Button>
+        )}
       </div>
     );
   }
@@ -227,6 +232,13 @@ export function CashierPinLogin({ onAdminLogin }: { onAdminLogin?: () => void })
         ))}
       </div>
 
+      {lockedFor > 0 && (
+        <p className="flex items-center justify-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-center text-xs text-destructive">
+          <ShieldAlert className="size-4 shrink-0" />
+          Too many wrong PINs. Try again in {describeLockout(lockedFor)}.
+        </p>
+      )}
+
       <div className="grid grid-cols-3 gap-2">
         {KEYS.map((k) => (
           <Button
@@ -234,7 +246,7 @@ export function CashierPinLogin({ onAdminLogin }: { onAdminLogin?: () => void })
             type="button"
             variant="outline"
             className="h-14 text-lg"
-            disabled={busy}
+            disabled={busy || lockedFor > 0}
             onClick={() => press(k)}
           >
             {k}
@@ -244,7 +256,7 @@ export function CashierPinLogin({ onAdminLogin }: { onAdminLogin?: () => void })
           type="button"
           variant="ghost"
           className="h-14 text-xs"
-          disabled={busy}
+          disabled={busy || lockedFor > 0}
           onClick={() => {
             setPin("");
             setError("");
@@ -256,7 +268,7 @@ export function CashierPinLogin({ onAdminLogin }: { onAdminLogin?: () => void })
           type="button"
           variant="outline"
           className="h-14 text-lg"
-          disabled={busy}
+          disabled={busy || lockedFor > 0}
           onClick={() => press("0")}
         >
           0
@@ -266,7 +278,7 @@ export function CashierPinLogin({ onAdminLogin }: { onAdminLogin?: () => void })
           variant="ghost"
           className="h-14"
           aria-label="Delete last digit"
-          disabled={busy}
+          disabled={busy || lockedFor > 0}
           onClick={() => setPin(pin.slice(0, -1))}
         >
           <Delete className="size-5" />
@@ -279,6 +291,11 @@ export function CashierPinLogin({ onAdminLogin }: { onAdminLogin?: () => void })
         </p>
       )}
       {error && <p className="text-center text-sm text-destructive">{error}</p>}
+      {onAdminLogin && (
+        <Button type="button" variant="ghost" className="w-full text-xs" onClick={onAdminLogin}>
+          Administrator sign in with email and password
+        </Button>
+      )}
       <p className="text-[11px] leading-relaxed text-muted-foreground">
         PINs are checked by the backend. Once you have signed in here, the same PIN works with
         no connection.
