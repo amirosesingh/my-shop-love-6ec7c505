@@ -442,13 +442,31 @@ const shiftSessionToRow = (s: ShiftSession): Row => ({
  * Exactly the bill and line columns the till renders — no `SELECT *`, so a
  * schema that grows new columns never inflates the payload of every read.
  */
-const SALE_COLUMNS =
-  "id, bill_number, client_transaction_id, store_id, shift_id, cashier_name, member_id, subtotal_amount, " +
+const SALE_COLUMNS_BASE =
+  "id, bill_number, store_id, shift_id, cashier_name, member_id, subtotal_amount, " +
   "discount_amount, tax_amount, total_amount, paid_amount, change_amount, payment_type, " +
   "payments, points_earned, is_refunded, original_bill_number, exchanged_to_bill_number, " +
   "exchange_credit, coupon_code, coupon_promo_id, coupon_scope, coupon_discount, created_at, " +
   "sale_items(product_id, product_name, unit_price, quantity, tax_rate, discount_percent, " +
   "discount_amount, is_return, is_foc, promo_id, coupon_code, coupon_discount, unit_cost)";
+
+/**
+ * Older databases have not had the checkout-attempt column added yet. Asking
+ * for it there fails the whole read, so the first refusal switches every later
+ * query to the columns that definitely exist.
+ */
+let hasClientTxnColumn = true;
+
+const saleColumns = () =>
+  hasClientTxnColumn ? `${SALE_COLUMNS_BASE}, client_transaction_id` : SALE_COLUMNS_BASE;
+
+/** True when a failure is "that column is not in this database (yet)". */
+export const isMissingTxnColumn = (message: string | undefined | null) =>
+  !!message && /client_transaction_id/.test(message) && /does not exist|schema cache/i.test(message);
+
+const forgetTxnColumn = () => {
+  hasClientTxnColumn = false;
+};
 
 const rowToSale = (r: Row): Sale => ({
   id: r.id,
