@@ -17,6 +17,7 @@
 \i 24_staff_management.sql
 \i 25_staff_account_lifecycle.sql
 \i 27_staff_credentials_and_ids.sql
+\i 28_app_users_id_link.sql
 
 SELECT 'staff upgrade 22-25 complete' AS verification,
        to_regclass('public.app_users') IS NOT NULL AS app_users_ready,
