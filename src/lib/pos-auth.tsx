@@ -715,6 +715,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, [logout]);
 
+  // An account switched off by a manager must lose the till straight away, not
+  // at the next sign-in. Re-checked on a timer and whenever the screen is
+  // brought back into view; with no connection the check simply does not run.
+  useEffect(() => {
+    if (!user || typeof window === "undefined") return;
+    let alive = true;
+    const check = async () => {
+      if (document.visibilityState === "hidden") return;
+      if (typeof navigator !== "undefined" && !navigator.onLine) return;
+      try {
+        const { data, error } = await supabase.rpc("current_app_user");
+        if (!alive || error) return;
+        const profile = (Array.isArray(data) ? data[0] : null) as Record<string, unknown> | null;
+        if (profile && profile["is_active"] === false) {
+          await logout();
+          void import("sonner").then(({ toast }) =>
+            toast.error("Account deactivated", {
+              id: "pos-account-deactivated",
+              description: "This account has been switched off. Please contact an administrator.",
+            }),
+          );
+        }
+      } catch {
+        /* advisory only — the row rules still guard every write */
+      }
+    };
+    void check();
+    const timer = window.setInterval(() => void check(), 60_000);
+    document.addEventListener("visibilitychange", check);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", check);
+    };
+  }, [user?.staffId, logout]);
+
   // Boot / resume check: before the dashboard trusts what it has, ask the
   // server whether this device's token is still live and its branch still
   // exists. Only a definite refusal signs anyone out — offline stays working.
