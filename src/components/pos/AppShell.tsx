@@ -17,6 +17,7 @@ import { SystemStatusPill } from "@/components/pos/SystemStatusPill";
 import { SecurityAlertBell } from "@/components/pos/SecurityAlertBell";
 import { ShiftGuard } from "@/components/pos/ShiftGuard";
 import { PermissionDenied } from "@/components/pos/PermissionGate";
+import { useVisibility } from "@/lib/ui-visibility";
 import { LiveClock } from "@/components/pos/LiveClock";
 import { ThemeToggle } from "@/components/pos/ThemeToggle";
 import { startSyncEngine } from "@/lib/sync-engine";
