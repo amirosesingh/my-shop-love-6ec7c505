@@ -613,11 +613,20 @@ export async function loadCloudState(): Promise<CloudSlice> {
   const [products, members, sales, promotions, settings, stores, shifts] = await Promise.all([
     supabase.from("products").select("*").order("name"),
     supabase.from("members").select("*").order("created_at"),
-    supabase
-      .from("sales")
-      .select(SALE_COLUMNS)
-      .order("created_at", { ascending: false })
-      .limit(500),
+    (async () => {
+      const read = () =>
+        supabase
+          .from("sales")
+          .select(saleColumns())
+          .order("created_at", { ascending: false })
+          .limit(500);
+      const first = await read();
+      if (first.error && isMissingTxnColumn(first.error.message)) {
+        forgetTxnColumn();
+        return await read();
+      }
+      return first;
+    })(),
     supabase.from("promotions").select("*").order("created_at"),
     supabase.from("pos_settings").select("*").eq("id", 1).maybeSingle(),
     // The stores table only exists once schema10.sql has been applied; a
@@ -783,10 +792,18 @@ export async function loadSalesPage(
   cursor: Cursor = null,
   limit = PAGE_SIZE,
 ): Promise<Page<Sale>> {
-  let q = supabase.from("sales").select(SALE_COLUMNS);
-  if (storeId) q = q.eq("store_id", storeId) as typeof q;
-  const res = await keyset(q as never, "created_at", cursor, limit);
-  const err = (res as { error?: { message: string } }).error;
+  const query = () => {
+    let q = supabase.from("sales").select(saleColumns());
+    if (storeId) q = q.eq("store_id", storeId) as typeof q;
+    return keyset(q as never, "created_at", cursor, limit);
+  };
+  let res = await query();
+  let err = (res as { error?: { message: string } }).error;
+  if (err && isMissingTxnColumn(err.message)) {
+    forgetTxnColumn();
+    res = await query();
+    err = (res as { error?: { message: string } }).error;
+  }
   if (err) throw new Error(err.message);
   const rows = ((res as { data?: Row[] | null }).data ?? []) as Row[];
   return {
