@@ -25,12 +25,22 @@ import { cn } from "@/lib/utils";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
-export function CashierPinLogin({ onAdminLogin }: { onAdminLogin?: () => void }) {
+export function CashierPinLogin({
+  onAdminLogin,
+  initialUsername = "",
+}: {
+  onAdminLogin?: () => void;
+  initialUsername?: string;
+}) {
   const { cashierLogin } = useAuth();
   const [staff, setStaff] = useState<TerminalStaff[]>([]);
   const [loading, setLoading] = useState(true);
   const [picked, setPicked] = useState<TerminalStaff | null>(null);
-  const [manual, setManual] = useState("");
+  // What is being typed, and what has actually been committed. Keeping them
+  // apart is what lets someone type a whole username without the screen
+  // jumping to the keypad after the first character.
+  const [draft, setDraft] = useState(initialUsername);
+  const [manual, setManual] = useState(initialUsername.trim().toLowerCase());
   const [typing, setTyping] = useState(false);
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
@@ -57,10 +67,15 @@ export function CashierPinLogin({ onAdminLogin }: { onAdminLogin?: () => void })
   }, []);
 
   const username = picked?.username ?? manual.trim().toLowerCase();
-  const pinLength = picked?.pinLength && picked.pinLength >= 4 ? picked.pinLength : 4;
-  // Longer credentials are passcodes rather than tapped PINs, so they get a
-  // masked field and an explicit Enter instead of auto-submitting.
-  const keypadMode = !typing && pinLength <= 8;
+  const storedLength = picked?.pinLength ?? 0;
+  // A numeric PIN is 4-6 digits. Anything longer is a typed passcode, which
+  // gets a plain field with no length cap and no auto-submit.
+  const passcodeAccount = storedLength > 6;
+  // Known account: submit as soon as the expected digit lands. Unknown
+  // (typed) username: allow up to 6 digits and wait for an explicit Sign in.
+  const knownLength = storedLength >= 4 && storedLength <= 6 ? storedLength : 0;
+  const pinLength = knownLength || 6;
+  const keypadMode = !typing && !passcodeAccount;
 
   const submit = useCallback(
     async (value: string) => {
@@ -106,7 +121,7 @@ export function CashierPinLogin({ onAdminLogin }: { onAdminLogin?: () => void })
     const next = pinRef.current + digit;
     setPin(next);
     setError("");
-    if (next.length === pinLength) void submit(next);
+    if (knownLength && next.length === knownLength) void submit(next);
   };
 
   // Physical keyboards and keypads work exactly like the on-screen pad.
@@ -133,6 +148,16 @@ export function CashierPinLogin({ onAdminLogin }: { onAdminLogin?: () => void })
 
   /* ---------------------------- step one: person --------------------------- */
   if (!picked && !manual) {
+    const commitDraft = () => {
+      const value = draft.trim().toLowerCase();
+      if (!value) {
+        setError("Enter your username to continue");
+        return;
+      }
+      setManual(value);
+      setPin("");
+      setError("");
+    };
     return (
       <div className="space-y-4 pt-4">
         <div>
@@ -173,16 +198,33 @@ export function CashierPinLogin({ onAdminLogin }: { onAdminLogin?: () => void })
             No staff are listed for this terminal&apos;s branch yet. Type your username below.
           </p>
         )}
-        <div className="space-y-1">
+        <form
+          className="space-y-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            commitDraft();
+          }}
+        >
           <Label htmlFor="pin-username">Or enter a username</Label>
           <Input
             id="pin-username"
             autoComplete="username"
             placeholder="cashier101"
-            onChange={(e) => setManual(e.target.value.replace(/\s+/g, ""))}
+            value={draft}
+            onChange={(e) => {
+              setDraft(e.target.value.replace(/\s+/g, ""));
+              setError("");
+            }}
+            onBlur={() => {
+              if (draft.trim().length >= 2) commitDraft();
+            }}
             className="h-11 text-center"
           />
-        </div>
+          <Button type="submit" variant="outline" className="w-full" disabled={!draft.trim()}>
+            Next
+          </Button>
+          {error && <p className="text-center text-sm text-destructive">{error}</p>}
+        </form>
         {onAdminLogin && (
           <Button type="button" variant="ghost" className="w-full text-xs" onClick={onAdminLogin}>
             Administrator sign in with email and password
@@ -212,6 +254,8 @@ export function CashierPinLogin({ onAdminLogin }: { onAdminLogin?: () => void })
           onClick={() => {
             setPicked(null);
             setManual("");
+            setDraft("");
+            setTyping(false);
             setPin("");
             setError("");
           }}
@@ -244,7 +288,13 @@ export function CashierPinLogin({ onAdminLogin }: { onAdminLogin?: () => void })
       )}
 
       {keypadMode ? (
-      <div className="grid grid-cols-3 gap-2">
+      <form
+        className="grid grid-cols-3 gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (pin.length >= 4) void submit(pin);
+        }}
+      >
         {KEYS.map((k) => (
           <Button
             key={k}
@@ -288,7 +338,16 @@ export function CashierPinLogin({ onAdminLogin }: { onAdminLogin?: () => void })
         >
           <Delete className="size-5" />
         </Button>
-      </div>
+        {!knownLength && (
+          <Button
+            type="submit"
+            className="col-span-3 h-12"
+            disabled={busy || lockedFor > 0 || pin.length < 4}
+          >
+            Sign in
+          </Button>
+        )}
+      </form>
       ) : (
         <form
           className="space-y-2"
@@ -297,17 +356,20 @@ export function CashierPinLogin({ onAdminLogin }: { onAdminLogin?: () => void })
             if (pin.length >= 4) void submit(pin);
           }}
         >
-          <Label htmlFor="pin-passcode">Passcode</Label>
+          <Label htmlFor="pin-passcode">{passcodeAccount ? "Passcode" : "PIN"}</Label>
           <Input
             id="pin-passcode"
             type="password"
             autoFocus
             autoComplete="current-password"
-            maxLength={32}
+            {...(passcodeAccount
+              ? { maxLength: 64 }
+              : { inputMode: "numeric" as const, pattern: "[0-9]*", maxLength: 6 })}
             value={pin}
             disabled={busy || lockedFor > 0}
             onChange={(e) => {
-              setPin(e.target.value);
+              const raw = e.target.value;
+              setPin(passcodeAccount ? raw : raw.replace(/\D+/g, "").slice(0, 6));
               setError("");
             }}
             className="h-12 text-center"
@@ -318,7 +380,7 @@ export function CashierPinLogin({ onAdminLogin }: { onAdminLogin?: () => void })
         </form>
       )}
 
-      {pinLength <= 8 && (
+      {!passcodeAccount && (
         <Button
           type="button"
           variant="ghost"

@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useBranding } from "@/lib/branding";
 import { isTerminalApp } from "@/lib/native";
 import { CashierPinLogin } from "@/components/auth/CashierPinLogin";
+import { isExternalEmail, usernameFromAddress } from "@/lib/internal-domains";
 
 export function TerminalLogin() {
   const { login } = useAuth();
@@ -22,6 +23,8 @@ export function TerminalLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [tab, setTab] = useState("admin");
+  const [pinIdentifier, setPinIdentifier] = useState("");
+  const [routed, setRouted] = useState(false);
 
   useEffect(() => {
     setTab(terminal ? "cashier" : "admin");
@@ -59,7 +62,19 @@ export function TerminalLogin() {
 
           {terminal && (
             <TabsContent value="cashier">
-              <CashierPinLogin onAdminLogin={() => setTab("admin")} />
+              {routed && (
+                <p className="rounded-md border border-border bg-surface-2 p-3 text-[11px] text-muted-foreground">
+                  That is a till account, so it signs in with a PIN instead of a password.
+                </p>
+              )}
+              <CashierPinLogin
+                key={pinIdentifier}
+                initialUsername={pinIdentifier}
+                onAdminLogin={() => {
+                  setRouted(false);
+                  setTab("admin");
+                }}
+              />
             </TabsContent>
           )}
 
@@ -68,6 +83,16 @@ export function TerminalLogin() {
               className="space-y-4"
               onSubmit={async (e) => {
                 e.preventDefault();
+                const typed = email.trim().toLowerCase();
+                // Internal accounts (bare usernames and our own hidden
+                // domains) never use a password — hand them to the keypad.
+                if (terminal && typed && !isExternalEmail(typed)) {
+                  setPinIdentifier(usernameFromAddress(typed));
+                  setRouted(true);
+                  setError("");
+                  setTab("cashier");
+                  return;
+                }
                 setBusy(true);
                 setError("");
                 const res = await login(email, password);
