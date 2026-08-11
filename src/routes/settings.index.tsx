@@ -141,6 +141,12 @@ const GROUPS = [
         blurb: "Automatic running-number product codes, or manual entry.",
       },
       {
+        to: "/settings/numbering",
+        label: "Bill numbering",
+        icon: ReceiptText,
+        blurb: "Branch, till, date and running number on every receipt.",
+      },
+      {
         to: "/settings/catalog",
         label: "Categories & units",
         icon: ScanBarcode,
