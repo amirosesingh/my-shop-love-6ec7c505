@@ -25,7 +25,9 @@ export type Database = {
           last_login_at: string | null
           permissions: Json
           pin_hash: string
+          pin_length: number
           role: Database["public"]["Enums"]["app_role"]
+          role_slug: string | null
           store_id: string | null
           updated_at: string
           user_id: string
@@ -40,7 +42,9 @@ export type Database = {
           last_login_at?: string | null
           permissions?: Json
           pin_hash?: string
+          pin_length?: number
           role?: Database["public"]["Enums"]["app_role"]
+          role_slug?: string | null
           store_id?: string | null
           updated_at?: string
           user_id: string
@@ -55,7 +59,9 @@ export type Database = {
           last_login_at?: string | null
           permissions?: Json
           pin_hash?: string
+          pin_length?: number
           role?: Database["public"]["Enums"]["app_role"]
+          role_slug?: string | null
           store_id?: string | null
           updated_at?: string
           user_id?: string
@@ -270,6 +276,7 @@ export type Database = {
           last_login_at: string | null
           permissions: Json
           pin_hash: string
+          role_slug: string | null
           store_id: string | null
           updated_at: string
           username: string
@@ -282,6 +289,7 @@ export type Database = {
           last_login_at?: string | null
           permissions?: Json
           pin_hash: string
+          role_slug?: string | null
           store_id?: string | null
           updated_at?: string
           username: string
@@ -294,6 +302,7 @@ export type Database = {
           last_login_at?: string | null
           permissions?: Json
           pin_hash?: string
+          role_slug?: string | null
           store_id?: string | null
           updated_at?: string
           username?: string
@@ -1507,6 +1516,36 @@ export type Database = {
         }
         Relationships: []
       }
+      staff_roles: {
+        Row: {
+          base_level: string
+          created_at: string
+          is_core: boolean
+          name: string
+          permissions: Json
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          base_level?: string
+          created_at?: string
+          is_core?: boolean
+          name: string
+          permissions?: Json
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          base_level?: string
+          created_at?: string
+          is_core?: boolean
+          name?: string
+          permissions?: Json
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       stock_adjustments: {
         Row: {
           barcode: string | null
@@ -2079,6 +2118,17 @@ export type Database = {
       is_staff: { Args: { _user_id: string }; Returns: boolean }
       is_staff_now: { Args: never; Returns: boolean }
       is_supervisor_now: { Args: never; Returns: boolean }
+      legacy_cashiers_for_migration: {
+        Args: never
+        Returns: {
+          full_name: string
+          is_active: boolean
+          pin_hash: string
+          role_slug: string
+          store_id: string
+          username: string
+        }[]
+      }
       list_app_users: {
         Args: never
         Returns: {
@@ -2086,11 +2136,14 @@ export type Database = {
           created_at: string
           email: string
           full_name: string
+          has_pin: boolean
           id: string
           is_active: boolean
           last_login_at: string
           permissions: Json
+          pin_length: number
           role: Database["public"]["Enums"]["app_role"]
+          role_slug: string
           store_id: string
           user_id: string
         }[]
@@ -2148,6 +2201,48 @@ export type Database = {
         Args: { p_active: boolean; p_user_id: string }
         Returns: undefined
       }
+      staff_account_adopt_legacy: {
+        Args: { p_username: string }
+        Returns: undefined
+      }
+      staff_account_delete_profile: {
+        Args: { p_auth_user_id: string; p_user_id: string }
+        Returns: undefined
+      }
+      staff_account_set_active: {
+        Args: { p_active: boolean; p_user_id: string }
+        Returns: undefined
+      }
+      staff_account_set_pin: {
+        Args: { p_pin: string; p_pin_length?: number; p_user_id: string }
+        Returns: undefined
+      }
+      staff_account_upsert: {
+        Args: {
+          p_auth_user_id: string
+          p_email: string
+          p_full_name: string
+          p_is_active: boolean
+          p_permissions?: Json
+          p_pin: string
+          p_pin_length: number
+          p_role: Database["public"]["Enums"]["app_role"]
+          p_role_slug: string
+          p_store_id: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
+      staff_role_delete: { Args: { _slug: string }; Returns: undefined }
+      staff_role_save: {
+        Args: {
+          _base_level: string
+          _name: string
+          _permissions: Json
+          _slug: string
+        }
+        Returns: undefined
+      }
       stock_transfer_receive: {
         Args: {
           p_deduct_source?: boolean
@@ -2157,6 +2252,17 @@ export type Database = {
         Returns: undefined
       }
       store_visible: { Args: { _store_id: string }; Returns: boolean }
+      terminal_staff_list: {
+        Args: { p_store_id?: string }
+        Returns: {
+          full_name: string
+          kind: string
+          pin_length: number
+          role_slug: string
+          store_id: string
+          user_id: string
+        }[]
+      }
       terminal_token_claim: {
         Args: { p_device?: string; p_token_id: string }
         Returns: boolean
