@@ -158,6 +158,8 @@ export async function provisionStaffAccount(payload: StaffPayload): Promise<{ us
     });
   }
 
+  if (!userId) throw new Error("The authentication account was not created");
+
   await serviceRpc("staff_account_upsert", {
     p_user_id: username,
     p_full_name: payload.displayName.trim() || username,
@@ -178,7 +180,6 @@ export async function provisionStaffAccount(payload: StaffPayload): Promise<{ us
     body: JSON.stringify([{ user_id: userId, role: payload.baseRole }]),
   });
 
-  if (!userId) throw new Error("The authentication account was not created");
   return { userId };
 }
 
@@ -208,10 +209,11 @@ type StaffProfileRow = {
   is_active: boolean;
   auth_user_id: string | null;
   permissions: Record<string, boolean>;
+  pin_length: number;
 };
 
 async function staffProfile(username: string): Promise<StaffProfileRow | null> {
-  const query = `app_users?user_id=eq.${encodeURIComponent(username.trim().toLowerCase())}&select=user_id,full_name,email,role,role_slug,store_id,is_active,auth_user_id,permissions&limit=1`;
+  const query = `app_users?user_id=eq.${encodeURIComponent(username.trim().toLowerCase())}&select=user_id,full_name,email,role,role_slug,store_id,is_active,auth_user_id,permissions,pin_length&limit=1`;
   const res = await serviceRest(query);
   if (!res.ok) throw new Error("The staff profile could not be loaded");
   const rows = (await res.json()) as StaffProfileRow[];
@@ -261,7 +263,9 @@ export async function updateStaffProfile(input: {
     p_store_id: input.branchId,
     p_is_active: input.active,
     p_pin: terminalAccount && credential ? credential : "",
-    p_pin_length: terminalAccount && credential ? credential.length : 0,
+    p_pin_length: terminalAccount
+      ? (credential ? credential.length : profile.pin_length)
+      : 0,
     p_auth_user_id: profile.auth_user_id,
     p_permissions: null,
   });

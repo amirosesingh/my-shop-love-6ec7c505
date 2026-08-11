@@ -36,7 +36,7 @@ export const looksLikeEmail = (input: string) => {
 
 /** Built-in levels map onto the three access tiers the database understands. */
 export const dbBaseRole = (role: StaffRole): "admin" | "manager" | "staff" =>
-  role === "admin" ? "admin" : role === "supervisor" || role === "warehouse" ? "manager" : "staff";
+  role === "admin" ? "admin" : role === "supervisor" ? "manager" : "staff";
 
 async function accessToken(): Promise<string> {
   const { data } = await supabaseExternal.auth.getSession();
