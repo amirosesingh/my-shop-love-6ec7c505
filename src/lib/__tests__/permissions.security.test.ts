@@ -4,11 +4,18 @@ import {
   FULL_PERMISSIONS,
   PERMISSION_GROUPS,
   PERMISSION_KEYS,
+  PERMISSION_TAGS,
+  PERMISSION_TAG_KEYS,
+  ROLE_PRESETS,
+  STAFF_ROLES,
+  SUPERVISOR_PERMISSIONS,
   WAREHOUSE_PERMISSIONS,
   normalizePermissions,
   rolePermissions,
+  roleHasTag,
   type PermissionKey,
 } from "@/lib/permissions";
+import { isRouteVisibleFor } from "@/lib/ui-visibility";
 
 /**
  * Snapshot of the least-privilege presets. If a preset is widened, this test
@@ -97,9 +104,9 @@ describe("permission presets", () => {
     }
   });
 
-  it("only admins and supervisors get the full matrix", () => {
+  it("only administrators get the full matrix", () => {
     expect(rolePermissions("admin")).toEqual(FULL_PERMISSIONS);
-    expect(rolePermissions("supervisor")).toEqual(FULL_PERMISSIONS);
+    expect(rolePermissions("supervisor")).not.toEqual(FULL_PERMISSIONS);
     expect(rolePermissions("cashier")).not.toEqual(FULL_PERMISSIONS);
     expect(rolePermissions("warehouse")).not.toEqual(FULL_PERMISSIONS);
   });
@@ -128,5 +135,54 @@ describe("permission matrix integrity", () => {
   it("an empty stored matrix denies everything for limited roles", () => {
     const matrix = normalizePermissions({}, "cashier");
     expect(granted(matrix)).toEqual([]);
+  });
+});
+describe("permission tags", () => {
+  it("every permission belongs to exactly one tag", () => {
+    const tagged = PERMISSION_TAG_KEYS.flatMap((t) => PERMISSION_TAGS[t].keys);
+    expect([...tagged].sort()).toEqual([...PERMISSION_KEYS].sort());
+    expect(new Set(tagged).size).toBe(tagged.length);
+  });
+
+  it("only administrators carry the admin-only tag", () => {
+    expect(PERMISSION_TAGS["admin-only"].roles).toEqual(["admin"]);
+    expect(roleHasTag("cashier", "admin-only")).toBe(false);
+    expect(roleHasTag("supervisor", "admin-only")).toBe(false);
+    expect(roleHasTag("admin", "admin-only")).toBe(true);
+  });
+
+  it("supervisors never get staff, terminal, sync or settings control", () => {
+    for (const key of [
+      "can_manage_staff",
+      "can_manage_terminals",
+      "can_manage_sync_backup",
+      "can_access_pos_settings",
+    ] as PermissionKey[]) {
+      expect(SUPERVISOR_PERMISSIONS[key], key).toBe(false);
+    }
+    expect(SUPERVISOR_PERMISSIONS.can_process_sale).toBe(true);
+  });
+
+  it("every built-in role has a preset", () => {
+    for (const role of STAFF_ROLES) expect(ROLE_PRESETS[role]).toEqual(rolePermissions(role));
+  });
+});
+
+describe("route visibility", () => {
+  it("a hidden settings page is refused for that role only", () => {
+    const hidden = { "route:/settings/services": ["supervisor"] };
+    expect(isRouteVisibleFor(hidden, "/settings/services", "supervisor")).toBe(false);
+    expect(isRouteVisibleFor({}, "/settings/services", "supervisor")).toBe(true);
+    expect(isRouteVisibleFor(hidden, "/settings/services", "admin")).toBe(true);
+  });
+
+  it("an admin-only settings page is never shown to a cashier", () => {
+    expect(isRouteVisibleFor({}, "/settings/sync", "cashier")).toBe(false);
+    expect(isRouteVisibleFor({}, "/settings/display", "cashier")).toBe(true);
+  });
+
+  it("screens with no visibility entry stay reachable", () => {
+    expect(isRouteVisibleFor({}, "/", "cashier")).toBe(true);
+    expect(isRouteVisibleFor({}, "/reports/sales", "supervisor")).toBe(true);
   });
 });

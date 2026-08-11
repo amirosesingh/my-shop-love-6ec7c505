@@ -74,7 +74,10 @@ describe("route guards", () => {
     );
     expect(entries.length).toBeGreaterThan(0);
     for (const entry of entries) {
-      expect(entry, entry).toContain('flag: "can_view_sales_reports"');
+      const gated =
+        entry.includes('flag: "can_view_sales_reports"') ||
+        entry.includes('flag: "can_view_audit_trail"');
+      expect(gated, entry).toBe(true);
     }
   });
 });

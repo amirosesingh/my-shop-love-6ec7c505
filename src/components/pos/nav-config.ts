@@ -35,7 +35,7 @@ import {
   PackageSearch,
 } from "lucide-react";
 
-import type { PermissionFlag } from "@/lib/permissions";
+import type { PermissionFlag, PermissionTag } from "@/lib/permissions";
 
 export type NavFlag = PermissionFlag;
 
@@ -44,6 +44,8 @@ export type NavItem = {
   label: string;
   icon: typeof LayoutGrid;
   flag?: NavFlag;
+  /** Which roles this entry is meant for. Defaults to the tag of `flag`. */
+  tag?: PermissionTag;
   adminOnly?: boolean;
   /** Cloud-only admin tool — hidden in the Windows desktop build. */
   desktopHidden?: boolean;

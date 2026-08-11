@@ -262,7 +262,9 @@ export const rolePermissions = (role: StaffRole): StaffPermissions =>
     ? { ...CASHIER_PERMISSIONS }
     : role === "warehouse"
       ? { ...WAREHOUSE_PERMISSIONS }
-      : { ...FULL_PERMISSIONS };
+      : role === "supervisor"
+        ? { ...SUPERVISOR_PERMISSIONS }
+        : { ...FULL_PERMISSIONS };
 
 // --------------------------------------------------------------------------
 // Legacy flag aliases used by older screens / nav config.
@@ -391,3 +393,154 @@ export function getEffectivePermissions(
   }
   return merged;
 }
+
+// --------------------------------------------------------------------------
+// Role presets and permission tags.
+//
+// One source of truth: the same presets drive account creation, the Accounts
+// screen preset picker and custom-role base levels. Tags sit *over* the matrix
+// and decide what a role can see; the matrix still decides what may be done.
+// --------------------------------------------------------------------------
+
+/** Supervisors run the floor but do not own the install: no staff control,
+ *  no terminal activation, no sync/backup and no settings. */
+export const SUPERVISOR_PERMISSIONS: StaffPermissions = build(
+  PERMISSION_KEYS.filter(
+    (k) =>
+      k !== "can_manage_staff" &&
+      k !== "can_manage_terminals" &&
+      k !== "can_manage_sync_backup" &&
+      k !== "can_access_pos_settings",
+  ),
+);
+
+/** Every built-in level with the permissions a brand-new account starts on. */
+export const ROLE_PRESETS: Record<StaffRole, StaffPermissions> = {
+  cashier: CASHIER_PERMISSIONS,
+  warehouse: WAREHOUSE_PERMISSIONS,
+  supervisor: SUPERVISOR_PERMISSIONS,
+  admin: FULL_PERMISSIONS,
+};
+
+export const ROLE_LABELS: Record<StaffRole, string> = {
+  cashier: "Cashier",
+  warehouse: "Warehouse",
+  supervisor: "Supervisor",
+  admin: "Owner / Administrator",
+};
+
+export type PermissionTag =
+  | "cashier-visible"
+  | "inventory-access"
+  | "reports-access"
+  | "supervisor-only"
+  | "admin-only";
+
+export const TAG_LABELS: Record<PermissionTag, string> = {
+  "cashier-visible": "Till floor",
+  "inventory-access": "Stock & supply",
+  "reports-access": "Reporting",
+  "supervisor-only": "Supervisor",
+  "admin-only": "Administrator",
+};
+
+/** Which roles a tag is meant for, and the permissions it bundles. */
+export const PERMISSION_TAGS: Record<
+  PermissionTag,
+  { roles: StaffRole[]; keys: PermissionKey[] }
+> = {
+  "cashier-visible": {
+    roles: ["cashier", "supervisor", "admin"],
+    keys: [
+      "can_open_drawer",
+      "can_close_drawer",
+      "can_view_drawer_balance",
+      "can_open_shift",
+      "can_close_shift",
+      "can_bypass_shift_lock",
+      "can_delete_line",
+      "can_reduce_qty",
+      "can_discount_bill",
+      "can_override_price",
+      "can_void_cart",
+      "can_no_sale_open",
+      "can_edit_tenders",
+      "can_process_sale",
+      "can_give_discount",
+      "can_void_item",
+      "can_hold_cart",
+      "can_process_refund",
+      "can_process_exchange",
+      "can_reprint_bill",
+      "can_send_whatsapp_bill",
+      "can_manage_bookings",
+      "can_add_member",
+      "can_apply_member_discount",
+      "can_redeem_points",
+      "can_view_member_history",
+    ],
+  },
+  "inventory-access": {
+    roles: ["warehouse", "supervisor", "admin"],
+    keys: [
+      "can_view_inventory",
+      "can_edit_product_price",
+      "can_add_new_product",
+      "can_receive_purchase_order",
+      "can_adjust_stock",
+      "can_create_transfer",
+      "can_receive_transfer",
+      "can_approve_transfer",
+      "can_manage_locations",
+      "can_manage_categories",
+      "can_bulk_edit_products",
+      "can_merge_products",
+    ],
+  },
+  "reports-access": {
+    roles: ["supervisor", "admin"],
+    keys: [
+      "can_view_sales_reports",
+      "can_view_dashboard",
+      "can_view_audit_trail",
+      "can_export_reports",
+    ],
+  },
+  "supervisor-only": {
+    roles: ["supervisor", "admin"],
+    keys: ["can_edit_member_points", "can_manage_promotions"],
+  },
+  "admin-only": {
+    roles: ["admin"],
+    keys: [
+      "can_access_pos_settings",
+      "can_manage_staff",
+      "can_manage_terminals",
+      "can_manage_sync_backup",
+    ],
+  },
+};
+
+export const PERMISSION_TAG_KEYS = Object.keys(PERMISSION_TAGS) as PermissionTag[];
+
+const TAG_OF_KEY = ((): Record<PermissionKey, PermissionTag> => {
+  const map = {} as Record<PermissionKey, PermissionTag>;
+  for (const tag of PERMISSION_TAG_KEYS) {
+    for (const key of PERMISSION_TAGS[tag].keys) map[key] = tag;
+  }
+  return map;
+})();
+
+/** The tag a single permission belongs to. */
+export const tagOfPermission = (flag: PermissionFlag): PermissionTag =>
+  TAG_OF_KEY[resolvePermission(flag)] ?? "admin-only";
+
+/** Tags a role is meant to see. Administrators see everything. */
+export function tagsForRole(role: StaffRole): PermissionTag[] {
+  if (role === "admin") return [...PERMISSION_TAG_KEYS];
+  return PERMISSION_TAG_KEYS.filter((t) => PERMISSION_TAGS[t].roles.includes(role));
+}
+
+/** Is a screen carrying `tag` meant for this role? */
+export const roleHasTag = (role: StaffRole, tag: PermissionTag): boolean =>
+  role === "admin" || PERMISSION_TAGS[tag].roles.includes(role);

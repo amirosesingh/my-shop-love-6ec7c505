@@ -17,6 +17,8 @@ import { SystemStatusPill } from "@/components/pos/SystemStatusPill";
 import { SecurityAlertBell } from "@/components/pos/SecurityAlertBell";
 import { ShiftGuard } from "@/components/pos/ShiftGuard";
 import { PermissionDenied } from "@/components/pos/PermissionGate";
+import { useVisibility } from "@/lib/ui-visibility";
+import { roleHasTag, tagOfPermission, type StaffRole } from "@/lib/permissions";
 import { LiveClock } from "@/components/pos/LiveClock";
 import { ThemeToggle } from "@/components/pos/ThemeToggle";
 import { startSyncEngine } from "@/lib/sync-engine";
@@ -124,6 +126,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Windows tills must be registered to a location before they can be used.
   const terminal = useRevocationCheck();
   const location = useLocation();
+  const { visibleRoute, role: visibilityRole } = useVisibility();
 
   // Terminal-wide font / control scaling preference.
   useUiScale();
@@ -219,6 +222,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (item.desktopHidden && isDesktop()) return false;
     if (item.flag && !can(item.flag)) return false;
     if (item.adminOnly && !isAdmin && !item.flag) return false;
+    if (!visibleRoute(item.to)) return false;
+    const tag = item.tag ?? (item.flag ? tagOfPermission(item.flag) : null);
+    if (tag && !roleHasTag((visibilityRole as StaffRole) ?? "cashier", tag)) return false;
     return true;
   };
 
@@ -441,7 +447,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             const required = requiredPermission(location.pathname);
             const allowed =
               required === null ? true : required === "unknown" ? isAdmin : can(required);
-            if (allowed) return children;
+            if (allowed && visibleRoute(location.pathname)) return children;
+            if (allowed)
+              return (
+                <PermissionDenied title="Hidden for your role" flag={null} />
+              );
             return <PermissionDenied flag={required === "unknown" ? null : required} />;
           })()}
         </main>
