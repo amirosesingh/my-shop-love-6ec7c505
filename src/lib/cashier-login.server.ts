@@ -33,11 +33,16 @@ export async function cashierLoginServer(input: {
 }): Promise<CashierLoginResult> {
   const username = input.username.trim().toLowerCase();
   if (!username) return { ok: false, error: "Enter your username" };
-  if (!/^\d{4,6}$/.test(input.pin)) return { ok: false, error: "Enter your PIN" };
+  // Accounts are provisioned with a 4-32 character credential, so the login
+  // must accept the same range — a longer or alphanumeric passcode is valid.
+  const secret = input.pin;
+  if (secret.length < 4 || secret.length > 32) {
+    return { ok: false, error: "Enter your PIN or passcode" };
+  }
 
   const res = await serviceRest("rpc/verify_terminal_pin", {
     method: "POST",
-    body: JSON.stringify({ p_user_id: username, p_pin: input.pin }),
+    body: JSON.stringify({ p_user_id: username, p_pin: secret }),
   });
   if (!res.ok) return { ok: false, error: "Could not reach the central database" };
 
