@@ -87,6 +87,9 @@
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^3.24.2"
   },
+  "optionalDependencies": {
+    "msnodesqlv8": "^4.4.0"
+  },
   "devDependencies": {
     "@capacitor/cli": "^8.5.0",
     "@electron/packager": "^20.0.4",
@@ -113,7 +116,7 @@
     "vitest": "^4.1.10",
     "wrangler": "^4.119.0"
   },
-  "version": "1.2.88",
+  "version": "1.2.89",
   "build": {
     "appId": "app.lovable.pos",
     "productName": "LovablePOS",
@@ -121,6 +124,10 @@
       "electron/**",
       "dist-desktop/**",
       "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/msnodesqlv8/**",
+      "node_modules/mssql/**"
     ],
     "win": {
       "target": [

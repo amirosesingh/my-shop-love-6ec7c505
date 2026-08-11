@@ -23,6 +23,7 @@ import {
 } from "./db-mode";
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { readSnapshot } from "./offline-snapshot";
+import { checkHealth, lastHealth } from "./connection-health";
 import type { Row, SyncOp } from "./sync-outbox";
 
 export { AllTargetsFailed, isCloudDirect };
@@ -105,7 +106,10 @@ export const dbRouter = {
    */
   async query(table: string, options: QueryOptions = {}): Promise<Row[]> {
     const cached = () => localQuery(table, options);
-    if (effectiveDatabaseMode() === "local") {
+    const health = lastHealth();
+    // Working locally, or the last probe says the central database is out of
+    // reach: serve the terminal copy without a doomed round trip.
+    if (effectiveDatabaseMode() === "local" || (health && !health.cloud)) {
       const rows = cached();
       if (rows) return rows;
     }
@@ -148,6 +152,9 @@ export const dbRouter = {
 
   /** Plain wording for where a change landed. */
   label: commitLabel,
+
+  /** Live view of what is reachable right now (cached for two seconds). */
+  health: checkHealth,
 };
 
 /** Same gateway, under the name used elsewhere in the project brief. */

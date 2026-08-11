@@ -7,6 +7,8 @@
  * toast. Nothing fails silently.
  */
 import { toast } from "sonner";
+import { guardNotification, isConnectivityMessage } from "./notification-guard";
+import { anyDatabaseReachable } from "./connection-health";
 
 export type NotifyKind = "success" | "info" | "warning" | "error";
 
@@ -57,10 +59,15 @@ export function describeError(error: unknown, action = "That action"): string {
 /** Show a message. The single entry point for all user-facing notifications. */
 export function showNotification(message: string, kind: NotifyKind = "info", description?: string) {
   const options = description ? { description } : undefined;
-  if (kind === "success") return toast.success(message, options);
-  if (kind === "error") return toast.error(message, options);
-  if (kind === "warning") return toast.warning(message, options);
-  return toast(message, options);
+  const emit = () => {
+    if (kind === "success") return toast.success(message, options);
+    if (kind === "error") return toast.error(message, options);
+    if (kind === "warning") return toast.warning(message, options);
+    return toast(message, options);
+  };
+  // A connectivity complaint is only true when nothing at all is reachable.
+  if (kind === "success") return emit();
+  return guardNotification(message, emit);
 }
 
 /** Report a caught failure as a readable popup and return the message shown. */
@@ -69,15 +76,16 @@ export function notifyError(error: unknown, action = "That action"): string {
   // that needs a modal the operator has to acknowledge, not a passing toast.
   if ((error as { name?: string } | null)?.name === "AllTargetsFailed") {
     const message = (error as Error).message;
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(
-        new CustomEvent("pos:db-unreachable", { detail: { message, action } }),
-      );
-    }
+    // Blocking modal only when both databases really are gone.
+    void anyDatabaseReachable().then((reachable) => {
+      if (reachable || typeof window === "undefined") return;
+      window.dispatchEvent(new CustomEvent("pos:db-unreachable", { detail: { message, action } }));
+    });
     return message;
   }
   const message = describeError(error, action);
-  showNotification(message, "error");
+  if (isConnectivityMessage(message)) guardNotification(message, () => toast.error(message));
+  else showNotification(message, "error");
   return message;
 }
 

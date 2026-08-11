@@ -3,6 +3,7 @@ import { DatabaseZap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { unreachableMessage } from "@/lib/db-mode";
+import { CLEAR_EVENT } from "@/lib/notification-guard";
 
 /**
  * Shown only when a change could not be stored on this terminal *or* in the
@@ -18,7 +19,13 @@ export function DbConnectionModal() {
       setMessage(detail?.message ?? unreachableMessage());
     };
     window.addEventListener("pos:db-unreachable", onFail);
-    return () => window.removeEventListener("pos:db-unreachable", onFail);
+    // A database came back: the warning is no longer true, so drop it.
+    const onClear = () => setMessage(null);
+    window.addEventListener(CLEAR_EVENT, onClear);
+    return () => {
+      window.removeEventListener("pos:db-unreachable", onFail);
+      window.removeEventListener(CLEAR_EVENT, onClear);
+    };
   }, []);
 
   return (
