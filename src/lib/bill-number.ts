@@ -15,6 +15,20 @@ import { readTerminalConfig } from "./terminal-tokens";
 
 export type Platform = "PC" | "MB" | "WB";
 
+/** Everything an admin can change about the numbering, from Settings. */
+export type BillNumberConfig = {
+  /** Blank = use the branch's own code. */
+  branchCode?: string;
+  /** Blank = derive from the activation token. */
+  terminalNo?: string;
+  /** Digits in the running number, 3–6. */
+  padding?: number;
+  /** Start again at 1 each trading day. */
+  resetDaily?: boolean;
+  /** IANA zone for the date part; blank = this device's zone. */
+  timeZone?: string;
+};
+
 const SEQ_KEY = "pos.bill.seq";
 const TERMINAL_NO_KEY = "pos.bill.terminalNo";
 
@@ -43,16 +57,36 @@ export function terminalNumber(): string {
   return value;
 }
 
-/** Local date stamp (the till's own day, not UTC). */
-export function dayStamp(at: Date = new Date()): string {
+/** Date stamp in the configured trading time zone (the till's day, not UTC). */
+export function dayStamp(at: Date = new Date(), timeZone?: string): string {
+  if (timeZone) {
+    try {
+      const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(at);
+      return parts.replace(/-/g, "");
+    } catch {
+      /* an unknown zone falls back to the device clock */
+    }
+  }
   const m = `${at.getMonth() + 1}`.padStart(2, "0");
   const d = `${at.getDate()}`.padStart(2, "0");
   return `${at.getFullYear()}${m}${d}`;
 }
 
 /** The fixed part of every bill number this device writes today. */
-export function billPrefix(branchCode: string, at: Date = new Date()): string {
-  return `${clean(branchCode, "BR")}-${currentPlatform()}${terminalNumber()}-${dayStamp(at)}`;
+export function billPrefix(
+  branchCode: string,
+  at: Date = new Date(),
+  config: BillNumberConfig = {},
+): string {
+  const branch = clean(config.branchCode || branchCode, "BR");
+  const terminal = clean(config.terminalNo, "") || terminalNumber();
+  const day = config.resetDaily === false ? "00000000" : dayStamp(at, config.timeZone);
+  return `${branch}-${currentPlatform()}${terminal.slice(0, 2).padStart(2, "0")}-${day}`;
 }
 
 type SeqStore = { prefix: string; next: number };
@@ -95,14 +129,19 @@ export function seedFromExisting(prefix: string, existing: Iterable<string>): nu
  * Next bill number for this branch/device/day. `existing` is any list of
  * receipt numbers the till already knows about, used to recover the counter.
  */
-export function nextBillNumber(branchCode: string, existing: Iterable<string> = []): string {
-  const prefix = billPrefix(branchCode);
+export function nextBillNumber(
+  branchCode: string,
+  existing: Iterable<string> = [],
+  config: BillNumberConfig = {},
+): string {
+  const prefix = billPrefix(branchCode, new Date(), config);
+  const pad = Math.min(6, Math.max(3, Math.round(config.padding ?? 4)));
   const saved = readSeq();
   const base =
     saved && saved.prefix === prefix ? saved.next : seedFromExisting(prefix, existing) + 1;
   const seq = Math.max(1, base, seedFromExisting(prefix, existing) + 1);
   writeSeq({ prefix, next: seq + 1 });
-  return `${prefix}-${String(seq).padStart(4, "0")}`;
+  return `${prefix}-${String(seq).padStart(pad, "0")}`;
 }
 
 /** A checkout attempt id: retries of the same attempt reuse it, so no double bill. */
