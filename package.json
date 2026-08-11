@@ -123,7 +123,8 @@
     "files": [
       "electron/**",
       "dist-desktop/**",
-      "package.json"
+      "package.json",
+      "node_modules/**"
     ],
     "asarUnpack": [
       "node_modules/msnodesqlv8/**",

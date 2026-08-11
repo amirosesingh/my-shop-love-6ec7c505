@@ -10,6 +10,7 @@ const repo = require("./db/repo.cjs");
 const worker = require("./sync/worker.cjs");
 const updater = require("./updater.cjs");
 const terminalStore = require("./terminal-store.cjs");
+const dbConfigStore = require("./db-config-store.cjs");
 const brandingStore = require("./branding-store.cjs");
 const health = require("./health.cjs");
 const recovery = require("./recovery.cjs");
@@ -27,6 +28,9 @@ let baseUrl = DEV_URL || null;
 /** Cleared as soon as the renderer reports that the till actually mounted. */
 let readyWatchdog = null;
 let safeMode = false;
+let reconnectTimer = null;
+let reconnectDelay = 5_000;
+let cloudConfig = null;
 
 function enterSafeMode(reason) {
   if (safeMode) return;
@@ -186,6 +190,43 @@ function broadcastStatus(payload) {
   for (const win of BrowserWindow.getAllWindows()) {
     win.webContents.send("pos:status-changed", payload);
   }
+}
+
+async function statusPayload() {
+  const status = await worker.status();
+  return { ...status, cloudConfigured: !!cloudConfig };
+}
+
+async function connectLocal(config) {
+  await pool.connect(config);
+  reconnectDelay = 5_000;
+  broadcastStatus(await statusPayload());
+}
+
+function scheduleReconnect() {
+  if (reconnectTimer || !dbConfigStore.read()) return;
+  reconnectTimer = setTimeout(async () => {
+    reconnectTimer = null;
+    try {
+      await connectLocal(dbConfigStore.read());
+    } catch (error) {
+      broadcastStatus({ connected: false, error: fail(error).error, tables: [] });
+      reconnectDelay = Math.min(reconnectDelay * 2, 60_000);
+      scheduleReconnect();
+    }
+  }, reconnectDelay);
+}
+
+async function initializeWorker(config) {
+  if (!config?.url || !config?.key) return null;
+  cloudConfig = config;
+  worker.init({
+    ...config,
+    relayUrl: baseUrl ? `${baseUrl}/api/public/sync` : null,
+    onChange: async () => broadcastStatus(await statusPayload()),
+  });
+  worker.start();
+  return worker.run();
 }
 
 const fail = (err) => ({ ok: false, error: err instanceof Error ? err.message : String(err) });
@@ -481,18 +522,29 @@ function registerIpc() {
     }
   });
 
-  ipcMain.handle("pos:connect", async (_e, config) => {
+  ipcMain.handle("pos:connect", async (_e, config, cloud) => {
+    let cloudError;
     try {
-      await pool.connect(config);
-      worker.init({
-        url: process.env.SUPABASE_URL ?? config.cloudUrl,
-        key: process.env.SUPABASE_PUBLISHABLE_KEY ?? config.cloudKey,
-        onChange: async () => broadcastStatus(await worker.status()),
-      });
-      worker.start();
-      return { ok: true };
+      await connectLocal(config);
+      const saved = dbConfigStore.write(config);
+      if (!saved.ok) console.warn("[pos] could not seal SQL config:", saved.error);
     } catch (err) {
       return fail(err);
+    }
+    try {
+      await initializeWorker(cloud);
+    } catch (error) {
+      cloudError = fail(error).error;
+    }
+    return { ok: true, ...(cloudError ? { cloudError } : {}) };
+  });
+
+  ipcMain.handle("pos:configure-cloud", async (_e, cloud) => {
+    try {
+      await initializeWorker(cloud);
+      return { ok: true };
+    } catch (error) {
+      return fail(error);
     }
   });
 
@@ -515,6 +567,13 @@ function registerIpc() {
   });
 
   ipcMain.handle("pos:status", () => worker.status());
+  ipcMain.handle("pos:snapshot", async () => {
+    try {
+      return { ok: true, ...(await repo.snapshot()) };
+    } catch (error) {
+      return fail(error);
+    }
+  });
 
   /* ------------------- updates & terminal registration ---------------- */
 
@@ -700,6 +759,15 @@ app.whenReady().then(async () => {
     return;
   }
   createWindows();
+  const savedDbConfig = dbConfigStore.read();
+  if (savedDbConfig) {
+    try {
+      await connectLocal(savedDbConfig);
+    } catch (error) {
+      console.error("[pos] automatic SQL reconnect failed:", fail(error).error);
+      scheduleReconnect();
+    }
+  }
   updater.start();
   // If the till never reports in, the build is broken — recover instead of
   // leaving the operator staring at a blank window.
@@ -712,6 +780,7 @@ app.whenReady().then(async () => {
 app.on("window-all-closed", async () => {
   if (readyWatchdog) clearTimeout(readyWatchdog);
   worker.stop();
+  if (reconnectTimer) clearTimeout(reconnectTimer);
   updater.stop();
   stopAppServer();
   await pool.close();

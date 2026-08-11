@@ -37,8 +37,8 @@ export function subscribeDatabaseMode(listener: Listener) {
   };
 }
 
-/** The default for this platform: the phone is a live client, tills are local-first. */
-export const defaultDatabaseMode = (): DatabaseMode => (isLiveOnly() ? "online" : "local");
+/** Every platform is online-first; local SQL is an automatic fallback. */
+export const defaultDatabaseMode = (): DatabaseMode => "online";
 
 /** The mode the operator picked (ignoring any temporary failover). */
 export function preferredDatabaseMode(): DatabaseMode {

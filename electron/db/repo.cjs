@@ -8,6 +8,7 @@ const SETTINGS_ID = "00000000-0000-0000-0000-000000000001";
 
 /** Tables in dependency order — parents push before their children. */
 const TABLES = [
+  "stores",
   "membership_tiers",
   "products",
   "members",
@@ -21,11 +22,13 @@ const TABLES = [
   "bookings",
   "booking_payments",
   "transfers",
+  "stock_transfers",
+  "stock_transfer_items",
   "audit_logs",
 ];
 
 /** Cloud is authoritative for these; they are the only tables ever pulled. */
-const CATALOGUE_TABLES = ["membership_tiers", "products", "promotions"];
+const CATALOGUE_TABLES = ["stores", "membership_tiers", "products", "promotions"];
 
 const SYNC_COLUMNS = new Set(["is_synced", "sync_status", "synced_at"]);
 
@@ -60,6 +63,23 @@ function normaliseRow(table, row) {
   if (table !== "pos_settings") return row;
   const { id: _id, ...payload } = row;
   return { id: SETTINGS_ID, payload };
+}
+
+const JSON_COLUMNS = {
+  products: ["stock_by_store", "packs", "barcode_aliases"],
+  promotions: ["tier_rates"],
+  bookings: ["lines"],
+  transfers: ["items"],
+  audit_logs: ["details"],
+};
+
+function parseJsonColumns(table, row) {
+  const copy = { ...row };
+  for (const column of JSON_COLUMNS[table] ?? []) {
+    if (typeof copy[column] !== "string") continue;
+    try { copy[column] = JSON.parse(copy[column]); } catch { /* preserve invalid legacy text */ }
+  }
+  return copy;
 }
 
 async function upsertRow(tx, table, row, { markPending = true } = {}) {
@@ -336,7 +356,25 @@ async function createSale({ sale, items, products = [], member = null, branchId 
 /** Full local catalogue — the register never fetches products over HTTP. */
 async function getProducts() {
   const res = await getPool().request().query("SELECT * FROM dbo.products ORDER BY name ASC;");
-  return res.recordset;
+  return res.recordset.map((row) => parseJsonColumns("products", row));
+}
+
+async function rows(table) {
+  assertTable(table);
+  const result = await getPool().request().query(`SELECT * FROM dbo.[${table}];`);
+  return result.recordset.map((row) => parseJsonColumns(table, row));
+}
+
+async function snapshot() {
+  const [products, members, stores, shifts, promotions, tiers, settings] = await Promise.all([
+    rows("products"), rows("members"), rows("stores"), rows("shifts"), rows("promotions"),
+    rows("membership_tiers"), rows("pos_settings"),
+  ]);
+  const setting = settings[0];
+  const payload = setting
+    ? (typeof setting.payload === "string" ? JSON.parse(setting.payload) : setting.payload)
+    : null;
+  return { products, members, stores, shifts, promotions, tiers, settings: payload };
 }
 
 /** How many locally-created rows are still waiting for the central server. */
@@ -361,7 +399,7 @@ function toCloudRow(table, row) {
     const payload = typeof rest.payload === "string" ? JSON.parse(rest.payload) : rest.payload;
     return { id: 1, ...payload };
   }
-  return rest;
+  return parseJsonColumns(table, rest);
 }
 
 module.exports = {
@@ -371,6 +409,7 @@ module.exports = {
   applyOp,
   createSale,
   getProducts,
+  snapshot,
   pendingSyncCount,
   pendingRows,
   markSynced,

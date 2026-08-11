@@ -2,7 +2,7 @@ import { toast } from "sonner";
 import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
 import { defaultSettings, sampleState } from "./pos-seed";
 import { drainOutbox, runOpLive } from "./sync-engine";
-import { electronDb, localDb, readBranch } from "./local-db";
+import { localDb } from "./local-db";
 import { enqueue, listQueue, persisted, type SyncOp } from "./sync-outbox";
 import { isLiveOnly } from "./live-mode";
 import {
@@ -104,18 +104,27 @@ export const rowToProduct = (r: Row): Product => ({
   category: r.category ?? "",
   subCategory: r.sub_category ?? undefined,
   unit: r.unit ?? undefined,
-  packs: Array.isArray(r.packs) ? r.packs : [],
-  barcodes: Array.isArray(r.barcode_aliases) ? r.barcode_aliases : [],
+  packs: Array.isArray(jsonValue(r.packs, [])) ? jsonValue(r.packs, []) : [],
+  barcodes: Array.isArray(jsonValue(r.barcode_aliases, [])) ? jsonValue(r.barcode_aliases, []) : [],
   price: num(r.selling_price),
   cost: num(r.cost_price),
   ecomPrice: r.ecom_price == null ? undefined : num(r.ecom_price),
   ecomVisible: r.ecom_visible ?? true,
   archived: r.is_archived === true,
-  stockByStore: (r.stock_by_store ?? {}) as Record<string, number>,
+  stockByStore: jsonValue<Record<string, number>>(r.stock_by_store, {}),
   reorderLevel: num(r.reorder_level),
   taxRate: num(r.tax_rate),
   customPoints: r.custom_points == null ? undefined : num(r.custom_points),
 });
+
+function jsonValue<T>(value: unknown, fallback: T): T {
+  if (typeof value !== "string") return (value ?? fallback) as T;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return fallback;
+  }
+}
 
 export const productToRow = (p: Product): Row => ({
   id: p.id,
@@ -573,7 +582,7 @@ export async function loadCloudState(): Promise<CloudSlice> {
   const { hydrateTerminalConfig } = await import("./terminal-tokens");
   await hydrateTerminalConfig();
   const tiers = await supabase.from("membership_tiers").select("id, name");
-  if (tiers.error) throw tiers.error;
+  if (tiers.error) return loadLocalState(tiers.error);
   tierIdByName = {};
   tierNameById = {};
   for (const t of tiers.data ?? []) {
@@ -632,7 +641,7 @@ export async function loadCloudState(): Promise<CloudSlice> {
   ]);
 
   const err = products.error || members.error || sales.error || promotions.error || settings.error;
-  if (err) throw err;
+  if (err) return loadLocalState(err);
 
   return {
     products: (products.data ?? []).map(rowToProduct),
@@ -642,6 +651,29 @@ export async function loadCloudState(): Promise<CloudSlice> {
     settings: rowToSettings(settings.data as Row | null),
     stores: ((stores.data as Row[] | null) ?? []).map(rowToStore),
     shifts: ((shifts.data as Row[] | null) ?? []).map(rowToShift),
+  };
+}
+
+async function loadLocalState(cause: unknown): Promise<CloudSlice> {
+  const bridge = localDb();
+  if (!bridge) throw cause;
+  const result = await bridge.snapshot();
+  if (!result.ok) throw cause;
+  tierIdByName = {};
+  tierNameById = {};
+  for (const tier of result.tiers ?? []) {
+    const name = String(tier.name ?? "Member") as MemberTier;
+    tierIdByName[name] = String(tier.id);
+    tierNameById[String(tier.id)] = name;
+  }
+  return {
+    products: (result.products ?? []).map(rowToProduct),
+    members: (result.members ?? []).map((row) => rowToMember(row, tierName)),
+    sales: [],
+    promotions: (result.promotions ?? []).map(rowToPromotion),
+    settings: rowToSettings((result.settings as Row | null) ?? null),
+    stores: (result.stores ?? []).map(rowToStore),
+    shifts: (result.shifts ?? []).map(rowToShift),
   };
 }
 
@@ -964,48 +996,26 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
   // Windows desktop with a local SQL Server present.
   const bridge = localDb();
   if (bridge) {
-    // Online working: the central database is the source of truth and the
-    // till must never wait on local SQL to finish a sale. The same rows are
-    // copied onto this terminal afterwards, in the background.
-    if (effectiveDatabaseMode() === "online") {
-      try {
-        for (const op of ops) await runOpLive(context, op);
-        noteConnectionRestored();
-        setCloudDirect(false);
-        void mirrorToLocal(context, ops);
-        return noteCommitTarget("cloud");
-      } catch (cloud) {
-        if (!isConnectionError(cloud)) throw cloud;
-        noteConnectionLost();
-        // Line down: keep trading by storing it on this terminal instead.
-        try {
-          for (const op of ops) {
-            const res = await bridge.write(context, op);
-            if (!res.ok) throw new Error(res.error ?? `${context} could not be stored locally`);
-          }
-          setCloudDirect(false);
-          return noteCommitTarget("local");
-        } catch (local) {
-          throw new AllTargetsFailed(context, local);
-        }
-      }
-    }
-    // Offline working: local first, pushed up later.
+    // Desktop is always cloud first. Local SQL is a durable fallback only for
+    // connection-class cloud failures; validation and permission errors remain visible.
     try {
-      for (const op of ops) {
-        const res = await bridge.write(context, op);
-        if (!res.ok) throw new Error(res.error ?? `${context} could not be stored locally`);
-      }
+      for (const op of ops) await runOpLive(context, op);
+      noteConnectionRestored();
       setCloudDirect(false);
-      return noteCommitTarget("local");
-    } catch (local) {
+      void mirrorToLocal(context, ops);
+      return noteCommitTarget("cloud");
+    } catch (cloud) {
+      if (!isConnectionError(cloud)) throw cloud;
+      noteConnectionLost();
       try {
-        for (const op of ops) await runOpLive(context, op);
-        setCloudDirect(true);
-        noteConnectionRestored();
-        return noteCommitTarget("cloud");
-      } catch (cloud) {
-        if (!isConnectionError(cloud)) throw cloud;
+        for (const op of ops) {
+          const res = await bridge.write(context, op);
+          if (!res.ok) throw new Error(res.error ?? `${context} could not be stored locally`);
+        }
+        setCloudDirect(false);
+        if (bridge.push) void bridge.push();
+        return noteCommitTarget("local");
+      } catch (local) {
         throw new AllTargetsFailed(context, local);
       }
     }
@@ -1201,37 +1211,7 @@ export const db = {
 
   /** Persist a completed bill, its lines, the stock movement and member points. */
   recordSale(sale: Sale, products: Product[], member: Member | null) {
-    // Desktop shell: one transactional, fully offline call into local SQL Server.
-    const bridge = electronDb();
-    if (bridge) {
-      void bridge
-        .createSale({
-          sale: saleToRow(sale),
-          items: saleItemRows(sale),
-          products: products.map(productToRow),
-          member: member ? memberToRow(member, tierId) : null,
-          branchId: readBranch().branchId ?? sale.storeId ?? null,
-          exchangeOfBillNumber: sale.exchangeOfReceiptNo ?? null,
-        })
-        .then((res) => {
-          if (!res.ok) dbError("Saving sale", new Error(res.error ?? "Local sale write failed"));
-        })
-        .catch((err) => dbError("Saving sale", err));
-      return;
-    }
-    // Order matters — the queue drains sequentially and stops on failure.
-    queue("Saving sale", { kind: "insert", table: "sales", rows: [saleToRow(sale)] });
-    queue("Saving sale items", { kind: "insert", table: "sale_items", rows: saleItemRows(sale) });
-    if (products.length) db.upsertProducts(products);
-    if (member) db.upsertMember(member);
-    if (sale.exchangeOfReceiptNo) {
-      queue("Linking exchange bill", {
-        kind: "update",
-        table: "sales",
-        values: { exchanged_to_bill_number: sale.receiptNo },
-        match: { bill_number: sale.exchangeOfReceiptNo },
-      });
-    }
+    void db.commitSale(sale, products, member).catch((error) => dbError("Saving sale", error));
   },
 
   refundSale(saleId: string, products: Product[]) {

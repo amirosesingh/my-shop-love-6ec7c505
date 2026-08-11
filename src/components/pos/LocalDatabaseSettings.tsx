@@ -19,6 +19,7 @@ import {
   type LocalDbConfig,
   type LocalSyncStatus,
 } from "@/lib/local-db";
+import { supabaseConfig } from "@/lib/external-supabase-config";
 
 /**
  * Local Microsoft SQL Server controls. Only meaningful inside the Windows
@@ -88,7 +89,8 @@ export function LocalDatabaseSettings() {
       <div>
         <p className="text-sm">Local database</p>
         <p className="text-xs text-muted-foreground">
-          Every sale is written here first. The connection details stay on this machine.
+          Sales use the online database first and automatically fall back here. Connection details
+          stay encrypted on this machine.
         </p>
       </div>
 
@@ -151,7 +153,7 @@ export function LocalDatabaseSettings() {
           onClick={() =>
             run("Connected to local database", async () => {
               await writeLocalDbConfig(config);
-              return localDb()!.connect(config);
+              return localDb()!.connect(config, supabaseConfig());
             })
           }
         >

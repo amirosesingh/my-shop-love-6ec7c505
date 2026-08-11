@@ -48,7 +48,11 @@ export type LocalSyncStatus = {
 export type PosBridge = {
   /** Persist one operation to local SQL Server. Resolves once committed. */
   write: (context: string, op: SyncOp) => Promise<{ ok: boolean; error?: string }>;
-  connect: (config: LocalDbConfig) => Promise<{ ok: boolean; error?: string }>;
+  connect: (
+    config: LocalDbConfig,
+    cloud?: CloudBridgeConfig,
+  ) => Promise<{ ok: boolean; error?: string; cloudError?: string }>;
+  configureCloud: (cloud: CloudBridgeConfig) => Promise<{ ok: boolean; error?: string }>;
   test: (config: LocalDbConfig) => Promise<{ ok: boolean; error?: string; version?: string }>;
   status: () => Promise<LocalSyncStatus>;
   push: () => Promise<{ ok: boolean; pushed: number; failed: number; error?: string }>;
@@ -56,6 +60,17 @@ export type PosBridge = {
   setSyncEnabled: (on: boolean) => Promise<void>;
   backup: (path?: string) => Promise<{ ok: boolean; path?: string; error?: string }>;
   retryErrored: () => Promise<{ ok: boolean }>;
+  snapshot: () => Promise<{
+    ok: boolean;
+    error?: string;
+    products?: LocalSaleRow[];
+    members?: LocalSaleRow[];
+    stores?: LocalSaleRow[];
+    shifts?: LocalSaleRow[];
+    promotions?: LocalSaleRow[];
+    tiers?: LocalSaleRow[];
+    settings?: LocalSaleRow | null;
+  }>;
   /** Device settings stored in the branch SQL database. */
   getSetting?: (key: string) => Promise<{ ok: boolean; value?: string | null; error?: string }>;
   setSetting?: (
@@ -63,6 +78,16 @@ export type PosBridge = {
     value: string | null,
   ) => Promise<{ ok: boolean; error?: string }>;
   onStatus: (cb: (s: LocalSyncStatus) => void) => () => void;
+};
+
+export type CloudBridgeConfig = {
+  url: string;
+  key: string;
+  accessToken?: string;
+  sessionToken?: string;
+  cashierToken?: string;
+  terminalToken?: string;
+  branchId?: string;
 };
 
 declare global {

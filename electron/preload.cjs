@@ -8,7 +8,8 @@ const invoke = (channel, ...args) => ipcRenderer.invoke(channel, ...args);
 
 contextBridge.exposeInMainWorld("pos", {
   write: (context, op) => invoke("pos:write", context, op),
-  connect: (config) => invoke("pos:connect", config),
+  connect: (config, cloud) => invoke("pos:connect", config, cloud),
+  configureCloud: (cloud) => invoke("pos:configure-cloud", cloud),
   test: (config) => invoke("pos:test", config),
   status: () => invoke("pos:status"),
   /** Silent receipt printing — no Windows print dialog. */
@@ -21,6 +22,7 @@ contextBridge.exposeInMainWorld("pos", {
   setSyncEnabled: (on) => invoke("pos:set-sync-enabled", on),
   backup: (path) => invoke("pos:backup", path),
   retryErrored: () => invoke("pos:retry-errored"),
+  snapshot: () => invoke("pos:snapshot"),
   /* auto-update */
   appVersion: () => invoke("app:version"),
   updateStatus: () => invoke("update:status"),

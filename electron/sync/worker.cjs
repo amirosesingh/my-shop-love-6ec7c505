@@ -19,12 +19,40 @@ let timer = null;
 let running = false;
 let notify = () => {};
 const attempts = new Map(); // `${table}:${id}` -> failed attempts
+let credentials = {};
+let relayUrl = null;
 
-function init({ url, key, onChange }) {
+function init({ url, key, accessToken, sessionToken, cashierToken, terminalToken, branchId, relayUrl: relay, onChange }) {
   supabase = createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
+    global: accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : undefined,
   });
+  credentials = { accessToken, sessionToken, cashierToken, terminalToken, branchId };
+  relayUrl = relay || null;
   if (onChange) notify = onChange;
+}
+
+async function cloudUpsert(table, rows) {
+  const bearer = credentials.sessionToken || credentials.accessToken;
+  if (relayUrl && (bearer || credentials.cashierToken || credentials.terminalToken)) {
+    const response = await fetch(relayUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}) },
+      body: JSON.stringify({
+        sessionToken: credentials.sessionToken,
+        cashierToken: credentials.cashierToken,
+        terminalToken: credentials.terminalToken,
+        ops: [{ kind: "upsert", table, rows, onConflict: "id" }],
+      }),
+    });
+    const body = await response.json().catch(() => null);
+    if (!response.ok || !body?.ok || body.results?.some((result) => !result.ok)) {
+      throw new Error(body?.error || body?.results?.find((result) => !result.ok)?.error || `Sync relay failed (${response.status})`);
+    }
+    return;
+  }
+  const { error } = await supabase.from(table).upsert(rows, { onConflict: "id" });
+  if (error) throw error;
 }
 
 function setEnabled(on) {
@@ -68,7 +96,12 @@ async function push() {
 
     const ids = rows.map((r) => r.id);
     const payload = rows.map((r) => repo.toCloudRow(table, r));
-    const { error } = await supabase.from(table).upsert(payload, { onConflict: "id" });
+    let error = null;
+    try {
+      await cloudUpsert(table, payload);
+    } catch (err) {
+      error = err;
+    }
 
     if (error) {
       failed += ids.length;
