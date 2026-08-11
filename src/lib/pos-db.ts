@@ -442,13 +442,31 @@ const shiftSessionToRow = (s: ShiftSession): Row => ({
  * Exactly the bill and line columns the till renders — no `SELECT *`, so a
  * schema that grows new columns never inflates the payload of every read.
  */
-const SALE_COLUMNS =
-  "id, bill_number, client_transaction_id, store_id, shift_id, cashier_name, member_id, subtotal_amount, " +
+const SALE_COLUMNS_BASE =
+  "id, bill_number, store_id, shift_id, cashier_name, member_id, subtotal_amount, " +
   "discount_amount, tax_amount, total_amount, paid_amount, change_amount, payment_type, " +
   "payments, points_earned, is_refunded, original_bill_number, exchanged_to_bill_number, " +
   "exchange_credit, coupon_code, coupon_promo_id, coupon_scope, coupon_discount, created_at, " +
   "sale_items(product_id, product_name, unit_price, quantity, tax_rate, discount_percent, " +
   "discount_amount, is_return, is_foc, promo_id, coupon_code, coupon_discount, unit_cost)";
+
+/**
+ * Older databases have not had the checkout-attempt column added yet. Asking
+ * for it there fails the whole read, so the first refusal switches every later
+ * query to the columns that definitely exist.
+ */
+let hasClientTxnColumn = true;
+
+const saleColumns = () =>
+  hasClientTxnColumn ? `${SALE_COLUMNS_BASE}, client_transaction_id` : SALE_COLUMNS_BASE;
+
+/** True when a failure is "that column is not in this database (yet)". */
+export const isMissingTxnColumn = (message: string | undefined | null) =>
+  !!message && /client_transaction_id/.test(message) && /does not exist|schema cache/i.test(message);
+
+const forgetTxnColumn = () => {
+  hasClientTxnColumn = false;
+};
 
 const rowToSale = (r: Row): Sale => ({
   id: r.id,
@@ -595,11 +613,20 @@ export async function loadCloudState(): Promise<CloudSlice> {
   const [products, members, sales, promotions, settings, stores, shifts] = await Promise.all([
     supabase.from("products").select("*").order("name"),
     supabase.from("members").select("*").order("created_at"),
-    supabase
-      .from("sales")
-      .select(SALE_COLUMNS)
-      .order("created_at", { ascending: false })
-      .limit(500),
+    (async () => {
+      const read = () =>
+        supabase
+          .from("sales")
+          .select(saleColumns())
+          .order("created_at", { ascending: false })
+          .limit(500);
+      const first = await read();
+      if (first.error && isMissingTxnColumn(first.error.message)) {
+        forgetTxnColumn();
+        return await read();
+      }
+      return first;
+    })(),
     supabase.from("promotions").select("*").order("created_at"),
     supabase.from("pos_settings").select("*").eq("id", 1).maybeSingle(),
     // The stores table only exists once schema10.sql has been applied; a
@@ -765,10 +792,18 @@ export async function loadSalesPage(
   cursor: Cursor = null,
   limit = PAGE_SIZE,
 ): Promise<Page<Sale>> {
-  let q = supabase.from("sales").select(SALE_COLUMNS);
-  if (storeId) q = q.eq("store_id", storeId) as typeof q;
-  const res = await keyset(q as never, "created_at", cursor, limit);
-  const err = (res as { error?: { message: string } }).error;
+  const query = () => {
+    let q = supabase.from("sales").select(saleColumns());
+    if (storeId) q = q.eq("store_id", storeId) as typeof q;
+    return keyset(q as never, "created_at", cursor, limit);
+  };
+  let res = await query();
+  let err = (res as { error?: { message: string } }).error;
+  if (err && isMissingTxnColumn(err.message)) {
+    forgetTxnColumn();
+    res = await query();
+    err = (res as { error?: { message: string } }).error;
+  }
   if (err) throw new Error(err.message);
   const rows = ((res as { data?: Row[] | null }).data ?? []) as Row[];
   return {

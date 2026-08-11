@@ -663,6 +663,20 @@ export type IntegrationSettings = {
   branches?: Record<string, BranchPolicy>;
   /** products owned by a private-catalogue branch: productId -> storeId */
   productOwners?: Record<string, string>;
+  /** How receipt numbers are built on this branch's tills. */
+  billNumbering?: BillNumberingSettings;
+};
+
+/** Receipt numbering: [BRANCH]-[PLATFORM][TERMINAL]-[YYYYMMDD]-[SEQUENCE]. */
+export type BillNumberingSettings = {
+  /** Blank = use the branch's own code. */
+  branchCode?: string;
+  /** Blank = derive from this device's activation. */
+  terminalNo?: string;
+  /** Digits in the running number (3–6). */
+  padding?: number;
+  /** Start again at 1 each trading day. */
+  resetDaily?: boolean;
 };
 
 export type PaymentAccountType = "card_machine" | "bank_account" | "ewallet" | "other";

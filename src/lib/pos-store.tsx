@@ -755,6 +755,10 @@ export function PosProvider({ children }: { children: ReactNode }) {
       receiptNo: nextBillNumber(
         store?.receiptPrefix?.trim() || store?.code || "R",
         snapshot.sales.map((s) => s.receiptNo),
+        {
+          ...(snapshot.settings.integrations.billNumbering ?? {}),
+          timeZone: snapshot.settings.integrations.timeZone || undefined,
+        },
       ),
       clientTxnId: input.clientTxnId ?? crypto.randomUUID(),
       createdAt: new Date().toISOString(),

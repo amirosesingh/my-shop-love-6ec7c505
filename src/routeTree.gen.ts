@@ -58,6 +58,7 @@ import { Route as SettingsIdentityRouteImport } from './routes/settings.identity
 import { Route as SettingsInheritanceRouteImport } from './routes/settings.inheritance'
 import { Route as SettingsLinesRouteImport } from './routes/settings.lines'
 import { Route as SettingsMobileTerminalsRouteImport } from './routes/settings.mobile-terminals'
+import { Route as SettingsNumberingRouteImport } from './routes/settings.numbering'
 import { Route as SettingsPaymentRouteImport } from './routes/settings.payment'
 import { Route as SettingsPrinterRouteImport } from './routes/settings.printer'
 import { Route as SettingsQrRouteImport } from './routes/settings.qr'
@@ -328,6 +329,11 @@ const SettingsMobileTerminalsRoute = SettingsMobileTerminalsRouteImport.update({
   path: '/settings/mobile-terminals',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsNumberingRoute = SettingsNumberingRouteImport.update({
+  id: '/settings/numbering',
+  path: '/settings/numbering',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsPaymentRoute = SettingsPaymentRouteImport.update({
   id: '/settings/payment',
   path: '/settings/payment',
@@ -497,6 +503,7 @@ export interface FileRoutesByFullPath {
   '/settings/inheritance': typeof SettingsInheritanceRoute
   '/settings/lines': typeof SettingsLinesRoute
   '/settings/mobile-terminals': typeof SettingsMobileTerminalsRoute
+  '/settings/numbering': typeof SettingsNumberingRoute
   '/settings/payment': typeof SettingsPaymentRoute
   '/settings/printer': typeof SettingsPrinterRoute
   '/settings/qr': typeof SettingsQrRoute
@@ -572,6 +579,7 @@ export interface FileRoutesByTo {
   '/settings/inheritance': typeof SettingsInheritanceRoute
   '/settings/lines': typeof SettingsLinesRoute
   '/settings/mobile-terminals': typeof SettingsMobileTerminalsRoute
+  '/settings/numbering': typeof SettingsNumberingRoute
   '/settings/payment': typeof SettingsPaymentRoute
   '/settings/printer': typeof SettingsPrinterRoute
   '/settings/qr': typeof SettingsQrRoute
@@ -648,6 +656,7 @@ export interface FileRoutesById {
   '/settings/inheritance': typeof SettingsInheritanceRoute
   '/settings/lines': typeof SettingsLinesRoute
   '/settings/mobile-terminals': typeof SettingsMobileTerminalsRoute
+  '/settings/numbering': typeof SettingsNumberingRoute
   '/settings/payment': typeof SettingsPaymentRoute
   '/settings/printer': typeof SettingsPrinterRoute
   '/settings/qr': typeof SettingsQrRoute
@@ -725,6 +734,7 @@ export interface FileRouteTypes {
     | '/settings/inheritance'
     | '/settings/lines'
     | '/settings/mobile-terminals'
+    | '/settings/numbering'
     | '/settings/payment'
     | '/settings/printer'
     | '/settings/qr'
@@ -800,6 +810,7 @@ export interface FileRouteTypes {
     | '/settings/inheritance'
     | '/settings/lines'
     | '/settings/mobile-terminals'
+    | '/settings/numbering'
     | '/settings/payment'
     | '/settings/printer'
     | '/settings/qr'
@@ -875,6 +886,7 @@ export interface FileRouteTypes {
     | '/settings/inheritance'
     | '/settings/lines'
     | '/settings/mobile-terminals'
+    | '/settings/numbering'
     | '/settings/payment'
     | '/settings/printer'
     | '/settings/qr'
@@ -951,6 +963,7 @@ export interface RootRouteChildren {
   SettingsInheritanceRoute: typeof SettingsInheritanceRoute
   SettingsLinesRoute: typeof SettingsLinesRoute
   SettingsMobileTerminalsRoute: typeof SettingsMobileTerminalsRoute
+  SettingsNumberingRoute: typeof SettingsNumberingRoute
   SettingsPaymentRoute: typeof SettingsPaymentRoute
   SettingsPrinterRoute: typeof SettingsPrinterRoute
   SettingsQrRoute: typeof SettingsQrRoute
@@ -1322,6 +1335,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsMobileTerminalsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/numbering': {
+      id: '/settings/numbering'
+      path: '/settings/numbering'
+      fullPath: '/settings/numbering'
+      preLoaderRoute: typeof SettingsNumberingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/payment': {
       id: '/settings/payment'
       path: '/settings/payment'
@@ -1555,6 +1575,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsInheritanceRoute: SettingsInheritanceRoute,
   SettingsLinesRoute: SettingsLinesRoute,
   SettingsMobileTerminalsRoute: SettingsMobileTerminalsRoute,
+  SettingsNumberingRoute: SettingsNumberingRoute,
   SettingsPaymentRoute: SettingsPaymentRoute,
   SettingsPrinterRoute: SettingsPrinterRoute,
   SettingsQrRoute: SettingsQrRoute,
