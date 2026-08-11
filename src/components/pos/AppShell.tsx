@@ -42,6 +42,8 @@ import { setBranchId } from "@/lib/activity-journal";
 import { soleBranchId } from "@/lib/active-branch";
 import { flushWhatsAppQueue } from "@/lib/whatsapp";
 import { reportAppReady } from "@/lib/app-health";
+import { localDb } from "@/lib/local-db";
+import { supabaseConfig } from "@/lib/external-supabase-config";
 
 /** Permission required to open each screen. Keys are path prefixes, so child
  *  pages (/settings/tax, /reports/sales …) inherit the parent gate unless they
@@ -128,6 +130,15 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   // Background outbox drain: keeps offline sales flowing once the link returns.
   useEffect(() => startSyncEngine(), []);
+  // The web client already knows the activated tenant. Hand the same public
+  // connection details to Electron's sync worker on every launch so desktop
+  // catalogue pulls and local recovery do not depend on opening Settings first.
+  useEffect(() => {
+    const bridge = localDb();
+    if (!bridge) return;
+    const { url, key } = supabaseConfig();
+    void bridge.configureCloud({ url, key });
+  }, [terminal.config?.supabaseUrl, terminal.config?.supabaseKey]);
   // Keeps the database-mode pill and the automatic local failover honest.
   useEffect(() => startDatabaseModeWatch(), []);
 
