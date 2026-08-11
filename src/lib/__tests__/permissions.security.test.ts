@@ -170,10 +170,10 @@ describe("permission tags", () => {
 
 describe("route visibility", () => {
   it("a hidden settings page is refused for that role only", () => {
-    const hidden = { "route:/settings/tax": ["cashier"] };
-    expect(isRouteVisibleFor(hidden, "/settings/tax", "cashier")).toBe(false);
-    expect(isRouteVisibleFor(hidden, "/settings/tax", "supervisor")).toBe(true);
-    expect(isRouteVisibleFor(hidden, "/settings/tax", "admin")).toBe(true);
+    const hidden = { "route:/settings/services": ["supervisor"] };
+    expect(isRouteVisibleFor(hidden, "/settings/services", "supervisor")).toBe(false);
+    expect(isRouteVisibleFor({}, "/settings/services", "supervisor")).toBe(true);
+    expect(isRouteVisibleFor(hidden, "/settings/services", "admin")).toBe(true);
   });
 
   it("an admin-only settings page is never shown to a cashier", () => {
