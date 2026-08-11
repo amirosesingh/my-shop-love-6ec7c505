@@ -29,8 +29,9 @@ files calls. Run `00` then `02` before anything else.
 | `23_unified_staff_accounts.sql` | Unified username/PIN and email/password staff accounts | `app_users` account routines |
 | `24_staff_management.sql` | Safe legacy cashier migration | Copies legacy cashiers when present; fresh databases skip it |
 | `25_staff_account_lifecycle.sql` | Inactive-first permanent staff deletion | Protected account lifecycle routine |
-| `26_staff_upgrade_22_25.sql` | Consolidated staff upgrade runner | Runs files 22–25 and 27 in order with psql |
+| `26_staff_upgrade_22_25.sql` | Consolidated staff upgrade runner | Runs files 22–25, 27 and 28 in order with psql |
 | `27_staff_credentials_and_ids.sql` | Generated staff ids and 4–32 character credentials | Fixes `null value in column "id"`, widens PIN/passcode length |
+| `28_app_users_id_link.sql` | Removes the legacy link between the staff id and the sign-in account id | Fixes `violates foreign key constraint "app_users_id_fkey"` |
 
 `98_drop_unused.sql` is separate and **destructive**, and every statement in it
 is commented out as shipped, so running the file by accident deletes nothing.
@@ -42,7 +43,7 @@ Uncomment a single line only after taking a backup. It is never included in
 For an existing database that already has the base POS schema, run these files
 in order: `22_roles_and_pin_gates.sql`, `23_unified_staff_accounts.sql`,
 `24_staff_management.sql`, `25_staff_account_lifecycle.sql`, then
-`27_staff_credentials_and_ids.sql`. File 24 keeps
+`27_staff_credentials_and_ids.sql`, then `28_app_users_id_link.sql`. File 24 keeps
 the legacy cashier table and login routine so older installed terminals remain
 compatible. These files are also safe when the legacy `cashiers` table does
 not exist; `app_users` remains the canonical staff source. Account rows are deleted only when an administrator explicitly
