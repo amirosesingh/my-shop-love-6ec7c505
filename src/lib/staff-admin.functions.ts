@@ -133,7 +133,7 @@ export const deleteStaffAccount = createServerFn({ method: "POST" })
     try {
       const mod = await import("./staff-admin.server");
       await mod.requireSupervisor(data.accessToken);
-      await mod.permanentlyDeleteStaff(data.username);
+      await mod.permanentlyDeleteStaff(data.username, data.accessToken);
       return { ok: true };
     } catch (e) {
       return { ok: false, error: (e as Error).message };

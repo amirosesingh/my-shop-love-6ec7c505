@@ -178,7 +178,8 @@ export async function provisionStaffAccount(payload: StaffPayload): Promise<{ us
     body: JSON.stringify([{ user_id: userId, role: payload.baseRole }]),
   });
 
-  return { userId: userId! };
+  if (!userId) throw new Error("The authentication account was not created");
+  return { userId };
 }
 
 /** Turn an account on or off everywhere at once. */
@@ -273,9 +274,23 @@ export async function updateStaffProfile(input: {
   if (!roleResult.ok) throw new Error("The account role could not be updated");
 }
 
-export async function permanentlyDeleteStaff(username: string): Promise<void> {
+async function callerId(accessToken: string): Promise<string> {
+  const { url, key } = supabaseConfig();
+  const response = await fetch(`${url}/auth/v1/user`, {
+    headers: { apikey: key, Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) throw new Error("Please sign in again");
+  const body = (await response.json()) as { id?: string };
+  if (!body.id) throw new Error("Please sign in again");
+  return body.id;
+}
+
+export async function permanentlyDeleteStaff(username: string, accessToken: string): Promise<void> {
   const profile = await staffProfile(username);
   if (!profile?.auth_user_id) throw new Error("The staff account could not be found");
+  if (profile.auth_user_id === await callerId(accessToken)) {
+    throw new Error("CANNOT_DELETE_CURRENT_ACCOUNT");
+  }
   await serviceRpc("staff_account_delete_profile", {
     p_user_id: profile.user_id,
     p_auth_user_id: profile.auth_user_id,

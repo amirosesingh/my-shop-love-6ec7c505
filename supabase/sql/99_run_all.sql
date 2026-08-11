@@ -33,3 +33,4 @@
 \i 22_roles_and_pin_gates.sql
 \i 23_unified_staff_accounts.sql
 \i 24_staff_management.sql
+\i 25_staff_account_lifecycle.sql
