@@ -316,6 +316,50 @@ CREATE TABLE dbo.stock_transfer_items (
 );
 GO
 
+/* Suppliers back the purchasing screens; the cloud is authoritative for them,
+   but a till must still be able to raise an invoice while the line is down. */
+IF OBJECT_ID('dbo.suppliers', 'U') IS NULL
+CREATE TABLE dbo.suppliers (
+  id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(), name NVARCHAR(200) NOT NULL,
+  contact_name NVARCHAR(200) NULL, phone NVARCHAR(60) NULL, email NVARCHAR(200) NULL,
+  address NVARCHAR(400) NULL, tax_number NVARCHAR(80) NULL, notes NVARCHAR(MAX) NULL,
+  is_active BIT NOT NULL DEFAULT 1,
+  is_synced BIT NOT NULL DEFAULT 0, sync_status NVARCHAR(20) NOT NULL DEFAULT N'pending',
+  created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(), updated_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+/* Stock corrections raised at the till: damages, counts, write-offs. */
+IF OBJECT_ID('dbo.stock_adjustments', 'U') IS NULL
+CREATE TABLE dbo.stock_adjustments (
+  id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(), product_id UNIQUEIDENTIFIER NULL,
+  product_name NVARCHAR(200) NULL, sku NVARCHAR(80) NULL, barcode NVARCHAR(80) NULL,
+  store_id NVARCHAR(60) NULL, terminal_id NVARCHAR(80) NULL,
+  reason NVARCHAR(80) NOT NULL DEFAULT N'adjustment', note NVARCHAR(400) NOT NULL DEFAULT N'',
+  previous_stock INT NOT NULL DEFAULT 0, updated_stock INT NOT NULL DEFAULT 0,
+  delta INT NOT NULL DEFAULT 0, cost_impact DECIMAL(18,4) NOT NULL DEFAULT 0,
+  staff_id NVARCHAR(80) NULL, staff_name NVARCHAR(200) NULL, role NVARCHAR(60) NULL,
+  is_synced BIT NOT NULL DEFAULT 0, sync_status NVARCHAR(20) NOT NULL DEFAULT N'pending',
+  created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(), updated_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+/* Parked tickets. The id is the app's own string key, not a GUID. */
+IF OBJECT_ID('dbo.held_orders', 'U') IS NULL
+CREATE TABLE dbo.held_orders (
+  id NVARCHAR(80) NOT NULL PRIMARY KEY, label NVARCHAR(200) NOT NULL DEFAULT N'',
+  store_id NVARCHAR(60) NULL, shift_id NVARCHAR(80) NULL, held_by NVARCHAR(200) NULL,
+  total DECIMAL(18,4) NOT NULL DEFAULT 0, lines NVARCHAR(MAX) NOT NULL DEFAULT N'[]',
+  cart_discount DECIMAL(18,4) NOT NULL DEFAULT 0,
+  cart_discount_type NVARCHAR(20) NOT NULL DEFAULT N'amount',
+  exchange_ref NVARCHAR(80) NULL, member_id NVARCHAR(80) NULL, member_name NVARCHAR(200) NULL,
+  coupon NVARCHAR(MAX) NULL, note NVARCHAR(400) NOT NULL DEFAULT N'',
+  cancelled_from NVARCHAR(80) NULL, held_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+  is_synced BIT NOT NULL DEFAULT 0, sync_status NVARCHAR(20) NOT NULL DEFAULT N'pending',
+  created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(), updated_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
 IF OBJECT_ID('dbo.audit_logs', 'U') IS NULL
 CREATE TABLE dbo.audit_logs (
   id              UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),

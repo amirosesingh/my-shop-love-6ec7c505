@@ -139,6 +139,8 @@ export function SyncSettings() {
 
       <SyncLogViewer />
 
+      <Housekeeping />
+
       <PendingTransactions rows={queueView()} onChange={bump} />
 
       {quarantined.length > 0 && (
@@ -179,6 +181,64 @@ export function SyncSettings() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Desktop-only storage tidy-up. Only rows the central database has already
+ * confirmed are ever removed, so nothing unsent can be lost here.
+ */
+function Housekeeping() {
+  const [days, setDays] = useState(90);
+  const [busy, setBusy] = useState(false);
+  const bridge = localDb();
+  if (!bridge?.housekeep) return null;
+
+  return (
+    <div className="space-y-2 rounded-md border border-border p-3">
+      <div>
+        <p className="text-sm">Storage housekeeping</p>
+        <p className="text-xs text-muted-foreground">
+          Removes bills, stock moves and logs older than the window below — but only once the
+          central database has confirmed them. Anything still waiting to send is always kept.
+        </p>
+      </div>
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="text-xs text-muted-foreground">
+          Keep confirmed records for
+          <input
+            type="number"
+            min={7}
+            max={3650}
+            value={days}
+            onChange={(e) => setDays(Number(e.target.value) || 90)}
+            className="numeric ml-2 w-24 rounded-md border border-input bg-background px-2 py-1 text-sm text-foreground"
+          />
+          <span className="ml-2">days</span>
+        </label>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            try {
+              const res = await bridge.housekeep?.({ retentionDays: days });
+              if (!res?.ok) throw new Error(res?.error ?? "Cleanup could not finish");
+              toast.success(
+                `Cleanup done — ${res.rows ?? 0} record(s) and ${res.files ?? 0} leftover file(s) removed`,
+              );
+            } catch (error) {
+              showNotification(describeError(error, "Storage cleanup"), "error");
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          {busy ? "Cleaning…" : "Run cleanup now"}
+        </Button>
+      </div>
     </div>
   );
 }

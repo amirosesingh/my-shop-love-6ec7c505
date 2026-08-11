@@ -23,6 +23,8 @@ contextBridge.exposeInMainWorld("pos", {
   backup: (path) => invoke("pos:backup", path),
   retryErrored: () => invoke("pos:retry-errored"),
   snapshot: () => invoke("pos:snapshot"),
+  /** Prune confirmed rows and orphaned temp files. */
+  housekeep: (options) => invoke("pos:housekeep", options),
   /* auto-update */
   appVersion: () => invoke("app:version"),
   updateStatus: () => invoke("update:status"),

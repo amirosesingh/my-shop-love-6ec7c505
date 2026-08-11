@@ -60,6 +60,14 @@ export type PosBridge = {
   setSyncEnabled: (on: boolean) => Promise<void>;
   backup: (path?: string) => Promise<{ ok: boolean; path?: string; error?: string }>;
   retryErrored: () => Promise<{ ok: boolean }>;
+  /** Prunes rows the central database has confirmed plus orphaned temp files. */
+  housekeep?: (options?: { retentionDays?: number }) => Promise<{
+    ok: boolean;
+    error?: string;
+    files?: number;
+    bytes?: number;
+    rows?: number;
+  }>;
   snapshot: () => Promise<{
     ok: boolean;
     error?: string;
