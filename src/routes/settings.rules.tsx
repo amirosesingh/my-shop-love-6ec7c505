@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { notifyError } from "@/lib/notify";
 
 import { AppShell } from "@/components/pos/AppShell";
+import { SaveIndicator } from "@/components/pos/settings/SaveIndicator";
+import { SettingsSections } from "@/components/pos/settings/SettingsSection";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -140,13 +142,15 @@ function RulesSettings() {
           </p>
         )}
 
-        {RULE_GROUPS.map((group) => (
-          <section key={group.id} className="space-y-4 rounded-lg border border-border bg-card p-5">
-            <div>
-              <h2 className="text-sm font-semibold">{group.label}</h2>
-              <p className="text-xs text-muted-foreground">{group.blurb}</p>
-            </div>
-            <div className="space-y-3">
+        <section className="rounded-lg border border-border bg-card px-5">
+          <SettingsSections
+            storageKey="rules"
+            items={RULE_GROUPS.map((group) => ({
+              id: group.id,
+              title: group.label,
+              blurb: group.blurb,
+              content: (
+                <div className="space-y-3 pb-2">
               {group.fields.map((field) => (
                 <div
                   key={field.key}
@@ -175,9 +179,11 @@ function RulesSettings() {
                   )}
                 </div>
               ))}
-            </div>
-          </section>
-        ))}
+                </div>
+              ),
+            }))}
+          />
+        </section>
 
         <section className="space-y-4 rounded-lg border border-border bg-card p-5">
           <div>
@@ -208,9 +214,7 @@ function RulesSettings() {
 
         {mayEdit && (
           <div className="sticky bottom-0 -mx-6 flex items-center gap-3 border-t border-border bg-background/95 px-6 py-3 backdrop-blur">
-            <span className="text-xs text-muted-foreground">
-              {dirty ? "Unsaved changes" : "All rules saved"}
-            </span>
+            <SaveIndicator dirty={dirty} saving={saving} />
             <Button
               size="sm"
               className="ml-auto"
