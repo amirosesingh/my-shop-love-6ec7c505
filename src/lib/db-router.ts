@@ -22,7 +22,6 @@ import {
   isConnectionError,
 } from "./db-mode";
 import { supabaseExternal } from "@/integrations/supabase/external-client";
-import { localDb } from "./local-db";
 import { readSnapshot } from "./offline-snapshot";
 import type { Row, SyncOp } from "./sync-outbox";
 
@@ -76,31 +75,14 @@ function localQuery(table: string, options: QueryOptions = {}): Row[] | null {
   return options.limit ? out.slice(0, options.limit) : out;
 }
 
-/**
- * Keep the local copy in step with a row that has just been saved centrally,
- * so the same record is there if the connection drops a second later.
- * Best effort only: a failure here never fails the caller's action.
- */
-async function mirrorLocally(context: string, ops: SyncOp[]) {
-  const bridge = localDb();
-  if (!bridge) return;
-  for (const op of ops) {
-    try {
-      await bridge.write(context, op);
-    } catch {
-      /* the change is already safe centrally */
-    }
-  }
-}
-
 export const dbRouter = {
-  /** Store a group of changes. Resolves only once the data is genuinely saved. */
-  async write(context: string, ops: SyncOp[]): Promise<CommitTarget> {
-    const target = await commitOps(context, ops);
-    // Saved centrally: mirror the very same rows onto this terminal so both
-    // sides hold the record straight away.
-    if (target === "cloud") await mirrorLocally(context, ops);
-    return target;
+  /**
+   * Store a group of changes. Resolves once the data is genuinely saved;
+   * when it went to the central database the terminal copy is written in the
+   * background by the commit layer, so nothing at the till waits for it.
+   */
+  write(context: string, ops: SyncOp[]): Promise<CommitTarget> {
+    return commitOps(context, ops);
   },
 
   /**
