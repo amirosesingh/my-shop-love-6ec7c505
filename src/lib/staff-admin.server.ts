@@ -183,8 +183,8 @@ export async function provisionStaffAccount(payload: StaffPayload): Promise<{ us
 
 /** Turn an account on or off everywhere at once. */
 export async function setStaffActive(username: string, active: boolean): Promise<void> {
-  const email = internalEmail(username);
-  const userId = await findUserId(email);
+  const profile = await staffProfile(username);
+  const userId = profile?.auth_user_id ?? null;
   if (userId) {
     await adminFetch(`admin/users/${userId}`, {
       method: "PUT",
@@ -195,6 +195,95 @@ export async function setStaffActive(username: string, active: boolean): Promise
     p_user_id: username.trim().toLowerCase(),
     p_active: active,
   });
+}
+
+type StaffProfileRow = {
+  user_id: string;
+  full_name: string;
+  email: string;
+  role: "admin" | "manager" | "staff";
+  role_slug: string | null;
+  store_id: string | null;
+  is_active: boolean;
+  auth_user_id: string | null;
+  permissions: Record<string, boolean>;
+};
+
+async function staffProfile(username: string): Promise<StaffProfileRow | null> {
+  const query = `app_users?user_id=eq.${encodeURIComponent(username.trim().toLowerCase())}&select=user_id,full_name,email,role,role_slug,store_id,is_active,auth_user_id,permissions&limit=1`;
+  const res = await serviceRest(query);
+  if (!res.ok) throw new Error("The staff profile could not be loaded");
+  const rows = (await res.json()) as StaffProfileRow[];
+  return rows[0] ?? null;
+}
+
+export async function updateStaffProfile(input: {
+  username: string;
+  displayName: string;
+  branchId: string | null;
+  roleSlug: string;
+  baseRole: "admin" | "manager" | "staff";
+  active: boolean;
+  credential?: string;
+}): Promise<void> {
+  const profile = await staffProfile(input.username);
+  if (!profile?.auth_user_id) throw new Error("This staff account has no authentication identity");
+  const terminalAccount = profile.email.endsWith(`@${INTERNAL_EMAIL_DOMAIN}`);
+  const credential = input.credential ?? "";
+  if (credential) {
+    if (terminalAccount && !/^\d{4,6}$/.test(credential)) throw new Error("A PIN must be 4 to 6 digits");
+    if (!terminalAccount && credential.length < 8) throw new Error("A password must be at least 8 characters");
+  }
+
+  const authUpdate = await adminFetch(`admin/users/${profile.auth_user_id}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      ...(credential ? { password: credential } : {}),
+      user_metadata: {
+        username: profile.user_id,
+        full_name: input.displayName.trim(),
+        role: input.baseRole === "admin" ? "admin" : input.baseRole === "manager" ? "supervisor" : "cashier",
+        role_slug: input.roleSlug,
+        store_id: input.branchId,
+        active: input.active,
+      },
+    }),
+  });
+  if (!authUpdate.ok) throw new Error((await authUpdate.text()).slice(0, 240) || "The login account could not be updated");
+
+  await serviceRpc("staff_account_upsert", {
+    p_user_id: profile.user_id,
+    p_full_name: input.displayName.trim(),
+    p_email: profile.email,
+    p_role: input.baseRole,
+    p_role_slug: input.roleSlug,
+    p_store_id: input.branchId,
+    p_is_active: input.active,
+    p_pin: terminalAccount && credential ? credential : "",
+    p_pin_length: terminalAccount && credential ? credential.length : 0,
+    p_auth_user_id: profile.auth_user_id,
+    p_permissions: null,
+  });
+  await serviceRest("user_roles?user_id=eq." + encodeURIComponent(profile.auth_user_id), { method: "DELETE" });
+  const roleResult = await serviceRest("user_roles", {
+    method: "POST",
+    prefer: "return=minimal",
+    body: JSON.stringify([{ user_id: profile.auth_user_id, role: input.baseRole }]),
+  });
+  if (!roleResult.ok) throw new Error("The account role could not be updated");
+}
+
+export async function permanentlyDeleteStaff(username: string): Promise<void> {
+  const profile = await staffProfile(username);
+  if (!profile?.auth_user_id) throw new Error("The staff account could not be found");
+  await serviceRpc("staff_account_delete_profile", {
+    p_user_id: profile.user_id,
+    p_auth_user_id: profile.auth_user_id,
+  });
+  const deleted = await adminFetch(`admin/users/${profile.auth_user_id}`, { method: "DELETE" });
+  if (!deleted.ok && deleted.status !== 404) {
+    throw new Error((await deleted.text()).slice(0, 240) || "The login identity could not be deleted");
+  }
 }
 
 type VerifiedPin = { username: string; fullName: string; storeId: string | null };

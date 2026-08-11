@@ -9,8 +9,10 @@ import {
   listTerminalStaffAccounts,
   migrateCashiersToAccounts,
   preparePinSignIn,
+  deleteStaffAccount,
   saveStaffAccount,
   setStaffAccountActive,
+  updateStaffAccount,
 } from "@/lib/staff-admin.functions";
 import type { StaffRole } from "@/lib/permissions";
 
@@ -73,6 +75,32 @@ export async function createStaffMember(input: StaffAccountInput): Promise<void>
 export async function toggleStaffStatus(username: string, active: boolean): Promise<void> {
   const res = await setStaffAccountActive({
     data: { accessToken: await accessToken(), username, active },
+  });
+  if (!res.ok) throw new Error(res.error);
+}
+
+export async function updateStaffMember(input: {
+  username: string;
+  displayName: string;
+  branchId: string | null;
+  roleSlug: string;
+  baseRole: StaffRole;
+  active: boolean;
+  credential?: string;
+}): Promise<void> {
+  const res = await updateStaffAccount({
+    data: {
+      accessToken: await accessToken(),
+      ...input,
+      baseRole: dbBaseRole(input.baseRole),
+    },
+  });
+  if (!res.ok) throw new Error(res.error);
+}
+
+export async function permanentlyDeleteStaffMember(username: string): Promise<void> {
+  const res = await deleteStaffAccount({
+    data: { accessToken: await accessToken(), username },
   });
   if (!res.ok) throw new Error(res.error);
 }

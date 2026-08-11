@@ -1,23 +1,21 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-const token = z.string().min(10).max(4000);
-
-const staffInput = z.object({
-  accessToken: token,
-  displayName: z.string().min(1).max(120),
-  username: z.string().min(2).max(160),
-  pin: z.string().regex(/^\d{4,6}$/).optional(),
-  password: z.string().min(8).max(200).optional(),
-  branchId: z.string().max(60).nullable().optional(),
-  roleSlug: z.string().min(2).max(60),
-  baseRole: z.enum(["admin", "manager", "staff"]),
-  active: z.boolean(),
-});
-
 /** Create or update a staff member and the account behind them. */
 export const saveStaffAccount = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => staffInput.parse(data))
+  .inputValidator((data: unknown) =>
+    z.object({
+      accessToken: z.string().min(10).max(4000),
+      displayName: z.string().trim().min(1).max(120),
+      username: z.string().min(2).max(160),
+      pin: z.string().regex(/^\d{4,6}$/).optional(),
+      password: z.string().min(8).max(200).optional(),
+      branchId: z.string().max(60).nullable().optional(),
+      roleSlug: z.string().min(2).max(60),
+      baseRole: z.enum(["admin", "manager", "staff"]),
+      active: z.boolean(),
+    }).parse(data),
+  )
   .handler(async ({ data }): Promise<{ ok: true } | { ok: false; error: string }> => {
     try {
       const mod = await import("./staff-admin.server");
@@ -38,15 +36,13 @@ export const saveStaffAccount = createServerFn({ method: "POST" })
     }
   });
 
-const activeInput = z.object({
-  accessToken: token,
-  username: z.string().min(2).max(40),
-  active: z.boolean(),
-});
-
 /** Switch a staff account on or off. */
 export const setStaffAccountActive = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => activeInput.parse(data))
+  .inputValidator((data: unknown) => z.object({
+    accessToken: z.string().min(10).max(4000),
+    username: z.string().min(2).max(160),
+    active: z.boolean(),
+  }).parse(data))
   .handler(async ({ data }): Promise<{ ok: true } | { ok: false; error: string }> => {
     try {
       const mod = await import("./staff-admin.server");
@@ -58,18 +54,16 @@ export const setStaffAccountActive = createServerFn({ method: "POST" })
     }
   });
 
-const pinInput = z.object({
-  username: z.string().min(2).max(40),
-  pin: z.string().regex(/^\d{4,6}$/),
-});
-
 /**
  * Public by necessity: a till has no session yet when someone taps their PIN.
  * The PIN itself is the credential and is checked against the stored hash
  * before anything is created or changed.
  */
 export const preparePinSignIn = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => pinInput.parse(data))
+  .inputValidator((data: unknown) => z.object({
+    username: z.string().min(2).max(40),
+    pin: z.string().regex(/^\d{4,6}$/),
+  }).parse(data))
   .handler(async ({ data }): Promise<{ ok: true; email: string } | { ok: false; error: string }> => {
     try {
       const mod = await import("./staff-admin.server");
@@ -79,11 +73,9 @@ export const preparePinSignIn = createServerFn({ method: "POST" })
     }
   });
 
-const listInput = z.object({ storeId: z.string().max(60).nullable().optional() });
-
 /** The sign-in grid for a till: active staff who hold a PIN. */
 export const listTerminalStaffAccounts = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => listInput.parse(data))
+  .inputValidator((data: unknown) => z.object({ storeId: z.string().max(60).nullable().optional() }).parse(data))
   .handler(async ({ data }) => {
     try {
       const mod = await import("./staff-admin.server");
@@ -94,17 +86,55 @@ export const listTerminalStaffAccounts = createServerFn({ method: "POST" })
     }
   });
 
-const bulkInput = z.object({ accessToken: token });
-
 /** One-off catch-up for tills that still have old cashier-only records. */
 export const migrateCashiersToAccounts = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => bulkInput.parse(data))
+  .inputValidator((data: unknown) => z.object({ accessToken: z.string().min(10).max(4000) }).parse(data))
   .handler(async ({ data }): Promise<{ ok: true; migrated: number } | { ok: false; error: string }> => {
     try {
       const mod = await import("./staff-admin.server");
       await mod.requireSupervisor(data.accessToken);
       const res = await mod.migrateLegacyCashiers();
       return { ok: true, ...res };
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  });
+
+/** Update profile fields and optionally replace the credential. */
+export const updateStaffAccount = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({
+    accessToken: z.string().min(10).max(4000),
+    username: z.string().min(2).max(160),
+    displayName: z.string().trim().min(1).max(120),
+    branchId: z.string().max(60).nullable(),
+    roleSlug: z.string().min(2).max(60),
+    baseRole: z.enum(["admin", "manager", "staff"]),
+    active: z.boolean(),
+    credential: z.string().max(200).optional(),
+  }).parse(data))
+  .handler(async ({ data }): Promise<{ ok: true } | { ok: false; error: string }> => {
+    try {
+      const mod = await import("./staff-admin.server");
+      await mod.requireSupervisor(data.accessToken);
+      await mod.updateStaffProfile(data);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: (e as Error).message };
+    }
+  });
+
+/** Permanently remove an inactive account after server-side safety checks. */
+export const deleteStaffAccount = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({
+    accessToken: z.string().min(10).max(4000),
+    username: z.string().min(2).max(160),
+  }).parse(data))
+  .handler(async ({ data }): Promise<{ ok: true } | { ok: false; error: string }> => {
+    try {
+      const mod = await import("./staff-admin.server");
+      await mod.requireSupervisor(data.accessToken);
+      await mod.permanentlyDeleteStaff(data.username);
+      return { ok: true };
     } catch (e) {
       return { ok: false, error: (e as Error).message };
     }
