@@ -556,6 +556,23 @@ export function PosProvider({ children }: { children: ReactNode }) {
     });
   }, [activeShift?.id, user?.staffId, user?.name, terminalUser?.userCode]);
 
+  // Signing in on a shift somebody else already opened is never interrupted by
+  // the opening screen — say so once, then get out of the way.
+  const announcedShiftRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!activeShift || !signedIn) return;
+    if (announcedShiftRef.current === activeShift.id) return;
+    announcedShiftRef.current = activeShift.id;
+    // The till that just opened the shift already saw its own confirmation.
+    if (justOpenedRef.current?.shift.id === activeShift.id) return;
+    const branch =
+      stateRef.current.stores.find((s) => s.id === activeShift.storeId)?.name ??
+      activeShift.storeId;
+    toast.success(`Continuing active shift opened at ${branch}`, {
+      description: `Opened by ${activeShift.cashier} · float ${money(activeShift.openingFloat)}`,
+    });
+  }, [activeShift?.id, signedIn]);
+
   const setCurrentStore = useCallback(
     (id: string) => setState((s) => ({ ...s, currentStoreId: id })),
     [],
