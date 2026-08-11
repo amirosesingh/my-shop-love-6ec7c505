@@ -181,7 +181,10 @@ export function StaffManager() {
     }
   };
 
-  const pinValid = /^\d{4}$/.test(form.pin);
+  const identifier = form.username.trim().toLowerCase();
+  const emailMode = looksLikeEmail(identifier);
+  const pinValid = /^\d{4,6}$/.test(form.pin);
+  const canCreate = emailMode ? form.password.length >= 8 : pinValid && identifier.length >= 2;
 
   return (
     <section className="space-y-4 rounded-lg border border-border bg-card p-5">
@@ -222,9 +225,10 @@ export function StaffManager() {
           <thead>
             <tr className="border-b border-border text-left text-xs text-muted-foreground">
               <th className="py-2">Name</th>
-              <th className="py-2">Username</th>
+              <th className="py-2">Username / email</th>
               <th className="py-2">Level</th>
               <th className="py-2">Branch</th>
+              <th className="py-2">Sign-in</th>
               <th className="py-2 text-right">Active</th>
             </tr>
           </thead>
@@ -241,6 +245,23 @@ export function StaffManager() {
                 <td className="py-2 pr-2 text-muted-foreground">
                   {stores.find((s) => s.id === r.store_id)?.name ?? "All branches"}
                 </td>
+                <td className="py-2 pr-2">
+                  {r.email && !r.email.endsWith("@pos-internal.local") ? (
+                    <span className="text-xs text-muted-foreground">Email &amp; password</span>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-[11px]"
+                      onClick={() => {
+                        setPinFor(r);
+                        setNewPin("");
+                      }}
+                    >
+                      <KeyRound className="size-3.5" /> PIN set · Change
+                    </Button>
+                  )}
+                </td>
                 <td className="py-2 text-right">
                   <Switch
                     checked={r.is_active}
@@ -253,7 +274,7 @@ export function StaffManager() {
             ))}
             {!loading && !rows.length && (
               <tr>
-                <td colSpan={5} className="py-6 text-center text-muted-foreground">
+                <td colSpan={6} className="py-6 text-center text-muted-foreground">
                   No staff accounts yet.
                 </td>
               </tr>
@@ -267,7 +288,9 @@ export function StaffManager() {
           <DialogHeader>
             <DialogTitle>New staff member</DialogTitle>
             <DialogDescription>
-              The PIN is how this person signs in at a till. It is never shown again.
+              A username creates a till account that signs in with a PIN straight away. A real
+              email address creates a back-office account with its own password and a
+              confirmation email.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -280,30 +303,49 @@ export function StaffManager() {
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="sm-user">Username</Label>
+              <Label htmlFor="sm-user">Username or email address</Label>
               <Input
                 id="sm-user"
-                placeholder="cashier101"
+                placeholder="cashier101 or owner@store.com"
                 value={form.username}
                 onChange={(e) =>
                   setForm({ ...form, username: e.target.value.replace(/\s+/g, "") })
                 }
               />
+              <p className="text-[11px] text-muted-foreground">
+                {emailMode
+                  ? "This person signs in with their email address and password, and must confirm the email first."
+                  : "No “@” means a till account: the person taps their name and PIN on the terminal."}
+              </p>
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="sm-pin">4-digit PIN</Label>
-              <Input
-                id="sm-pin"
-                type="password"
-                inputMode="numeric"
-                maxLength={4}
-                autoComplete="new-password"
-                value={form.pin}
-                onChange={(e) =>
-                  setForm({ ...form, pin: e.target.value.replace(/\D/g, "").slice(0, 4) })
-                }
-              />
-            </div>
+            {emailMode ? (
+              <div className="space-y-1">
+                <Label htmlFor="sm-password">Password</Label>
+                <Input
+                  id="sm-password"
+                  type="password"
+                  autoComplete="new-password"
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                />
+                <p className="text-[11px] text-muted-foreground">At least 8 characters.</p>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <Label htmlFor="sm-pin">PIN (4 to 6 digits)</Label>
+                <Input
+                  id="sm-pin"
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={6}
+                  autoComplete="new-password"
+                  value={form.pin}
+                  onChange={(e) =>
+                    setForm({ ...form, pin: e.target.value.replace(/\D/g, "").slice(0, 6) })
+                  }
+                />
+              </div>
+            )}
             <div className="space-y-1">
               <Label>Role</Label>
               <Select
@@ -350,11 +392,37 @@ export function StaffManager() {
             </label>
           </div>
           <DialogFooter>
-            <Button
-              onClick={() => void create()}
-              disabled={saving || !pinValid || form.username.trim().length < 2}
-            >
+            <Button onClick={() => void create()} disabled={saving || !canCreate}>
               {saving && <Loader2 className="size-4 animate-spin" />} Create account
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!pinFor} onOpenChange={(v) => !v && setPinFor(null)}>
+        <DialogContent className="sm:max-w-xs">
+          <DialogHeader>
+            <DialogTitle>Change PIN</DialogTitle>
+            <DialogDescription>
+              {pinFor?.full_name || pinFor?.user_id} will use the new PIN at the next sign-in.
+              Existing PINs are never shown.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1">
+            <Label htmlFor="sm-newpin">New PIN (4 to 6 digits)</Label>
+            <Input
+              id="sm-newpin"
+              type="password"
+              inputMode="numeric"
+              maxLength={6}
+              autoComplete="new-password"
+              value={newPin}
+              onChange={(e) => setNewPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+            />
+          </div>
+          <DialogFooter>
+            <Button onClick={() => void changePin()} disabled={saving || !/^\d{4,6}$/.test(newPin)}>
+              {saving && <Loader2 className="size-4 animate-spin" />} Save PIN
             </Button>
           </DialogFooter>
         </DialogContent>
