@@ -7,6 +7,13 @@ import { canRelay, hasStaffSession, relayOp } from "./sync-relay";
 import { preferRelay } from "./pos-auth-route";
 import { isConnectionError, noteConnectionLost, noteConnectionRestored } from "./db-mode";
 import {
+  lastSuccessfulPull,
+  setLastSuccessfulPull,
+  setSyncState,
+  syncState,
+} from "./sync-status";
+import { writeSnapshot, readSnapshot } from "./offline-snapshot";
+import {
   failOp,
   isOnline,
   isOnlineSyncEnabled,
@@ -281,9 +288,11 @@ let draining = false;
  */
 export async function drainOutbox(): Promise<{ pushed: number; failed: number }> {
   // A revoked terminal keeps selling locally but is cut off from the cloud.
+  if (!isOnline()) setSyncState({ phase: "offline", pending: listQueue().length });
   if (draining || !isOnline() || !isOnlineSyncEnabled() || isTerminalRevoked())
     return { pushed: 0, failed: 0 };
   draining = true;
+  setSyncState({ phase: "syncing", pending: listQueue().length });
   let pushed = 0;
   let failed = 0;
   const blocked = new Set<string>();
@@ -309,8 +318,66 @@ export async function drainOutbox(): Promise<{ pushed: number; failed: number }>
     if (pushed) noteConnectionRestored();
   } finally {
     draining = false;
+    setSyncState({
+      phase: isOnline() ? "idle" : "offline",
+      pending: listQueue().length,
+      ...(pushed && !failed ? { lastSyncAt: new Date().toISOString(), lastError: null } : {}),
+    });
   }
   return { pushed, failed };
+}
+
+/* ---------------------------- downward sync ---------------------------- */
+
+/** Tables the central database owns; a till only ever reads these back. */
+const PULL_TABLES = ["products", "members", "membership_tiers", "promotions", "stores"] as const;
+
+let pulling = false;
+
+/**
+ * Bring down everything changed centrally since the last clean pull, so a
+ * price edited at head office reaches this till without a restart.
+ */
+export async function pullDelta(): Promise<{ merged: number }> {
+  if (pulling || !isOnline() || !isOnlineSyncEnabled()) return { merged: 0 };
+  pulling = true;
+  const since = lastSuccessfulPull() ?? "1970-01-01T00:00:00.000Z";
+  const startedAt = new Date().toISOString();
+  let merged = 0;
+  try {
+    const snapshot = readSnapshot();
+    if (!snapshot) return { merged: 0 };
+    const next: Record<string, unknown> = { ...(snapshot as Record<string, unknown>) };
+    for (const table of PULL_TABLES) {
+      if (!tableSyncAllowed(table)) continue;
+      let { data, error } = await supabaseExternal
+        .from(table)
+        .select("*")
+        .gt("updated_at", since);
+      if (error)
+        ({ data, error } = await supabaseExternal.from(table).select("*").gt("created_at", since));
+      if (error) {
+        logSync("pull", table, false, error.message);
+        continue;
+      }
+      const rows = (data ?? []) as { id?: string }[];
+      if (!rows.length) continue;
+      const existing = Array.isArray(next[table]) ? (next[table] as { id?: string }[]) : [];
+      const byId = new Map(existing.map((r) => [r.id, r]));
+      for (const row of rows) byId.set(row.id, { ...byId.get(row.id), ...row });
+      next[table] = [...byId.values()];
+      merged += rows.length;
+      logSync("pull", table, true, `${rows.length} row(s)`);
+    }
+    if (merged) writeSnapshot(next as never);
+    setLastSuccessfulPull(startedAt);
+    setSyncState({ lastSyncAt: startedAt });
+  } catch (e) {
+    setSyncState({ lastError: e instanceof Error ? e.message : String(e) });
+  } finally {
+    pulling = false;
+  }
+  return { merged };
 }
 
 let started = false;
@@ -319,13 +386,35 @@ let started = false;
 export function startSyncEngine() {
   if (started || typeof window === "undefined") return () => {};
   started = true;
-  const tick = () => void drainOutbox();
+  // Push first, then bring central changes down.
+  const tick = () => void drainOutbox().then(() => pullDelta());
   const timer = window.setInterval(tick, 15000);
-  window.addEventListener("online", tick);
+  const wake = () => {
+    setSyncState({ phase: "syncing" });
+    tick();
+  };
+  const sleep = () => setSyncState({ phase: "offline" });
+  window.addEventListener("online", wake);
+  window.addEventListener("offline", sleep);
+  // The browser's online flag lies on captive networks, so confirm by asking
+  // the central database every half minute and resume the moment it answers.
+  const ping = window.setInterval(() => {
+    if (!navigator.onLine) return;
+    void supabaseExternal
+      .from("public_flags")
+      .select("key")
+      .limit(1)
+      .then(({ error }) => {
+        if (error) return;
+        if (syncState().phase === "offline") wake();
+      });
+  }, 30000);
   tick();
   return () => {
     window.clearInterval(timer);
-    window.removeEventListener("online", tick);
+    window.clearInterval(ping);
+    window.removeEventListener("online", wake);
+    window.removeEventListener("offline", sleep);
     started = false;
   };
 }
