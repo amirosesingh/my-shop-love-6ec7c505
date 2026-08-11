@@ -20,6 +20,8 @@ import {
 } from "./sync-status";
 import { writeSnapshot } from "./offline-snapshot";
 import { loadCloudState } from "./pos-db";
+import { localDb } from "./local-db";
+import { checkHealth } from "./connection-health";
 import {
   failOp,
   isOnline,
@@ -387,14 +389,57 @@ export async function pullDelta(): Promise<{ merged: number }> {
   return { merged: changed };
 }
 
+/**
+ * Phase 1 of convergence: everything stored on this terminal and still marked
+ * `pending_sync = 1` is pushed up, keyed on its own id (or the temporary id it
+ * was given locally), so a replay updates rather than duplicates. The desktop
+ * shell owns the local SQL Server connection and does the T-SQL side.
+ */
+export async function pushLocalPending(): Promise<{ pushed: number; failed: number }> {
+  const bridge = localDb();
+  if (!bridge || !isOnline() || !isOnlineSyncEnabled()) return { pushed: 0, failed: 0 };
+  try {
+    const res = await bridge.push();
+    if (res.pushed) logSync("push", "local", true, `${res.pushed} queued local row(s) uploaded`);
+    if (res.error) logSync("push", "local", false, res.error);
+    return { pushed: res.pushed ?? 0, failed: res.failed ?? 0 };
+  } catch (e) {
+    logSync("push", "local", false, e instanceof Error ? e.message : String(e));
+    return { pushed: 0, failed: 0 };
+  }
+}
+
+/**
+ * Phase 2 of convergence: bring central changes down into the terminal's own
+ * database so the two stay in step even when nothing was sold here.
+ */
+export async function pullIntoLocal(): Promise<{ merged: number }> {
+  const bridge = localDb();
+  if (!bridge || !isOnline() || !isOnlineSyncEnabled()) return { merged: 0 };
+  try {
+    const res = await bridge.pull();
+    if (res.merged) logSync("pull", "local", true, `${res.merged} row(s) refreshed on this terminal`);
+    return { merged: res.merged ?? 0 };
+  } catch (e) {
+    logSync("pull", "local", false, e instanceof Error ? e.message : String(e));
+    return { merged: 0 };
+  }
+}
+
 let started = false;
 
 /** Start the background sync loop (called once from the app shell). */
 export function startSyncEngine() {
   if (started || typeof window === "undefined") return () => {};
   started = true;
-  // Push first, then bring central changes down.
-  const tick = () => void drainOutbox().then(() => pullDelta());
+  // Push queued work first, then bring central changes down, then converge the
+  // terminal's own database in both directions.
+  const tick = () =>
+    void drainOutbox()
+      .then(() => pullDelta())
+      .then(() => pushLocalPending())
+      .then(() => pullIntoLocal())
+      .then(() => checkHealth(true));
   const timer = window.setInterval(tick, 15000);
   const wake = () => {
     setSyncState({ phase: "syncing" });
