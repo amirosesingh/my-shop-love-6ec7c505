@@ -31,6 +31,7 @@ export function CashierPinLogin({ onAdminLogin }: { onAdminLogin?: () => void })
   const [loading, setLoading] = useState(true);
   const [picked, setPicked] = useState<TerminalStaff | null>(null);
   const [manual, setManual] = useState("");
+  const [typing, setTyping] = useState(false);
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -57,6 +58,9 @@ export function CashierPinLogin({ onAdminLogin }: { onAdminLogin?: () => void })
 
   const username = picked?.username ?? manual.trim().toLowerCase();
   const pinLength = picked?.pinLength && picked.pinLength >= 4 ? picked.pinLength : 4;
+  // Longer credentials are passcodes rather than tapped PINs, so they get a
+  // masked field and an explicit Enter instead of auto-submitting.
+  const keypadMode = !typing && pinLength <= 8;
 
   const submit = useCallback(
     async (value: string) => {
@@ -107,7 +111,7 @@ export function CashierPinLogin({ onAdminLogin }: { onAdminLogin?: () => void })
 
   // Physical keyboards and keypads work exactly like the on-screen pad.
   useEffect(() => {
-    if (!picked && !manual) return;
+    if ((!picked && !manual) || !keypadMode) return;
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
       if (el && el.tagName === "INPUT" && el.id === "pin-username") return;
@@ -125,7 +129,7 @@ export function CashierPinLogin({ onAdminLogin }: { onAdminLogin?: () => void })
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [picked, manual, busy, pinLength, submit]);
+  }, [picked, manual, busy, pinLength, keypadMode, submit]);
 
   /* ---------------------------- step one: person --------------------------- */
   if (!picked && !manual) {
@@ -221,7 +225,7 @@ export function CashierPinLogin({ onAdminLogin }: { onAdminLogin?: () => void })
         aria-label="PIN entry"
         role="status"
       >
-        {Array.from({ length: pinLength }).map((_, i) => (
+        {Array.from({ length: Math.min(pinLength, 12) }).map((_, i) => (
           <span
             key={i}
             className={cn(
@@ -239,6 +243,7 @@ export function CashierPinLogin({ onAdminLogin }: { onAdminLogin?: () => void })
         </p>
       )}
 
+      {keypadMode ? (
       <div className="grid grid-cols-3 gap-2">
         {KEYS.map((k) => (
           <Button
@@ -284,6 +289,50 @@ export function CashierPinLogin({ onAdminLogin }: { onAdminLogin?: () => void })
           <Delete className="size-5" />
         </Button>
       </div>
+      ) : (
+        <form
+          className="space-y-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (pin.length >= 4) void submit(pin);
+          }}
+        >
+          <Label htmlFor="pin-passcode">Passcode</Label>
+          <Input
+            id="pin-passcode"
+            type="password"
+            autoFocus
+            autoComplete="current-password"
+            maxLength={32}
+            value={pin}
+            disabled={busy || lockedFor > 0}
+            onChange={(e) => {
+              setPin(e.target.value);
+              setError("");
+            }}
+            className="h-12 text-center"
+          />
+          <Button type="submit" className="w-full" disabled={busy || lockedFor > 0 || pin.length < 4}>
+            Sign in
+          </Button>
+        </form>
+      )}
+
+      {pinLength <= 8 && (
+        <Button
+          type="button"
+          variant="ghost"
+          className="w-full text-xs"
+          disabled={busy}
+          onClick={() => {
+            setTyping(!typing);
+            setPin("");
+            setError("");
+          }}
+        >
+          {typing ? "Use the keypad" : "Type my passcode instead"}
+        </Button>
+      )}
 
       {busy && (
         <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground">

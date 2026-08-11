@@ -8,7 +8,7 @@ export const saveStaffAccount = createServerFn({ method: "POST" })
       accessToken: z.string().min(10).max(4000),
       displayName: z.string().trim().min(1).max(120),
       username: z.string().min(2).max(160),
-      pin: z.string().regex(/^\d{4,6}$/).optional(),
+      pin: z.string().min(4).max(32).optional(),
       password: z.string().min(8).max(200).optional(),
       branchId: z.string().max(60).nullable().optional(),
       roleSlug: z.string().min(2).max(60),
@@ -62,7 +62,7 @@ export const setStaffAccountActive = createServerFn({ method: "POST" })
 export const preparePinSignIn = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({
     username: z.string().min(2).max(40),
-    pin: z.string().regex(/^\d{4,6}$/),
+    pin: z.string().min(4).max(32),
   }).parse(data))
   .handler(async ({ data }): Promise<{ ok: true; email: string } | { ok: false; error: string }> => {
     try {

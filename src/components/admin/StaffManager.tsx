@@ -173,7 +173,7 @@ export function StaffManager() {
     ? true
     : emailMode
       ? form.credential.length >= 8
-      : /^\d{4,6}$/.test(form.credential);
+      : form.credential.length >= 4 && form.credential.length <= 32;
   const canSave = nameValid && identifierValid && credentialValid && !!selectedRole;
 
   const save = async () => {
@@ -298,7 +298,7 @@ export function StaffManager() {
               const terminal = row.email.endsWith("@pos-internal.local");
               return <tr key={row.user_id} className="border-b border-border/60">
                 <td className="py-3 pr-3"><p className="font-medium">{row.full_name}</p><p className="text-xs text-muted-foreground">{row.user_id}</p></td>
-                <td className="pr-3"><Badge variant="outline">{terminal ? `PIN · ${row.pin_length || 4} digits` : "Email & password"}</Badge></td>
+                <td className="pr-3"><Badge variant="outline">{terminal ? `PIN · ${row.pin_length || 4} characters` : "Email & password"}</Badge></td>
                 <td className="pr-3">{roles.find((role) => role.slug === row.role_slug)?.name ?? row.role_slug}</td>
                 <td className="pr-3">{stores.find((store) => store.id === row.store_id)?.name ?? "All branches"}</td>
                 <td className="pr-3 text-xs text-muted-foreground">{row.last_login_at ? new Date(row.last_login_at).toLocaleString() : "Never"}</td>
@@ -321,7 +321,7 @@ export function StaffManager() {
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1 sm:col-span-2"><Label htmlFor="staff-name">Display name *</Label><Input id="staff-name" maxLength={120} value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} aria-invalid={!nameValid} />{!nameValid && <p className="text-xs text-destructive">Display name is required.</p>}</div>
             <div className="space-y-1"><Label htmlFor="staff-identifier">Username or email *</Label><Input id="staff-identifier" disabled={!!editing} value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value.replace(/\s+/g, "") })} aria-invalid={!identifierValid} />{!identifierValid && <p className="text-xs text-destructive">Enter a valid username or email.</p>}</div>
-            <div className="space-y-1"><Label htmlFor="staff-credential">{emailMode ? "Password" : "PIN (4–6 digits)"}{editing ? "" : " *"}</Label><Input id="staff-credential" type="password" inputMode={emailMode ? undefined : "numeric"} maxLength={emailMode ? 200 : 6} autoComplete="new-password" value={form.credential} onChange={(e) => setForm({ ...form, credential: emailMode ? e.target.value : e.target.value.replace(/\D/g, "").slice(0, 6) })} aria-invalid={!credentialValid} />{!credentialValid && <p className="text-xs text-destructive">{emailMode ? "Use at least 8 characters." : "Use 4 to 6 digits."}</p>}</div>
+            <div className="space-y-1"><Label htmlFor="staff-credential">{emailMode ? "Password" : "PIN or passcode (4–32)"}{editing ? "" : " *"}</Label><Input id="staff-credential" type="password" maxLength={emailMode ? 200 : 32} autoComplete="new-password" value={form.credential} onChange={(e) => setForm({ ...form, credential: emailMode ? e.target.value : e.target.value.slice(0, 32) })} aria-invalid={!credentialValid} />{!credentialValid && <p className="text-xs text-destructive">{emailMode ? "Use at least 8 characters." : "Use 4 to 32 characters."}</p>}</div>
             <div className="space-y-1"><Label>Role *</Label><Select value={form.roleSlug} onValueChange={(roleSlug) => setForm({ ...form, roleSlug })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{roles.map((role) => <SelectItem key={role.slug} value={role.slug}>{role.name}</SelectItem>)}</SelectContent></Select></div>
             <div className="space-y-1"><Label>Branch</Label><Select value={form.branchId} onValueChange={(branchId) => setForm({ ...form, branchId })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">All branches</SelectItem>{stores.map((store) => <SelectItem key={store.id} value={store.id}>{store.code} · {store.name}</SelectItem>)}</SelectContent></Select></div>
             <label className="flex items-center justify-between rounded-md border border-border p-3 text-sm sm:col-span-2">Active immediately<Switch checked={form.active} onCheckedChange={(active) => setForm({ ...form, active })} /></label>

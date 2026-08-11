@@ -116,7 +116,9 @@ export async function provisionStaffAccount(payload: StaffPayload): Promise<{ us
     if (!/^[a-z0-9._-]{2,40}$/.test(username)) {
       throw new Error("A username may only use letters, numbers, dot, dash or underscore");
     }
-    if (!/^\d{4,6}$/.test(pin)) throw new Error("A PIN must be 4 to 6 digits");
+    if (pin.length < 4 || pin.length > 32) {
+      throw new Error("A till PIN or passcode must be 4 to 32 characters");
+    }
     email = internalEmail(username);
     secret = pin;
   }
@@ -234,7 +236,8 @@ export async function updateStaffProfile(input: {
   const terminalAccount = profile.email.endsWith(`@${INTERNAL_EMAIL_DOMAIN}`);
   const credential = input.credential ?? "";
   if (credential) {
-    if (terminalAccount && !/^\d{4,6}$/.test(credential)) throw new Error("A PIN must be 4 to 6 digits");
+    if (terminalAccount && (credential.length < 4 || credential.length > 32))
+      throw new Error("A till PIN or passcode must be 4 to 32 characters");
     if (!terminalAccount && credential.length < 8) throw new Error("A password must be at least 8 characters");
   }
 
@@ -351,7 +354,7 @@ export async function ensurePinAccount(
   pin: string,
 ): Promise<{ ok: true; email: string } | { ok: false; error: string }> {
   const code = username.trim().toLowerCase();
-  if (!/^\d{4,6}$/.test(pin)) return { ok: false, error: "Enter your PIN" };
+  if (pin.length < 4 || pin.length > 32) return { ok: false, error: "Enter your PIN" };
   const verified = await verifyPin(code, pin);
   if (!verified) return { ok: false, error: "Invalid username or PIN" };
 
