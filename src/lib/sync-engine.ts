@@ -5,7 +5,13 @@ import { isTerminalRevoked } from "./use-revocation-check";
 import { tableSyncAllowed } from "./sync-policy";
 import { canRelay, hasStaffSession, relayOp } from "./sync-relay";
 import { preferRelay } from "./pos-auth-route";
-import { isConnectionError, noteConnectionLost, noteConnectionRestored } from "./db-mode";
+import {
+  effectiveDatabaseMode,
+  isConnectionError,
+  noteConnectionLost,
+  noteConnectionRestored,
+  subscribeDatabaseMode,
+} from "./db-mode";
 import {
   lastSuccessfulPull,
   setLastSuccessfulPull,
@@ -397,6 +403,15 @@ export function startSyncEngine() {
   const sleep = () => setSyncState({ phase: "offline" });
   window.addEventListener("online", wake);
   window.addEventListener("offline", sleep);
+  // Flipping the switch back to online catches up immediately instead of
+  // waiting for the next timer tick.
+  let lastMode = effectiveDatabaseMode();
+  const offMode = subscribeDatabaseMode(() => {
+    const mode = effectiveDatabaseMode();
+    if (mode === lastMode) return;
+    lastMode = mode;
+    if (mode === "online") wake();
+  });
   // The browser's online flag lies on captive networks, so confirm by asking
   // the central database every half minute and resume the moment it answers.
   const ping = window.setInterval(() => {
@@ -416,6 +431,7 @@ export function startSyncEngine() {
     window.clearInterval(ping);
     window.removeEventListener("online", wake);
     window.removeEventListener("offline", sleep);
+    offMode();
     started = false;
   };
 }

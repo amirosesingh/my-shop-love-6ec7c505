@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { usePos } from "@/lib/pos-store";
 import { downloadSqlBackup } from "@/lib/backup-sql";
-import { drainOutbox } from "@/lib/sync-engine";
+import { drainOutbox, pullDelta } from "@/lib/sync-engine";
 import { LocalDatabaseSettings } from "@/components/pos/LocalDatabaseSettings";
 import { ConnectionCheck } from "@/components/pos/ConnectionCheck";
 import { SyncLogViewer } from "@/components/SyncLogViewer";
@@ -78,7 +78,9 @@ export function SyncSettings() {
           onCheckedChange={(v) => {
             setPreferredDatabaseMode(v ? "local" : "online");
             bump();
-            if (!v) void drainOutbox();
+            // Back to online working: push what is waiting, then bring down
+            // anything that changed centrally while this till was on its own.
+            if (!v) void drainOutbox().then(() => pullDelta());
           }}
         />
       </div>
