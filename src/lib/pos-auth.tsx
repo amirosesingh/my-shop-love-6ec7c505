@@ -321,11 +321,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (email: string, password: string) => {
+      // One handler for both worlds: a plain username belongs to a terminal
+      // account and is mapped onto its hidden internal address; anything with
+      // an "@" is used exactly as typed.
+      const typed = email.trim().toLowerCase();
+      const address = typed.includes("@") ? typed : `${typed}@pos-internal.local`;
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
+        email: address,
         password,
       });
       if (error) return { ok: false, error: error.message };
+      // A blocked account may still hold valid credentials — refuse it here.
+      try {
+        const { data: profileRows } = await supabase.rpc("current_app_user");
+        const profile = (Array.isArray(profileRows) ? profileRows[0] : null) as
+          | Record<string, unknown>
+          | null;
+        if (profile && profile["is_active"] === false) {
+          await supabase.auth.signOut();
+          return { ok: false, error: "Account deactivated. Please contact an administrator." };
+        }
+      } catch {
+        /* the profile lookup is advisory — row rules still apply server-side */
+      }
       // Whoever signs in on this device trades in the terminal's branch.
       bindTerminalBranch();
       // Register this device so it can be listed and reset remotely, and so
