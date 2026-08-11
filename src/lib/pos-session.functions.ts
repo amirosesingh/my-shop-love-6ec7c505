@@ -3,7 +3,7 @@ import { z } from "zod";
 
 const input = z.object({
   username: z.string().min(1).max(64),
-  pin: z.string().regex(/^\d{6}$/),
+  pin: z.string().regex(/^\d{4,6}$/),
 });
 
 /**
@@ -19,26 +19,29 @@ export const issueCashierSession = createServerFn({ method: "POST" })
     );
     const { signCashierSession } = await import("./pos-session.server");
     try {
-      const res = await fetch(`${supabaseConfig().url}/rest/v1/rpc/verify_cashier_pin`, {
+      const config = supabaseConfig();
+      const headers: Record<string, string> = {
+        apikey: config.key,
+        "Content-Type": "application/json",
+      };
+      if (!config.key.startsWith("sb_")) headers["Authorization"] = `Bearer ${config.key}`;
+      const res = await fetch(`${config.url}/rest/v1/rpc/verify_terminal_pin`, {
         method: "POST",
-        headers: {
-          apikey: supabaseConfig().key,
-          "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify({
-          p_username: data.username.trim().toLowerCase(),
+          p_user_id: data.username.trim().toLowerCase(),
           p_pin: data.pin,
         }),
       });
       if (!res.ok) return { ok: false as const, error: "Sign in failed" };
       const rows = (await res.json()) as unknown;
       const row = (Array.isArray(rows) ? rows[0] : rows) as
-        | { id?: string; username?: string }
+        | { user_id?: string }
         | null;
-      if (!row?.id) return { ok: false as const, error: "Invalid username or PIN" };
+      if (!row?.user_id) return { ok: false as const, error: "Invalid username or PIN" };
       return {
         ok: true as const,
-        token: signCashierSession({ id: String(row.id), username: String(row.username ?? "") }),
+        token: signCashierSession({ id: String(row.user_id), username: String(row.user_id) }),
       };
     } catch {
       return { ok: false as const, error: "Sign in failed" };

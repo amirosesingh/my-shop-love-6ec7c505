@@ -1,9 +1,9 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
 /**
- * Short-lived signed session token for cashier terminals. Cashiers have no
- * Supabase Auth account, so privileged server functions verify this token
- * instead. It is minted only after the PIN has been checked server-side.
+ * Short-lived signed device token for terminal compatibility paths. Every
+ * staff member also has a backend Auth account; this token is minted only
+ * after the canonical app_users PIN hash has been checked server-side.
  */
 const TTL_MS = 12 * 60 * 60 * 1000;
 

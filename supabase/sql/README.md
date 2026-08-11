@@ -27,7 +27,7 @@ files calls. Run `00` then `02` before anything else.
 | `12_analytics_views.sql` | Reporting views | `v_sale_line_facts`, `v_daily_store_sales`, `v_daily_item_sales` |
 | `22_roles_and_pin_gates.sql` | Dynamic staff roles and permission gates | `staff_roles`, role assignment fields |
 | `23_unified_staff_accounts.sql` | Unified username/PIN and email/password staff accounts | `app_users` account routines |
-| `24_staff_management.sql` | Safe legacy cashier migration | Copies legacy cashiers without dropping compatibility login |
+| `24_staff_management.sql` | Safe legacy cashier migration | Copies legacy cashiers when present; fresh databases skip it |
 | `25_staff_account_lifecycle.sql` | Inactive-first permanent staff deletion | Protected account lifecycle routine |
 
 `98_drop_unused.sql` is separate and **destructive**, and every statement in it
@@ -41,7 +41,8 @@ For an existing database that already has the base POS schema, run these files
 in order: `22_roles_and_pin_gates.sql`, `23_unified_staff_accounts.sql`,
 `24_staff_management.sql`, then `25_staff_account_lifecycle.sql`. File 24 keeps
 the legacy cashier table and login routine so older installed terminals remain
-compatible. Account rows are deleted only when an administrator explicitly
+compatible. These files are also safe when the legacy `cashiers` table does
+not exist; `app_users` remains the canonical staff source. Account rows are deleted only when an administrator explicitly
 uses Delete permanently after first deactivating that account.
 
 ## Nothing is deleted by a deploy
