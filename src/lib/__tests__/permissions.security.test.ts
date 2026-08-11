@@ -4,11 +4,18 @@ import {
   FULL_PERMISSIONS,
   PERMISSION_GROUPS,
   PERMISSION_KEYS,
+  PERMISSION_TAGS,
+  PERMISSION_TAG_KEYS,
+  ROLE_PRESETS,
+  STAFF_ROLES,
+  SUPERVISOR_PERMISSIONS,
   WAREHOUSE_PERMISSIONS,
   normalizePermissions,
   rolePermissions,
+  roleHasTag,
   type PermissionKey,
 } from "@/lib/permissions";
+import { isRouteVisibleFor } from "@/lib/ui-visibility";
 
 /**
  * Snapshot of the least-privilege presets. If a preset is widened, this test
