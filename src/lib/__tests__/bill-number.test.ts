@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it, beforeEach } from "vitest";
 import { billPrefix, dayStamp, nextBillNumber } from "@/lib/bill-number";
 
