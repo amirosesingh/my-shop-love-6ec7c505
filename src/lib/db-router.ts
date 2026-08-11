@@ -14,7 +14,7 @@
  * Reads come from whatever is available: the local snapshot first when the
  * connection is down, the cloud otherwise.
  */
-import { commitOps, commitLabel, mirrorToLocal, type CommitTarget } from "./pos-db";
+import { commitOps, commitLabel, type CommitTarget } from "./pos-db";
 import {
   AllTargetsFailed,
   effectiveDatabaseMode,
@@ -76,13 +76,13 @@ function localQuery(table: string, options: QueryOptions = {}): Row[] | null {
 }
 
 export const dbRouter = {
-  /** Store a group of changes. Resolves only once the data is genuinely saved. */
-  async write(context: string, ops: SyncOp[]): Promise<CommitTarget> {
-    const target = await commitOps(context, ops);
-    // Saved centrally: mirror the very same rows onto this terminal in the
-    // background so nothing at the till waits on the local database.
-    if (target === "cloud") void mirrorToLocal(context, ops);
-    return target;
+  /**
+   * Store a group of changes. Resolves once the data is genuinely saved;
+   * when it went to the central database the terminal copy is written in the
+   * background by the commit layer, so nothing at the till waits for it.
+   */
+  write(context: string, ops: SyncOp[]): Promise<CommitTarget> {
+    return commitOps(context, ops);
   },
 
   /**
