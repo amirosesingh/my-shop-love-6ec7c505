@@ -8,7 +8,7 @@
 import { useCallback } from "react";
 import { usePos } from "./pos-store";
 import { useAuth } from "@/lib/pos-auth";
-import type { StaffRole } from "./permissions";
+import { roleHasTag, type PermissionTag, type StaffRole } from "./permissions";
 
 export type VisibilityRole = Exclude<StaffRole, "admin">;
 
@@ -23,6 +23,10 @@ export type VisibilityElement = {
   label: string;
   blurb: string;
   group: string;
+  /** Route this element hides. Set for whole screens such as settings pages. */
+  route?: string;
+  /** Which roles the screen is meant for at all. */
+  tag?: PermissionTag;
 };
 
 /** Every element an administrator can hide, grouped by the screen it lives on. */
