@@ -1,70 +1,51 @@
-# Make SQL files 22–25 run on a database with no legacy cashier table
+# Repair staff SQL and unify terminal authentication
 
-## What is happening
+## Confirmed architecture
 
-Files 22–25 were written for a database that still had the old `cashiers`
-table. On a clean database that table was never created, so the very first
-statement that touches it stops the whole script with
-`relation "public.cashiers" does not exist`.
+The application currently uses backend Auth and should keep it:
 
-Confirmed hard references (statements that fail immediately when the table
-is absent):
+- Administrators and email staff sign in with email/password.
+- Terminal staff enter username/PIN; the server maps that to an internal login identity, then establishes a normal authenticated session.
+- `app_users` is the canonical staff profile and permission source.
+- `cashiers` is only a legacy compatibility table, but several SQL statements and two fallback login paths still assume it exists.
 
-- `22_roles_and_pin_gates.sql`: `ALTER TABLE public.cashiers ADD COLUMN ...`,
-  `UPDATE public.cashiers ...`, and `list_cashiers()` selecting from it.
-- `24_staff_management.sql`: `REVOKE`/`GRANT`/`ALTER TABLE ... ENABLE ROW LEVEL SECURITY`
-  on `public.cashiers`, plus the final verification query that counts its rows.
+The connected database currently contains `cashiers`, while the supplied SQL files fail on another/fresh database where it is absent. The scripts therefore need to support both states without recreating the obsolete table.
 
-Places already guarded and safe: the legacy loops and routines in
-`23_unified_staff_accounts.sql` and `25_staff_account_lifecycle.sql`, which
-either check `to_regclass` or trap `undefined_table`.
+## Implementation
 
-## The fix
+1. **Make SQL 22–25 portable and idempotent**
+   - In `22_roles_and_pin_gates.sql`, guard the legacy cashier column/backfill operations and legacy routines with `to_regclass`/`undefined_table` handling.
+   - Make `list_cashiers()` return an empty result if the legacy table is absent.
+   - Guard the optional `pos_store_settings` section so staff-account setup is not blocked when that separate module is absent.
+   - In `23_unified_staff_accounts.sql`, remove the compile-time `%rowtype` dependency on `public.cashiers` and keep migration helpers safe when the table is absent.
+   - In `24_staff_management.sql`, conditionally run cashier grants, RLS changes, migration, and verification only when the table exists.
+   - Recheck `25_staff_account_lifecycle.sql`; retain its existing guarded legacy cleanup.
 
-Keep one behaviour on both kinds of database — legacy present or absent —
-by making every remaining hard reference conditional.
+2. **Keep backend Auth, remove active runtime dependence on `cashiers`**
+   - Keep account provisioning through the server-side Auth Admin API and keep `app_users`/`user_roles` as RBAC sources.
+   - Update PIN session issuance and the cashier-login endpoint to verify against `app_users` through `verify_terminal_pin`, not `verify_cashier_pin`.
+   - Keep legacy cashier lookup only as an optional migration fallback in the account-healing code; a missing legacy table must fail closed without showing a server-connectivity error.
+   - Preserve the existing offline cached-PIN flow, but align any server-issued session with the canonical `app_users` identity.
 
-1. **22_roles_and_pin_gates.sql**
-   - Wrap the cashier column add, the backfill, and the role-slug setter in a
-     block that runs only when `to_regclass('public.cashiers')` is not null.
-   - Rewrite `list_cashiers()` so it returns an empty set when the table is
-     missing instead of failing to create or failing on call.
-2. **24_staff_management.sql**
-   - Move the cashier grants, revokes, and row-level-security switch inside the
-     same existence check as the copy loop.
-   - Make the closing verification query report `0 rows left to copy` when the
-     table is absent rather than erroring.
-3. **25_staff_account_lifecycle.sql** — already guarded; only re-checked, no
-   behaviour change expected.
-4. **File header notes** updated to state that 22–25 are safe on both a fresh
-   database and one upgraded from the old cashier layout.
+3. **Harden authorization boundaries**
+   - Keep privileged create/update/delete operations server-side and supervisor-authorized.
+   - Ensure staff management server functions remain thin wrappers and do not expose privileged keys or accept caller-selected authority.
+   - Restrict PIN-verification routines to only the roles/endpoints that require them and return minimal identity fields.
+   - Preserve deactivation, self-delete prevention, last-admin protection, and role/permission synchronization.
 
-No table is created just to satisfy the scripts, and nothing existing is
-dropped: a database that still has `cashiers` keeps working exactly as today.
-
-## Also worth knowing
-
-`22_roles_and_pin_gates.sql` also alters `pos_store_settings`. If that table
-does not exist on the same database, the script will stop there next for the
-same reason. The same conditional treatment will be applied to that section so
-the file completes in one pass either way.
+4. **Deliver updated SQL files**
+   - Update the downloadable SQL 22–25 files in place with clear run order and compatibility notes.
+   - Add an ordered consolidated upgrade SQL file containing the repaired 22–25 changes for databases that have not applied them yet.
+   - Apply the equivalent schema changes to the connected backend through the approved migration flow; do not create `cashiers` where it is absent and do not delete it automatically where legacy records may still need migration.
 
 ## Verification
 
-- Run `22` → `25` in order on the current database and confirm each finishes
-  without error.
-- Confirm the four built-in roles exist and `app_users` has `role_slug` and
-  `pin_length`.
-- Confirm `staff_account_upsert`, `staff_account_set_active`,
-  `staff_account_set_pin`, and `terminal_staff_list` all exist.
-- Create one username/PIN account and one email/password account from Accounts
-  to confirm the earlier "missing a required field" failure is gone.
+- Validate the SQL against both conditions: `cashiers` present and `cashiers` absent.
+- Confirm `staff_roles`, `app_users.role_slug`, `app_users.pin_length`, and all unified staff RPCs exist with the intended grants.
+- Test Accounts create, edit, deactivate/reactivate, permission update, PIN/password reset, and permanent delete.
+- Test one username/PIN sign-in and one administrator email/password sign-in, confirming both receive authenticated sessions and load the correct `app_users` role/branch.
+- Confirm no normal login request calls `verify_cashier_pin`, and missing legacy tables no longer produce “Can't reach server” or relation-not-found errors.
 
 ## Technical scope
 
-Edited files: `supabase/sql/22_roles_and_pin_gates.sql`,
-`supabase/sql/24_staff_management.sql`, and a re-check of
-`supabase/sql/23_unified_staff_accounts.sql` and
-`supabase/sql/25_staff_account_lifecycle.sql`. Application code is unchanged.
-The same corrected SQL is applied as one Lovable Cloud migration so the live
-database and the downloadable files stay identical.
+Expected updates include SQL files 22–25 plus the consolidated upgrade file, staff PIN session/login server code, and only the minimal auth-context adjustments required to remove the obsolete fallback. No change to the selected backend Auth model or unrelated POS features.
