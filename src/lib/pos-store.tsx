@@ -33,6 +33,7 @@ import type {
 } from "./pos-types";
 import { bookingBalance, lineUnitDiscount, r2, type DiscountType } from "./pos-types";
 import { logger } from "./audit-log";
+import { toast } from "sonner";
 import { db, dbError, loadActiveShift, loadCloudState, openShiftOnServer } from "./pos-db";
 import type { CloudSlice, CommitTarget } from "./pos-db";
 import { clearSnapshot, readSnapshot, writeSnapshot } from "./offline-snapshot";
