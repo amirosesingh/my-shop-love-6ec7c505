@@ -9,9 +9,10 @@
  */
 import { Link } from "@tanstack/react-router";
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ArrowLeft, Check, Eye, Loader2, RotateCcw, Save, TriangleAlert } from "lucide-react";
+import { ArrowLeft, Eye, Loader2, RotateCcw, Save } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
+import { SaveIndicator } from "@/components/pos/settings/SaveIndicator";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -335,23 +336,7 @@ export function SettingsFrame({
 
           {/* Nothing is considered stored until this bar confirms it. */}
           <div className="sticky bottom-0 -mx-6 flex flex-wrap items-center gap-3 border-t border-border bg-background/95 px-6 py-3 backdrop-blur">
-            <span className="flex items-center gap-2 text-xs text-muted-foreground">
-              {saveError ? (
-                <>
-                  <TriangleAlert className="size-4 text-destructive" />
-                  <span className="text-destructive">Could not save — {saveError}</span>
-                </>
-              ) : dirty ? (
-                <>
-                  <TriangleAlert className="size-4 text-amber-500" /> Unsaved changes
-                </>
-              ) : (
-                <>
-                  <Check className="size-4 text-emerald-500" />
-                  {savedAt ? `All changes saved · ${savedAt}` : "All changes saved"}
-                </>
-              )}
-            </span>
+            <SaveIndicator dirty={dirty} saving={saving} savedAt={savedAt} error={saveError} />
             <div className="ml-auto flex gap-2">
               <Button variant="ghost" size="sm" disabled={!dirty || saving} onClick={discard}>
                 <RotateCcw className="size-4" /> Discard changes
