@@ -649,6 +649,15 @@ export async function loadActiveShift(storeId: string): Promise<Shift | null> {
   const { hasStaffSession, canRelay, relayActiveShift } = await import("./sync-relay");
 
   if (hasStaffSession()) {
+    // The server routine answers for every staff account, whatever branch is
+    // written on their profile, and hands back the whole row in one call.
+    const rpc = await supabase.rpc("shift_active_for_branch" as never, {
+      p_store_id: storeId,
+    } as never);
+    if (!rpc.error) {
+      const row = (Array.isArray(rpc.data) ? rpc.data[0] : rpc.data) as Row | null;
+      return row?.id ? rowToShift(row) : null;
+    }
     const res = await supabase
       .from("shifts" as never)
       .select("*")
@@ -667,6 +676,35 @@ export async function loadActiveShift(storeId: string): Promise<Shift | null> {
   const relayed = await relayActiveShift(storeId);
   if (!relayed.ok) throw new Error(relayed.error ?? "Could not read the open shift");
   return relayed.row ? rowToShift(relayed.row as Row) : null;
+}
+
+/**
+ * Open a shift through the server routine, which stores the row and hands the
+ * stored record straight back — no second, rule-checked read to unlock the
+ * till. Returns `null` when the central database cannot be reached, so the
+ * caller falls back to the usual local/offline commit path.
+ */
+export async function openShiftOnServer(s: Shift): Promise<Shift | null> {
+  const { hasStaffSession } = await import("./sync-relay");
+  if (!hasStaffSession()) return null;
+  try {
+    const res = await supabase.rpc("shift_open" as never, {
+      p_id: s.id,
+      p_store_id: s.storeId,
+      p_opened_by_name: s.cashier,
+      p_opening_float: s.openingFloat,
+      p_terminal_id: s.terminalId ?? null,
+      p_terminal_name: s.terminalName ?? null,
+      p_opened_by_staff_id: s.openedByStaffId ?? null,
+      p_opened_by_role: s.openedByRole ?? null,
+      p_user_id: s.userId ?? null,
+    } as never);
+    if (res.error) return null;
+    const row = (Array.isArray(res.data) ? res.data[0] : res.data) as Row | null;
+    return row?.id ? rowToShift(row) : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
