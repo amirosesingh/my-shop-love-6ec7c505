@@ -262,7 +262,9 @@ export const rolePermissions = (role: StaffRole): StaffPermissions =>
     ? { ...CASHIER_PERMISSIONS }
     : role === "warehouse"
       ? { ...WAREHOUSE_PERMISSIONS }
-      : { ...FULL_PERMISSIONS };
+      : role === "supervisor"
+        ? { ...SUPERVISOR_PERMISSIONS }
+        : { ...FULL_PERMISSIONS };
 
 // --------------------------------------------------------------------------
 // Legacy flag aliases used by older screens / nav config.
