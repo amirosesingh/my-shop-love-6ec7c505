@@ -2201,6 +2201,82 @@ export type Database = {
         Args: { p_active: boolean; p_user_id: string }
         Returns: undefined
       }
+      shift_active_for_branch: {
+        Args: { p_store_id: string }
+        Returns: {
+          closed_at: string | null
+          closed_by_name: string | null
+          closed_by_role: string | null
+          closed_by_staff_id: string | null
+          closing_float: number | null
+          counted_cash: number | null
+          created_at: string
+          expected_cash: number | null
+          id: string
+          note: string
+          opened_at: string
+          opened_by_name: string
+          opened_by_role: string | null
+          opened_by_staff_id: string | null
+          opening_float: number
+          overdue: boolean
+          status: string
+          store_id: string
+          terminal_id: string | null
+          terminal_name: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "shifts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      shift_open: {
+        Args: {
+          p_id: string
+          p_opened_by_name: string
+          p_opened_by_role?: string
+          p_opened_by_staff_id?: string
+          p_opening_float?: number
+          p_store_id: string
+          p_terminal_id?: string
+          p_terminal_name?: string
+          p_user_id?: string
+        }
+        Returns: {
+          closed_at: string | null
+          closed_by_name: string | null
+          closed_by_role: string | null
+          closed_by_staff_id: string | null
+          closing_float: number | null
+          counted_cash: number | null
+          created_at: string
+          expected_cash: number | null
+          id: string
+          note: string
+          opened_at: string
+          opened_by_name: string
+          opened_by_role: string | null
+          opened_by_staff_id: string | null
+          opening_float: number
+          overdue: boolean
+          status: string
+          store_id: string
+          terminal_id: string | null
+          terminal_name: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "shifts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       staff_account_adopt_legacy: {
         Args: { p_username: string }
         Returns: undefined
