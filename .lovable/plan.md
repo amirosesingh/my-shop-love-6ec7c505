@@ -1,47 +1,41 @@
-# Shift continuation and multi-cashier terminal sharing
+# Fix cashier shift opening, access rules, and active-shift continuation
 
-## What already works today (verified in the code)
+## What is wrong today (verified)
 
-- On sign-in the till reads the open shift straight from the database for the terminal's branch (`loadActiveShift(storeId)`, matched on branch + not closed, no date logic). If one exists the register unlocks; if not, the lock panel with the opening-float form appears. So Step 1's routing behaviour is in place.
-- Locking (`lock()` in the auth provider) signs the user out but never closes the shift; the next PIN sign-in re-reads the same open shift and joins it. Each sign-in writes a `shift_sessions` row through `beginShiftSession`, and sign-out stamps the time.
-- Sales, refunds, voids and bookings already stamp the **live signed-in user**, not the shift opener (`activeCashier = user?.name || activeShift?.cashier`).
-- Closing already requires the `can_close_shift` permission, a mandatory counted-cash entry, and a server re-check (held bills, cash count) before the shift is written closed.
+- The database rules on `shifts` require two things at once: the signed-in account must be recognised as staff (`is_staff_now()`, which only reads the `user_roles` table) **and** the shift's branch must match the branch stored on the staff profile (`store_visible()` via `app_users.store_id`).
+- A cashier whose profile has **no branch assigned** fails that branch test (an empty profile branch compares as "unknown", not "allowed"), and a cashier with no row in `user_roles` fails the staff test. Either one silently refuses the insert and the follow-up read, which is what produces "shift was not found in the database after saving" and permission errors.
+- Opening a shift is currently a plain table write followed by a separate read-back, so both steps have to pass the rules independently.
+- Continuation already partly works: the register reads the branch's open shift and, when one exists, the lock screen never appears. What is missing is (a) it fails for cashiers because of the rules above and (b) there is no "continuing active shift" confirmation.
 
-## The real gaps to close
+## Step 1 — Branch and staff rules on shifts
 
-### 1. Attachment banner (Step 1)
-When a user signs in and the till attaches to a shift somebody else opened, show a one-time toast plus a persistent line in the shift strip: "Attached to active shift opened by [Opener] at [Start time]". Today the strip shows the opener and time but never signals that you joined an existing shift.
+New SQL file `supabase/sql/29_shift_access_and_rpcs.sql` (plus the same change applied to the cloud database):
 
-### 2. Transaction-level user identity, not just a name (Step 2)
-Sales currently carry `cashier_name` and `shift_id` but no stable staff identifier, so per-cashier reporting relies on matching display names — two staff with the same name are indistinguishable and a rename rewrites history.
+- Treat a staff member with **no branch on their profile** as allowed on the terminal's branch instead of denied, and keep everyone else pinned to their own branch. Supervisors and admins keep full visibility.
+- Recognise staff from `app_users.role`/`role_slug` as well as `user_roles`, so accounts created through the staff screen are staff even when the role row is missing.
+- Re-create read / create / update rules on `shifts` and `shift_sessions` on top of the corrected helpers, with the matching table grants.
 
-Database change (one additive migration, plus a matching standalone SQL script for self-hosted installs):
-- `sales`: add `cashier_id` (text staff code) and `cashier_user_id` (uuid, the signed-in account), both nullable, backfilled to null.
-- `drawer_events` already stores `staff_id`/`staff_name`/`role` — no change.
-- Index on `sales (shift_id, cashier_id)` for the reconciliation reads.
+## Step 2 — Server routines for opening and finding a shift
 
-Application change: `recordSale` (and the refund/void paths that go through it) stamps both ids from the live session alongside the existing cashier name.
+Same SQL file:
 
-### 3. Reconciliation split by shift vs by cashier (Step 2)
-- Drawer/Z-report totals stay keyed on `shift_id` (unchanged).
-- The Shifts page gains a per-shift "By cashier" breakdown: each person who transacted on that shift with their sales count, gross takings, refunds and voids, keyed on `cashier_id` with the name as a fallback for older rows.
-- The sales report gains a cashier filter driven by the same key.
+- `shift_open(...)` — creates the shift and **returns the complete new row**, so the till never needs a second restricted query. If the caller's profile has no branch, it falls back to the branch passed by the terminal. Refuses if a shift is already open for that branch and returns the existing one instead, so two tills cannot double-open.
+- `shift_active_for_branch(branch)` — returns the branch's open shift as a full row.
+- Both run with elevated rights but only for signed-in staff, and both are blocked for visitors.
 
-### 4. Deliberate closure (Step 3)
-- Add a final confirmation step to the close dialog ("This ends the shift for everyone on this terminal") so a close is never one tap away from a cash-count typo.
-- When the signed-in user lacks `can_close_shift`, offer a supervisor PIN override through the existing manager-gate flow instead of a dead button.
-- Unchanged: opener terminal binding, held-bill blocking, mandatory count.
+## Step 3 — Register wiring
 
-### 5. Audit trail (Step 4)
-The shift row already records opener and closer with staff id and role. Add the shift close audit entry to list the distinct cashiers who transacted, so one audit record answers "who opened, who sold, who closed".
+- `src/lib/pos-db.ts`: `commitShift` for a *new* shift calls `shift_open` and returns the stored row; `loadActiveShift` calls `shift_active_for_branch` first and keeps today's relay and offline-queue fallbacks untouched. Closing a shift keeps the existing update path.
+- `src/lib/pos-store.tsx`: use the row returned by the open call as the active shift (drops the fragile read-back check), and when a login lands on a shift that was already open, show a one-time toast "Continuing active shift opened at <branch>". No modal, no interruption — the cashier goes straight to the register.
+- `src/components/pos/ShiftGuard.tsx`: unchanged behaviour, minus the misleading permission wording when the failure was a branch mismatch.
 
 ## Verification
 
-Walk the four scenarios in the request against the running app: open with a float as manager, lock and sign in as Cashier A (lands on the register, banner shows the opener), sell, lock, sign in as Cashier B, sell, then close and confirm the shift row, the per-cashier breakdown and the audit entry all agree.
+- Query the rules and helpers back from the database after the change.
+- Sign in as an admin, open a shift with a float, then re-check the same branch read as a cashier-shaped account and confirm the row is visible.
+- Confirm a second sign-in on the open shift skips the open-shift panel and shows the continuation notice, and that closing then re-opening works cleanly.
 
 ## Technical notes
 
-- Files touched: `src/lib/pos-store.tsx` (sale attribution, attach signal), `src/components/pos/ShiftGuard.tsx` (attached banner), `src/routes/index.tsx` (close confirmation + override), `src/routes/shifts.tsx` (per-cashier breakdown), `src/routes/reports.sales.tsx` (cashier filter), `src/lib/pos-db.ts` (new columns mapped both ways), `src/lib/pos-types.ts`.
-- New `supabase/sql/29_sale_cashier_identity.sql` mirroring the managed migration, plus the Windows SQL Server offline script.
-- No change to PIN verification, session tokens, branch resolution or the offline outbox contract beyond the two new sale fields.
-- Patch version bump.
+- Nothing is opened to anonymous callers; the relaxation is limited to staff whose profile has no branch, who are scoped to the terminal's registered branch.
+- The offline outbox path is untouched: when the terminal cannot reach the database, the shift is still queued locally exactly as today.
