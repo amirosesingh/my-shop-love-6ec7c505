@@ -570,6 +570,8 @@ export async function importSampleData() {
 
 /** Load every cloud-backed slice of the POS state. */
 export async function loadCloudState(): Promise<CloudSlice> {
+  const { hydrateTerminalConfig } = await import("./terminal-tokens");
+  await hydrateTerminalConfig();
   const tiers = await supabase.from("membership_tiers").select("id, name");
   if (tiers.error) throw tiers.error;
   tierIdByName = {};
@@ -594,13 +596,22 @@ export async function loadCloudState(): Promise<CloudSlice> {
     // builders are thenables, not Promises, so guard with try/catch.
     (async (): Promise<{ data: Row[] | null }> => {
       try {
+        const { loadCashierToken } = await import("./pos-credentials");
+        const cashierToken = await loadCashierToken();
+        // A PIN-only cashier has no database auth session, so use the proven
+        // relay immediately instead of accepting an RLS-filtered empty list.
+        if (cashierToken && canRelay()) {
+          const relayed = await relayStores();
+          if (relayed.ok) return { data: (relayed.rows as Row[] | undefined) ?? [] };
+        }
+        const direct = await supabase.from("stores").select("*").order("name");
+        if (!direct.error) return { data: (direct.data as Row[] | null) ?? [] };
+        // Registered terminals and staff sessions can still recover through
+        // the server relay when a direct RLS read is unavailable.
         if (canRelay()) {
           const relayed = await relayStores();
           if (relayed.ok) return { data: (relayed.rows as Row[] | undefined) ?? [] };
         }
-        // Branches are protected operational data. Without a proven staff or
-        // terminal identity, keep the local snapshot instead of issuing a
-        // browser request that row security is expected to refuse.
         return { data: null };
       } catch {
         return { data: null };
@@ -934,6 +945,10 @@ export async function mirrorToLocal(context: string, ops: SyncOp[]) {
  */
 export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitTarget> {
   if (!ops.length) return noteCommitTarget("cloud");
+  // A packaged or browser till may carry an encrypted tenant override. Never
+  // let an early write resolve the client against the build-time tenant first.
+  const { hydrateTerminalConfig } = await import("./terminal-tokens");
+  await hydrateTerminalConfig();
 
   // Android / live-only: the backend is the single source of truth.
   if (isLiveOnly()) {
@@ -1400,19 +1415,6 @@ export const db = {
 
   /** Save a completed bill and wait until it is stored somewhere. */
   async commitSale(sale: Sale, products: Product[], member: Member | null): Promise<CommitTarget> {
-    const bridge = electronDb();
-    if (bridge) {
-      const res = await bridge.createSale({
-        sale: saleToRow(sale),
-        items: saleItemRows(sale),
-        products: products.map(productToRow),
-        member: member ? memberToRow(member, tierId) : null,
-        branchId: readBranch().branchId ?? sale.storeId ?? null,
-        exchangeOfBillNumber: sale.exchangeOfReceiptNo ?? null,
-      });
-      if (!res.ok) throw new Error(res.error ?? "The sale could not be stored on this terminal");
-      return "local";
-    }
     const ops: SyncOp[] = [
       { kind: "insert", table: "sales", rows: [saleToRow(sale)] },
       { kind: "insert", table: "sale_items", rows: saleItemRows(sale) },

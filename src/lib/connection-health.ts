@@ -10,6 +10,7 @@
  */
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { localDb } from "./local-db";
+import { hydrateTerminalConfig } from "./terminal-tokens";
 
 export type HealthReport = {
   /** Central database answered in time. */
@@ -52,6 +53,7 @@ function withTimeout(work: Promise<boolean>, ms: number): Promise<boolean> {
 
 async function probeCloud(): Promise<boolean> {
   if (typeof navigator !== "undefined" && navigator.onLine === false) return false;
+  await hydrateTerminalConfig();
   const { error } = await supabaseExternal.from("public_flags").select("key").limit(1);
   return !error;
 }
