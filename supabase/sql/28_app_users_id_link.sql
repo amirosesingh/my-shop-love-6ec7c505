@@ -27,10 +27,10 @@ BEGIN
     FROM pg_constraint c
     WHERE c.conrelid = 'public.app_users'::regclass
       AND c.contype = 'f'
-      AND (SELECT array_agg(a.attname)
+      AND (SELECT array_agg(a.attname::text)
              FROM unnest(c.conkey) k
              JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = k)
-          = ARRAY['id']
+          = ARRAY['id']::text[]
   LOOP
     EXECUTE format('ALTER TABLE public.app_users DROP CONSTRAINT %I', r.conname);
   END LOOP;
