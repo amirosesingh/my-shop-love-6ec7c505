@@ -301,6 +301,14 @@ export const navGroups: NavGroup[] = [
         blurb: "Who voided, cancelled or refunded, and why.",
       },
       {
+        to: "/reports/history",
+        label: "Edit History",
+        icon: Activity,
+        flag: "can_view_audit_log",
+        keywords: "audit trail immutable override void discount permission login attempt",
+        blurb: "Permanent record of overrides, account and permission changes.",
+      },
+      {
         to: "/reports/activity",
         label: "Register Activity",
         icon: Activity,
