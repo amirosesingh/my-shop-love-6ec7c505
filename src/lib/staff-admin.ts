@@ -53,8 +53,8 @@ export async function createStaffMember(input: StaffAccountInput): Promise<void>
   if (emailMode) {
     if ((input.password ?? "").length < 8)
       throw new Error("Set a password of at least 8 characters for an email account");
-  } else if (!/^\d{4,6}$/.test(input.pin ?? "")) {
-    throw new Error("A PIN must be 4 to 6 digits");
+  } else if ((input.pin ?? "").length < 4 || (input.pin ?? "").length > 32) {
+    throw new Error("A till PIN or passcode must be 4 to 32 characters");
   }
   const res = await saveStaffAccount({
     data: {
