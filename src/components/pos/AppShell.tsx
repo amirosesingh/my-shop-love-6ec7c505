@@ -223,6 +223,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (item.flag && !can(item.flag)) return false;
     if (item.adminOnly && !isAdmin && !item.flag) return false;
     if (!visibleRoute(item.to)) return false;
+    const tag = item.tag ?? (item.flag ? tagOfPermission(item.flag) : null);
+    if (tag && !roleHasTag((visibilityRole as StaffRole) ?? "cashier", tag)) return false;
     return true;
   };
 
