@@ -3,7 +3,7 @@
  * bring any leftover old cashier records onto real accounts.
  */
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, RefreshCw, UserPlus, Users } from "lucide-react";
+import { KeyRound, Loader2, RefreshCw, UserPlus, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -30,13 +30,20 @@ import { Switch } from "@/components/ui/switch";
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { usePos } from "@/lib/pos-store";
 import { notifyError } from "@/lib/notify";
-import { createStaffMember, migrateLegacyCashiers, toggleStaffStatus } from "@/lib/staff-admin";
+import {
+  createStaffMember,
+  looksLikeEmail,
+  migrateLegacyCashiers,
+  toggleStaffStatus,
+} from "@/lib/staff-admin";
 import { getRolesWithPermissions, type RoleDef } from "@/lib/role-admin";
 
 type Row = {
   user_id: string;
   full_name: string;
   role: string;
+  role_slug: string;
+  email: string;
   store_id: string | null;
   is_active: boolean;
 };
@@ -45,6 +52,7 @@ const EMPTY = {
   displayName: "",
   username: "",
   pin: "",
+  password: "",
   roleSlug: "cashier",
   branchId: "none",
   active: true,
@@ -59,6 +67,8 @@ export function StaffManager() {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ ...EMPTY });
+  const [pinFor, setPinFor] = useState<Row | null>(null);
+  const [newPin, setNewPin] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -74,6 +84,8 @@ export function StaffManager() {
           user_id: String(r["user_id"] ?? ""),
           full_name: String(r["full_name"] ?? ""),
           role: String(r["role"] ?? "staff"),
+          role_slug: String(r["role_slug"] ?? r["role"] ?? "cashier"),
+          email: String(r["email"] ?? ""),
           store_id: (r["store_id"] as string | null) ?? null,
           is_active: r["is_active"] !== false,
         })),
@@ -97,17 +109,47 @@ export function StaffManager() {
         displayName: form.displayName.trim(),
         username: form.username.trim().toLowerCase(),
         pin: form.pin,
+        password: form.password,
         branchId: form.branchId === "none" ? null : form.branchId,
         roleSlug: form.roleSlug,
         baseRole: role?.baseLevel ?? "cashier",
         active: form.active,
       });
-      toast.success(`${form.displayName || form.username} can now sign in`);
+      toast.success(
+        emailMode
+          ? `${form.displayName || form.username} will receive a confirmation email`
+          : `${form.displayName || form.username} can now sign in with their PIN`,
+      );
       setOpen(false);
       setForm({ ...EMPTY });
       void load();
     } catch (e) {
       notifyError(e, "The account could not be created");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /** Re-set someone's PIN without ever showing the old one. */
+  const changePin = async () => {
+    if (!pinFor) return;
+    const role = roles.find((r) => r.slug === pinFor.role_slug);
+    setSaving(true);
+    try {
+      await createStaffMember({
+        displayName: pinFor.full_name || pinFor.user_id,
+        username: pinFor.user_id,
+        pin: newPin,
+        branchId: pinFor.store_id,
+        roleSlug: role?.slug ?? "cashier",
+        baseRole: role?.baseLevel ?? "cashier",
+        active: pinFor.is_active,
+      });
+      toast.success("The new PIN is ready to use");
+      setPinFor(null);
+      setNewPin("");
+    } catch (e) {
+      notifyError(e, "That PIN could not be changed");
     } finally {
       setSaving(false);
     }
