@@ -264,10 +264,19 @@ export async function runOpLive(context: string, op: SyncOp): Promise<void> {
   }
 
   let res = await execute(op);
-  if ((op.kind === "upsert" || op.kind === "insert") && res.error?.code === "PGRST204") {
-    const named = missingColumn(res.error.message);
-    const drop = named ? [named] : (OPTIONAL_COLUMNS[op.table] ?? []);
-    if (drop.length) res = await execute({ ...op, rows: strip(op.rows, drop) } as SyncOp);
+  // Older databases are missing newer columns. Drop whichever column the
+  // error names and retry until the core row saves, exactly like the queued
+  // path does, so a direct (online-first) write never fails on schema drift.
+  if (op.kind === "upsert" || op.kind === "insert") {
+    const dropped: string[] = [];
+    let guard = 0;
+    while (res.error?.code === "PGRST204" && guard++ < 12) {
+      const named = missingColumn(res.error.message);
+      const next = named ? [named] : (OPTIONAL_COLUMNS[op.table] ?? []);
+      if (!next.length || next.every((c) => dropped.includes(c))) break;
+      dropped.push(...next);
+      res = await execute({ ...op, rows: strip(op.rows, dropped) } as SyncOp);
+    }
   }
   if (res.error) {
     if (isPermissionError(res.error) && canRelay()) {

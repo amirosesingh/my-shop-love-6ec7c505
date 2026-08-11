@@ -1177,6 +1177,7 @@ export type Database = {
           bill_number: string
           cashier_name: string | null
           change_amount: number
+          client_transaction_id: string | null
           coupon_code: string | null
           coupon_discount: number
           coupon_promo_id: string | null
@@ -1205,6 +1206,7 @@ export type Database = {
           bill_number: string
           cashier_name?: string | null
           change_amount?: number
+          client_transaction_id?: string | null
           coupon_code?: string | null
           coupon_discount?: number
           coupon_promo_id?: string | null
@@ -1233,6 +1235,7 @@ export type Database = {
           bill_number?: string
           cashier_name?: string | null
           change_amount?: number
+          client_transaction_id?: string | null
           coupon_code?: string | null
           coupon_discount?: number
           coupon_promo_id?: string | null

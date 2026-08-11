@@ -82,6 +82,12 @@ async function connect(config) {
   pool = await new (loadDriver().ConnectionPool)(driverConfig).connect();
   activeConfig = config;
   await applySchema();
+  // Newly added columns must become visible to the write layer.
+  try {
+    require("./repo.cjs").forgetColumnCache();
+  } catch {
+    /* repo not loaded yet */
+  }
   return pool;
 }
 

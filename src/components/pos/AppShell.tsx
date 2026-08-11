@@ -45,6 +45,7 @@ import { reportAppReady } from "@/lib/app-health";
 import { localDb } from "@/lib/local-db";
 import { supabaseConfig } from "@/lib/external-supabase-config";
 import { readCredentials } from "@/lib/pos-credentials";
+import { TillLoader } from "@/components/pos/TillLoader";
 
 /** Permission required to open each screen. Keys are path prefixes, so child
  *  pages (/settings/tax, /reports/sales …) inherit the parent gate unless they
@@ -116,6 +117,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { ready, user, isAdmin, canSwitchStores, terminalStoreId, logout, lock, can } = useAuth();
   const [collapsed, setCollapsed] = useSidebarCollapsed();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // Set when the operator chooses to carry on from the terminal's own copy
+  // after the first load could not reach the central database.
+  const [offlineBypass, setOfflineBypass] = useState(false);
   const branding = useBranding();
   // Windows tills must be registered to a location before they can be used.
   const terminal = useRevocationCheck();
@@ -198,13 +202,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (!terminal.config) return <TerminalActivation onActivated={() => clearRevocation()} />;
   }
   if (!user) return <TerminalLogin />;
-  if (!dataReady)
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-3">
-        <Loader2 className="size-6 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground">Loading store data…</p>
-      </div>
-    );
+  if (!dataReady && !offlineBypass)
+    return <TillLoader onContinueOffline={() => setOfflineBypass(true)} />;
 
   const inbound = state.transfers.filter(
     (t) =>

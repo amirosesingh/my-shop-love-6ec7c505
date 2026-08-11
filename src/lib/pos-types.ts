@@ -195,6 +195,8 @@ export type Sale = {
   receiptNo: string;
   storeId: string;
   shiftId: string;
+  /** one id per checkout attempt, so a retry returns the same bill */
+  clientTxnId?: string;
   lines: CartLine[];
   subtotal: number;
   discount: number;
