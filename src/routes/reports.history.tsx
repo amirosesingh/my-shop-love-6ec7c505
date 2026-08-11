@@ -14,7 +14,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TablePagination, usePagination } from "@/components/pos/TablePagination";
-import { ReportHeader, downloadCsv, stamp } from "@/components/pos/report-kit";
+import {
+  ReportHeader,
+  defaultRange,
+  downloadCsv,
+  inRange,
+  stamp,
+} from "@/components/pos/report-kit";
 import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
 import { listSystemAudit } from "@/lib/system-audit.functions";
 
@@ -60,6 +66,9 @@ function EditHistoryReport() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [q, setQ] = useState("");
+  const init = defaultRange(30);
+  const [from, setFrom] = useState(init.from);
+  const [to, setTo] = useState(init.to);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -82,8 +91,9 @@ function EditHistoryReport() {
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    if (!needle) return rows;
-    return rows.filter((r) =>
+    const dated = rows.filter((r) => inRange(r.created_at, from, to));
+    if (!needle) return dated;
+    return dated.filter((r) =>
       [
         r.actor_name,
         r.actor_id,
@@ -97,16 +107,15 @@ function EditHistoryReport() {
         .toLowerCase()
         .includes(needle),
     );
-  }, [rows, q]);
+  }, [rows, q, from, to]);
 
-  const page = usePagination(filtered.length);
+  const page = usePagination(filtered);
 
   const exportCsv = () => {
-    downloadCsv(
-      `edit-history-${stamp()}.csv`,
+    downloadCsv("edit-history", [
       ["When", "Who", "Role", "Action", "Affected", "Reference", "Before", "After", "Terminal"],
-      filtered.map((r) => [
-        new Date(r.created_at).toLocaleString(),
+      ...filtered.map((r) => [
+        stamp(r.created_at),
         r.actor_name ?? r.actor_id ?? "",
         r.actor_role ?? "",
         r.action_type,
@@ -116,7 +125,7 @@ function EditHistoryReport() {
         r.new_value ?? "",
         r.terminal_id ?? "",
       ]),
-    );
+    ]);
   };
 
   return (
@@ -125,10 +134,12 @@ function EditHistoryReport() {
         <ReportHeader
           title="Edit History"
           subtitle="A permanent, tamper-proof record of every critical action. Entries can never be changed or removed."
+          from={from}
+          to={to}
+          onFrom={setFrom}
+          onTo={setTo}
           onExport={exportCsv}
-        />
-
-        <div className="flex flex-wrap items-end gap-3">
+        >
           <div className="grid gap-1">
             <Label htmlFor="history-search">Search</Label>
             <Input
@@ -142,7 +153,7 @@ function EditHistoryReport() {
           <Button variant="outline" onClick={() => void load()} disabled={loading}>
             Refresh
           </Button>
-        </div>
+        </ReportHeader>
 
         {loading ? (
           <p className="text-sm text-muted-foreground">Loading the edit history…</p>
@@ -165,10 +176,10 @@ function EditHistoryReport() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filtered.slice(page.start, page.end).map((r) => (
+                  {page.pageItems.map((r) => (
                     <TableRow key={r.id}>
                       <TableCell className="whitespace-nowrap text-xs">
-                        {new Date(r.created_at).toLocaleString()}
+                        {stamp(r.created_at)}
                       </TableCell>
                       <TableCell className="text-sm">
                         <div className="font-medium">{r.actor_name ?? r.actor_id ?? "Unknown"}</div>
@@ -195,7 +206,17 @@ function EditHistoryReport() {
                 </TableBody>
               </Table>
             </div>
-            <TablePagination {...page} />
+            <TablePagination
+              page={page.page}
+              pageCount={page.pageCount}
+              pageSize={page.pageSize}
+              total={page.total}
+              from={page.from}
+              to={page.to}
+              label="entries"
+              onPage={page.setPage}
+              onPageSize={page.setPageSize}
+            />
           </>
         )}
       </div>

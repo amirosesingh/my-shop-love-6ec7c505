@@ -304,7 +304,7 @@ export const navGroups: NavGroup[] = [
         to: "/reports/history",
         label: "Edit History",
         icon: Activity,
-        flag: "can_view_audit_log",
+        flag: "can_view_audit_trail",
         keywords: "audit trail immutable override void discount permission login attempt",
         blurb: "Permanent record of overrides, account and permission changes.",
       },
