@@ -217,6 +217,61 @@ function scheduleReconnect() {
   }, reconnectDelay);
 }
 
+/** Loose files a crashed update or print job can leave behind. */
+function isJunkFile(name) {
+  return (
+    name.endsWith(".tmp") ||
+    name.endsWith(".partial") ||
+    name.endsWith(".download") ||
+    /^pos-print-.*\.(bin|prn|txt)$/i.test(name) ||
+    /^pending-print-/i.test(name)
+  );
+}
+
+/**
+ * Startup tidy-up: clears orphaned temp files and prunes mirrored rows the
+ * central database has already confirmed. Never touches pending work.
+ */
+async function runHousekeeping() {
+  const summary = { files: 0, bytes: 0, rows: 0 };
+  const folders = [app.getPath("userData"), path.join(app.getPath("userData"), "Cache")];
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+  for (const folder of folders) {
+    let entries = [];
+    try {
+      entries = await fs.promises.readdir(folder, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      if (!entry.isFile() || !isJunkFile(entry.name)) continue;
+      const full = path.join(folder, entry.name);
+      try {
+        const stat = await fs.promises.stat(full);
+        if (stat.mtimeMs > cutoff) continue; // still in use
+        await fs.promises.unlink(full);
+        summary.files += 1;
+        summary.bytes += stat.size;
+      } catch {
+        /* a locked file is simply left for next time */
+      }
+    }
+  }
+  if (pool.getConfig()) {
+    try {
+      const retentionDays = Number(await repo.getState("retention_days")) || 90;
+      const pruned = await repo.housekeep({ retentionDays });
+      summary.rows = pruned.removedRows;
+    } catch (error) {
+      if (DEBUG) console.warn("[pos] housekeeping skipped:", fail(error).error);
+    }
+  }
+  console.log(
+    `[pos] housekeeping: removed ${summary.files} temp file(s), ${summary.rows} confirmed row(s)`,
+  );
+  return summary;
+}
+
 async function initializeWorker(config) {
   if (!config?.url || !config?.key) return null;
   cloudConfig = config;
@@ -567,6 +622,17 @@ function registerIpc() {
   });
 
   ipcMain.handle("pos:status", () => worker.status());
+  ipcMain.handle("pos:housekeep", async (_e, options) => {
+    try {
+      const retentionDays = Number(options?.retentionDays);
+      if (Number.isFinite(retentionDays) && retentionDays >= 7) {
+        await repo.setState("retention_days", String(Math.round(retentionDays)));
+      }
+      return { ok: true, ...(await runHousekeeping()) };
+    } catch (error) {
+      return fail(error);
+    }
+  });
   ipcMain.handle("pos:snapshot", async () => {
     try {
       return { ok: true, ...(await repo.snapshot()) };
@@ -769,6 +835,13 @@ app.whenReady().then(async () => {
     }
   }
   updater.start();
+  // A few seconds after the till is usable, never before: housekeeping must
+  // never sit between the operator and the register.
+  setTimeout(() => {
+    void runHousekeeping().catch((error) => {
+      if (DEBUG) console.warn("[pos] housekeeping failed:", fail(error).error);
+    });
+  }, 8_000);
   // If the till never reports in, the build is broken — recover instead of
   // leaving the operator staring at a blank window.
   readyWatchdog = setTimeout(() => enterSafeMode("Startup timed out"), 60_000);

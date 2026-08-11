@@ -14,6 +14,7 @@ const TABLES = [
   "members",
   "promotions",
   "pos_settings",
+  "suppliers",
   "shifts",
   "sales",
   "sale_items",
@@ -24,11 +25,32 @@ const TABLES = [
   "transfers",
   "stock_transfers",
   "stock_transfer_items",
+  "stock_adjustments",
+  "held_orders",
   "audit_logs",
 ];
 
 /** Cloud is authoritative for these; they are the only tables ever pulled. */
-const CATALOGUE_TABLES = ["stores", "membership_tiers", "products", "promotions"];
+const CATALOGUE_TABLES = ["stores", "membership_tiers", "products", "promotions", "suppliers"];
+
+/**
+ * Tables housekeeping may prune once the cloud has confirmed the row. Reference
+ * data (products, members, stores, settings …) is never pruned: the till reads
+ * it offline.
+ */
+const PRUNABLE_TABLES = [
+  "sale_items",
+  "sales",
+  "purchase_order_items",
+  "purchase_orders",
+  "booking_payments",
+  "bookings",
+  "stock_transfer_items",
+  "stock_transfers",
+  "transfers",
+  "stock_adjustments",
+  "audit_logs",
+];
 
 const SYNC_COLUMNS = new Set(["is_synced", "sync_status", "synced_at"]);
 
@@ -96,6 +118,7 @@ const JSON_COLUMNS = {
   bookings: ["lines"],
   transfers: ["items"],
   audit_logs: ["details"],
+  held_orders: ["lines", "coupon"],
 };
 
 function parseJsonColumns(table, row) {
@@ -228,7 +251,8 @@ async function markSynced(table, ids) {
   if (!ids.length) return;
   assertTable(table);
   const request = getPool().request();
-  ids.forEach((id, i) => request.input(`id${i}`, sql.UniqueIdentifier, id));
+  // Most keys are GUIDs, but held tickets carry the app's own string id.
+  ids.forEach((id, i) => bind(request, `id${i}`, id));
   await request.query(`
     UPDATE dbo.[${table}]
        SET is_synced = 1, sync_status = N'synced', synced_at = SYSUTCDATETIME(),
@@ -245,7 +269,7 @@ async function markFailed(table, ids, message, quarantine) {
     .request()
     .input("status", sql.NVarChar(20), quarantine ? "quarantined" : "error")
     .input("msg", sql.NVarChar(sql.MAX), String(message).slice(0, 3000));
-  ids.forEach((id, i) => request.input(`id${i}`, sql.UniqueIdentifier, id));
+  ids.forEach((id, i) => bind(request, `id${i}`, id));
   await request.query(`
     UPDATE dbo.[${table}]
        SET sync_status = @status
@@ -423,6 +447,60 @@ async function pendingSyncCount() {
   return { total, sales };
 }
 
+/**
+ * Housekeeping: reclaim space taken by rows the central database has already
+ * confirmed, then tidy the indexes. Anything still waiting to sync, anything
+ * newer than the retention window, and all reference data are left alone.
+ */
+async function housekeep({ retentionDays = 90 } = {}) {
+  const days = Math.max(7, Math.round(Number(retentionDays) || 90));
+  const pool = getPool();
+  const removed = [];
+  let total = 0;
+  for (const table of PRUNABLE_TABLES) {
+    // A till that has never had the confirmation stamp keeps everything.
+    const columns = await tableColumns(table);
+    if (!columns.has("synced_at")) continue;
+    try {
+      const res = await pool
+        .request()
+        .input("days", sql.Int, days)
+        .query(`
+          DELETE FROM dbo.[${table}]
+           WHERE is_synced = 1
+             AND synced_at IS NOT NULL
+             AND synced_at < DATEADD(day, -@days, SYSUTCDATETIME());
+          SELECT @@ROWCOUNT AS n;
+        `);
+      const n = res.recordset?.[0]?.n ?? 0;
+      if (n > 0) removed.push({ table, rows: n });
+      total += n;
+    } catch (err) {
+      // A table a till hasn't migrated to yet must not stop the sweep.
+      removed.push({ table, rows: 0, error: err.message });
+    }
+  }
+  try {
+    await pool.request().query(`
+      DECLARE @tbl SYSNAME, @sqlReorg NVARCHAR(MAX);
+      DECLARE hk CURSOR FOR SELECT name FROM sys.tables;
+      OPEN hk; FETCH NEXT FROM hk INTO @tbl;
+      WHILE @@FETCH_STATUS = 0
+      BEGIN
+        SET @sqlReorg = N'ALTER INDEX ALL ON dbo.[' + @tbl + N'] REORGANIZE;';
+        BEGIN TRY EXEC sp_executesql @sqlReorg; END TRY BEGIN CATCH END CATCH;
+        FETCH NEXT FROM hk INTO @tbl;
+      END
+      CLOSE hk; DEALLOCATE hk;
+    `);
+  } catch {
+    /* index tidy-up is best effort */
+  }
+  await setState("last_housekeeping_at", new Date().toISOString());
+  await setState("last_housekeeping_rows", String(total));
+  return { ok: true, retentionDays: days, removedRows: total, tables: removed };
+}
+
 /** Strips local-only bookkeeping before a row is sent to the cloud. */
 function toCloudRow(table, row) {
   const { is_synced: _s, sync_status: _st, ...rest } = row;
@@ -436,11 +514,13 @@ function toCloudRow(table, row) {
 module.exports = {
   TABLES,
   CATALOGUE_TABLES,
+  PRUNABLE_TABLES,
   SETTINGS_ID,
   applyOp,
   createSale,
   forgetColumnCache,
   getProducts,
+  housekeep,
   snapshot,
   pendingSyncCount,
   pendingRows,

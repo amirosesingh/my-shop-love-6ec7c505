@@ -348,7 +348,14 @@ export async function drainOutbox(): Promise<{ pushed: number; failed: number }>
 /* ---------------------------- downward sync ---------------------------- */
 
 /** Tables the central database owns; a till only ever reads these back. */
-const PULL_TABLES = ["products", "members", "membership_tiers", "promotions", "stores"] as const;
+const PULL_TABLES = [
+  "products",
+  "members",
+  "membership_tiers",
+  "promotions",
+  "stores",
+  "suppliers",
+] as const;
 
 let pulling = false;
 
