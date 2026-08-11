@@ -14,6 +14,7 @@ import {
   setCloudDirect,
 } from "./db-mode";
 import { notifyError, showNotification } from "./notify";
+import { logSync } from "./sync-log";
 import { canRelay, relayStores } from "./sync-relay";
 import { isOperationalTable } from "./pos-auth-route";
 import { keyset, nextCursor, PAGE_SIZE, type Cursor, type Page } from "./keyset";
@@ -927,11 +928,36 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
     return noteCommitTarget("cloud");
   }
 
-  // Windows desktop: the local SQL Server instance is the source of truth.
-  // If it is unreachable or refuses the write, the cloud is tried before the
-  // action is allowed to fail.
+  // Windows desktop with a local SQL Server present.
   const bridge = localDb();
   if (bridge) {
+    // Online working: the central database is the source of truth and the
+    // till must never wait on local SQL to finish a sale. The same rows are
+    // copied onto this terminal afterwards, in the background.
+    if (effectiveDatabaseMode() === "online") {
+      try {
+        for (const op of ops) await runOpLive(context, op);
+        noteConnectionRestored();
+        setCloudDirect(false);
+        void mirrorToLocal(context, ops);
+        return noteCommitTarget("cloud");
+      } catch (cloud) {
+        if (!isConnectionError(cloud)) throw cloud;
+        noteConnectionLost();
+        // Line down: keep trading by storing it on this terminal instead.
+        try {
+          for (const op of ops) {
+            const res = await bridge.write(context, op);
+            if (!res.ok) throw new Error(res.error ?? `${context} could not be stored locally`);
+          }
+          setCloudDirect(false);
+          return noteCommitTarget("local");
+        } catch (local) {
+          throw new AllTargetsFailed(context, local);
+        }
+      }
+    }
+    // Offline working: local first, pushed up later.
     try {
       for (const op of ops) {
         const res = await bridge.write(context, op);
