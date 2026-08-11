@@ -39,6 +39,7 @@ import {
 import { useAuth } from "@/lib/pos-auth";
 import { usePos } from "@/lib/pos-store";
 import { getRolesWithPermissions, type RoleDef } from "@/lib/role-admin";
+import { isExternalEmail, isInternalAddress } from "@/lib/internal-domains";
 import {
   createStaffMember,
   looksLikeEmail,
@@ -164,7 +165,7 @@ export function StaffManager() {
   };
 
   const selectedRole = roles.find((role) => role.slug === form.roleSlug);
-  const emailMode = editing ? !editing.email.endsWith("@pos-internal.local") : looksLikeEmail(form.username);
+  const emailMode = editing ? isExternalEmail(editing.email) : looksLikeEmail(form.username);
   const nameValid = form.displayName.trim().length > 0;
   const identifierValid = emailMode
     ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.username.trim())
@@ -295,7 +296,7 @@ export function StaffManager() {
           </tr></thead>
           <tbody>
             {filtered.map((row) => {
-              const terminal = row.email.endsWith("@pos-internal.local");
+              const terminal = isInternalAddress(row.email);
               return <tr key={row.user_id} className="border-b border-border/60">
                 <td className="py-3 pr-3"><p className="font-medium">{row.full_name}</p><p className="text-xs text-muted-foreground">{row.user_id}</p></td>
                 <td className="pr-3"><Badge variant="outline">{terminal ? `PIN · ${row.pin_length || 4} characters` : "Email & password"}</Badge></td>

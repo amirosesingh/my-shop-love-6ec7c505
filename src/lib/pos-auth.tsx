@@ -23,6 +23,7 @@ import {
 } from "@/lib/user-sessions.functions";
 import { loadSessionToken, saveSessionToken } from "@/lib/pos-credentials";
 import { preparePinAccount } from "@/lib/staff-admin";
+import { toLoginAddress } from "@/lib/internal-domains";
 import { activeBranchId, activeBranchName, bindTerminalBranch } from "@/lib/active-branch";
 import { cacheCredential, verifyCachedPin } from "@/lib/offline-credentials";
 import { recordSignIn } from "@/lib/shift-attendance";
@@ -325,8 +326,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // One handler for both worlds: a plain username belongs to a terminal
       // account and is mapped onto its hidden internal address; anything with
       // an "@" is used exactly as typed.
-      const typed = email.trim().toLowerCase();
-      const address = typed.includes("@") ? typed : `${typed}@pos-internal.local`;
+      const address = toLoginAddress(email);
       const { data, error } = await supabase.auth.signInWithPassword({
         email: address,
         password,
@@ -443,7 +443,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const cashierLogin = useCallback(async (userId: string, pin: string) => {
     const code = userId.trim().toLowerCase();
     if (!code) return { ok: false, error: "Enter your username" };
-    if (!/^\d{4,6}$/.test(pin)) return { ok: false, error: "Enter your PIN" };
+    // A till PIN is 4-6 digits; longer text passcodes are allowed up to the
+    // server's 32 character limit.
+    if (pin.length < 4 || pin.length > 32)
+      return { ok: false, error: "Enter your PIN or passcode" };
+    if (/^\d+$/.test(pin) && pin.length > 6)
+      return { ok: false, error: "A numeric PIN must be 4 to 6 digits" };
     let offline = false;
     if (typeof navigator !== "undefined" && !navigator.onLine) offline = true;
 

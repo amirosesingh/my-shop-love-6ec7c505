@@ -15,6 +15,7 @@ import {
   updateStaffAccount,
 } from "@/lib/staff-admin.functions";
 import type { StaffRole } from "@/lib/permissions";
+import { isExternalEmail } from "@/lib/internal-domains";
 
 export type StaffAccountInput = {
   displayName: string;
@@ -28,11 +29,8 @@ export type StaffAccountInput = {
   active: boolean;
 };
 
-/** A real address is anything with an "@" outside our own hidden domain. */
-export const looksLikeEmail = (input: string) => {
-  const v = input.trim().toLowerCase();
-  return v.includes("@") && !v.endsWith("@pos-internal.local");
-};
+/** A real address is anything with an "@" outside our own hidden domains. */
+export const looksLikeEmail = (input: string) => isExternalEmail(input);
 
 /** Built-in levels map onto the three access tiers the database understands. */
 export const dbBaseRole = (role: StaffRole): "admin" | "manager" | "staff" =>
