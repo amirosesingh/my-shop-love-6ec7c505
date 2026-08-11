@@ -11,6 +11,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import {
   PERMISSION_KEYS,
+  cacheRoleDefinitions,
   normalizePermissions,
   rolePermissions,
   type StaffPermissions,
@@ -73,7 +74,10 @@ export async function listStaffRoles(): Promise<RoleDef[]> {
   // Older databases have no roles table yet — the built-ins still work.
   if (error) return CORE_ROLES;
   const rows = ((data ?? []) as Record<string, unknown>[]).map(mapRow);
-  return rows.length ? rows : CORE_ROLES;
+  const roles = rows.length ? rows : CORE_ROLES;
+  // Keep the resolver working with no connection.
+  cacheRoleDefinitions(roles);
+  return roles;
 }
 
 export async function saveStaffRole(role: {

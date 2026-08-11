@@ -7,6 +7,14 @@ import { canRelay, hasStaffSession, relayOp } from "./sync-relay";
 import { preferRelay } from "./pos-auth-route";
 import { isConnectionError, noteConnectionLost, noteConnectionRestored } from "./db-mode";
 import {
+  lastSuccessfulPull,
+  setLastSuccessfulPull,
+  setSyncState,
+  syncState,
+} from "./sync-status";
+import { writeSnapshot } from "./offline-snapshot";
+import { loadCloudState } from "./pos-db";
+import {
   failOp,
   isOnline,
   isOnlineSyncEnabled,
@@ -281,9 +289,11 @@ let draining = false;
  */
 export async function drainOutbox(): Promise<{ pushed: number; failed: number }> {
   // A revoked terminal keeps selling locally but is cut off from the cloud.
+  if (!isOnline()) setSyncState({ phase: "offline", pending: listQueue().length });
   if (draining || !isOnline() || !isOnlineSyncEnabled() || isTerminalRevoked())
     return { pushed: 0, failed: 0 };
   draining = true;
+  setSyncState({ phase: "syncing", pending: listQueue().length });
   let pushed = 0;
   let failed = 0;
   const blocked = new Set<string>();
@@ -309,8 +319,66 @@ export async function drainOutbox(): Promise<{ pushed: number; failed: number }>
     if (pushed) noteConnectionRestored();
   } finally {
     draining = false;
+    setSyncState({
+      phase: isOnline() ? "idle" : "offline",
+      pending: listQueue().length,
+      ...(pushed && !failed ? { lastSyncAt: new Date().toISOString(), lastError: null } : {}),
+    });
   }
   return { pushed, failed };
+}
+
+/* ---------------------------- downward sync ---------------------------- */
+
+/** Tables the central database owns; a till only ever reads these back. */
+const PULL_TABLES = ["products", "members", "membership_tiers", "promotions", "stores"] as const;
+
+let pulling = false;
+
+/**
+ * Bring down everything changed centrally since the last clean pull, so a
+ * price edited at head office reaches this till without a restart.
+ */
+export async function pullDelta(): Promise<{ merged: number }> {
+  if (pulling || !isOnline() || !isOnlineSyncEnabled()) return { merged: 0 };
+  pulling = true;
+  const since = lastSuccessfulPull() ?? "1970-01-01T00:00:00.000Z";
+  const startedAt = new Date().toISOString();
+  let changed = 0;
+  try {
+    for (const table of PULL_TABLES) {
+      if (!tableSyncAllowed(table)) continue;
+      // Only ask how many rows moved; the full refresh below does the reading.
+      let { count, error } = await supabaseExternal
+        .from(table)
+        .select("id", { count: "exact", head: true })
+        .gt("updated_at", since);
+      if (error)
+        ({ count, error } = await supabaseExternal
+          .from(table)
+          .select("id", { count: "exact", head: true })
+          .gt("created_at", since));
+      if (error) {
+        logSync("pull", table, false, error.message);
+        continue;
+      }
+      if (!count) continue;
+      changed += count;
+      logSync("pull", table, true, `${count} row(s) changed centrally`);
+    }
+    // Something moved centrally: refresh the local copy in one consistent read.
+    if (changed) {
+      writeSnapshot(await loadCloudState());
+      window.dispatchEvent(new CustomEvent("pos:cloud-refreshed"));
+    }
+    setLastSuccessfulPull(startedAt);
+    setSyncState({ lastSyncAt: startedAt });
+  } catch (e) {
+    setSyncState({ lastError: e instanceof Error ? e.message : String(e) });
+  } finally {
+    pulling = false;
+  }
+  return { merged: changed };
 }
 
 let started = false;
@@ -319,13 +387,35 @@ let started = false;
 export function startSyncEngine() {
   if (started || typeof window === "undefined") return () => {};
   started = true;
-  const tick = () => void drainOutbox();
+  // Push first, then bring central changes down.
+  const tick = () => void drainOutbox().then(() => pullDelta());
   const timer = window.setInterval(tick, 15000);
-  window.addEventListener("online", tick);
+  const wake = () => {
+    setSyncState({ phase: "syncing" });
+    tick();
+  };
+  const sleep = () => setSyncState({ phase: "offline" });
+  window.addEventListener("online", wake);
+  window.addEventListener("offline", sleep);
+  // The browser's online flag lies on captive networks, so confirm by asking
+  // the central database every half minute and resume the moment it answers.
+  const ping = window.setInterval(() => {
+    if (!navigator.onLine) return;
+    void supabaseExternal
+      .from("public_flags")
+      .select("key")
+      .limit(1)
+      .then(({ error }) => {
+        if (error) return;
+        if (syncState().phase === "offline") wake();
+      });
+  }, 30000);
   tick();
   return () => {
     window.clearInterval(timer);
-    window.removeEventListener("online", tick);
+    window.clearInterval(ping);
+    window.removeEventListener("online", wake);
+    window.removeEventListener("offline", sleep);
     started = false;
   };
 }

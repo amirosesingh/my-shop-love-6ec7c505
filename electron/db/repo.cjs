@@ -27,7 +27,7 @@ const TABLES = [
 /** Cloud is authoritative for these; they are the only tables ever pulled. */
 const CATALOGUE_TABLES = ["membership_tiers", "products", "promotions"];
 
-const SYNC_COLUMNS = new Set(["is_synced", "sync_status"]);
+const SYNC_COLUMNS = new Set(["is_synced", "sync_status", "synced_at"]);
 
 const isUuid = (v) =>
   typeof v === "string" &&
@@ -85,7 +85,7 @@ async function upsertRow(tx, table, row, { markPending = true } = {}) {
   await request.query(`
     MERGE dbo.[${table}] WITH (HOLDLOCK) AS t
     USING (SELECT ${source}) AS s ON t.[id] = s.[id]
-    WHEN MATCHED THEN UPDATE SET ${setList}
+    WHEN MATCHED ${markPending ? "" : "AND t.[is_synced] = 1 "}THEN UPDATE SET ${setList}
     WHEN NOT MATCHED THEN INSERT (${insertCols}, [is_synced], [sync_status])
       VALUES (${insertVals}, ${markPending ? 0 : 1}, ${markPending ? "N'pending'" : "N'synced'"});
   `);
@@ -180,7 +180,8 @@ async function markSynced(table, ids) {
   ids.forEach((id, i) => request.input(`id${i}`, sql.UniqueIdentifier, id));
   await request.query(`
     UPDATE dbo.[${table}]
-       SET is_synced = 1, sync_status = N'synced', updated_at = updated_at
+       SET is_synced = 1, sync_status = N'synced', synced_at = SYSUTCDATETIME(),
+           updated_at = updated_at
      WHERE id IN (${ids.map((_, i) => `@id${i}`).join(", ")});
   `);
 }

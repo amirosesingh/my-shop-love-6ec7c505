@@ -97,7 +97,10 @@ async function pull() {
   const since = (await repo.getState("last_pull_at")) ?? "1970-01-01T00:00:00.000Z";
   let merged = 0;
   for (const table of repo.CATALOGUE_TABLES) {
-    const { data, error } = await supabase.from(table).select("*").gt("created_at", since);
+    // Delta only: anything the cloud has touched since our last clean pull.
+    let { data, error } = await supabase.from(table).select("*").gt("updated_at", since);
+    // Not every table carries updated_at; those fall back to creation time.
+    if (error) ({ data, error } = await supabase.from(table).select("*").gt("created_at", since));
     if (error) return { ok: false, merged, error: error.message };
     merged += await repo.mergeFromCloud(table, data ?? []);
   }
