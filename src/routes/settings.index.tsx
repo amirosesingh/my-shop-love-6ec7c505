@@ -18,10 +18,12 @@ import {
   ReceiptText,
   RefreshCw,
   ScanBarcode,
+  Search,
   ShieldCheck,
   Type,
 } from "lucide-react";
 import { AppShell } from "@/components/pos/AppShell";
+import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/pos-auth";
 import { isDesktop } from "@/lib/branding";
 
@@ -304,6 +306,16 @@ function SettingsHub() {
     pages: (g.pages as readonly SettingsPage[]).filter((p) => !(p.cloudOnly && desktop)),
   })).filter((g) => g.pages.length > 0);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const term = query.trim().toLowerCase();
+  const matches = term
+    ? groups
+        .flatMap((g) => g.pages.map((p) => ({ ...p, group: g.label })))
+        .filter(
+          (p) =>
+            p.label.toLowerCase().includes(term) || p.blurb.toLowerCase().includes(term),
+        )
+    : [];
   const open = groups.find((g) => g.id === openId) ?? null;
 
   return (
@@ -330,6 +342,44 @@ function SettingsHub() {
           </p>
         ) : (
           <div className="space-y-5">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search settings — tax, printer, sync…"
+                aria-label="Search settings"
+                className="pl-9"
+              />
+            </div>
+
+            {term ? (
+              matches.length ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {matches.map((p) => (
+                    <Link
+                      key={p.to}
+                      to={p.to as never}
+                      className="flex items-start gap-3 rounded-lg border border-border bg-card p-4 transition-colors hover:border-primary/60"
+                    >
+                      <p.icon className="mt-0.5 size-5 shrink-0 text-primary" />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-medium">{p.label}</span>
+                        <span className="block text-xs text-muted-foreground">{p.blurb}</span>
+                        <span className="mt-1 block text-[11px] text-muted-foreground">
+                          {p.group}
+                        </span>
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Nothing matches “{query}”. Try a shorter word.
+                </p>
+              )
+            ) : (
+              <>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {groups.map((g) => {
                 const Icon = (g.pages as readonly SettingsPage[])[0]?.icon ?? MonitorCog;
@@ -385,6 +435,8 @@ function SettingsHub() {
               <p className="text-xs text-muted-foreground">
                 Pick a category to see the pages inside it.
               </p>
+            )}
+              </>
             )}
           </div>
         )}
