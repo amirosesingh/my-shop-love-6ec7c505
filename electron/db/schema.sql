@@ -381,3 +381,62 @@ END
 CLOSE tbl;
 DEALLOCATE tbl;
 GO
+
+/* ------------------------------------------------------------------
+   Cloud-parity sync block.
+
+   pending_sync is the flag the sync engine reads: 1 while the row is
+   still waiting to go up, 0 once the central database has taken it. It
+   is computed from is_synced, so the two can never disagree.
+
+   temp_id is the local identity a row is born with when it is created
+   offline, so an upward push can be replayed without duplicating it.
+   ------------------------------------------------------------------ */
+DECLARE @st SYSNAME, @sqlSync NVARCHAR(MAX);
+DECLARE synctbl CURSOR FOR
+  SELECT name FROM sys.tables
+   WHERE COL_LENGTH('dbo.' + name, 'is_synced') IS NOT NULL;
+OPEN synctbl;
+FETCH NEXT FROM synctbl INTO @st;
+WHILE @@FETCH_STATUS = 0
+BEGIN
+  IF COL_LENGTH('dbo.' + @st, 'pending_sync') IS NULL
+  BEGIN
+    SET @sqlSync = N'ALTER TABLE dbo.[' + @st + N'] ADD pending_sync AS '
+      + N'CAST(CASE WHEN [is_synced] = 1 THEN 0 ELSE 1 END AS BIT) PERSISTED;';
+    EXEC sp_executesql @sqlSync;
+  END
+  IF COL_LENGTH('dbo.' + @st, 'temp_id') IS NULL
+  BEGIN
+    SET @sqlSync = N'ALTER TABLE dbo.[' + @st
+      + N'] ADD temp_id UNIQUEIDENTIFIER NOT NULL CONSTRAINT [DF_' + @st
+      + N'_temp_id] DEFAULT NEWID();';
+    EXEC sp_executesql @sqlSync;
+  END
+  FETCH NEXT FROM synctbl INTO @st;
+END
+CLOSE synctbl;
+DEALLOCATE synctbl;
+GO
+
+/* Pending work is read constantly by the sync engine; index it once. */
+DECLARE @it SYSNAME, @sqlIx NVARCHAR(MAX);
+DECLARE ixtbl CURSOR FOR
+  SELECT name FROM sys.tables
+   WHERE COL_LENGTH('dbo.' + name, 'pending_sync') IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1 FROM sys.indexes i
+        WHERE i.object_id = OBJECT_ID('dbo.' + sys.tables.name)
+          AND i.name = 'IX_' + sys.tables.name + '_pending_sync');
+OPEN ixtbl;
+FETCH NEXT FROM ixtbl INTO @it;
+WHILE @@FETCH_STATUS = 0
+BEGIN
+  SET @sqlIx = N'CREATE INDEX [IX_' + @it + N'_pending_sync] ON dbo.[' + @it
+    + N'] ([pending_sync]);';
+  EXEC sp_executesql @sqlIx;
+  FETCH NEXT FROM ixtbl INTO @it;
+END
+CLOSE ixtbl;
+DEALLOCATE ixtbl;
+GO
