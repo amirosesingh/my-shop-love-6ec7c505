@@ -29,6 +29,7 @@ files calls. Run `00` then `02` before anything else.
 | `23_unified_staff_accounts.sql` | Unified username/PIN and email/password staff accounts | `app_users` account routines |
 | `24_staff_management.sql` | Safe legacy cashier migration | Copies legacy cashiers when present; fresh databases skip it |
 | `25_staff_account_lifecycle.sql` | Inactive-first permanent staff deletion | Protected account lifecycle routine |
+| `26_staff_upgrade_22_25.sql` | Consolidated staff upgrade runner | Runs files 22–25 in order with psql |
 
 `98_drop_unused.sql` is separate and **destructive**, and every statement in it
 is commented out as shipped, so running the file by accident deletes nothing.

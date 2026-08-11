@@ -1,33 +1,24 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-const input = z.object({
-  username: z.string().min(1).max(64),
-  pin: z.string().regex(/^\d{4,6}$/),
-});
-
 /**
  * Mints a signed terminal session for a cashier after the PIN has been
  * verified server-side. Privileged server functions accept this token in
  * place of a Supabase access token.
  */
 export const issueCashierSession = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => input.parse(data))
+  .inputValidator((data: unknown) =>
+    z.object({
+      username: z.string().min(1).max(64),
+      pin: z.string().regex(/^\d{4,6}$/),
+    }).parse(data),
+  )
   .handler(async ({ data }) => {
-    const { supabaseConfig } = await import(
-      "./external-supabase-config"
-    );
     const { signCashierSession } = await import("./pos-session.server");
+    const { serviceRest } = await import("./pos-relay.server");
     try {
-      const config = supabaseConfig();
-      const headers: Record<string, string> = {
-        apikey: config.key,
-        "Content-Type": "application/json",
-      };
-      if (!config.key.startsWith("sb_")) headers["Authorization"] = `Bearer ${config.key}`;
-      const res = await fetch(`${config.url}/rest/v1/rpc/verify_terminal_pin`, {
+      const res = await serviceRest("rpc/verify_terminal_pin", {
         method: "POST",
-        headers,
         body: JSON.stringify({
           p_user_id: data.username.trim().toLowerCase(),
           p_pin: data.pin,

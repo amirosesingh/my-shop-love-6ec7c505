@@ -42,6 +42,21 @@ ALTER TABLE public.app_users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.staff_roles ENABLE ROW LEVEL SECURITY;
 
+-- PIN lookup is never an anonymous browser capability. Terminal login calls
+-- it through the trusted server; signed-in supervisors retain manager-PIN use.
+DO $pin_rpc_grants$
+BEGIN
+  IF to_regprocedure('public.verify_terminal_pin(text,text)') IS NOT NULL THEN
+    REVOKE EXECUTE ON FUNCTION public.verify_terminal_pin(text, text) FROM PUBLIC, anon;
+    GRANT EXECUTE ON FUNCTION public.verify_terminal_pin(text, text) TO authenticated, service_role;
+  END IF;
+  IF to_regprocedure('public.verify_cashier_pin(text,text)') IS NOT NULL THEN
+    REVOKE EXECUTE ON FUNCTION public.verify_cashier_pin(text, text) FROM PUBLIC, anon, authenticated;
+    GRANT EXECUTE ON FUNCTION public.verify_cashier_pin(text, text) TO service_role;
+  END IF;
+END
+$pin_rpc_grants$;
+
 DO $legacy_cashier_security$
 BEGIN
   IF to_regclass('public.cashiers') IS NOT NULL THEN
