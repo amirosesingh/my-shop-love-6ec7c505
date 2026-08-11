@@ -31,6 +31,22 @@ CREATE TABLE dbo.system_settings (
 );
 GO
 
+IF OBJECT_ID('dbo.stores', 'U') IS NULL
+CREATE TABLE dbo.stores (
+  id             UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+  code           NVARCHAR(80)     NOT NULL DEFAULT N'',
+  name           NVARCHAR(200)    NOT NULL DEFAULT N'',
+  address        NVARCHAR(400)    NULL,
+  phone          NVARCHAR(40)     NULL,
+  group_id       NVARCHAR(80)     NOT NULL DEFAULT N'default',
+  receipt_prefix NVARCHAR(30)     NULL,
+  is_synced      BIT              NOT NULL DEFAULT 1,
+  sync_status    NVARCHAR(20)     NOT NULL DEFAULT N'synced',
+  created_at     DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at     DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
 IF OBJECT_ID('dbo.products', 'U') IS NULL
 CREATE TABLE dbo.products (
   id               UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
@@ -52,6 +68,15 @@ CREATE TABLE dbo.products (
   created_at       DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
   updated_at       DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
 );
+GO
+
+IF COL_LENGTH('dbo.products', 'sub_category') IS NULL ALTER TABLE dbo.products ADD sub_category NVARCHAR(120) NULL;
+IF COL_LENGTH('dbo.products', 'unit') IS NULL ALTER TABLE dbo.products ADD unit NVARCHAR(30) NULL;
+IF COL_LENGTH('dbo.products', 'packs') IS NULL ALTER TABLE dbo.products ADD packs NVARCHAR(MAX) NULL;
+IF COL_LENGTH('dbo.products', 'barcode_aliases') IS NULL ALTER TABLE dbo.products ADD barcode_aliases NVARCHAR(MAX) NULL;
+IF COL_LENGTH('dbo.products', 'is_archived') IS NULL ALTER TABLE dbo.products ADD is_archived BIT NOT NULL DEFAULT 0;
+IF COL_LENGTH('dbo.products', 'archived_at') IS NULL ALTER TABLE dbo.products ADD archived_at DATETIME2(3) NULL;
+IF COL_LENGTH('dbo.products', 'stock_quantity') IS NULL ALTER TABLE dbo.products ADD stock_quantity INT NOT NULL DEFAULT 0;
 GO
 
 IF OBJECT_ID('dbo.membership_tiers', 'U') IS NULL
@@ -266,6 +291,31 @@ CREATE TABLE dbo.transfers (
 );
 GO
 
+IF OBJECT_ID('dbo.stock_transfers', 'U') IS NULL
+CREATE TABLE dbo.stock_transfers (
+  id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(), ref NVARCHAR(80) NOT NULL,
+  kind NVARCHAR(20) NOT NULL DEFAULT N'transfer', transfer_scope NVARCHAR(30) NOT NULL DEFAULT N'INTRA_GROUP',
+  from_store_id NVARCHAR(60) NOT NULL, from_store_name NVARCHAR(200) NULL, from_group_id NVARCHAR(80) NULL,
+  to_store_id NVARCHAR(60) NOT NULL, to_store_name NVARCHAR(200) NULL, to_group_id NVARCHAR(80) NULL,
+  status NVARCHAR(30) NOT NULL DEFAULT N'pending', note NVARCHAR(400) NOT NULL DEFAULT N'',
+  created_by NVARCHAR(120) NULL, approved_by NVARCHAR(120) NULL, approved_at DATETIME2(3) NULL,
+  received_by NVARCHAR(120) NULL, received_at DATETIME2(3) NULL, rejected_reason NVARCHAR(400) NULL,
+  is_synced BIT NOT NULL DEFAULT 0, sync_status NVARCHAR(20) NOT NULL DEFAULT N'pending',
+  created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(), updated_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+IF OBJECT_ID('dbo.stock_transfer_items', 'U') IS NULL
+CREATE TABLE dbo.stock_transfer_items (
+  id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(), transfer_id UNIQUEIDENTIFIER NOT NULL,
+  product_id UNIQUEIDENTIFIER NULL, barcode NVARCHAR(80) NULL, sku NVARCHAR(80) NULL,
+  product_name NVARCHAR(200) NULL, quantity INT NOT NULL DEFAULT 0, quantity_received INT NOT NULL DEFAULT 0,
+  unit_cost DECIMAL(18,4) NOT NULL DEFAULT 0, is_synced BIT NOT NULL DEFAULT 0,
+  sync_status NVARCHAR(20) NOT NULL DEFAULT N'pending', created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
 IF OBJECT_ID('dbo.audit_logs', 'U') IS NULL
 CREATE TABLE dbo.audit_logs (
   id              UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
@@ -301,7 +351,8 @@ DECLARE tables CURSOR FOR
   SELECT name FROM sys.tables
    WHERE name IN ('products','membership_tiers','members','sales','sale_items',
                   'purchase_orders','purchase_order_items','promotions','shifts',
-                  'bookings','booking_payments','transfers','audit_logs','pos_settings');
+                   'bookings','booking_payments','transfers','stock_transfers',
+                   'stock_transfer_items','stores','audit_logs','pos_settings');
 OPEN tables;
 FETCH NEXT FROM tables INTO @t;
 WHILE @@FETCH_STATUS = 0
