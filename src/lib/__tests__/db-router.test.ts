@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { AllTargetsFailed, isCloudDirect, setCloudDirect, databaseModeLabel } from "@/lib/db-mode";
-import { dbRouter } from "@/lib/db-router";
+import { dbProxy, dbRouter } from "@/lib/db-router";
 
 describe("dbRouter", () => {
   beforeEach(() => setCloudDirect(false));
@@ -36,5 +36,15 @@ describe("dbRouter", () => {
     const e = new AllTargetsFailed("Saving sale");
     expect(e.name).toBe("AllTargetsFailed");
     expect(e.message).toMatch(/Database Connection Required/);
+  });
+
+  it("exposes the same gateway under both names", () => {
+    expect(dbProxy).toBe(dbRouter);
+  });
+
+  it("offers table operations so screens never pick a database", () => {
+    for (const fn of ["query", "insert", "upsert", "update", "delete"] as const) {
+      expect(typeof dbRouter[fn]).toBe("function");
+    }
   });
 });
