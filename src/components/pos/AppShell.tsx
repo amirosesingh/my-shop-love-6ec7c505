@@ -125,6 +125,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Windows tills must be registered to a location before they can be used.
   const terminal = useRevocationCheck();
   const location = useLocation();
+  const { visibleRoute } = useVisibility();
 
   // Terminal-wide font / control scaling preference.
   useUiScale();
@@ -220,6 +221,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (item.desktopHidden && isDesktop()) return false;
     if (item.flag && !can(item.flag)) return false;
     if (item.adminOnly && !isAdmin && !item.flag) return false;
+    if (!visibleRoute(item.to)) return false;
     return true;
   };
 
@@ -442,7 +444,14 @@ export function AppShell({ children }: { children: ReactNode }) {
             const required = requiredPermission(location.pathname);
             const allowed =
               required === null ? true : required === "unknown" ? isAdmin : can(required);
-            if (allowed) return children;
+            if (allowed && visibleRoute(location.pathname)) return children;
+            if (allowed)
+              return (
+                <PermissionDenied
+                  title="Hidden for your role"
+                  flag={required === "unknown" ? null : required}
+                />
+              );
             return <PermissionDenied flag={required === "unknown" ? null : required} />;
           })()}
         </main>
