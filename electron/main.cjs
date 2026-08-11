@@ -220,7 +220,11 @@ function scheduleReconnect() {
 async function initializeWorker(config) {
   if (!config?.url || !config?.key) return null;
   cloudConfig = config;
-  worker.init({ ...config, onChange: async () => broadcastStatus(await statusPayload()) });
+  worker.init({
+    ...config,
+    relayUrl: baseUrl ? `${baseUrl}/api/public/sync` : null,
+    onChange: async () => broadcastStatus(await statusPayload()),
+  });
   worker.start();
   return worker.run();
 }

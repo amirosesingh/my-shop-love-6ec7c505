@@ -44,6 +44,7 @@ import { flushWhatsAppQueue } from "@/lib/whatsapp";
 import { reportAppReady } from "@/lib/app-health";
 import { localDb } from "@/lib/local-db";
 import { supabaseConfig } from "@/lib/external-supabase-config";
+import { readCredentials } from "@/lib/pos-credentials";
 
 /** Permission required to open each screen. Keys are path prefixes, so child
  *  pages (/settings/tax, /reports/sales …) inherit the parent gate unless they
@@ -137,8 +138,15 @@ export function AppShell({ children }: { children: ReactNode }) {
     const bridge = localDb();
     if (!bridge) return;
     const { url, key } = supabaseConfig();
-    void bridge.configureCloud({ url, key });
-  }, [terminal.config?.supabaseUrl, terminal.config?.supabaseKey]);
+    void readCredentials().then((credentials) =>
+      bridge.configureCloud({
+        url,
+        key,
+        ...credentials,
+        branchId: terminal.config?.locationId ?? currentStore?.id,
+      }),
+    );
+  }, [terminal.config?.supabaseUrl, terminal.config?.supabaseKey, terminal.config?.locationId, user?.staffId]);
   // Keeps the database-mode pill and the automatic local failover honest.
   useEffect(() => startDatabaseModeWatch(), []);
 
