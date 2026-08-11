@@ -37,8 +37,8 @@ import {
   PERMISSION_KEYS,
   PERMISSION_LABELS,
   fromDbRole,
+  hasPermission,
   normalizePermissions,
-  resolvePermission,
   toDbRole,
   type PermissionFlag,
   type PermissionKey,
@@ -55,6 +55,7 @@ export {
   PERMISSION_KEYS,
   PERMISSION_LABELS,
   fromDbRole,
+  hasPermission,
   normalizePermissions,
   toDbRole,
 };
@@ -830,8 +831,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       authUserId: userId,
       terminalUser,
       appUser,
-      can: (flag) =>
-        user?.role === "admin" || !!user?.permissions?.[resolvePermission(flag)],
+      can: (flag) => hasPermission(user, flag),
       staff,
       addStaff,
       updateStaff,

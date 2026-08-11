@@ -361,3 +361,23 @@ IF OBJECT_ID('dbo.BranchSaleItems', 'V') IS NOT NULL DROP VIEW dbo.BranchSaleIte
 GO
 CREATE VIEW dbo.BranchSaleItems AS SELECT * FROM dbo.sale_items;
 GO
+/* ------------------------------------------------------------------
+   Confirmation stamp — when the central database accepted this row.
+   Lets a supervisor see how far behind a till is, per record.
+   ------------------------------------------------------------------ */
+DECLARE @t SYSNAME, @sqlAdd NVARCHAR(MAX);
+DECLARE tbl CURSOR FOR
+  SELECT name FROM sys.tables
+   WHERE COL_LENGTH('dbo.' + name, 'is_synced') IS NOT NULL
+     AND COL_LENGTH('dbo.' + name, 'synced_at') IS NULL;
+OPEN tbl;
+FETCH NEXT FROM tbl INTO @t;
+WHILE @@FETCH_STATUS = 0
+BEGIN
+  SET @sqlAdd = N'ALTER TABLE dbo.[' + @t + N'] ADD synced_at DATETIME2 NULL;';
+  EXEC sp_executesql @sqlAdd;
+  FETCH NEXT FROM tbl INTO @t;
+END
+CLOSE tbl;
+DEALLOCATE tbl;
+GO

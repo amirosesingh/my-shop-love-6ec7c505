@@ -302,3 +302,92 @@ export function normalizePermissions(
   }
   return base;
 }
+
+// --------------------------------------------------------------------------
+// One place every screen asks "is this person allowed to …".
+// --------------------------------------------------------------------------
+
+/** Anything that can carry permissions: a signed-in user, or a bare matrix. */
+export type PermissionSubject =
+  | {
+      role?: string | null;
+      roleSlug?: string | null;
+      permissions?: Record<string, unknown> | null;
+    }
+  | Record<string, unknown>
+  | null
+  | undefined;
+
+const matrixOf = (subject: PermissionSubject): Record<string, unknown> => {
+  if (!subject) return {};
+  const withPerms = subject as { permissions?: Record<string, unknown> | null };
+  if (withPerms.permissions && typeof withPerms.permissions === "object") return withPerms.permissions;
+  return subject as Record<string, unknown>;
+};
+
+/** Administrators are never blocked by the matrix. */
+const isAdminSubject = (subject: PermissionSubject): boolean => {
+  const s = (subject ?? {}) as { role?: unknown; roleSlug?: unknown };
+  return s.role === "admin" || s.roleSlug === "admin";
+};
+
+/** Is this person allowed to do `flag`? Legacy flag names are accepted. */
+export function hasPermission(subject: PermissionSubject, flag: PermissionFlag | string): boolean {
+  if (isAdminSubject(subject)) return true;
+  return !!matrixOf(subject)[resolvePermission(flag as PermissionFlag)];
+}
+
+/** Allowed to do at least one of these. */
+export function hasAnyPermission(
+  subject: PermissionSubject,
+  flags: (PermissionFlag | string)[],
+): boolean {
+  return flags.some((f) => hasPermission(subject, f));
+}
+
+/** Allowed to do every one of these. */
+export function hasAllPermissions(
+  subject: PermissionSubject,
+  flags: (PermissionFlag | string)[],
+): boolean {
+  return flags.every((f) => hasPermission(subject, f));
+}
+
+/**
+ * Roles seen the last time the roles table answered, kept in memory so the
+ * resolver below still works with no connection.
+ */
+type CachedRole = { slug: string; baseLevel: StaffRole; permissions: StaffPermissions };
+const roleCache = new Map<string, CachedRole>();
+
+export function cacheRoleDefinitions(roles: CachedRole[]) {
+  for (const r of roles) if (r.slug) roleCache.set(r.slug, r);
+}
+
+export function cachedRoleDefinition(slug: string | null | undefined): CachedRole | null {
+  return slug ? (roleCache.get(slug) ?? null) : null;
+}
+
+/**
+ * The permissions a role grants before any per-person tuning: a custom role
+ * from the roles table when we know it, otherwise the built-in preset.
+ */
+export function getEffectivePermissions(
+  roleSlug: string | null | undefined,
+  overrides?: Record<string, unknown> | null,
+): StaffPermissions {
+  const cached = roleSlug ? roleCache.get(roleSlug) : null;
+  const base: StaffRole =
+    cached?.baseLevel ??
+    (roleSlug === "admin" || roleSlug === "supervisor" || roleSlug === "warehouse" || roleSlug === "cashier"
+      ? (roleSlug as StaffRole)
+      : "cashier");
+  const preset = cached ? { ...cached.permissions } : rolePermissions(base);
+  if (!overrides || Object.keys(overrides).length === 0) return preset;
+  const merged = { ...preset };
+  for (const [key, value] of Object.entries(overrides)) {
+    const resolved = resolvePermission(key as PermissionFlag);
+    if (resolved in merged) merged[resolved] = !!value;
+  }
+  return merged;
+}
