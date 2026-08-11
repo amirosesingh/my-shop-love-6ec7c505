@@ -5,7 +5,7 @@
  * tap your PIN on the keypad. Sign-in fires as soon as the last digit lands.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, Delete, Loader2, UserRound } from "lucide-react";
+import { ArrowLeft, Delete, Loader2, ShieldAlert, UserRound } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,11 +14,18 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/pos-auth";
 import { activeBranchId } from "@/lib/active-branch";
 import { listTerminalStaff, type TerminalStaff } from "@/lib/staff-admin";
+import {
+  attemptsLeft,
+  clearPinFailures,
+  describeLockout,
+  lockoutRemaining,
+  notePinFailure,
+} from "@/lib/pin-lockout";
 import { cn } from "@/lib/utils";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
-export function CashierPinLogin() {
+export function CashierPinLogin({ onAdminLogin }: { onAdminLogin?: () => void }) {
   const { cashierLogin } = useAuth();
   const [staff, setStaff] = useState<TerminalStaff[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,8 +34,16 @@ export function CashierPinLogin() {
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [lockedFor, setLockedFor] = useState(() => lockoutRemaining());
   const pinRef = useRef(pin);
   pinRef.current = pin;
+
+  // Countdown while the keypad is locked after too many wrong PINs.
+  useEffect(() => {
+    if (!lockedFor) return;
+    const t = window.setInterval(() => setLockedFor(lockoutRemaining()), 1000);
+    return () => window.clearInterval(t);
+  }, [lockedFor]);
 
   useEffect(() => {
     let live = true;
@@ -49,12 +64,33 @@ export function CashierPinLogin() {
         setError("Choose who is signing in");
         return;
       }
+      const waiting = lockoutRemaining();
+      if (waiting) {
+        setLockedFor(waiting);
+        setPin("");
+        return;
+      }
       setBusy(true);
       setError("");
       const res = await cashierLogin(username, value);
       if (!res.ok) {
-        setError(res.error ?? "That PIN was not recognised");
+        const message = res.error ?? "That PIN was not recognised";
+        const deactivated = /deactivat|not active|blocked/i.test(message);
         setPin("");
+        if (deactivated) {
+          setError("Account deactivated. Please contact an administrator.");
+        } else {
+          const locked = notePinFailure();
+          setLockedFor(locked);
+          const left = attemptsLeft();
+          setError(
+            locked
+              ? ""
+              : `${message}${left ? ` — ${left} attempt${left === 1 ? "" : "s"} left` : ""}`,
+          );
+        }
+      } else {
+        clearPinFailures();
       }
       setBusy(false);
     },
@@ -62,7 +98,7 @@ export function CashierPinLogin() {
   );
 
   const press = (digit: string) => {
-    if (busy || pinRef.current.length >= pinLength) return;
+    if (busy || lockedFor || pinRef.current.length >= pinLength) return;
     const next = pinRef.current + digit;
     setPin(next);
     setError("");
@@ -143,6 +179,11 @@ export function CashierPinLogin() {
             className="h-11 text-center"
           />
         </div>
+        {onAdminLogin && (
+          <Button type="button" variant="ghost" className="w-full text-xs" onClick={onAdminLogin}>
+            Administrator sign in with email and password
+          </Button>
+        )}
       </div>
     );
   }
@@ -191,6 +232,13 @@ export function CashierPinLogin() {
         ))}
       </div>
 
+      {lockedFor > 0 && (
+        <p className="flex items-center justify-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-center text-xs text-destructive">
+          <ShieldAlert className="size-4 shrink-0" />
+          Too many wrong PINs. Try again in {describeLockout(lockedFor)}.
+        </p>
+      )}
+
       <div className="grid grid-cols-3 gap-2">
         {KEYS.map((k) => (
           <Button
@@ -198,7 +246,7 @@ export function CashierPinLogin() {
             type="button"
             variant="outline"
             className="h-14 text-lg"
-            disabled={busy}
+            disabled={busy || lockedFor > 0}
             onClick={() => press(k)}
           >
             {k}
@@ -208,7 +256,7 @@ export function CashierPinLogin() {
           type="button"
           variant="ghost"
           className="h-14 text-xs"
-          disabled={busy}
+          disabled={busy || lockedFor > 0}
           onClick={() => {
             setPin("");
             setError("");
@@ -220,7 +268,7 @@ export function CashierPinLogin() {
           type="button"
           variant="outline"
           className="h-14 text-lg"
-          disabled={busy}
+          disabled={busy || lockedFor > 0}
           onClick={() => press("0")}
         >
           0
@@ -230,7 +278,7 @@ export function CashierPinLogin() {
           variant="ghost"
           className="h-14"
           aria-label="Delete last digit"
-          disabled={busy}
+          disabled={busy || lockedFor > 0}
           onClick={() => setPin(pin.slice(0, -1))}
         >
           <Delete className="size-5" />
@@ -243,6 +291,11 @@ export function CashierPinLogin() {
         </p>
       )}
       {error && <p className="text-center text-sm text-destructive">{error}</p>}
+      {onAdminLogin && (
+        <Button type="button" variant="ghost" className="w-full text-xs" onClick={onAdminLogin}>
+          Administrator sign in with email and password
+        </Button>
+      )}
       <p className="text-[11px] leading-relaxed text-muted-foreground">
         PINs are checked by the backend. Once you have signed in here, the same PIN works with
         no connection.

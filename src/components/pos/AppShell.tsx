@@ -9,6 +9,7 @@ import {
   TerminalRevokedScreen,
 } from "@/components/pos/TerminalActivation";
 import { clearRevocation, useRevocationCheck } from "@/lib/use-revocation-check";
+import { useAutoLock } from "@/lib/auto-lock";
 import { SidebarNav, useSidebarCollapsed } from "@/components/pos/SidebarNav";
 import { SyncStatus } from "@/components/pos/SyncStatus";
 import { WindowControls } from "@/components/pos/WindowControls";
@@ -119,6 +120,11 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   // Terminal-wide font / control scaling preference.
   useUiScale();
+
+  // Idle screens return to the sign-in keypad. The shift stays open.
+  useAutoLock(!!user, () => {
+    void lock();
+  });
 
   // Background outbox drain: keeps offline sales flowing once the link returns.
   useEffect(() => startSyncEngine(), []);

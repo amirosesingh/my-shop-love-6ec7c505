@@ -59,7 +59,7 @@ export function TerminalLogin() {
 
           {terminal && (
             <TabsContent value="cashier">
-              <CashierPinLogin />
+              <CashierPinLogin onAdminLogin={() => setTab("admin")} />
             </TabsContent>
           )}
 
@@ -76,10 +76,10 @@ export function TerminalLogin() {
               }}
             >
               <div className="space-y-1">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">Email or username</Label>
                 <Input
                   id="email"
-                  type="email"
+                  type="text"
                   autoComplete="email"
                   placeholder="supervisor@store.com"
                   value={email}
