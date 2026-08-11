@@ -303,6 +303,8 @@ function SettingsHub() {
     ...g,
     pages: (g.pages as readonly SettingsPage[]).filter((p) => !(p.cloudOnly && desktop)),
   })).filter((g) => g.pages.length > 0);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const open = groups.find((g) => g.id === openId) ?? null;
 
   return (
     <AppShell>
@@ -327,15 +329,44 @@ function SettingsHub() {
             Configuration is managed by an administrator.
           </p>
         ) : (
-          <div className="space-y-6">
-            {groups.map((g) => (
-              <section key={g.id} className="space-y-3">
+          <div className="space-y-5">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {groups.map((g) => {
+                const Icon = (g.pages as readonly SettingsPage[])[0]?.icon ?? MonitorCog;
+                const active = g.id === openId;
+                return (
+                  <button
+                    key={g.id}
+                    type="button"
+                    onClick={() => setOpenId(active ? null : g.id)}
+                    aria-expanded={active}
+                    className={`flex items-start gap-3 rounded-lg border p-4 text-left transition-colors ${
+                      active
+                        ? "border-primary bg-primary/5"
+                        : "border-border bg-card hover:border-primary/60"
+                    }`}
+                  >
+                    <Icon className="mt-0.5 size-5 shrink-0 text-primary" />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium">{g.label}</span>
+                      <span className="block text-xs text-muted-foreground">{g.blurb}</span>
+                      <span className="mt-1 block text-[11px] text-muted-foreground">
+                        {g.pages.length} {g.pages.length === 1 ? "page" : "pages"}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {open ? (
+              <section className="space-y-3 rounded-lg border border-border bg-surface-2 p-4">
                 <div>
-                  <h2 className="text-sm font-semibold">{g.label}</h2>
-                  <p className="text-xs text-muted-foreground">{g.blurb}</p>
+                  <h2 className="text-sm font-semibold">{open.label}</h2>
+                  <p className="text-xs text-muted-foreground">{open.blurb}</p>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {g.pages.map((p) => (
+                  {open.pages.map((p) => (
                     <Link
                       key={p.to}
                       to={p.to as never}
@@ -350,7 +381,11 @@ function SettingsHub() {
                   ))}
                 </div>
               </section>
-            ))}
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Pick a category to see the pages inside it.
+              </p>
+            )}
           </div>
         )}
       </div>
