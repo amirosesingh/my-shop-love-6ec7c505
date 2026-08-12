@@ -2970,7 +2970,7 @@ function Register() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCloseShiftOpen(false)}>
+            <Button variant="outline" onClick={abandonShiftClose}>
               Cancel
             </Button>
             <Button
