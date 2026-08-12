@@ -16,6 +16,7 @@ import { WindowControls } from "@/components/pos/WindowControls";
 import { SystemStatusPill } from "@/components/pos/SystemStatusPill";
 import { SecurityAlertBell } from "@/components/pos/SecurityAlertBell";
 import { ActivityBell } from "@/components/pos/ActivityBell";
+import { MobileStatusSheet } from "@/components/pos/MobileStatusSheet";
 import { ShiftGuard } from "@/components/pos/ShiftGuard";
 import { PermissionDenied } from "@/components/pos/PermissionGate";
 import { useVisibility } from "@/lib/ui-visibility";
@@ -185,11 +186,14 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   // A registered till fixes the branch for everyone signed in on it; otherwise
   // an account with a single assigned branch is pinned to that one.
+  // The phone app is an admin tool: an admin on Android keeps the freedom to
+  // look at any branch, so the terminal pin does not apply to them there.
   useEffect(() => {
+    if (isNative() && isAdmin) return;
     const pinned =
       terminalStoreId ?? (canSwitchStores ? null : (user?.storeId ?? soleBranchId()));
     if (user && pinned && currentStore.id !== pinned) setCurrentStore(pinned);
-  }, [user, canSwitchStores, terminalStoreId, currentStore.id, setCurrentStore]);
+  }, [user, isAdmin, canSwitchStores, terminalStoreId, currentStore.id, setCurrentStore]);
 
   if (!ready) return null;
   // Every activated terminal, including a browser-based till, must finish
@@ -243,8 +247,12 @@ export function AppShell({ children }: { children: ReactNode }) {
     </div>
   );
 
+  // An admin on the phone browses every branch even though the device itself
+  // is registered to one.
+  const mayPickStore = canSwitchStores || (isNative() && isAdmin);
+
   const StorePicker = () =>
-    canSwitchStores ? (
+    mayPickStore ? (
       <Select value={currentStore.id} onValueChange={setCurrentStore}>
         <SelectTrigger className="h-9 w-full text-xs">
           <Store className="size-3.5 text-muted-foreground" />
@@ -375,7 +383,12 @@ export function AppShell({ children }: { children: ReactNode }) {
             <ReceiptText className="size-4 shrink-0 text-primary" />
             <span className="truncate text-sm font-semibold">{companyName}</span>
           </div>
-          <Badge
+          {mayPickStore ? (
+            <div className="ml-auto w-32 shrink-0">
+              <StorePicker />
+            </div>
+          ) : (
+            <Badge
             variant="outline"
             className={cn(
               "ml-auto shrink-0 text-[10px]",
@@ -385,12 +398,13 @@ export function AppShell({ children }: { children: ReactNode }) {
             )}
           >
             {currentStore.code}
-          </Badge>
-          <LiveClock compact />
-          <SyncStatus />
-          <SystemStatusPill compact />
-          <SecurityAlertBell compact />
-          <ActivityBell compact />
+            </Badge>
+          )}
+          {/* Narrow phones only get the essentials; the rest lives in the sheet. */}
+          <span className="hidden sm:inline-flex">
+            <LiveClock compact />
+          </span>
+          <MobileStatusSheet />
           <ThemeToggle />
           <Button
             variant="outline"

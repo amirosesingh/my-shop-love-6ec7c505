@@ -9,7 +9,12 @@
 
    It creates the POS_LOCAL database, a dedicated login, every offline
    table with its sync bookkeeping columns, and the indexes the till uses.
-   The script is idempotent: running it again changes nothing.
+   The script is idempotent: running it again changes nothing, so it is
+   also the upgrade path for a till installed with an older build.
+
+   This file is kept in step with the schema the Windows shell applies on
+   start-up, so a till set up by hand and a till set up by the app end up
+   with exactly the same database.
 
    After it finishes, open the POS and go to
    System & Settings -> Local Database, then enter:
@@ -44,6 +49,16 @@ ALTER ROLE db_datawriter ADD MEMBER pos_local;
 GO
 
 /* ---- tables (identical to the shape the till syncs to the cloud) ---- */
+/*
+  Local POS database for the Windows till.
+
+  Every table mirrors its cloud counterpart column-for-column and adds the
+  standard sync block, so a pending row can be batch-upserted straight into
+  Supabase with no field mapping.
+
+  Idempotent: safe to run on every app start.
+*/
+
 SET NOCOUNT ON;
 
 IF OBJECT_ID('dbo.sync_state', 'U') IS NULL
@@ -51,6 +66,35 @@ CREATE TABLE dbo.sync_state (
   [key]      NVARCHAR(60)  NOT NULL PRIMARY KEY,
   [value]    NVARCHAR(400) NULL,
   updated_at DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+/*
+  Device settings that must live in the branch database rather than browser
+  storage: the terminal activation token, the branch it is bound to and the
+  local database connection details.
+*/
+IF OBJECT_ID('dbo.system_settings', 'U') IS NULL
+CREATE TABLE dbo.system_settings (
+  [key]      NVARCHAR(120)  NOT NULL PRIMARY KEY,
+  [value]    NVARCHAR(MAX)  NULL,
+  updated_at DATETIME2(3)   NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+IF OBJECT_ID('dbo.stores', 'U') IS NULL
+CREATE TABLE dbo.stores (
+  id             UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+  code           NVARCHAR(80)     NOT NULL DEFAULT N'',
+  name           NVARCHAR(200)    NOT NULL DEFAULT N'',
+  address        NVARCHAR(400)    NULL,
+  phone          NVARCHAR(40)     NULL,
+  group_id       NVARCHAR(80)     NOT NULL DEFAULT N'default',
+  receipt_prefix NVARCHAR(30)     NULL,
+  is_synced      BIT              NOT NULL DEFAULT 1,
+  sync_status    NVARCHAR(20)     NOT NULL DEFAULT N'synced',
+  created_at     DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at     DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
 );
 GO
 
@@ -75,6 +119,15 @@ CREATE TABLE dbo.products (
   created_at       DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
   updated_at       DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
 );
+GO
+
+IF COL_LENGTH('dbo.products', 'sub_category') IS NULL ALTER TABLE dbo.products ADD sub_category NVARCHAR(120) NULL;
+IF COL_LENGTH('dbo.products', 'unit') IS NULL ALTER TABLE dbo.products ADD unit NVARCHAR(30) NULL;
+IF COL_LENGTH('dbo.products', 'packs') IS NULL ALTER TABLE dbo.products ADD packs NVARCHAR(MAX) NULL;
+IF COL_LENGTH('dbo.products', 'barcode_aliases') IS NULL ALTER TABLE dbo.products ADD barcode_aliases NVARCHAR(MAX) NULL;
+IF COL_LENGTH('dbo.products', 'is_archived') IS NULL ALTER TABLE dbo.products ADD is_archived BIT NOT NULL DEFAULT 0;
+IF COL_LENGTH('dbo.products', 'archived_at') IS NULL ALTER TABLE dbo.products ADD archived_at DATETIME2(3) NULL;
+IF COL_LENGTH('dbo.products', 'stock_quantity') IS NULL ALTER TABLE dbo.products ADD stock_quantity INT NOT NULL DEFAULT 0;
 GO
 
 IF OBJECT_ID('dbo.membership_tiers', 'U') IS NULL
@@ -289,6 +342,75 @@ CREATE TABLE dbo.transfers (
 );
 GO
 
+IF OBJECT_ID('dbo.stock_transfers', 'U') IS NULL
+CREATE TABLE dbo.stock_transfers (
+  id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(), ref NVARCHAR(80) NOT NULL,
+  kind NVARCHAR(20) NOT NULL DEFAULT N'transfer', transfer_scope NVARCHAR(30) NOT NULL DEFAULT N'INTRA_GROUP',
+  from_store_id NVARCHAR(60) NOT NULL, from_store_name NVARCHAR(200) NULL, from_group_id NVARCHAR(80) NULL,
+  to_store_id NVARCHAR(60) NOT NULL, to_store_name NVARCHAR(200) NULL, to_group_id NVARCHAR(80) NULL,
+  status NVARCHAR(30) NOT NULL DEFAULT N'pending', note NVARCHAR(400) NOT NULL DEFAULT N'',
+  created_by NVARCHAR(120) NULL, approved_by NVARCHAR(120) NULL, approved_at DATETIME2(3) NULL,
+  received_by NVARCHAR(120) NULL, received_at DATETIME2(3) NULL, rejected_reason NVARCHAR(400) NULL,
+  is_synced BIT NOT NULL DEFAULT 0, sync_status NVARCHAR(20) NOT NULL DEFAULT N'pending',
+  created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(), updated_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+IF OBJECT_ID('dbo.stock_transfer_items', 'U') IS NULL
+CREATE TABLE dbo.stock_transfer_items (
+  id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(), transfer_id UNIQUEIDENTIFIER NOT NULL,
+  product_id UNIQUEIDENTIFIER NULL, barcode NVARCHAR(80) NULL, sku NVARCHAR(80) NULL,
+  product_name NVARCHAR(200) NULL, quantity INT NOT NULL DEFAULT 0, quantity_received INT NOT NULL DEFAULT 0,
+  unit_cost DECIMAL(18,4) NOT NULL DEFAULT 0, is_synced BIT NOT NULL DEFAULT 0,
+  sync_status NVARCHAR(20) NOT NULL DEFAULT N'pending', created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+/* Suppliers back the purchasing screens; the cloud is authoritative for them,
+   but a till must still be able to raise an invoice while the line is down. */
+IF OBJECT_ID('dbo.suppliers', 'U') IS NULL
+CREATE TABLE dbo.suppliers (
+  id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(), name NVARCHAR(200) NOT NULL,
+  contact_name NVARCHAR(200) NULL, phone NVARCHAR(60) NULL, email NVARCHAR(200) NULL,
+  address NVARCHAR(400) NULL, tax_number NVARCHAR(80) NULL, notes NVARCHAR(MAX) NULL,
+  is_active BIT NOT NULL DEFAULT 1,
+  is_synced BIT NOT NULL DEFAULT 0, sync_status NVARCHAR(20) NOT NULL DEFAULT N'pending',
+  created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(), updated_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+/* Stock corrections raised at the till: damages, counts, write-offs. */
+IF OBJECT_ID('dbo.stock_adjustments', 'U') IS NULL
+CREATE TABLE dbo.stock_adjustments (
+  id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(), product_id UNIQUEIDENTIFIER NULL,
+  product_name NVARCHAR(200) NULL, sku NVARCHAR(80) NULL, barcode NVARCHAR(80) NULL,
+  store_id NVARCHAR(60) NULL, terminal_id NVARCHAR(80) NULL,
+  reason NVARCHAR(80) NOT NULL DEFAULT N'adjustment', note NVARCHAR(400) NOT NULL DEFAULT N'',
+  previous_stock INT NOT NULL DEFAULT 0, updated_stock INT NOT NULL DEFAULT 0,
+  delta INT NOT NULL DEFAULT 0, cost_impact DECIMAL(18,4) NOT NULL DEFAULT 0,
+  staff_id NVARCHAR(80) NULL, staff_name NVARCHAR(200) NULL, role NVARCHAR(60) NULL,
+  is_synced BIT NOT NULL DEFAULT 0, sync_status NVARCHAR(20) NOT NULL DEFAULT N'pending',
+  created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(), updated_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+/* Parked tickets. The id is the app's own string key, not a GUID. */
+IF OBJECT_ID('dbo.held_orders', 'U') IS NULL
+CREATE TABLE dbo.held_orders (
+  id NVARCHAR(80) NOT NULL PRIMARY KEY, label NVARCHAR(200) NOT NULL DEFAULT N'',
+  store_id NVARCHAR(60) NULL, shift_id NVARCHAR(80) NULL, held_by NVARCHAR(200) NULL,
+  total DECIMAL(18,4) NOT NULL DEFAULT 0, lines NVARCHAR(MAX) NOT NULL DEFAULT N'[]',
+  cart_discount DECIMAL(18,4) NOT NULL DEFAULT 0,
+  cart_discount_type NVARCHAR(20) NOT NULL DEFAULT N'amount',
+  exchange_ref NVARCHAR(80) NULL, member_id NVARCHAR(80) NULL, member_name NVARCHAR(200) NULL,
+  coupon NVARCHAR(MAX) NULL, note NVARCHAR(400) NOT NULL DEFAULT N'',
+  cancelled_from NVARCHAR(80) NULL, held_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+  is_synced BIT NOT NULL DEFAULT 0, sync_status NVARCHAR(20) NOT NULL DEFAULT N'pending',
+  created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(), updated_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
 IF OBJECT_ID('dbo.audit_logs', 'U') IS NULL
 CREATE TABLE dbo.audit_logs (
   id              UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
@@ -324,7 +446,8 @@ DECLARE tables CURSOR FOR
   SELECT name FROM sys.tables
    WHERE name IN ('products','membership_tiers','members','sales','sale_items',
                   'purchase_orders','purchase_order_items','promotions','shifts',
-                  'bookings','booking_payments','transfers','audit_logs','pos_settings');
+                   'bookings','booking_payments','transfers','stock_transfers',
+                   'stock_transfer_items','stores','audit_logs','pos_settings');
 OPEN tables;
 FETCH NEXT FROM tables INTO @t;
 WHILE @@FETCH_STATUS = 0
@@ -373,17 +496,62 @@ IF COL_LENGTH('dbo.sale_items', 'unit_cost') IS NULL
   ALTER TABLE dbo.sale_items ADD unit_cost DECIMAL(18, 4) NOT NULL DEFAULT 0;
 GO
 
-/* Friendly branch-facing names used by the offline checkout path.
-   Single-table views, so INSERT/UPDATE flow straight through. */
-IF OBJECT_ID('dbo.BranchSales', 'V') IS NOT NULL DROP VIEW dbo.BranchSales;
-GO
-CREATE VIEW dbo.BranchSales AS SELECT * FROM dbo.sales;
+/* ------------------------------------------------------------------
+   Bill identity — one checkout attempt, one bill. The attempt id is
+   written by the till before the save, so a retry after a network drop
+   updates the same row instead of creating a second bill. Both keys are
+   unique here exactly as they are in the central database.
+   ------------------------------------------------------------------ */
+IF COL_LENGTH('dbo.sales', 'client_transaction_id') IS NULL
+  ALTER TABLE dbo.sales ADD client_transaction_id NVARCHAR(80) NULL;
 GO
 
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UX_sales_client_txn'
+                 AND object_id = OBJECT_ID('dbo.sales'))
+  CREATE UNIQUE INDEX UX_sales_client_txn ON dbo.sales (client_transaction_id)
+    WHERE client_transaction_id IS NOT NULL;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UX_sales_bill_number'
+                 AND object_id = OBJECT_ID('dbo.sales'))
+   AND NOT EXISTS (SELECT 1 FROM (SELECT bill_number FROM dbo.sales
+                                   GROUP BY bill_number HAVING COUNT(*) > 1) d)
+  CREATE UNIQUE INDEX UX_sales_bill_number ON dbo.sales (bill_number);
+GO
+
+/* Legacy single-table views from the first offline build. Nothing reads them
+   any more; drop them so the local database matches the cloud shape. */
+IF OBJECT_ID('dbo.BranchSales', 'V') IS NOT NULL DROP VIEW dbo.BranchSales;
+GO
 IF OBJECT_ID('dbo.BranchSaleItems', 'V') IS NOT NULL DROP VIEW dbo.BranchSaleItems;
 GO
-CREATE VIEW dbo.BranchSaleItems AS SELECT * FROM dbo.sale_items;
+/* ------------------------------------------------------------------
+   Activity notifications — sign-ins, shift changes, sales, voids and
+   stock edits raised on this till, queued for the admin's screen and
+   the WhatsApp fan-out.
+   ------------------------------------------------------------------ */
+IF OBJECT_ID('dbo.activity_events', 'U') IS NULL
+CREATE TABLE dbo.activity_events (
+  id           UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+  event_type   NVARCHAR(80)     NOT NULL,
+  severity     NVARCHAR(20)     NOT NULL DEFAULT N'info',
+  title        NVARCHAR(200)    NOT NULL DEFAULT N'',
+  message      NVARCHAR(MAX)    NOT NULL DEFAULT N'',
+  actor_id     NVARCHAR(80)     NULL,
+  actor_name   NVARCHAR(200)    NULL,
+  actor_role   NVARCHAR(60)     NULL,
+  store_id     NVARCHAR(80)     NULL,
+  store_name   NVARCHAR(200)    NULL,
+  terminal_id  NVARCHAR(120)    NULL,
+  branch_id    NVARCHAR(60)     NULL,
+  metadata     NVARCHAR(MAX)    NOT NULL DEFAULT N'{}',
+  is_synced    BIT              NOT NULL DEFAULT 0,
+  sync_status  NVARCHAR(20)     NOT NULL DEFAULT N'pending',
+  created_at   DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at   DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
+);
 GO
+
 /* ---- day-end shift summaries queued for the manager's phone ---- */
 IF OBJECT_ID('dbo.shift_notifications', 'U') IS NULL
 CREATE TABLE dbo.shift_notifications (
@@ -409,6 +577,86 @@ CREATE TABLE dbo.shift_notifications (
   created_at        DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
   updated_at        DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
 );
+GO
+
+/* ------------------------------------------------------------------
+   Confirmation stamp — when the central database accepted this row.
+   Lets a supervisor see how far behind a till is, per record.
+   ------------------------------------------------------------------ */
+DECLARE @t SYSNAME, @sqlAdd NVARCHAR(MAX);
+DECLARE tbl CURSOR FOR
+  SELECT name FROM sys.tables
+   WHERE COL_LENGTH('dbo.' + name, 'is_synced') IS NOT NULL
+     AND COL_LENGTH('dbo.' + name, 'synced_at') IS NULL;
+OPEN tbl;
+FETCH NEXT FROM tbl INTO @t;
+WHILE @@FETCH_STATUS = 0
+BEGIN
+  SET @sqlAdd = N'ALTER TABLE dbo.[' + @t + N'] ADD synced_at DATETIME2 NULL;';
+  EXEC sp_executesql @sqlAdd;
+  FETCH NEXT FROM tbl INTO @t;
+END
+CLOSE tbl;
+DEALLOCATE tbl;
+GO
+
+/* ------------------------------------------------------------------
+   Cloud-parity sync block.
+
+   pending_sync is the flag the sync engine reads: 1 while the row is
+   still waiting to go up, 0 once the central database has taken it. It
+   is computed from is_synced, so the two can never disagree.
+
+   temp_id is the local identity a row is born with when it is created
+   offline, so an upward push can be replayed without duplicating it.
+   ------------------------------------------------------------------ */
+DECLARE @st SYSNAME, @sqlSync NVARCHAR(MAX);
+DECLARE synctbl CURSOR FOR
+  SELECT name FROM sys.tables
+   WHERE COL_LENGTH('dbo.' + name, 'is_synced') IS NOT NULL;
+OPEN synctbl;
+FETCH NEXT FROM synctbl INTO @st;
+WHILE @@FETCH_STATUS = 0
+BEGIN
+  IF COL_LENGTH('dbo.' + @st, 'pending_sync') IS NULL
+  BEGIN
+    SET @sqlSync = N'ALTER TABLE dbo.[' + @st + N'] ADD pending_sync AS '
+      + N'CAST(CASE WHEN [is_synced] = 1 THEN 0 ELSE 1 END AS BIT) PERSISTED;';
+    EXEC sp_executesql @sqlSync;
+  END
+  IF COL_LENGTH('dbo.' + @st, 'temp_id') IS NULL
+  BEGIN
+    SET @sqlSync = N'ALTER TABLE dbo.[' + @st
+      + N'] ADD temp_id UNIQUEIDENTIFIER NOT NULL CONSTRAINT [DF_' + @st
+      + N'_temp_id] DEFAULT NEWID();';
+    EXEC sp_executesql @sqlSync;
+  END
+  FETCH NEXT FROM synctbl INTO @st;
+END
+CLOSE synctbl;
+DEALLOCATE synctbl;
+GO
+
+/* Pending work is read constantly by the sync engine; index it once. */
+DECLARE @it SYSNAME, @sqlIx NVARCHAR(MAX);
+DECLARE ixtbl CURSOR FOR
+  SELECT t.name FROM sys.tables AS t
+   WHERE COL_LENGTH('dbo.' + t.name, 'pending_sync') IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1 FROM sys.indexes i
+        WHERE i.object_id = t.object_id
+          AND i.name = 'IX_' + t.name + '_pending_sync');
+OPEN ixtbl;
+FETCH NEXT FROM ixtbl INTO @it;
+WHILE @@FETCH_STATUS = 0
+BEGIN
+  SET @sqlIx = N'CREATE INDEX [IX_' + @it + N'_pending_sync] ON dbo.[' + @it
+    + N'] ([pending_sync]);';
+  EXEC sp_executesql @sqlIx;
+  FETCH NEXT FROM ixtbl INTO @it;
+END
+CLOSE ixtbl;
+DEALLOCATE ixtbl;
 GO
 
 /* ---- verification ---- */

@@ -468,17 +468,66 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UX_sales_bill_number'
   CREATE UNIQUE INDEX UX_sales_bill_number ON dbo.sales (bill_number);
 GO
 
-/* Friendly branch-facing names used by the offline checkout path.
-   Single-table views, so INSERT/UPDATE flow straight through. */
+/* Legacy single-table views from the first offline build. Nothing reads them
+   any more; drop them so the local database matches the cloud shape. */
 IF OBJECT_ID('dbo.BranchSales', 'V') IS NOT NULL DROP VIEW dbo.BranchSales;
 GO
-CREATE VIEW dbo.BranchSales AS SELECT * FROM dbo.sales;
-GO
-
 IF OBJECT_ID('dbo.BranchSaleItems', 'V') IS NOT NULL DROP VIEW dbo.BranchSaleItems;
 GO
-CREATE VIEW dbo.BranchSaleItems AS SELECT * FROM dbo.sale_items;
+/* ------------------------------------------------------------------
+   Activity notifications — sign-ins, shift changes, sales, voids and
+   stock edits raised on this till, queued for the admin's screen and
+   the WhatsApp fan-out.
+   ------------------------------------------------------------------ */
+IF OBJECT_ID('dbo.activity_events', 'U') IS NULL
+CREATE TABLE dbo.activity_events (
+  id           UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+  event_type   NVARCHAR(80)     NOT NULL,
+  severity     NVARCHAR(20)     NOT NULL DEFAULT N'info',
+  title        NVARCHAR(200)    NOT NULL DEFAULT N'',
+  message      NVARCHAR(MAX)    NOT NULL DEFAULT N'',
+  actor_id     NVARCHAR(80)     NULL,
+  actor_name   NVARCHAR(200)    NULL,
+  actor_role   NVARCHAR(60)     NULL,
+  store_id     NVARCHAR(80)     NULL,
+  store_name   NVARCHAR(200)    NULL,
+  terminal_id  NVARCHAR(120)    NULL,
+  branch_id    NVARCHAR(60)     NULL,
+  metadata     NVARCHAR(MAX)    NOT NULL DEFAULT N'{}',
+  is_synced    BIT              NOT NULL DEFAULT 0,
+  sync_status  NVARCHAR(20)     NOT NULL DEFAULT N'pending',
+  created_at   DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at   DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
+);
 GO
+
+/* ---- day-end shift summaries queued for the manager's phone ---- */
+IF OBJECT_ID('dbo.shift_notifications', 'U') IS NULL
+CREATE TABLE dbo.shift_notifications (
+  id                UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+  shift_id          NVARCHAR(80)     NOT NULL,
+  store_id          NVARCHAR(80)     NOT NULL,
+  store_name        NVARCHAR(200)    NULL,
+  terminal_id       NVARCHAR(120)    NULL,
+  terminal_name     NVARCHAR(200)    NULL,
+  closed_by         NVARCHAR(200)    NULL,
+  opened_at         DATETIME2(3)     NULL,
+  closed_at         DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  total_sales       DECIMAL(18, 4)   NOT NULL DEFAULT 0,
+  transactions      INT              NOT NULL DEFAULT 0,
+  discounts         DECIMAL(18, 4)   NOT NULL DEFAULT 0,
+  refunds           DECIMAL(18, 4)   NOT NULL DEFAULT 0,
+  expected_cash     DECIMAL(18, 4)   NOT NULL DEFAULT 0,
+  counted_cash      DECIMAL(18, 4)   NOT NULL DEFAULT 0,
+  payment_breakdown NVARCHAR(MAX)    NOT NULL DEFAULT N'{}',
+  summary           NVARCHAR(MAX)    NOT NULL DEFAULT N'',
+  is_synced         BIT              NOT NULL DEFAULT 0,
+  sync_status       NVARCHAR(20)     NOT NULL DEFAULT N'pending',
+  created_at        DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at        DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
 /* ------------------------------------------------------------------
    Confirmation stamp — when the central database accepted this row.
    Lets a supervisor see how far behind a till is, per record.

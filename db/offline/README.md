@@ -40,8 +40,19 @@ with the machine key, so they cannot be read or edited outside the app.
 
 ## What it creates
 
-Products, members and tiers, sales and sale items, purchase orders and their
-items, promotions, shifts and day-end shift summaries, bookings and booking
-payments, stock transfers, audit logs, POS settings, and the `sync_state`
-bookkeeping table. Every table carries `is_synced` / `sync_status` so pending
-rows upload automatically once the link returns.
+Branches (`stores`), device settings (`system_settings`), products, members and
+tiers, sales and sale items, purchase orders and their items, promotions,
+shifts, day-end shift summaries, activity notifications (`activity_events`),
+bookings and booking payments, transfers and stock transfers with their items,
+suppliers, stock adjustments, held orders, audit logs, POS settings, and the
+`sync_state` bookkeeping table.
+
+Every table carries `is_synced` / `sync_status`, a computed `pending_sync`
+flag, `temp_id` and `synced_at`, plus the indexes and touch triggers the sync
+engine relies on, so pending rows upload automatically once the link returns.
+
+## Upgrading a till installed with an older build
+
+Run the same file again. It only adds what is missing — existing rows are never
+touched — and it retires the obsolete `BranchSales` / `BranchSaleItems` views
+from the first offline release.
