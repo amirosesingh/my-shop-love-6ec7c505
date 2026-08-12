@@ -139,6 +139,21 @@ export function failOp(id: string, message: string) {
   );
 }
 
+/**
+ * The server refused this change on principle (wrong branch, or the account
+ * lacks the permission). Retrying cannot help, so park it straight away with
+ * the reason showing on the Sync & backup screen.
+ */
+export function refuseOp(id: string, message: string) {
+  write(
+    read().map((q) =>
+      q.id === id
+        ? { ...q, attempts: MAX_ATTEMPTS, lastError: message, status: "failed" as const, quarantined: true }
+        : q,
+    ),
+  );
+}
+
 export function retryQuarantined() {
   write(
     read().map((q) =>

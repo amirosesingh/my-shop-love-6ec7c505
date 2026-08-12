@@ -24,6 +24,7 @@ import { localDb } from "./local-db";
 import { checkHealth } from "./connection-health";
 import {
   failOp,
+  refuseOp,
   isOnline,
   isOnlineSyncEnabled,
   listQueue,
@@ -187,6 +188,29 @@ async function execute(op: SyncOp): Promise<QueryResult> {
   }
 }
 
+/** Codes the relay uses when a change is refused on principle. */
+const REFUSAL_CODES = new Set([
+  "STORE_FORBIDDEN",
+  "PERMISSION_DENIED",
+  "SCOPE_MISSING",
+  "SCOPE_STALE",
+  "TABLE_FORBIDDEN",
+]);
+
+/**
+ * A refused change is parked immediately with its reason; anything else keeps
+ * its place in the queue and is retried.
+ */
+function recordRelayFailure(
+  entry: QueuedOp,
+  relayed: { error?: string; code?: string },
+) {
+  const message = relayed.error ?? "The server could not save this change";
+  if (relayed.code && REFUSAL_CODES.has(relayed.code)) refuseOp(entry.id, message);
+  else failOp(entry.id, message);
+  logSync("push", entry.op.table, false, `${entry.context}: ${message}`);
+}
+
 async function runOne(entry: QueuedOp): Promise<boolean> {
   // This account has already been refused on this table — go straight to the
   // relay instead of triggering another refused request.
@@ -200,7 +224,7 @@ async function runOne(entry: QueuedOp): Promise<boolean> {
       resolveOp(entry.id);
       return true;
     }
-    failOp(entry.id, relayed.error ?? "The server could not save this change");
+    recordRelayFailure(entry, relayed);
     return false;
   }
 
@@ -233,12 +257,7 @@ async function runOne(entry: QueuedOp): Promise<boolean> {
         resolveOp(entry.id);
         return true;
       }
-      failOp(
-        entry.id,
-        relayed.error
-          ? `The central database refused this change and the server relay could not save it either: ${relayed.error}`
-          : "The server could not save this change",
-      );
+      recordRelayFailure(entry, relayed);
       return false;
     }
     const message = describeError(entry.op.table, res.error);

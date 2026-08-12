@@ -149,11 +149,12 @@ const query = (match: Record<string, unknown>) =>
 export async function runRelayOp(
   op: RelayOp,
   scope: RelayScope,
+  batchIds?: Map<string, Set<string>>,
 ): Promise<{ ok: boolean; error?: string; code?: string }> {
   if (!RELAY_TABLES.has(op.table)) return { ok: false, error: `"${op.table}" cannot be synced` };
 
   const { safeAuthorizeRelayOp } = await import("./relay-policy.server");
-  const decision = await safeAuthorizeRelayOp(op, scope);
+  const decision = await safeAuthorizeRelayOp(op, scope, batchIds);
   if (!decision.ok) return { ok: false, error: decision.error, code: decision.code };
   const safeOp = decision.op;
 
@@ -207,6 +208,8 @@ export type RelayCaller = {
   staffUserId?: string | null;
   /** Supabase Auth id, for staff signed in with email + password. */
   authUserId?: string | null;
+  /** Signed claims from the proof, used as the no-round-trip fast path. */
+  claims?: import("./relay-claims.server").CallerClaims | null;
 };
 
 /**
@@ -273,8 +276,17 @@ export async function verifyRelayCaller(input: {
     });
     if (res.ok) {
       const user = (await res.json()) as { id?: string; email?: string };
-      if (user.id)
-        return { kind: "staff", label: user.email ?? user.id, authUserId: user.id };
+      if (user.id) {
+        // The token is proven; only now are its claims worth reading.
+        const { claimsFromJwt, claimsFromPayload } = await import("./relay-claims.server");
+        const claims = claimsFromJwt(input.accessToken) ?? claimsFromPayload(user);
+        return {
+          kind: "staff",
+          label: user.email ?? user.id,
+          authUserId: user.id,
+          claims,
+        };
+      }
     }
   }
 

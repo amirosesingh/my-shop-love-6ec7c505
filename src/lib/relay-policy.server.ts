@@ -14,6 +14,8 @@
  */
 import { serviceRest } from "./pos-relay.server";
 import type { RelayOp } from "./pos-relay.server";
+import { claimsFromPayload, normalisePermissions } from "./relay-claims.server";
+import type { CallerClaims } from "./relay-claims.server";
 
 export type RelayScope = {
   kind: "cashier" | "terminal" | "staff";
@@ -24,11 +26,22 @@ export type RelayScope = {
   permissions: Record<string, boolean>;
   /** Admin / manager: allowed to write across branches. */
   isSupervisor: boolean;
+  /** Who is acting: app_users.user_id, used for attribution only. */
+  staffUserId?: string | null;
+  /** Human name written onto rows so attribution is server-truth. */
+  actorName?: string | null;
+  /** Claims answered the question but no account row backed them up. */
+  stale?: boolean;
 };
 
 export type RelayDenial = {
   ok: false;
-  code: "TABLE_FORBIDDEN" | "STORE_FORBIDDEN" | "PERMISSION_DENIED" | "SCOPE_MISSING";
+  code:
+    | "TABLE_FORBIDDEN"
+    | "STORE_FORBIDDEN"
+    | "PERMISSION_DENIED"
+    | "SCOPE_MISSING"
+    | "SCOPE_STALE";
   error: string;
 };
 
@@ -59,6 +72,34 @@ const GLOBAL_TABLES = new Set(["products", "members", "audit_logs"]);
 
 /** Both ends of a transfer may write it. */
 const TRANSFER_TABLE = "stock_transfers";
+
+/**
+ * Who did it. These columns are written from the proven caller and any value
+ * the till sent is discarded, so a receipt can never name another cashier.
+ */
+type ActorColumns = { id?: string; name?: string; role?: string };
+const ACTOR_COLUMNS: Record<string, ActorColumns> = {
+  sales: { id: "cashier_id", name: "cashier_name" },
+  shift_sessions: { id: "staff_id", name: "staff_name", role: "role" },
+  drawer_events: { id: "staff_id", name: "staff_name", role: "role" },
+  stock_adjustments: { id: "staff_id", name: "staff_name", role: "role" },
+  sku_audit: { id: "staff_id", name: "staff_name", role: "role" },
+  bookings: { name: "cashier" },
+  held_orders: { name: "held_by" },
+  purchase_orders: { name: "operator_name" },
+};
+
+/** Shift rows record who opened and, later, who closed. */
+const SHIFT_OPEN: ActorColumns = {
+  id: "opened_by_staff_id",
+  name: "opened_by_name",
+  role: "opened_by_role",
+};
+const SHIFT_CLOSE: ActorColumns = {
+  id: "closed_by_staff_id",
+  name: "closed_by_name",
+  role: "closed_by_role",
+};
 
 /** column -> permission flag required to set it. */
 const COLUMN_PERMISSIONS: Record<string, Record<string, string>> = {
@@ -105,17 +146,9 @@ export const RELAY_WRITABLE_TABLES = new Set([
 
 const deny = (code: RelayDenial["code"], error: string): RelayDenial => ({ ok: false, code, error });
 
-function normalisePermissions(raw: unknown): Record<string, boolean> {
-  if (!raw || typeof raw !== "object") return {};
-  const out: Record<string, boolean> = {};
-  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
-    out[key] = value === true || value === "true";
-  }
-  return out;
-}
-
 type AppUserRow = {
   user_id?: string | null;
+  full_name?: string | null;
   store_id?: string | null;
   role?: string | null;
   role_slug?: string | null;
@@ -123,49 +156,88 @@ type AppUserRow = {
   is_active?: boolean | null;
 };
 
-const SELECT_APP_USER = "select=user_id,store_id,role,role_slug,permissions,is_active";
+const SELECT_APP_USER =
+  "select=user_id,full_name,store_id,role,role_slug,permissions,is_active";
+
+/**
+ * Short-lived cache so a burst of queued operations from one till costs a
+ * single lookup instead of one per operation.
+ */
+const CACHE_TTL_MS = 30_000;
+const userCache = new Map<string, { at: number; row: AppUserRow | null }>();
 
 async function fetchAppUser(filter: string): Promise<AppUserRow | null> {
+  const hit = userCache.get(filter);
+  if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.row;
   const res = await serviceRest(`app_users?${filter}&${SELECT_APP_USER}&limit=1`);
-  if (!res.ok) return null;
+  if (!res.ok) return null; // transient failure: do not cache
   const rows = (await res.json()) as AppUserRow[];
   const row = rows[0];
-  if (!row || row.is_active === false) return null;
-  return row;
+  const value = !row || row.is_active === false ? null : row;
+  userCache.set(filter, { at: Date.now(), row: value });
+  return value;
 }
 
-/** Look the caller up in app_users so role and branch come from the server. */
+const supervisorRole = (role: string | null, slug: string | null) =>
+  role === "admin" || role === "manager" || slug === "admin" || slug === "supervisor";
+
+/**
+ * Work out the caller's branch, identity and permissions.
+ *
+ * Fast path: the proof's own signed claims already answer it. Fallback: look
+ * the account up in app_users (cached briefly). A caller whose claims name a
+ * branch but whose account row is missing is not refused outright — the scope
+ * is marked stale so the till is told to refresh instead of retrying forever.
+ */
 export async function resolveRelayScope(caller: {
   kind: "cashier" | "terminal" | "staff";
   label: string;
   storeId?: string | null;
   staffUserId?: string | null;
   authUserId?: string | null;
+  claims?: CallerClaims | null;
 }): Promise<RelayScope> {
-  let row: AppUserRow | null = null;
-  if (caller.authUserId) row = await fetchAppUser(`auth_user_id=eq.${encodeURIComponent(caller.authUserId)}`);
-  if (!row && caller.staffUserId)
-    row = await fetchAppUser(`user_id=eq.${encodeURIComponent(caller.staffUserId)}`);
-  if (!row && caller.kind !== "terminal" && caller.label)
-    row = await fetchAppUser(`user_id=eq.${encodeURIComponent(caller.label)}`);
+  const claims = caller.claims ?? null;
+  const fastEnough =
+    claims && claims.storeId && claims.role && claims.permissions !== null;
 
-  const role = row?.role ?? null;
-  const roleSlug = row?.role_slug ?? null;
-  const isSupervisor =
-    role === "admin" || role === "manager" || roleSlug === "admin" || roleSlug === "supervisor";
+  let row: AppUserRow | null = null;
+  if (!fastEnough) {
+    if (caller.authUserId)
+      row = await fetchAppUser(`auth_user_id=eq.${encodeURIComponent(caller.authUserId)}`);
+    if (!row && caller.staffUserId)
+      row = await fetchAppUser(`user_id=eq.${encodeURIComponent(caller.staffUserId)}`);
+    if (!row && caller.kind !== "terminal" && caller.label)
+      row = await fetchAppUser(`user_id=eq.${encodeURIComponent(caller.label)}`);
+  }
+
+  const role = row?.role ?? claims?.role ?? null;
+  const roleSlug = row?.role_slug ?? claims?.roleSlug ?? null;
+  const permissions = row
+    ? normalisePermissions(row.permissions)
+    : (claims?.permissions ?? {});
+  const staffUserId = row?.user_id ?? caller.staffUserId ?? claims?.staffUserId ?? null;
 
   return {
     kind: caller.kind,
     label: caller.label,
     // The proof's own branch wins: a terminal token is physically bound to a
     // branch, and a session records the branch it was opened at.
-    storeId: caller.storeId ?? row?.store_id ?? null,
+    storeId: caller.storeId ?? row?.store_id ?? claims?.storeId ?? null,
     role,
     roleSlug,
-    permissions: normalisePermissions(row?.permissions),
-    isSupervisor,
+    permissions,
+    isSupervisor: supervisorRole(role, roleSlug),
+    staffUserId,
+    actorName: row?.full_name ?? claims?.actorName ?? caller.label ?? null,
+    // No account row and no usable claims: the caller can still be identified
+    // but their permissions are unknown, so writes are refused as stale.
+    stale: !row && !fastEnough && caller.kind === "staff",
   };
 }
+
+/** Re-export so callers can build a scope from a verified token payload. */
+export { claimsFromPayload };
 
 const allowed = (scope: RelayScope, flag: string | undefined) =>
   !flag || scope.isSupervisor || scope.permissions[flag] === true;
@@ -197,12 +269,20 @@ const visibleStore = (scope: RelayScope, storeId: string | null | undefined) =>
 export async function authorizeRelayOp(
   op: RelayOp,
   scope: RelayScope,
+  /** ids inserted earlier in the same request, so child-first pushes work. */
+  batchIds?: Map<string, Set<string>>,
 ): Promise<{ ok: true; op: RelayOp } | RelayDenial> {
   if (!RELAY_WRITABLE_TABLES.has(op.table))
     return deny("TABLE_FORBIDDEN", `"${op.table}" cannot be synced`);
 
   if (!scope.isSupervisor && !scope.storeId)
     return deny("SCOPE_MISSING", "This till is not assigned to a branch — sign in again.");
+
+  if (scope.stale && !scope.isSupervisor)
+    return deny(
+      "SCOPE_STALE",
+      "Your account details could not be confirmed — sign in again to refresh them.",
+    );
 
   const gate = TABLE_PERMISSIONS[op.table];
   if (op.kind === "delete") {
@@ -226,15 +306,50 @@ export async function authorizeRelayOp(
     }
   }
 
+  op = stampActor(op, scope);
+
   const storeColumn = STORE_COLUMN[op.table];
   if (storeColumn) return pinToStore(op, scope, storeColumn);
 
   if (op.table === TRANSFER_TABLE) return authorizeTransfer(op, scope);
 
-  if (PARENT_OF[op.table]) return authorizeChild(op, scope);
+  if (PARENT_OF[op.table]) return authorizeChild(op, scope, batchIds);
 
   // Global catalogue rows: no branch to pin, permissions already checked.
   return { ok: true, op };
+}
+
+/** Overwrite the actor columns from the proven caller. */
+function stampActor(op: RelayOp, scope: RelayScope): RelayOp {
+  const base = ACTOR_COLUMNS[op.table];
+  const isShift = op.table === "shifts";
+  if (!base && !isShift) return op;
+
+  const apply = (payload: Record<string, unknown>, closing: boolean) => {
+    const cols = isShift ? (closing ? SHIFT_CLOSE : SHIFT_OPEN) : base!;
+    const out = { ...payload };
+    // Only stamp what the row is actually touching for updates of shifts, so
+    // an unrelated edit does not rewrite the opener.
+    if (cols.id && scope.staffUserId) out[cols.id] = scope.staffUserId;
+    if (cols.name && scope.actorName) out[cols.name] = scope.actorName;
+    if (cols.role && (scope.roleSlug ?? scope.role))
+      out[cols.role] = scope.roleSlug ?? scope.role;
+    return out;
+  };
+
+  if (op.kind === "insert" || op.kind === "upsert")
+    return { ...op, rows: op.rows.map((row) => apply(row, false)) };
+  if (op.kind === "update") {
+    // A shift update that sets closed_at is the close; anything else leaves
+    // the opener alone and records nothing new.
+    if (isShift) {
+      const closing = op.values["closed_at"] !== undefined || op.values["status"] === "CLOSED";
+      if (!closing) return op;
+      return { ...op, values: apply(op.values, true) };
+    }
+    return { ...op, values: apply(op.values, false) };
+  }
+  return op;
 }
 
 function pinToStore(
@@ -276,7 +391,7 @@ class StoreViolation extends Error {}
 function authorizeTransfer(
   op: RelayOp,
   scope: RelayScope,
-): { ok: true; op: RelayOp } | RelayDenial {
+): Promise<{ ok: true; op: RelayOp } | RelayDenial> | ({ ok: true; op: RelayOp } | RelayDenial) {
   if (scope.isSupervisor) return { ok: true, op };
   const involved = (row: Record<string, unknown>) =>
     String(row["from_store_id"] ?? "") === scope.storeId ||
@@ -287,12 +402,43 @@ function authorizeTransfer(
       return deny("STORE_FORBIDDEN", "A transfer must involve your own branch.");
     return { ok: true, op };
   }
+  // Updates and deletes: the transfer named by the match must have this
+  // branch at one end, and the ends themselves may never be rewritten.
+  if (op.kind === "update") {
+    for (const column of ["from_store_id", "to_store_id"]) {
+      const given = op.values[column];
+      if (given !== undefined && String(given) !== scope.storeId)
+        return deny("STORE_FORBIDDEN", "A transfer cannot be re-pointed at another branch.");
+    }
+  }
+  return transferInvolvesCaller(op, scope);
+}
+
+async function transferInvolvesCaller(
+  op: RelayOp,
+  scope: RelayScope,
+): Promise<{ ok: true; op: RelayOp } | RelayDenial> {
+  const match = op.kind === "update" || op.kind === "delete" ? op.match : {};
+  const id = match["id"];
+  if (id === undefined || id === null)
+    return deny("STORE_FORBIDDEN", "This change does not say which transfer it applies to.");
+  const res = await serviceRest(
+    `${TRANSFER_TABLE}?id=eq.${encodeURIComponent(String(id))}&select=from_store_id,to_store_id&limit=1`,
+  );
+  if (!res.ok) return deny("STORE_FORBIDDEN", "The transfer could not be checked — try again.");
+  const rows = (await res.json()) as Record<string, unknown>[];
+  const row = rows[0];
+  if (!row) return deny("STORE_FORBIDDEN", "That transfer no longer exists.");
+  const ends = [row["from_store_id"], row["to_store_id"]].map((v) => (v == null ? null : String(v)));
+  if (!ends.includes(scope.storeId))
+    return deny("STORE_FORBIDDEN", "You cannot change another branch's transfer.");
   return { ok: true, op };
 }
 
 async function authorizeChild(
   op: RelayOp,
   scope: RelayScope,
+  batchIds?: Map<string, Set<string>>,
 ): Promise<{ ok: true; op: RelayOp } | RelayDenial> {
   if (scope.isSupervisor) return { ok: true, op };
   const parent = PARENT_OF[op.table]!;
@@ -301,25 +447,44 @@ async function authorizeChild(
       ? op.rows.map((row) => row[parent.fk])
       : [op.match[parent.fk] ?? (op.kind === "update" ? op.values[parent.fk] : undefined)];
 
+  const known = batchIds?.get(parent.table);
   for (const id of ids) {
     if (id === undefined || id === null)
       return deny("STORE_FORBIDDEN", "This record does not say which order it belongs to.");
+    // A parent pushed earlier in this same request was already pinned to the
+    // caller's branch, so the child rides on that check.
+    if (known?.has(String(id))) continue;
     const store = await parentStore(op.table, id);
-    // An unknown parent is a row we have not received yet — pushing the child
-    // first is normal for an offline till, so only a known mismatch is refused.
-    if (store !== undefined && !visibleStore(scope, store))
+    // Anything else must be a parent the server already holds, in this branch.
+    if (store === undefined || !visibleStore(scope, store))
       return deny("STORE_FORBIDDEN", "You cannot change another branch's records.");
   }
   return { ok: true, op };
+}
+
+/**
+ * Collect the ids of parent rows being inserted in this request, so children
+ * pushed alongside their parent are accepted.
+ */
+export function batchInsertIds(ops: RelayOp[]): Map<string, Set<string>> {
+  const map = new Map<string, Set<string>>();
+  for (const op of ops) {
+    if (op.kind !== "insert" && op.kind !== "upsert") continue;
+    const set = map.get(op.table) ?? new Set<string>();
+    for (const row of op.rows) if (row["id"] != null) set.add(String(row["id"]));
+    map.set(op.table, set);
+  }
+  return map;
 }
 
 /** Wrapper so the thrown branch violation inside map() becomes a denial. */
 export async function safeAuthorizeRelayOp(
   op: RelayOp,
   scope: RelayScope,
+  batchIds?: Map<string, Set<string>>,
 ): Promise<{ ok: true; op: RelayOp } | RelayDenial> {
   try {
-    return await authorizeRelayOp(op, scope);
+    return await authorizeRelayOp(op, scope, batchIds);
   } catch (e) {
     if (e instanceof StoreViolation)
       return deny("STORE_FORBIDDEN", "You cannot write records for another branch.");

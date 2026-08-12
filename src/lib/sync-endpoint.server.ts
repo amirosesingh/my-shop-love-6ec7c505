@@ -128,18 +128,26 @@ export async function handleSyncRequest(request: Request): Promise<Response> {
   }
 
   const results: { ok: boolean; error?: string; code?: string }[] = [];
-  for (const op of body.ops ?? []) {
+  const { batchInsertIds } = await import("./relay-policy.server");
+  const ops = body.ops ?? [];
+  // Parents inserted in this same push let their child rows through.
+  const batchIds = batchInsertIds(ops);
+  for (const op of ops) {
     try {
-      results.push(await runRelayOp(op, scope));
+      results.push(await runRelayOp(op, scope, batchIds));
     } catch (e) {
       results.push({ ok: false, error: (e as Error).message });
     }
   }
   const refused = results.find(
-    (r) => r.code === "STORE_FORBIDDEN" || r.code === "PERMISSION_DENIED" || r.code === "SCOPE_MISSING",
+    (r) =>
+      r.code === "STORE_FORBIDDEN" ||
+      r.code === "PERMISSION_DENIED" ||
+      r.code === "SCOPE_MISSING" ||
+      r.code === "SCOPE_STALE",
   );
   return Response.json(
-    { ok: results.every((r) => r.ok), results },
+    { ok: results.every((r) => r.ok), results, ...(refused?.code ? { code: refused.code } : {}) },
     { status: refused ? 403 : 200 },
   );
 }

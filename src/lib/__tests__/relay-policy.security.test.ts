@@ -3,7 +3,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 const restMock = vi.fn();
 vi.mock("../pos-relay.server", () => ({ serviceRest: (...a: unknown[]) => restMock(...a) }));
 
-import { safeAuthorizeRelayOp, type RelayScope } from "../relay-policy.server";
+import { safeAuthorizeRelayOp, batchInsertIds, type RelayScope } from "../relay-policy.server";
 
 const cashier: RelayScope = {
   kind: "cashier",
@@ -13,6 +13,8 @@ const cashier: RelayScope = {
   roleSlug: "cashier",
   permissions: { can_process_sale: true },
   isSupervisor: false,
+  staffUserId: "u-1",
+  actorName: "Amy",
 };
 
 const admin: RelayScope = { ...cashier, role: "admin", roleSlug: "admin", isSupervisor: true };
@@ -80,5 +82,70 @@ describe("relay authorisation", () => {
       cashier,
     );
     expect(out.ok).toBe(false);
+  });
+
+  it("writes the cashier from the proven caller, not the payload", async () => {
+    const out = await safeAuthorizeRelayOp(
+      { kind: "insert", table: "sales", rows: [{ id: "1", cashier_name: "Someone else" }] },
+      cashier,
+    );
+    expect(out.ok).toBe(true);
+    if (out.ok && out.op.kind === "insert") {
+      expect(out.op.rows[0]!["cashier_name"]).toBe("Amy");
+      expect(out.op.rows[0]!["cashier_id"]).toBe("u-1");
+    }
+  });
+
+  it("refuses a child whose parent the server has never seen", async () => {
+    restMock.mockResolvedValue({ ok: true, json: async () => [] });
+    const out = await safeAuthorizeRelayOp(
+      { kind: "insert", table: "sale_items", rows: [{ id: "i", sale_id: "ghost" }] },
+      cashier,
+    );
+    expect(out.ok).toBe(false);
+  });
+
+  it("accepts a child pushed alongside its parent", async () => {
+    const ops = [
+      { kind: "insert" as const, table: "sales", rows: [{ id: "s9" }] },
+      { kind: "insert" as const, table: "sale_items", rows: [{ id: "i", sale_id: "s9" }] },
+    ];
+    const out = await safeAuthorizeRelayOp(ops[1]!, cashier, batchInsertIds(ops));
+    expect(out.ok).toBe(true);
+    expect(restMock).not.toHaveBeenCalled();
+  });
+
+  it("refuses a transfer change by a branch at neither end", async () => {
+    restMock.mockResolvedValue({
+      ok: true,
+      json: async () => [{ from_store_id: "STORE-B", to_store_id: "STORE-C" }],
+    });
+    const out = await safeAuthorizeRelayOp(
+      { kind: "update", table: "stock_transfers", values: { status: "RECEIVED" }, match: { id: "t1" } },
+      cashier,
+    );
+    expect(out.ok).toBe(false);
+    if (!out.ok) expect(out.code).toBe("STORE_FORBIDDEN");
+  });
+
+  it("allows a transfer change by the receiving branch", async () => {
+    restMock.mockResolvedValue({
+      ok: true,
+      json: async () => [{ from_store_id: "STORE-B", to_store_id: "STORE-A" }],
+    });
+    const out = await safeAuthorizeRelayOp(
+      { kind: "update", table: "stock_transfers", values: { status: "RECEIVED" }, match: { id: "t1" } },
+      cashier,
+    );
+    expect(out.ok).toBe(true);
+  });
+
+  it("asks a stale account to sign in again instead of failing blankly", async () => {
+    const out = await safeAuthorizeRelayOp(
+      { kind: "insert", table: "sales", rows: [{ id: "1" }] },
+      { ...cashier, stale: true },
+    );
+    expect(out.ok).toBe(false);
+    if (!out.ok) expect(out.code).toBe("SCOPE_STALE");
   });
 });
