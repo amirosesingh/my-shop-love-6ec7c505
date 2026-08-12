@@ -8,6 +8,7 @@
  * the write with the service key, which never reaches the browser.
  */
 import { runtimeEnvValue, supabaseConfig } from "./external-supabase-config";
+import type { RelayScope } from "./relay-policy.server";
 
 export type RelayOp =
   | { kind: "insert"; table: string; rows: Record<string, unknown>[] }
@@ -25,7 +26,11 @@ export type RelayRead =
   | { kind: "activeShift"; storeId: string }
   | { kind: "stores" };
 
-/** Only operational tables may be written through the relay. */
+/**
+ * Only operational tables may be written through the relay. `stores` is
+ * deliberately absent: branch records are supervisor-only and supervisors
+ * hold a real session, so they write directly under the row rules.
+ */
 export const RELAY_TABLES = new Set([
   "sales",
   "sale_items",
@@ -45,7 +50,6 @@ export const RELAY_TABLES = new Set([
   "stock_transfers",
   "stock_transfer_items",
   "whatsapp_queue",
-  "stores",
 ]);
 
 /**
@@ -135,35 +139,49 @@ const query = (match: Record<string, unknown>) =>
     .map(([k, v]) => `${encodeURIComponent(k)}=${encodeValue(v)}`)
     .join("&");
 
-/** Execute one queued operation with service rights. */
-export async function runRelayOp(op: RelayOp): Promise<{ ok: boolean; error?: string }> {
+/**
+ * Execute one queued operation with service rights.
+ *
+ * The caller's scope is mandatory: the operation is first rewritten so it can
+ * only touch the caller's own branch and only the columns their permissions
+ * allow, and is refused outright otherwise.
+ */
+export async function runRelayOp(
+  op: RelayOp,
+  scope: RelayScope,
+): Promise<{ ok: boolean; error?: string; code?: string }> {
   if (!RELAY_TABLES.has(op.table)) return { ok: false, error: `"${op.table}" cannot be synced` };
 
+  const { safeAuthorizeRelayOp } = await import("./relay-policy.server");
+  const decision = await safeAuthorizeRelayOp(op, scope);
+  if (!decision.ok) return { ok: false, error: decision.error, code: decision.code };
+  const safeOp = decision.op;
+
   let res: Response;
-  switch (op.kind) {
+  switch (safeOp.kind) {
     case "insert":
-      res = await serviceRest(op.table, {
+      res = await serviceRest(safeOp.table, {
         method: "POST",
-        body: JSON.stringify(op.rows),
+        body: JSON.stringify(safeOp.rows),
         prefer: "return=minimal",
       });
       break;
     case "upsert":
-      res = await serviceRest(`${op.table}?on_conflict=${op.onConflict ?? "id"}`, {
+      res = await serviceRest(`${safeOp.table}?on_conflict=${safeOp.onConflict ?? "id"}`, {
         method: "POST",
-        body: JSON.stringify(op.rows),
+        body: JSON.stringify(safeOp.rows),
         prefer: "return=minimal,resolution=merge-duplicates",
       });
       break;
     case "update":
-      res = await serviceRest(`${op.table}?${query(op.match)}`, {
+      res = await serviceRest(`${safeOp.table}?${query(safeOp.match)}`, {
         method: "PATCH",
-        body: JSON.stringify(op.values),
+        body: JSON.stringify(safeOp.values),
         prefer: "return=minimal",
       });
       break;
     case "delete":
-      res = await serviceRest(`${op.table}?${query(op.match)}`, {
+      res = await serviceRest(`${safeOp.table}?${query(safeOp.match)}`, {
         method: "DELETE",
         prefer: "return=minimal",
       });
@@ -185,6 +203,10 @@ export type RelayCaller = {
   kind: "cashier" | "terminal" | "staff";
   label: string;
   storeId?: string | null;
+  /** app_users.user_id, when the proof carries it. */
+  staffUserId?: string | null;
+  /** Supabase Auth id, for staff signed in with email + password. */
+  authUserId?: string | null;
 };
 
 /**
@@ -205,7 +227,12 @@ export async function verifyRelayCaller(input: {
       const s = check.session;
       const kind: RelayCaller["kind"] =
         s.kind === "cashier" ? "cashier" : s.kind === "terminal" ? "terminal" : "staff";
-      return { kind, label: s.label ?? s.staff_user_id ?? "session", storeId: s.branch_id ?? null };
+      return {
+        kind,
+        label: s.label ?? s.staff_user_id ?? "session",
+        storeId: s.branch_id ?? null,
+        staffUserId: s.staff_user_id ?? null,
+      };
     }
     if (check.reason === "revoked" || check.reason === "idle") {
       throw new Error("Your session has ended — please sign in again.");
@@ -215,7 +242,8 @@ export async function verifyRelayCaller(input: {
   if (input.cashierToken) {
     const { verifyCashierSession } = await import("./pos-session.server");
     const session = verifyCashierSession(input.cashierToken);
-    if (session) return { kind: "cashier", label: session.username };
+    if (session)
+      return { kind: "cashier", label: session.username, staffUserId: session.username };
   }
 
   if (input.terminalToken) {
@@ -245,7 +273,8 @@ export async function verifyRelayCaller(input: {
     });
     if (res.ok) {
       const user = (await res.json()) as { id?: string; email?: string };
-      if (user.id) return { kind: "staff", label: user.email ?? user.id };
+      if (user.id)
+        return { kind: "staff", label: user.email ?? user.id, authUserId: user.id };
     }
   }
 

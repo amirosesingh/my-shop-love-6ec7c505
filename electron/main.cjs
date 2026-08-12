@@ -277,7 +277,7 @@ async function initializeWorker(config) {
   cloudConfig = config;
   worker.init({
     ...config,
-    relayUrl: baseUrl ? `${baseUrl}/api/public/sync` : null,
+    relayUrl: baseUrl ? `${baseUrl}/api/v1/pos/sync` : null,
     onChange: async () => broadcastStatus(await statusPayload()),
   });
   worker.start();

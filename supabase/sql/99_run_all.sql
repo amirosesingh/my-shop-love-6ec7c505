@@ -42,3 +42,5 @@
 \i 32_purchase_order_scoping.sql
 \i 33_products_archive_columns.sql
 \i 34_shift_close_rules.sql
+\i 35_activity_and_token_columns.sql
+\i 36_store_isolation.sql
