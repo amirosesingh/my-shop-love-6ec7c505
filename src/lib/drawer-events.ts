@@ -75,6 +75,20 @@ export function recordNoSale(input: Omit<DrawerEvent, "id" | "at">) {
     approvedBy: entry.approvedBy,
     at: entry.at,
   });
+  recordActivity({
+    type: "drawer_open",
+    severity: "warning",
+    title: "Cash drawer opened without a sale",
+    message: entry.reason + (entry.note ? ` — ${entry.note}` : ""),
+    actorId: entry.staffId ?? null,
+    actorName: entry.staffName ?? null,
+    actorRole: entry.role ?? null,
+    terminalId: entry.terminalId ?? null,
+    storeId: entry.storeId ?? null,
+    entityType: "drawer_event",
+    entityId: entry.id,
+    meta: { approvedBy: entry.approvedBy ?? null },
+  });
   logger.log("cash", "Cash drawer opened without a sale", "register", {
     reason: entry.reason,
     note: entry.note,
