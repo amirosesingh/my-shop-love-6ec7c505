@@ -38,3 +38,7 @@
 \i 28_app_users_id_link.sql
 \i 29_shift_access_and_rpcs.sql
 \i 30_sales_unique_keys.sql
+\i 31_updated_at_columns.sql
+\i 32_purchase_order_scoping.sql
+\i 33_products_archive_columns.sql
+\i 34_shift_close_rules.sql
