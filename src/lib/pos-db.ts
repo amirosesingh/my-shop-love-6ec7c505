@@ -919,13 +919,14 @@ const invoiceLineRow = (poId: string, l: ReceivingLine): Row => ({
 export async function loadReceivingInvoices(
   storeId: string | null,
   limit = 100,
+  allStores = false,
 ): Promise<ReceivingInvoice[]> {
   let q = supabase
     .from("purchase_orders" as never)
     .select("*, purchase_order_items(*)")
     .order("invoice_entry_date", { ascending: false })
     .limit(limit);
-  if (storeId) {
+  if (storeId && !allStores) {
     // PostgREST needs the literal quoted; branch ids are free text and may hold
     // a comma, dot or space that would otherwise break the filter (400).
     const quoted = `"${storeId.replace(/"/g, '\\"')}"`;
