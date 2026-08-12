@@ -18,6 +18,14 @@ CREATE TABLE IF NOT EXISTS public.pos_store_settings (
   max_drawer_cash_limit numeric NOT NULL DEFAULT 1000,
   require_reason_for_payout boolean NOT NULL DEFAULT true,
   allow_multiple_shifts_per_terminal boolean NOT NULL DEFAULT false,
+  -- A2 · shift close screen & X report
+  enable_cashier_x_report boolean NOT NULL DEFAULT false,
+  show_opening_float_at_close boolean NOT NULL DEFAULT true,
+  show_expected_totals_at_close boolean NOT NULL DEFAULT false,
+  show_live_variance_at_close boolean NOT NULL DEFAULT false,
+  show_itemized_tender_breakdown boolean NOT NULL DEFAULT true,
+  require_manager_pin_on_variance boolean NOT NULL DEFAULT true,
+  variance_pin_threshold numeric NOT NULL DEFAULT 10,
   -- B · discounts, pricing, overrides
   max_cashier_discount_percent numeric NOT NULL DEFAULT 10,
   max_cart_discount_amount numeric NOT NULL DEFAULT 100,
@@ -45,6 +53,15 @@ DROP TRIGGER IF EXISTS pos_store_settings_touch ON public.pos_store_settings;
 -- Additive for databases created before this rule existed.
 ALTER TABLE public.pos_store_settings
   ADD COLUMN IF NOT EXISTS require_counted_cash_on_close boolean NOT NULL DEFAULT true;
+
+ALTER TABLE public.pos_store_settings
+  ADD COLUMN IF NOT EXISTS enable_cashier_x_report boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS show_opening_float_at_close boolean NOT NULL DEFAULT true,
+  ADD COLUMN IF NOT EXISTS show_expected_totals_at_close boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS show_live_variance_at_close boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS show_itemized_tender_breakdown boolean NOT NULL DEFAULT true,
+  ADD COLUMN IF NOT EXISTS require_manager_pin_on_variance boolean NOT NULL DEFAULT true,
+  ADD COLUMN IF NOT EXISTS variance_pin_threshold numeric NOT NULL DEFAULT 10;
 
 CREATE TRIGGER pos_store_settings_touch BEFORE UPDATE ON public.pos_store_settings
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();

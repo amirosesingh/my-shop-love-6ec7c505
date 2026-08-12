@@ -33,6 +33,7 @@ const closeInput = z.object({
   terminalToken: z.string().min(10).optional(),
   storeId: z.string().max(64).optional(),
   countedCash: z.number().nullable().optional(),
+  variance: z.number().nullable().optional(),
   grantToken: z.string().optional(),
 });
 
@@ -220,6 +221,19 @@ export const assertShiftClosable = createServerFn({ method: "POST" })
           held: 0,
           error: "Enter the counted cash in the drawer before closing the shift.",
         };
+      }
+      // Large shortage or overage: a manager must have approved the close.
+      if (rules.require_manager_pin_on_variance && !override) {
+        const limit = Math.abs(Number(rules.variance_pin_threshold) || 0);
+        const variance = Number(data.variance ?? 0);
+        if (Number.isFinite(variance) && Math.abs(variance) > limit) {
+          return {
+            ok: false as const,
+            code: "VARIANCE" as const,
+            held: 0,
+            error: `The drawer is out by more than ${limit.toFixed(2)}. A manager must approve this closure.`,
+          };
+        }
       }
       return { ok: true as const, code: "OK" as const, held: 0, error: "" };
     } catch (e) {

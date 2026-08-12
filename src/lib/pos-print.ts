@@ -453,7 +453,11 @@ function shiftBody(shift: Shift, sales: Sale[], kind: "xreport" | "zreport") {
       <tr class="b"><td>Variance</td><td class="r">${fmt(counted - expected)}</td></tr>
     </table>
     ${shift.note ? `<hr><div class="muted">Note: ${esc(shift.note)}</div>` : ""}
-    <hr><div class="c muted">Signature ______________________</div>`;
+    ${
+      kind === "xreport"
+        ? `<hr><div class="c muted">System-generated snapshot — cannot be edited</div>`
+        : `<hr><div class="c muted">Signature ______________________</div>`
+    }`;
 }
 
 function memberBody(member: Member, sales: Sale[]) {

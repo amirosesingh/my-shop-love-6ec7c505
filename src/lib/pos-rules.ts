@@ -17,6 +17,14 @@ export type PosRules = {
   max_drawer_cash_limit: number;
   require_reason_for_payout: boolean;
   allow_multiple_shifts_per_terminal: boolean;
+  /* A2 · shift close screen & X report */
+  enable_cashier_x_report: boolean;
+  show_opening_float_at_close: boolean;
+  show_expected_totals_at_close: boolean;
+  show_live_variance_at_close: boolean;
+  show_itemized_tender_breakdown: boolean;
+  require_manager_pin_on_variance: boolean;
+  variance_pin_threshold: number;
   /* B · discount, pricing & overrides */
   max_cashier_discount_percent: number;
   max_cart_discount_amount: number;
@@ -58,6 +66,13 @@ export const DEFAULT_POS_RULES: PosRules = {
   max_drawer_cash_limit: 1000,
   require_reason_for_payout: true,
   allow_multiple_shifts_per_terminal: false,
+  enable_cashier_x_report: false,
+  show_opening_float_at_close: true,
+  show_expected_totals_at_close: false,
+  show_live_variance_at_close: false,
+  show_itemized_tender_breakdown: true,
+  require_manager_pin_on_variance: true,
+  variance_pin_threshold: 10,
   max_cashier_discount_percent: 10,
   max_cart_discount_amount: 100,
   allow_discount_stacking: false,
@@ -123,6 +138,20 @@ export const RULE_GROUPS: RuleGroup[] = [
       { key: "max_drawer_cash_limit", kind: "number", label: "Max cash in drawer", blurb: "Prompts for a safe drop above this amount." },
       { key: "require_reason_for_payout", kind: "switch", label: "Reason for pay-in / pay-out", blurb: "Petty cash movements need a reason code." },
       { key: "allow_multiple_shifts_per_terminal", kind: "switch", label: "Allow multiple shifts per terminal", blurb: "Off means one open shift per till." },
+    ],
+  },
+  {
+    id: "shift-close",
+    label: "Shift close screen",
+    blurb: "What the cashier sees while counting the drawer, and the mid-shift X report.",
+    fields: [
+      { key: "enable_cashier_x_report", kind: "switch", label: "Cashiers may print the X report", blurb: "Off means only supervisors and admins can take a mid-shift snapshot." },
+      { key: "show_opening_float_at_close", kind: "switch", label: "Show opening float at close", blurb: "Display the float the shift started with. It is read-only." },
+      { key: "show_expected_totals_at_close", kind: "switch", label: "Show expected totals at close", blurb: "Display the system-expected cash, card and mobile figures while counting." },
+      { key: "show_live_variance_at_close", kind: "switch", label: "Show live variance at close", blurb: "Update the shortage / overage as the count is typed." },
+      { key: "show_itemized_tender_breakdown", kind: "switch", label: "Itemised tender breakdown", blurb: "Show card, mobile and voucher lines instead of a single cash total." },
+      { key: "require_manager_pin_on_variance", kind: "switch", label: "Manager PIN on large variance", blurb: "A manager must approve the close when the count is off by more than the limit below." },
+      { key: "variance_pin_threshold", kind: "number", label: "Variance limit before manager PIN", blurb: "Absolute shortage or overage allowed without approval." },
     ],
   },
   {

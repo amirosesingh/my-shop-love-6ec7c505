@@ -84,7 +84,9 @@ import { parseAmount, parsePositiveAmount } from "@/lib/amount";
 import { getPosCallerAuth } from "@/lib/pos-caller-auth";
 import { evaluatePromotions, focLine } from "@/lib/pos-promotions";
 import { clearCartDraft, loadCartDraft, saveCartDraft } from "@/lib/cart-draft";
-import { openCashDrawer, printBookingSlip, printJobTag, printSaleReceipt, saleReceiptPreview } from "@/lib/pos-print";
+import { openCashDrawer, printBookingSlip, printJobTag, printSaleReceipt, printShiftReport, saleReceiptPreview } from "@/lib/pos-print";
+import { closeScreenView, derivedCashSales, varianceNeedsPin } from "@/lib/shift-close";
+import { logSystemAction } from "@/lib/system-audit";
 import { openCustomerDisplay, publishDisplay, toDisplayLine, type DisplaySnapshot } from "@/lib/customer-display";
 import { MemberHistoryDialog } from "@/components/pos/MemberHistoryDialog";
 
@@ -132,6 +134,23 @@ function Register() {
   const [countedCash, setCountedCash] = useState("");
   const [closing, setClosing] = useState(false);
   const [closeNote, setCloseNote] = useState("");
+  /** Visibility flags and derived figures for the closing screen. */
+  const closeView = closeScreenView(rules, activeShift, state.sales);
+  /** Leaving the dialog never closes the shift and never prints anything. */
+  function abandonShiftClose() {
+    setCloseShiftOpen(false);
+    if (activeShift) {
+      logSystemAction({
+        actorName: user?.name ?? activeShift.cashier,
+        actorRole: user?.role ?? null,
+        actionType: "SHIFT_CLOSE_CANCELLED",
+        entityAffected: "shifts",
+        entityId: activeShift.id,
+        storeId: currentStore.id,
+        note: "Closing screen dismissed — shift left open, nothing printed.",
+      });
+    }
+  }
   const canDiscount = can("can_give_discount");
   const [discountOverride, setDiscountOverride] = useState(false);
   const discountAllowed = canDiscount || discountOverride;
@@ -2872,15 +2891,38 @@ function Register() {
       </Dialog>
 
       {/* Close shift — straight from the register header */}
-      <Dialog open={closeShiftOpen} onOpenChange={setCloseShiftOpen}>
+      <Dialog
+        open={closeShiftOpen}
+        onOpenChange={(open) => {
+          if (!open) abandonShiftClose();
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Close shift</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <p className="text-xs text-muted-foreground">
-              Opened by {activeShift?.cashier} · float {money(activeShift?.openingFloat ?? 0)}
+              Opened by {activeShift?.cashier}
+              {closeView.showFloat ? ` · float ${money(closeView.openingFloat)}` : ""}
             </p>
+            {closeView.showExpected && (
+              <p className="numeric text-xs text-muted-foreground">
+                Expected in drawer: {money(closeView.expected)}
+              </p>
+            )}
+            {closeView.showTenders && (
+              <div className="rounded-md border border-border px-3 py-2 text-xs">
+                {closeView.tenders.map((t) => (
+                  <div key={t.method} className="flex justify-between">
+                    <span className="text-muted-foreground">
+                      {t.label} ({t.count})
+                    </span>
+                    <span className="numeric">{money(t.value)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="space-y-1">
               <Label>Cashier</Label>
               {/* Locked to the signed-in user — a closure is always theirs. */}
@@ -2888,7 +2930,7 @@ function Register() {
             </div>
             <div className="space-y-1">
               <Label>
-                Counted cash in drawer <span className="text-destructive">*</span>
+                Total cash in drawer <span className="text-destructive">*</span>
               </Label>
               <Input
                 className="numeric"
@@ -2906,6 +2948,17 @@ function Register() {
                 <p className="text-[11px] text-destructive">The amount cannot be negative.</p>
               ) : null}
             </div>
+            {parseAmount(countedCash) !== null && parseAmount(countedCash)! >= 0 && (
+              <p className="numeric text-xs text-muted-foreground">
+                Cash sales{" "}
+                {money(derivedCashSales(parseAmount(countedCash)!, closeView.openingFloat))}
+              </p>
+            )}
+            {closeView.showVariance && parseAmount(countedCash) !== null && (
+              <p className="numeric text-xs">
+                Variance {money(parseAmount(countedCash)! - closeView.expected)}
+              </p>
+            )}
             {rules.block_shift_close_on_hold && held.length > 0 && (
               <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
                 {held.length} held bill(s) pending. Settle or cancel them before closing.
@@ -2917,7 +2970,7 @@ function Register() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCloseShiftOpen(false)}>
+            <Button variant="outline" onClick={abandonShiftClose}>
               Cancel
             </Button>
             <Button
@@ -2936,23 +2989,48 @@ function Register() {
                   }
                   setClosing(true);
                   try {
+                    const variance = counted - closeView.expected;
+                    let grantToken = "";
+                    if (varianceNeedsPin(rules, variance)) {
+                      const granted = await askManager({
+                        action: "shift_close",
+                        title: "Drawer variance approval",
+                        reason: `The drawer is out by ${money(variance)}.`,
+                        storeId: currentStore.id,
+                        requestedBy: user?.name ?? null,
+                      });
+                      if (granted === null) {
+                        toast.error("Closure not approved — the shift stays open.");
+                        return;
+                      }
+                      grantToken = granted;
+                    }
                     // The server re-checks held tickets and the cash count
                     // against the database rules — the browser copy is only
                     // used to give faster feedback.
                     const auth = await getPosCallerAuth();
                     const gate = await assertShiftClosable({
-                      data: { ...auth, storeId: currentStore.id, countedCash: counted },
+                      data: {
+                        ...auth,
+                        storeId: currentStore.id,
+                        countedCash: counted,
+                        variance,
+                        ...(grantToken ? { grantToken } : {}),
+                      },
                     });
                     if (!gate.ok) {
                       toast.error(gate.error);
                       return;
                     }
-                    const closed = closeShift(counted, closeNote.trim());
+                    const closed = await closeShift(counted, closeNote.trim());
                     if (!closed) {
                       toast.error("This shift was opened on another terminal");
                       return;
                     }
                     setCloseShiftOpen(false);
+                    // Print and kick the drawer only once the close is stored.
+                    printShiftReport(closed, state.sales, "zreport");
+                    openCashDrawer();
                     toast.success("Shift closed");
                   } finally {
                     setClosing(false);
