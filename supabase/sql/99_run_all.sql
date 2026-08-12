@@ -44,3 +44,4 @@
 \i 34_shift_close_rules.sql
 \i 35_activity_and_token_columns.sql
 \i 36_store_isolation.sql
+\i 37_pin_throttle_and_grants.sql

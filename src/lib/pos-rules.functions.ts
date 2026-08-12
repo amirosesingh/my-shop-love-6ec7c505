@@ -119,6 +119,19 @@ export const verifyManagerPin = createServerFn({ method: "POST" })
     const { verifyManagerPinInDb, signOverrideGrant } = await import(
       "./pos-rules.server"
     );
+    const { throttleStatus, throttleFail, throttleReset, minutesLeft } = await import(
+      "./pin-throttle.server"
+    );
+    // Guessing is stopped in the server, not the keypad: the count follows the
+    // manager ID, so trying from another till does not reset it.
+    const throttleKey = `manager:${data.managerId.toLowerCase()}`;
+    const state = await throttleStatus(throttleKey);
+    if (state.locked) {
+      return {
+        ok: false as const,
+        error: `Too many wrong PINs — try again in ${minutesLeft(state)} minute(s)`,
+      };
+    }
     try {
       // The audit entry is written by the database inside the same routine that
       // checks the PIN, so an override record can never be forged separately.
@@ -130,7 +143,16 @@ export const verifyManagerPin = createServerFn({ method: "POST" })
         terminalId: data.terminalId ?? null,
         detail: data.detail ?? null,
       });
-      if (!manager) return { ok: false as const, error: "Invalid manager ID or PIN" };
+      if (!manager) {
+        const after = await throttleFail(throttleKey);
+        return {
+          ok: false as const,
+          error: after.locked
+            ? `Too many wrong PINs — try again in ${minutesLeft(after)} minute(s)`
+            : "Invalid manager ID or PIN",
+        };
+      }
+      await throttleReset(throttleKey);
       return {
         ok: true as const,
         manager: { id: manager.userId, name: manager.name, role: manager.role },

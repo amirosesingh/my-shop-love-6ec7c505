@@ -11,6 +11,7 @@
  */
 import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
 import { pushActivityEvent } from "./activity-events.functions";
+import { readCredentials } from "./pos-credentials";
 
 export type EventSeverity = "info" | "warning" | "critical";
 
@@ -136,7 +137,11 @@ function writeQueue(rows: Queued[]) {
 
 async function send(entry: Queued): Promise<boolean> {
   try {
-    const res = await pushActivityEvent({ data: entry });
+    // The server refuses events it cannot attribute, so the device's proof
+    // travels with every one. Before sign-in the event simply waits in the
+    // local queue and is flushed once there is a session.
+    const credentials = await readCredentials();
+    const res = await pushActivityEvent({ data: { ...entry, ...credentials } });
     return res.ok;
   } catch {
     return false;

@@ -1,7 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-const input = z.object({ tokenId: z.string().min(8).max(100) });
+const input = z.object({
+  tokenId: z.string().min(8).max(100),
+  /** The device string recorded when this token was claimed. */
+  device: z.string().max(200).optional(),
+});
 
 /**
  * Hand an activated terminal its own machine account so its writes are
@@ -14,7 +18,7 @@ export const getTerminalAccount = createServerFn({ method: "POST" })
   > => {
     try {
       const { ensureTerminalAccount } = await import("./terminal-account.server");
-      const account = await ensureTerminalAccount(data.tokenId);
+      const account = await ensureTerminalAccount(data.tokenId, data.device ?? null);
       return { ok: true, ...account };
     } catch (e) {
       return { ok: false, error: (e as Error).message };

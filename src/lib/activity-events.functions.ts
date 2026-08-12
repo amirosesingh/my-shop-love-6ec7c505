@@ -18,23 +18,47 @@ const eventInput = z.object({
   meta: z.record(z.string(), z.unknown()).optional(),
   clientEventId: z.string().max(80).optional(),
   createdAt: z.string().max(40).optional(),
+  // Proof of who is raising the event. Without it nothing is written.
+  sessionToken: z.string().max(400).optional(),
+  cashierToken: z.string().max(2000).optional(),
+  terminalToken: z.string().max(200).optional(),
+  accessToken: z.string().max(4000).optional(),
 });
 
 export const pushActivityEvent = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => eventInput.parse(input))
   .handler(async ({ data }) => {
+    // The feed is an audit trail: an unattested caller must not be able to
+    // invent sign-ins, refunds or branch activity in it.
+    const { verifyRelayCaller } = await import("./pos-relay.server");
+    const { resolveRelayScope } = await import("./relay-policy.server");
+    let scope: Awaited<ReturnType<typeof resolveRelayScope>>;
+    try {
+      const caller = await verifyRelayCaller({
+        ...(data.sessionToken ? { sessionToken: data.sessionToken } : {}),
+        ...(data.cashierToken ? { cashierToken: data.cashierToken } : {}),
+        ...(data.terminalToken ? { terminalToken: data.terminalToken } : {}),
+        ...(data.accessToken ? { accessToken: data.accessToken } : {}),
+      });
+      scope = await resolveRelayScope(caller);
+    } catch {
+      return { ok: false as const, error: "Not signed in" };
+    }
+    // Only a supervisor may file an event against another branch; everyone
+    // else is stamped with the branch their proof belongs to.
+    const storeId = scope.isSupervisor ? (data.storeId ?? scope.storeId ?? null) : (scope.storeId ?? null);
     const { writeActivityEvent } = await import("./activity-events.server");
     const res = await writeActivityEvent({
       event_type: data.type,
       severity: data.severity,
       title: data.title,
       message: data.message ?? "",
-      actor_id: data.actorId ?? null,
+      actor_id: data.actorId ?? scope.label ?? null,
       actor_name: data.actorName ?? null,
-      actor_role: data.actorRole ?? null,
+      actor_role: data.actorRole ?? scope.role ?? null,
       terminal_id: data.terminalId ?? null,
       terminal_name: data.terminalName ?? null,
-      store_id: data.storeId ?? null,
+      store_id: storeId,
       entity_type: data.entityType ?? null,
       entity_id: data.entityId ?? null,
       amount: data.amount ?? null,

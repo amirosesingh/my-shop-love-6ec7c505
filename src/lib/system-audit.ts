@@ -3,6 +3,7 @@
  * action must never slow down or block the person performing it.
  */
 import { recordSystemAudit } from "./system-audit.functions";
+import { readCredentials } from "./pos-credentials";
 
 export type SystemAuditInput = {
   actorId?: string | null;
@@ -19,5 +20,10 @@ export type SystemAuditInput = {
 };
 
 export function logSystemAction(entry: SystemAuditInput): void {
-  void recordSystemAudit({ data: entry }).catch(() => {});
+  // The server only accepts a line it can attribute, so the device's proof
+  // goes with it.
+  void (async () => {
+    const credentials = await readCredentials();
+    await recordSystemAudit({ data: { ...entry, ...credentials } });
+  })().catch(() => {});
 }

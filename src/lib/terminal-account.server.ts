@@ -37,18 +37,29 @@ async function adminFetch(path: string, init: RequestInit = {}) {
  * Create (or repair) the machine account for an activated terminal and return
  * the credentials the till should keep encrypted on the device.
  */
-export async function ensureTerminalAccount(tokenId: string): Promise<TerminalAccount> {
+export async function ensureTerminalAccount(
+  tokenId: string,
+  device: string | null = null,
+): Promise<TerminalAccount> {
   const tokenRes = await serviceRest(
-    `terminal_tokens?id=eq.${encodeURIComponent(tokenId)}&select=id,status,location_id,location_name`,
+    `terminal_tokens?id=eq.${encodeURIComponent(tokenId)}&select=id,status,location_id,location_name,revoked_at,claimed_by_device`,
   );
   if (!tokenRes.ok) throw new Error("Could not reach the central database");
   const token = ((await tokenRes.json()) as {
     status?: string;
     location_id?: string | null;
     location_name?: string | null;
+    revoked_at?: string | null;
+    claimed_by_device?: string | null;
   }[])[0];
-  if (!token || (token.status !== "active" && token.status !== "used")) {
+  if (!token || token.revoked_at || (token.status !== "active" && token.status !== "used")) {
     throw new Error("This terminal is not activated");
+  }
+  // Knowing a token ID is not enough to be handed the branch's machine
+  // credentials: the request must come from the device that claimed it.
+  const claimedBy = token.claimed_by_device?.trim();
+  if (claimedBy && claimedBy.toLowerCase() !== (device ?? "").trim().toLowerCase()) {
+    throw new Error("This activation belongs to another device");
   }
 
   const email = emailFor(tokenId);
