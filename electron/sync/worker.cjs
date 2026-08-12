@@ -21,6 +21,23 @@ let notify = () => {};
 const attempts = new Map(); // `${table}:${id}` -> failed attempts
 let credentials = {};
 let relayUrl = null;
+// Which timestamp column each catalogue table actually has. Probed once so a
+// table without updated_at doesn't fire a failing request on every pull.
+const stampColumn = new Map();
+
+async function selectChangedSince(table, since) {
+  const ask = (column) => supabase.from(table).select("*").gt(column, since);
+  const known = stampColumn.get(table);
+  if (known) return await ask(known);
+  let res = await ask("updated_at");
+  if (!res.error) {
+    stampColumn.set(table, "updated_at");
+    return res;
+  }
+  res = await ask("created_at");
+  if (!res.error) stampColumn.set(table, "created_at");
+  return res;
+}
 
 function init({ url, key, accessToken, sessionToken, cashierToken, terminalToken, branchId, relayUrl: relay, onChange }) {
   supabase = createClient(url, key, {
@@ -131,9 +148,7 @@ async function pull() {
   let merged = 0;
   for (const table of repo.CATALOGUE_TABLES) {
     // Delta only: anything the cloud has touched since our last clean pull.
-    let { data, error } = await supabase.from(table).select("*").gt("updated_at", since);
-    // Not every table carries updated_at; those fall back to creation time.
-    if (error) ({ data, error } = await supabase.from(table).select("*").gt("created_at", since));
+    const { data, error } = await selectChangedSince(table, since);
     if (error) return { ok: false, merged, error: error.message };
     merged += await repo.mergeFromCloud(table, data ?? []);
   }
