@@ -23,7 +23,7 @@ import {
 } from "@/lib/user-sessions.functions";
 import { loadSessionToken, saveSessionToken } from "@/lib/pos-credentials";
 import { preparePinAccount } from "@/lib/staff-admin";
-import { toLoginAddress } from "@/lib/internal-domains";
+import { toLoginAddress, usernameFromAddress } from "@/lib/internal-domains";
 import { activeBranchId, activeBranchName, bindTerminalBranch } from "@/lib/active-branch";
 import { cacheCredential, verifyCachedPin } from "@/lib/offline-credentials";
 import { recordSignIn } from "@/lib/shift-attendance";
