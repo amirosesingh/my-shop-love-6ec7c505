@@ -3022,7 +3022,7 @@ function Register() {
                       toast.error(gate.error);
                       return;
                     }
-                    const closed = closeShift(counted, closeNote.trim());
+                    const closed = await closeShift(counted, closeNote.trim());
                     if (!closed) {
                       toast.error("This shift was opened on another terminal");
                       return;
