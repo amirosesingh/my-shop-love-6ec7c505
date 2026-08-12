@@ -80,8 +80,8 @@ function NotificationsReport() {
     );
   }, [rows, actor]);
 
-  const page = usePagination(filtered.length);
-  const visible = filtered.slice(page.start, page.end);
+  const page = usePagination(filtered);
+  const visible = page.pageItems;
 
   const exportCsv = () => {
     const url = URL.createObjectURL(
@@ -205,7 +205,17 @@ function NotificationsReport() {
             </TableBody>
           </Table>
         </div>
-        <TablePagination {...page} />
+        <TablePagination
+          page={page.page}
+          pageCount={page.pageCount}
+          pageSize={page.pageSize}
+          total={page.total}
+          from={page.from}
+          to={page.to}
+          label="events"
+          onPage={page.setPage}
+          onPageSize={page.setPageSize}
+        />
       </div>
     </AppShell>
   );
