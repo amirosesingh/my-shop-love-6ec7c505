@@ -44,6 +44,8 @@ import { money, stockAt, usePos } from "@/lib/pos-store";
 import { resolveByBarcode } from "@/lib/product-lookup";
 import { useAuth } from "@/lib/pos-auth";
 import { logger } from "@/lib/audit-log";
+import { logSystemAction } from "@/lib/system-audit";
+import { activeBranchId } from "@/lib/active-branch";
 import { cachedSuppliers, loadSuppliers, type Supplier } from "@/lib/suppliers";
 import type { Product } from "@/lib/pos-types";
 
@@ -94,6 +96,7 @@ function Purchasing() {
   const [scan, setScan] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
   const [history, setHistory] = useState<ReceivingInvoice[]>([]);
+  const [masterView, setMasterView] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<ReceivingInvoice | null>(null);
@@ -124,7 +127,7 @@ function Purchasing() {
   /** Invoice history is a database read, so it survives reloads and restarts. */
   const refreshHistory = async () => {
     try {
-      const rows = await loadReceivingInvoices(currentStore.id);
+      const rows = await loadReceivingInvoices(currentStore.id, 100, masterView);
       setHistory(rows);
       setHistoryError(null);
     } catch (e) {
@@ -135,7 +138,7 @@ function Purchasing() {
   useEffect(() => {
     void refreshHistory();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentStore.id]);
+  }, [currentStore.id, masterView]);
 
   if (!can("can_receive_purchase_order")) {
     return (
@@ -334,13 +337,22 @@ function Purchasing() {
       }
 
       const picked = suppliers.find((s) => s.name === supplier.trim());
+      // A receiving order must never land without a branch: fall back to the
+      // branch this terminal is bound to when the view has not resolved one.
+      const storeId = currentStore.id || activeBranchId(currentStore.id);
+      if (!storeId) {
+        toast.error("This terminal has no branch yet", {
+          description: "Activate the terminal or pick a branch before receiving stock.",
+        });
+        return;
+      }
       const invoice: ReceivingInvoice = {
         id: crypto.randomUUID(),
         invoiceNo: ref,
         supplier: supplier.trim(),
         supplierId: picked?.id ?? null,
         operator: user?.name ?? "—",
-        storeId: currentStore.id,
+        storeId,
         storeCode: currentStore.code,
         invoiceDate,
         entryDate: new Date(entryDate).toISOString(),
@@ -495,6 +507,37 @@ function Purchasing() {
         removedLines: removedLineIds.length,
         stockDeltas: deltas,
         storeCode: currentStore.code,
+      });
+
+      // Immutable edit history: who changed what, with before and after values.
+      const snapshot = (inv: ReceivingInvoice | undefined) =>
+        inv
+          ? {
+              invoiceNo: inv.invoiceNo,
+              supplier: inv.supplier,
+              invoiceDate: inv.invoiceDate,
+              entryDate: inv.entryDate,
+              totalCost: inv.totalCost,
+              lines: inv.lines.map((l) => ({
+                id: l.id,
+                name: l.name,
+                qty: l.qty,
+                cost: l.cost,
+                price: l.price,
+              })),
+            }
+          : null;
+      logSystemAction({
+        actorId: user?.staffId ?? null,
+        actorName: user?.name ?? null,
+        actorRole: user?.metaRole ?? user?.role ?? null,
+        actionType: "purchase_order_edit",
+        entityAffected: "purchase_orders",
+        entityId: next.id,
+        oldValue: snapshot(original),
+        newValue: snapshot(next),
+        storeId: next.storeId,
+        note: `Invoice ${next.invoiceNo} corrected`,
       });
 
       toast.success(`Invoice ${next.invoiceNo} updated`);
@@ -703,11 +746,33 @@ function Purchasing() {
         <section className="rounded-lg border border-border bg-card">
           <div className="flex items-center justify-between px-5 py-3">
             <h2 className="text-sm font-semibold">Invoices received history</h2>
-            {historyError && (
-              <span className="text-xs text-warning-foreground">
-                Offline — showing what this terminal could read
-              </span>
-            )}
+            <div className="flex items-center gap-3">
+              {historyError && (
+                <span className="text-xs text-warning-foreground">
+                  Offline — showing what this terminal could read
+                </span>
+              )}
+              {isAdmin && (
+                <div className="flex rounded-md border border-border p-0.5">
+                  <Button
+                    size="sm"
+                    variant={masterView ? "ghost" : "secondary"}
+                    className="h-7 px-3 text-xs"
+                    onClick={() => setMasterView(false)}
+                  >
+                    Current branch
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={masterView ? "secondary" : "ghost"}
+                    className="h-7 px-3 text-xs"
+                    onClick={() => setMasterView(true)}
+                  >
+                    All branches
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
           <Separator />
           <Table>
@@ -747,6 +812,12 @@ function Purchasing() {
                     <Button
                       variant="outline"
                       size="sm"
+                      disabled={!isAdmin && !!h.storeId && h.storeId !== currentStore.id}
+                      title={
+                        !isAdmin && !!h.storeId && h.storeId !== currentStore.id
+                          ? "This invoice belongs to another branch"
+                          : undefined
+                      }
                       onClick={() => {
                         setRemovedLineIds([]);
                         setEditing(structuredClone(h));
