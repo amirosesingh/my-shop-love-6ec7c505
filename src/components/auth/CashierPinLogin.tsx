@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/pos-auth";
 import { activeBranchId } from "@/lib/active-branch";
 import { listTerminalStaff, type TerminalStaff } from "@/lib/staff-admin";
+import { usernameFromAddress } from "@/lib/internal-domains";
 import {
   attemptsLeft,
   clearPinFailures,
@@ -66,7 +67,9 @@ export function CashierPinLogin({
     };
   }, []);
 
-  const username = picked?.username ?? manual.trim().toLowerCase();
+  // A whole internal address is accepted too — it is what the account list
+  // shows — so it is reduced to the username before anything is sent.
+  const username = picked?.username ?? usernameFromAddress(manual);
   const storedLength = picked?.pinLength ?? 0;
   // A numeric PIN is 4-6 digits. Anything longer is a typed passcode, which
   // gets a plain field with no length cap and no auto-submit.
