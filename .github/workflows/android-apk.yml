@@ -102,7 +102,7 @@ jobs:
           ANDROID_VERSION_NAME: ${{ steps.meta.outputs.version }}
           ANDROID_VERSION_CODE: ${{ github.run_number }}
         run: |
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_FILE"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | tr -d '\r\n ' | base64 --decode --ignore-garbage > "$ANDROID_KEYSTORE_FILE"
           node scripts/android-release.cjs
 
       - name: Verify generated camera permission
