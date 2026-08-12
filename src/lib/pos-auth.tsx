@@ -23,7 +23,7 @@ import {
 } from "@/lib/user-sessions.functions";
 import { loadSessionToken, saveSessionToken } from "@/lib/pos-credentials";
 import { preparePinAccount } from "@/lib/staff-admin";
-import { toLoginAddress } from "@/lib/internal-domains";
+import { toLoginAddress, usernameFromAddress } from "@/lib/internal-domains";
 import { activeBranchId, activeBranchName, bindTerminalBranch } from "@/lib/active-branch";
 import { cacheCredential, verifyCachedPin } from "@/lib/offline-credentials";
 import { recordSignIn } from "@/lib/shift-attendance";
@@ -441,32 +441,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const cashierLogin = useCallback(async (userId: string, pin: string) => {
-    const code = userId.trim().toLowerCase();
+    const code = usernameFromAddress(userId);
     if (!code) return { ok: false, error: "Enter your username" };
-    // A till PIN is 4-6 digits; longer text passcodes are allowed up to the
-    // server's 32 character limit.
+    // Accounts are provisioned with a 4-32 character credential, so the till
+    // accepts the same range: short numeric PINs and longer passcodes alike.
     if (pin.length < 4 || pin.length > 32)
       return { ok: false, error: "Enter your PIN or passcode" };
-    if (/^\d+$/.test(pin) && pin.length > 6)
-      return { ok: false, error: "A numeric PIN must be 4 to 6 digits" };
     let offline = false;
     if (typeof navigator !== "undefined" && !navigator.onLine) offline = true;
 
-    // Preferred path: the PIN is the password of this person's own account,
-    // so a successful entry leaves the till holding a real, verified session.
+    // The stored PIN hash is the authority: it is checked on the server with
+    // the internal key. The Auth password is only aligned afterwards, so a
+    // stale password can no longer refuse a person with the right PIN.
+    type ServerLogin = {
+      ok?: boolean;
+      error?: string;
+      cashierToken?: string;
+      sessionToken?: string;
+      cashier?: {
+        id: string;
+        username: string;
+        full_name: string;
+        store_id: string | null;
+        permissions: Record<string, boolean>;
+      };
+    };
+    let verified: ServerLogin | null = null;
+    let failure = "";
     if (!offline) {
       try {
-        const prepared = await preparePinAccount(code, pin);
-        if (prepared.ok) {
-          const { error } = await supabase.auth.signInWithPassword({
-            email: prepared.email,
-            password: pin,
-          });
-          if (!error) {
-            const signedIn = await finishAccountPinSignIn(code, pin);
-            if (signedIn) return signedIn;
-          }
-        }
+        const res = await fetch("/api/public/cashier-login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: code,
+            pin,
+            platform: typeof navigator === "undefined" ? "web" : navigator.platform || "web",
+          }),
+        });
+        const payload = (await res.json()) as ServerLogin;
+        if (payload?.ok) verified = payload;
+        else failure = payload?.error ?? "";
       } catch {
         offline = true;
       }
@@ -490,8 +505,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         cashierId: cached.cashierId,
         permissions: cached.permissions as unknown as TerminalUser["permissions"],
       };
+    } else if (verified?.cashier) {
+      const account = verified.cashier;
+      next = {
+        userCode: account.username,
+        name: account.full_name || account.username,
+        role: "staff",
+        storeId: activeBranchId(account.store_id ?? null),
+        email: "",
+        cashierId: account.id,
+        permissions: account.permissions as unknown as TerminalUser["permissions"],
+      };
     } else {
-      return { ok: false, error: "Invalid username or PIN" };
+      return { ok: false, error: failure || "Invalid username or PIN" };
     }
     setTerminalUser(next);
     // The branch is in place before the register mounts, so nothing renders
@@ -513,33 +539,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       // Preferred path: the server endpoint checks the PIN with the internal
       // key and opens the device session in one call.
-      let cashierToken = "";
-      let sessionToken = "";
-      try {
-        const res = await fetch("/api/public/cashier-login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            username: code,
-            pin,
-            platform: typeof navigator === "undefined" ? "web" : navigator.platform || "web",
-          }),
-        });
-        const payload = (await res.json()) as {
-          ok?: boolean;
-          cashierToken?: string;
-          sessionToken?: string;
-        };
-        if (res.ok && payload.ok) {
-          cashierToken = payload.cashierToken ?? "";
-          sessionToken = payload.sessionToken ?? "";
-        }
-      } catch {
-        /* fall back to the server function below */
-      }
+      // The sign-in call above already opened the device session; reuse it.
+      let cashierToken = verified?.cashierToken ?? "";
+      let sessionToken = verified?.sessionToken ?? "";
 
       if (!cashierToken) {
-        const issued = await issueCashierSession({ data: { username: code, pin } });
+        const issued = await issueCashierSession({ data: { username: next.userCode, pin } });
         if (issued.ok) cashierToken = issued.token;
       }
 
@@ -572,6 +577,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       void ensureTerminalSession();
     } catch {
       /* the server relay still carries the writes */
+    }
+    // Last: line the Auth password up with the PIN so the till also holds a
+    // real session, and let the account's own profile (role, branch, rights)
+    // replace the summary above when it arrives.
+    if (verified?.cashier) {
+      try {
+        const prepared = await preparePinAccount(next.userCode, pin);
+        if (prepared.ok) {
+          const { error } = await supabase.auth.signInWithPassword({
+            email: prepared.email,
+            password: pin,
+          });
+          if (!error) await finishAccountPinSignIn(next.userCode, pin);
+        }
+      } catch {
+        /* the signed device session already keeps the till working */
+      }
     }
     return { ok: true };
   }, [finishAccountPinSignIn]);

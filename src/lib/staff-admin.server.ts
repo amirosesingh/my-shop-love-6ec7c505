@@ -322,6 +322,19 @@ export async function permanentlyDeleteStaff(username: string, accessToken: stri
 
 type VerifiedPin = { username: string; fullName: string; storeId: string | null };
 
+/** Resolve the staff username behind whatever was typed: username or address. */
+async function usernameForIdentifier(identifier: string): Promise<string | null> {
+  const value = identifier.trim().toLowerCase();
+  if (!value.includes("@")) return null;
+  const res = await serviceRest(
+    `app_users?email=eq.${encodeURIComponent(value)}&select=user_id&limit=1`,
+  );
+  if (!res.ok) return null;
+  const rows = (await res.json()) as { user_id?: string }[];
+  const found = rows[0]?.user_id;
+  return found ? String(found) : null;
+}
+
 /** Check a PIN against whichever record holds it: the account, or the old cashier row. */
 async function verifyPin(username: string, pin: string): Promise<VerifiedPin | null> {
   const account = (await serviceRpc("verify_terminal_pin", {
@@ -335,6 +348,23 @@ async function verifyPin(username: string, pin: string): Promise<VerifiedPin | n
       fullName: String(row.full_name ?? row.user_id),
       storeId: row.store_id ?? null,
     };
+  }
+  // Someone typed the whole address (that is what the account list shows), so
+  // find the username it belongs to and check the PIN against that.
+  const byEmail = await usernameForIdentifier(username);
+  if (byEmail && byEmail.toLowerCase() !== username.trim().toLowerCase()) {
+    const second = (await serviceRpc("verify_terminal_pin", {
+      p_user_id: byEmail,
+      p_pin: pin,
+    })) as { user_id?: string; full_name?: string; store_id?: string | null }[] | null;
+    const hit = Array.isArray(second) ? second[0] : null;
+    if (hit?.user_id) {
+      return {
+        username: String(hit.user_id),
+        fullName: String(hit.full_name ?? hit.user_id),
+        storeId: hit.store_id ?? null,
+      };
+    }
   }
   try {
     const legacy = (await serviceRpc("verify_cashier_pin", {
@@ -370,7 +400,10 @@ export async function ensurePinAccount(
   const verified = await verifyPin(code, pin);
   if (!verified) return { ok: false, error: "Invalid username or PIN" };
 
-  const email = internalEmail(verified.username);
+  // Sign in on the address this account actually holds; the hidden internal
+  // address is only a fallback for rows that never had one.
+  const stored = await staffProfile(verified.username);
+  const email = stored?.email?.trim().toLowerCase() || internalEmail(verified.username);
   const existing = await findUserId(email);
   if (existing) {
     await adminFetch(`admin/users/${existing}`, {

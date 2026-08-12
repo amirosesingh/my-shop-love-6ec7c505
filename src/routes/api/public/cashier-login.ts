@@ -8,8 +8,8 @@ import { z } from "zod";
  * credential and is verified server-side with the internal key.
  */
 const body = z.object({
-  username: z.string().min(1).max(64),
-  pin: z.string().min(4).max(6),
+  username: z.string().min(1).max(120),
+  pin: z.string().min(4).max(32),
   platform: z.string().max(60).optional(),
   terminalId: z.string().max(64).optional(),
 });

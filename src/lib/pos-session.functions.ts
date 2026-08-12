@@ -10,7 +10,7 @@ export const issueCashierSession = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z.object({
       username: z.string().min(1).max(64),
-      pin: z.string().regex(/^\d{4,6}$/),
+      pin: z.string().min(4).max(32),
     }).parse(data),
   )
   .handler(async ({ data }) => {

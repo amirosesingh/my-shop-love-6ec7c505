@@ -108,7 +108,7 @@ export const setStaffAccountActive = createServerFn({ method: "POST" })
  */
 export const preparePinSignIn = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({
-    username: z.string().min(2).max(40),
+    username: z.string().min(2).max(120),
     pin: z.string().min(4).max(32),
   }).parse(data))
   .handler(async ({ data }): Promise<{ ok: true; email: string } | { ok: false; error: string }> => {
