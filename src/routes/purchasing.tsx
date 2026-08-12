@@ -509,6 +509,37 @@ function Purchasing() {
         storeCode: currentStore.code,
       });
 
+      // Immutable edit history: who changed what, with before and after values.
+      const snapshot = (inv: ReceivingInvoice | undefined) =>
+        inv
+          ? {
+              invoiceNo: inv.invoiceNo,
+              supplier: inv.supplier,
+              invoiceDate: inv.invoiceDate,
+              entryDate: inv.entryDate,
+              totalCost: inv.totalCost,
+              lines: inv.lines.map((l) => ({
+                id: l.id,
+                name: l.name,
+                qty: l.qty,
+                cost: l.cost,
+                price: l.price,
+              })),
+            }
+          : null;
+      logSystemAction({
+        actorId: user?.staffId ?? null,
+        actorName: user?.name ?? null,
+        actorRole: user?.metaRole ?? user?.role ?? null,
+        actionType: "purchase_order_edit",
+        entityAffected: "purchase_orders",
+        entityId: next.id,
+        oldValue: snapshot(original),
+        newValue: snapshot(next),
+        storeId: next.storeId,
+        note: `Invoice ${next.invoiceNo} corrected`,
+      });
+
       toast.success(`Invoice ${next.invoiceNo} updated`);
       setEditing(null);
       setRemovedLineIds([]);
