@@ -1,40 +1,61 @@
-# Signed Android APK workflow (`android-release.yml`)
+# Fix the signed Android release build
 
-## What it does
+## What's actually wrong
 
-A new GitHub Actions workflow that runs on every push to `main`, builds the web app,
-wraps it with Capacitor, signs the APK with your keystore secrets, and uploads the
-resulting `app-release.apk` as a downloadable artifact.
+`scripts/android-release.cjs` patches the `build.gradle` that `npx cap add android`
+generates at build time (the `android/` folder is not stored in this repo — it is
+regenerated on every CI run). It does that with regular expressions, and the regex
+that finds the `release { ... }` block is brace-blind: it stops at the first line
+that starts with `}`, so on some generated files the `signingConfig
+signingConfigs.release` line lands in the wrong block (or gets appended twice on
+re-runs), and Gradle fails.
 
-Steps in the workflow:
+Because `android/app/build.gradle` is generated, there is no committed copy to
+"reset" — the durable fix is to make the patcher correct and verifiable.
 
-1. Checkout, Node.js 24 (npm cache), Java 17 Temurin, Android SDK.
-2. `npm ci` (falls back to `npm install`), then `npm run build`.
-3. `npx cap add android` (the `android/` folder is not committed, so it must be
-   generated) followed by `npx cap sync android`.
-4. Decode `ANDROID_KEYSTORE_BASE64` into `android/app/release-key.keystore`.
-5. Inject a `signingConfigs.release` block into the generated
-   `android/app/build.gradle` that reads `KEYSTORE_PASSWORD`, `KEY_ALIAS`,
-   `KEY_PASSWORD` from the environment and points at `release-key.keystore`,
-   then attach it to the `release` build type.
-6. `./gradlew assembleRelease` in `android/` with those three env vars set from
-   `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`.
-7. `actions/upload-artifact@v4` uploads
-   `android/app/build/outputs/apk/release/app-release.apk` as artifact
-   `app-release-apk` (`if-no-files-found: error`).
+## The fix
 
-## Technical notes
+**1. Rewrite `scripts/android-release.cjs`**
 
-- Signing must be injected because Capacitor's generated `build.gradle` has no
-  release signing config; step 5 does this with a small inline `node`/`sed`
-  patch inside the workflow, using the exact env names you specified.
-- Concurrency group `android-release-yml` with `cancel-in-progress: true` so
-  rapid pushes don't queue up duplicate builds.
+- Replace regex block-hunting with a small brace-matching parser: locate the
+  `android { ... }` block, then its direct `buildTypes { ... }` child, then that
+  block's direct `release { ... }` child, tracking nesting depth and ignoring
+  braces inside strings/comments.
+- Update `versionCode` / `versionName` only inside `defaultConfig`.
+- Insert `signingConfigs { release { ... } }` as a direct child of `android { }`
+  (before `buildTypes`), reading `ANDROID_KEYSTORE_FILE`,
+  `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` via
+  `System.getenv(...)`. Skip if already present, so re-runs are idempotent.
+- Add `signingConfig signingConfigs.release` only inside `buildTypes.release`,
+  never inside `signingConfigs`, and never twice.
+- After patching, self-verify: fail with a clear message unless there is exactly
+  one `signingConfigs.release` definition, exactly one `signingConfig
+  signingConfigs.release` reference, and that reference sits inside
+  `buildTypes.release`. Print the patched block to the CI log.
+- Validate that the keystore file named by `ANDROID_KEYSTORE_FILE` exists and is
+  non-empty before writing anything.
 
-## Heads-up: overlap with the existing pipeline
+**2. Update `.github/workflows/android-apk.yml`**
 
-`.github/workflows/android-apk.yml` already builds and signs an APK on every push
-to `main` (using `ANDROID_*` env names, an R2 upload, and OTA manifests). Adding
-this new workflow means two Android builds per push. I'll add the new file exactly
-as requested and leave the existing one untouched; say the word if you'd rather
-disable or replace `android-apk.yml`.
+- Pin `actions/checkout@v4`, `actions/setup-node@v4`, `actions/setup-java@v4`
+  (temurin), `android-actions/setup-android@v3`.
+- Keep the single "Configure signed upgrade build" step that exports
+  `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`,
+  `ANDROID_KEY_PASSWORD`, `ANDROID_KEYSTORE_FILE`, `ANDROID_VERSION_NAME`
+  (`steps.meta.outputs.version`) and `ANDROID_VERSION_CODE`
+  (`github.run_number`); decode the base64 keystore to
+  `android/release.keystore` and then run `node scripts/android-release.cjs`.
+  Decoding uses `base64 --decode -i` with whitespace tolerated, and the step
+  fails loudly if the decoded file is empty.
+- Build with `./gradlew assembleRelease --stacktrace` inside `working-directory:
+  android`, passing only the signing env vars — no `-P` flags or duplicated
+  gradle arguments.
+- Leave the rest of the pipeline (offline bundle, permissions patch, artifact
+  upload, R2 sync, release attachment) unchanged.
+
+## One deviation to flag
+
+You asked for Java 17. This project is on Capacitor 8, which requires JDK 21 —
+Java 17 would fail the Gradle build outright. The workflow will stay on
+`java-version: 21` (temurin). Node stays at 24, which the rest of the pipeline
+already uses; I can drop it to 22 if you prefer.
