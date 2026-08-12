@@ -126,7 +126,41 @@ function jsonValue<T>(value: unknown, fallback: T): T {
   }
 }
 
-export const productToRow = (p: Product): Row => ({
+/** Strict numeric coercion: "" / null / NaN / Infinity never reach the database. */
+export const safeNum = (value: unknown, fallback = 0): number => {
+  if (value === "" || value == null || typeof value === "boolean") return fallback;
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : fallback;
+};
+
+/** Integer columns must never receive a decimal. */
+const safeInt = (value: unknown, fallback = 0): number => Math.round(safeNum(value, fallback));
+
+/** Optional numeric columns keep NULL rather than collapsing to zero. */
+const safeNumOrNull = (value: unknown): number | null => {
+  if (value === "" || value == null) return null;
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
+};
+
+const safeArray = <T,>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
+
+const safeStockMap = (value: unknown): Record<string, number> => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const out: Record<string, number> = {};
+  for (const [key, qty] of Object.entries(value as Record<string, unknown>)) {
+    if (!key) continue;
+    out[key] = safeInt(qty);
+  }
+  return out;
+};
+
+export const productToRow = (p: Product): Row => {
+  const stock =
+    p.stockByStore && typeof p.stockByStore === "object" && !Array.isArray(p.stockByStore)
+      ? safeStockMap(p.stockByStore)
+      : null;
+  return {
   id: p.id,
   barcode: p.barcode || p.sku || p.id,
   name: p.name,
@@ -134,27 +168,30 @@ export const productToRow = (p: Product): Row => ({
   category: p.category ?? null,
   sub_category: p.subCategory ?? null,
   unit: p.unit ?? null,
-  packs: p.packs ?? [],
-  barcode_aliases: p.barcodes ?? [],
-  cost_price: p.cost ?? 0,
-  selling_price: p.price ?? 0,
-  ecom_price: p.ecomPrice ?? null,
+  packs: safeArray(p.packs),
+  barcode_aliases: safeArray<string>(p.barcodes)
+    .map((b) => String(b ?? "").trim())
+    .filter(Boolean),
+  cost_price: safeNum(p.cost),
+  selling_price: safeNum(p.price),
+  ecom_price: safeNumOrNull(p.ecomPrice),
   ecom_visible: p.ecomVisible ?? true,
   is_archived: p.archived === true,
   archived_at: p.archived ? new Date().toISOString() : null,
   // Stock is only ever written when the caller actually carries the per-branch
   // map. A product saved without it (a price or name edit, a partial import)
   // must never zero the quantity that is already banked in the database.
-  ...(p.stockByStore && typeof p.stockByStore === "object"
+  ...(stock
     ? {
-        stock_quantity: Object.values(p.stockByStore).reduce((a, b) => a + (b || 0), 0),
-        stock_by_store: p.stockByStore,
+        stock_quantity: safeInt(Object.values(stock).reduce((a, b) => a + b, 0)),
+        stock_by_store: stock,
       }
     : {}),
-  reorder_level: p.reorderLevel ?? 0,
-  tax_rate: p.taxRate ?? 0,
-  custom_points: p.customPoints ?? null,
-});
+  reorder_level: safeInt(p.reorderLevel),
+  tax_rate: safeNum(p.taxRate),
+  custom_points: safeNumOrNull(p.customPoints),
+  };
+};
 
 const rowToMember = (r: Row, tierName: (id: string | null) => MemberTier): Member => ({
   id: r.id,
