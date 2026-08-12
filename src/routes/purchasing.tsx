@@ -337,13 +337,22 @@ function Purchasing() {
       }
 
       const picked = suppliers.find((s) => s.name === supplier.trim());
+      // A receiving order must never land without a branch: fall back to the
+      // branch this terminal is bound to when the view has not resolved one.
+      const storeId = currentStore.id || activeBranchId(currentStore.id);
+      if (!storeId) {
+        toast.error("This terminal has no branch yet", {
+          description: "Activate the terminal or pick a branch before receiving stock.",
+        });
+        return;
+      }
       const invoice: ReceivingInvoice = {
         id: crypto.randomUUID(),
         invoiceNo: ref,
         supplier: supplier.trim(),
         supplierId: picked?.id ?? null,
         operator: user?.name ?? "—",
-        storeId: currentStore.id,
+        storeId,
         storeCode: currentStore.code,
         invoiceDate,
         entryDate: new Date(entryDate).toISOString(),
