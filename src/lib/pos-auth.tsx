@@ -516,20 +516,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         cashierId: account.id,
         permissions: account.permissions as unknown as TerminalUser["permissions"],
       };
-      // Best effort: line the Auth password up with the PIN so the till also
-      // holds a real session for the calls that need one.
-      try {
-        const prepared = await preparePinAccount(account.username, pin);
-        if (prepared.ok) {
-          const { error } = await supabase.auth.signInWithPassword({
-            email: prepared.email,
-            password: pin,
-          });
-          if (!error) await finishAccountPinSignIn(account.username, pin);
-        }
-      } catch {
-        /* the signed device session below is enough to keep working */
-      }
     } else {
       return { ok: false, error: failure || "Invalid username or PIN" };
     }
@@ -591,6 +577,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       void ensureTerminalSession();
     } catch {
       /* the server relay still carries the writes */
+    }
+    // Last: line the Auth password up with the PIN so the till also holds a
+    // real session, and let the account's own profile (role, branch, rights)
+    // replace the summary above when it arrives.
+    if (verified?.cashier) {
+      try {
+        const prepared = await preparePinAccount(next.userCode, pin);
+        if (prepared.ok) {
+          const { error } = await supabase.auth.signInWithPassword({
+            email: prepared.email,
+            password: pin,
+          });
+          if (!error) await finishAccountPinSignIn(next.userCode, pin);
+        }
+      } catch {
+        /* the signed device session already keeps the till working */
+      }
     }
     return { ok: true };
   }, [finishAccountPinSignIn]);
