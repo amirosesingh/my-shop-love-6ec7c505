@@ -59,6 +59,7 @@ import { Route as SettingsIdentityRouteImport } from './routes/settings.identity
 import { Route as SettingsInheritanceRouteImport } from './routes/settings.inheritance'
 import { Route as SettingsLinesRouteImport } from './routes/settings.lines'
 import { Route as SettingsMobileTerminalsRouteImport } from './routes/settings.mobile-terminals'
+import { Route as SettingsNotificationsRouteImport } from './routes/settings.notifications'
 import { Route as SettingsNumberingRouteImport } from './routes/settings.numbering'
 import { Route as SettingsPaymentRouteImport } from './routes/settings.payment'
 import { Route as SettingsPrinterRouteImport } from './routes/settings.printer'
@@ -335,6 +336,11 @@ const SettingsMobileTerminalsRoute = SettingsMobileTerminalsRouteImport.update({
   path: '/settings/mobile-terminals',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsNotificationsRoute = SettingsNotificationsRouteImport.update({
+  id: '/settings/notifications',
+  path: '/settings/notifications',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsNumberingRoute = SettingsNumberingRouteImport.update({
   id: '/settings/numbering',
   path: '/settings/numbering',
@@ -510,6 +516,7 @@ export interface FileRoutesByFullPath {
   '/settings/inheritance': typeof SettingsInheritanceRoute
   '/settings/lines': typeof SettingsLinesRoute
   '/settings/mobile-terminals': typeof SettingsMobileTerminalsRoute
+  '/settings/notifications': typeof SettingsNotificationsRoute
   '/settings/numbering': typeof SettingsNumberingRoute
   '/settings/payment': typeof SettingsPaymentRoute
   '/settings/printer': typeof SettingsPrinterRoute
@@ -587,6 +594,7 @@ export interface FileRoutesByTo {
   '/settings/inheritance': typeof SettingsInheritanceRoute
   '/settings/lines': typeof SettingsLinesRoute
   '/settings/mobile-terminals': typeof SettingsMobileTerminalsRoute
+  '/settings/notifications': typeof SettingsNotificationsRoute
   '/settings/numbering': typeof SettingsNumberingRoute
   '/settings/payment': typeof SettingsPaymentRoute
   '/settings/printer': typeof SettingsPrinterRoute
@@ -665,6 +673,7 @@ export interface FileRoutesById {
   '/settings/inheritance': typeof SettingsInheritanceRoute
   '/settings/lines': typeof SettingsLinesRoute
   '/settings/mobile-terminals': typeof SettingsMobileTerminalsRoute
+  '/settings/notifications': typeof SettingsNotificationsRoute
   '/settings/numbering': typeof SettingsNumberingRoute
   '/settings/payment': typeof SettingsPaymentRoute
   '/settings/printer': typeof SettingsPrinterRoute
@@ -744,6 +753,7 @@ export interface FileRouteTypes {
     | '/settings/inheritance'
     | '/settings/lines'
     | '/settings/mobile-terminals'
+    | '/settings/notifications'
     | '/settings/numbering'
     | '/settings/payment'
     | '/settings/printer'
@@ -821,6 +831,7 @@ export interface FileRouteTypes {
     | '/settings/inheritance'
     | '/settings/lines'
     | '/settings/mobile-terminals'
+    | '/settings/notifications'
     | '/settings/numbering'
     | '/settings/payment'
     | '/settings/printer'
@@ -898,6 +909,7 @@ export interface FileRouteTypes {
     | '/settings/inheritance'
     | '/settings/lines'
     | '/settings/mobile-terminals'
+    | '/settings/notifications'
     | '/settings/numbering'
     | '/settings/payment'
     | '/settings/printer'
@@ -976,6 +988,7 @@ export interface RootRouteChildren {
   SettingsInheritanceRoute: typeof SettingsInheritanceRoute
   SettingsLinesRoute: typeof SettingsLinesRoute
   SettingsMobileTerminalsRoute: typeof SettingsMobileTerminalsRoute
+  SettingsNotificationsRoute: typeof SettingsNotificationsRoute
   SettingsNumberingRoute: typeof SettingsNumberingRoute
   SettingsPaymentRoute: typeof SettingsPaymentRoute
   SettingsPrinterRoute: typeof SettingsPrinterRoute
@@ -1355,6 +1368,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsMobileTerminalsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/notifications': {
+      id: '/settings/notifications'
+      path: '/settings/notifications'
+      fullPath: '/settings/notifications'
+      preLoaderRoute: typeof SettingsNotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/numbering': {
       id: '/settings/numbering'
       path: '/settings/numbering'
@@ -1596,6 +1616,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsInheritanceRoute: SettingsInheritanceRoute,
   SettingsLinesRoute: SettingsLinesRoute,
   SettingsMobileTerminalsRoute: SettingsMobileTerminalsRoute,
+  SettingsNotificationsRoute: SettingsNotificationsRoute,
   SettingsNumberingRoute: SettingsNumberingRoute,
   SettingsPaymentRoute: SettingsPaymentRoute,
   SettingsPrinterRoute: SettingsPrinterRoute,

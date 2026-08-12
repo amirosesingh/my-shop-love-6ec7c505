@@ -176,7 +176,7 @@ function NotificationSettingsPage() {
                     <ThemedSelect
                       className="h-9 w-52"
                       value={cfg.channels[t.type] ?? "app"}
-                      onValueChange={(v) =>
+                      onChange={(v) =>
                         patch({ channels: { ...cfg.channels, [t.type]: v as Channel } })
                       }
                       options={CHANNEL_OPTIONS}
