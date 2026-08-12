@@ -14,6 +14,72 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_events: {
+        Row: {
+          actor_id: string | null
+          actor_name: string | null
+          actor_role: string | null
+          amount: number | null
+          client_event_id: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          event_type: string
+          id: string
+          message: string
+          meta: Json
+          severity: string
+          store_id: string | null
+          terminal_id: string | null
+          terminal_name: string | null
+          title: string
+          whatsapp_error: string | null
+          whatsapp_status: string
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_name?: string | null
+          actor_role?: string | null
+          amount?: number | null
+          client_event_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          event_type: string
+          id?: string
+          message?: string
+          meta?: Json
+          severity?: string
+          store_id?: string | null
+          terminal_id?: string | null
+          terminal_name?: string | null
+          title: string
+          whatsapp_error?: string | null
+          whatsapp_status?: string
+        }
+        Update: {
+          actor_id?: string | null
+          actor_name?: string | null
+          actor_role?: string | null
+          amount?: number | null
+          client_event_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          event_type?: string
+          id?: string
+          message?: string
+          meta?: Json
+          severity?: string
+          store_id?: string | null
+          terminal_id?: string | null
+          terminal_name?: string | null
+          title?: string
+          whatsapp_error?: string | null
+          whatsapp_status?: string
+        }
+        Relationships: []
+      }
       app_users: {
         Row: {
           auth_user_id: string | null
@@ -704,6 +770,7 @@ export type Database = {
           id: number
           integration_settings: Json
           max_shift_hours: number
+          notification_settings: Json
           paper_size: string
           phone: string | null
           qr: Json
@@ -742,6 +809,7 @@ export type Database = {
           id?: number
           integration_settings?: Json
           max_shift_hours?: number
+          notification_settings?: Json
           paper_size?: string
           phone?: string | null
           qr?: Json
@@ -780,6 +848,7 @@ export type Database = {
           id?: number
           integration_settings?: Json
           max_shift_hours?: number
+          notification_settings?: Json
           paper_size?: string
           phone?: string | null
           qr?: Json
