@@ -168,14 +168,51 @@ const isMissingColumn = (error: { message?: string; code?: string } | null, colu
  * Insert a token row, dropping columns an older database does not have yet
  * (`platform`, `is_claimed`, `expires_at` arrive with schema25/schema26).
  */
+const UNSUPPORTED_KEY = "pos.terminal_tokens.unsupported.v1";
+
+/** Columns this database has already rejected — remembered so we ask once. */
+function unsupportedColumns(): Set<string> {
+  const url = supabaseConfig().url;
+  if (typeof window === "undefined") return new Set();
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(UNSUPPORTED_KEY) ?? "{}") as Record<
+      string,
+      string[]
+    >;
+    return new Set(saved[url] ?? []);
+  } catch {
+    return new Set();
+  }
+}
+
+function rememberUnsupported(column: string): void {
+  if (typeof window === "undefined") return;
+  const url = supabaseConfig().url;
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(UNSUPPORTED_KEY) ?? "{}") as Record<
+      string,
+      string[]
+    >;
+    const list = new Set(saved[url] ?? []);
+    list.add(column);
+    saved[url] = [...list];
+    window.localStorage.setItem(UNSUPPORTED_KEY, JSON.stringify(saved));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
 async function insertTokenRow(row: Record<string, unknown>): Promise<void> {
   const optional = ["platform", "is_claimed", "expires_at"];
   const attempt: Record<string, unknown> = { ...row };
+  // Skip straight past the columns this database told us it does not have.
+  for (const column of unsupportedColumns()) delete attempt[column];
   for (let i = 0; i <= optional.length; i += 1) {
     const { error } = await table().insert([attempt]);
     if (!error) return;
     const missing = optional.find((c) => c in attempt && isMissingColumn(error, c));
     if (!missing) throw error;
+    rememberUnsupported(missing);
     delete attempt[missing];
   }
   throw new Error("Could not save the activation token");

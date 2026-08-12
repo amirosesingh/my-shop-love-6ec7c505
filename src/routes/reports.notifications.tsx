@@ -21,6 +21,7 @@ import {
   EVENT_CATALOG,
   EVENT_LABELS,
   SEVERITY_TONE,
+  isActivityLogMissing,
   listActivityEvents,
   markActivitySeen,
   toCsv,
@@ -52,6 +53,7 @@ function NotificationsReport() {
   const [severity, setSeverity] = useState("all");
   const [actor, setActor] = useState("");
   const [busy, setBusy] = useState(false);
+  const [missing, setMissing] = useState(false);
 
   const load = useCallback(async () => {
     setBusy(true);
@@ -61,6 +63,7 @@ function NotificationsReport() {
       severities: severity === "all" ? undefined : [severity as EventSeverity],
     });
     setRows(list);
+    setMissing(isActivityLogMissing());
     markActivitySeen(list[0]?.createdAt ?? new Date().toISOString());
     setBusy(false);
   }, [type, severity]);
@@ -107,6 +110,13 @@ function NotificationsReport() {
   return (
     <AppShell>
       <div className="space-y-4 p-4">
+        {missing && (
+          <p className="rounded-md border border-border bg-surface-2 p-3 text-xs text-muted-foreground">
+            The activity log is not set up on this database yet. Run{" "}
+            <span className="font-medium">supabase/sql/35_activity_and_token_columns.sql</span> once
+            against your database to start recording events.
+          </p>
+        )}
         <div className="flex flex-wrap items-end gap-3">
           <div className="mr-auto">
             <h1 className="text-lg font-semibold">Activity & notifications</h1>

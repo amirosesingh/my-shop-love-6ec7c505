@@ -206,8 +206,25 @@ export type ActivityFilter = {
   limit?: number;
 };
 
+/**
+ * Older databases predate the activity feed. When the table is absent every
+ * poll would log a 404, so the first miss switches the feature off for the
+ * session and the UI shows a short "run the setup file" hint instead.
+ */
+let logMissing = false;
+
+export const isActivityLogMissing = () => logMissing;
+
+const looksMissing = (error: { code?: string; message?: string } | null) =>
+  !!error &&
+  (error.code === "PGRST205" ||
+    error.code === "42P01" ||
+    /activity_events/i.test(error.message ?? "") ||
+    /schema cache|does not exist/i.test(error.message ?? ""));
+
 /** Newest first. Returns [] when the caller is not an admin or supervisor. */
 export async function listActivityEvents(filter: ActivityFilter = {}): Promise<ActivityEvent[]> {
+  if (logMissing) return [];
   let q = supabase
     .from("activity_events")
     .select("*")
@@ -220,7 +237,10 @@ export async function listActivityEvents(filter: ActivityFilter = {}): Promise<A
   if (filter.from) q = q.gte("created_at", filter.from);
   if (filter.to) q = q.lte("created_at", filter.to);
   const { data, error } = await q;
-  if (error) return [];
+  if (error) {
+    if (looksMissing(error)) logMissing = true;
+    return [];
+  }
   return ((data ?? []) as Row[]).map(map);
 }
 
