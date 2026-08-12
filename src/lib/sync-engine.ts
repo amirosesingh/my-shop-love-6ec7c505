@@ -366,7 +366,7 @@ let pulling = false;
  */
 const stampColumn = new Map<string, "updated_at" | "created_at">();
 
-async function countChangedSince(table: string, since: string) {
+async function countChangedSince(table: (typeof PULL_TABLES)[number], since: string) {
   const ask = (column: string) =>
     supabaseExternal
       .from(table)
