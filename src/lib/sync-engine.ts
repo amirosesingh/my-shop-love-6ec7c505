@@ -360,6 +360,33 @@ const PULL_TABLES = [
 let pulling = false;
 
 /**
+ * Which timestamp column each table actually carries. Probed once, then
+ * remembered, so a table without `updated_at` doesn't fire a failing request
+ * (HTTP 400) on every polling cycle.
+ */
+const stampColumn = new Map<string, "updated_at" | "created_at">();
+
+async function countChangedSince(table: string, since: string) {
+  const ask = (column: string) =>
+    supabaseExternal
+      .from(table)
+      .select("id", { count: "exact", head: true })
+      .gt(column, since);
+
+  const known = stampColumn.get(table);
+  if (known) return await ask(known);
+
+  let res = await ask("updated_at");
+  if (!res.error) {
+    stampColumn.set(table, "updated_at");
+    return res;
+  }
+  res = await ask("created_at");
+  if (!res.error) stampColumn.set(table, "created_at");
+  return res;
+}
+
+/**
  * Bring down everything changed centrally since the last clean pull, so a
  * price edited at head office reaches this till without a restart.
  */
@@ -373,15 +400,7 @@ export async function pullDelta(): Promise<{ merged: number }> {
     for (const table of PULL_TABLES) {
       if (!tableSyncAllowed(table)) continue;
       // Only ask how many rows moved; the full refresh below does the reading.
-      let { count, error } = await supabaseExternal
-        .from(table)
-        .select("id", { count: "exact", head: true })
-        .gt("updated_at", since);
-      if (error)
-        ({ count, error } = await supabaseExternal
-          .from(table)
-          .select("id", { count: "exact", head: true })
-          .gt("created_at", since));
+      const { count, error } = await countChangedSince(table, since);
       if (error) {
         logSync("pull", table, false, error.message);
         continue;
