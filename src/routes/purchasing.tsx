@@ -812,6 +812,12 @@ function Purchasing() {
                     <Button
                       variant="outline"
                       size="sm"
+                      disabled={!isAdmin && !!h.storeId && h.storeId !== currentStore.id}
+                      title={
+                        !isAdmin && !!h.storeId && h.storeId !== currentStore.id
+                          ? "This invoice belongs to another branch"
+                          : undefined
+                      }
                       onClick={() => {
                         setRemovedLineIds([]);
                         setEditing(structuredClone(h));
