@@ -55,7 +55,8 @@ Because `android/app/build.gradle` is generated, there is no committed copy to
 
 ## One deviation to flag
 
-You asked for Java 17. This project is on Capacitor 8, which requires JDK 21 —
-Java 17 would fail the Gradle build outright. The workflow will stay on
-`java-version: 21` (temurin) and Node stays at 24 — the combination the rest of
-the pipeline already builds with successfully.
+You asked for Java 17, but this project is on Capacitor 8, which requires JDK 21
+— Java 17 would fail the Gradle build outright. The workflow will use the latest
+versions every tool in the chain needs: Java 21 (temurin), Node 24, and the
+current major of each action (`checkout@v4`, `setup-node@v4`, `setup-java@v4`,
+`setup-android@v3`, `upload-artifact@v4`).
