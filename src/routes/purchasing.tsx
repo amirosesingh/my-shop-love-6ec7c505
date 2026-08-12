@@ -44,6 +44,8 @@ import { money, stockAt, usePos } from "@/lib/pos-store";
 import { resolveByBarcode } from "@/lib/product-lookup";
 import { useAuth } from "@/lib/pos-auth";
 import { logger } from "@/lib/audit-log";
+import { logSystemAction } from "@/lib/system-audit";
+import { activeBranchId } from "@/lib/active-branch";
 import { cachedSuppliers, loadSuppliers, type Supplier } from "@/lib/suppliers";
 import type { Product } from "@/lib/pos-types";
 
@@ -94,6 +96,7 @@ function Purchasing() {
   const [scan, setScan] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
   const [history, setHistory] = useState<ReceivingInvoice[]>([]);
+  const [masterView, setMasterView] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<ReceivingInvoice | null>(null);
@@ -124,7 +127,7 @@ function Purchasing() {
   /** Invoice history is a database read, so it survives reloads and restarts. */
   const refreshHistory = async () => {
     try {
-      const rows = await loadReceivingInvoices(currentStore.id);
+      const rows = await loadReceivingInvoices(currentStore.id, 100, masterView);
       setHistory(rows);
       setHistoryError(null);
     } catch (e) {
@@ -135,7 +138,7 @@ function Purchasing() {
   useEffect(() => {
     void refreshHistory();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentStore.id]);
+  }, [currentStore.id, masterView]);
 
   if (!can("can_receive_purchase_order")) {
     return (
