@@ -84,7 +84,9 @@ import { parseAmount, parsePositiveAmount } from "@/lib/amount";
 import { getPosCallerAuth } from "@/lib/pos-caller-auth";
 import { evaluatePromotions, focLine } from "@/lib/pos-promotions";
 import { clearCartDraft, loadCartDraft, saveCartDraft } from "@/lib/cart-draft";
-import { openCashDrawer, printBookingSlip, printJobTag, printSaleReceipt, saleReceiptPreview } from "@/lib/pos-print";
+import { openCashDrawer, printBookingSlip, printJobTag, printSaleReceipt, printShiftReport, saleReceiptPreview } from "@/lib/pos-print";
+import { closeScreenView, derivedCashSales, varianceNeedsPin } from "@/lib/shift-close";
+import { logSystemAction } from "@/lib/system-audit";
 import { openCustomerDisplay, publishDisplay, toDisplayLine, type DisplaySnapshot } from "@/lib/customer-display";
 import { MemberHistoryDialog } from "@/components/pos/MemberHistoryDialog";
 
@@ -132,6 +134,23 @@ function Register() {
   const [countedCash, setCountedCash] = useState("");
   const [closing, setClosing] = useState(false);
   const [closeNote, setCloseNote] = useState("");
+  /** Visibility flags and derived figures for the closing screen. */
+  const closeView = closeScreenView(rules, activeShift, state.sales);
+  /** Leaving the dialog never closes the shift and never prints anything. */
+  function abandonShiftClose() {
+    setCloseShiftOpen(false);
+    if (activeShift) {
+      logSystemAction({
+        actorName: user?.name ?? activeShift.cashier,
+        actorRole: user?.role ?? null,
+        actionType: "SHIFT_CLOSE_CANCELLED",
+        entityAffected: "shifts",
+        entityId: activeShift.id,
+        storeId: currentStore.id,
+        note: "Closing screen dismissed — shift left open, nothing printed.",
+      });
+    }
+  }
   const canDiscount = can("can_give_discount");
   const [discountOverride, setDiscountOverride] = useState(false);
   const discountAllowed = canDiscount || discountOverride;
