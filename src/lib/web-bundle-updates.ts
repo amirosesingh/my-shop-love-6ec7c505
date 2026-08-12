@@ -13,6 +13,7 @@
 import { APP_VERSION } from "./app-updates";
 import { isNative } from "./native";
 import { httpGetBase64, httpGetJson } from "./native-http";
+import { fetchManifest, withTimeout } from "./update-manifest";
 
 const BASE = "https://updatecms.luckycharmsdnbhd.com/pos-app";
 /** Current layout first, legacy path second, for phones on older releases. */
@@ -76,13 +77,26 @@ export async function checkWebBundle(): Promise<string | null> {
   try {
     let manifest: Manifest | null = null;
     let feed = WEB_FEEDS[0]!;
-    for (const candidate of WEB_FEEDS) {
-      try {
-        manifest = await httpGetJson<Manifest>(`${candidate}/latest.json`);
-        feed = candidate;
-        break;
-      } catch {
-        /* try the next path */
+
+    // Preferred: the shared self-hosted manifest, which carries `bundleUrl`.
+    const shared = await fetchManifest();
+    if (shared?.bundleUrl) {
+      manifest = {
+        version: shared.version,
+        file: shared.bundleUrl.split("/").pop() || `web-${shared.version}.zip`,
+        url: shared.bundleUrl,
+      };
+    }
+
+    if (!manifest) {
+      for (const candidate of WEB_FEEDS) {
+        try {
+          manifest = await withTimeout(httpGetJson<Manifest>(`${candidate}/latest.json`));
+          feed = candidate;
+          break;
+        } catch {
+          /* try the next path */
+        }
       }
     }
     const current = readState()?.version ?? APP_VERSION;
