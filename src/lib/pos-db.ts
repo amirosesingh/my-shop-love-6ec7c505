@@ -925,7 +925,12 @@ export async function loadReceivingInvoices(
     .select("*, purchase_order_items(*)")
     .order("invoice_entry_date", { ascending: false })
     .limit(limit);
-  if (storeId) q = q.or(`store_id.eq.${storeId},store_id.is.null`) as typeof q;
+  if (storeId) {
+    // PostgREST needs the literal quoted; branch ids are free text and may hold
+    // a comma, dot or space that would otherwise break the filter (400).
+    const quoted = `"${storeId.replace(/"/g, '\\"')}"`;
+    q = q.or(`store_id.eq.${quoted},store_id.is.null`) as typeof q;
+  }
   const res = await q;
   if (res.error) throw res.error;
   return ((res.data as Row[] | null) ?? []).map(rowToReceivingInvoice);
