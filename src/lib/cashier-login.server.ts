@@ -54,7 +54,29 @@ export async function cashierLoginServer(input: {
         store_id: string | null;
       }[]
     | null;
-  const row = Array.isArray(rows) ? rows[0] : null;
+  let row = Array.isArray(rows) ? rows[0] : null;
+  // The account list shows the hidden address, so accept it as well as the
+  // bare username: resolve it to the username and check the PIN again.
+  if (!row && username.includes("@")) {
+    const lookup = await serviceRest(
+      `app_users?email=eq.${encodeURIComponent(username)}&select=user_id&limit=1`,
+    );
+    const found = lookup.ok
+      ? ((await lookup.json()) as { user_id?: string }[])[0]?.user_id
+      : null;
+    if (found) {
+      const retry = await serviceRest("rpc/verify_terminal_pin", {
+        method: "POST",
+        body: JSON.stringify({ p_user_id: found, p_pin: secret }),
+      });
+      if (retry.ok) {
+        const again = (await retry.json()) as
+          | { user_id: string; full_name: string; store_id: string | null }[]
+          | null;
+        row = Array.isArray(again) ? (again[0] ?? null) : null;
+      }
+    }
+  }
   if (!row) {
     // A failed sign-in is recorded too — repeated failures are the signal.
     await writeSystemAudit({
