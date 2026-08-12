@@ -14,6 +14,7 @@ import {
   EVENT_LABELS,
   SEVERITY_TONE,
   flushActivityQueue,
+  isActivityLogMissing,
   listActivityEvents,
   markActivitySeen,
   unseenEvents,
@@ -33,10 +34,15 @@ export function ActivityBell({ compact }: { compact?: boolean }) {
   const [rows, setRows] = useState<ActivityEvent[]>([]);
   const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
+  const [missing, setMissing] = useState(false);
 
   const refresh = useCallback(async () => {
     void flushActivityQueue();
     const list = await listActivityEvents({ limit: 40 });
+    if (isActivityLogMissing()) {
+      setMissing(true);
+      return;
+    }
     setRows(list);
     const fresh = unseenEvents(list);
     setUnread(fresh.length);
@@ -49,7 +55,14 @@ export function ActivityBell({ compact }: { compact?: boolean }) {
   useEffect(() => {
     if (!allowed) return;
     void refresh();
-    const t = setInterval(() => void refresh(), POLL_MS);
+    const t = setInterval(() => {
+      // Stop polling a database that has no activity log.
+      if (isActivityLogMissing()) {
+        clearInterval(t);
+        return;
+      }
+      void refresh();
+    }, POLL_MS);
     return () => clearInterval(t);
   }, [allowed, refresh]);
 
@@ -94,7 +107,13 @@ export function ActivityBell({ compact }: { compact?: boolean }) {
           </p>
         </div>
         <div className="max-h-80 overflow-y-auto">
-          {rows.length === 0 ? (
+          {missing ? (
+            <p className="px-3 py-6 text-center text-xs text-muted-foreground">
+              The activity log is not set up on this database yet. Run
+              <span className="font-medium"> supabase/sql/35_activity_and_token_columns.sql</span> to
+              switch it on.
+            </p>
+          ) : rows.length === 0 ? (
             <p className="px-3 py-6 text-center text-xs text-muted-foreground">
               Nothing has happened yet today.
             </p>
