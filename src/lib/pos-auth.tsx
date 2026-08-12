@@ -553,33 +553,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       // Preferred path: the server endpoint checks the PIN with the internal
       // key and opens the device session in one call.
-      let cashierToken = "";
-      let sessionToken = "";
-      try {
-        const res = await fetch("/api/public/cashier-login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            username: code,
-            pin,
-            platform: typeof navigator === "undefined" ? "web" : navigator.platform || "web",
-          }),
-        });
-        const payload = (await res.json()) as {
-          ok?: boolean;
-          cashierToken?: string;
-          sessionToken?: string;
-        };
-        if (res.ok && payload.ok) {
-          cashierToken = payload.cashierToken ?? "";
-          sessionToken = payload.sessionToken ?? "";
-        }
-      } catch {
-        /* fall back to the server function below */
-      }
+      // The sign-in call above already opened the device session; reuse it.
+      let cashierToken = verified?.cashierToken ?? "";
+      let sessionToken = verified?.sessionToken ?? "";
 
       if (!cashierToken) {
-        const issued = await issueCashierSession({ data: { username: code, pin } });
+        const issued = await issueCashierSession({ data: { username: next.userCode, pin } });
         if (issued.ok) cashierToken = issued.token;
       }
 
