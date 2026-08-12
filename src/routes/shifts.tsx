@@ -37,6 +37,10 @@ import type { ShiftSession } from "@/lib/pos-types";
 import { parseAmount, parsePositiveAmount } from "@/lib/amount";
 import { getPosCallerAuth } from "@/lib/pos-caller-auth";
 import { assertShiftClosable } from "@/lib/pos-rules.functions";
+import { usePosRules } from "@/lib/pos-rules.tsx";
+import { useManagerGate } from "@/lib/manager-gate";
+import { closeScreenView, derivedCashSales, varianceNeedsPin } from "@/lib/shift-close";
+import { logSystemAction } from "@/lib/system-audit";
 
 export const Route = createFileRoute("/shifts")({
   head: () => ({
@@ -58,6 +62,8 @@ function Shifts() {
   const { state, activeShift, openShift, closeShift, refundSale, currentStore, stores } = usePos();
   const { user, isAdmin, isSupervisor } = useAuth();
   const { requirePermission } = useUserPermissions();
+  const { rules } = usePosRules();
+  const { authorize } = useManagerGate();
   const [cashier, setCashier] = useState(user?.name ?? "Cashier");
   const [float, setFloat] = useState("150");
   const [counted, setCounted] = useState("");
@@ -114,6 +120,29 @@ function Shifts() {
   const overdueNow = activeShift
     ? isShiftOverdue(activeShift, state.settings.hours)
     : false;
+
+  /* Mid-shift snapshot: supervisors always, cashiers only when switched on. */
+  const mayPrintXReport = isAdmin || isSupervisor || rules.enable_cashier_x_report;
+  // What the closing screen may reveal, and the derived figures.
+  const closeView = closeScreenView(rules, activeShift, storeSales);
+  const countedValue = parseAmount(counted);
+  const varianceNow = (countedValue ?? 0) - closeView.expected;
+
+  /** Leaving the dialog never closes the shift and never prints anything. */
+  function abandonClose() {
+    setCloseOpen(false);
+    if (activeShift) {
+      logSystemAction({
+        actorName: user?.name ?? activeShift.cashier,
+        actorRole: user?.role ?? null,
+        actionType: "SHIFT_CLOSE_CANCELLED",
+        entityAffected: "shifts",
+        entityId: activeShift.id,
+        storeId: currentStore.id,
+        note: "Closing screen dismissed — shift left open, nothing printed.",
+      });
+    }
+  }
 
   const storeIndex = stores.findIndex((s) => s.id === currentStore.id);
   const storeLabel = `Store ${storeIndex + 1}`;
