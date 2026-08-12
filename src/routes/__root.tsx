@@ -89,6 +89,16 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
             : "Something went wrong on our end. You can try refreshing or head back home."}
         </p>
         <p className="mt-2 break-words text-xs text-muted-foreground/80">{error.message}</p>
+        {error.stack && (
+          <details className="mt-3 text-left">
+            <summary className="cursor-pointer text-xs text-muted-foreground">
+              Technical details
+            </summary>
+            <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted p-2 text-[10px] leading-snug text-muted-foreground">
+              {error.stack}
+            </pre>
+          </details>
+        )}
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => {
