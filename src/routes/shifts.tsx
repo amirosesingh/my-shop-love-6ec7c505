@@ -229,12 +229,27 @@ function Shifts() {
                 recorded under whoever is signed in at the time.
               </p>
               <div className="md:col-span-4 flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => printShiftReport(activeShift, storeSales, "xreport")}
-                >
-                  <Printer className="size-4" /> Print X report
-                </Button>
+                {mayPrintXReport && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      // Read-only audit snapshot: derived from recorded sales,
+                      // never editable, and every print is logged.
+                      printShiftReport(activeShift, storeSales, "xreport");
+                      logSystemAction({
+                        actorName: user?.name ?? activeShift.cashier,
+                        actorRole: user?.role ?? null,
+                        actionType: "X_REPORT_PRINTED",
+                        entityAffected: "shifts",
+                        entityId: activeShift.id,
+                        storeId: currentStore.id,
+                        terminalId: hereId,
+                      });
+                    }}
+                  >
+                    <Printer className="size-4" /> Print X report
+                  </Button>
+                )}
                 <Button
                   disabled={!canCloseHere}
                   onClick={async () => {
