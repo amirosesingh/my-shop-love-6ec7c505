@@ -98,6 +98,12 @@ Repository → **Settings → Secrets and variables → Actions → Variables** 
 `POS_MOBILE_URL` with your POS address (must be `https`). Every later build uses
 it automatically.
 
+Also add `POS_SERVER_URL` with the same `https` address. The offline bundle runs
+entirely on the phone, but a few calls (cashier sign-in check, the sync relay,
+the staff list on the sign-in screen) need a real server. Without this variable
+those calls hit the phone's own file server, staff cannot be listed, and sign-in
+falls back to typing the username with cached offline credentials.
+
 ## Permanent signing for install-over updates
 
 Every APK published by GitHub must use the same permanent signing key. Android

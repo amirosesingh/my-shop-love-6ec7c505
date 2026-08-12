@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/pos-auth";
+import { serverUnreachableOnDevice } from "@/lib/server-origin";
 import { activeBranchId } from "@/lib/active-branch";
 import { listTerminalStaff, type TerminalStaff } from "@/lib/staff-admin";
 import { usernameFromAddress } from "@/lib/internal-domains";
@@ -60,7 +61,10 @@ export function CashierPinLogin({
   useEffect(() => {
     let live = true;
     void listTerminalStaff(activeBranchId(null))
-      .then((rows) => live && setStaff(rows))
+      // A malformed or missing answer must never blank the till: the typed
+      // username path below keeps sign-in possible.
+      .then((rows) => live && setStaff(Array.isArray(rows) ? rows : []))
+      .catch(() => live && setStaff([]))
       .finally(() => live && setLoading(false));
     return () => {
       live = false;
@@ -178,7 +182,7 @@ export function CashierPinLogin({
           <div className="flex justify-center py-8">
             <Loader2 className="size-5 animate-spin text-muted-foreground" />
           </div>
-        ) : staff.length ? (
+        ) : staff?.length ? (
           <div className="grid max-h-[46vh] grid-cols-2 gap-2 overflow-y-auto">
             {staff.map((s) => (
               <button
@@ -203,7 +207,9 @@ export function CashierPinLogin({
           </div>
         ) : (
           <p className="rounded-md border border-border bg-surface-2 p-3 text-xs text-muted-foreground">
-            No staff are listed for this terminal&apos;s branch yet. Type your username below.
+            {serverUnreachableOnDevice()
+              ? "This app build has no POS server address, so the staff list cannot load. Type your username below."
+              : "No staff are listed for this terminal's branch yet. Type your username below."}
           </p>
         )}
         <form

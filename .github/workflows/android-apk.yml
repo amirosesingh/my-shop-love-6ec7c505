@@ -69,6 +69,10 @@ jobs:
 
       - name: Build the offline app bundle
         if: ${{ !inputs.app_url }}
+        env:
+          # Where the phone should send server calls (sign-in, sync relay).
+          # Set the POS_SERVER_URL repository variable to your POS address.
+          VITE_POS_SERVER_URL: ${{ vars.POS_SERVER_URL }}
         run: npm run mobile:build
 
       - name: Add Android platform

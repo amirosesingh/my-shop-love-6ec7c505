@@ -209,10 +209,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   if (!dataReady && !offlineBypass)
     return <TillLoader onContinueOffline={() => setOfflineBypass(true)} />;
 
-  const inbound = state.transfers.filter(
+  const inbound = (state.transfers ?? []).filter(
     (t) =>
-      (t.toStoreId === currentStore.id && t.status === "in_transit") ||
-      (t.fromStoreId === currentStore.id && t.status === "requested"),
+      (t.toStoreId === currentStore?.id && t.status === "in_transit") ||
+      (t.fromStoreId === currentStore?.id && t.status === "requested"),
   ).length;
 
   // Receipt identity wins; the locally captured install name is the fallback.
