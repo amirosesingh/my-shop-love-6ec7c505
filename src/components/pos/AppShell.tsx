@@ -316,7 +316,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     );
 
   return (
-    <div className="pos-scaled flex h-screen flex-col overflow-hidden bg-background text-foreground">
+    <div className="pos-scaled flex h-dvh min-h-dvh flex-col overflow-hidden bg-background text-foreground">
       <DbConnectionModal />
       {/* Frameless desktop shell: draggable strip under the native window buttons. */}
       {isDesktop() && (
@@ -354,14 +354,14 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {/* Mobile top bar + slide-out drawer */}
-        <header className="flex shrink-0 items-center gap-2 border-b border-border bg-sidebar px-3 py-2 md:hidden">
+        <header className="pt-safe sticky top-0 z-30 flex shrink-0 items-center gap-2 border-b border-border bg-sidebar px-3 pb-2 md:hidden">
           <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="Open menu">
+              <Button variant="ghost" size="icon" aria-label="Open menu" className="touch-target">
                 <Menu className="size-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-72 bg-sidebar p-0">
+            <SheetContent side="left" className="pt-safe pb-safe z-50 w-72 bg-sidebar p-0">
               <SheetTitle className="sr-only">Navigation</SheetTitle>
               <SidebarNav
                 canSee={canSee}
@@ -409,7 +409,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Button
             variant="outline"
             size="sm"
-            className="h-8 shrink-0 px-2 text-[11px]"
+            className="touch-target shrink-0 px-2 text-[11px]"
             onClick={() => void lock()}
           >
             <Lock className="size-3.5" /> Lock
@@ -417,7 +417,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </header>
 
         {/* Desktop header: signed-in cashier + quick lock / switch user */}
-        <header className="hidden shrink-0 items-center gap-3 border-b border-border bg-sidebar px-4 py-2 md:flex">
+        <header className="sticky top-0 z-30 hidden shrink-0 items-center gap-3 border-b border-border bg-sidebar px-4 py-2 md:flex">
           <div className="min-w-0">
             <p className="truncate text-sm font-medium">{user.name}</p>
             <p className="text-[11px] capitalize text-muted-foreground">

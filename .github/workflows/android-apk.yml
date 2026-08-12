@@ -139,6 +139,12 @@ jobs:
           echo "$manifest" > latest/android/latest.json
           echo "$manifest" > versioned/android/latest.json
           echo "$manifest" > release-assets/latest.json
+          # Unified cross-platform manifest read by Android, Windows and web.
+          base="https://updatecms.luckycharmsdnbhd.com/pos-app"
+          build=$(echo "$v" | awk -F. '{printf "%d", ($1*10000)+($2*100)+$3}')
+          printf '{"version":"%s","buildNumber":%s,"releaseNotes":"%s","apkUrl":"%s/latest/android/NorthwindPOS-%s.apk","bundleUrl":"%s/latest/android/web/web-%s.zip"}\n' \
+            "$v" "$build" "Release $v" "$base" "$v" "$base" "$v" > release-assets/manifest.json
+          cp release-assets/manifest.json latest/manifest.json 2>/dev/null || { mkdir -p latest && cp release-assets/manifest.json latest/manifest.json; }
           if [ -z "${{ inputs.app_url }}" ]; then
             (cd capacitor-shell && zip -qr "$GITHUB_WORKSPACE/versioned/android/web/web-$v.zip" .)
             cp "versioned/android/web/web-$v.zip" "latest/android/web/web-$v.zip"
@@ -173,6 +179,10 @@ jobs:
             --endpoint-url "$R2_ENDPOINT" --cache-control "no-cache" --delete
           aws s3 sync latest/android s3://updatelccms/pos-app/android \
             --endpoint-url "$R2_ENDPOINT" --cache-control "no-cache" --delete
+          # Root manifest.json — the single feed every platform reads.
+          aws s3 cp release-assets/manifest.json s3://updatelccms/pos-app/manifest.json \
+            --endpoint-url "$R2_ENDPOINT" --cache-control "no-cache" \
+            --content-type "application/json"
 
       - name: Attach APK to the GitHub release
         if: startsWith(github.ref, 'refs/tags/v')

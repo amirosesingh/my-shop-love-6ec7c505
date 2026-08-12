@@ -251,3 +251,95 @@
 .app-no-drag {
   -webkit-app-region: no-drag;
 }
+
+/* ── Safe areas, viewport and platform chrome ─────────────────────────────
+   Android (especially Samsung One UI) draws the app edge-to-edge under the
+   status bar and gesture handle. These variables expose the OS insets to the
+   layout so nothing hides behind a notch or camera cutout.               */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+
+  /* Z-index scale — sticky headers sit under drawers and their backdrop. */
+  --z-header: 30;
+  --z-backdrop: 40;
+  --z-drawer: 50;
+}
+
+/** Header padding that clears the status bar / cutout. */
+@utility pt-safe {
+  padding-top: calc(max(env(safe-area-inset-top), 0px) + 0.75rem);
+}
+
+/** Footer padding that clears the gesture bar. */
+@utility pb-safe {
+  padding-bottom: max(env(safe-area-inset-bottom), 0.75rem);
+}
+
+/** Horizontal insets for landscape phones with a side cutout. */
+@utility px-safe {
+  padding-left: max(env(safe-area-inset-left), 0px);
+  padding-right: max(env(safe-area-inset-right), 0px);
+}
+
+/** Minimum comfortable touch target on phones and touch tills. */
+@utility touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Custom scrollbars: thin and themed on desktop, untouched on touch shells. */
+@media (pointer: fine) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--color-muted-foreground) 45%, transparent)
+      transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    background-clip: padding-box;
+    border-radius: 9999px;
+    background-color: color-mix(in oklab, var(--color-muted-foreground) 35%, transparent);
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in oklab, var(--color-muted-foreground) 60%, transparent);
+  }
+}
+
+/* One UI style grouped list: rounded card with hairline rows. */
+@utility tile-group {
+  border-radius: var(--radius-2xl);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-card);
+  overflow: hidden;
+}
+
+@utility tile-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  min-height: 56px;
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+@media (pointer: fine) {
+  .tile-row:hover {
+    background-color: color-mix(in oklab, var(--color-muted) 55%, transparent);
+  }
+}

@@ -1,11 +1,59 @@
-import { DownloadCloud, Loader2, RefreshCw } from "lucide-react";
+import { CheckCircle2, DownloadCloud, Loader2, RefreshCw, Smartphone, Monitor, Globe } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { APP_VERSION, useAppUpdates } from "@/lib/app-updates";
-import { useEffect, useState } from "react";
 import { useAndroidUpdates } from "@/lib/android-updates";
 import { isAndroid, isNative } from "@/lib/native";
 import { checkWebBundle } from "@/lib/web-bundle-updates";
+import { MANIFEST_URL } from "@/lib/update-manifest";
+
+/* ── One UI style tiles ──────────────────────────────────────────────── */
+
+export function TileGroup({ title, children }: { title?: string; children: ReactNode }) {
+  return (
+    <section className="space-y-2">
+      {title && (
+        <h3 className="px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          {title}
+        </h3>
+      )}
+      <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
+        {children}
+      </div>
+    </section>
+  );
+}
+
+export function TileRow({
+  label,
+  value,
+  hint,
+  icon,
+  children,
+}: {
+  label: string;
+  value?: ReactNode;
+  hint?: ReactNode;
+  icon?: ReactNode;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="flex min-h-[56px] items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50">
+      {icon && <span className="shrink-0 text-primary">{icon}</span>}
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium">{label}</p>
+        {hint && <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>}
+        {children}
+      </div>
+      {value !== undefined && (
+        <div className="shrink-0 text-right text-sm text-muted-foreground">{value}</div>
+      )}
+    </div>
+  );
+}
+
+/* ── Update centre ───────────────────────────────────────────────────── */
 
 const LABELS: Record<string, string> = {
   idle: "Not checked yet",
@@ -14,89 +62,141 @@ const LABELS: Record<string, string> = {
   downloading: "Downloading update…",
   ready: "Update ready — restart to install",
   error: "Update check failed",
-  unavailable: "Automatic updates are not available in this build",
+  unavailable: "This build installs updates from the web server",
 };
 
-/** Current version, manual check, and restart-to-install. On the web build the
- *  card still shows the running version, with checks disabled. */
+/**
+ * One update card for every platform. All three shells read the same
+ * self-hosted manifest; only the install action differs.
+ */
 export function AppUpdateSettings() {
-  const { state, supported, check, install, lastChecked } = useAppUpdates();
-  const [onAndroid, setOnAndroid] = useState(false);
-  const version = state.version || APP_VERSION;
+  const [platform, setPlatform] = useState<"web" | "android" | "windows">("web");
 
   useEffect(() => {
-    setOnAndroid(isNative() && isAndroid());
+    setPlatform(isNative() && isAndroid() ? "android" : "web");
   }, []);
 
-  if (onAndroid) return <AndroidUpdateCard />;
+  if (platform === "android") return <AndroidUpdateCard />;
+  return <DesktopUpdateCard />;
+}
+
+function DesktopUpdateCard() {
+  const {
+    state,
+    supported,
+    check,
+    install,
+    lastChecked,
+    manifestChecking,
+    manifestVersion,
+    manifestNewer,
+    releaseNotes,
+    downloadUrl,
+  } = useAppUpdates();
+
+  const version = state.version || APP_VERSION;
+  const busy = manifestChecking || state.status === "checking" || state.status === "downloading";
+
+  const status = manifestChecking
+    ? LABELS["checking"]
+    : supported
+      ? (LABELS[state.status] ?? state.status)
+      : manifestNewer
+        ? "A newer version is published"
+        : manifestVersion
+          ? LABELS["current"]
+          : LABELS["unavailable"];
 
   return (
-    <section className="rounded-lg border border-border bg-card p-5">
-      <h2 className="flex items-center gap-2 text-lg font-semibold">
-        <DownloadCloud className="size-4 text-primary" /> App updates
-      </h2>
-      <p className="mt-1 text-xs text-muted-foreground">
-        {supported
-          ? "This till checks for new versions in the background. Updates never interrupt a shift — they install when you restart. Your terminal registration is kept."
-          : "You are running the browser version, which is always up to date. Automatic updates apply to the Windows desktop till."}
-      </p>
+    <div className="space-y-4">
+      <TileGroup title="Version">
+        <TileRow
+          icon={supported ? <Monitor className="size-4" /> : <Globe className="size-4" />}
+          label="Installed version"
+          hint={supported ? "Windows till" : "Browser build"}
+          value={<span className="numeric font-semibold text-foreground">v{version}</span>}
+        />
+        <TileRow
+          label="Latest published"
+          hint="From the update server"
+          value={
+            <span className="numeric font-semibold text-foreground">
+              {manifestVersion ? `v${manifestVersion}` : "—"}
+            </span>
+          }
+        />
+        <TileRow label="Update source" hint={MANIFEST_URL} />
+      </TileGroup>
 
-      <dl className="mt-4 grid gap-3 sm:grid-cols-2">
-        <div className="rounded-md border border-border px-3 py-2">
-          <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">
-            Installed version
-          </dt>
-          <dd className="numeric text-sm font-semibold">v{version}</dd>
-        </div>
-        <div className="rounded-md border border-border px-3 py-2">
-          <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">Status</dt>
-          <dd className="text-sm">
-            {supported ? (LABELS[state.status] ?? state.status) : LABELS["unavailable"]}
-            {state.available && state.status !== "current" && (
-              <span className="numeric ml-1 text-primary">→ v{state.available}</span>
-            )}
-          </dd>
-          {lastChecked && (
-            <dd className="text-[11px] text-muted-foreground">
-              Last checked {lastChecked.toLocaleString()}
-            </dd>
-          )}
-        </div>
-      </dl>
+      <TileGroup title="Status">
+        <TileRow
+          icon={
+            busy ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : manifestNewer || state.available ? (
+              <DownloadCloud className="size-4" />
+            ) : (
+              <CheckCircle2 className="size-4" />
+            )
+          }
+          label={status}
+          hint={lastChecked ? `Last checked ${lastChecked.toLocaleString()}` : "Not checked yet"}
+          value={
+            state.available && state.status !== "current" ? (
+              <span className="numeric text-primary">→ v{state.available}</span>
+            ) : undefined
+          }
+        />
+        {state.status === "downloading" && (
+          <div className="px-4 py-3">
+            <Progress value={state.percent} className="h-2" aria-label="Update download progress" />
+          </div>
+        )}
+        {releaseNotes && (
+          <TileRow label="Release notes" hint={releaseNotes} />
+        )}
+        {state.error && (
+          <TileRow label="Last error" hint={<span className="text-destructive">{state.error}</span>} />
+        )}
+      </TileGroup>
 
-      {state.status === "downloading" && (
-        <Progress value={state.percent} className="mt-3 h-2" aria-label="Update download progress" />
-      )}
-
-      {state.error && <p className="mt-2 text-xs text-destructive">{state.error}</p>}
-
-      <div className="mt-4 flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Button
           variant="outline"
-          size="sm"
-          disabled={!supported || state.status === "checking" || state.status === "downloading"}
+          className="touch-target"
+          disabled={busy}
           onClick={() => void check()}
         >
-          {state.status === "checking" ? (
-            <Loader2 className="size-3.5 animate-spin" />
-          ) : (
-            <RefreshCw className="size-3.5" />
-          )}
+          {busy ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
           Check for updates now
         </Button>
-        {state.status === "ready" && (
-          <Button size="sm" onClick={() => void install()}>
+        {supported && state.status === "ready" && (
+          <Button className="touch-target" onClick={() => void install()}>
             Restart and install
           </Button>
         )}
+        {!supported && downloadUrl && (
+          <Button asChild className="touch-target">
+            <a href={downloadUrl} rel="noreferrer">
+              Download v{manifestVersion}
+            </a>
+          </Button>
+        )}
       </div>
-    </section>
+
+      <p className="px-1 text-xs text-muted-foreground">
+        {supported
+          ? "Updates download quietly in the background and install when you restart — a shift is never interrupted. Your terminal registration is kept."
+          : "The browser build always serves the newest files. Downloads here are for the Windows till installer."}
+      </p>
+    </div>
   );
 }
 
-/** Android till: same card, driven by the APK feed plus the live web bundle. */
+/** Android till: APK manifest plus the live web bundle, no store involved. */
 function AndroidUpdateCard() {
   const { state, available, check, install } = useAndroidUpdates();
+  const [bundle, setBundle] = useState<string | null>(null);
 
   const status = state.checking
     ? "Checking for updates…"
@@ -109,71 +209,92 @@ function AndroidUpdateCard() {
           : "Not checked yet";
 
   return (
-    <section className="rounded-lg border border-border bg-card p-5">
-      <h2 className="flex items-center gap-2 text-lg font-semibold">
-        <DownloadCloud className="size-4 text-primary" /> App updates
-      </h2>
-      <p className="mt-1 text-xs text-muted-foreground">
-        This till checks for new Android releases in the background. Interface fixes arrive
-        automatically on the next launch; a full release opens Android&rsquo;s installer.
-      </p>
-
-      <dl className="mt-4 grid gap-3 sm:grid-cols-2">
-        <div className="rounded-md border border-border px-3 py-2">
-          <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">
-            Installed version
-          </dt>
-          <dd className="numeric text-sm font-semibold">v{state.installed}</dd>
-        </div>
-        <div className="rounded-md border border-border px-3 py-2">
-          <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">Status</dt>
-          <dd className="text-sm">
-            {status}
-            {available && state.latest && (
-              <span className="numeric ml-1 text-primary">&rarr; v{state.latest}</span>
-            )}
-          </dd>
-          {state.lastChecked && (
-            <dd className="text-[11px] text-muted-foreground">
-              Last checked {state.lastChecked.toLocaleString()}
-            </dd>
-          )}
-        </div>
-      </dl>
-
-      {state.downloading && (
-        <Progress
-          value={state.percent}
-          className="mt-3 h-2"
-          aria-label="Update download progress"
+    <div className="space-y-4">
+      <TileGroup title="Version">
+        <TileRow
+          icon={<Smartphone className="size-4" />}
+          label="Installed version"
+          hint="Android till"
+          value={<span className="numeric font-semibold text-foreground">v{state.installed}</span>}
         />
-      )}
+        <TileRow
+          label="Latest published"
+          hint="From the update server"
+          value={
+            <span className="numeric font-semibold text-foreground">
+              {state.latest ? `v${state.latest}` : "—"}
+            </span>
+          }
+        />
+        <TileRow label="Update source" hint={MANIFEST_URL} />
+      </TileGroup>
 
-      {state.error && <p className="mt-2 text-xs text-destructive">{state.error}</p>}
+      <TileGroup title="Status">
+        <TileRow
+          icon={
+            state.checking || state.downloading ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : available ? (
+              <DownloadCloud className="size-4" />
+            ) : (
+              <CheckCircle2 className="size-4" />
+            )
+          }
+          label={status}
+          hint={
+            state.lastChecked ? `Last checked ${state.lastChecked.toLocaleString()}` : "Not checked yet"
+          }
+          value={
+            available && state.latest ? (
+              <span className="numeric text-primary">&rarr; v{state.latest}</span>
+            ) : undefined
+          }
+        />
+        {state.downloading && (
+          <div className="px-4 py-3">
+            <Progress value={state.percent} className="h-2" aria-label="Update download progress" />
+          </div>
+        )}
+        {state.notes && <TileRow label="Release notes" hint={state.notes} />}
+        {bundle && (
+          <TileRow
+            label="Interface update"
+            hint={`v${bundle} downloaded — it applies the next time the app starts.`}
+          />
+        )}
+        {state.error && (
+          <TileRow label="Last error" hint={<span className="text-destructive">{state.error}</span>} />
+        )}
+      </TileGroup>
 
-      <div className="mt-4 flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Button
           variant="outline"
-          size="sm"
+          className="touch-target"
           disabled={state.checking || state.downloading}
           onClick={() => {
             void check();
-            void checkWebBundle();
+            void checkWebBundle().then(setBundle);
           }}
         >
           {state.checking ? (
-            <Loader2 className="size-3.5 animate-spin" />
+            <Loader2 className="size-4 animate-spin" />
           ) : (
-            <RefreshCw className="size-3.5" />
+            <RefreshCw className="size-4" />
           )}
           Check for updates now
         </Button>
         {available && (
-          <Button size="sm" disabled={state.downloading} onClick={() => void install()}>
+          <Button className="touch-target" disabled={state.downloading} onClick={() => void install()}>
             {state.downloading ? "Downloading…" : "Download and install"}
           </Button>
         )}
       </div>
-    </section>
+
+      <p className="px-1 text-xs text-muted-foreground">
+        Interface fixes arrive automatically on the next launch. A full release downloads the app
+        file from your own server and opens Android&rsquo;s installer — no app store needed.
+      </p>
+    </div>
   );
 }

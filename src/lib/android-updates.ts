@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from "react";
 import { APP_VERSION } from "./app-updates";
 import { isNative, isAndroid } from "./native";
 import { describeNetworkError, httpGetBase64, httpGetJson } from "./native-http";
+import { compareVersions, fetchManifest, resolvePlatformTarget, withTimeout } from "./update-manifest";
 
 const BASE = "https://updatecms.luckycharmsdnbhd.com/pos-app";
 /** Current layout first, legacy path second, for phones on older releases. */
@@ -23,6 +24,9 @@ export type AndroidUpdateState = {
   latest: string | null;
   file: string | null;
   feed: string | null;
+  /** Absolute APK URL from the manifest, when one was published. */
+  url: string | null;
+  notes: string | null;
   checking: boolean;
   downloading: boolean;
   percent: number;
@@ -36,6 +40,8 @@ const INITIAL: AndroidUpdateState = {
   latest: null,
   file: null,
   feed: null,
+  url: null,
+  notes: null,
   checking: false,
   downloading: false,
   percent: 0,
@@ -45,26 +51,47 @@ const INITIAL: AndroidUpdateState = {
 
 /** "1.2.10" > "1.2.9" — plain numeric compare, missing parts count as 0. */
 export function isNewer(candidate: string, current: string): boolean {
-  const a = candidate.split(".").map((n) => Number.parseInt(n, 10) || 0);
-  const b = current.split(".").map((n) => Number.parseInt(n, 10) || 0);
-  for (let i = 0; i < Math.max(a.length, b.length); i += 1) {
-    const x = a[i] ?? 0;
-    const y = b[i] ?? 0;
-    if (x !== y) return x > y;
-  }
-  return false;
+  return compareVersions(candidate, current) > 0;
 }
 
-async function fetchLatest(): Promise<{ version: string; file: string; feed: string }> {
+type Latest = {
+  version: string;
+  file: string;
+  feed: string;
+  url: string | null;
+  notes: string | null;
+};
+
+async function fetchLatest(): Promise<Latest> {
+  // Preferred path: the single self-hosted manifest.
+  const manifest = await fetchManifest();
+  if (manifest) {
+    const target = resolvePlatformTarget(manifest, "android");
+    const file =
+      target?.url.split("/").pop() || `NorthwindPOS-${manifest.version}.apk`;
+    return {
+      version: manifest.version,
+      file,
+      feed: FEEDS[0]!,
+      url: target?.kind === "apk" ? target.url : null,
+      notes: manifest.releaseNotes ?? null,
+    };
+  }
+
+  // Legacy per-folder feeds, for phones pointed at an older bucket layout.
   let last: unknown = new Error("No update feed is reachable.");
   for (const feed of FEEDS) {
     try {
-      const data = await httpGetJson<{ version?: string; file?: string }>(`${feed}/latest.json`);
+      const data = await withTimeout(
+        httpGetJson<{ version?: string; file?: string }>(`${feed}/latest.json`),
+      );
       if (!data?.version) throw new Error("The update feed did not report a version.");
       return {
         version: data.version,
         file: data.file || `NorthwindPOS-${data.version}.apk`,
         feed,
+        url: null,
+        notes: null,
       };
     } catch (err) {
       last = err;
@@ -75,8 +102,8 @@ async function fetchLatest(): Promise<{ version: string; file: string; feed: str
 
 /** Download the APK into app storage and open Android's package installer. */
 async function downloadAndInstall(
+  url: string,
   file: string,
-  feed: string,
   onProgress: (pct: number) => void,
 ) {
   const [{ Filesystem, Directory }, { FileOpener }] = await Promise.all([
@@ -84,7 +111,7 @@ async function downloadAndInstall(
     import("@capacitor-community/file-opener"),
   ]);
 
-  const base64 = await httpGetBase64(`${feed}/${encodeURIComponent(file)}`, onProgress);
+  const base64 = await httpGetBase64(url, onProgress);
 
   await Filesystem.writeFile({ path: file, data: base64, directory: Directory.Cache });
   const { uri } = await Filesystem.getUri({ path: file, directory: Directory.Cache });
@@ -101,22 +128,25 @@ export function useAndroidUpdates() {
     if (!isNative() || !isAndroid()) return;
     setState((s) => ({ ...s, checking: true, error: null }));
     try {
-      const { version, file, feed } = await fetchLatest();
+      const { version, file, feed, url, notes } = await fetchLatest();
       setState((s) => ({
         ...s,
-        checking: false,
         latest: version,
         file,
         feed,
+        url,
+        notes,
         lastChecked: new Date(),
       }));
     } catch (err) {
       setState((s) => ({
         ...s,
-        checking: false,
         error: describeNetworkError(err),
         lastChecked: new Date(),
       }));
+    } finally {
+      // Whatever happened above, the card must never stay on "Checking…".
+      setState((s) => ({ ...s, checking: false }));
     }
   }, []);
 
@@ -125,7 +155,9 @@ export function useAndroidUpdates() {
     try {
       const file = state.file;
       if (!file) throw new Error("No update file is available yet.");
-      await downloadAndInstall(file, state.feed ?? FEEDS[0]!, (percent: number) =>
+      const url =
+        state.url ?? `${state.feed ?? FEEDS[0]!}/${encodeURIComponent(file)}`;
+      await downloadAndInstall(url, file, (percent: number) =>
         setState((s) => ({ ...s, percent })),
       );
       setState((s) => ({ ...s, downloading: false, percent: 100 }));
@@ -136,7 +168,7 @@ export function useAndroidUpdates() {
         error: describeNetworkError(err),
       }));
     }
-  }, [state.file, state.feed]);
+  }, [state.file, state.feed, state.url]);
 
   useEffect(() => {
     if (!isNative() || !isAndroid()) return;

@@ -4,6 +4,12 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { APP_VERSION as GENERATED_VERSION } from "../version";
+import {
+  fetchManifest,
+  isNewerVersion,
+  resolvePlatformTarget,
+  type UpdateManifest,
+} from "./update-manifest";
 
 /** Version baked in at build time — shown on web where there is no bridge. */
 export const APP_VERSION: string = GENERATED_VERSION;
@@ -45,6 +51,8 @@ export function useAppUpdates() {
   const [state, setState] = useState<UpdateState>(INITIAL);
   const [supported, setSupported] = useState(false);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
+  const [manifest, setManifest] = useState<UpdateManifest | null>(null);
+  const [manifestChecking, setManifestChecking] = useState(false);
 
   useEffect(() => {
     const bridge = updateBridge();
@@ -59,6 +67,17 @@ export function useAppUpdates() {
   }, []);
 
   const check = useCallback(async () => {
+    // The self-hosted manifest is read on every platform: it is the only
+    // update source the web build has, and it gives the desktop card release
+    // notes and a direct installer link even when the bridge stays quiet.
+    setManifestChecking(true);
+    try {
+      const found = await fetchManifest();
+      setManifest(found);
+    } finally {
+      setManifestChecking(false);
+      setLastChecked(new Date());
+    }
     const bridge = updateBridge();
     if (!bridge) return;
     const next = await bridge.checkForUpdates();
@@ -70,5 +89,22 @@ export function useAppUpdates() {
     await updateBridge()?.installUpdate();
   }, []);
 
-  return { state, supported, check, install, lastChecked };
+  const version = state.version || APP_VERSION;
+  const manifestVersion = manifest?.version ?? null;
+  const manifestNewer = Boolean(manifestVersion && isNewerVersion(manifestVersion, version));
+  const downloadUrl = manifest && manifestNewer ? resolvePlatformTarget(manifest)?.url ?? null : null;
+
+  return {
+    state,
+    supported,
+    check,
+    install,
+    lastChecked,
+    manifest,
+    manifestChecking,
+    manifestVersion,
+    manifestNewer,
+    releaseNotes: manifest?.releaseNotes ?? null,
+    downloadUrl,
+  };
 }
