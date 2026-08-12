@@ -43,7 +43,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 21
 
       - uses: android-actions/setup-android@v3
 
@@ -101,6 +101,9 @@ jobs:
           ANDROID_VERSION_CODE: ${{ github.run_number }}
         run: |
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | tr -d '\r\n ' | base64 --decode --ignore-garbage > "$ANDROID_KEYSTORE_FILE"
+          if [ ! -s "$ANDROID_KEYSTORE_FILE" ]; then
+            echo "Decoded keystore is empty — check the ANDROID_KEYSTORE_BASE64 secret."; exit 1
+          fi
           node scripts/android-release.cjs
 
       - name: Verify generated camera permission
@@ -114,12 +117,7 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           ANDROID_KEYSTORE_FILE: ${{ github.workspace }}/android/release.keystore
         run: |
-          ./gradlew assembleRelease \
-            -Pandroid.injected.signing.store.file="$ANDROID_KEYSTORE_FILE" \
-            -Pandroid.injected.signing.store.password="$ANDROID_KEYSTORE_PASSWORD" \
-            -Pandroid.injected.signing.key.alias="$ANDROID_KEY_ALIAS" \
-            -Pandroid.injected.signing.key.password="$ANDROID_KEY_PASSWORD" \
-            --stacktrace
+          ./gradlew assembleRelease --stacktrace
 
       - name: Stage the APK and the web bundle
         run: |
