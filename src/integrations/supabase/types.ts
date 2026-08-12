@@ -755,6 +755,33 @@ export type Database = {
         }
         Relationships: []
       }
+      pin_attempts: {
+        Row: {
+          attempts: number
+          created_at: string
+          key: string
+          locked_until: string | null
+          updated_at: string
+          window_started_at: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          key: string
+          locked_until?: string | null
+          updated_at?: string
+          window_started_at?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          key?: string
+          locked_until?: string | null
+          updated_at?: string
+          window_started_at?: string
+        }
+        Relationships: []
+      }
       pos_settings: {
         Row: {
           booking_slip: Json
@@ -2308,6 +2335,17 @@ export type Database = {
         Returns: string
       }
       normalize_phone: { Args: { _phone: string }; Returns: string }
+      pin_throttle_fail: {
+        Args: {
+          _key: string
+          _limit?: number
+          _lock_secs?: number
+          _window_secs?: number
+        }
+        Returns: Json
+      }
+      pin_throttle_reset: { Args: { _key: string }; Returns: undefined }
+      pin_throttle_status: { Args: { _key: string }; Returns: Json }
       security_report_findings: {
         Args: { _deployment_ref: string; _findings: Json; _source: string }
         Returns: Json
