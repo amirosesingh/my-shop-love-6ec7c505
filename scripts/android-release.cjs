@@ -49,16 +49,20 @@ if (!gradle.includes("storeFile file(System.getenv(\"ANDROID_KEYSTORE_FILE\"))")
   gradle = gradle.replace(/\n\s*buildTypes\s*\{/, `${signing}\n    buildTypes {`);
 }
 
-const releaseBlock = /(release\s*\{)([\s\S]*?)(\n\s*\})/;
-if (!releaseBlock.test(gradle)) {
-  console.error("Could not locate the Android release build block.");
+// target release { ... } INSIDE buildTypes { ... }
+const buildTypesReleaseRegex = /(buildTypes\s*\{[\s\S]*?\brelease\s*\{)([\s\S]*?)(\n\s*\})/;
+
+if (!buildTypesReleaseRegex.test(gradle)) {
+  console.error("Could not locate release build block within buildTypes.");
   process.exit(1);
 }
-gradle = gradle.replace(releaseBlock, (whole, open, body, close) =>
-  body.includes("signingConfig signingConfigs.release")
-    ? whole
-    : `${open}\n            signingConfig signingConfigs.release${body}${close}`,
-);
+
+gradle = gradle.replace(buildTypesReleaseRegex, (whole, open, body, close) => {
+  if (body.includes("signingConfig signingConfigs.release")) {
+    return whole;
+  }
+  return `${open}\n            signingConfig signingConfigs.release${body}${close}`;
+});
 
 fs.writeFileSync(gradlePath, gradle, "utf8");
 console.log(`✓ Android release configured as ${process.env.ANDROID_VERSION_NAME} (${versionCode})`);
