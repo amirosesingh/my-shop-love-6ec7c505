@@ -44,6 +44,7 @@ import { Route as ReportsCatalogRouteImport } from './routes/reports.catalog'
 import { Route as ReportsCouponsRouteImport } from './routes/reports.coupons'
 import { Route as ReportsHistoryRouteImport } from './routes/reports.history'
 import { Route as ReportsItemsRouteImport } from './routes/reports.items'
+import { Route as ReportsNotificationsRouteImport } from './routes/reports.notifications'
 import { Route as ReportsPaymentsRouteImport } from './routes/reports.payments'
 import { Route as ReportsSalesRouteImport } from './routes/reports.sales'
 import { Route as ReportsStockRouteImport } from './routes/reports.stock'
@@ -259,6 +260,11 @@ const ReportsHistoryRoute = ReportsHistoryRouteImport.update({
 const ReportsItemsRoute = ReportsItemsRouteImport.update({
   id: '/reports/items',
   path: '/reports/items',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsNotificationsRoute = ReportsNotificationsRouteImport.update({
+  id: '/reports/notifications',
+  path: '/reports/notifications',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReportsPaymentsRoute = ReportsPaymentsRouteImport.update({
@@ -502,6 +508,7 @@ export interface FileRoutesByFullPath {
   '/reports/coupons': typeof ReportsCouponsRoute
   '/reports/history': typeof ReportsHistoryRoute
   '/reports/items': typeof ReportsItemsRoute
+  '/reports/notifications': typeof ReportsNotificationsRoute
   '/reports/payments': typeof ReportsPaymentsRoute
   '/reports/sales': typeof ReportsSalesRoute
   '/reports/stock': typeof ReportsStockRoute
@@ -580,6 +587,7 @@ export interface FileRoutesByTo {
   '/reports/coupons': typeof ReportsCouponsRoute
   '/reports/history': typeof ReportsHistoryRoute
   '/reports/items': typeof ReportsItemsRoute
+  '/reports/notifications': typeof ReportsNotificationsRoute
   '/reports/payments': typeof ReportsPaymentsRoute
   '/reports/sales': typeof ReportsSalesRoute
   '/reports/stock': typeof ReportsStockRoute
@@ -659,6 +667,7 @@ export interface FileRoutesById {
   '/reports/coupons': typeof ReportsCouponsRoute
   '/reports/history': typeof ReportsHistoryRoute
   '/reports/items': typeof ReportsItemsRoute
+  '/reports/notifications': typeof ReportsNotificationsRoute
   '/reports/payments': typeof ReportsPaymentsRoute
   '/reports/sales': typeof ReportsSalesRoute
   '/reports/stock': typeof ReportsStockRoute
@@ -739,6 +748,7 @@ export interface FileRouteTypes {
     | '/reports/coupons'
     | '/reports/history'
     | '/reports/items'
+    | '/reports/notifications'
     | '/reports/payments'
     | '/reports/sales'
     | '/reports/stock'
@@ -817,6 +827,7 @@ export interface FileRouteTypes {
     | '/reports/coupons'
     | '/reports/history'
     | '/reports/items'
+    | '/reports/notifications'
     | '/reports/payments'
     | '/reports/sales'
     | '/reports/stock'
@@ -895,6 +906,7 @@ export interface FileRouteTypes {
     | '/reports/coupons'
     | '/reports/history'
     | '/reports/items'
+    | '/reports/notifications'
     | '/reports/payments'
     | '/reports/sales'
     | '/reports/stock'
@@ -974,6 +986,7 @@ export interface RootRouteChildren {
   ReportsCouponsRoute: typeof ReportsCouponsRoute
   ReportsHistoryRoute: typeof ReportsHistoryRoute
   ReportsItemsRoute: typeof ReportsItemsRoute
+  ReportsNotificationsRoute: typeof ReportsNotificationsRoute
   ReportsPaymentsRoute: typeof ReportsPaymentsRoute
   ReportsSalesRoute: typeof ReportsSalesRoute
   ReportsStockRoute: typeof ReportsStockRoute
@@ -1261,6 +1274,13 @@ declare module '@tanstack/react-router' {
       path: '/reports/items'
       fullPath: '/reports/items'
       preLoaderRoute: typeof ReportsItemsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports/notifications': {
+      id: '/reports/notifications'
+      path: '/reports/notifications'
+      fullPath: '/reports/notifications'
+      preLoaderRoute: typeof ReportsNotificationsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reports/payments': {
@@ -1602,6 +1622,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReportsCouponsRoute: ReportsCouponsRoute,
   ReportsHistoryRoute: ReportsHistoryRoute,
   ReportsItemsRoute: ReportsItemsRoute,
+  ReportsNotificationsRoute: ReportsNotificationsRoute,
   ReportsPaymentsRoute: ReportsPaymentsRoute,
   ReportsSalesRoute: ReportsSalesRoute,
   ReportsStockRoute: ReportsStockRoute,
