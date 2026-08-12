@@ -57,5 +57,5 @@ Because `android/app/build.gradle` is generated, there is no committed copy to
 
 You asked for Java 17. This project is on Capacitor 8, which requires JDK 21 —
 Java 17 would fail the Gradle build outright. The workflow will stay on
-`java-version: 21` (temurin). Node stays at 24, which the rest of the pipeline
-already uses; I can drop it to 22 if you prefer.
+`java-version: 21` (temurin) and Node stays at 24 — the combination the rest of
+the pipeline already builds with successfully.
