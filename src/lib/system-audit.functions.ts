@@ -13,13 +13,39 @@ const entryInput = z.object({
   terminalId: z.string().max(120).nullish(),
   storeId: z.string().max(64).nullish(),
   note: z.string().max(400).nullish(),
+  sessionToken: z.string().max(400).optional(),
+  cashierToken: z.string().max(2000).optional(),
+  terminalToken: z.string().max(200).optional(),
+  accessToken: z.string().max(4000).optional(),
 });
 
 export const recordSystemAudit = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => entryInput.parse(input))
   .handler(async ({ data }) => {
+    // The edit history is only worth keeping if every line came from a proven
+    // caller, filed against the branch that caller belongs to.
+    const { verifyRelayCaller } = await import("./pos-relay.server");
+    const { resolveRelayScope } = await import("./relay-policy.server");
+    let scope: Awaited<ReturnType<typeof resolveRelayScope>>;
+    try {
+      scope = await resolveRelayScope(
+        await verifyRelayCaller({
+          ...(data.sessionToken ? { sessionToken: data.sessionToken } : {}),
+          ...(data.cashierToken ? { cashierToken: data.cashierToken } : {}),
+          ...(data.terminalToken ? { terminalToken: data.terminalToken } : {}),
+          ...(data.accessToken ? { accessToken: data.accessToken } : {}),
+        }),
+      );
+    } catch {
+      return { ok: false as const, error: "Not signed in" };
+    }
     const { writeSystemAudit } = await import("./system-audit.server");
-    await writeSystemAudit(data);
+    await writeSystemAudit({
+      ...data,
+      actorId: data.actorId ?? scope.label ?? null,
+      actorRole: data.actorRole ?? scope.role ?? null,
+      storeId: scope.isSupervisor ? (data.storeId ?? scope.storeId ?? null) : (scope.storeId ?? null),
+    });
     return { ok: true as const };
   });
 
