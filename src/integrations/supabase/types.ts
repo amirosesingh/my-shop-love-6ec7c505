@@ -622,6 +622,7 @@ export type Database = {
           phone: string
           tier_id: string | null
           total_spent: number
+          updated_at: string
         }
         Insert: {
           address?: string | null
@@ -635,6 +636,7 @@ export type Database = {
           phone: string
           tier_id?: string | null
           total_spent?: number
+          updated_at?: string
         }
         Update: {
           address?: string | null
@@ -648,6 +650,7 @@ export type Database = {
           phone?: string
           tier_id?: string | null
           total_spent?: number
+          updated_at?: string
         }
         Relationships: [
           {
@@ -666,6 +669,7 @@ export type Database = {
           id: string
           name: string
           points_multiplier: number
+          updated_at: string
         }
         Insert: {
           created_at?: string
@@ -673,6 +677,7 @@ export type Database = {
           id?: string
           name: string
           points_multiplier?: number
+          updated_at?: string
         }
         Update: {
           created_at?: string
@@ -680,6 +685,7 @@ export type Database = {
           id?: string
           name?: string
           points_multiplier?: number
+          updated_at?: string
         }
         Relationships: []
       }
@@ -925,6 +931,7 @@ export type Database = {
           start_date: string | null
           tier_rates: Json | null
           title: string
+          updated_at: string
         }
         Insert: {
           created_at?: string
@@ -940,6 +947,7 @@ export type Database = {
           start_date?: string | null
           tier_rates?: Json | null
           title: string
+          updated_at?: string
         }
         Update: {
           created_at?: string
@@ -955,6 +963,7 @@ export type Database = {
           start_date?: string | null
           tier_rates?: Json | null
           title?: string
+          updated_at?: string
         }
         Relationships: [
           {
