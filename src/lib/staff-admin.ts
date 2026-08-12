@@ -120,8 +120,27 @@ export type TerminalStaff = {
 
 /** Staff to show on a till's sign-in grid. */
 export async function listTerminalStaff(storeId: string | null): Promise<TerminalStaff[]> {
-  const res = await listTerminalStaffAccounts({ data: { storeId } });
-  return res.ok ? res.staff : [];
+  const rows = (value: unknown): TerminalStaff[] => {
+    const staff = (value as { staff?: unknown } | null)?.staff;
+    return Array.isArray(staff) ? (staff as TerminalStaff[]) : [];
+  };
+  try {
+    // Android talks to the hosted POS directly; a server function would be
+    // answered by the phone's own static file server.
+    const { serverOrigin, posFetch } = await import("./server-origin");
+    if (serverOrigin()) {
+      const res = await posFetch("/api/public/terminal-staff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ storeId }),
+      });
+      return rows(await res.json().catch(() => null));
+    }
+    return rows(await listTerminalStaffAccounts({ data: { storeId } }));
+  } catch {
+    // A till must still be able to sign in by typing a username.
+    return [];
+  }
 }
 
 /** Ask the server to make sure this person's account matches the PIN typed in. */

@@ -84,6 +84,7 @@ import { Route as ApiPublicCashierLoginRouteImport } from './routes/api/public/c
 import { Route as ApiPublicSecurityAlertsRouteImport } from './routes/api/public/security-alerts'
 import { Route as ApiPublicSyncRouteImport } from './routes/api/public/sync'
 import { Route as ApiPublicSyncHealthRouteImport } from './routes/api/public/sync-health'
+import { Route as ApiPublicTerminalStaffRouteImport } from './routes/api/public/terminal-staff'
 import { Route as ApiSettingsSyncBatchRouteImport } from './routes/api/settings.sync-batch'
 import { Route as ApiSettingsUpsertRouteImport } from './routes/api/settings.upsert'
 
@@ -462,6 +463,11 @@ const ApiPublicSyncHealthRoute = ApiPublicSyncHealthRouteImport.update({
   path: '/api/public/sync-health',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicTerminalStaffRoute = ApiPublicTerminalStaffRouteImport.update({
+  id: '/api/public/terminal-staff',
+  path: '/api/public/terminal-staff',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSettingsSyncBatchRoute = ApiSettingsSyncBatchRouteImport.update({
   id: '/sync-batch',
   path: '/sync-batch',
@@ -549,6 +555,7 @@ export interface FileRoutesByFullPath {
   '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
   '/api/public/sync': typeof ApiPublicSyncRoute
   '/api/public/sync-health': typeof ApiPublicSyncHealthRoute
+  '/api/public/terminal-staff': typeof ApiPublicTerminalStaffRoute
   '/api/settings/sync-batch': typeof ApiSettingsSyncBatchRoute
   '/api/settings/upsert': typeof ApiSettingsUpsertRoute
 }
@@ -628,6 +635,7 @@ export interface FileRoutesByTo {
   '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
   '/api/public/sync': typeof ApiPublicSyncRoute
   '/api/public/sync-health': typeof ApiPublicSyncHealthRoute
+  '/api/public/terminal-staff': typeof ApiPublicTerminalStaffRoute
   '/api/settings/sync-batch': typeof ApiSettingsSyncBatchRoute
   '/api/settings/upsert': typeof ApiSettingsUpsertRoute
 }
@@ -708,6 +716,7 @@ export interface FileRoutesById {
   '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
   '/api/public/sync': typeof ApiPublicSyncRoute
   '/api/public/sync-health': typeof ApiPublicSyncHealthRoute
+  '/api/public/terminal-staff': typeof ApiPublicTerminalStaffRoute
   '/api/settings/sync-batch': typeof ApiSettingsSyncBatchRoute
   '/api/settings/upsert': typeof ApiSettingsUpsertRoute
 }
@@ -789,6 +798,7 @@ export interface FileRouteTypes {
     | '/api/public/security-alerts'
     | '/api/public/sync'
     | '/api/public/sync-health'
+    | '/api/public/terminal-staff'
     | '/api/settings/sync-batch'
     | '/api/settings/upsert'
   fileRoutesByTo: FileRoutesByTo
@@ -868,6 +878,7 @@ export interface FileRouteTypes {
     | '/api/public/security-alerts'
     | '/api/public/sync'
     | '/api/public/sync-health'
+    | '/api/public/terminal-staff'
     | '/api/settings/sync-batch'
     | '/api/settings/upsert'
   id:
@@ -947,6 +958,7 @@ export interface FileRouteTypes {
     | '/api/public/security-alerts'
     | '/api/public/sync'
     | '/api/public/sync-health'
+    | '/api/public/terminal-staff'
     | '/api/settings/sync-batch'
     | '/api/settings/upsert'
   fileRoutesById: FileRoutesById
@@ -1027,6 +1039,7 @@ export interface RootRouteChildren {
   ApiPublicSecurityAlertsRoute: typeof ApiPublicSecurityAlertsRoute
   ApiPublicSyncRoute: typeof ApiPublicSyncRoute
   ApiPublicSyncHealthRoute: typeof ApiPublicSyncHealthRoute
+  ApiPublicTerminalStaffRoute: typeof ApiPublicTerminalStaffRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1556,6 +1569,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicSyncHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/terminal-staff': {
+      id: '/api/public/terminal-staff'
+      path: '/api/public/terminal-staff'
+      fullPath: '/api/public/terminal-staff'
+      preLoaderRoute: typeof ApiPublicTerminalStaffRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/settings/sync-batch': {
       id: '/api/settings/sync-batch'
       path: '/sync-batch'
@@ -1663,6 +1683,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicSecurityAlertsRoute: ApiPublicSecurityAlertsRoute,
   ApiPublicSyncRoute: ApiPublicSyncRoute,
   ApiPublicSyncHealthRoute: ApiPublicSyncHealthRoute,
+  ApiPublicTerminalStaffRoute: ApiPublicTerminalStaffRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

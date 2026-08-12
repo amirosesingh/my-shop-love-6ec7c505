@@ -60,7 +60,10 @@ export function CashierPinLogin({
   useEffect(() => {
     let live = true;
     void listTerminalStaff(activeBranchId(null))
-      .then((rows) => live && setStaff(rows))
+      // A malformed or missing answer must never blank the till: the typed
+      // username path below keeps sign-in possible.
+      .then((rows) => live && setStaff(Array.isArray(rows) ? rows : []))
+      .catch(() => live && setStaff([]))
       .finally(() => live && setLoading(false));
     return () => {
       live = false;
@@ -178,7 +181,7 @@ export function CashierPinLogin({
           <div className="flex justify-center py-8">
             <Loader2 className="size-5 animate-spin text-muted-foreground" />
           </div>
-        ) : staff.length ? (
+        ) : staff?.length ? (
           <div className="grid max-h-[46vh] grid-cols-2 gap-2 overflow-y-auto">
             {staff.map((s) => (
               <button
