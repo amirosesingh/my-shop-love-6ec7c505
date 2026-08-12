@@ -746,11 +746,33 @@ function Purchasing() {
         <section className="rounded-lg border border-border bg-card">
           <div className="flex items-center justify-between px-5 py-3">
             <h2 className="text-sm font-semibold">Invoices received history</h2>
-            {historyError && (
-              <span className="text-xs text-warning-foreground">
-                Offline — showing what this terminal could read
-              </span>
-            )}
+            <div className="flex items-center gap-3">
+              {historyError && (
+                <span className="text-xs text-warning-foreground">
+                  Offline — showing what this terminal could read
+                </span>
+              )}
+              {isAdmin && (
+                <div className="flex rounded-md border border-border p-0.5">
+                  <Button
+                    size="sm"
+                    variant={masterView ? "ghost" : "secondary"}
+                    className="h-7 px-3 text-xs"
+                    onClick={() => setMasterView(false)}
+                  >
+                    Current branch
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={masterView ? "secondary" : "ghost"}
+                    className="h-7 px-3 text-xs"
+                    onClick={() => setMasterView(true)}
+                  >
+                    All branches
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
           <Separator />
           <Table>
