@@ -470,7 +470,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let failure = "";
     if (!offline) {
       try {
-        const res = await fetch("/api/public/cashier-login", {
+        const { serverUrl } = await import("@/lib/server-origin");
+        const res = await fetch(serverUrl("/api/public/cashier-login"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

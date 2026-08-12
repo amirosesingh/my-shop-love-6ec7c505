@@ -6,6 +6,7 @@
  * `/api/public/sync`, which proves the caller and writes with service rights.
  */
 import { authHeaders, cashierTokenSync, readCredentials } from "./pos-credentials";
+import { serverUrl } from "./server-origin";
 import { readTerminalConfig } from "./terminal-tokens";
 import type { SyncOp } from "./sync-outbox";
 
@@ -21,7 +22,7 @@ export type SyncHealth = { serviceKey: boolean; posUrl: boolean; host: string };
  */
 export async function syncHealth(): Promise<SyncHealth | null> {
   try {
-    const res = await fetch("/api/public/sync-health", { cache: "no-store" });
+    const res = await fetch(serverUrl("/api/public/sync-health"), { cache: "no-store" });
     if (!res.ok) return null;
     const body = (await res.json()) as { serviceKey?: boolean; posUrl?: boolean };
     return {
@@ -80,7 +81,7 @@ export async function relayOp(
   op: SyncOp,
 ): Promise<{ ok: boolean; error?: string; code?: string }> {
   try {
-    const res = await fetch("/api/public/sync", {
+    const res = await fetch(serverUrl("/api/public/sync"), {
       method: "POST",
       headers: await relayHeaders(),
       body: JSON.stringify({ ...(await credentials()), ops: [op] }),
@@ -107,7 +108,7 @@ export async function relayActiveShift(
   storeId: string,
 ): Promise<{ ok: boolean; row?: Record<string, unknown> | null; error?: string }> {
   try {
-    const res = await fetch("/api/public/sync", {
+    const res = await fetch(serverUrl("/api/public/sync"), {
       method: "POST",
       headers: await relayHeaders(),
       body: JSON.stringify({ ...(await credentials()), read: { kind: "activeShift", storeId } }),
@@ -131,7 +132,7 @@ export async function relayStores(): Promise<{
   error?: string;
 }> {
   try {
-    const res = await fetch("/api/public/sync", {
+    const res = await fetch(serverUrl("/api/public/sync"), {
       method: "POST",
       headers: await relayHeaders(),
       body: JSON.stringify({ ...(await credentials()), read: { kind: "stores" } }),
@@ -151,7 +152,7 @@ export async function relayStores(): Promise<{
 /** Quick health probe used by the connection check panel. */
 export async function probeRelay(): Promise<{ ok: boolean; error?: string; code?: string }> {
   try {
-    const res = await fetch("/api/public/sync", {
+    const res = await fetch(serverUrl("/api/public/sync"), {
       method: "POST",
       headers: await relayHeaders(),
       body: JSON.stringify({
