@@ -28,8 +28,8 @@ const when = (iso: string) => {
 };
 
 export function ActivityBell({ compact }: { compact?: boolean }) {
-  const { user, isAdmin } = useAuth();
-  const allowed = isAdmin || user?.role === "manager";
+  const { isSupervisor } = useAuth();
+  const allowed = isSupervisor;
   const [rows, setRows] = useState<ActivityEvent[]>([]);
   const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
