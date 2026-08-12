@@ -140,7 +140,7 @@ export function BulkImportDialog({
           price,
           cost: num(key("cost")) || Number((price * 0.6).toFixed(2)),
           category: String(key("category") ?? "Imported").trim() || "Imported",
-          stock: num(key("stock_quantity")),
+          stock: Math.round(num(key("stock_quantity"))),
           customPoints: num(key("custom_points")),
           existing: !!resolveByBarcode(state.products, barcode),
         });
