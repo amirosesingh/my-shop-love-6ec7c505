@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/pos-auth";
+import { serverUnreachableOnDevice } from "@/lib/server-origin";
 import { activeBranchId } from "@/lib/active-branch";
 import { listTerminalStaff, type TerminalStaff } from "@/lib/staff-admin";
 import { usernameFromAddress } from "@/lib/internal-domains";
@@ -206,7 +207,9 @@ export function CashierPinLogin({
           </div>
         ) : (
           <p className="rounded-md border border-border bg-surface-2 p-3 text-xs text-muted-foreground">
-            No staff are listed for this terminal&apos;s branch yet. Type your username below.
+            {serverUnreachableOnDevice()
+              ? "This app build has no POS server address, so the staff list cannot load. Type your username below."
+              : "No staff are listed for this terminal's branch yet. Type your username below."}
           </p>
         )}
         <form
