@@ -22,14 +22,22 @@ type Prefs = {
   keys: () => Promise<{ keys: string[] }>;
 };
 
-let prefs: Prefs | null = null;
+let prefs: { value: Prefs } | null = null;
 let installed = false;
 
-async function loadPrefs(): Promise<Prefs | null> {
+/**
+ * The plugin handle is kept inside a wrapper object: a Capacitor plugin Proxy
+ * answers every property — `then` included — with a native call, so returning
+ * one from an `async` function makes the runtime call `Preferences.then(...)`
+ * and the bridge fails with "not implemented".
+ */
+async function loadPrefs(): Promise<{ value: Prefs } | null> {
   if (prefs) return prefs;
   try {
     const mod = await import("@capacitor/preferences");
-    prefs = mod.Preferences as unknown as Prefs;
+    const plugin = mod.Preferences as unknown as Prefs | undefined;
+    if (!plugin || typeof plugin.get !== "function") return null;
+    prefs = { value: plugin };
     return prefs;
   } catch {
     return null;
@@ -69,8 +77,9 @@ export async function hydrateNativeStorage(): Promise<void> {
   // Business data must never survive on the phone, whether or not the
   // Preferences plugin is available this session.
   purgeBusinessKeys();
-  const store = await loadPrefs();
-  if (!store) return;
+  const loaded = await loadPrefs();
+  if (!loaded) return;
+  const store = loaded.value;
   try {
     const { keys } = await store.keys();
     for (const key of keys) {

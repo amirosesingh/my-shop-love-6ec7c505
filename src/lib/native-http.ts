@@ -20,10 +20,23 @@ type CapHttp = {
   }) => Promise<{ status: number; data: unknown; headers?: Record<string, string> }>;
 };
 
-async function nativeHttp(): Promise<CapHttp | null> {
+/**
+ * Capacitor plugin handles are Proxies that answer *every* property with a
+ * native call — including `then`. Returning one straight out of an `async`
+ * function makes JavaScript treat it as a thenable and invoke `http.then(...)`,
+ * which the bridge reports as "http.then is not implemented on Android".
+ * Wrapping it in a plain object keeps the plugin away from the await machinery.
+ */
+async function nativeHttp(): Promise<{ http: CapHttp } | null> {
   try {
-    const mod = (await import("@capacitor/core")) as unknown as { CapacitorHttp?: CapHttp };
-    return mod.CapacitorHttp ?? null;
+    const mod = (await import("@capacitor/core")) as unknown as {
+      CapacitorHttp?: CapHttp;
+      Capacitor?: { isPluginAvailable?: (name: string) => boolean };
+    };
+    const available = mod.Capacitor?.isPluginAvailable?.("CapacitorHttp") ?? true;
+    const http = mod.CapacitorHttp;
+    if (!available || !http || typeof http.request !== "function") return null;
+    return { http };
   } catch {
     return null;
   }
@@ -42,8 +55,10 @@ export function describeNetworkError(err: unknown): string {
 export async function httpGetJson<T>(url: string): Promise<T> {
   const bust = `${url}${url.includes("?") ? "&" : "?"}t=${Date.now()}`;
   if (isNative()) {
-    const http = await nativeHttp();
-    if (http) {
+    const native = await nativeHttp();
+    if (native) {
+      const { http } = native;
+      try {
       const res = await http.request({
         url: bust,
         method: "GET",
@@ -56,6 +71,11 @@ export async function httpGetJson<T>(url: string): Promise<T> {
         throw new Error(`Update check failed (HTTP ${res.status}).`);
       }
       return (typeof res.data === "string" ? JSON.parse(res.data) : res.data) as T;
+      } catch (err) {
+        // A bridge that is missing or misbehaving must not end the request:
+        // fall through to the webview's own fetch below.
+        if (!/not implemented/i.test(err instanceof Error ? err.message : String(err))) throw err;
+      }
     }
   }
   const res = await fetch(bust, { cache: "no-store" });
@@ -69,22 +89,27 @@ export async function httpGetBase64(
   onProgress?: (pct: number) => void,
 ): Promise<string> {
   if (isNative()) {
-    const http = await nativeHttp();
-    if (http) {
+    const native = await nativeHttp();
+    if (native) {
+      const { http } = native;
       onProgress?.(5);
-      const res = await http.request({
+      try {
+        const res = await http.request({
         url,
         method: "GET",
         responseType: "blob",
         connectTimeout: 15000,
         readTimeout: 300000,
-      });
-      if (res.status < 200 || res.status >= 300) {
-        throw new Error(`Download failed (HTTP ${res.status}).`);
+        });
+        if (res.status < 200 || res.status >= 300) {
+          throw new Error(`Download failed (HTTP ${res.status}).`);
+        }
+        onProgress?.(100);
+        // The native bridge already hands back base64 for blob responses.
+        return String(res.data);
+      } catch (err) {
+        if (!/not implemented/i.test(err instanceof Error ? err.message : String(err))) throw err;
       }
-      onProgress?.(100);
-      // The native bridge already hands back base64 for blob responses.
-      return String(res.data);
     }
   }
 

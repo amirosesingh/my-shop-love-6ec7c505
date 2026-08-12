@@ -12,6 +12,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { Loader2, ShieldAlert } from "lucide-react";
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { Button } from "@/components/ui/button";
+import { TillLoader } from "@/components/pos/TillLoader";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -67,12 +68,9 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
 }
 
 function AuthContextLoading() {
-  return (
-    <div className="flex min-h-screen items-center justify-center gap-2 text-muted-foreground">
-      <Loader2 className="h-4 w-4 animate-spin" />
-      <span className="text-sm">Starting the till…</span>
-    </div>
-  );
+  // Same connection-aware screen the till shows everywhere else, so web,
+  // Windows and Android all report the database state identically.
+  return <TillLoader message="Starting the till…" />;
 }
 
 function AuthContextMissing() {

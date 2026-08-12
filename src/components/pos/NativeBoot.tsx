@@ -12,6 +12,7 @@ import { isNative } from "../../lib/native";
 import { hydrateNativeStorage } from "../../lib/mobile-storage";
 import { hydrateTerminalConfig } from "../../lib/terminal-tokens";
 import { applyPendingWebBundle, startWebBundleChecks } from "../../lib/web-bundle-updates";
+import { TillLoader } from "./TillLoader";
 
 export function NativeBoot({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
@@ -43,12 +44,8 @@ export function NativeBoot({ children }: { children: React.ReactNode }) {
     return startWebBundleChecks();
   }, [ready]);
 
-  if (!ready) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <p className="text-sm text-muted-foreground">Starting the till…</p>
-      </div>
-    );
-  }
+  // The splash reports what the till is actually loading against: green for the
+  // central database, amber for this device's own copy, blue while syncing.
+  if (!ready) return <TillLoader message="Starting the till…" />;
   return <>{children}</>;
 }
