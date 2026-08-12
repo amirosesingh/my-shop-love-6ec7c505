@@ -554,15 +554,39 @@ function Shifts() {
         </section>
       </div>
 
-      <Dialog open={closeOpen} onOpenChange={setCloseOpen}>
+      <Dialog
+        open={closeOpen}
+        onOpenChange={(open) => {
+          if (!open) abandonClose();
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Close shift &amp; count drawer</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <p className="numeric text-sm text-muted-foreground">
-              Expected in drawer: {money(expected)}
-            </p>
+            {closeView.showFloat && (
+              <p className="numeric text-sm text-muted-foreground">
+                Opening float: {money(closeView.openingFloat)}
+              </p>
+            )}
+            {closeView.showExpected && (
+              <p className="numeric text-sm text-muted-foreground">
+                Expected in drawer: {money(closeView.expected)}
+              </p>
+            )}
+            {closeView.showTenders && (
+              <div className="rounded-md border border-border px-3 py-2 text-xs">
+                {closeView.tenders.map((t) => (
+                  <div key={t.method} className="flex justify-between">
+                    <span className="text-muted-foreground">
+                      {t.label} ({t.count})
+                    </span>
+                    <span className="numeric">{money(t.value)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="space-y-1">
               <Label>Cashier</Label>
               {/* Locked to the signed-in user — a closure is always theirs. */}
@@ -570,7 +594,7 @@ function Shifts() {
             </div>
             <div className="space-y-1">
               <Label>
-                Counted cash <span className="text-destructive">*</span>
+                Total cash in drawer <span className="text-destructive">*</span>
               </Label>
               <Input
                 className="numeric h-12 text-xl"
@@ -586,16 +610,25 @@ function Shifts() {
                 </p>
               )}
             </div>
-            <p className="numeric text-sm">
-              Variance {money((parseAmount(counted) ?? 0) - expected)}
-            </p>
+            {countedValue !== null && countedValue >= 0 && (
+              <p className="numeric text-sm text-muted-foreground">
+                Cash sales {money(derivedCashSales(countedValue, closeView.openingFloat))}
+              </p>
+            )}
+            {closeView.showVariance && countedValue !== null && (
+              <p
+                className={`numeric text-sm ${Math.abs(varianceNow) > 0.005 ? "text-destructive" : ""}`}
+              >
+                Variance {money(varianceNow)}
+              </p>
+            )}
             <div className="space-y-1">
               <Label>Note</Label>
               <Input value={note} onChange={(e) => setNote(e.target.value)} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCloseOpen(false)}>
+            <Button variant="outline" onClick={abandonClose}>
               Cancel
             </Button>
             <Button
@@ -606,12 +639,33 @@ function Shifts() {
                   toast.error("Enter the counted cash amount");
                   return;
                 }
+                const variance = amount - closeView.expected;
+                // Large shortage or overage needs a manager before anything
+                // is written or printed.
+                let grantToken = "";
+                if (varianceNeedsPin(rules, variance)) {
+                  const res = await authorize({
+                    action: "shift_close",
+                    title: "Drawer variance approval",
+                    reason: `The drawer is out by ${money(variance)}.`,
+                    storeId: currentStore.id,
+                    terminalId: hereId,
+                    requestedBy: user?.name ?? null,
+                  });
+                  if (!res.ok) {
+                    toast.error("Closure not approved — the shift stays open.");
+                    return;
+                  }
+                  grantToken = res.grantToken ?? "";
+                }
                 // The server re-checks held tickets and the cash-count rule.
                 const gate = await assertShiftClosable({
                   data: {
                     ...(await getPosCallerAuth()),
                     storeId: currentStore.id,
                     countedCash: amount,
+                    variance,
+                    ...(grantToken ? { grantToken } : {}),
                   },
                 });
                 if (!gate.ok) {
@@ -619,13 +673,15 @@ function Shifts() {
                   return;
                 }
                 const closed = await closeShift(amount, note);
-                if (closed) {
-                  printShiftReport(closed, storeSales, "zreport");
-                  openCashDrawer();
-                  toast.success("Shift closed · Z report printed");
-                } else {
+                if (!closed) {
                   toast.error("This shift can only be closed on the terminal that opened it.");
+                  return;
                 }
+                // Only now — the shift is stored closed — does anything print
+                // or pulse the drawer.
+                printShiftReport(closed, storeSales, "zreport");
+                openCashDrawer();
+                toast.success("Shift closed · Z report printed");
                 setCloseOpen(false);
                 setNote("");
                 setCounted("");
