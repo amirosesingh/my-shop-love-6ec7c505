@@ -254,7 +254,8 @@ function Shifts() {
                   disabled={!canCloseHere}
                   onClick={async () => {
                     if (!(await requirePermission("can_close_drawer"))) return;
-                    setCounted(expected.toFixed(2));
+                    // Never pre-fill the count — the drawer must be counted.
+                    setCounted("");
                     setCloseOpen(true);
                   }}
                 >
