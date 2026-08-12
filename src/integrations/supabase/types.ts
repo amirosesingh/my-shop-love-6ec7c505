@@ -843,6 +843,7 @@ export type Database = {
       }
       products: {
         Row: {
+          archived_at: string | null
           barcode: string
           barcode_aliases: string[]
           category: string | null
@@ -852,6 +853,7 @@ export type Database = {
           ecom_price: number | null
           ecom_visible: boolean
           id: string
+          is_archived: boolean
           landing_pct: number | null
           name: string
           packs: Json
@@ -867,6 +869,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
           barcode: string
           barcode_aliases?: string[]
           category?: string | null
@@ -876,6 +879,7 @@ export type Database = {
           ecom_price?: number | null
           ecom_visible?: boolean
           id?: string
+          is_archived?: boolean
           landing_pct?: number | null
           name: string
           packs?: Json
@@ -891,6 +895,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
           barcode?: string
           barcode_aliases?: string[]
           category?: string | null
@@ -900,6 +905,7 @@ export type Database = {
           ecom_price?: number | null
           ecom_visible?: boolean
           id?: string
+          is_archived?: boolean
           landing_pct?: number | null
           name?: string
           packs?: Json
