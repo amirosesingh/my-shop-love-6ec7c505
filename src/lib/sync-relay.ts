@@ -3,7 +3,8 @@
  *
  * When a direct write to the central database is refused because the till has
  * no cloud account (cashier PIN sign-in), the same operation is posted to
- * `/api/public/sync`, which proves the caller and writes with service rights.
+ * `/api/v1/pos/sync`, which proves the caller and writes only within the
+ * branch and permissions that caller actually has.
  */
 import { authHeaders, cashierTokenSync, readCredentials } from "./pos-credentials";
 import { serverUrl } from "./server-origin";
@@ -76,12 +77,15 @@ export function canRelay(): boolean {
   return !!readTerminalConfig()?.tokenId || hasStaffSession();
 }
 
+/** Canonical relay endpoint. The old `/api/public/sync` path still answers. */
+const SYNC_PATH = "/api/v1/pos/sync";
+
 /** Push one operation through the relay. */
 export async function relayOp(
   op: SyncOp,
 ): Promise<{ ok: boolean; error?: string; code?: string }> {
   try {
-    const res = await fetch(serverUrl("/api/public/sync"), {
+    const res = await fetch(serverUrl(SYNC_PATH), {
       method: "POST",
       headers: await relayHeaders(),
       body: JSON.stringify({ ...(await credentials()), ops: [op] }),
@@ -108,7 +112,7 @@ export async function relayActiveShift(
   storeId: string,
 ): Promise<{ ok: boolean; row?: Record<string, unknown> | null; error?: string }> {
   try {
-    const res = await fetch(serverUrl("/api/public/sync"), {
+    const res = await fetch(serverUrl(SYNC_PATH), {
       method: "POST",
       headers: await relayHeaders(),
       body: JSON.stringify({ ...(await credentials()), read: { kind: "activeShift", storeId } }),
@@ -132,7 +136,7 @@ export async function relayStores(): Promise<{
   error?: string;
 }> {
   try {
-    const res = await fetch(serverUrl("/api/public/sync"), {
+    const res = await fetch(serverUrl(SYNC_PATH), {
       method: "POST",
       headers: await relayHeaders(),
       body: JSON.stringify({ ...(await credentials()), read: { kind: "stores" } }),
@@ -152,7 +156,7 @@ export async function relayStores(): Promise<{
 /** Quick health probe used by the connection check panel. */
 export async function probeRelay(): Promise<{ ok: boolean; error?: string; code?: string }> {
   try {
-    const res = await fetch(serverUrl("/api/public/sync"), {
+    const res = await fetch(serverUrl(SYNC_PATH), {
       method: "POST",
       headers: await relayHeaders(),
       body: JSON.stringify({

@@ -87,6 +87,7 @@ import { Route as ApiPublicSyncHealthRouteImport } from './routes/api/public/syn
 import { Route as ApiPublicTerminalStaffRouteImport } from './routes/api/public/terminal-staff'
 import { Route as ApiSettingsSyncBatchRouteImport } from './routes/api/settings.sync-batch'
 import { Route as ApiSettingsUpsertRouteImport } from './routes/api/settings.upsert'
+import { Route as ApiV1PosSyncRouteImport } from './routes/api/v1/pos/sync'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -478,6 +479,11 @@ const ApiSettingsUpsertRoute = ApiSettingsUpsertRouteImport.update({
   path: '/upsert',
   getParentRoute: () => ApiSettingsRoute,
 } as any)
+const ApiV1PosSyncRoute = ApiV1PosSyncRouteImport.update({
+  id: '/api/v1/pos/sync',
+  path: '/api/v1/pos/sync',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -558,6 +564,7 @@ export interface FileRoutesByFullPath {
   '/api/public/terminal-staff': typeof ApiPublicTerminalStaffRoute
   '/api/settings/sync-batch': typeof ApiSettingsSyncBatchRoute
   '/api/settings/upsert': typeof ApiSettingsUpsertRoute
+  '/api/v1/pos/sync': typeof ApiV1PosSyncRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -638,6 +645,7 @@ export interface FileRoutesByTo {
   '/api/public/terminal-staff': typeof ApiPublicTerminalStaffRoute
   '/api/settings/sync-batch': typeof ApiSettingsSyncBatchRoute
   '/api/settings/upsert': typeof ApiSettingsUpsertRoute
+  '/api/v1/pos/sync': typeof ApiV1PosSyncRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -719,6 +727,7 @@ export interface FileRoutesById {
   '/api/public/terminal-staff': typeof ApiPublicTerminalStaffRoute
   '/api/settings/sync-batch': typeof ApiSettingsSyncBatchRoute
   '/api/settings/upsert': typeof ApiSettingsUpsertRoute
+  '/api/v1/pos/sync': typeof ApiV1PosSyncRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -801,6 +810,7 @@ export interface FileRouteTypes {
     | '/api/public/terminal-staff'
     | '/api/settings/sync-batch'
     | '/api/settings/upsert'
+    | '/api/v1/pos/sync'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -881,6 +891,7 @@ export interface FileRouteTypes {
     | '/api/public/terminal-staff'
     | '/api/settings/sync-batch'
     | '/api/settings/upsert'
+    | '/api/v1/pos/sync'
   id:
     | '__root__'
     | '/'
@@ -961,6 +972,7 @@ export interface FileRouteTypes {
     | '/api/public/terminal-staff'
     | '/api/settings/sync-batch'
     | '/api/settings/upsert'
+    | '/api/v1/pos/sync'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1040,6 +1052,7 @@ export interface RootRouteChildren {
   ApiPublicSyncRoute: typeof ApiPublicSyncRoute
   ApiPublicSyncHealthRoute: typeof ApiPublicSyncHealthRoute
   ApiPublicTerminalStaffRoute: typeof ApiPublicTerminalStaffRoute
+  ApiV1PosSyncRoute: typeof ApiV1PosSyncRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1590,6 +1603,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSettingsUpsertRouteImport
       parentRoute: typeof ApiSettingsRoute
     }
+    '/api/v1/pos/sync': {
+      id: '/api/v1/pos/sync'
+      path: '/api/v1/pos/sync'
+      fullPath: '/api/v1/pos/sync'
+      preLoaderRoute: typeof ApiV1PosSyncRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -1684,6 +1704,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicSyncRoute: ApiPublicSyncRoute,
   ApiPublicSyncHealthRoute: ApiPublicSyncHealthRoute,
   ApiPublicTerminalStaffRoute: ApiPublicTerminalStaffRoute,
+  ApiV1PosSyncRoute: ApiV1PosSyncRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
