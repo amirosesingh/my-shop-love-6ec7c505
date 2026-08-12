@@ -44,6 +44,7 @@ import { Route as ReportsCatalogRouteImport } from './routes/reports.catalog'
 import { Route as ReportsCouponsRouteImport } from './routes/reports.coupons'
 import { Route as ReportsHistoryRouteImport } from './routes/reports.history'
 import { Route as ReportsItemsRouteImport } from './routes/reports.items'
+import { Route as ReportsNotificationsRouteImport } from './routes/reports.notifications'
 import { Route as ReportsPaymentsRouteImport } from './routes/reports.payments'
 import { Route as ReportsSalesRouteImport } from './routes/reports.sales'
 import { Route as ReportsStockRouteImport } from './routes/reports.stock'
@@ -59,6 +60,7 @@ import { Route as SettingsIdentityRouteImport } from './routes/settings.identity
 import { Route as SettingsInheritanceRouteImport } from './routes/settings.inheritance'
 import { Route as SettingsLinesRouteImport } from './routes/settings.lines'
 import { Route as SettingsMobileTerminalsRouteImport } from './routes/settings.mobile-terminals'
+import { Route as SettingsNotificationsRouteImport } from './routes/settings.notifications'
 import { Route as SettingsNumberingRouteImport } from './routes/settings.numbering'
 import { Route as SettingsPaymentRouteImport } from './routes/settings.payment'
 import { Route as SettingsPrinterRouteImport } from './routes/settings.printer'
@@ -260,6 +262,11 @@ const ReportsItemsRoute = ReportsItemsRouteImport.update({
   path: '/reports/items',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReportsNotificationsRoute = ReportsNotificationsRouteImport.update({
+  id: '/reports/notifications',
+  path: '/reports/notifications',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReportsPaymentsRoute = ReportsPaymentsRouteImport.update({
   id: '/reports/payments',
   path: '/reports/payments',
@@ -333,6 +340,11 @@ const SettingsLinesRoute = SettingsLinesRouteImport.update({
 const SettingsMobileTerminalsRoute = SettingsMobileTerminalsRouteImport.update({
   id: '/settings/mobile-terminals',
   path: '/settings/mobile-terminals',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsNotificationsRoute = SettingsNotificationsRouteImport.update({
+  id: '/settings/notifications',
+  path: '/settings/notifications',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsNumberingRoute = SettingsNumberingRouteImport.update({
@@ -496,6 +508,7 @@ export interface FileRoutesByFullPath {
   '/reports/coupons': typeof ReportsCouponsRoute
   '/reports/history': typeof ReportsHistoryRoute
   '/reports/items': typeof ReportsItemsRoute
+  '/reports/notifications': typeof ReportsNotificationsRoute
   '/reports/payments': typeof ReportsPaymentsRoute
   '/reports/sales': typeof ReportsSalesRoute
   '/reports/stock': typeof ReportsStockRoute
@@ -510,6 +523,7 @@ export interface FileRoutesByFullPath {
   '/settings/inheritance': typeof SettingsInheritanceRoute
   '/settings/lines': typeof SettingsLinesRoute
   '/settings/mobile-terminals': typeof SettingsMobileTerminalsRoute
+  '/settings/notifications': typeof SettingsNotificationsRoute
   '/settings/numbering': typeof SettingsNumberingRoute
   '/settings/payment': typeof SettingsPaymentRoute
   '/settings/printer': typeof SettingsPrinterRoute
@@ -573,6 +587,7 @@ export interface FileRoutesByTo {
   '/reports/coupons': typeof ReportsCouponsRoute
   '/reports/history': typeof ReportsHistoryRoute
   '/reports/items': typeof ReportsItemsRoute
+  '/reports/notifications': typeof ReportsNotificationsRoute
   '/reports/payments': typeof ReportsPaymentsRoute
   '/reports/sales': typeof ReportsSalesRoute
   '/reports/stock': typeof ReportsStockRoute
@@ -587,6 +602,7 @@ export interface FileRoutesByTo {
   '/settings/inheritance': typeof SettingsInheritanceRoute
   '/settings/lines': typeof SettingsLinesRoute
   '/settings/mobile-terminals': typeof SettingsMobileTerminalsRoute
+  '/settings/notifications': typeof SettingsNotificationsRoute
   '/settings/numbering': typeof SettingsNumberingRoute
   '/settings/payment': typeof SettingsPaymentRoute
   '/settings/printer': typeof SettingsPrinterRoute
@@ -651,6 +667,7 @@ export interface FileRoutesById {
   '/reports/coupons': typeof ReportsCouponsRoute
   '/reports/history': typeof ReportsHistoryRoute
   '/reports/items': typeof ReportsItemsRoute
+  '/reports/notifications': typeof ReportsNotificationsRoute
   '/reports/payments': typeof ReportsPaymentsRoute
   '/reports/sales': typeof ReportsSalesRoute
   '/reports/stock': typeof ReportsStockRoute
@@ -665,6 +682,7 @@ export interface FileRoutesById {
   '/settings/inheritance': typeof SettingsInheritanceRoute
   '/settings/lines': typeof SettingsLinesRoute
   '/settings/mobile-terminals': typeof SettingsMobileTerminalsRoute
+  '/settings/notifications': typeof SettingsNotificationsRoute
   '/settings/numbering': typeof SettingsNumberingRoute
   '/settings/payment': typeof SettingsPaymentRoute
   '/settings/printer': typeof SettingsPrinterRoute
@@ -730,6 +748,7 @@ export interface FileRouteTypes {
     | '/reports/coupons'
     | '/reports/history'
     | '/reports/items'
+    | '/reports/notifications'
     | '/reports/payments'
     | '/reports/sales'
     | '/reports/stock'
@@ -744,6 +763,7 @@ export interface FileRouteTypes {
     | '/settings/inheritance'
     | '/settings/lines'
     | '/settings/mobile-terminals'
+    | '/settings/notifications'
     | '/settings/numbering'
     | '/settings/payment'
     | '/settings/printer'
@@ -807,6 +827,7 @@ export interface FileRouteTypes {
     | '/reports/coupons'
     | '/reports/history'
     | '/reports/items'
+    | '/reports/notifications'
     | '/reports/payments'
     | '/reports/sales'
     | '/reports/stock'
@@ -821,6 +842,7 @@ export interface FileRouteTypes {
     | '/settings/inheritance'
     | '/settings/lines'
     | '/settings/mobile-terminals'
+    | '/settings/notifications'
     | '/settings/numbering'
     | '/settings/payment'
     | '/settings/printer'
@@ -884,6 +906,7 @@ export interface FileRouteTypes {
     | '/reports/coupons'
     | '/reports/history'
     | '/reports/items'
+    | '/reports/notifications'
     | '/reports/payments'
     | '/reports/sales'
     | '/reports/stock'
@@ -898,6 +921,7 @@ export interface FileRouteTypes {
     | '/settings/inheritance'
     | '/settings/lines'
     | '/settings/mobile-terminals'
+    | '/settings/notifications'
     | '/settings/numbering'
     | '/settings/payment'
     | '/settings/printer'
@@ -962,6 +986,7 @@ export interface RootRouteChildren {
   ReportsCouponsRoute: typeof ReportsCouponsRoute
   ReportsHistoryRoute: typeof ReportsHistoryRoute
   ReportsItemsRoute: typeof ReportsItemsRoute
+  ReportsNotificationsRoute: typeof ReportsNotificationsRoute
   ReportsPaymentsRoute: typeof ReportsPaymentsRoute
   ReportsSalesRoute: typeof ReportsSalesRoute
   ReportsStockRoute: typeof ReportsStockRoute
@@ -976,6 +1001,7 @@ export interface RootRouteChildren {
   SettingsInheritanceRoute: typeof SettingsInheritanceRoute
   SettingsLinesRoute: typeof SettingsLinesRoute
   SettingsMobileTerminalsRoute: typeof SettingsMobileTerminalsRoute
+  SettingsNotificationsRoute: typeof SettingsNotificationsRoute
   SettingsNumberingRoute: typeof SettingsNumberingRoute
   SettingsPaymentRoute: typeof SettingsPaymentRoute
   SettingsPrinterRoute: typeof SettingsPrinterRoute
@@ -1250,6 +1276,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReportsItemsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reports/notifications': {
+      id: '/reports/notifications'
+      path: '/reports/notifications'
+      fullPath: '/reports/notifications'
+      preLoaderRoute: typeof ReportsNotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reports/payments': {
       id: '/reports/payments'
       path: '/reports/payments'
@@ -1353,6 +1386,13 @@ declare module '@tanstack/react-router' {
       path: '/settings/mobile-terminals'
       fullPath: '/settings/mobile-terminals'
       preLoaderRoute: typeof SettingsMobileTerminalsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/notifications': {
+      id: '/settings/notifications'
+      path: '/settings/notifications'
+      fullPath: '/settings/notifications'
+      preLoaderRoute: typeof SettingsNotificationsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings/numbering': {
@@ -1582,6 +1622,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReportsCouponsRoute: ReportsCouponsRoute,
   ReportsHistoryRoute: ReportsHistoryRoute,
   ReportsItemsRoute: ReportsItemsRoute,
+  ReportsNotificationsRoute: ReportsNotificationsRoute,
   ReportsPaymentsRoute: ReportsPaymentsRoute,
   ReportsSalesRoute: ReportsSalesRoute,
   ReportsStockRoute: ReportsStockRoute,
@@ -1596,6 +1637,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsInheritanceRoute: SettingsInheritanceRoute,
   SettingsLinesRoute: SettingsLinesRoute,
   SettingsMobileTerminalsRoute: SettingsMobileTerminalsRoute,
+  SettingsNotificationsRoute: SettingsNotificationsRoute,
   SettingsNumberingRoute: SettingsNumberingRoute,
   SettingsPaymentRoute: SettingsPaymentRoute,
   SettingsPrinterRoute: SettingsPrinterRoute,

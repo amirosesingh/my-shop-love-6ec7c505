@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { db } from "./pos-db";
 import { logger } from "./audit-log";
+import { recordActivity } from "./activity-events";
 
 /** Minimum / maximum length of the typed no-sale reason. */
 export const NO_SALE_REASON_MIN = 3;
@@ -74,6 +75,20 @@ export function recordNoSale(input: Omit<DrawerEvent, "id" | "at">) {
     note: entry.note || null,
     approvedBy: entry.approvedBy,
     at: entry.at,
+  });
+  recordActivity({
+    type: "drawer_open",
+    severity: "warning",
+    title: "Cash drawer opened without a sale",
+    message: entry.reason + (entry.note ? ` — ${entry.note}` : ""),
+    actorId: entry.staffId ?? null,
+    actorName: entry.staffName ?? null,
+    actorRole: entry.role ?? null,
+    terminalId: entry.terminalId ?? null,
+    storeId: entry.storeId ?? null,
+    entityType: "drawer_event",
+    entityId: entry.id,
+    meta: { approvedBy: entry.approvedBy ?? null },
   });
   logger.log("cash", "Cash drawer opened without a sale", "register", {
     reason: entry.reason,

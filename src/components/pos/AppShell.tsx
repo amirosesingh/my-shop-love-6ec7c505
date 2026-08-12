@@ -15,6 +15,7 @@ import { SyncStatus } from "@/components/pos/SyncStatus";
 import { WindowControls } from "@/components/pos/WindowControls";
 import { SystemStatusPill } from "@/components/pos/SystemStatusPill";
 import { SecurityAlertBell } from "@/components/pos/SecurityAlertBell";
+import { ActivityBell } from "@/components/pos/ActivityBell";
 import { ShiftGuard } from "@/components/pos/ShiftGuard";
 import { PermissionDenied } from "@/components/pos/PermissionGate";
 import { useVisibility } from "@/lib/ui-visibility";
@@ -389,6 +390,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <SyncStatus />
           <SystemStatusPill compact />
           <SecurityAlertBell compact />
+          <ActivityBell compact />
           <ThemeToggle />
           <Button
             variant="outline"
@@ -412,6 +414,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <LiveClock />
           <SystemStatusPill />
           <SecurityAlertBell />
+          <ActivityBell />
           {terminal.config && (
             <Badge
               variant="outline"

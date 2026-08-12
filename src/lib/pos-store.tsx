@@ -35,6 +35,7 @@ import { bookingBalance, lineUnitDiscount, r2, type DiscountType } from "./pos-t
 import { logger } from "./audit-log";
 import { toast } from "sonner";
 import { db, dbError, loadActiveShift, loadCloudState, openShiftOnServer } from "./pos-db";
+import { recordActivity } from "./activity-events";
 import type { CloudSlice, CommitTarget } from "./pos-db";
 import { clearSnapshot, readSnapshot, writeSnapshot } from "./offline-snapshot";
 import { isLiveOnly } from "./live-mode";
@@ -671,6 +672,19 @@ export function PosProvider({ children }: { children: ReactNode }) {
         storeId,
         terminal: terminal?.locationName ?? "This PC",
       });
+      recordActivity({
+        type: "shift_open",
+        title: "Shift opened",
+        message: `${cashier} opened a shift with a float of ${openingFloat}.`,
+        actorName: cashier,
+        actorRole: user?.role ?? terminalUser?.role ?? null,
+        terminalId: shift.terminalId ?? null,
+        terminalName: shift.terminalName ?? null,
+        storeId,
+        entityType: "shift",
+        entityId: shift.id,
+        amount: openingFloat,
+      });
       setState((s) => ({ ...s, shifts: [shift, ...s.shifts] }));
       justOpenedRef.current = { shift, at: Date.now() };
       setShiftReadError(null);
@@ -724,6 +738,21 @@ export function PosProvider({ children }: { children: ReactNode }) {
         note,
         closedBy: closed.closedBy,
         overdue: closed.overdue,
+      });
+      recordActivity({
+        type: "shift_close",
+        severity: closed.overdue ? "warning" : "info",
+        title: "Shift closed",
+        message: `${closed.closedBy ?? closed.cashier} closed the shift with ${countedCash} counted.`,
+        actorName: closed.closedBy ?? closed.cashier,
+        actorRole: closed.closedByRole ?? null,
+        terminalId: closed.terminalId ?? null,
+        terminalName: closed.terminalName ?? null,
+        storeId: closed.storeId,
+        entityType: "shift",
+        entityId: closed.id,
+        amount: countedCash,
+        meta: { note, overdue: closed.overdue },
       });
       // Day-end summary goes out on whatever channels this device enabled.
       void (async () => {
@@ -841,6 +870,17 @@ export function PosProvider({ children }: { children: ReactNode }) {
         })),
       },
     );
+    recordActivity({
+      type: "sale_complete",
+      title: sale.exchangeOfReceiptNo ? "Exchange bill created" : "Sale completed",
+      message: `Bill ${sale.receiptNo} for ${sale.total} paid by ${sale.method}.`,
+      actorName: sale.cashier ?? null,
+      storeId: sale.storeId,
+      entityType: "sale",
+      entityId: sale.receiptNo,
+      amount: sale.total,
+      meta: { lines: sale.lines.length, discount: sale.discount },
+    });
     return sale;
   }, []);
 
@@ -1064,6 +1104,19 @@ export function PosProvider({ children }: { children: ReactNode }) {
       saleId,
       receiptNo: stateRef.current.sales.find((x) => x.id === saleId)?.receiptNo ?? null,
     });
+    {
+      const refunded = stateRef.current.sales.find((x) => x.id === saleId);
+      recordActivity({
+        type: "sale_refund",
+        severity: "critical",
+        title: "Refund issued",
+        message: `Bill ${refunded?.receiptNo ?? saleId} was refunded.`,
+        storeId: refunded?.storeId ?? null,
+        entityType: "sale",
+        entityId: refunded?.receiptNo ?? saleId,
+        amount: refunded?.total ?? null,
+      });
+    }
     {
       const snap = stateRef.current;
       const sale = snap.sales.find((x) => x.id === saleId);

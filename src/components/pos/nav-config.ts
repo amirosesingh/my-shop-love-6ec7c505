@@ -319,6 +319,14 @@ export const navGroups: NavGroup[] = [
         blurb: "Holds, voids, splits and drawer opens in order.",
       },
       {
+        to: "/reports/notifications",
+        label: "Activity & Notifications",
+        icon: Activity,
+        flag: "can_view_audit_trail",
+        keywords: "notification alert whatsapp sign in shift sale drawer feed",
+        blurb: "Live event feed with WhatsApp delivery status and CSV export.",
+      },
+      {
         to: "/reports/catalog",
         label: "Catalog Changes",
         icon: PackageSearch,
