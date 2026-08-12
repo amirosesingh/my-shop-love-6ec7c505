@@ -1286,6 +1286,7 @@ export type Database = {
       sales: {
         Row: {
           bill_number: string
+          cashier_id: string | null
           cashier_name: string | null
           change_amount: number
           client_transaction_id: string | null
@@ -1294,6 +1295,7 @@ export type Database = {
           coupon_promo_id: string | null
           coupon_scope: string | null
           created_at: string
+          created_by: string | null
           discount_amount: number
           exchange_credit: number
           exchanged_to_bill_number: string | null
@@ -1312,9 +1314,11 @@ export type Database = {
           subtotal_amount: number
           tax_amount: number
           total_amount: number
+          updated_by: string | null
         }
         Insert: {
           bill_number: string
+          cashier_id?: string | null
           cashier_name?: string | null
           change_amount?: number
           client_transaction_id?: string | null
@@ -1323,6 +1327,7 @@ export type Database = {
           coupon_promo_id?: string | null
           coupon_scope?: string | null
           created_at?: string
+          created_by?: string | null
           discount_amount?: number
           exchange_credit?: number
           exchanged_to_bill_number?: string | null
@@ -1341,9 +1346,11 @@ export type Database = {
           subtotal_amount?: number
           tax_amount?: number
           total_amount?: number
+          updated_by?: string | null
         }
         Update: {
           bill_number?: string
+          cashier_id?: string | null
           cashier_name?: string | null
           change_amount?: number
           client_transaction_id?: string | null
@@ -1352,6 +1359,7 @@ export type Database = {
           coupon_promo_id?: string | null
           coupon_scope?: string | null
           created_at?: string
+          created_by?: string | null
           discount_amount?: number
           exchange_credit?: number
           exchanged_to_bill_number?: string | null
@@ -1370,6 +1378,7 @@ export type Database = {
           subtotal_amount?: number
           tax_amount?: number
           total_amount?: number
+          updated_by?: string | null
         }
         Relationships: [
           {

@@ -45,3 +45,4 @@
 \i 35_activity_and_token_columns.sql
 \i 36_store_isolation.sql
 \i 37_pin_throttle_and_grants.sql
+\i 38_store_identity.sql
