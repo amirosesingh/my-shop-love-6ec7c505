@@ -14,7 +14,10 @@ const SECRET = "terminal-account";
 
 /** Fetch (once) and remember this terminal's machine account, encrypted. */
 export async function provisionTerminalAccount(tokenId: string): Promise<Account | null> {
-  const res = await getTerminalAccount({ data: { tokenId } }).catch(() => null);
+  // The same device string that was recorded when the token was claimed, so
+  // the server can tell this is the till the activation belongs to.
+  const device = typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 120) : "";
+  const res = await getTerminalAccount({ data: { tokenId, device } }).catch(() => null);
   if (!res?.ok) return null;
   const account: Account = { email: res.email, password: res.password };
   await setDeviceSecret(SECRET, account);
