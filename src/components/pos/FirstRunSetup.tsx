@@ -4,14 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { isDesktop, restoreBrandingFromDisk, writeBranding } from "@/lib/branding";
-import { usePos } from "@/lib/pos-store";
+import { usePosOptional } from "@/lib/pos-store";
 
 /**
  * Shown once per machine right after install: the operator names their business
  * and this till, and every screen and receipt picks that name up.
  */
 export function FirstRunSetup({ children }: { children: React.ReactNode }) {
-  const { state, updateSettings } = usePos();
+  const pos = usePosOptional();
+  const state = pos?.state;
+  const updateSettings = pos?.updateSettings;
   const [needed, setNeeded] = useState(false);
   const [checked, setChecked] = useState(false);
   const [company, setCompany] = useState("");
@@ -40,7 +42,9 @@ export function FirstRunSetup({ children }: { children: React.ReactNode }) {
           const name = company.trim();
           if (!name) return;
           writeBranding({ company: name, terminal: terminal.trim() || "POS Terminal 01", configured: true });
-          updateSettings({ receipt: { ...state.settings.receipt, companyName: name } });
+          if (state && updateSettings) {
+            updateSettings({ receipt: { ...state.settings.receipt, companyName: name } });
+          }
           setNeeded(false);
         }}
         className="w-full max-w-md space-y-4 rounded-lg border border-border bg-card p-6"
