@@ -912,6 +912,31 @@ function Register() {
       toast.error("Deposit cannot exceed the booking total");
       return;
     }
+    const minDeposit = Math.min(minDepositFor(bookingTotal), bookingTotal);
+    if (minDeposit > 0 && paidNow + 0.001 < minDeposit) {
+      toast.error(`This branch needs a deposit of at least ${money(minDeposit)}`);
+      return;
+    }
+    if (racketMode) {
+      if (bookingRules.requireRacketModel && !racketModel.trim()) {
+        toast.error("Enter the racket brand / model");
+        return;
+      }
+      if (bookingRules.requireStringType && !stringType.trim()) {
+        toast.error("Enter the string type / brand");
+        return;
+      }
+      if (bookingRules.requirePromisedAt && !promisedAt) {
+        toast.error("Choose a ready-by date and time");
+        return;
+      }
+      if (bookingRules.warnOutsideTradingHours && promisedAt) {
+        const hhmm = promisedAt.slice(11, 16);
+        const { dayStart, dayEnd } = state.settings.hours;
+        if (dayStart && dayEnd && (hhmm < dayStart || hhmm > dayEnd))
+          toast.warning(`Ready-by time is outside trading hours (${dayStart}–${dayEnd})`);
+      }
+    }
     if (!dueDate) {
       toast.error("Choose a collect-by date");
       return;
@@ -940,7 +965,7 @@ function Register() {
         customerPhone: bookPhone.trim() || member?.phone || "",
         note: bookNote.trim(),
         cashier: activeCashier,
-        tagId: racketMode ? jobTag || newJobTag() : undefined,
+        tagId: racketMode ? jobTag || (bookingRules.autoJobTag ? newJobTag() : undefined) : undefined,
         job: racketMode
           ? {
               racketModel: racketModel.trim() || undefined,
