@@ -2917,6 +2917,47 @@ function Register() {
       </Dialog>
 
       {/* Book & pay later (goods) / racket stringing booking */}
+      <Dialog open={bookingHubOpen} onOpenChange={setBookingHubOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create / manage booking</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Button
+              className="h-auto w-full flex-col items-start gap-1 py-3 text-left"
+              onClick={() => {
+                setBookingHubOpen(false);
+                startRacketBooking();
+              }}
+            >
+              <span className="font-semibold">🏸 Racket service / stringing</span>
+              <span className="text-xs opacity-80">Racket + string specs, tension, stencil, job tag</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-auto w-full flex-col items-start gap-1 py-3 text-left"
+              onClick={() => {
+                setBookingHubOpen(false);
+                startCartBooking();
+              }}
+            >
+              <span className="font-semibold">🛒 Standard / general booking</span>
+              <span className="text-xs text-muted-foreground">Reserve cart items with a deposit and pickup date</span>
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full"
+              onClick={() => {
+                setBookingHubOpen(false);
+                void navigate({ to: "/bookings" });
+              }}
+            >
+              Manage bookings ({activeBookingCount} active)
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog
         open={bookOpen}
         onOpenChange={(o) => {
