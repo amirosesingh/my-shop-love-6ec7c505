@@ -60,7 +60,7 @@ import { nextBillNumber } from "@/lib/bill-number";
 import { useAuth } from "@/lib/pos-auth";
 import { productVisibleAt } from "@/lib/branch-policy";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
-import { BOOKING_TIMING_LABELS, type BookingPaymentTiming } from "@/lib/pos-types";
+import { BOOKING_TIMING_LABELS, bookingRulesOf, type BookingPaymentTiming } from "@/lib/pos-types";
 import { useUserPermissions } from "@/lib/pos-permissions";
 import { useVisibility } from "@/lib/ui-visibility";
 import { useUiScale } from "@/lib/use-ui-scale";
@@ -736,6 +736,33 @@ function Register() {
   const racketModelList = state.settings.integrations.racketModels ?? [];
   const stringModelList = state.settings.integrations.stringModels ?? [];
 
+  /** House rules for bookings, set in Settings → Booking rules. */
+  const bookingRules = bookingRulesOf(state.settings.integrations.bookingRules);
+  const isSupervisor = user?.role === "admin" || can("can_access_pos_settings");
+  /** Payment timings the branch allows, in the order they are shown. */
+  const allowedTimings = (["now", "deposit", "collection"] as BookingPaymentTiming[]).filter((t) =>
+    t === "now"
+      ? bookingRules.allowPayNow
+      : t === "deposit"
+        ? bookingRules.allowPayDeposit
+        : bookingRules.allowPayOnCollection,
+  );
+  /** Ready-by value pre-filled from the branch's default turnaround. */
+  const proposedPromisedAt = () => {
+    const hours = bookingRules.defaultTurnaroundHours;
+    if (!hours) return "";
+    const at = new Date(Date.now() + hours * 3_600_000);
+    at.setMinutes(at.getMinutes() - at.getTimezoneOffset());
+    return at.toISOString().slice(0, 16);
+  };
+  /** Smallest deposit this branch will accept on a booking of `total`. */
+  const minDepositFor = (total: number) =>
+    !bookingRules.requireDeposit
+      ? 0
+      : bookingRules.depositMode === "percent"
+        ? r2((total * Math.max(0, bookingRules.depositMin)) / 100)
+        : r2(Math.max(0, bookingRules.depositMin));
+
   /** Jobs still on the bench today — drives the badge on the booking button. */
   const activeBookingCount = state.bookings.filter(
     (b) => b.storeId === currentStore.id && b.status === "active" && b.jobStatus !== "collected",
@@ -762,7 +789,12 @@ function Register() {
         price: r2(Math.max(0, Number(stringingService?.fee ?? 0))),
       },
     ]);
-    setJobTag(newJobTag());
+    if (bookingRules.autoJobTag) setJobTag(newJobTag());
+    setTensionUnit(bookingRules.defaultTensionUnit);
+    if (bookingRules.defaultTensionMain) setTensionMain(String(bookingRules.defaultTensionMain));
+    if (bookingRules.defaultTensionCross) setTensionCross(String(bookingRules.defaultTensionCross));
+    setPromisedAt(proposedPromisedAt());
+    if (!allowedTimings.includes(payTiming) && allowedTimings[0]) setPayTiming(allowedTimings[0]);
     /* Auto-fill from the customer's last racket job so regulars are one tap. */
     const past = memberId
       ? state.bookings.find((b) => b.memberId === memberId && b.job?.racketModel)
@@ -791,6 +823,7 @@ function Register() {
     setBookPhone(member?.phone ?? "");
     setBookMode("cart");
     resetJobCard();
+    if (!allowedTimings.includes(payTiming) && allowedTimings[0]) setPayTiming(allowedTimings[0]);
     setBookOpen(true);
   }
 
@@ -798,6 +831,10 @@ function Register() {
   function editBookingSpecs(bookingId: string) {
     const b = state.bookings.find((x) => x.id === bookingId);
     if (!b) return;
+    if (bookingRules.managerOnlyEditPaidSpecs && b.paid > 0 && !isSupervisor) {
+      toast.error("A supervisor must change the specs once a deposit is held");
+      return;
+    }
     setEditBookingId(b.id);
     setBookMode("racket");
     setRacketModel(b.job?.racketModel ?? "");
@@ -875,6 +912,31 @@ function Register() {
       toast.error("Deposit cannot exceed the booking total");
       return;
     }
+    const minDeposit = Math.min(minDepositFor(bookingTotal), bookingTotal);
+    if (minDeposit > 0 && paidNow + 0.001 < minDeposit) {
+      toast.error(`This branch needs a deposit of at least ${money(minDeposit)}`);
+      return;
+    }
+    if (racketMode) {
+      if (bookingRules.requireRacketModel && !racketModel.trim()) {
+        toast.error("Enter the racket brand / model");
+        return;
+      }
+      if (bookingRules.requireStringType && !stringType.trim()) {
+        toast.error("Enter the string type / brand");
+        return;
+      }
+      if (bookingRules.requirePromisedAt && !promisedAt) {
+        toast.error("Choose a ready-by date and time");
+        return;
+      }
+      if (bookingRules.warnOutsideTradingHours && promisedAt) {
+        const hhmm = promisedAt.slice(11, 16);
+        const { dayStart, dayEnd } = state.settings.hours;
+        if (dayStart && dayEnd && (hhmm < dayStart || hhmm > dayEnd))
+          toast.warning(`Ready-by time is outside trading hours (${dayStart}–${dayEnd})`);
+      }
+    }
     if (!dueDate) {
       toast.error("Choose a collect-by date");
       return;
@@ -903,7 +965,7 @@ function Register() {
         customerPhone: bookPhone.trim() || member?.phone || "",
         note: bookNote.trim(),
         cashier: activeCashier,
-        tagId: racketMode ? jobTag || newJobTag() : undefined,
+        tagId: racketMode ? jobTag || (bookingRules.autoJobTag ? newJobTag() : undefined) : undefined,
         job: racketMode
           ? {
               racketModel: racketModel.trim() || undefined,
@@ -3109,7 +3171,7 @@ function Register() {
             <div className="space-y-1">
               <Label>When does the customer pay?</Label>
               <div className="flex overflow-hidden rounded-md border border-border">
-                {(["now", "deposit", "collection"] as BookingPaymentTiming[]).map((t) => (
+                {allowedTimings.map((t) => (
                   <button
                     key={t}
                     onClick={() => setPayTiming(t)}

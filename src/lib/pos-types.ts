@@ -707,6 +707,8 @@ export type IntegrationSettings = {
   requireBookingCustomer?: boolean;
   /** locked base labour fee used by the racket intake form */
   baseLaborFee?: number;
+  /** deposit, scheduling, racket and control rules for bookings */
+  bookingRules?: BookingRules;
   /** which catalogue categories intake lines are booked against */
   categoryMap?: IntakeCategoryMap;
   /** per-branch isolation and sync switches, keyed by store id */
@@ -759,6 +761,74 @@ export type BookingServiceType = {
   /** Racket / stringing work — opens the job card instead of needing cart items. */
   isStringingJob?: boolean;
 };
+
+/**
+ * House rules for bookings: what deposit is required, how the ready-by date is
+ * proposed, what a racket job must carry, and who may undo one.
+ */
+export type BookingRules = {
+  /** every booking must take money at the counter */
+  requireDeposit: boolean;
+  /** how the minimum is expressed */
+  depositMode: "percent" | "amount";
+  /** minimum deposit: percent of the booking total, or a flat figure */
+  depositMin: number;
+  /** payment timings a cashier may choose */
+  allowPayNow: boolean;
+  allowPayDeposit: boolean;
+  allowPayOnCollection: boolean;
+  /** a booking cannot be collected while money is still owed */
+  blockCollectionWithBalance: boolean;
+  /** hours added to now to pre-fill the ready-by box (0 = leave blank) */
+  defaultTurnaroundHours: number;
+  /** a racket job cannot be saved without a promised date and time */
+  requirePromisedAt: boolean;
+  /** warn when the promised time falls outside the trading day */
+  warnOutsideTradingHours: boolean;
+  /** stamp a job tag on every racket booking */
+  autoJobTag: boolean;
+  /** default tension unit and figures on a fresh job card */
+  defaultTensionUnit: "lb" | "kg";
+  defaultTensionMain: number;
+  defaultTensionCross: number;
+  /** the job card needs a racket model / string type before saving */
+  requireRacketModel: boolean;
+  requireStringType: boolean;
+  /** only supervisors and admins may cancel a booking */
+  managerOnlyCancel: boolean;
+  /** only supervisors and admins may edit specs once a deposit is held */
+  managerOnlyEditPaidSpecs: boolean;
+  /** flag uncollected bookings after this many days (0 = never) */
+  staleAfterDays: number;
+};
+
+export const DEFAULT_BOOKING_RULES: BookingRules = {
+  requireDeposit: false,
+  depositMode: "percent",
+  depositMin: 0,
+  allowPayNow: true,
+  allowPayDeposit: true,
+  allowPayOnCollection: true,
+  blockCollectionWithBalance: false,
+  defaultTurnaroundHours: 48,
+  requirePromisedAt: false,
+  warnOutsideTradingHours: false,
+  autoJobTag: true,
+  defaultTensionUnit: "lb",
+  defaultTensionMain: 0,
+  defaultTensionCross: 0,
+  requireRacketModel: false,
+  requireStringType: false,
+  managerOnlyCancel: false,
+  managerOnlyEditPaidSpecs: false,
+  staleAfterDays: 0,
+};
+
+/** Merge stored rules over the defaults so a partial blob is always complete. */
+export const bookingRulesOf = (raw: Partial<BookingRules> | undefined): BookingRules => ({
+  ...DEFAULT_BOOKING_RULES,
+  ...(raw ?? {}),
+});
 
 /** How one branch shares stock, catalogue and sync with the rest of the group. */
 export type BranchPolicy = {

@@ -200,6 +200,12 @@ const GROUPS = [
         blurb: "Re-stringing, repairs and other jobs with their default fee.",
       },
       {
+        to: "/settings/booking-rules",
+        label: "Booking rules",
+        icon: ShieldCheck,
+        blurb: "Deposits, turnaround, racket job requirements and who may cancel.",
+      },
+      {
         to: "/settings/whatsapp",
         label: "WhatsApp bills",
         icon: MessageCircle,
