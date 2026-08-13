@@ -1617,6 +1617,7 @@ export const db = {
     label: string;
     storeId: string | null;
     heldBy: string | null;
+    billNo?: string | null;
     total: number;
     lines: unknown;
     cartDiscount?: number;
@@ -1639,6 +1640,7 @@ export const db = {
             label: row.label,
             store_id: row.storeId,
             held_by: row.heldBy,
+            bill_no: row.billNo ?? null,
             total: row.total,
             lines: row.lines,
             cart_discount: row.cartDiscount ?? 0,
