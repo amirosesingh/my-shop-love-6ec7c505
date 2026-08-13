@@ -608,7 +608,7 @@ function registerIpc() {
     try {
       return await pool.test(config);
     } catch (err) {
-      return fail(err);
+      return { ok: false, ...pool.describeSqlError(err) };
     }
   });
 
@@ -782,6 +782,17 @@ function registerIpc() {
   ipcMain.handle("pos:retry-errored", async () => {
     try {
       await repo.retryErrored();
+      void worker.run();
+      return { ok: true };
+    } catch (err) {
+      return fail(err);
+    }
+  });
+
+  ipcMain.handle("pos:retry-row", async (_e, table, id) => {
+    try {
+      await repo.retryRow(String(table), id);
+      broadcastStatus(await statusPayload());
       void worker.run();
       return { ok: true };
     } catch (err) {
