@@ -708,6 +708,7 @@ function Register() {
     setJobNotes("");
     setPromisedAt("");
     setNotifyWhatsApp(false);
+    setIntakeCharges([]);
   }
 
   /** Racket / stringing job started from the products card — cart independent. */
@@ -723,11 +724,28 @@ function Register() {
       setServiceId(stringingService.id);
       setServiceFee(stringingService.fee ? String(stringingService.fee) : "");
     }
+    setIntakeCharges([
+      {
+        kind: "labor",
+        name: stringingService?.name || "Stringing labour",
+        price: r2(Math.max(0, Number(stringingService?.fee ?? 0))),
+      },
+    ]);
     setBookMode("racket");
     setBookOpen(true);
   }
   const serviceLabel = pickedService?.name ?? customService.trim();
-  const serviceCharge = useServices || racketMode ? r2(Math.max(0, Number(serviceFee || 0))) : 0;
+  const intake = intakeTotals(
+    intakeCharges,
+    state.settings.tax,
+    0,
+    state.settings.integrations.categoryMap,
+  );
+  const serviceCharge = racketMode
+    ? intake.subtotal
+    : useServices
+      ? r2(Math.max(0, Number(serviceFee || 0)))
+      : 0;
   const bookingTotal = r2(totals.total + serviceCharge);
 
   async function bookAndPayLater() {
