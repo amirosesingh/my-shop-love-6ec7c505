@@ -68,11 +68,26 @@ describe("relay authorisation", () => {
 
   it("never writes tables outside the relay set", async () => {
     const out = await safeAuthorizeRelayOp(
-      { kind: "insert", table: "stores", rows: [{ id: "x" }] },
+      { kind: "insert", table: "app_users", rows: [{ id: "x" }] },
       cashier,
     );
     expect(out.ok).toBe(false);
     if (!out.ok) expect(out.code).toBe("TABLE_FORBIDDEN");
+  });
+
+  it("lets an administrator register a branch but not a cashier", async () => {
+    const mine = await safeAuthorizeRelayOp(
+      { kind: "insert", table: "stores", rows: [{ id: "STORE-A", name: "Main" }] },
+      admin,
+    );
+    expect(mine.ok).toBe(true);
+
+    const theirs = await safeAuthorizeRelayOp(
+      { kind: "insert", table: "stores", rows: [{ id: "STORE-B", name: "Other" }] },
+      cashier,
+    );
+    expect(theirs.ok).toBe(false);
+    if (!theirs.ok) expect(theirs.code).toBe("STORE_FORBIDDEN");
   });
 
   it("refuses a child row whose parent belongs to another branch", async () => {
