@@ -207,6 +207,8 @@ export type RelayCaller = {
   storeId?: string | null;
   /** app_users.user_id, when the proof carries it. */
   staffUserId?: string | null;
+  /** Sign-in email, when the proof carries one. Used to find the staff record. */
+  email?: string | null;
   /** Supabase Auth id, for staff signed in with email + password. */
   authUserId?: string | null;
   /** Signed claims from the proof, used as the no-round-trip fast path. */
@@ -215,6 +217,14 @@ export type RelayCaller = {
 
 /**
  * Establish who is pushing. Fails closed: an unproven caller writes nothing.
+ *
+ * A device usually presents several proofs at once. They answer different
+ * questions, so all of them are read instead of stopping at the first:
+ *   - a staff account or staff session says *who* is acting, with what role;
+ *   - a terminal token says *where* the device physically is.
+ * An administrator working on a registered till therefore stays an
+ * administrator, pinned to that till's branch, instead of being downgraded to
+ * an anonymous terminal with no permissions at all.
  */
 export async function verifyRelayCaller(input: {
   sessionToken?: string;
@@ -222,6 +232,9 @@ export async function verifyRelayCaller(input: {
   terminalToken?: string;
   accessToken?: string;
 }): Promise<RelayCaller> {
+  let identity: RelayCaller | null = null;
+  let terminalStore: string | null = null;
+
   // A cryptographic session record is the strongest proof: it can be revoked
   // centrally and expires when the till has been left idle.
   if (input.sessionToken) {
@@ -231,23 +244,23 @@ export async function verifyRelayCaller(input: {
       const s = check.session;
       const kind: RelayCaller["kind"] =
         s.kind === "cashier" ? "cashier" : s.kind === "terminal" ? "terminal" : "staff";
-      return {
+      identity = {
         kind,
         label: s.label ?? s.staff_user_id ?? "session",
         storeId: s.branch_id ?? null,
         staffUserId: s.staff_user_id ?? null,
       };
     }
-    if (check.reason === "revoked" || check.reason === "idle") {
+    if (!check.ok && (check.reason === "revoked" || check.reason === "idle")) {
       throw new Error("Your session has ended — please sign in again.");
     }
   }
 
-  if (input.cashierToken) {
+  if (!identity && input.cashierToken) {
     const { verifyCashierSession } = await import("./pos-session.server");
     const session = verifyCashierSession(input.cashierToken);
     if (session)
-      return { kind: "cashier", label: session.username, staffUserId: session.username };
+      identity = { kind: "cashier", label: session.username, staffUserId: session.username };
   }
 
   if (input.terminalToken) {
@@ -263,12 +276,19 @@ export async function verifyRelayCaller(input: {
       const row = rows[0];
       // A revoked token (remote reset, branch removed) never proves anything.
       if (row && !row.revoked_at && (row.status === "active" || row.status === "used")) {
-        return { kind: "terminal", label: input.terminalToken, storeId: row.location_id ?? null };
+        terminalStore = row.location_id ?? null;
+        identity ??= {
+          kind: "terminal",
+          label: input.terminalToken,
+          storeId: terminalStore,
+        };
       }
     }
   }
 
-  if (input.accessToken) {
+  // A signed-in staff account always wins the identity question, even on a
+  // registered till: it is the only proof that carries a role.
+  if (input.accessToken && identity?.kind !== "staff") {
     const res = await fetch(`${supabaseConfig().url}/auth/v1/user`, {
       headers: {
         apikey: supabaseConfig().key,
@@ -281,15 +301,23 @@ export async function verifyRelayCaller(input: {
         // The token is proven; only now are its claims worth reading.
         const { claimsFromJwt, claimsFromPayload } = await import("./relay-claims.server");
         const claims = claimsFromJwt(input.accessToken) ?? claimsFromPayload(user);
-        return {
+        identity = {
           kind: "staff",
           label: user.email ?? user.id,
+          email: user.email ?? null,
           authUserId: user.id,
+          // The device's own branch still applies unless the account names one.
+          storeId: claims?.storeId ?? terminalStore,
           claims,
         };
       }
     }
   }
 
-  throw new Error("This till could not prove who it is — sign in again or re-activate it.");
+  if (!identity)
+    throw new Error("This till could not prove who it is — sign in again or re-activate it.");
+
+  // Whoever is acting, the device's registered branch is the fallback.
+  if (!identity.storeId && terminalStore) identity = { ...identity, storeId: terminalStore };
+  return identity;
 }

@@ -127,16 +127,23 @@ export async function handleSyncRequest(request: Request): Promise<Response> {
     }
   }
 
-  const results: { ok: boolean; error?: string; code?: string }[] = [];
+  const results: {
+    ok: boolean;
+    error?: string;
+    code?: string;
+    table?: string;
+    kind?: string;
+  }[] = [];
   const { batchInsertIds } = await import("./relay-policy.server");
   const ops = body.ops ?? [];
   // Parents inserted in this same push let their child rows through.
   const batchIds = batchInsertIds(ops);
   for (const op of ops) {
     try {
-      results.push(await runRelayOp(op, scope, batchIds));
+      const result = await runRelayOp(op, scope, batchIds);
+      results.push({ ...result, table: op.table, kind: op.kind });
     } catch (e) {
-      results.push({ ok: false, error: (e as Error).message });
+      results.push({ ok: false, error: (e as Error).message, table: op.table, kind: op.kind });
     }
   }
   const refused = results.find(
@@ -146,8 +153,33 @@ export async function handleSyncRequest(request: Request): Promise<Response> {
       r.code === "SCOPE_MISSING" ||
       r.code === "SCOPE_STALE",
   );
+  if (refused) {
+    // One readable line per refusal so a live server shows why, without ever
+    // logging a token, a key or the row contents.
+    console.warn(
+      `[sync] refused ${refused.kind} on ${refused.table}: ${refused.code} ` +
+        `(caller=${scope.kind}/${scope.label}, role=${scope.roleSlug ?? scope.role ?? "none"}, ` +
+        `branch=${scope.storeId ?? "none"}, supervisor=${scope.isSupervisor})`,
+    );
+  }
   return Response.json(
-    { ok: results.every((r) => r.ok), results, ...(refused?.code ? { code: refused.code } : {}) },
+    {
+      ok: results.every((r) => r.ok),
+      results,
+      ...(refused?.code
+        ? {
+            code: refused.code,
+            error: refused.error,
+            detail: {
+              table: refused.table,
+              kind: refused.kind,
+              role: scope.roleSlug ?? scope.role ?? null,
+              branch: scope.storeId ?? null,
+              supervisor: scope.isSupervisor,
+            },
+          }
+        : {}),
+    },
     { status: refused ? 403 : 200 },
   );
 }
