@@ -2047,6 +2047,7 @@ function Register() {
   return (
     <AppShell>
       <ZoomCanvas>
+        <RegisterActionsProvider handlers={registerActionHandlers}>
         <RegisterWorkspace
           terminalKey={terminalKey}
           slots={{
