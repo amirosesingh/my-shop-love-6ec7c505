@@ -40,6 +40,8 @@ import { ColumnResizer, usePanelWidth } from "@/components/pos/ColumnResizer";
 import { ProductSearchDialog } from "@/components/pos/ProductSearchDialog";
 import { ScanBar } from "@/components/pos/ScanBar";
 import { QuickMemberDialog } from "@/components/pos/QuickMemberDialog";
+import { RegisterWorkspace } from "@/components/pos/layout/RegisterWorkspace";
+import { readTerminalConfig } from "@/lib/terminal-tokens";
 import { ZoomCanvas } from "@/components/pos/ZoomCanvas";
 import { setTicketDirty } from "@/lib/desktop-window";
 import { Button } from "@/components/ui/button";
@@ -1327,12 +1329,10 @@ function Register() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [receiptPreview, displayKey, method, lastSale, member]);
 
-  return (
-    <AppShell>
-      <ZoomCanvas>
-      <div className="pos-scaled flex h-full min-h-0 min-w-0 flex-col overflow-hidden lg:flex-row">
-        {/* ── LEFT: product catalog (hidden on narrow windows) ─────────── */}
-        <section className="hidden min-h-0 w-full min-w-0 flex-1 flex-col gap-3 border-b border-border p-4 lg:flex lg:border-b-0">
+  const terminalKey = readTerminalConfig()?.tokenId ?? currentStore.id ?? "default";
+
+  const slot_catalog = (
+    <>
           <CatalogPanel
             storeName={currentStore.name}
             shiftOpen={!!activeShift}
@@ -1351,74 +1351,11 @@ function Register() {
                 : undefined
             }
           />
-        </section>
+    </>
+  );
 
-        {/* Unknown scans and manual lookups land in the search & add modal. */}
-        <ProductSearchDialog
-          open={catalogOpen}
-          onOpenChange={(v) => {
-            setCatalogOpen(v);
-            if (!v) setUnknownCode(null);
-          }}
-          query={query}
-          onQueryChange={setQuery}
-          products={state.products.filter((p) => productVisibleAt(state.settings, p.id, state.currentStoreId))}
-          storeId={currentStore.id}
-          unknownCode={unknownCode}
-          onAdd={(id) => {
-            addLine(id);
-            setCatalogOpen(false);
-            setUnknownCode(null);
-            setQuery("");
-          }}
-          onLinkBarcode={async (id, code) => {
-            const product = state.products.find((p) => p.id === id);
-            if (!product) return;
-            await upsertProduct({
-              ...product,
-              barcodes: Array.from(new Set([...(product.barcodes ?? []), code])),
-              ...(product.barcode ? {} : { barcode: code }),
-            });
-            toast.success(`${code} linked to ${product.name}`);
-            addLine(id);
-            setUnknownCode(null);
-            setQuery("");
-          }}
-          onCreateProduct={async (draft) => {
-            const created = {
-              id: crypto.randomUUID(),
-              name: draft.name,
-              sku: draft.sku,
-              barcode: draft.barcode,
-              category: draft.category,
-              price: draft.price,
-              cost: 0,
-              stockByStore: { [currentStore.id]: 1 },
-              reorderLevel: 0,
-              taxRate: state.settings.tax.enabled ? state.settings.tax.rate : 0,
-            };
-            await upsertProduct(created);
-            toast.success(`${created.name} added to the catalogue`);
-            addLine(created.id);
-            setUnknownCode(null);
-            setQuery("");
-          }}
-        />
-
-        {/* Drag bar — widens the bill column, Excel style. */}
-        <ColumnResizer
-          width={billWidth}
-          onWidth={setBillWidth}
-          min={320}
-          max={760}
-          label="Resize the bill column"
-        />
-
-        {/* ── CENTER: active bill (drag the bar to resize) ──────────────── */}
-        <section
-          className="flex min-h-0 w-full flex-col bg-sidebar lg:w-[var(--bill-w)] lg:min-w-[var(--bill-w)] lg:max-w-[var(--bill-w)] lg:shrink-0"
-          style={{ ["--bill-w" as string]: `${billWidth}px` }}
-        >
+  const slot_billHeader = (
+    <>
           <div className="flex flex-col gap-2 border-b border-border px-4 py-3">
             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
               <div className="min-w-0">
@@ -1454,15 +1391,22 @@ function Register() {
               </Button>
             </div>
           </div>
+    </>
+  );
 
-          <div className="@container border-b border-border px-4 py-3">
-            <div className="grid grid-cols-1 items-start gap-3 @[38rem]:grid-cols-2">
+  const slot_scanBar = (
+    <>
               <div className="min-w-0">
                 <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Scan barcode</Label>
                 <div className="mt-2">
                   <ScanBar onScan={scanCode} />
                 </div>
               </div>
+    </>
+  );
+
+  const slot_memberSearch = (
+    <>
               <div className="min-w-0">
                 <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">
                   Search loyalty member
@@ -1586,9 +1530,11 @@ function Register() {
                   </>
                 )}
               </div>
-            </div>
-          </div>
+    </>
+  );
 
+  const slot_cartLines = (
+    <>
           <ScrollArea className="min-h-0 flex-1">
             <div className="divide-y divide-border">
               {lines.map((l, i) => (
@@ -1663,7 +1609,11 @@ function Register() {
               )}
             </div>
           </ScrollArea>
+    </>
+  );
 
+  const slot_billFooter = (
+    <>
           <div className="w-full min-w-0 shrink-0 space-y-2 border-t border-border px-4 py-3 text-sm">
             {exchangeRef && (
               <div className="flex items-center justify-between rounded-md border border-accent/40 bg-accent/10 px-2 py-1.5 text-[11px]">
@@ -1897,35 +1847,11 @@ function Register() {
               </div>
             )}
           </div>
-        </section>
+    </>
+  );
 
-        {/* ── RIGHT: operation deck. Below lg it collapses into a bar under
-            the totals so it can never overlap the Charge buttons. ───────── */}
-        <ColumnResizer
-          width={deckWidth}
-          onWidth={setDeckWidth}
-          min={220}
-          max={560}
-          label="Resize the register actions column"
-        />
-
-        <aside
-          className="@container flex w-full shrink-0 flex-col border-t border-border bg-background lg:w-[var(--deck-w)] lg:border-l lg:border-t-0"
-          style={{ ["--deck-w" as string]: `${deckWidth}px` }}
-        >
-          <button
-            type="button"
-            onClick={() => setDeckOpen((v) => !v)}
-            aria-expanded={deckOpen}
-            className="flex shrink-0 items-center justify-between gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground lg:hidden"
-          >
-            <span>Register actions</span>
-            <ChevronUp className={`size-4 transition-transform ${deckOpen ? "" : "rotate-180"}`} />
-          </button>
-          <div
-            className={`${deckOpen ? "flex" : "hidden"} max-h-[45vh] min-h-0 flex-col gap-3 overflow-y-auto p-3 pt-0 lg:flex lg:max-h-none lg:pt-3`}
-          >
-            {/* Card 1 · transaction actions */}
+  const slot_transactionActions = (
+    <>
             {visible("register.transactionActions") && (
               <div className="rounded-lg border border-border bg-card p-3">
                 <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -2011,8 +1937,11 @@ function Register() {
                 )}
               </div>
             )}
+    </>
+  );
 
-            {/* Card 2 · device & printing */}
+  const slot_devicePrinting = (
+    <>
             <div className="rounded-lg border border-border bg-card p-3">
               <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Device &amp; printing
@@ -2040,9 +1969,147 @@ function Register() {
                 <Switch id="live-receipt" checked={receiptPreview} onCheckedChange={setReceiptPreview} />
               </div>
             </div>
+    </>
+  );
+
+  return (
+    <AppShell>
+      <ZoomCanvas>
+        <RegisterWorkspace
+          terminalKey={terminalKey}
+          slots={{
+            catalog: slot_catalog,
+            billHeader: slot_billHeader,
+            scanBar: slot_scanBar,
+            memberSearch: slot_memberSearch,
+            cartLines: slot_cartLines,
+            billFooter: slot_billFooter,
+            transactionActions: slot_transactionActions,
+            devicePrinting: slot_devicePrinting,
+          }}
+          classic={
+      <div className="pos-scaled flex h-full min-h-0 min-w-0 flex-col overflow-hidden lg:flex-row">
+        {/* ── LEFT: product catalog (hidden on narrow windows) ─────────── */}
+        <section className="hidden min-h-0 w-full min-w-0 flex-1 flex-col gap-3 border-b border-border p-4 lg:flex lg:border-b-0">
+          {slot_catalog}
+        </section>
+
+
+        {/* Drag bar — widens the bill column, Excel style. */}
+        <ColumnResizer
+          width={billWidth}
+          onWidth={setBillWidth}
+          min={320}
+          max={760}
+          label="Resize the bill column"
+        />
+
+        {/* ── CENTER: active bill (drag the bar to resize) ──────────────── */}
+        <section
+          className="flex min-h-0 w-full flex-col bg-sidebar lg:w-[var(--bill-w)] lg:min-w-[var(--bill-w)] lg:max-w-[var(--bill-w)] lg:shrink-0"
+          style={{ ["--bill-w" as string]: `${billWidth}px` }}
+        >
+          {slot_billHeader}
+
+          <div className="@container border-b border-border px-4 py-3">
+            <div className="grid grid-cols-1 items-start gap-3 @[38rem]:grid-cols-2">
+              {slot_scanBar}
+              {slot_memberSearch}
+            </div>
+          </div>
+
+          {slot_cartLines}
+
+          {slot_billFooter}
+        </section>
+
+        {/* ── RIGHT: operation deck. Below lg it collapses into a bar under
+            the totals so it can never overlap the Charge buttons. ───────── */}
+        <ColumnResizer
+          width={deckWidth}
+          onWidth={setDeckWidth}
+          min={220}
+          max={560}
+          label="Resize the register actions column"
+        />
+
+        <aside
+          className="@container flex w-full shrink-0 flex-col border-t border-border bg-background lg:w-[var(--deck-w)] lg:border-l lg:border-t-0"
+          style={{ ["--deck-w" as string]: `${deckWidth}px` }}
+        >
+          <button
+            type="button"
+            onClick={() => setDeckOpen((v) => !v)}
+            aria-expanded={deckOpen}
+            className="flex shrink-0 items-center justify-between gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground lg:hidden"
+          >
+            <span>Register actions</span>
+            <ChevronUp className={`size-4 transition-transform ${deckOpen ? "" : "rotate-180"}`} />
+          </button>
+          <div
+            className={`${deckOpen ? "flex" : "hidden"} max-h-[45vh] min-h-0 flex-col gap-3 overflow-y-auto p-3 pt-0 lg:flex lg:max-h-none lg:pt-3`}
+          >
+            {/* Card 1 · transaction actions */}
+            {slot_transactionActions}
+
+            {/* Card 2 · device & printing */}
+            {slot_devicePrinting}
           </div>
         </aside>
       </div>
+          }
+        />
+        {/* Unknown scans and manual lookups land in the search & add modal. */}
+        <ProductSearchDialog
+          open={catalogOpen}
+          onOpenChange={(v) => {
+            setCatalogOpen(v);
+            if (!v) setUnknownCode(null);
+          }}
+          query={query}
+          onQueryChange={setQuery}
+          products={state.products.filter((p) => productVisibleAt(state.settings, p.id, state.currentStoreId))}
+          storeId={currentStore.id}
+          unknownCode={unknownCode}
+          onAdd={(id) => {
+            addLine(id);
+            setCatalogOpen(false);
+            setUnknownCode(null);
+            setQuery("");
+          }}
+          onLinkBarcode={async (id, code) => {
+            const product = state.products.find((p) => p.id === id);
+            if (!product) return;
+            await upsertProduct({
+              ...product,
+              barcodes: Array.from(new Set([...(product.barcodes ?? []), code])),
+              ...(product.barcode ? {} : { barcode: code }),
+            });
+            toast.success(`${code} linked to ${product.name}`);
+            addLine(id);
+            setUnknownCode(null);
+            setQuery("");
+          }}
+          onCreateProduct={async (draft) => {
+            const created = {
+              id: crypto.randomUUID(),
+              name: draft.name,
+              sku: draft.sku,
+              barcode: draft.barcode,
+              category: draft.category,
+              price: draft.price,
+              cost: 0,
+              stockByStore: { [currentStore.id]: 1 },
+              reorderLevel: 0,
+              taxRate: state.settings.tax.enabled ? state.settings.tax.rate : 0,
+            };
+            await upsertProduct(created);
+            toast.success(`${created.name} added to the catalogue`);
+            addLine(created.id);
+            setUnknownCode(null);
+            setQuery("");
+          }}
+        />
       </ZoomCanvas>
 
       {/* Live receipt preview overlay */}
