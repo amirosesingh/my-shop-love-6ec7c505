@@ -76,7 +76,7 @@ import {
 } from "@/lib/coupons";
 import type { Campaign, VoucherView } from "@/lib/coupons";
 import type { Booking, CartLine, DiscountType, IntakeCharge, PaymentMethod, Sale } from "@/lib/pos-types";
-import { intakeTotals, newJobTag } from "@/lib/booking-charges";
+import { applyCombo, intakeTotals, newJobTag } from "@/lib/booking-charges";
 import type { Payment } from "@/lib/pos-types";
 import { TenderSplit, rememberBanks } from "@/components/pos/TenderSplit";
 import { lineUnitDiscount, paymentsLabel, paymentsTotal, PAYMENT_LABELS, r2, validateTenders } from "@/lib/pos-types";
@@ -258,6 +258,16 @@ function Register() {
   const [notifyWhatsApp, setNotifyWhatsApp] = useState(false);
   /** Itemised racket intake charges: labour, string, grip, add-ons. */
   const [intakeCharges, setIntakeCharges] = useState<IntakeCharge[]>([]);
+  /** Customer lookup inside the booking dialog (name or phone). */
+  const [bookMemberQuery, setBookMemberQuery] = useState("");
+  /** Racket / string sourced from stock, or brought in by the customer. */
+  const [racketProductId, setRacketProductId] = useState("");
+  const [racketCustomerOwned, setRacketCustomerOwned] = useState(true);
+  const [stringProductId, setStringProductId] = useState("");
+  const [stringCustomerOwned, setStringCustomerOwned] = useState(false);
+  /** Labour is locked to the configured fee until a cashier overrides it. */
+  const [labourUnlocked, setLabourUnlocked] = useState(false);
+  const [labourReason, setLabourReason] = useState("");
   /** Narrow windows: the action deck collapses so it can't cover the totals. */
   const [deckOpen, setDeckOpen] = useState(false);
   /* Operation deck state */
@@ -730,6 +740,13 @@ function Register() {
     setOvergrip(false);
     setJobTag("");
     setEditBookingId(null);
+    setBookMemberQuery("");
+    setRacketProductId("");
+    setRacketCustomerOwned(true);
+    setStringProductId("");
+    setStringCustomerOwned(false);
+    setLabourUnlocked(false);
+    setLabourReason("");
   }
 
   /** Master lists an admin curates in booking settings. */
@@ -881,8 +898,10 @@ function Register() {
   }
 
   const serviceLabel = pickedService?.name ?? customService.trim();
+  /** Racket + string bought together earns the configured combo on labour. */
+  const combo = applyCombo(intakeCharges, bookingRules);
   const intake = intakeTotals(
-    intakeCharges,
+    combo.charges,
     state.settings.tax,
     0,
     state.settings.integrations.categoryMap,
@@ -1552,7 +1571,6 @@ function Register() {
             onOpenCatalog={() => setCatalogOpen(true)}
             onOpenCustomerDisplay={visible("register.customerDisplay") ? openCustomerDisplay : undefined}
             onOpenShift={() => setOpenShiftOpen(true)}
-            onRacketBooking={startRacketBooking}
             onCloseShift={
               visible("register.closeShift")
                 ? async () => {
@@ -2034,21 +2052,6 @@ function Register() {
     </div>
   );
 
-  const atom_actBookLater = (
-    <div className="flex h-full min-w-0 items-center px-1">
-      <ActionButton
-        layout="inline"
-        variant="outline"
-        className="h-full w-full"
-        label="Book & pay later"
-        icon={<CalendarClock className="size-4" />}
-        disabled={tillLocked || refundDue > 0 || !lines.length}
-        disabledReason={tillLocked ? lockedReason : undefined}
-        onClick={startCartBooking}
-      />
-    </div>
-  );
-
   /** Always on the right panel, cart empty or not. */
   const atom_actBooking = (
     <div className="relative flex h-full min-w-0 items-center px-1">
@@ -2060,7 +2063,7 @@ function Register() {
       <ActionButton
         layout="inline"
         className="h-full w-full"
-        label="🏸 Create / Manage Booking"
+        label="Manage Booking"
         icon={<CalendarClock className="size-4" />}
         disabled={tillLocked}
         disabledReason={tillLocked ? lockedReason : undefined}
@@ -2156,7 +2159,6 @@ function Register() {
       <div className="h-12">{atom_balanceDue}</div>
       <div className="h-12 px-3">{atom_actCharge}</div>
       <div className="h-11 px-3">{atom_actBooking}</div>
-      <div className="h-11 px-3">{atom_actBookLater}</div>
       {lastSale && <div className="border-t border-border">{atom_reprintDeck}</div>}
     </div>
   );
@@ -2319,7 +2321,6 @@ function Register() {
       document.querySelector<HTMLInputElement>("[data-scan-focus] input")?.focus(),
     "hold.new": () => holdOrder(),
     "void.cart": () => void clearCart(),
-    "book.later": () => startCartBooking(),
     "book.hub": () => setBookingHubOpen(true),
     "shift.open": () => setOpenShiftOpen(true),
     "shift.close": () => setCloseShiftOpen(true),
@@ -2357,7 +2358,6 @@ function Register() {
             totalsBlock: atom_totalsBlock,
             balanceDue: atom_balanceDue,
             actCharge: atom_actCharge,
-            actBookLater: atom_actBookLater,
             actBooking: atom_actBooking,
             reprintDeck: atom_reprintDeck,
             actHold: atom_actHold,
@@ -2982,7 +2982,7 @@ function Register() {
       <Dialog open={bookingHubOpen} onOpenChange={setBookingHubOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Create / manage booking</DialogTitle>
+            <DialogTitle>Manage Booking</DialogTitle>
           </DialogHeader>
           <div className="space-y-2">
             <Button

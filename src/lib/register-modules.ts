@@ -9,7 +9,6 @@ export type RegisterModuleId =
   // action buttons
   | "actClear"
   | "actHold"
-  | "actBookLater"
   | "actBooking"
   | "actExchange"
   | "actVoid"
@@ -86,7 +85,6 @@ export const REGISTER_MODULES: RegisterModule[] = [
   bare("actCharge", "Charge / pay button", "Opens the payment deck for the balance due.", "Action buttons", 8, 3, {
     essential: true,
   }),
-  bare("actBookLater", "Book & pay later", "Parks the bill as a booking with a deposit.", "Action buttons", 8, 3),
   bare(
     "actBooking",
     "Create / manage booking",
@@ -173,7 +171,7 @@ export const LEGACY_EXPANSION: Record<string, RegisterModuleId[]> = {
   scanBar: ["scanBar"],
   memberSearch: ["memberSearch"],
   cartLines: ["cartLines"],
-  billFooter: ["totalsBlock", "balanceDue", "actCharge", "actBooking", "actBookLater", "reprintDeck"],
+  billFooter: ["totalsBlock", "balanceDue", "actCharge", "actBooking", "reprintDeck"],
   transactionActions: ["actHold", "actVoid", "actCoupon", "actSplit", "heldList"],
   devicePrinting: ["actDrawer", "receiptToggle"],
 };
