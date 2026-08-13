@@ -205,6 +205,7 @@ export type Database = {
       bookings: {
         Row: {
           cashier: string | null
+          charges: Json
           closed_at: string | null
           created_at: string
           customer_name: string
@@ -212,8 +213,10 @@ export type Database = {
           discount: number
           dropped_off_at: string | null
           due_date: string | null
+          grip_product_id: string | null
           grommet_notes: string | null
           id: string
+          intake_note: string | null
           job_notes: string | null
           job_status: string
           job_status_at: string | null
@@ -234,8 +237,11 @@ export type Database = {
           shift_id: string | null
           status: string
           store_id: string | null
+          string_origin: string | null
+          string_source_product_id: string | null
           string_type: string | null
           subtotal: number
+          tag_id: string | null
           tax: number
           tension_cross: number | null
           tension_main: number | null
@@ -245,6 +251,7 @@ export type Database = {
         }
         Insert: {
           cashier?: string | null
+          charges?: Json
           closed_at?: string | null
           created_at?: string
           customer_name?: string
@@ -252,8 +259,10 @@ export type Database = {
           discount?: number
           dropped_off_at?: string | null
           due_date?: string | null
+          grip_product_id?: string | null
           grommet_notes?: string | null
           id?: string
+          intake_note?: string | null
           job_notes?: string | null
           job_status?: string
           job_status_at?: string | null
@@ -274,8 +283,11 @@ export type Database = {
           shift_id?: string | null
           status?: string
           store_id?: string | null
+          string_origin?: string | null
+          string_source_product_id?: string | null
           string_type?: string | null
           subtotal?: number
+          tag_id?: string | null
           tax?: number
           tension_cross?: number | null
           tension_main?: number | null
@@ -285,6 +297,7 @@ export type Database = {
         }
         Update: {
           cashier?: string | null
+          charges?: Json
           closed_at?: string | null
           created_at?: string
           customer_name?: string
@@ -292,8 +305,10 @@ export type Database = {
           discount?: number
           dropped_off_at?: string | null
           due_date?: string | null
+          grip_product_id?: string | null
           grommet_notes?: string | null
           id?: string
+          intake_note?: string | null
           job_notes?: string | null
           job_status?: string
           job_status_at?: string | null
@@ -314,8 +329,11 @@ export type Database = {
           shift_id?: string | null
           status?: string
           store_id?: string | null
+          string_origin?: string | null
+          string_source_product_id?: string | null
           string_type?: string | null
           subtotal?: number
+          tag_id?: string | null
           tax?: number
           tension_cross?: number | null
           tension_main?: number | null
@@ -1468,6 +1486,60 @@ export type Database = {
           status?: string
           title?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      settings_locks: {
+        Row: {
+          created_at: string
+          locked: boolean
+          section: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          locked?: boolean
+          section: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          locked?: boolean
+          section?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      settings_overrides: {
+        Row: {
+          created_at: string
+          patch: Json
+          scope: string
+          scope_id: string
+          section: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          patch?: Json
+          scope?: string
+          scope_id?: string
+          section: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          patch?: Json
+          scope?: string
+          scope_id?: string
+          section?: string
+          updated_at?: string
+          updated_by?: string | null
         }
         Relationships: []
       }

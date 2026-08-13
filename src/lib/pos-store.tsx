@@ -16,6 +16,7 @@ import type {
   BookingPayment,
   BookingPaymentTiming,
   CartLine,
+  IntakeCharge,
   JobStatus,
   Member,
   PaymentMethod,
@@ -27,6 +28,7 @@ import type {
   Shift,
   Store,
   StockAdjustmentReason,
+  StringOrigin,
   TaxSettings,
   Transfer,
   TransferKind,
@@ -57,6 +59,24 @@ import { setActiveBranchSyncPolicy } from "./sync-policy";
 import { setPosFormats, setPosTimeZone } from "./time-zone";
 import { receiveTransferInDb, saveTransfer, setTransferStatus } from "./stock-transfers";
 import { commitBooking, deleteBookingRow, loadBookings, saveBookingQuietly } from "./bookings-db";
+import {
+  clearSectionOverride,
+  emptyBranchSettings,
+  loadBranchSettings,
+  saveSectionOverride,
+  setSectionLock,
+  type BranchSettingsState,
+} from "./branch-settings";
+import {
+  SECTION_BY_ID,
+  getPath,
+  mergePatch,
+  patchPaths,
+  pickSection,
+  sectionOfPath,
+  setPath,
+  type SettingsSectionId,
+} from "./settings-sections";
 
 const KEY = "pos-state-v2";
 
@@ -120,6 +140,15 @@ export type NewBooking = {
   cashier: string;
   /** racket stringing job card, when the booking is a string job */
   job?: RacketJob;
+  /** quick job tag used when no customer is attached yet */
+  tagId?: string;
+  /** who dropped the racket off ("Dropped off by Coach Alex") */
+  intakeNote?: string;
+  stringOrigin?: StringOrigin;
+  stringProductId?: string;
+  gripProductId?: string;
+  /** priced breakdown: labour, string, grip, add-ons */
+  charges?: IntakeCharge[];
 };
 
 /** Racket stringing job card captured with the booking. */
@@ -194,6 +223,12 @@ type Ctx = {
   removePromotion: (id: string) => void;
   togglePromotion: (id: string, active: boolean) => void;
   updateSettings: (patch: Partial<AppSettings>) => void;
+  /** Which settings blocks this branch overrides, and which are locked globally. */
+  settingsScope: BranchSettingsState;
+  /** Start (or stop) overriding one block for the branch in context. */
+  setSectionScope: (section: SettingsSectionId, on: boolean, storeId?: string) => Promise<void>;
+  /** Lock a block so no branch can override it. */
+  setSectionLocked: (section: SettingsSectionId, locked: boolean) => Promise<void>;
   createTransfer: (input: NewTransfer) => Transfer;
   approveTransfer: (id: string) => void;
   receiveTransfer: (id: string) => void;
@@ -262,6 +297,12 @@ export function PosProvider({ children }: { children: ReactNode }) {
   // Who is acting right now — stamped on transfer approvals and receipts.
   const actorRef = useRef("Manager");
   actorRef.current = terminalUser?.name || user?.email || "Manager";
+  // Branch overrides and global locks for the scopable settings blocks.
+  const [scope, setScope] = useState<BranchSettingsState>(emptyBranchSettings);
+  const scopeRef = useRef(scope);
+  scopeRef.current = scope;
+  const whoRef = useRef("Manager");
+  whoRef.current = actorRef.current;
   // Lets earlier callbacks reach the settings writer defined further down.
   const updateSettingsRef = useRef<((patch: Partial<AppSettings>) => void) | null>(null);
 
@@ -369,6 +410,18 @@ export function PosProvider({ children }: { children: ReactNode }) {
       /* storage full */
     }
   }, [state, ready]);
+
+  // Branch overrides follow the branch in context, once someone is signed in.
+  useEffect(() => {
+    if (!signedIn || !state.currentStoreId) return;
+    let cancelled = false;
+    void loadBranchSettings(state.currentStoreId).then((next) => {
+      if (!cancelled) setScope(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [signedIn, state.currentStoreId]);
 
   // The directory may not have loaded yet (a cashier signs in with a PIN and
   // has no central-database account of their own). The terminal's own
@@ -933,6 +986,12 @@ export function PosProvider({ children }: { children: ReactNode }) {
       createdAt: now,
       status: "active",
       job: input.job,
+      tagId: input.tagId,
+      intakeNote: input.intakeNote,
+      stringOrigin: input.stringOrigin,
+      stringProductId: input.stringProductId,
+      gripProductId: input.gripProductId,
+      charges: input.charges,
       jobStatus: input.job ? "received" : undefined,
       jobStatusBy: input.job ? input.cashier : undefined,
       jobStatusAt: input.job ? now : undefined,
@@ -1545,11 +1604,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
-  const updateSettings = useCallback((patch: Partial<AppSettings>) => {
-    logger.log("settings", "Settings updated", "settings", {
-      previous: stateRef.current.settings,
-      updated: patch,
-    });
+  const writeGlobalSettings = useCallback((patch: Partial<AppSettings>) => {
     {
       const prev = stateRef.current.settings;
       void db.saveSettings({
@@ -1577,7 +1632,86 @@ export function PosProvider({ children }: { children: ReactNode }) {
       },
     }));
   }, []);
+
+  /**
+   * Route each leaf of the patch to the scope that owns it: blocks this branch
+   * overrides are written to the branch record, everything else is global.
+   */
+  const updateSettings = useCallback(
+    (patch: Partial<AppSettings>) => {
+      logger.log("settings", "Settings updated", "settings", {
+        previous: stateRef.current.settings,
+        updated: patch,
+      });
+      const scope = scopeRef.current;
+      const storeId = stateRef.current.currentStoreId;
+      const bySection = new Map<SettingsSectionId, Record<string, unknown>>();
+      let globalPatch: Record<string, unknown> = {};
+      let hasGlobal = false;
+      for (const path of patchPaths(patch as Record<string, unknown>)) {
+        const value = getPath(patch, path);
+        const section = sectionOfPath(path);
+        const overridden = section ? scope.overrides[section.id] : undefined;
+        if (section && overridden && !scope.locks[section.id]) {
+          bySection.set(section.id, setPath(bySection.get(section.id) ?? overridden, path, value));
+        } else {
+          globalPatch = setPath(globalPatch, path, value);
+          hasGlobal = true;
+        }
+      }
+      if (hasGlobal) writeGlobalSettings(globalPatch as Partial<AppSettings>);
+      if (!bySection.size) return;
+      setScope((s) => ({
+        ...s,
+        overrides: { ...s.overrides, ...Object.fromEntries(bySection) },
+      }));
+      for (const [section, sectionPatch] of bySection) {
+        void saveSectionOverride(storeId, section, sectionPatch, whoRef.current).catch((e) =>
+          toast.error(`Branch settings not saved: ${(e as Error).message}`),
+        );
+      }
+    },
+    [writeGlobalSettings],
+  );
   updateSettingsRef.current = updateSettings;
+
+  /** Start or stop overriding one block for a branch. */
+  const setSectionScope = useCallback(
+    async (section: SettingsSectionId, on: boolean, storeId?: string) => {
+      const target = storeId || stateRef.current.currentStoreId;
+      const def = SECTION_BY_ID[section];
+      if (!target || !def) return;
+      if (scopeRef.current.locks[section] && on) {
+        toast.error("This block is locked by head office.");
+        return;
+      }
+      if (on) {
+        const patch = pickSection(stateRef.current.settings, def);
+        setScope((s) => ({ ...s, overrides: { ...s.overrides, [section]: patch } }));
+        await saveSectionOverride(target, section, patch, whoRef.current);
+      } else {
+        setScope((s) => {
+          const overrides = { ...s.overrides };
+          delete overrides[section];
+          return { ...s, overrides };
+        });
+        await clearSectionOverride(target, section);
+      }
+      logger.log("settings", on ? "Branch override enabled" : "Reset to global default", "settings", {
+        section,
+        storeId: target,
+      });
+    },
+    [],
+  );
+
+  const setSectionLocked = useCallback(async (section: SettingsSectionId, locked: boolean) => {
+    setScope((s) => ({ ...s, locks: { ...s.locks, [section]: locked } }));
+    await setSectionLock(section, locked, whoRef.current);
+    logger.log("settings", locked ? "Setting locked globally" : "Setting unlocked", "settings", {
+      section,
+    });
+  }, []);
 
   const createTransfer = useCallback((input: NewTransfer) => {
     const now = new Date().toISOString();
@@ -1746,9 +1880,21 @@ export function PosProvider({ children }: { children: ReactNode }) {
 
   const reset = useCallback(() => setState(emptyState), []);
 
+  // Every consumer sees the resolved record: branch override over global.
+  const effectiveState = useMemo(() => {
+    const keys = Object.keys(scope.overrides) as SettingsSectionId[];
+    if (!keys.length) return state;
+    let settings = state.settings;
+    for (const key of keys) settings = mergePatch(settings, scope.overrides[key]);
+    return { ...state, settings };
+  }, [state, scope]);
+
   const value: Ctx = {
     ready,
-    state,
+    state: effectiveState,
+    settingsScope: scope,
+    setSectionScope,
+    setSectionLocked,
     stores: state.stores,
     currentStore,
     setCurrentStore,

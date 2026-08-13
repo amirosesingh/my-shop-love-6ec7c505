@@ -49,6 +49,12 @@ const toRow = (b: Booking): Row => ({
   job_status_by: b.jobStatusBy ?? null,
   job_status_at: b.jobStatusAt ?? null,
   notify_whatsapp: !!b.job?.notifyWhatsApp,
+  tag_id: b.tagId ?? null,
+  intake_note: b.intakeNote ?? null,
+  string_origin: b.stringOrigin ?? null,
+  string_source_product_id: b.stringProductId ?? null,
+  grip_product_id: b.gripProductId ?? null,
+  charges: b.charges ?? [],
 });
 
 const rowToBooking = (r: Row, payments: Row[]): Booking => ({
@@ -86,6 +92,12 @@ const rowToBooking = (r: Row, payments: Row[]): Booking => ({
   jobStatus: (r.job_status as JobStatus) ?? "received",
   jobStatusBy: r.job_status_by ?? undefined,
   jobStatusAt: r.job_status_at ?? undefined,
+  tagId: r.tag_id ?? undefined,
+  intakeNote: r.intake_note ?? undefined,
+  stringOrigin: r.string_origin ?? undefined,
+  stringProductId: r.string_source_product_id ?? undefined,
+  gripProductId: r.grip_product_id ?? undefined,
+  charges: Array.isArray(r.charges) ? r.charges : [],
   job: {
     racketModel: r.racket_model ?? undefined,
     stringType: r.string_type ?? undefined,
