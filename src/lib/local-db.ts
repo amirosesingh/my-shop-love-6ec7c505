@@ -55,6 +55,23 @@ export type LocalDbTestResult = {
   hint?: string | null;
 };
 
+/** One SQL Server instance found on this machine or the local network. */
+export type DiscoveredDbServer = {
+  address: string;
+  serverName: string;
+  instance: string;
+  port: number | null;
+  version: string | null;
+  source?: "browser" | "local";
+};
+
+export type ScanNetworkResult = {
+  ok: boolean;
+  servers?: DiscoveredDbServer[];
+  error?: string;
+  hint?: string;
+};
+
 export type LocalSyncStatus = {
   connected: boolean;
   error?: string;
@@ -75,6 +92,9 @@ export type PosBridge = {
   ) => Promise<LocalDbTestResult & { cloudError?: string }>;
   configureCloud: (cloud: CloudBridgeConfig) => Promise<{ ok: boolean; error?: string }>;
   test: (config: LocalDbConfig) => Promise<LocalDbTestResult>;
+  /** Discover local/LAN SQL Server instances (desktop shell only). */
+  scanNetwork?: () => Promise<ScanNetworkResult>;
+  scanLocalDatabases?: () => Promise<ScanNetworkResult>;
   status: () => Promise<LocalSyncStatus>;
   push: () => Promise<{ ok: boolean; pushed: number; failed: number; error?: string }>;
   pull: () => Promise<{ ok: boolean; merged: number; error?: string }>;
@@ -215,6 +235,28 @@ export async function writeLocalSetting(key: string, value: string | null): Prom
 
 export const localDb = (): PosBridge | null =>
   typeof window === "undefined" ? null : (window.pos ?? null);
+
+/**
+ * Ask the desktop shell to look for SQL Server instances. In the browser there
+ * is no network access to give, so the caller gets an empty, explained result.
+ */
+export async function scanLocalDatabases(): Promise<ScanNetworkResult> {
+  const bridge = localDb();
+  const run = bridge?.scanNetwork ?? bridge?.scanLocalDatabases;
+  if (!run) {
+    return {
+      ok: false,
+      servers: [],
+      error: "Network discovery is only available in the Windows desktop app.",
+    };
+  }
+  try {
+    const res = await run();
+    return { ...res, servers: res.servers ?? [] };
+  } catch (err) {
+    return { ok: false, servers: [], error: err instanceof Error ? err.message : String(err) };
+  }
+}
 
 const CONFIG_KEY = "pos.localdb.config";
 const SECRET_NAME = "localdb.config";

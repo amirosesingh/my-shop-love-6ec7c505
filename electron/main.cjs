@@ -7,6 +7,7 @@ const { app, BrowserWindow, ipcMain, screen, dialog, shell } = require("electron
 
 const pool = require("./db/pool.cjs");
 const repo = require("./db/repo.cjs");
+const discover = require("./db/discover.cjs");
 const worker = require("./sync/worker.cjs");
 const updater = require("./updater.cjs");
 const terminalStore = require("./terminal-store.cjs");
@@ -609,6 +610,14 @@ function registerIpc() {
       return await pool.test(config);
     } catch (err) {
       return { ok: false, ...pool.describeSqlError(err) };
+    }
+  });
+
+  ipcMain.handle("pos:scan-network", async () => {
+    try {
+      return await discover.scan();
+    } catch (err) {
+      return { ok: false, servers: [], ...pool.describeSqlError(err) };
     }
   });
 
