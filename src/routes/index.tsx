@@ -990,6 +990,9 @@ function Register() {
         note: bookNote.trim(),
         cashier: activeCashier,
         tagId: racketMode ? jobTag || (bookingRules.autoJobTag ? newJobTag() : undefined) : undefined,
+        stringOrigin: racketMode ? (stringCustomerOwned ? "customer" : "store") : undefined,
+        stringProductId: racketMode && !stringCustomerOwned ? stringProductId || undefined : undefined,
+        intakeNote: racketMode ? grommetNotes.trim() || undefined : undefined,
         job: racketMode
           ? {
               racketModel: racketModel.trim() || undefined,
