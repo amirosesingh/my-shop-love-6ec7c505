@@ -809,6 +809,7 @@ export function printJobTag(booking: Booking) {
     ${j?.grommetNotes ? `<div class="muted">${esc(j.grommetNotes)}</div>` : ""}
     ${j?.jobNotes ? `<div class="muted">${esc(j.jobNotes)}</div>` : ""}
     <hr>${barcodeSvg(booking.ref)}
+    <div class="c">${qrSvg(booking.ref, 96)}</div>
     <div class="c muted">${esc(booking.ref)}</div>`;
   printHtml(`${booking.ref} job tag`, body, true, booking.ref);
 }

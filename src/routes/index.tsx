@@ -914,14 +914,9 @@ function Register() {
   const stringOptions = catalogueOptions(/string/i);
   const addOnOptions = catalogueOptions(/grip|grommet|stencil|accessor|add-on/i);
 
-  /** Replace (or clear) one charge line of a given kind. */
-  const setChargeOfKind = (kind: IntakeCharge["kind"], next: IntakeCharge | null) =>
-    setIntakeCharges((rows) => {
-      const rest = rows.filter((r) => !(r.kind === kind && r.productId !== undefined) && !(r.kind === kind && !r.name));
-      const without = rows.filter((r) => r.kind !== kind || r.kind === "labor");
-      const base = kind === "labor" ? rows : without.length ? without : rest;
-      return next ? [...base, next] : base;
-    });
+  /** Replace one charge line of a given kind (labour lines are never touched). */
+  const setChargeOfKind = (kind: IntakeCharge["kind"], next: IntakeCharge) =>
+    setIntakeCharges((rows) => [...rows.filter((r) => r.kind !== kind), next]);
 
   function pickRacketProduct(id: string) {
     const p = state.products.find((x) => x.id === id);
@@ -1011,7 +1006,7 @@ function Register() {
       return;
     }
     if (!racketMode && !lines.length) {
-      toast.error("Add at least one item to the cart before booking", {
+      toast.error("Please add at least one item to the cart before saving a pay-later booking.", {
         description: "Only racket / stringing jobs can be booked with an empty cart.",
       });
       return;
@@ -1029,6 +1024,10 @@ function Register() {
       return;
     }
     if (racketMode) {
+      if (labourUnlocked && !labourReason.trim()) {
+        toast.error("Enter a reason for the labour override");
+        return;
+      }
       if (bookingRules.requireRacketModel && !racketModel.trim()) {
         toast.error("Enter the racket brand / model");
         return;
@@ -1066,7 +1065,13 @@ function Register() {
         serviceTypeId: pickedService?.id,
         serviceName: serviceLabel || undefined,
         serviceFee: serviceCharge || undefined,
-        charges: racketMode && intake.charges.length ? intake.charges : undefined,
+        charges: racketMode && intake.charges.length
+          ? intake.charges.map((c) =>
+              c.kind === "labor" && labourUnlocked && labourReason.trim()
+                ? { ...c, overrideReason: labourReason.trim() }
+                : c,
+            )
+          : undefined,
         paymentTiming: payTiming,
         deposit: paidNow,
         depositMethod,
@@ -3405,14 +3410,73 @@ function Register() {
                 </div>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label>Customer name</Label>
-                <Input value={bookName} onChange={(e) => setBookName(e.target.value)} />
+            <div className="space-y-2 rounded-md border border-border p-2">
+              <div className="flex items-center justify-between">
+                <Label>Customer</Label>
+                <button
+                  type="button"
+                  className="text-[11px] text-primary hover:underline"
+                  onClick={() => {
+                    setMemberQuery(bookMemberQuery);
+                    setQuickMemberOpen(true);
+                  }}
+                >
+                  + Quick add customer
+                </button>
               </div>
-              <div className="space-y-1">
-                <Label>Phone</Label>
-                <Input value={bookPhone} onChange={(e) => setBookPhone(e.target.value)} className="numeric" />
+              <Input
+                value={bookMemberQuery}
+                onChange={(e) => setBookMemberQuery(e.target.value)}
+                placeholder="Search by name or phone…"
+              />
+              {bookMemberQuery.trim() && !member ? (
+                <div className="space-y-1">
+                  {state.members
+                    .filter((m) => {
+                      const q = bookMemberQuery.trim().toLowerCase();
+                      return (
+                        m.name.toLowerCase().includes(q) ||
+                        m.phone.replace(/\s/g, "").includes(q.replace(/\s/g, "")) ||
+                        m.code.toLowerCase().includes(q)
+                      );
+                    })
+                    .slice(0, 5)
+                    .map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        className="flex w-full items-center justify-between rounded-md border border-border px-2 py-1.5 text-left text-xs hover:bg-muted"
+                        onClick={() => {
+                          attachMember(m);
+                          setBookName(m.name);
+                          setBookPhone(m.phone);
+                          setBookMemberQuery("");
+                        }}
+                      >
+                        <span className="truncate">
+                          {m.name} · {m.phone}
+                        </span>
+                        <Badge variant="outline">
+                          {m.code} · {m.tier}
+                        </Badge>
+                      </button>
+                    ))}
+                </div>
+              ) : null}
+              {member ? (
+                <p className="text-[11px] text-muted-foreground">
+                  Attached: {member.name} · {member.code} · {member.tier}
+                </p>
+              ) : null}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>Customer name</Label>
+                  <Input value={bookName} onChange={(e) => setBookName(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Phone</Label>
+                  <Input value={bookPhone} onChange={(e) => setBookPhone(e.target.value)} className="numeric" />
+                </div>
               </div>
             </div>
             <div className="space-y-1">
@@ -3530,8 +3594,9 @@ function Register() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label>Grommet / grip notes</Label>
-                    <Input
+                    <Label>Racket inspection / pre-existing condition</Label>
+                    <Textarea
+                      rows={2}
                       value={grommetNotes}
                       onChange={(e) => setGrommetNotes(e.target.value)}
                       placeholder="Two cracked grommets at 12 o'clock, replace grip"
@@ -3564,8 +3629,23 @@ function Register() {
             <Button variant="outline" onClick={() => setBookOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={() => void bookAndPayLater()} disabled={saving}>
-              {saving ? "Saving…" : "Reserve & print slip"}
+            {allowedTimings.includes("now") && (
+              <Button
+                variant="secondary"
+                disabled={saving}
+                onClick={() => {
+                  setPayTiming("now");
+                  void bookAndPayLater();
+                }}
+              >
+                Pay now
+              </Button>
+            )}
+            <Button
+              onClick={() => void bookAndPayLater()}
+              disabled={saving || (!racketMode && !lines.length)}
+            >
+              {saving ? "Saving…" : racketMode ? "Save job & print ticket" : "Save pay-later booking"}
             </Button>
           </DialogFooter>
         </DialogContent>
