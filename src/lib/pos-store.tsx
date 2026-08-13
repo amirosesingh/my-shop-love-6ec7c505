@@ -69,6 +69,7 @@ import {
 } from "./branch-settings";
 import {
   SECTION_BY_ID,
+  getPath,
   mergePatch,
   patchPaths,
   pickSection,
