@@ -11,6 +11,9 @@ contextBridge.exposeInMainWorld("pos", {
   connect: (config, cloud) => invoke("pos:connect", config, cloud),
   configureCloud: (cloud) => invoke("pos:configure-cloud", cloud),
   test: (config) => invoke("pos:test", config),
+  /** Discover SQL Server instances on this machine and the local network. */
+  scanNetwork: () => invoke("pos:scan-network"),
+  scanLocalDatabases: () => invoke("pos:scan-network"),
   status: () => invoke("pos:status"),
   /** Silent receipt printing — no Windows print dialog. */
   print: (html, options) => invoke("print:silent", html, options),
