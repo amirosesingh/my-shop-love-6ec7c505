@@ -247,6 +247,11 @@ function BookingsPage() {
             {bookings.map((b) => {
               const balance = bookingBalance(b);
               const overdue = b.status === "active" && b.dueDate < today;
+              const stale =
+                b.status === "active" &&
+                rules.staleAfterDays > 0 &&
+                Date.now() - new Date(b.createdAt).getTime() >
+                  rules.staleAfterDays * 86_400_000;
               const job = b.job;
               const jobStatus = (b.jobStatus ?? "received") as JobStatus;
               const hasJob =
@@ -264,6 +269,11 @@ function BookingsPage() {
                         {overdue && (
                           <Badge variant="outline" className="border-destructive/40 text-destructive">
                             overdue
+                          </Badge>
+                        )}
+                        {stale && (
+                          <Badge variant="outline" className="border-warning/40 text-warning">
+                            uncollected {rules.staleAfterDays}d+
                           </Badge>
                         )}
                       </div>
@@ -342,6 +352,16 @@ function BookingsPage() {
                             <button
                               key={s}
                               onClick={() => {
+                                if (
+                                  s === "collected" &&
+                                  rules.blockCollectionWithBalance &&
+                                  balance > 0
+                                ) {
+                                  toast.error(
+                                    `Balance of ${money(balance)} must be settled before collection`,
+                                  );
+                                  return;
+                                }
                                 setBookingJobStatus(b.id, s, b.cashier || "Counter");
                                 toast.success(`${b.ref} · ${JOB_STATUS_LABELS[s].toLowerCase()}`);
                               }}
@@ -401,7 +421,7 @@ function BookingsPage() {
                               icon={<Ban className="size-4" />}
                               className="text-destructive"
                               onClick={async () => {
-                                if (!(await requirePermission("can_cancel_booking"))) return;
+                                if (!(await guardCancel())) return;
                                 cancelBooking(b.id, "Cancelled at counter");
                                 toast.success(`${b.ref} cancelled · stock released`);
                               }}
@@ -416,7 +436,7 @@ function BookingsPage() {
                           icon={<Trash2 className="size-4" />}
                           className="text-destructive"
                           onClick={async () => {
-                            if (!(await requirePermission("can_cancel_booking"))) return;
+                            if (!(await guardCancel())) return;
                             setRemoving(b);
                             setRemoveReason(
                               b.status === "active" && jobStatus !== "collected"
