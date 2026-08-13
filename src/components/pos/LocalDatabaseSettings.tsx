@@ -17,6 +17,7 @@ import {
   loadLocalDbConfig,
   writeLocalDbConfig,
   type LocalDbConfig,
+  type LocalDbTestResult,
   type LocalSyncStatus,
 } from "@/lib/local-db";
 import { supabaseConfig } from "@/lib/external-supabase-config";
@@ -30,6 +31,7 @@ export function LocalDatabaseSettings() {
   const [config, setConfig] = useState<LocalDbConfig>(defaultLocalDbConfig);
   const [status, setStatus] = useState<LocalSyncStatus | null>(null);
   const [busy, setBusy] = useState(false);
+  const [diagnostic, setDiagnostic] = useState<LocalDbTestResult | null>(null);
 
   useEffect(() => {
     void loadLocalDbConfig().then(setConfig);
@@ -73,6 +75,29 @@ export function LocalDatabaseSettings() {
     } finally {
       setBusy(false);
     }
+  };
+
+  /** Test connection keeps the full driver diagnostic on screen. */
+  const testConnection = async () => {
+    setBusy(true);
+    setDiagnostic(null);
+    try {
+      const res = await localDb()!.test(config);
+      setDiagnostic(res);
+      if (res.ok) toast.success("Connection works");
+      else toast.error(res.error ?? "Could not connect");
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const retryRow = async (table: string, id: string) => {
+    const bridge = localDb();
+    if (!bridge?.retryRow) return;
+    const res = await bridge.retryRow(table, id);
+    if (!res.ok) toast.error(res.error ?? "Retry failed");
+    await refresh();
   };
 
   const totals = (status?.tables ?? []).reduce(
@@ -143,7 +168,7 @@ export function LocalDatabaseSettings() {
           size="sm"
           variant="outline"
           disabled={busy}
-          onClick={() => run("Connection works", () => localDb()!.test(config))}
+          onClick={testConnection}
         >
           Test connection
         </Button>
@@ -187,6 +212,34 @@ export function LocalDatabaseSettings() {
         )}
       </div>
 
+      {diagnostic && (
+        <div
+          className={`rounded-md border px-3 py-2 text-xs ${
+            diagnostic.ok
+              ? "border-emerald-500/40 bg-emerald-500/10"
+              : "border-destructive/40 bg-destructive/10"
+          }`}
+        >
+          {diagnostic.ok ? (
+            <p>
+              Connected{diagnostic.serverName ? ` to ${diagnostic.serverName}` : ""}.{" "}
+              <span className="text-muted-foreground">{diagnostic.version}</span>
+            </p>
+          ) : (
+            <div className="space-y-1">
+              <p className="font-medium">
+                {diagnostic.code ? `${diagnostic.code}: ` : ""}
+                {diagnostic.error}
+              </p>
+              {diagnostic.originalMessage && (
+                <p className="text-muted-foreground">{diagnostic.originalMessage}</p>
+              )}
+              {diagnostic.hint && <p className="text-muted-foreground">{diagnostic.hint}</p>}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="grid gap-2 text-sm sm:grid-cols-3">
         <Stat label="Waiting to sync" value={String(totals.pending)} />
         <Stat label="Synced" value={String(totals.synced)} />
@@ -199,7 +252,18 @@ export function LocalDatabaseSettings() {
           label="Last pull"
           value={status?.lastPullAt ? new Date(status.lastPullAt).toLocaleString() : "Never"}
         />
-        <Stat label="Status" value={status?.connected ? "Connected" : (status?.error ?? "Offline")} />
+        <Stat
+          label="Status"
+          value={
+            status?.connected
+              ? status.phase && status.phase !== "idle"
+                ? status.phase === "pushing"
+                  ? "Sending changes…"
+                  : "Pulling catalogue…"
+                : "Connected"
+              : (status?.error ?? "Offline")
+          }
+        />
       </div>
 
       {!!status?.tables.length && (
@@ -226,7 +290,72 @@ export function LocalDatabaseSettings() {
           </table>
         </div>
       )}
+
+      {!!status?.queue?.length && (
+        <div className="space-y-1">
+          <p className="text-xs text-muted-foreground">Sync queue</p>
+          <div className="max-h-64 overflow-auto rounded-md border border-border">
+            <table className="w-full text-xs">
+              <thead className="text-muted-foreground">
+                <tr>
+                  <th className="px-2 py-1 text-left">Record</th>
+                  <th className="px-2 py-1 text-left">State</th>
+                  <th className="px-2 py-1 text-left">Reason</th>
+                  <th className="px-2 py-1" />
+                </tr>
+              </thead>
+              <tbody>
+                {status.queue.map((row) => {
+                  const failed = row.status === "error" || row.status === "quarantined";
+                  return (
+                    <tr key={`${row.table}:${row.id}`} className="border-t border-border">
+                      <td className="px-2 py-1">
+                        <span>{row.table}</span>{" "}
+                        <span className="text-muted-foreground">{row.id.slice(0, 8)}</span>
+                      </td>
+                      <td className="px-2 py-1">
+                        <StatusBadge status={row.status} />
+                      </td>
+                      <td
+                        className="max-w-[18rem] truncate px-2 py-1 text-muted-foreground"
+                        title={row.error ?? ""}
+                      >
+                        {row.error ?? (failed ? "Unknown error" : "—")}
+                      </td>
+                      <td className="px-2 py-1 text-right">
+                        {failed && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 px-2 text-xs"
+                            onClick={() => void retryRow(row.table, row.id)}
+                          >
+                            Retry
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const map: Record<string, { label: string; className: string }> = {
+    synced: { label: "Synced", className: "bg-emerald-500/15 text-emerald-600" },
+    pending: { label: "Waiting to sync", className: "bg-amber-500/15 text-amber-600" },
+    error: { label: "Sync failed", className: "bg-destructive/15 text-destructive" },
+    quarantined: { label: "Parked", className: "bg-destructive/15 text-destructive" },
+  };
+  const tone = map[status] ?? { label: status, className: "bg-muted text-muted-foreground" };
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-[11px] ${tone.className}`}>{tone.label}</span>
   );
 }
 
