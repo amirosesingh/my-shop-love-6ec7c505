@@ -177,8 +177,85 @@ export function ProductSearchDialog({
           ))}
         </div>
 
-        <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,1fr)_300px]">
-          <ScrollArea className="min-h-0 rounded-md border border-border">
+        <div className="flex min-h-0 flex-1 flex-col gap-3">
+          <div className="flex shrink-0 flex-col gap-3 rounded-md border border-border p-3">
+            {unknownCode ? (
+              <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2">
+                <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-warning">
+                  <Barcode className="size-3.5" /> Unrecognised code
+                </p>
+                <p className="numeric mt-1 break-all text-sm font-semibold">{unknownCode}</p>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Pick an item below to add it to the bill.
+              </p>
+            )}
+
+            {!creating && (
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Button
+                  variant="outline"
+                  disabled={!selected || !unknownCode || busy}
+                  onClick={() => void linkBarcode()}
+                >
+                  <Link2 className="size-4" /> Link barcode to selected item
+                </Button>
+                <Button disabled={busy} onClick={() => setCreating(true)}>
+                  <PackagePlus className="size-4" /> Create new product with this barcode
+                </Button>
+              </div>
+            )}
+
+            {creating && (
+              <div className="space-y-2">
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <div>
+                    <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                      Name
+                    </Label>
+                    <Input
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="mt-1 h-10"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                      Price
+                    </Label>
+                    <Input
+                      value={price}
+                      inputMode="decimal"
+                      onChange={(e) => setPrice(e.target.value)}
+                      className="numeric mt-1 h-10"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                      Category
+                    </Label>
+                    <Input
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                      placeholder="General"
+                      className="mt-1 h-10"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button className="flex-1" disabled={busy} onClick={() => void createProduct()}>
+                    Save &amp; add
+                  </Button>
+                  <Button variant="ghost" disabled={busy} onClick={() => setCreating(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <ScrollArea className="min-h-0 flex-1 rounded-md border border-border">
             <div className="flex flex-col gap-1 p-2">
               {results.map((p) => (
                 <div
@@ -211,71 +288,6 @@ export function ProductSearchDialog({
               )}
             </div>
           </ScrollArea>
-
-          <div className="flex min-h-0 flex-col gap-3 rounded-md border border-border p-3">
-            {unknownCode ? (
-              <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2">
-                <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-warning">
-                  <Barcode className="size-3.5" /> Unrecognised code
-                </p>
-                <p className="numeric mt-1 break-all text-sm font-semibold">{unknownCode}</p>
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                Pick an item on the left to add it to the bill.
-              </p>
-            )}
-
-            {!creating && (
-              <>
-                <Button
-                  variant="outline"
-                  disabled={!selected || !unknownCode || busy}
-                  onClick={() => void linkBarcode()}
-                >
-                  <Link2 className="size-4" /> Link barcode to selected item
-                </Button>
-                <Button disabled={busy} onClick={() => setCreating(true)}>
-                  <PackagePlus className="size-4" /> Create new product with this barcode
-                </Button>
-              </>
-            )}
-
-            {creating && (
-              <div className="space-y-2">
-                <div>
-                  <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Name</Label>
-                  <Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 h-10" />
-                </div>
-                <div>
-                  <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Price</Label>
-                  <Input
-                    value={price}
-                    inputMode="decimal"
-                    onChange={(e) => setPrice(e.target.value)}
-                    className="numeric mt-1 h-10"
-                  />
-                </div>
-                <div>
-                  <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Category</Label>
-                  <Input
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    placeholder="General"
-                    className="mt-1 h-10"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <Button className="flex-1" disabled={busy} onClick={() => void createProduct()}>
-                    Save &amp; add
-                  </Button>
-                  <Button variant="ghost" disabled={busy} onClick={() => setCreating(false)}>
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
       </DialogContent>
     </Dialog>

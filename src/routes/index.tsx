@@ -36,6 +36,7 @@ import { commitLabel } from "@/lib/pos-db";
 import { AppShell } from "@/components/pos/AppShell";
 import { ActionButton } from "@/components/pos/ActionButton";
 import { CatalogPanel } from "@/components/pos/CatalogPanel";
+import { ColumnResizer, usePanelWidth } from "@/components/pos/ColumnResizer";
 import { ProductSearchDialog } from "@/components/pos/ProductSearchDialog";
 import { ScanBar } from "@/components/pos/ScanBar";
 import { QuickMemberDialog } from "@/components/pos/QuickMemberDialog";
@@ -171,6 +172,9 @@ function Register() {
   const [unknownCode, setUnknownCode] = useState<string | null>(null);
   /** Bill number reserved the moment this ticket started. */
   const [billNo, setBillNo] = useState<string | null>(null);
+  /** Cashier-adjustable column widths, remembered on this device. */
+  const [billWidth, setBillWidth] = usePanelWidth("pos.register.billWidth", 420);
+  const [deckWidth, setDeckWidth] = usePanelWidth("pos.register.deckWidth", 288);
   const [category, setCategory] = useState("All");
   const [lines, setLines] = useState<CartLine[]>([]);
   const [cartDiscount, setCartDiscount] = useState(0);
@@ -1328,20 +1332,11 @@ function Register() {
       <ZoomCanvas>
       <div className="pos-scaled flex h-full min-h-0 min-w-0 flex-col overflow-hidden lg:flex-row">
         {/* ── LEFT: product catalog (hidden on narrow windows) ─────────── */}
-        <section className="hidden min-h-0 w-full shrink-0 flex-col gap-3 border-b border-border p-4 lg:flex lg:w-[clamp(340px,32vw,520px)] lg:min-w-[340px] lg:border-b-0 lg:border-r">
+        <section className="hidden min-h-0 w-full min-w-0 flex-1 flex-col gap-3 border-b border-border p-4 lg:flex lg:border-b-0">
           <CatalogPanel
-            query={query}
-            onQueryChange={setQuery}
-            onScanSubmit={scanSubmit}
-            categories={categories}
-            category={category}
-            onCategoryChange={setCategory}
-            products={filtered}
-            storeId={currentStore.id}
             storeName={currentStore.name}
             shiftOpen={!!activeShift}
-            onAdd={addLine}
-            onDetail={setDetailId}
+            onOpenCatalog={() => setCatalogOpen(true)}
             onOpenCustomerDisplay={visible("register.customerDisplay") ? openCustomerDisplay : undefined}
             onOpenShift={() => setOpenShiftOpen(true)}
             onRacketBooking={startRacketBooking}
@@ -1355,7 +1350,6 @@ function Register() {
                   }
                 : undefined
             }
-            showSearch={false}
           />
         </section>
 
@@ -1411,8 +1405,20 @@ function Register() {
           }}
         />
 
-        {/* ── CENTER: active bill (fixed width; only zoom resizes it) ───── */}
-        <section className="flex min-h-0 w-full flex-col bg-sidebar lg:w-[420px] lg:min-w-[420px] lg:max-w-[420px] lg:shrink-0">
+        {/* Drag bar — widens the bill column, Excel style. */}
+        <ColumnResizer
+          width={billWidth}
+          onWidth={setBillWidth}
+          min={320}
+          max={760}
+          label="Resize the bill column"
+        />
+
+        {/* ── CENTER: active bill (drag the bar to resize) ──────────────── */}
+        <section
+          className="flex min-h-0 w-full flex-col bg-sidebar lg:w-[var(--bill-w)] lg:min-w-[var(--bill-w)] lg:max-w-[var(--bill-w)] lg:shrink-0"
+          style={{ ["--bill-w" as string]: `${billWidth}px` }}
+        >
           <div className="flex flex-col gap-2 border-b border-border px-4 py-3">
             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
               <div className="min-w-0">
@@ -1895,7 +1901,18 @@ function Register() {
 
         {/* ── RIGHT: operation deck. Below lg it collapses into a bar under
             the totals so it can never overlap the Charge buttons. ───────── */}
-        <aside className="@container flex w-full shrink-0 flex-col border-t border-border bg-background lg:w-[288px] lg:border-l lg:border-t-0">
+        <ColumnResizer
+          width={deckWidth}
+          onWidth={setDeckWidth}
+          min={220}
+          max={560}
+          label="Resize the register actions column"
+        />
+
+        <aside
+          className="@container flex w-full shrink-0 flex-col border-t border-border bg-background lg:w-[var(--deck-w)] lg:border-l lg:border-t-0"
+          style={{ ["--deck-w" as string]: `${deckWidth}px` }}
+        >
           <button
             type="button"
             onClick={() => setDeckOpen((v) => !v)}

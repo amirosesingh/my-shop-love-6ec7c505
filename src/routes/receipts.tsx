@@ -68,10 +68,14 @@ const TEMPLATES: { key: Template; label: string; icon: typeof Printer }[] = [
 ];
 
 function ReceiptVault() {
-  const { state, currentStore, refundSale, changeSalePayment } = usePos();
+  const { state, currentStore, activeShift, refundSale, changeSalePayment } = usePos();
   const { user } = useAuth();
   const { requirePermission } = useUserPermissions();
   const [query, setQuery] = useState("");
+  /** Cashiers land on their own shift; anything older needs a date range. */
+  const [scope, setScope] = useState<"shift" | "range" | "all">("shift");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [template, setTemplate] = useState<Template>("standard");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -112,7 +116,18 @@ function ReceiptVault() {
     }
   };
 
-  const rows = sales.filter((s) => {
+  const scoped = sales.filter((s) => {
+    if (scope === "shift") return activeShift ? s.shiftId === activeShift.id : true;
+    if (scope === "range") {
+      const day = new Date(s.createdAt).toLocaleDateString("en-CA");
+      if (fromDate && day < fromDate) return false;
+      if (toDate && day > toDate) return false;
+      return true;
+    }
+    return true;
+  });
+
+  const rows = scoped.filter((s) => {
     const q = query.trim().toLowerCase();
     if (!q) return true;
     return (
@@ -234,6 +249,77 @@ function ReceiptVault() {
           </div>
         </header>
 
+        <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-3">
+          <div className="flex gap-2">
+            {(
+              [
+                { id: "shift", label: "Current shift" },
+                { id: "range", label: "Date range" },
+                { id: "all", label: "Everything" },
+              ] as const
+            ).map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setScope(s.id)}
+                className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                  scope === s.id
+                    ? "border-primary bg-primary/15 text-primary"
+                    : "border-border text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+
+          {scope === "range" && (
+            <div className="flex flex-wrap items-end gap-2">
+              <div>
+                <Label htmlFor="from-date" className="text-[11px] uppercase text-muted-foreground">
+                  From
+                </Label>
+                <Input
+                  id="from-date"
+                  type="date"
+                  value={fromDate}
+                  max={toDate || undefined}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  className="mt-1 h-9 w-40"
+                />
+              </div>
+              <div>
+                <Label htmlFor="to-date" className="text-[11px] uppercase text-muted-foreground">
+                  To
+                </Label>
+                <Input
+                  id="to-date"
+                  type="date"
+                  value={toDate}
+                  min={fromDate || undefined}
+                  onChange={(e) => setToDate(e.target.value)}
+                  className="mt-1 h-9 w-40"
+                />
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setFromDate("");
+                  setToDate("");
+                }}
+              >
+                Clear dates
+              </Button>
+            </div>
+          )}
+
+          <p className="ml-auto text-xs text-muted-foreground">
+            {scope === "shift" && !activeShift
+              ? "No shift open — showing every receipt at this store."
+              : `${rows.length} receipt${rows.length === 1 ? "" : "s"} shown`}
+          </p>
+        </div>
+
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
           <section className="rounded-lg border border-border bg-card">
             <ScrollArea className="h-[calc(100vh-220px)]">
@@ -269,7 +355,9 @@ function ReceiptVault() {
                 ))}
                 {!rows.length && (
                   <li className="py-16 text-center text-sm text-muted-foreground">
-                    No receipts recorded at this store yet.
+                    {scope === "shift"
+                      ? "No receipts on the current shift yet."
+                      : "No receipts match this filter."}
                   </li>
                 )}
                 {!exhausted && sales.length > 0 && (

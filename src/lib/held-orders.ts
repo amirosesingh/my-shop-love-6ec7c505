@@ -84,6 +84,7 @@ export function persistHeldOrder(order: HeldOrder) {
     label: order.label,
     storeId: order.storeId ?? null,
     heldBy: order.heldBy ?? null,
+    billNo: order.billNo ?? null,
     total: order.total,
     lines: order.lines,
     cartDiscount: order.cartDiscount ?? 0,
