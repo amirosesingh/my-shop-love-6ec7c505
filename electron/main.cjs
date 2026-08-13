@@ -211,7 +211,7 @@ function scheduleReconnect() {
     try {
       await connectLocal(dbConfigStore.read());
     } catch (error) {
-      broadcastStatus({ connected: false, error: fail(error).error, tables: [] });
+      broadcastStatus({ connected: false, error: fail(error).error, tables: [], queue: [] });
       reconnectDelay = Math.min(reconnectDelay * 2, 60_000);
       scheduleReconnect();
     }
@@ -585,7 +585,7 @@ function registerIpc() {
       const saved = dbConfigStore.write(config);
       if (!saved.ok) console.warn("[pos] could not seal SQL config:", saved.error);
     } catch (err) {
-      return fail(err);
+      return { ok: false, ...pool.describeSqlError(err) };
     }
     try {
       await initializeWorker(cloud);
@@ -608,7 +608,7 @@ function registerIpc() {
     try {
       return await pool.test(config);
     } catch (err) {
-      return fail(err);
+      return { ok: false, ...pool.describeSqlError(err) };
     }
   });
 
@@ -782,6 +782,17 @@ function registerIpc() {
   ipcMain.handle("pos:retry-errored", async () => {
     try {
       await repo.retryErrored();
+      void worker.run();
+      return { ok: true };
+    } catch (err) {
+      return fail(err);
+    }
+  });
+
+  ipcMain.handle("pos:retry-row", async (_e, table, id) => {
+    try {
+      await repo.retryRow(String(table), id);
+      broadcastStatus(await statusPayload());
       void worker.run();
       return { ok: true };
     } catch (err) {

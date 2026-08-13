@@ -52,7 +52,7 @@ const PRUNABLE_TABLES = [
   "audit_logs",
 ];
 
-const SYNC_COLUMNS = new Set(["is_synced", "sync_status", "synced_at"]);
+const SYNC_COLUMNS = new Set(["is_synced", "sync_status", "synced_at", "sync_error"]);
 
 const isUuid = (v) =>
   typeof v === "string" &&
@@ -272,7 +272,7 @@ async function markFailed(table, ids, message, quarantine) {
   ids.forEach((id, i) => bind(request, `id${i}`, id));
   await request.query(`
     UPDATE dbo.[${table}]
-       SET sync_status = @status
+       SET sync_status = @status, sync_error = @msg
      WHERE id IN (${ids.map((_, i) => `@id${i}`).join(", ")});
     MERGE dbo.sync_state AS t
     USING (SELECT N'last_error' AS [key], @msg AS [value]) AS s ON t.[key] = s.[key]
@@ -286,10 +286,66 @@ async function retryErrored() {
     await getPool()
       .request()
       .query(
-        `UPDATE dbo.[${table}] SET sync_status = N'pending'
+        `UPDATE dbo.[${table}] SET sync_status = N'pending', sync_error = NULL
           WHERE is_synced = 0 AND sync_status IN (N'error', N'quarantined');`,
       );
   }
+}
+
+/** Puts a single parked row back at the front of the queue. */
+async function retryRow(table, id) {
+  assertTable(table);
+  const request = getPool().request();
+  bind(request, "id", id);
+  await request.query(
+    `UPDATE dbo.[${table}] SET sync_status = N'pending', sync_error = NULL,
+            is_synced = 0
+      WHERE id = @id;`,
+  );
+}
+
+/**
+ * Row-level view behind the sync status table: everything not yet confirmed by
+ * the cloud, failures first so a red badge is never buried.
+ */
+async function queueRows(limit = 100) {
+  const rows = [];
+  for (const table of TABLES) {
+    let res;
+    try {
+      res = await getPool()
+        .request()
+        .input("limit", sql.Int, limit)
+        .query(`
+          SELECT TOP (@limit)
+                 CONVERT(NVARCHAR(64), id) AS id,
+                 sync_status,
+                 sync_error,
+                 CONVERT(NVARCHAR(40), updated_at, 127) AS updated_at
+            FROM dbo.[${table}]
+           WHERE is_synced = 0
+           ORDER BY CASE WHEN sync_status IN (N'error', N'quarantined') THEN 0 ELSE 1 END,
+                    updated_at DESC;
+        `);
+    } catch {
+      continue; // a table the local schema hasn't grown yet
+    }
+    for (const row of res.recordset) {
+      rows.push({
+        table,
+        id: row.id,
+        status: row.sync_status,
+        error: row.sync_error ?? null,
+        updatedAt: row.updated_at ?? null,
+      });
+    }
+    if (rows.length >= limit) break;
+  }
+  rows.sort((a, b) => {
+    const rank = (s) => (s === "error" || s === "quarantined" ? 0 : 1);
+    return rank(a.status) - rank(b.status);
+  });
+  return rows.slice(0, limit);
 }
 
 /** Cloud rows land through MERGE and are flagged as already synced. */
@@ -527,6 +583,8 @@ module.exports = {
   markSynced,
   markFailed,
   retryErrored,
+  retryRow,
+  queueRows,
   mergeFromCloud,
   stats,
   getState,

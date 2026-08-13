@@ -607,3 +607,21 @@ END
 CLOSE ixtbl;
 DEALLOCATE ixtbl;
 GO
+
+/* Per-row failure reason so the sync table can explain a red badge. */
+DECLARE @et SYSNAME, @sqlEr NVARCHAR(MAX);
+DECLARE errtbl CURSOR FOR
+  SELECT t.name FROM sys.tables AS t
+   WHERE COL_LENGTH('dbo.' + t.name, 'sync_status') IS NOT NULL
+     AND COL_LENGTH('dbo.' + t.name, 'sync_error') IS NULL;
+OPEN errtbl;
+FETCH NEXT FROM errtbl INTO @et;
+WHILE @@FETCH_STATUS = 0
+BEGIN
+  SET @sqlEr = N'ALTER TABLE dbo.[' + @et + N'] ADD [sync_error] NVARCHAR(MAX) NULL;';
+  EXEC sp_executesql @sqlEr;
+  FETCH NEXT FROM errtbl INTO @et;
+END
+CLOSE errtbl;
+DEALLOCATE errtbl;
+GO
