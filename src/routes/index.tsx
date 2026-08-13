@@ -40,6 +40,8 @@ import { ColumnResizer, usePanelWidth } from "@/components/pos/ColumnResizer";
 import { ProductSearchDialog } from "@/components/pos/ProductSearchDialog";
 import { ScanBar } from "@/components/pos/ScanBar";
 import { QuickMemberDialog } from "@/components/pos/QuickMemberDialog";
+import { RegisterWorkspace } from "@/components/pos/layout/RegisterWorkspace";
+import { readTerminalConfig } from "@/lib/terminal-tokens";
 import { ZoomCanvas } from "@/components/pos/ZoomCanvas";
 import { setTicketDirty } from "@/lib/desktop-window";
 import { Button } from "@/components/ui/button";
@@ -1326,6 +1328,8 @@ function Register() {
     return source ? saleReceiptPreview(source, member, "sale") : "";
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [receiptPreview, displayKey, method, lastSale, member]);
+
+  const terminalKey = readTerminalConfig()?.tokenId ?? currentStore.id ?? "default";
 
   const slot_catalog = (
     <>
