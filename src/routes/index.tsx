@@ -789,7 +789,12 @@ function Register() {
         price: r2(Math.max(0, Number(stringingService?.fee ?? 0))),
       },
     ]);
-    setJobTag(newJobTag());
+    if (bookingRules.autoJobTag) setJobTag(newJobTag());
+    setTensionUnit(bookingRules.defaultTensionUnit);
+    if (bookingRules.defaultTensionMain) setTensionMain(String(bookingRules.defaultTensionMain));
+    if (bookingRules.defaultTensionCross) setTensionCross(String(bookingRules.defaultTensionCross));
+    setPromisedAt(proposedPromisedAt());
+    if (!allowedTimings.includes(payTiming) && allowedTimings[0]) setPayTiming(allowedTimings[0]);
     /* Auto-fill from the customer's last racket job so regulars are one tap. */
     const past = memberId
       ? state.bookings.find((b) => b.memberId === memberId && b.job?.racketModel)
@@ -818,6 +823,7 @@ function Register() {
     setBookPhone(member?.phone ?? "");
     setBookMode("cart");
     resetJobCard();
+    if (!allowedTimings.includes(payTiming) && allowedTimings[0]) setPayTiming(allowedTimings[0]);
     setBookOpen(true);
   }
 
@@ -825,6 +831,10 @@ function Register() {
   function editBookingSpecs(bookingId: string) {
     const b = state.bookings.find((x) => x.id === bookingId);
     if (!b) return;
+    if (bookingRules.managerOnlyEditPaidSpecs && b.paid > 0 && !isSupervisor) {
+      toast.error("A supervisor must change the specs once a deposit is held");
+      return;
+    }
     setEditBookingId(b.id);
     setBookMode("racket");
     setRacketModel(b.job?.racketModel ?? "");
