@@ -1,5 +1,5 @@
 /** Feature Component Hub — the drawer of till controls an admin can drop in. */
-import { GripVertical, Plus } from "lucide-react";
+import { GripVertical, Plus, PlusCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -11,12 +11,14 @@ export function FeaturePalette({
   modules,
   onAdd,
   onDragStart,
+  onCreate,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   modules: RegisterModule[];
   onAdd: (id: RegisterModuleId) => void;
   onDragStart: (id: RegisterModuleId) => void;
+  onCreate: () => void;
 }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange} modal={false}>
@@ -27,6 +29,9 @@ export function FeaturePalette({
         </SheetHeader>
         <ScrollArea className="mt-4 h-[calc(100vh-9rem)] pr-3">
           <div className="space-y-5">
+            <Button variant="outline" className="w-full justify-start gap-2" onClick={onCreate}>
+              <PlusCircle className="size-4" /> Create new action button
+            </Button>
             {REGISTER_CATEGORIES.map((cat) => {
               const items = modules.filter((m) => m.category === cat);
               return (

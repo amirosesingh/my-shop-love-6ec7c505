@@ -6,7 +6,12 @@
 import { createContext, useContext, type ReactNode } from "react";
 import type { ModuleStyle } from "@/lib/register-layout";
 
-export type NodeOptions = { label?: string; style?: ModuleStyle };
+export type NodeOptions = {
+  label?: string;
+  style?: ModuleStyle;
+  /** The control should fill its canvas node inside the node padding. */
+  fill?: boolean;
+};
 
 const NodeOptionsContext = createContext<NodeOptions>({});
 

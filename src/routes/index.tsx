@@ -41,6 +41,7 @@ import { ProductSearchDialog } from "@/components/pos/ProductSearchDialog";
 import { ScanBar } from "@/components/pos/ScanBar";
 import { QuickMemberDialog } from "@/components/pos/QuickMemberDialog";
 import { RegisterWorkspace } from "@/components/pos/layout/RegisterWorkspace";
+import { RegisterActionsProvider, type ActionHandlers } from "@/lib/register-actions";
 import { readTerminalConfig } from "@/lib/terminal-tokens";
 import { ZoomCanvas } from "@/components/pos/ZoomCanvas";
 import { setTicketDirty } from "@/lib/desktop-window";
@@ -1446,7 +1447,7 @@ function Register() {
 
   const slot_scanBar = (
     <>
-              <div className="min-w-0">
+              <div className="min-w-0" data-scan-focus>
                 <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Scan barcode</Label>
                 <div className="mt-2">
                   <ScanBar onScan={scanCode} />
@@ -2043,9 +2044,51 @@ function Register() {
     </div>
   );
 
+  /**
+   * Every till feature, registered once. Buttons only trigger these — removing
+   * a button from the canvas never unregisters the handler or its hotkey.
+   */
+  const registerActionHandlers: ActionHandlers = {
+    "cart.charge": () => openPayment(),
+    "cart.fastCash": () => openPayment(),
+    "cart.clear": () => void clearCart("clear"),
+    "cart.coupon": () => setCouponOpen(true),
+    "cart.split": () => setSplitOpen(true),
+    "cart.receipt": () => setReceiptPreview((v) => !v),
+    "cart.barcode": () =>
+      document.querySelector<HTMLInputElement>("[data-scan-focus] input")?.focus(),
+    "hold.new": () => holdOrder(),
+    "void.cart": () => void clearCart(),
+    "book.later": () => {
+      setDeposit("");
+      setBookName(member?.name ?? "");
+      setBookPhone(member?.phone ?? "");
+      setBookMode("cart");
+      resetJobCard();
+      setBookOpen(true);
+    },
+    "shift.open": () => setOpenShiftOpen(true),
+    "shift.close": () => setCloseShiftOpen(true),
+    "drawer.open": () => setNoSaleOpen(true),
+    "member.add": () => setQuickMemberOpen(true),
+    "product.search": () => setCatalogOpen(true),
+    "exchange.open": () => setExchangeOpen(true),
+    ...(lastSale
+      ? {
+          "receipt.reprint": () =>
+            printSaleReceipt(
+              lastSale,
+              state.members.find((m) => m.id === lastSale.memberId) ?? null,
+              "duplicate",
+            ),
+        }
+      : {}),
+  };
+
   return (
     <AppShell>
       <ZoomCanvas>
+        <RegisterActionsProvider handlers={registerActionHandlers}>
         <RegisterWorkspace
           terminalKey={terminalKey}
           slots={{
@@ -2142,6 +2185,7 @@ function Register() {
       </div>
           }
         />
+        </RegisterActionsProvider>
         {/* Unknown scans and manual lookups land in the search & add modal. */}
         <ProductSearchDialog
           open={catalogOpen}

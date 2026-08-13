@@ -73,8 +73,9 @@ const bare = (
   category,
   w,
   h,
-  minW: 2,
-  minH: 2,
+  // Bare controls can shrink to a single grid cell for icon-only tiles.
+  minW: 1,
+  minH: 1,
   chrome: "bare",
   supportsLabel: true,
   ...extra,

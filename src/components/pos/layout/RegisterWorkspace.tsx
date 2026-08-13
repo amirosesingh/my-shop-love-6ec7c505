@@ -2,39 +2,54 @@
  * Register workspace.
  *
  * Renders either the factory three-column till or an admin-authored atomic
- * canvas. Each element is supplied by the register route, so a control keeps
+ * canvas that fills the whole screen. Each element is supplied by the register
+ * route (or the action registry, for admin-created buttons), so a control keeps
  * its handlers, permissions and state wherever it is placed.
  */
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Responsive, useContainerWidth, type Layout } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
-import { Eye, GripVertical, LayoutGrid, List, PanelLeftOpen, Pencil, RotateCcw, Save, Settings2, X } from "lucide-react";
+import {
+  Eye,
+  GripVertical,
+  LayoutGrid,
+  List,
+  PanelLeftOpen,
+  Pencil,
+  RotateCcw,
+  Save,
+  Settings2,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAuth } from "@/lib/pos-auth";
 import {
+  DEFAULT_PAD,
   GRID_COLS,
+  MAX_PAD,
+  isCustomId,
+  nodeSpec,
   useRegisterLayout,
+  type CustomButtonSpec,
   type LayoutBox,
   type ModuleFont,
   type ModuleOptions,
   type ModuleStyle,
   type ModuleTone,
 } from "@/lib/register-layout";
-import { MODULE_BY_ID, isRegisterModuleId, type RegisterModuleId } from "@/lib/register-modules";
+import type { RegisterModuleId } from "@/lib/register-modules";
+import { MODULE_BY_ID } from "@/lib/register-modules";
 import { FeaturePalette } from "./FeaturePalette";
+import { CustomButtonDialog } from "./CustomButtonDialog";
+import { CustomActionButton } from "./CustomActionButton";
 import { NodeOptionsProvider } from "./node-options";
 
 export type RegisterSlots = Record<RegisterModuleId, ReactNode>;
 
-const FONT_CLASS: Record<ModuleFont, string> = {
-  sm: "text-[12px]",
-  md: "",
-  lg: "text-[15px]",
-  xl: "text-[18px]",
-};
+const FONT_SCALE: Record<ModuleFont, number> = { sm: 0.85, md: 1, lg: 1.18, xl: 1.4 };
 
 /** Tone recolours the control inside the node using semantic tokens only. */
 const TONE_CLASS: Record<ModuleTone, string> = {
@@ -47,6 +62,8 @@ const TONE_CLASS: Record<ModuleTone, string> = {
 
 const DOT_GRID =
   "bg-[radial-gradient(color-mix(in_oklab,var(--primary)_28%,transparent)_1px,transparent_1px)] [background-size:13px_13px]";
+
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 export function RegisterWorkspace({
   slots,
@@ -61,6 +78,7 @@ export function RegisterWorkspace({
   const { isAdmin } = useAuth();
   const layout = useRegisterLayout(terminalKey);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const [dragging, setDragging] = useState<RegisterModuleId | null>(null);
   const { containerRef, width } = useContainerWidth();
 
@@ -69,21 +87,24 @@ export function RegisterWorkspace({
 
   const boxes = useMemo<Layout>(
     () =>
-      (layout.active?.items ?? []).map((it) => ({
-        i: it.i,
-        x: it.x,
-        y: it.y,
-        w: it.w,
-        h: it.h,
-        minW: MODULE_BY_ID[it.i].minW,
-        minH: MODULE_BY_ID[it.i].minH,
-        static: !editing,
-      })),
+      (layout.active?.items ?? []).map((it) => {
+        const spec = nodeSpec(it);
+        return {
+          i: it.i,
+          x: it.x,
+          y: it.y,
+          w: it.w,
+          h: it.h,
+          minW: spec?.minW ?? 1,
+          minH: spec?.minH ?? 1,
+          static: !editing,
+        };
+      }),
     [layout.active, editing],
   );
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col">
+    <div className="relative flex h-full min-h-0 w-full min-w-0 flex-col">
       {isAdmin && (
         <CustomizeBar
           editing={editing}
@@ -98,6 +119,7 @@ export function RegisterWorkspace({
             setPaletteOpen(false);
           }}
           onPalette={() => setPaletteOpen((v) => !v)}
+          onPadAll={layout.setAllPadding}
           onPreview={layout.preview}
           onResume={layout.resumeEdit}
           onSave={() => {
@@ -119,25 +141,37 @@ export function RegisterWorkspace({
         modules={layout.palette}
         onAdd={(id) => layout.addModule(id)}
         onDragStart={setDragging}
+        onCreate={() => setCreateOpen(true)}
+      />
+
+      <CustomButtonDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreate={(spec: CustomButtonSpec, opts) => {
+          layout.addCustom(spec, opts);
+          setCreateOpen(false);
+          toast.success(`${spec.label} added to the canvas`);
+        }}
       />
 
       {!showCanvas ? (
-        <div className="min-h-0 flex-1">{classic}</div>
+        <div className="min-h-0 w-full flex-1">{classic}</div>
       ) : (
         <div
           ref={containerRef}
-          className={`min-h-0 flex-1 overflow-auto bg-background ${editing ? DOT_GRID : ""}`}
+          className={`min-h-0 w-full flex-1 overflow-auto bg-background ${editing ? DOT_GRID : ""}`}
           onDragOver={(e) => {
             if (editing && dragging) e.preventDefault();
           }}
         >
           <Responsive
             width={width || 1200}
-            className="pos-scaled"
+            className="pos-scaled w-full"
             breakpoints={{ lg: 1200, md: 900, sm: 0 }}
             cols={{ lg: GRID_COLS, md: 16, sm: 8 }}
             rowHeight={20}
-            margin={[6, 6]}
+            margin={[0, 0]}
+            containerPadding={[0, 0]}
             layouts={{ lg: boxes, md: boxes, sm: boxes }}
             dragConfig={{ enabled: editing, handle: ".rgl-drag-handle" }}
             resizeConfig={{ enabled: editing }}
@@ -160,14 +194,19 @@ export function RegisterWorkspace({
                   box={box}
                   editing={editing}
                   onRemove={() => {
-                    if (MODULE_BY_ID[box.i].essential) {
-                      toast.warning(`${MODULE_BY_ID[box.i].label} removed — the till cannot take payment without it.`);
+                    const spec = nodeSpec(box);
+                    if (spec?.essential) {
+                      toast.warning(`${spec.label} removed — the till cannot take payment without it.`);
                     }
                     layout.removeModule(box.i);
                   }}
                   onOptions={(opts) => layout.setOptions(box.i, opts)}
                 >
-                  {slots[box.i]}
+                  {isCustomId(box.i) && box.custom ? (
+                    <CustomActionButton spec={box.custom} />
+                  ) : (
+                    slots[box.i as RegisterModuleId]
+                  )}
                 </CanvasItem>
               </div>
             ))}
@@ -176,6 +215,35 @@ export function RegisterWorkspace({
       )}
     </div>
   );
+}
+
+/**
+ * Sizes the node content to whatever space is left inside the padding, so an
+ * icon-only tile shrunk to one grid cell has no dead space around its glyph.
+ */
+function useAutoScale(pad: number, font: ModuleFont, bare: boolean) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [vars, setVars] = useState<CSSProperties>({});
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !bare) return;
+    const measure = () => {
+      const w = el.clientWidth - pad * 2;
+      const h = el.clientHeight - pad * 2;
+      if (w <= 0 || h <= 0) return;
+      const base = Math.min(w, h);
+      const scale = FONT_SCALE[font];
+      setVars({
+        ["--node-icon" as string]: `${clamp(base * 0.5, 12, 44) * scale}px`,
+        ["--node-font" as string]: `${clamp(base * 0.22, 9, 20) * scale}px`,
+      });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [pad, font, bare]);
+  return { ref, vars };
 }
 
 function CanvasItem({
@@ -191,14 +259,19 @@ function CanvasItem({
   onOptions: (opts: ModuleOptions) => void;
   children: ReactNode;
 }) {
-  const def = isRegisterModuleId(box.i) ? MODULE_BY_ID[box.i] : null;
+  const def = nodeSpec(box);
+  const pad = box.pad ?? DEFAULT_PAD;
+  const bare = def?.chrome === "bare";
+  const { ref, vars } = useAutoScale(pad, box.font ?? "md", bare);
   if (!def) return null;
-  const panel = def.chrome !== "bare";
+  const panel = !bare;
   return (
     <section
+      ref={ref}
+      style={{ padding: pad, ...vars }}
       className={`group relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden ${
         panel ? "rounded-lg border border-border bg-card" : ""
-      } ${editing ? "rounded-lg outline-2 outline-dashed outline-primary/50" : ""} ${FONT_CLASS[box.font ?? "md"]} ${
+      } ${editing ? "rounded-lg outline-2 outline-dashed outline-primary/50" : ""} ${
         TONE_CLASS[box.tone ?? "neutral"]
       }`}
       data-view={box.view ?? "list"}
@@ -211,7 +284,13 @@ function CanvasItem({
           >
             <GripVertical className="size-3.5" />
           </span>
-          <Inspector box={box} label={def.label} supportsView={!!def.supportsView} supportsLabel={!!def.supportsLabel} onOptions={onOptions} />
+          <Inspector
+            box={box}
+            label={def.label}
+            supportsView={def.supportsView}
+            supportsLabel={def.supportsLabel}
+            onOptions={onOptions}
+          />
           <Button
             size="icon"
             variant="ghost"
@@ -228,6 +307,7 @@ function CanvasItem({
           value={{
             ...(box.label ? { label: box.label } : {}),
             ...(box.style ? { style: box.style } : {}),
+            ...(bare ? { fill: true } : {}),
           }}
         >
           {children}
@@ -250,6 +330,7 @@ function Inspector({
   supportsLabel: boolean;
   onOptions: (opts: ModuleOptions) => void;
 }) {
+  const pad = box.pad ?? DEFAULT_PAD;
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -263,10 +344,16 @@ function Inspector({
           <div>
             <p className="mb-1 text-[11px] text-muted-foreground">Custom label</p>
             <Input
-              value={box.label ?? ""}
+              value={box.custom ? box.custom.label : (box.label ?? "")}
               placeholder={label}
               className="h-8 text-sm"
-              onChange={(e) => onOptions({ label: e.target.value })}
+              onChange={(e) =>
+                onOptions(
+                  box.custom
+                    ? { custom: { ...box.custom, label: e.target.value } }
+                    : { label: e.target.value },
+                )
+              }
             />
           </div>
         )}
@@ -347,6 +434,21 @@ function Inspector({
             ))}
           </div>
         </div>
+        <div>
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Inner padding — {pad}px
+          </p>
+          <input
+            type="range"
+            min={0}
+            max={MAX_PAD}
+            step={1}
+            value={pad}
+            className="w-full accent-primary"
+            aria-label="Inner padding"
+            onChange={(e) => onOptions({ pad: Number(e.target.value) })}
+          />
+        </div>
       </PopoverContent>
     </Popover>
   );
@@ -359,6 +461,7 @@ function CustomizeBar({
   onEdit,
   onCancel,
   onPalette,
+  onPadAll,
   onPreview,
   onResume,
   onSave,
@@ -370,21 +473,24 @@ function CustomizeBar({
   onEdit: () => void;
   onCancel: () => void;
   onPalette: () => void;
+  onPadAll: (pad: number) => void;
   onPreview: () => void;
   onResume: () => void;
   onSave: () => void;
   onReset: () => void;
 }) {
+  // Live mode keeps every pixel for the till: the entry point floats instead of
+  // taking a full toolbar row.
   if (!editing && !previewing) {
     return (
-      <div className="flex shrink-0 items-center justify-end gap-2 border-b border-border bg-background px-3 py-1.5">
-        {custom && (
-          <span className="mr-auto text-[11px] text-muted-foreground">Custom layout active on this terminal</span>
-        )}
-        <Button size="sm" variant="outline" className="h-8" onClick={onEdit}>
-          <Pencil className="size-3.5" /> Customize layout
-        </Button>
-      </div>
+      <Button
+        size="sm"
+        variant="outline"
+        className="absolute right-2 top-2 z-40 h-7 gap-1 bg-background/80 px-2 text-[11px] opacity-60 backdrop-blur transition-opacity hover:opacity-100"
+        onClick={onEdit}
+      >
+        <Pencil className="size-3" /> {custom ? "Edit layout" : "Customize layout"}
+      </Button>
     );
   }
   return (
@@ -393,9 +499,23 @@ function CustomizeBar({
         {previewing ? "Live preview — tap controls to test" : "Edit mode — drag, resize, restyle or remove elements"}
       </span>
       {editing && (
-        <Button size="sm" variant="outline" className="h-8" onClick={onPalette}>
-          <PanelLeftOpen className="size-3.5" /> Feature hub
-        </Button>
+        <>
+          <Button size="sm" variant="outline" className="h-8" onClick={onPalette}>
+            <PanelLeftOpen className="size-3.5" /> Feature hub
+          </Button>
+          <label className="flex items-center gap-1 text-[11px] text-primary">
+            Padding
+            <input
+              type="number"
+              min={0}
+              max={MAX_PAD}
+              defaultValue={DEFAULT_PAD}
+              className="h-8 w-14 rounded-md border border-border bg-background px-2 text-xs"
+              aria-label="Padding for every element"
+              onChange={(e) => onPadAll(Number(e.target.value))}
+            />
+          </label>
+        </>
       )}
       {editing ? (
         <Button size="sm" variant="outline" className="h-8" onClick={onPreview}>

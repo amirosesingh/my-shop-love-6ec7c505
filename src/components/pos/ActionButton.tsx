@@ -37,6 +37,10 @@ export function ActionButton({
   const label = node.label?.trim() ? node.label : labelProp;
   const icon = node.style === "text" ? null : iconProp;
   const forcedIconOnly = node.style === "icon";
+  // Inside a canvas node the button fills the box: sizes come from the CSS
+  // variables the node computes from its own size minus its padding.
+  const fill = !!node.fill;
+  const hideText = iconOnly || forcedIconOnly;
   // Touch devices have no hover — a long press (450ms) reveals the label.
   const [held, setHeld] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -63,8 +67,11 @@ export function ActionButton({
               onTouchCancel={cancelHold}
               onTouchMove={cancelHold}
               className={cn(
-                "h-auto min-h-10 w-full min-w-0 px-2 py-2",
-                layout === "stack" ? "flex-col gap-1 text-xs" : "justify-center gap-2",
+                fill
+                  ? "h-full min-h-0 w-full min-w-0 p-0 text-[length:var(--node-font,12px)] [&_svg]:size-[var(--node-icon,16px)]"
+                  : "h-auto min-h-10 w-full min-w-0 px-2 py-2",
+                layout === "stack" && !hideText ? "flex-col gap-1" : "justify-center gap-2",
+                !fill && layout === "stack" ? "text-xs" : "",
                 className,
               )}
               {...props}
@@ -72,7 +79,7 @@ export function ActionButton({
               <span className="shrink-0" aria-hidden="true">
                 {icon}
               </span>
-              {!(iconOnly || forcedIconOnly) && (
+              {!hideText && (
                 <span className="line-clamp-2 min-w-0 leading-tight break-words">{label}</span>
               )}
             </Button>
