@@ -221,6 +221,7 @@ export type Database = {
           job_status: string
           job_status_at: string | null
           job_status_by: string | null
+          liability_accepted: boolean
           lines: Json
           member_id: string | null
           note: string
@@ -243,6 +244,7 @@ export type Database = {
           subtotal: number
           tag_id: string | null
           tax: number
+          technician: string | null
           tension_cross: number | null
           tension_main: number | null
           tension_unit: string
@@ -267,6 +269,7 @@ export type Database = {
           job_status?: string
           job_status_at?: string | null
           job_status_by?: string | null
+          liability_accepted?: boolean
           lines?: Json
           member_id?: string | null
           note?: string
@@ -289,6 +292,7 @@ export type Database = {
           subtotal?: number
           tag_id?: string | null
           tax?: number
+          technician?: string | null
           tension_cross?: number | null
           tension_main?: number | null
           tension_unit?: string
@@ -313,6 +317,7 @@ export type Database = {
           job_status?: string
           job_status_at?: string | null
           job_status_by?: string | null
+          liability_accepted?: boolean
           lines?: Json
           member_id?: string | null
           note?: string
@@ -335,6 +340,7 @@ export type Database = {
           subtotal?: number
           tag_id?: string | null
           tax?: number
+          technician?: string | null
           tension_cross?: number | null
           tension_main?: number | null
           tension_unit?: string
@@ -960,6 +966,7 @@ export type Database = {
           archived_at: string | null
           barcode: string
           barcode_aliases: string[]
+          brand: string | null
           category: string | null
           cost_price: number
           created_at: string
@@ -972,6 +979,7 @@ export type Database = {
           name: string
           packs: Json
           point_multiplier: number
+          product_group: string | null
           reorder_level: number
           selling_price: number
           sku: string | null
@@ -986,6 +994,7 @@ export type Database = {
           archived_at?: string | null
           barcode: string
           barcode_aliases?: string[]
+          brand?: string | null
           category?: string | null
           cost_price?: number
           created_at?: string
@@ -998,6 +1007,7 @@ export type Database = {
           name: string
           packs?: Json
           point_multiplier?: number
+          product_group?: string | null
           reorder_level?: number
           selling_price?: number
           sku?: string | null
@@ -1012,6 +1022,7 @@ export type Database = {
           archived_at?: string | null
           barcode?: string
           barcode_aliases?: string[]
+          brand?: string | null
           category?: string | null
           cost_price?: number
           created_at?: string
@@ -1024,6 +1035,7 @@ export type Database = {
           name?: string
           packs?: Json
           point_multiplier?: number
+          product_group?: string | null
           reorder_level?: number
           selling_price?: number
           sku?: string | null
@@ -2458,6 +2470,7 @@ export type Database = {
         Args: { p_active: boolean; p_user_id: string }
         Returns: undefined
       }
+      settings_private_key: { Args: never; Returns: string }
       shift_active_for_branch: {
         Args: { p_store_id: string }
         Returns: {
