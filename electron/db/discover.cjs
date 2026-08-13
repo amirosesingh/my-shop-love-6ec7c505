@@ -10,6 +10,7 @@
 const dgram = require("node:dgram");
 const net = require("node:net");
 const os = require("node:os");
+const { execFile } = require("node:child_process");
 
 const BROWSER_PORT = 1434;
 const LISTEN_MS = 3000;
@@ -179,3 +180,93 @@ async function scan() {
 }
 
 module.exports = { scan };
+
+/**
+ * Windows registry probe: lists every SQL Server instance installed on THIS
+ * machine, even when the SQL Browser service is stopped.
+ */
+function registryInstances() {
+  return new Promise((resolve) => {
+    if (process.platform !== "win32") {
+      resolve([]);
+      return;
+    }
+    execFile(
+      "reg",
+      [
+        "query",
+        "HKLM\\SOFTWARE\\Microsoft\\Microsoft SQL Server\\Instance Names\\SQL",
+      ],
+      { timeout: 4000, windowsHide: true },
+      (err, stdout) => {
+        if (err || !stdout) {
+          resolve([]);
+          return;
+        }
+        const names = [];
+        for (const line of String(stdout).split(/\r?\n/)) {
+          // "    SQLEXPRESS    REG_SZ    MSSQL16.SQLEXPRESS"
+          const m = /^\s{2,}(\S+)\s+REG_SZ\s+(\S+)\s*$/.exec(line);
+          if (m) names.push(m[1]);
+        }
+        resolve(names);
+      },
+    );
+  });
+}
+
+/**
+ * Everything this PC can offer as a connection target: loopback names plus
+ * every locally installed instance, merged with whatever the network scan saw.
+ */
+async function scanLocalInstances() {
+  const hostname = os.hostname();
+  try {
+    const [instances, network] = await Promise.all([registryInstances(), scan()]);
+    const targets = [];
+    const push = (value) => {
+      const text = String(value || "").trim();
+      if (!text) return;
+      if (!targets.some((t) => t.toLowerCase() === text.toLowerCase())) targets.push(text);
+    };
+    push("127.0.0.1");
+    push("localhost");
+    push(hostname);
+    for (const instance of instances) {
+      if (/^MSSQLSERVER$/i.test(instance)) continue; // default instance = bare host
+      push(`${hostname}\\${instance}`);
+      push(`localhost\\${instance}`);
+    }
+    const servers = [
+      ...instances.map((instance) => ({
+        address: hostname,
+        serverName: hostname,
+        instance: /^MSSQLSERVER$/i.test(instance) ? "" : instance,
+        port: null,
+        version: null,
+        source: "registry",
+      })),
+      ...(network.servers ?? []),
+    ];
+    for (const server of network.servers ?? []) {
+      push(server.instance ? `${server.serverName}\\${server.instance}` : server.serverName);
+    }
+    return {
+      ok: true,
+      hostname,
+      targets,
+      servers,
+      hint: targets.length > 2 ? undefined : NO_RESULT_HINT,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      hostname,
+      targets: ["127.0.0.1", "localhost", hostname].filter(Boolean),
+      servers: [],
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+module.exports.scanLocalInstances = scanLocalInstances;
