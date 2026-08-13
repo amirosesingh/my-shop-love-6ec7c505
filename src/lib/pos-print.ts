@@ -663,6 +663,7 @@ function bookingBody(booking: Booking, member: Member | null, pay: PaymentDetail
       ${booking.customerPhone ? `<tr><td>Phone</td><td class="r">${esc(booking.customerPhone)}</td></tr>` : ""}
     </table>
     <hr><table>${rows}</table>
+    ${chargesBlock(booking)}
     <hr><table>
       <tr><td>Subtotal</td><td class="r">${fmt(booking.subtotal)}</td></tr>
       <tr><td>Discount</td><td class="r">-${fmt(booking.discount)}</td></tr>
