@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { BOOKING_TIMING_LABELS } from "@/lib/pos-types";
+import { BOOKING_TIMING_LABELS, bookingRulesOf } from "@/lib/pos-types";
 import {
   Dialog,
   DialogContent,
@@ -91,6 +91,17 @@ function BookingsPage() {
     setBookingJobStatus,
   } = usePos();
   const { requirePermission } = useUserPermissions();
+  const { user, can } = useAuth();
+  const rules = bookingRulesOf(state.settings.integrations.bookingRules);
+  const isSupervisor = user?.role === "admin" || can("can_access_pos_settings");
+  /** Cancelling can be reserved for supervisors by the branch rules. */
+  const guardCancel = async () => {
+    if (rules.managerOnlyCancel && !isSupervisor) {
+      toast.error("Only a supervisor may cancel a booking");
+      return false;
+    }
+    return requirePermission("can_cancel_booking");
+  };
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<Booking["status"] | "all">("active");
   /** Extra lens over the racket workflow, on top of the booking status. */
