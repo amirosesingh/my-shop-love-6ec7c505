@@ -2144,6 +2144,7 @@ function Register() {
       </div>
           }
         />
+        </RegisterActionsProvider>
         {/* Unknown scans and manual lookups land in the search & add modal. */}
         <ProductSearchDialog
           open={catalogOpen}
