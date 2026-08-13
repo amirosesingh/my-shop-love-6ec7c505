@@ -3171,7 +3171,7 @@ function Register() {
             <div className="space-y-1">
               <Label>When does the customer pay?</Label>
               <div className="flex overflow-hidden rounded-md border border-border">
-                {(["now", "deposit", "collection"] as BookingPaymentTiming[]).map((t) => (
+                {allowedTimings.map((t) => (
                   <button
                     key={t}
                     onClick={() => setPayTiming(t)}
