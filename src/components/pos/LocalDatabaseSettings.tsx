@@ -23,6 +23,7 @@ import {
   type LocalSyncStatus,
 } from "@/lib/local-db";
 import { supabaseConfig } from "@/lib/external-supabase-config";
+import { SqlConnectionModal } from "@/components/database/SqlConnectionModal";
 
 /**
  * Local Microsoft SQL Server controls. Only meaningful inside the Windows
@@ -37,6 +38,7 @@ export function LocalDatabaseSettings() {
   const [scanning, setScanning] = useState(false);
   const [found, setFound] = useState<DiscoveredDbServer[] | null>(null);
   const [scanNote, setScanNote] = useState<string | null>(null);
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   useEffect(() => {
     void loadLocalDbConfig().then(setConfig);
@@ -162,6 +164,20 @@ export function LocalDatabaseSettings() {
           stay encrypted on this machine.
         </p>
       </div>
+
+      <div>
+        <Button size="sm" onClick={() => setWizardOpen(true)}>
+          Set up connection
+        </Button>
+      </div>
+      <SqlConnectionModal
+        open={wizardOpen}
+        onOpenChange={setWizardOpen}
+        onConnected={(next) => {
+          setConfig(next);
+          void refresh();
+        }}
+      />
 
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Server / instance">
