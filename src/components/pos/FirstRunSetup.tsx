@@ -42,7 +42,9 @@ export function FirstRunSetup({ children }: { children: React.ReactNode }) {
           const name = company.trim();
           if (!name) return;
           writeBranding({ company: name, terminal: terminal.trim() || "POS Terminal 01", configured: true });
-          updateSettings({ receipt: { ...state.settings.receipt, companyName: name } });
+          if (state && updateSettings) {
+            updateSettings({ receipt: { ...state.settings.receipt, companyName: name } });
+          }
           setNeeded(false);
         }}
         className="w-full max-w-md space-y-4 rounded-lg border border-border bg-card p-6"
