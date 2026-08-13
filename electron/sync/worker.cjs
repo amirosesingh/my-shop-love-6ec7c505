@@ -18,6 +18,12 @@ let enabled = true;
 let timer = null;
 let running = false;
 let notify = () => {};
+let phase = "idle";
+
+function setPhase(next) {
+  phase = next;
+  notify();
+}
 const attempts = new Map(); // `${table}:${id}` -> failed attempts
 let credentials = {};
 let relayUrl = null;
@@ -100,6 +106,7 @@ async function reachable() {
 
 async function push() {
   if (!supabase) return { ok: false, pushed: 0, failed: 0, error: "Cloud client not ready" };
+  setPhase("pushing");
   let pushed = 0;
   let failed = 0;
   for (const table of repo.TABLES) {
@@ -107,6 +114,7 @@ async function push() {
     try {
       rows = await repo.pendingRows(table, BATCH);
     } catch (err) {
+      setPhase("idle");
       return { ok: false, pushed, failed, error: err.message };
     }
     if (!rows.length) continue;
@@ -130,26 +138,32 @@ async function push() {
         if (n >= MAX_ATTEMPTS) quarantine = true;
       }
       await repo.markFailed(table, ids, error.message, quarantine);
+      notify();
       continue;
     }
 
     await repo.markSynced(table, ids);
     for (const id of ids) attempts.delete(`${table}:${id}`);
     pushed += ids.length;
+    notify();
   }
   if (pushed) await repo.setState("last_push_at", new Date().toISOString());
-  notify();
+  setPhase("idle");
   return { ok: failed === 0, pushed, failed };
 }
 
 async function pull() {
   if (!supabase) return { ok: false, merged: 0, error: "Cloud client not ready" };
+  setPhase("pulling");
   const since = (await repo.getState("last_pull_at")) ?? "1970-01-01T00:00:00.000Z";
   let merged = 0;
   for (const table of repo.CATALOGUE_TABLES) {
     // Delta only: anything the cloud has touched since our last clean pull.
     const { data, error } = await selectChangedSince(table, since);
-    if (error) return { ok: false, merged, error: error.message };
+    if (error) {
+      setPhase("idle");
+      return { ok: false, merged, error: error.message };
+    }
     merged += await repo.mergeFromCloud(table, data ?? []);
   }
   // Settings is a single wide row; fetch it whole.
@@ -159,7 +173,7 @@ async function pull() {
     merged += 1;
   }
   await repo.setState("last_pull_at", new Date().toISOString());
-  notify();
+  setPhase("idle");
   return { ok: true, merged };
 }
 
@@ -181,12 +195,24 @@ async function status() {
   try {
     return {
       connected: true,
+      phase,
+      enabled,
       tables: await repo.stats(),
+      queue: await repo.queueRows(60),
       lastPushAt: await repo.getState("last_push_at"),
       lastPullAt: await repo.getState("last_pull_at"),
     };
   } catch (err) {
-    return { connected: false, error: err.message, tables: [], lastPushAt: null, lastPullAt: null };
+    return {
+      connected: false,
+      phase,
+      enabled,
+      error: err.message,
+      tables: [],
+      queue: [],
+      lastPushAt: null,
+      lastPullAt: null,
+    };
   }
 }
 
