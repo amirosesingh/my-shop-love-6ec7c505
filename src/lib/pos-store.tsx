@@ -205,6 +205,12 @@ type Ctx = {
   removePromotion: (id: string) => void;
   togglePromotion: (id: string, active: boolean) => void;
   updateSettings: (patch: Partial<AppSettings>) => void;
+  /** Which settings blocks this branch overrides, and which are locked globally. */
+  settingsScope: BranchSettingsState;
+  /** Start (or stop) overriding one block for the branch in context. */
+  setSectionScope: (section: SettingsSectionId, on: boolean, storeId?: string) => Promise<void>;
+  /** Lock a block so no branch can override it. */
+  setSectionLocked: (section: SettingsSectionId, locked: boolean) => Promise<void>;
   createTransfer: (input: NewTransfer) => Transfer;
   approveTransfer: (id: string) => void;
   receiveTransfer: (id: string) => void;
