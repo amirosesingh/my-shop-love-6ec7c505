@@ -15,6 +15,16 @@ import {
   type RegisterModuleId,
 } from "./register-modules";
 import { isActionId } from "./register-actions";
+import {
+  layoutKey,
+  legacyKeys,
+  platformTarget,
+  readLayoutRaw,
+  readLocal,
+  writeLayoutRaw,
+  writeLocal,
+  type PlatformTarget,
+} from "./layout-store";
 
 export type ModuleView = "grid" | "list";
 export type ModuleFont = "sm" | "md" | "lg" | "xl";
@@ -39,31 +49,69 @@ export type ModuleOptions = {
   /** Inner padding in px around the node content. */
   pad?: number;
   custom?: CustomButtonSpec;
+  /** Group boxes only: the header shown across the top of the container. */
+  title?: string;
 };
 
 export type LayoutBox = ModuleOptions & {
-  /** A registry module id, or `custom:<id>` for an admin-created button. */
+  /** A registry module id, `custom:<id>` for an admin button, or `group:<id>`. */
   i: string;
   x: number;
   y: number;
   w: number;
   h: number;
+  /** Id of the group box this node is docked inside, when it is in one. */
+  parent?: string;
 };
 
-export type RegisterLayout = { version: 3; items: LayoutBox[] };
+export type CanvasAspect = "free" | "16:9" | "4:3";
+
+/**
+ * The logical canvas every till renders. Coordinates are stored in these grid
+ * units and never in device pixels, so the same JSON draws an identical screen
+ * on a 4K monitor and on a 1024px touch terminal — only the scale changes.
+ */
+export type CanvasConfig = {
+  cols: number;
+  rowHeight: number;
+  /** Logical design width in px that the canvas is scaled from. */
+  baseWidth: number;
+  aspect: CanvasAspect;
+};
+
+export type RegisterLayout = {
+  version: 4;
+  platform_target: PlatformTarget;
+  canvas: CanvasConfig;
+  items: LayoutBox[];
+};
 
 export const GRID_COLS = 24;
 export const DEFAULT_PAD = 5;
 export const MAX_PAD = 16;
+export const COL_CHOICES = [12, 16, 20, 24, 32] as const;
+export const MIN_ROW_HEIGHT = 8;
+export const MAX_ROW_HEIGHT = 60;
 
-const KEY_PREFIX = "pos.register.layout";
-const storageKey = (terminal: string) => `${KEY_PREFIX}.v3:${terminal || "default"}`;
-const v2Key = (terminal: string) => `${KEY_PREFIX}.v2:${terminal || "default"}`;
-const v1Key = (terminal: string) => `${KEY_PREFIX}.v1:${terminal || "default"}`;
+export const DEFAULT_CANVAS: CanvasConfig = {
+  cols: GRID_COLS,
+  rowHeight: 20,
+  baseWidth: 1920,
+  aspect: "free",
+};
+
+export const ASPECT_RATIO: Record<CanvasAspect, number | null> = {
+  free: null,
+  "16:9": 16 / 9,
+  "4:3": 4 / 3,
+};
 
 export const isCustomId = (id: string) => id.startsWith("custom:");
 export const newCustomId = () =>
   `custom:${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+export const isGroupId = (id: string) => id.startsWith("group:");
+export const newGroupId = () =>
+  `group:${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 
 export type NodeSpec = {
   label: string;
@@ -79,6 +127,19 @@ export type NodeSpec = {
 
 /** Sizing and capability facts for any node, registry module or custom button. */
 export function nodeSpec(box: Pick<LayoutBox, "i" | "custom">): NodeSpec | null {
+  if (isGroupId(box.i)) {
+    return {
+      label: "Group box",
+      minW: 2,
+      minH: 2,
+      w: 8,
+      h: 10,
+      chrome: "panel",
+      supportsView: false,
+      supportsLabel: true,
+      essential: false,
+    };
+  }
   if (isCustomId(box.i)) {
     return {
       label: box.custom?.label || "Custom button",
@@ -110,7 +171,9 @@ export function nodeSpec(box: Pick<LayoutBox, "i" | "custom">): NodeSpec | null 
 /** The factory screen expressed as atomic nodes on the 24-column canvas. */
 export function factoryLayout(): RegisterLayout {
   return {
-    version: 3,
+    version: 4,
+    platform_target: platformTarget(),
+    canvas: { ...DEFAULT_CANVAS },
     items: [
       { i: "catalog", x: 0, y: 0, w: 10, h: 34, view: "list", font: "md" },
       { i: "billNumber", x: 10, y: 0, w: 5, h: 3 },
@@ -165,6 +228,8 @@ function box(id: string, rec: Record<string, unknown>, custom?: CustomButtonSpec
   const label = typeof rec["label"] === "string" ? rec["label"].slice(0, 40) : undefined;
   const padRaw = Number(rec["pad"]);
   const pad = Number.isFinite(padRaw) ? Math.max(0, Math.min(MAX_PAD, Math.round(padRaw))) : DEFAULT_PAD;
+  const parent = typeof rec["parent"] === "string" && isGroupId(rec["parent"]) ? rec["parent"] : undefined;
+  const title = typeof rec["title"] === "string" ? rec["title"].slice(0, 40) : undefined;
   return {
     i: id,
     x: Number(rec["x"]) || 0,
@@ -173,12 +238,29 @@ function box(id: string, rec: Record<string, unknown>, custom?: CustomButtonSpec
     h: Math.max(spec.minH, Number(rec["h"]) || spec.h),
     pad,
     ...(custom ? { custom } : {}),
+    ...(parent ? { parent } : {}),
+    ...(title ? { title } : {}),
     ...(rec["view"] === "grid" || rec["view"] === "list" ? { view: rec["view"] as ModuleView } : {}),
     ...(font ? { font } : {}),
     ...(tone ? { tone } : {}),
     ...(style ? { style } : {}),
     ...(label ? { label } : {}),
   };
+}
+
+function readCanvas(raw: unknown): CanvasConfig {
+  const rec = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const cols = COL_CHOICES.find((c) => c === Number(rec["cols"])) ?? DEFAULT_CANVAS.cols;
+  const rhRaw = Number(rec["rowHeight"]);
+  const rowHeight = Number.isFinite(rhRaw)
+    ? Math.max(MIN_ROW_HEIGHT, Math.min(MAX_ROW_HEIGHT, Math.round(rhRaw)))
+    : DEFAULT_CANVAS.rowHeight;
+  const bwRaw = Number(rec["baseWidth"]);
+  const baseWidth = Number.isFinite(bwRaw)
+    ? Math.max(800, Math.min(3840, Math.round(bwRaw)))
+    : DEFAULT_CANVAS.baseWidth;
+  const aspect = (["free", "16:9", "4:3"] as CanvasAspect[]).find((a) => a === rec["aspect"]) ?? "free";
+  return { cols, rowHeight, baseWidth, aspect };
 }
 
 function sanitise(raw: unknown): RegisterLayout | null {
@@ -191,6 +273,11 @@ function sanitise(raw: unknown): RegisterLayout | null {
     const rec = it as Record<string, unknown>;
     const id = String(rec["i"] ?? "");
     if (clean.some((c) => c.i === id)) continue;
+    if (isGroupId(id)) {
+      const b = box(id, rec);
+      if (b) clean.push(b);
+      continue;
+    }
     if (isCustomId(id)) {
       const custom = readCustom(rec);
       if (!custom) continue;
@@ -202,7 +289,17 @@ function sanitise(raw: unknown): RegisterLayout | null {
     const b = box(id, rec);
     if (b) clean.push(b);
   }
-  return clean.length ? { version: 3, items: clean } : null;
+  // Drop dangling group references so orphans stay draggable on their own.
+  const groups = new Set(clean.filter((c) => isGroupId(c.i)).map((c) => c.i));
+  for (const c of clean) if (c.parent && !groups.has(c.parent)) delete c.parent;
+  return clean.length
+    ? {
+        version: 4,
+        platform_target: platformTarget(),
+        canvas: readCanvas((raw as { canvas?: unknown }).canvas),
+        items: clean,
+      }
+    : null;
 }
 
 /** A v1 coarse layout becomes atomic nodes stacked inside the old block area. */
@@ -235,50 +332,37 @@ function migrateV1(raw: unknown): RegisterLayout | null {
       y += h;
     }
   }
-  return out.length ? { version: 3, items: out } : null;
+  return out.length
+    ? { version: 4, platform_target: platformTarget(), canvas: { ...DEFAULT_CANVAS }, items: out }
+    : null;
 }
 
-export function readLayout(terminal: string): RegisterLayout | null {
+/**
+ * Loads the layout saved for *this* platform, migrating a legacy shared save
+ * on first run so an existing desktop design is not lost.
+ */
+export async function readLayout(terminal: string): Promise<RegisterLayout | null> {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(storageKey(terminal));
+    const raw = await readLayoutRaw(terminal);
     if (raw) return sanitise(JSON.parse(raw));
-    // v2 already used atomic ids — it only needs the new padding default.
-    const two = window.localStorage.getItem(v2Key(terminal));
-    if (two) {
-      const migrated = sanitise(JSON.parse(two));
-      if (migrated) {
-        window.localStorage.setItem(storageKey(terminal), JSON.stringify(migrated));
-        window.localStorage.removeItem(v2Key(terminal));
-      }
-      return migrated;
-    }
-    const old = window.localStorage.getItem(v1Key(terminal));
-    if (!old) return null;
-    const migrated = migrateV1(JSON.parse(old));
-    if (migrated) {
-      window.localStorage.setItem(storageKey(terminal), JSON.stringify(migrated));
-      window.localStorage.removeItem(v1Key(terminal));
-    }
+    const [v3, v2, v1] = legacyKeys(terminal).map((k) => readLocal(k));
+    const legacy = v3 ?? v2;
+    const migrated = legacy ? sanitise(JSON.parse(legacy)) : v1 ? migrateV1(JSON.parse(v1)) : null;
+    if (migrated) await writeLayoutRaw(terminal, JSON.stringify(migrated));
     return migrated;
   } catch {
     return null;
   }
 }
 
-export function writeLayout(terminal: string, layout: RegisterLayout | null) {
+export async function writeLayout(terminal: string, layout: RegisterLayout | null) {
   if (typeof window === "undefined") return;
-  try {
-    if (layout) window.localStorage.setItem(storageKey(terminal), JSON.stringify(layout));
-    else {
-      window.localStorage.removeItem(storageKey(terminal));
-      window.localStorage.removeItem(v2Key(terminal));
-      window.localStorage.removeItem(v1Key(terminal));
-    }
-  } catch {
-    /* storage full or blocked — the screen still works, it just won't persist */
-  }
+  await writeLayoutRaw(terminal, layout ? JSON.stringify(layout) : null);
+  if (!layout) for (const k of legacyKeys(terminal)) writeLocal(k, null);
 }
+
+export { layoutKey };
 
 /** Next free row so a dropped element never lands on top of another. */
 export function nextRow(items: LayoutBox[]) {
@@ -293,8 +377,16 @@ export function useRegisterLayout(terminal: string) {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    setSaved(readLayout(terminal));
-    setLoaded(true);
+    let alive = true;
+    setLoaded(false);
+    void readLayout(terminal).then((l) => {
+      if (!alive) return;
+      setSaved(l);
+      setLoaded(true);
+    });
+    return () => {
+      alive = false;
+    };
   }, [terminal]);
 
   const active = draft ?? saved;
@@ -332,7 +424,7 @@ export function useRegisterLayout(terminal: string) {
         if (l.items.some((i) => i.i === id)) return l;
         const item: LayoutBox = {
           i: id,
-          x: at ? Math.max(0, Math.min(GRID_COLS - def.w, at.x)) : 0,
+          x: at ? Math.max(0, Math.min(l.canvas.cols - def.w, at.x)) : 0,
           y: at ? at.y : nextRow(l.items),
           w: def.w,
           h: def.h,
@@ -366,8 +458,52 @@ export function useRegisterLayout(terminal: string) {
     [update],
   );
 
+  /** Adds an empty group container that other nodes can be docked into. */
+  const addGroup = useCallback(
+    (at?: { x: number; y: number }) => {
+      update((l) => {
+        const item: LayoutBox = {
+          i: newGroupId(),
+          x: at ? Math.max(0, Math.min(l.canvas.cols - 8, at.x)) : 0,
+          y: at ? at.y : nextRow(l.items),
+          w: 8,
+          h: 10,
+          pad: DEFAULT_PAD,
+          title: "Group",
+        };
+        // Groups render behind their children, so keep them first in the list.
+        return { ...l, items: [item, ...l.items] };
+      });
+    },
+    [update],
+  );
+
+  /** Canvas geometry: columns, row height, design width and aspect lock. */
+  const setCanvas = useCallback(
+    (patch: Partial<CanvasConfig>) =>
+      update((l) => {
+        const canvas = readCanvas({ ...l.canvas, ...patch });
+        if (canvas.cols === l.canvas.cols) return { ...l, canvas };
+        // Re-proportion every node so a column change never shreds the design.
+        const k = canvas.cols / l.canvas.cols;
+        const items = l.items.map((it) => {
+          const spec = nodeSpec(it);
+          const w = Math.max(spec?.minW ?? 1, Math.min(canvas.cols, Math.round(it.w * k)));
+          return { ...it, x: Math.max(0, Math.min(canvas.cols - w, Math.round(it.x * k))), w };
+        });
+        return { ...l, canvas, items };
+      }),
+    [update],
+  );
+
   const removeModule = useCallback(
-    (id: string) => update((l) => ({ ...l, items: l.items.filter((i) => i.i !== id) })),
+    (id: string) =>
+      update((l) => ({
+        ...l,
+        items: l.items
+          .filter((i) => i.i !== id)
+          .map((i) => (i.parent === id ? { ...i, parent: undefined } : i)),
+      })),
     [update],
   );
 
@@ -387,22 +523,53 @@ export function useRegisterLayout(terminal: string) {
     [update],
   );
 
+  /**
+   * Commits grid geometry. Moving a group carries its docked children with it,
+   * and any node dropped inside a group's footprint is adopted by that group.
+   */
   const applyBoxes = useCallback(
     (boxes: { i: string; x: number; y: number; w: number; h: number }[]) =>
-      update((l) => ({
-        ...l,
-        items: l.items.map((it) => {
-          const found = boxes.find((b) => b.i === it.i);
+      update((l) => {
+        const byId = new Map(boxes.map((b) => [b.i, b]));
+        let items = l.items.map((it) => {
+          const found = byId.get(it.i);
           return found ? { ...it, x: found.x, y: found.y, w: found.w, h: found.h } : it;
-        }),
-      })),
+        });
+
+        for (const prev of l.items) {
+          if (!isGroupId(prev.i)) continue;
+          const next = byId.get(prev.i);
+          if (!next) continue;
+          const dx = next.x - prev.x;
+          const dy = next.y - prev.y;
+          if (!dx && !dy) continue;
+          items = items.map((it) =>
+            it.parent === prev.i && it.i !== prev.i ? { ...it, x: it.x + dx, y: it.y + dy } : it,
+          );
+        }
+
+        const groups = items.filter((g) => isGroupId(g.i));
+        const inside = (it: LayoutBox, g: LayoutBox) => {
+          const cx = it.x + it.w / 2;
+          const cy = it.y + it.h / 2;
+          return cx >= g.x && cx <= g.x + g.w && cy >= g.y && cy <= g.y + g.h;
+        };
+        items = items.map((it) => {
+          if (isGroupId(it.i)) return it;
+          const host = groups.find((g) => inside(it, g));
+          if (host) return it.parent === host.i ? it : { ...it, parent: host.i };
+          return it.parent ? { ...it, parent: undefined } : it;
+        });
+
+        return { ...l, items };
+      }),
     [update],
   );
 
   const save = useCallback(() => {
     const next = draft ?? saved;
     if (!next) return;
-    writeLayout(terminal, next);
+    void writeLayout(terminal, next);
     setSaved(next);
     setDraft(null);
     setEditing(false);
@@ -410,7 +577,7 @@ export function useRegisterLayout(terminal: string) {
   }, [draft, saved, terminal]);
 
   const reset = useCallback(() => {
-    writeLayout(terminal, null);
+    void writeLayout(terminal, null);
     setSaved(null);
     setDraft(null);
     setEditing(false);
@@ -434,6 +601,8 @@ export function useRegisterLayout(terminal: string) {
     resumeEdit,
     addModule,
     addCustom,
+    addGroup,
+    setCanvas,
     removeModule,
     setOptions,
     setAllPadding,
