@@ -2257,14 +2257,8 @@ function Register() {
       document.querySelector<HTMLInputElement>("[data-scan-focus] input")?.focus(),
     "hold.new": () => holdOrder(),
     "void.cart": () => void clearCart(),
-    "book.later": () => {
-      setDeposit("");
-      setBookName(member?.name ?? "");
-      setBookPhone(member?.phone ?? "");
-      setBookMode("cart");
-      resetJobCard();
-      setBookOpen(true);
-    },
+    "book.later": () => startCartBooking(),
+    "book.hub": () => setBookingHubOpen(true),
     "shift.open": () => setOpenShiftOpen(true),
     "shift.close": () => setCloseShiftOpen(true),
     "drawer.open": () => setNoSaleOpen(true),
