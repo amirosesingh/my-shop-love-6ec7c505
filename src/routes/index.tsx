@@ -1715,16 +1715,16 @@ function Register() {
                 </div>
                 {promo.promoDiscount > 0 && <Row label="Promotion discount" value={`-${money(promo.promoDiscount)}`} />}
                 <Row label="Discount applied" value={`-${money(totals.discount)}`} />
-                <Row
-                  label={
-                    !taxSettings.enabled
-                      ? "Tax (disabled)"
-                      : taxSettings.mode === "inclusive"
+                {taxSettings.enabled && !!totals.tax && (
+                  <Row
+                    label={
+                      taxSettings.mode === "inclusive"
                         ? `Tax ${taxSettings.rate}% (included)`
                         : `Tax ${taxSettings.rate}%`
-                  }
-                  value={money(totals.tax)}
-                />
+                    }
+                    value={money(totals.tax)}
+                  />
+                )}
               </div>
 
               <div className="w-full min-w-0 space-y-2">
