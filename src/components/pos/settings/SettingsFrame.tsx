@@ -13,6 +13,7 @@ import { ArrowLeft, Eye, Loader2, RotateCcw, Save } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
 import { SaveIndicator } from "@/components/pos/settings/SaveIndicator";
+import { ScopePanel } from "@/components/pos/settings/ScopeControls";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -37,6 +38,7 @@ import type {
   ReceiptSettings,
   Sale,
 } from "@/lib/pos-types";
+import type { SettingsSectionId } from "@/lib/settings-sections";
 
 type Ctx = {
   effective: ReceiptSettings;
@@ -71,6 +73,8 @@ type Props = {
   /** Branch picker + receipt preview only make sense for receipt-shaped pages. */
   branchAware?: boolean;
   showPreview?: boolean;
+  /** Scopable blocks this page edits — renders the Global/Cluster/Branch/Private selector. */
+  scopeSections?: SettingsSectionId[];
 };
 
 export function SettingsFrame({
@@ -79,6 +83,7 @@ export function SettingsFrame({
   children,
   branchAware = false,
   showPreview = false,
+  scopeSections,
 }: Props) {
   const { state, stores, currentStore, updateSettings, upsertStore } = usePos();
   const { isAdmin, can } = useAuth();
@@ -331,6 +336,8 @@ export function SettingsFrame({
               </div>
             </div>
           )}
+
+          {scopeSections?.length ? <ScopePanel sections={scopeSections} /> : null}
 
           <section className="space-y-4 rounded-lg border border-border bg-card p-5">{children}</section>
 
