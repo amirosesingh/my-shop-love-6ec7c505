@@ -62,10 +62,15 @@ import { commitBooking, deleteBookingRow, loadBookings, saveBookingQuietly } fro
 import {
   clearSectionOverride,
   emptyBranchSettings,
+  emptyScopeIds,
   loadBranchSettings,
   saveSectionOverride,
   setSectionLock,
+  SETTING_TIERS,
   type BranchSettingsState,
+  type ScopeIds,
+  type SettingSource,
+  type SettingTier,
 } from "./branch-settings";
 import {
   SECTION_BY_ID,
@@ -225,10 +230,19 @@ type Ctx = {
   removePromotion: (id: string) => void;
   togglePromotion: (id: string, active: boolean) => void;
   updateSettings: (patch: Partial<AppSettings>) => void;
-  /** Which settings blocks this branch overrides, and which are locked globally. */
+  /** Which settings blocks each tier overrides, and which are locked globally. */
   settingsScope: BranchSettingsState;
-  /** Start (or stop) overriding one block for the branch in context. */
-  setSectionScope: (section: SettingsSectionId, on: boolean, storeId?: string) => Promise<void>;
+  /** The cluster / branch / private ids this terminal resolves settings against. */
+  scopeIds: ScopeIds;
+  /** Start (or stop) overriding one block at one tier. */
+  setSectionScope: (
+    section: SettingsSectionId,
+    on: boolean,
+    tier?: SettingTier,
+    scopeId?: string,
+  ) => Promise<void>;
+  /** Where the value at a dotted settings path is coming from right now. */
+  sourceOfPath: (path: string) => SettingSource;
   /** Lock a block so no branch can override it. */
   setSectionLocked: (section: SettingsSectionId, locked: boolean) => Promise<void>;
   createTransfer: (input: NewTransfer) => Transfer;
@@ -299,10 +313,21 @@ export function PosProvider({ children }: { children: ReactNode }) {
   // Who is acting right now — stamped on transfer approvals and receipts.
   const actorRef = useRef("Manager");
   actorRef.current = terminalUser?.name || user?.email || "Manager";
-  // Branch overrides and global locks for the scopable settings blocks.
+  // Scoped overrides (cluster / branch / private) and global locks.
   const [scope, setScope] = useState<BranchSettingsState>(emptyBranchSettings);
   const scopeRef = useRef(scope);
   scopeRef.current = scope;
+  // Which cluster, branch and person this terminal resolves settings against.
+  const scopeIds = useMemo<ScopeIds>(() => {
+    const store = state.stores.find((s) => s.id === state.currentStoreId);
+    return {
+      CLUSTER: store?.groupId ?? "",
+      BRANCH: state.currentStoreId ?? "",
+      PRIVATE: user?.staffId ?? terminalUser?.userCode ?? authUserId ?? "",
+    };
+  }, [state.stores, state.currentStoreId, user?.staffId, terminalUser?.userCode, authUserId]);
+  const scopeIdsRef = useRef<ScopeIds>(emptyScopeIds);
+  scopeIdsRef.current = scopeIds;
   const whoRef = useRef("Manager");
   whoRef.current = actorRef.current;
   // Lets earlier callbacks reach the settings writer defined further down.
@@ -413,17 +438,17 @@ export function PosProvider({ children }: { children: ReactNode }) {
     }
   }, [state, ready]);
 
-  // Branch overrides follow the branch in context, once someone is signed in.
+  // Overrides follow the cluster, branch and person in context.
   useEffect(() => {
     if (!signedIn || !state.currentStoreId) return;
     let cancelled = false;
-    void loadBranchSettings(state.currentStoreId).then((next) => {
+    void loadBranchSettings(scopeIds).then((next) => {
       if (!cancelled) setScope(next);
     });
     return () => {
       cancelled = true;
     };
-  }, [signedIn, state.currentStoreId]);
+  }, [signedIn, state.currentStoreId, scopeIds]);
 
   // The directory may not have loaded yet (a cashier signs in with a PIN and
   // has no central-database account of their own). The terminal's own
@@ -1651,8 +1676,9 @@ export function PosProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /**
-   * Route each leaf of the patch to the scope that owns it: blocks this branch
-   * overrides are written to the branch record, everything else is global.
+   * Route each leaf of the patch to the tier that owns it: a block overridden
+   * privately is written privately, then branch, then cluster, otherwise the
+   * global record. Locked blocks always fall back to global.
    */
   const updateSettings = useCallback(
     (patch: Partial<AppSettings>) => {
@@ -1661,62 +1687,86 @@ export function PosProvider({ children }: { children: ReactNode }) {
         updated: patch,
       });
       const scope = scopeRef.current;
-      const storeId = stateRef.current.currentStoreId;
-      const bySection = new Map<SettingsSectionId, Record<string, unknown>>();
+      const ids = scopeIdsRef.current;
+      const byTier = new Map<SettingTier, Map<SettingsSectionId, Record<string, unknown>>>();
       let globalPatch: Record<string, unknown> = {};
       let hasGlobal = false;
       for (const path of patchPaths(patch as Record<string, unknown>)) {
         const value = getPath(patch, path);
         const section = sectionOfPath(path);
-        const overridden = section ? scope.overrides[section.id] : undefined;
-        if (section && overridden && !scope.locks[section.id]) {
-          bySection.set(section.id, setPath(bySection.get(section.id) ?? overridden, path, value));
+        // Strongest tier that already owns this block wins the write.
+        const tier =
+          section && !scope.locks[section.id]
+            ? [...SETTING_TIERS].reverse().find((t) => scope.overrides[t][section.id] && ids[t])
+            : undefined;
+        if (section && tier) {
+          const bag = byTier.get(tier) ?? new Map<SettingsSectionId, Record<string, unknown>>();
+          const base = bag.get(section.id) ?? scope.overrides[tier][section.id] ?? {};
+          bag.set(section.id, setPath(base, path, value));
+          byTier.set(tier, bag);
         } else {
           globalPatch = setPath(globalPatch, path, value);
           hasGlobal = true;
         }
       }
       if (hasGlobal) writeGlobalSettings(globalPatch as Partial<AppSettings>);
-      if (!bySection.size) return;
-      setScope((s) => ({
-        ...s,
-        overrides: { ...s.overrides, ...Object.fromEntries(bySection) },
-      }));
-      for (const [section, sectionPatch] of bySection) {
-        void saveSectionOverride(storeId, section, sectionPatch, whoRef.current).catch((e) =>
-          toast.error(`Branch settings not saved: ${(e as Error).message}`),
-        );
+      if (!byTier.size) return;
+      setScope((s) => {
+        const overrides = { ...s.overrides };
+        for (const [tier, bag] of byTier) {
+          overrides[tier] = { ...overrides[tier], ...Object.fromEntries(bag) };
+        }
+        return { ...s, overrides };
+      });
+      for (const [tier, bag] of byTier) {
+        for (const [section, sectionPatch] of bag) {
+          void saveSectionOverride(tier, ids[tier], section, sectionPatch, whoRef.current).catch(
+            (e) => toast.error(`Scoped settings not saved: ${(e as Error).message}`),
+          );
+        }
       }
     },
     [writeGlobalSettings],
   );
   updateSettingsRef.current = updateSettings;
 
-  /** Start or stop overriding one block for a branch. */
+  /** Start or stop overriding one block at one tier. */
   const setSectionScope = useCallback(
-    async (section: SettingsSectionId, on: boolean, storeId?: string) => {
-      const target = storeId || stateRef.current.currentStoreId;
+    async (section: SettingsSectionId, on: boolean, tier: SettingTier = "BRANCH", scopeId?: string) => {
+      const target = scopeId || scopeIdsRef.current[tier];
       const def = SECTION_BY_ID[section];
-      if (!target || !def) return;
+      if (!def) return;
+      if (!target) {
+        toast.error(
+          tier === "CLUSTER"
+            ? "This branch is not part of a cluster yet."
+            : "No scope is available for this terminal.",
+        );
+        return;
+      }
       if (scopeRef.current.locks[section] && on) {
         toast.error("This block is locked by head office.");
         return;
       }
       if (on) {
         const patch = pickSection(stateRef.current.settings, def);
-        setScope((s) => ({ ...s, overrides: { ...s.overrides, [section]: patch } }));
-        await saveSectionOverride(target, section, patch, whoRef.current);
+        setScope((s) => ({
+          ...s,
+          overrides: { ...s.overrides, [tier]: { ...s.overrides[tier], [section]: patch } },
+        }));
+        await saveSectionOverride(tier, target, section, patch, whoRef.current);
       } else {
         setScope((s) => {
-          const overrides = { ...s.overrides };
-          delete overrides[section];
-          return { ...s, overrides };
+          const tierBag = { ...s.overrides[tier] };
+          delete tierBag[section];
+          return { ...s, overrides: { ...s.overrides, [tier]: tierBag } };
         });
-        await clearSectionOverride(target, section);
+        await clearSectionOverride(tier, target, section);
       }
-      logger.log("settings", on ? "Branch override enabled" : "Reset to global default", "settings", {
+      logger.log("settings", on ? "Scope override enabled" : "Override removed", "settings", {
         section,
-        storeId: target,
+        tier,
+        scopeId: target,
       });
     },
     [],
@@ -1897,19 +1947,42 @@ export function PosProvider({ children }: { children: ReactNode }) {
 
   const reset = useCallback(() => setState(emptyState), []);
 
-  // Every consumer sees the resolved record: branch override over global.
+  // Every consumer sees the resolved record:
+  // Private > Branch > Cluster > Global > shipped default.
   const effectiveState = useMemo(() => {
-    const keys = Object.keys(scope.overrides) as SettingsSectionId[];
-    if (!keys.length) return state;
     let settings = state.settings;
-    for (const key of keys) settings = mergePatch(settings, scope.overrides[key]);
+    let touched = false;
+    for (const tier of SETTING_TIERS) {
+      for (const key of Object.keys(scope.overrides[tier]) as SettingsSectionId[]) {
+        if (scope.locks[key]) continue;
+        settings = mergePatch(settings, scope.overrides[tier][key]);
+        touched = true;
+      }
+    }
+    if (!touched) return state;
     return { ...state, settings };
   }, [state, scope]);
+
+  /** Which tier is supplying the value at a dotted settings path right now. */
+  const sourceOfPath = useCallback(
+    (path: string): SettingSource => {
+      const section = sectionOfPath(path);
+      if (!section || scope.locks[section.id]) return "GLOBAL";
+      for (const tier of [...SETTING_TIERS].reverse()) {
+        const patch = scope.overrides[tier][section.id];
+        if (patch && getPath(patch, path) !== undefined) return tier;
+      }
+      return "GLOBAL";
+    },
+    [scope],
+  );
 
   const value: Ctx = {
     ready,
     state: effectiveState,
     settingsScope: scope,
+    scopeIds,
+    sourceOfPath,
     setSectionScope,
     setSectionLocked,
     stores: state.stores,
