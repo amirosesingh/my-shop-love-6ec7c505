@@ -37,10 +37,31 @@ export type TableSyncStat = {
   errored: number;
 };
 
+export type SyncQueueRow = {
+  table: string;
+  id: string;
+  status: string;
+  error: string | null;
+  updatedAt: string | null;
+};
+
+export type LocalDbTestResult = {
+  ok: boolean;
+  version?: string;
+  serverName?: string;
+  error?: string;
+  code?: string | null;
+  originalMessage?: string | null;
+  hint?: string | null;
+};
+
 export type LocalSyncStatus = {
   connected: boolean;
   error?: string;
+  phase?: "idle" | "pushing" | "pulling";
+  enabled?: boolean;
   tables: TableSyncStat[];
+  queue?: SyncQueueRow[];
   lastPushAt: string | null;
   lastPullAt: string | null;
 };
@@ -51,15 +72,16 @@ export type PosBridge = {
   connect: (
     config: LocalDbConfig,
     cloud?: CloudBridgeConfig,
-  ) => Promise<{ ok: boolean; error?: string; cloudError?: string }>;
+  ) => Promise<LocalDbTestResult & { cloudError?: string }>;
   configureCloud: (cloud: CloudBridgeConfig) => Promise<{ ok: boolean; error?: string }>;
-  test: (config: LocalDbConfig) => Promise<{ ok: boolean; error?: string; version?: string }>;
+  test: (config: LocalDbConfig) => Promise<LocalDbTestResult>;
   status: () => Promise<LocalSyncStatus>;
   push: () => Promise<{ ok: boolean; pushed: number; failed: number; error?: string }>;
   pull: () => Promise<{ ok: boolean; merged: number; error?: string }>;
   setSyncEnabled: (on: boolean) => Promise<void>;
   backup: (path?: string) => Promise<{ ok: boolean; path?: string; error?: string }>;
   retryErrored: () => Promise<{ ok: boolean }>;
+  retryRow?: (table: string, id: string) => Promise<{ ok: boolean; error?: string }>;
   /** Prunes rows the central database has confirmed plus orphaned temp files. */
   housekeep?: (options?: { retentionDays?: number }) => Promise<{
     ok: boolean;
