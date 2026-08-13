@@ -50,6 +50,7 @@ export const RELAY_TABLES = new Set([
   "stock_transfers",
   "stock_transfer_items",
   "whatsapp_queue",
+  "stores",
 ]);
 
 /**

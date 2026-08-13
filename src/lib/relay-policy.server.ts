@@ -398,6 +398,34 @@ function pinToStore(
 
 class StoreViolation extends Error {}
 
+/**
+ * Branch registry rules. Creating or renaming a branch is an administrator's
+ * job; a till may at most keep its own branch row up to date.
+ */
+function authorizeStores(
+  op: RelayOp,
+  scope: RelayScope,
+): { ok: true; op: RelayOp } | RelayDenial {
+  if (scope.isSupervisor) return { ok: true, op };
+
+  if (op.kind === "delete")
+    return deny("PERMISSION_DENIED", "Only an administrator can remove a branch.");
+
+  if (op.kind === "insert" || op.kind === "upsert") {
+    const foreign = op.rows.some((row) => String(row["id"] ?? "") !== (scope.storeId ?? ""));
+    if (foreign)
+      return deny("STORE_FORBIDDEN", "Only an administrator can add or change other branches.");
+    return { ok: true, op };
+  }
+
+  const target = op.match["id"];
+  if (target === undefined || String(target) !== (scope.storeId ?? ""))
+    return deny("STORE_FORBIDDEN", "You cannot change another branch's details.");
+  if (op.values["id"] !== undefined && String(op.values["id"]) !== scope.storeId)
+    return deny("STORE_FORBIDDEN", "A branch cannot be given another branch's id.");
+  return { ok: true, op };
+}
+
 function authorizeTransfer(
   op: RelayOp,
   scope: RelayScope,
