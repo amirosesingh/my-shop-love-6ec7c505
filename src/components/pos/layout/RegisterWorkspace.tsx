@@ -126,21 +126,20 @@ export function RegisterWorkspace({
             rowHeight={28}
             margin={[10, 10]}
             layouts={{ lg: boxes, md: boxes, sm: boxes }}
-            isDraggable={editing}
-            isResizable={editing}
-            isDroppable={editing}
-            droppingItem={
-              dragging
-                ? { i: dragging, x: 0, y: 0, w: MODULE_BY_ID[dragging].w, h: MODULE_BY_ID[dragging].h }
-                : undefined
-            }
-            draggableHandle=".rgl-drag-handle"
+            dragConfig={{ enabled: editing, handle: ".rgl-drag-handle" }}
+            resizeConfig={{ enabled: editing }}
+            dropConfig={{
+              enabled: editing,
+              ...(dragging
+                ? { defaultItem: { w: MODULE_BY_ID[dragging].w, h: MODULE_BY_ID[dragging].h } }
+                : {}),
+            }}
             onDrop={(_l, item) => {
               if (!dragging) return;
               layout.addModule(dragging, { x: item?.x ?? 0, y: item?.y ?? 0 });
               setDragging(null);
             }}
-            onLayoutChange={(next) => {
+            onLayoutChange={(next: Layout) => {
               if (editing) layout.applyBoxes(next.map((b) => ({ i: String(b.i), x: b.x, y: b.y, w: b.w, h: b.h })));
             }}
           >
