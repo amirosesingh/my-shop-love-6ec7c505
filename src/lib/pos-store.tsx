@@ -120,6 +120,15 @@ export type NewBooking = {
   cashier: string;
   /** racket stringing job card, when the booking is a string job */
   job?: RacketJob;
+  /** quick job tag used when no customer is attached yet */
+  tagId?: string;
+  /** who dropped the racket off ("Dropped off by Coach Alex") */
+  intakeNote?: string;
+  stringOrigin?: StringOrigin;
+  stringProductId?: string;
+  gripProductId?: string;
+  /** priced breakdown: labour, string, grip, add-ons */
+  charges?: IntakeCharge[];
 };
 
 /** Racket stringing job card captured with the booking. */
@@ -933,6 +942,12 @@ export function PosProvider({ children }: { children: ReactNode }) {
       createdAt: now,
       status: "active",
       job: input.job,
+      tagId: input.tagId,
+      intakeNote: input.intakeNote,
+      stringOrigin: input.stringOrigin,
+      stringProductId: input.stringProductId,
+      gripProductId: input.gripProductId,
+      charges: input.charges,
       jobStatus: input.job ? "received" : undefined,
       jobStatusBy: input.job ? input.cashier : undefined,
       jobStatusAt: input.job ? now : undefined,
