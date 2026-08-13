@@ -76,7 +76,7 @@ import {
 } from "@/lib/coupons";
 import type { Campaign, VoucherView } from "@/lib/coupons";
 import type { Booking, CartLine, DiscountType, IntakeCharge, PaymentMethod, Sale } from "@/lib/pos-types";
-import { intakeTotals } from "@/lib/booking-charges";
+import { intakeTotals, newJobTag } from "@/lib/booking-charges";
 import type { Payment } from "@/lib/pos-types";
 import { TenderSplit, rememberBanks } from "@/components/pos/TenderSplit";
 import { lineUnitDiscount, paymentsLabel, paymentsTotal, PAYMENT_LABELS, r2, validateTenders } from "@/lib/pos-types";
@@ -118,8 +118,17 @@ export const Route = createFileRoute("/")({
 });
 
 function Register() {
-  const { state, activeShift, recordSale, createBooking, openShift, closeShift, currentStore, upsertProduct } =
-    usePos();
+  const {
+    state,
+    activeShift,
+    recordSale,
+    createBooking,
+    updateBookingSpecs,
+    openShift,
+    closeShift,
+    currentStore,
+    upsertProduct,
+  } = usePos();
   useUiScale();
   const { user, can } = useAuth();
   const { requirePermission } = useUserPermissions();
@@ -238,6 +247,14 @@ function Register() {
   const [grommetNotes, setGrommetNotes] = useState("");
   const [jobNotes, setJobNotes] = useState("");
   const [promisedAt, setPromisedAt] = useState("");
+  const [stencil, setStencil] = useState(false);
+  const [overgrip, setOvergrip] = useState(false);
+  /** Job tag / barcode printed on the racket and carried onto the ticket. */
+  const [jobTag, setJobTag] = useState("");
+  /** Booking hub chooser: racket service vs standard reservation. */
+  const [bookingHubOpen, setBookingHubOpen] = useState(false);
+  /** Set when the racket dialog is re-opened to edit an existing job. */
+  const [editBookingId, setEditBookingId] = useState<string | null>(null);
   const [notifyWhatsApp, setNotifyWhatsApp] = useState(false);
   /** Itemised racket intake charges: labour, string, grip, add-ons. */
   const [intakeCharges, setIntakeCharges] = useState<IntakeCharge[]>([]);
@@ -709,7 +726,20 @@ function Register() {
     setPromisedAt("");
     setNotifyWhatsApp(false);
     setIntakeCharges([]);
+    setStencil(false);
+    setOvergrip(false);
+    setJobTag("");
+    setEditBookingId(null);
   }
+
+  /** Master lists an admin curates in booking settings. */
+  const racketModelList = state.settings.integrations.racketModels ?? [];
+  const stringModelList = state.settings.integrations.stringModels ?? [];
+
+  /** Jobs still on the bench today — drives the badge on the booking button. */
+  const activeBookingCount = state.bookings.filter(
+    (b) => b.storeId === currentStore.id && b.status === "active" && b.jobStatus !== "collected",
+  ).length;
 
   /** Racket / stringing job started from the products card — cart independent. */
   function startRacketBooking() {
@@ -717,6 +747,7 @@ function Register() {
       toast.error("Open a shift before taking a booking");
       return;
     }
+    resetJobCard();
     setDeposit("");
     setBookName(member?.name ?? "");
     setBookPhone(member?.phone ?? "");
@@ -731,9 +762,87 @@ function Register() {
         price: r2(Math.max(0, Number(stringingService?.fee ?? 0))),
       },
     ]);
+    setJobTag(newJobTag());
+    /* Auto-fill from the customer's last racket job so regulars are one tap. */
+    const past = memberId
+      ? state.bookings.find((b) => b.memberId === memberId && b.job?.racketModel)
+      : undefined;
+    if (past?.job) {
+      setRacketModel(past.job.racketModel ?? "");
+      setStringType(past.job.stringType ?? "");
+      setTensionMain(past.job.tensionMain ? String(past.job.tensionMain) : "");
+      setTensionCross(past.job.tensionCross ? String(past.job.tensionCross) : "");
+      setTensionUnit(past.job.tensionUnit ?? "lb");
+      setStencil(!!past.job.stencil);
+      setOvergrip(!!past.job.overgrip);
+    }
     setBookMode("racket");
     setBookOpen(true);
   }
+
+  /** Standard / general booking against the cart. */
+  function startCartBooking() {
+    if (!activeShift) {
+      toast.error("Open a shift before taking a booking");
+      return;
+    }
+    setDeposit("");
+    setBookName(member?.name ?? "");
+    setBookPhone(member?.phone ?? "");
+    setBookMode("cart");
+    resetJobCard();
+    setBookOpen(true);
+  }
+
+  /** Re-open the racket dialog on a booking already on the ticket. */
+  function editBookingSpecs(bookingId: string) {
+    const b = state.bookings.find((x) => x.id === bookingId);
+    if (!b) return;
+    setEditBookingId(b.id);
+    setBookMode("racket");
+    setRacketModel(b.job?.racketModel ?? "");
+    setStringType(b.job?.stringType ?? "");
+    setTensionMain(b.job?.tensionMain ? String(b.job.tensionMain) : "");
+    setTensionCross(b.job?.tensionCross ? String(b.job.tensionCross) : "");
+    setTensionUnit(b.job?.tensionUnit ?? "lb");
+    setGrommetNotes(b.job?.grommetNotes ?? "");
+    setJobNotes(b.job?.jobNotes ?? "");
+    setStencil(!!b.job?.stencil);
+    setOvergrip(!!b.job?.overgrip);
+    setNotifyWhatsApp(!!b.job?.notifyWhatsApp);
+    setPromisedAt(b.job?.promisedAt ? new Date(b.job.promisedAt).toISOString().slice(0, 16) : "");
+    setJobTag(b.tagId ?? "");
+    setBookOpen(true);
+  }
+
+  /** Save spec edits made from the cart row back onto the stored booking. */
+  function saveSpecEdits() {
+    if (!editBookingId) return;
+    const job = {
+      racketModel: racketModel.trim() || undefined,
+      stringType: stringType.trim() || undefined,
+      tensionMain: tensionMain ? Number(tensionMain) : undefined,
+      tensionCross: tensionCross ? Number(tensionCross) : undefined,
+      tensionUnit,
+      grommetNotes: grommetNotes.trim() || undefined,
+      jobNotes: jobNotes.trim() || undefined,
+      stencil,
+      overgrip,
+      promisedAt: promisedAt ? new Date(promisedAt).toISOString() : undefined,
+      notifyWhatsApp,
+    };
+    const updated = updateBookingSpecs(editBookingId, job);
+    if (!updated) {
+      toast.error("That booking is no longer on file");
+      return;
+    }
+    setLines((ls) => ls.map((l) => (l.bookingId === editBookingId ? { ...l, job: updated.job } : l)));
+    setBookOpen(false);
+    resetJobCard();
+    setBookMode("cart");
+    toast.success(`Specs updated for ${updated.ref}`);
+  }
+
   const serviceLabel = pickedService?.name ?? customService.trim();
   const intake = intakeTotals(
     intakeCharges,
@@ -794,6 +903,7 @@ function Register() {
         customerPhone: bookPhone.trim() || member?.phone || "",
         note: bookNote.trim(),
         cashier: activeCashier,
+        tagId: racketMode ? jobTag || newJobTag() : undefined,
         job: racketMode
           ? {
               racketModel: racketModel.trim() || undefined,
@@ -803,6 +913,8 @@ function Register() {
               tensionUnit,
               grommetNotes: grommetNotes.trim() || undefined,
               jobNotes: jobNotes.trim() || undefined,
+              stencil,
+              overgrip,
               droppedOffAt: new Date().toISOString(),
               promisedAt: promisedAt ? new Date(promisedAt).toISOString() : undefined,
               notifyWhatsApp,
@@ -840,6 +952,22 @@ function Register() {
     });
     resetCart();
     setMemberId(null);
+    /* The job stays visible on the ticket so the counter can edit its specs
+       and see what is on the bench. It is priced at 0 — the money already sits
+       on the booking as a deposit or an on-collection balance. */
+    setLines([
+      {
+        productId: `booking:${booking.id}`,
+        name: `${booking.job ? "Racket job" : "Booking"} ${booking.ref}`,
+        price: 0,
+        qty: 1,
+        taxRate: 0,
+        discount: 0,
+        bookingId: booking.id,
+        bookingRef: booking.ref,
+        ...(booking.job ? { job: booking.job } : {}),
+      },
+    ]);
     setBookOpen(false);
     setDeposit("");
     setBookName("");
@@ -1625,7 +1753,39 @@ function Register() {
                           </Badge>
                         )}
                         {l.foc && <Badge className="ml-2 bg-success/15 text-[10px] text-success">FREE PROMO</Badge>}
+                        {l.bookingRef && (
+                          <Badge variant="outline" className="ml-2 text-[10px]">
+                            {l.bookingRef}
+                          </Badge>
+                        )}
                       </div>
+                      {l.bookingId && (
+                        <div className="mt-1 flex flex-wrap items-center gap-1">
+                          {[
+                            l.job?.racketModel,
+                            l.job?.stringType,
+                            l.job?.tensionMain || l.job?.tensionCross
+                              ? `${l.job?.tensionMain ?? "—"}x${l.job?.tensionCross ?? l.job?.tensionMain ?? "—"} ${l.job?.tensionUnit ?? "lb"}`
+                              : "",
+                            l.job?.stencil ? "stencil" : "",
+                            l.job?.overgrip ? "overgrip" : "",
+                            l.job?.promisedAt ? `ready ${new Date(l.job.promisedAt).toLocaleString()}` : "",
+                          ]
+                            .filter(Boolean)
+                            .map((chip) => (
+                              <Badge key={chip as string} variant="secondary" className="text-[10px] font-normal">
+                                {chip}
+                              </Badge>
+                            ))}
+                          <button
+                            type="button"
+                            className="text-[11px] text-primary underline-offset-2 hover:underline"
+                            onClick={() => editBookingSpecs(l.bookingId!)}
+                          >
+                            Edit specs
+                          </button>
+                        </div>
+                      )}
                       <p className="numeric text-[11px] text-muted-foreground">
                         {money(l.price)} · tax {(l.taxRate * 100).toFixed(0)}%
                       </p>
@@ -1822,17 +1982,32 @@ function Register() {
         icon={<CalendarClock className="size-4" />}
         disabled={tillLocked || refundDue > 0 || !lines.length}
         disabledReason={tillLocked ? lockedReason : undefined}
-        onClick={() => {
-          setDeposit("");
-          setBookName(member?.name ?? "");
-          setBookPhone(member?.phone ?? "");
-          setBookMode("cart");
-          resetJobCard();
-          setBookOpen(true);
-        }}
+        onClick={startCartBooking}
       />
     </div>
   );
+
+  /** Always on the right panel, cart empty or not. */
+  const atom_actBooking = (
+    <div className="relative flex h-full min-w-0 items-center px-1">
+      {activeBookingCount > 0 && (
+        <Badge className="absolute right-2 top-0 z-10 h-5 min-w-5 justify-center px-1 text-[10px]">
+          {activeBookingCount}
+        </Badge>
+      )}
+      <ActionButton
+        layout="inline"
+        className="h-full w-full"
+        label="🏸 Create / Manage Booking"
+        icon={<CalendarClock className="size-4" />}
+        disabled={tillLocked}
+        disabledReason={tillLocked ? lockedReason : undefined}
+        onClick={() => setBookingHubOpen(true)}
+      />
+    </div>
+  );
+
+
 
   const atom_reprintDeck = lastSale ? (
     <div className="flex flex-wrap items-center gap-2 px-3 py-2">
@@ -1918,6 +2093,7 @@ function Register() {
       </div>
       <div className="h-12">{atom_balanceDue}</div>
       <div className="h-12 px-3">{atom_actCharge}</div>
+      <div className="h-11 px-3">{atom_actBooking}</div>
       <div className="h-11 px-3">{atom_actBookLater}</div>
       {lastSale && <div className="border-t border-border">{atom_reprintDeck}</div>}
     </div>
@@ -2081,14 +2257,8 @@ function Register() {
       document.querySelector<HTMLInputElement>("[data-scan-focus] input")?.focus(),
     "hold.new": () => holdOrder(),
     "void.cart": () => void clearCart(),
-    "book.later": () => {
-      setDeposit("");
-      setBookName(member?.name ?? "");
-      setBookPhone(member?.phone ?? "");
-      setBookMode("cart");
-      resetJobCard();
-      setBookOpen(true);
-    },
+    "book.later": () => startCartBooking(),
+    "book.hub": () => setBookingHubOpen(true),
     "shift.open": () => setOpenShiftOpen(true),
     "shift.close": () => setCloseShiftOpen(true),
     "drawer.open": () => setNoSaleOpen(true),
@@ -2126,6 +2296,7 @@ function Register() {
             balanceDue: atom_balanceDue,
             actCharge: atom_actCharge,
             actBookLater: atom_actBookLater,
+            actBooking: atom_actBooking,
             reprintDeck: atom_reprintDeck,
             actHold: atom_actHold,
             actVoid: atom_actVoid,
@@ -2746,6 +2917,47 @@ function Register() {
       </Dialog>
 
       {/* Book & pay later (goods) / racket stringing booking */}
+      <Dialog open={bookingHubOpen} onOpenChange={setBookingHubOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create / manage booking</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Button
+              className="h-auto w-full flex-col items-start gap-1 py-3 text-left"
+              onClick={() => {
+                setBookingHubOpen(false);
+                startRacketBooking();
+              }}
+            >
+              <span className="font-semibold">🏸 Racket service / stringing</span>
+              <span className="text-xs opacity-80">Racket + string specs, tension, stencil, job tag</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-auto w-full flex-col items-start gap-1 py-3 text-left"
+              onClick={() => {
+                setBookingHubOpen(false);
+                startCartBooking();
+              }}
+            >
+              <span className="font-semibold">🛒 Standard / general booking</span>
+              <span className="text-xs text-muted-foreground">Reserve cart items with a deposit and pickup date</span>
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full"
+              onClick={() => {
+                setBookingHubOpen(false);
+                void navigate({ to: "/bookings" });
+              }}
+            >
+              Manage bookings ({activeBookingCount} active)
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog
         open={bookOpen}
         onOpenChange={(o) => {
@@ -3000,14 +3212,46 @@ function Register() {
                       <Label>Racket brand / model</Label>
                       <Input
                         value={racketModel}
+                        list="racket-models"
                         onChange={(e) => setRacketModel(e.target.value)}
                         placeholder="Yonex Astrox 88D"
                       />
+                      <datalist id="racket-models">
+                        {racketModelList.map((m) => (
+                          <option key={m} value={m} />
+                        ))}
+                      </datalist>
                     </div>
                     <div className="space-y-1">
                       <Label>String type / brand</Label>
-                      <Input value={stringType} onChange={(e) => setStringType(e.target.value)} placeholder="BG65 Ti" />
+                      <Input
+                        value={stringType}
+                        list="string-models"
+                        onChange={(e) => setStringType(e.target.value)}
+                        placeholder="BG65 Ti"
+                      />
+                      <datalist id="string-models">
+                        {stringModelList.map((m) => (
+                          <option key={m} value={m} />
+                        ))}
+                      </datalist>
                     </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-4 text-xs">
+                    <label className="flex items-center gap-2">
+                      <input type="checkbox" checked={stencil} onChange={(e) => setStencil(e.target.checked)} />
+                      Stencil the string
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input type="checkbox" checked={overgrip} onChange={(e) => setOvergrip(e.target.checked)} />
+                      Replace overgrip
+                    </label>
+                    {jobTag && <Badge variant="outline">Job tag {jobTag}</Badge>}
+                    {editBookingId && (
+                      <Button size="sm" onClick={saveSpecEdits}>
+                        Save spec changes
+                      </Button>
+                    )}
                   </div>
                   <div className="grid grid-cols-3 gap-3">
                     <div className="space-y-1">

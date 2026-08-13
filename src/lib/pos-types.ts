@@ -108,6 +108,11 @@ export type CartLine = {
   couponDiscount?: number;
   /** unit cost price captured at the moment of sale (for margin reporting) */
   cost?: number;
+  /** booking this line represents (reserved job shown on the ticket) */
+  bookingRef?: string;
+  bookingId?: string;
+  /** racket job specs shown as chips on the cart row */
+  job?: RacketJob;
 };
 
 export type DiscountType = "amount" | "percent";
@@ -359,6 +364,10 @@ export type RacketJob = {
   tensionUnit?: "lb" | "kg";
   grommetNotes?: string;
   jobNotes?: string;
+  /** customer asked for the string to be stencilled */
+  stencil?: boolean;
+  /** overgrip replaced as part of the job */
+  overgrip?: boolean;
   /** ISO timestamps for drop-off and the promised ready time */
   droppedOffAt?: string;
   promisedAt?: string;
@@ -690,6 +699,10 @@ export type IntegrationSettings = {
   allowCustomServiceType?: boolean;
   /** re-stringing, repairs, custom orders … with their default fee */
   serviceTypes?: BookingServiceType[];
+  /** master list of racket brands / models offered in the intake picker */
+  racketModels?: string[];
+  /** master list of string brands / models offered in the intake picker */
+  stringModels?: string[];
   /** bookings cannot be saved without a named customer */
   requireBookingCustomer?: boolean;
   /** locked base labour fee used by the racket intake form */
