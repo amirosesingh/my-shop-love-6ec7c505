@@ -1637,7 +1637,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       let globalPatch: Record<string, unknown> = {};
       let hasGlobal = false;
       for (const path of patchPaths(patch as Record<string, unknown>)) {
-        const value = getSettingPath(patch, path);
+        const value = getPath(patch, path);
         const section = sectionOfPath(path);
         const overridden = section ? scope.overrides[section.id] : undefined;
         if (section && overridden && !scope.locks[section.id]) {
