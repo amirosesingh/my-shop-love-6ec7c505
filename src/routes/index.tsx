@@ -784,6 +784,7 @@ function Register() {
         serviceTypeId: pickedService?.id,
         serviceName: serviceLabel || undefined,
         serviceFee: serviceCharge || undefined,
+        charges: racketMode && intake.charges.length ? intake.charges : undefined,
         paymentTiming: payTiming,
         deposit: paidNow,
         depositMethod,
