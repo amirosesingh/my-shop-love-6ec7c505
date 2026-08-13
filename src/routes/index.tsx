@@ -41,6 +41,7 @@ import { ProductSearchDialog } from "@/components/pos/ProductSearchDialog";
 import { ScanBar } from "@/components/pos/ScanBar";
 import { QuickMemberDialog } from "@/components/pos/QuickMemberDialog";
 import { RegisterWorkspace } from "@/components/pos/layout/RegisterWorkspace";
+import { RegisterActionsProvider, type ActionHandlers } from "@/lib/register-actions";
 import { readTerminalConfig } from "@/lib/terminal-tokens";
 import { ZoomCanvas } from "@/components/pos/ZoomCanvas";
 import { setTicketDirty } from "@/lib/desktop-window";
@@ -1446,7 +1447,7 @@ function Register() {
 
   const slot_scanBar = (
     <>
-              <div className="min-w-0">
+              <div className="min-w-0" data-scan-focus>
                 <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Scan barcode</Label>
                 <div className="mt-2">
                   <ScanBar onScan={scanCode} />
