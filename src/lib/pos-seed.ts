@@ -92,6 +92,9 @@ export const defaultIntegrations: AppSettings["integrations"] = {
   useServiceTypes: false,
   allowCustomServiceType: true,
   serviceTypes: [],
+  requireBookingCustomer: true,
+  baseLaborFee: 0,
+  categoryMap: {},
   branches: {},
   productOwners: {},
 };

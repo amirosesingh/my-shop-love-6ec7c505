@@ -365,6 +365,28 @@ export type RacketJob = {
   notifyWhatsApp?: boolean;
 };
 
+/** Where the string on a racket job came from. */
+export type StringOrigin = "store" | "customer";
+
+/** Which catalogue category each intake component is booked against. */
+export type IntakeCategoryMap = {
+  labor?: { category?: string; subCategory?: string };
+  strings?: { category?: string; subCategory?: string };
+  grips?: { category?: string; subCategory?: string };
+  accessories?: { category?: string; subCategory?: string };
+};
+
+/** One priced component of a racket intake. */
+export type IntakeCharge = {
+  kind: "labor" | "string" | "grip" | "accessory";
+  name: string;
+  price: number;
+  /** set when the line came from stock, so it can be deducted and reported */
+  productId?: string;
+  category?: string;
+  subCategory?: string;
+};
+
 /** One-line summary of the string job, used on slips and tags. */
 export const racketSummary = (j: RacketJob | undefined) => {
   if (!j) return "";
@@ -411,6 +433,15 @@ export type Booking = {
   jobStatus?: JobStatus;
   jobStatusBy?: string;
   jobStatusAt?: string;
+  /** quick job tag handed out when no customer is attached yet */
+  tagId?: string;
+  /** who dropped the racket off, when the customer is not the one at the counter */
+  intakeNote?: string;
+  stringOrigin?: StringOrigin;
+  stringProductId?: string;
+  gripProductId?: string;
+  /** priced breakdown of the intake: labour, string, grip, add-ons */
+  charges?: IntakeCharge[];
   /** receipt number of the bill raised when the goods were collected */
   saleReceiptNo?: string;
 };
@@ -659,6 +690,12 @@ export type IntegrationSettings = {
   allowCustomServiceType?: boolean;
   /** re-stringing, repairs, custom orders … with their default fee */
   serviceTypes?: BookingServiceType[];
+  /** bookings cannot be saved without a named customer */
+  requireBookingCustomer?: boolean;
+  /** locked base labour fee used by the racket intake form */
+  baseLaborFee?: number;
+  /** which catalogue categories intake lines are booked against */
+  categoryMap?: IntakeCategoryMap;
   /** per-branch isolation and sync switches, keyed by store id */
   branches?: Record<string, BranchPolicy>;
   /** products owned by a private-catalogue branch: productId -> storeId */
