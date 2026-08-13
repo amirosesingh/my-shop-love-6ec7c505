@@ -411,6 +411,18 @@ export function PosProvider({ children }: { children: ReactNode }) {
     }
   }, [state, ready]);
 
+  // Branch overrides follow the branch in context, once someone is signed in.
+  useEffect(() => {
+    if (!signedIn || !state.currentStoreId) return;
+    let cancelled = false;
+    void loadBranchSettings(state.currentStoreId).then((next) => {
+      if (!cancelled) setScope(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [signedIn, state.currentStoreId]);
+
   // The directory may not have loaded yet (a cashier signs in with a PIN and
   // has no central-database account of their own). The terminal's own
   // activation claim still knows the branch, so use it rather than showing a
