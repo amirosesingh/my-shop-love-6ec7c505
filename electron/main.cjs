@@ -211,7 +211,7 @@ function scheduleReconnect() {
     try {
       await connectLocal(dbConfigStore.read());
     } catch (error) {
-      broadcastStatus({ connected: false, error: fail(error).error, tables: [] });
+      broadcastStatus({ connected: false, error: fail(error).error, tables: [], queue: [] });
       reconnectDelay = Math.min(reconnectDelay * 2, 60_000);
       scheduleReconnect();
     }
