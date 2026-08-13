@@ -91,15 +91,26 @@ export async function relayOp(
       body: JSON.stringify({ ...(await credentials()), ops: [op] }),
     });
     const body = (await res.json().catch(() => null)) as
-      | { ok?: boolean; error?: string; code?: string; results?: { ok: boolean; error?: string }[] }
+      | {
+          ok?: boolean;
+          error?: string;
+          code?: string;
+          detail?: { table?: string; kind?: string; role?: string | null; branch?: string | null };
+          results?: { ok: boolean; error?: string }[];
+        }
       | null;
     await inspectRelay(res, body);
-    if (!res.ok)
+    if (!res.ok) {
+      const d = body?.detail;
+      const where = d?.table ? ` (${d.kind ?? "write"} on ${d.table}` +
+        `${d.role ? `, signed in as ${d.role}` : ""}` +
+        `${d.branch ? `, branch ${d.branch}` : ""})` : "";
       return {
         ok: false,
-        error: body?.error ?? `Relay refused (${res.status})`,
+        error: `${body?.error ?? `Relay refused (${res.status})`}${where}`,
         ...(body?.code ? { code: body.code } : {}),
       };
+    }
     const first = body?.results?.[0];
     return first ?? { ok: !!body?.ok };
   } catch (e) {
