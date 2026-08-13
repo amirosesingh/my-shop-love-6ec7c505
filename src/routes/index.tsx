@@ -2826,15 +2826,72 @@ function Register() {
               </div>
             )}
             {racketMode && (
-              <div className="space-y-1">
-                <Label>Stringing fee</Label>
-                <Input
-                  className="numeric text-right"
-                  inputMode="decimal"
-                  placeholder="0.00"
-                  value={serviceFee}
-                  onChange={(e) => setServiceFee(e.target.value)}
-                />
+              <div className="space-y-2 rounded-md border border-border p-2">
+                <div className="flex items-center justify-between">
+                  <Label>Job charges</Label>
+                  <button
+                    type="button"
+                    className="text-[11px] text-primary hover:underline"
+                    onClick={() =>
+                      setIntakeCharges((c) => [...c, { kind: "accessory", name: "", price: 0 }])
+                    }
+                  >
+                    + Add charge
+                  </button>
+                </div>
+                {intakeCharges.map((c, i) => (
+                  <div key={i} className="grid grid-cols-[7rem_minmax(0,1fr)_6rem_1.5rem] items-center gap-1.5">
+                    <ThemedSelect
+                      ariaLabel="Charge type"
+                      value={c.kind}
+                      onChange={(v) =>
+                        setIntakeCharges((rows) =>
+                          rows.map((r, j) => (j === i ? { ...r, kind: v as IntakeCharge["kind"] } : r)),
+                        )
+                      }
+                      options={[
+                        { value: "labor", label: "Labour" },
+                        { value: "string", label: "String" },
+                        { value: "grip", label: "Grip" },
+                        { value: "accessory", label: "Add-on" },
+                      ]}
+                    />
+                    <Input
+                      placeholder="Description"
+                      value={c.name}
+                      onChange={(e) =>
+                        setIntakeCharges((rows) =>
+                          rows.map((r, j) => (j === i ? { ...r, name: e.target.value } : r)),
+                        )
+                      }
+                    />
+                    <Input
+                      className="numeric text-right"
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      value={c.price ? String(c.price) : ""}
+                      onChange={(e) =>
+                        setIntakeCharges((rows) =>
+                          rows.map((r, j) =>
+                            j === i ? { ...r, price: Math.max(0, Number(e.target.value) || 0) } : r,
+                          ),
+                        )
+                      }
+                    />
+                    <button
+                      type="button"
+                      aria-label="Remove charge"
+                      className="text-muted-foreground hover:text-destructive"
+                      onClick={() => setIntakeCharges((rows) => rows.filter((_, j) => j !== i))}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between border-t border-border pt-1 text-xs">
+                  <span className="text-muted-foreground">Charges total</span>
+                  <span className="numeric font-semibold">{money(intake.subtotal)}</span>
+                </div>
               </div>
             )}
             <div className="space-y-1">
