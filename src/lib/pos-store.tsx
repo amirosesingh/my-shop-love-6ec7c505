@@ -1585,11 +1585,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
-  const updateSettings = useCallback((patch: Partial<AppSettings>) => {
-    logger.log("settings", "Settings updated", "settings", {
-      previous: stateRef.current.settings,
-      updated: patch,
-    });
+  const writeGlobalSettings = useCallback((patch: Partial<AppSettings>) => {
     {
       const prev = stateRef.current.settings;
       void db.saveSettings({
@@ -1617,7 +1613,86 @@ export function PosProvider({ children }: { children: ReactNode }) {
       },
     }));
   }, []);
+
+  /**
+   * Route each leaf of the patch to the scope that owns it: blocks this branch
+   * overrides are written to the branch record, everything else is global.
+   */
+  const updateSettings = useCallback(
+    (patch: Partial<AppSettings>) => {
+      logger.log("settings", "Settings updated", "settings", {
+        previous: stateRef.current.settings,
+        updated: patch,
+      });
+      const scope = scopeRef.current;
+      const storeId = stateRef.current.currentStoreId;
+      const bySection = new Map<SettingsSectionId, Record<string, unknown>>();
+      let globalPatch: Record<string, unknown> = {};
+      let hasGlobal = false;
+      for (const path of patchPaths(patch as Record<string, unknown>)) {
+        const value = getSettingPath(patch, path);
+        const section = sectionOfPath(path);
+        const overridden = section ? scope.overrides[section.id] : undefined;
+        if (section && overridden && !scope.locks[section.id]) {
+          bySection.set(section.id, setPath(bySection.get(section.id) ?? overridden, path, value));
+        } else {
+          globalPatch = setPath(globalPatch, path, value);
+          hasGlobal = true;
+        }
+      }
+      if (hasGlobal) writeGlobalSettings(globalPatch as Partial<AppSettings>);
+      if (!bySection.size) return;
+      setScope((s) => ({
+        ...s,
+        overrides: { ...s.overrides, ...Object.fromEntries(bySection) },
+      }));
+      for (const [section, sectionPatch] of bySection) {
+        void saveSectionOverride(storeId, section, sectionPatch, whoRef.current).catch((e) =>
+          toast.error(`Branch settings not saved: ${(e as Error).message}`),
+        );
+      }
+    },
+    [writeGlobalSettings],
+  );
   updateSettingsRef.current = updateSettings;
+
+  /** Start or stop overriding one block for a branch. */
+  const setSectionScope = useCallback(
+    async (section: SettingsSectionId, on: boolean, storeId?: string) => {
+      const target = storeId || stateRef.current.currentStoreId;
+      const def = SECTION_BY_ID[section];
+      if (!target || !def) return;
+      if (scopeRef.current.locks[section] && on) {
+        toast.error("This block is locked by head office.");
+        return;
+      }
+      if (on) {
+        const patch = pickSection(stateRef.current.settings, def);
+        setScope((s) => ({ ...s, overrides: { ...s.overrides, [section]: patch } }));
+        await saveSectionOverride(target, section, patch, whoRef.current);
+      } else {
+        setScope((s) => {
+          const overrides = { ...s.overrides };
+          delete overrides[section];
+          return { ...s, overrides };
+        });
+        await clearSectionOverride(target, section);
+      }
+      logger.log("settings", on ? "Branch override enabled" : "Reset to global default", "settings", {
+        section,
+        storeId: target,
+      });
+    },
+    [],
+  );
+
+  const setSectionLocked = useCallback(async (section: SettingsSectionId, locked: boolean) => {
+    setScope((s) => ({ ...s, locks: { ...s.locks, [section]: locked } }));
+    await setSectionLock(section, locked, whoRef.current);
+    logger.log("settings", locked ? "Setting locked globally" : "Setting unlocked", "settings", {
+      section,
+    });
+  }, []);
 
   const createTransfer = useCallback((input: NewTransfer) => {
     const now = new Date().toISOString();
