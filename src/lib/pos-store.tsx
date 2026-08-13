@@ -59,6 +59,23 @@ import { setActiveBranchSyncPolicy } from "./sync-policy";
 import { setPosFormats, setPosTimeZone } from "./time-zone";
 import { receiveTransferInDb, saveTransfer, setTransferStatus } from "./stock-transfers";
 import { commitBooking, deleteBookingRow, loadBookings, saveBookingQuietly } from "./bookings-db";
+import {
+  clearSectionOverride,
+  emptyBranchSettings,
+  loadBranchSettings,
+  saveSectionOverride,
+  setSectionLock,
+  type BranchSettingsState,
+} from "./branch-settings";
+import {
+  SECTION_BY_ID,
+  mergePatch,
+  patchPaths,
+  pickSection,
+  sectionOfPath,
+  setPath,
+  type SettingsSectionId,
+} from "./settings-sections";
 
 const KEY = "pos-state-v2";
 
