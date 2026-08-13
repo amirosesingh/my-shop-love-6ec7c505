@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CameraScanner } from "@/components/pos/CameraScanner";
 import { isNativeApp, scanOnceNative } from "@/lib/camera";
+import { isNative } from "@/lib/native";
 
 /** True when the user is typing into a real field, so we must not steal keys. */
 function typingInField(target: EventTarget | null) {
@@ -34,11 +35,10 @@ export function ScanBar({
   const [webScan, setWebScan] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Camera scanning is an Android/iOS feature only — the Windows till and the
+  // web build use the USB/Bluetooth scanner through this field.
   // Rendered after mount so the server and the browser agree on the markup.
-  useEffect(
-    () => setHasCamera(isNativeApp() || Boolean(navigator.mediaDevices?.getUserMedia)),
-    [],
-  );
+  useEffect(() => setHasCamera(isNativeApp() || isNative()), []);
 
   // Keyboard-wedge capture: a burst of characters ending with Enter is a scan.
   useEffect(() => {
@@ -97,7 +97,7 @@ export function ScanBar({
             autoFocus
             disabled={disabled}
             onChange={(e) => setCode(e.target.value)}
-            placeholder="Scan barcode to add to the ticket…"
+            placeholder="Scan or enter barcode…"
             aria-label="Scan barcode"
             className="numeric h-10 pl-9"
           />

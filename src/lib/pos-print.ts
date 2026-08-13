@@ -367,8 +367,10 @@ function saleBody(sale: Sale, member: Member | null, kind: ReceiptKind) {
           : ""
       }
       ${
-        receiptCfg.showTax
-          ? `<tr><td>Tax${taxCfg.enabled ? ` ${taxCfg.rate}%${taxCfg.mode === "inclusive" ? " incl." : ""}` : " (off)"}</td><td class="r">${fmt(sign * sale.tax)}</td></tr>`
+        // Tax is settings-driven: no row at all when tax is off or the bill
+        // carries none.
+        receiptCfg.showTax && taxCfg.enabled && sale.tax
+          ? `<tr><td>Tax ${taxCfg.rate}%${taxCfg.mode === "inclusive" ? " incl." : ""}</td><td class="r">${fmt(sign * sale.tax)}</td></tr>`
           : ""
       }
       <tr class="b big"><td>TOTAL</td><td class="r">${fmt(sign * sale.total)}</td></tr>

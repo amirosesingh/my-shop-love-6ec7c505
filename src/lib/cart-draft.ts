@@ -16,6 +16,8 @@ export type CartDraft = {
   exchangeRef: string | null;
   memberId: string | null;
   coupon: unknown;
+  /** bill number reserved for this ticket */
+  billNo?: string | null;
 };
 
 const key = (storeId: string) => `pos.cart.draft.${storeId}`;
@@ -44,6 +46,7 @@ export function loadCartDraft(storeId: string): CartDraft | null {
       exchangeRef: parsed.exchangeRef ?? null,
       memberId: parsed.memberId ?? null,
       coupon: parsed.coupon ?? null,
+      billNo: parsed.billNo ?? null,
     };
   } catch {
     return null;

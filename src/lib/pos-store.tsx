@@ -152,7 +152,9 @@ type Ctx = {
   shiftReadError: string | null;
   /** False until the first open-shift read has answered. */
   shiftChecked: boolean;
-  recordSale: (sale: Omit<Sale, "id" | "receiptNo" | "createdAt">) => Promise<Sale>;
+  recordSale: (
+    sale: Omit<Sale, "id" | "receiptNo" | "createdAt"> & { receiptNo?: string },
+  ) => Promise<Sale>;
   refundSale: (saleId: string) => void;
   changeSalePayment: (saleId: string, method: PaymentMethod, reason?: string) => void;
   createBooking: (input: NewBooking) => Promise<Booking>;
@@ -769,7 +771,9 @@ export function PosProvider({ children }: { children: ReactNode }) {
     [activeShift, user, terminalUser, isAdmin, isSupervisor],
   );
 
-  const recordSale = useCallback(async (input: Omit<Sale, "id" | "receiptNo" | "createdAt">) => {
+  const recordSale = useCallback(async (
+    input: Omit<Sale, "id" | "receiptNo" | "createdAt"> & { receiptNo?: string },
+  ) => {
     const snapshot = stateRef.current;
     const counter = snapshot.counter + 1;
     // Never write a bill without a branch — the terminal's branch is authoritative.
@@ -790,14 +794,18 @@ export function PosProvider({ children }: { children: ReactNode }) {
       id: crypto.randomUUID(),
       // Branch + platform + terminal + day + sequence, so two registers can
       // never mint the same bill number, online or off.
-      receiptNo: nextBillNumber(
-        store?.receiptPrefix?.trim() || store?.code || "R",
-        snapshot.sales.map((s) => s.receiptNo),
-        {
-          ...(snapshot.settings.integrations.billNumbering ?? {}),
-          timeZone: snapshot.settings.integrations.timeZone || undefined,
-        },
-      ),
+      // A number reserved when the ticket started wins, so the header, the
+      // held record and the printed bill all agree.
+      receiptNo:
+        input.receiptNo ||
+        nextBillNumber(
+          store?.receiptPrefix?.trim() || store?.code || "R",
+          snapshot.sales.map((s) => s.receiptNo),
+          {
+            ...(snapshot.settings.integrations.billNumbering ?? {}),
+            timeZone: snapshot.settings.integrations.timeZone || undefined,
+          },
+        ),
       clientTxnId: input.clientTxnId ?? crypto.randomUUID(),
       createdAt: new Date().toISOString(),
     };

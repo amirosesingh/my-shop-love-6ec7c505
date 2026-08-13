@@ -36,6 +36,7 @@ import { commitLabel } from "@/lib/pos-db";
 import { AppShell } from "@/components/pos/AppShell";
 import { ActionButton } from "@/components/pos/ActionButton";
 import { CatalogPanel } from "@/components/pos/CatalogPanel";
+import { ProductSearchDialog } from "@/components/pos/ProductSearchDialog";
 import { ScanBar } from "@/components/pos/ScanBar";
 import { QuickMemberDialog } from "@/components/pos/QuickMemberDialog";
 import { ZoomCanvas } from "@/components/pos/ZoomCanvas";
@@ -51,6 +52,7 @@ import { Switch } from "@/components/ui/switch";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { availableAt, cartTotals, money, stockAt, usePos } from "@/lib/pos-store";
 import { resolveByBarcode } from "@/lib/product-lookup";
+import { nextBillNumber } from "@/lib/bill-number";
 import { useAuth } from "@/lib/pos-auth";
 import { productVisibleAt } from "@/lib/branch-policy";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
@@ -111,7 +113,8 @@ export const Route = createFileRoute("/")({
 });
 
 function Register() {
-  const { state, activeShift, recordSale, createBooking, openShift, closeShift, currentStore } = usePos();
+  const { state, activeShift, recordSale, createBooking, openShift, closeShift, currentStore, upsertProduct } =
+    usePos();
   useUiScale();
   const { user, can } = useAuth();
   const { requirePermission } = useUserPermissions();
@@ -164,6 +167,10 @@ function Register() {
   const [query, setQuery] = useState("");
   /** Narrow-window product browser. */
   const [catalogOpen, setCatalogOpen] = useState(false);
+  /** Code that failed to resolve, shown in the search dialog. */
+  const [unknownCode, setUnknownCode] = useState<string | null>(null);
+  /** Bill number reserved the moment this ticket started. */
+  const [billNo, setBillNo] = useState<string | null>(null);
   const [category, setCategory] = useState("All");
   const [lines, setLines] = useState<CartLine[]>([]);
   const [cartDiscount, setCartDiscount] = useState(0);
@@ -296,6 +303,7 @@ function Register() {
     setExchangeRef(draft.exchangeRef);
     setMemberId(draft.memberId);
     setCoupon((draft.coupon as typeof coupon) ?? null);
+    if (draft.billNo) setBillNo(draft.billNo);
     if (kept.length < draft.lines.length) toast.info("Some items on the saved ticket are no longer in the catalogue");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftStore, state.products.length]);
@@ -309,8 +317,26 @@ function Register() {
       exchangeRef,
       memberId,
       coupon,
+      billNo,
     });
-  }, [draftStore, lines, cartDiscount, cartDiscountType, exchangeRef, memberId, coupon]);
+  }, [draftStore, lines, cartDiscount, cartDiscountType, exchangeRef, memberId, coupon, billNo]);
+
+  /** A bill number is reserved the moment a ticket starts, so the header, the
+   *  held record and the printed receipt all carry the same number. */
+  useEffect(() => {
+    if (!lines.length || billNo) return;
+    setBillNo(
+      nextBillNumber(
+        currentStore.receiptPrefix?.trim() || currentStore.code || "R",
+        state.sales.map((s) => s.receiptNo),
+        {
+          ...(state.settings.integrations.billNumbering ?? {}),
+          timeZone: state.settings.integrations.timeZone || undefined,
+        },
+      ),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lines.length, billNo, currentStore.id]);
 
   // Keep the attached member's live vouchers loaded for the picker.
   useEffect(() => {
@@ -453,6 +479,7 @@ function Register() {
     setCartDiscount(0);
     setExchangeRef(null);
     setCoupon(null);
+    setBillNo(null);
     clearCartDraft(currentStore.id);
   }
 
@@ -535,6 +562,7 @@ function Register() {
       toast.error(`No product matches “${code}”`);
       // A mis-read or unknown barcode drops the cashier straight into search.
       setQuery(code);
+      setUnknownCode(code);
       setCatalogOpen(true);
       return;
     }
@@ -859,6 +887,7 @@ function Register() {
       setSaving(true);
       sale = await recordSale({
         storeId: currentStore.id,
+        ...(billNo ? { receiptNo: billNo } : {}),
         shiftId: activeShift.id,
         lines,
         subtotal: totals.subtotal,
@@ -984,6 +1013,7 @@ function Register() {
       storeId: currentStore.id,
       heldBy: activeCashier,
       cartDiscount,
+      ...(billNo ? { billNo } : {}),
       cartDiscountType,
       exchangeRef,
       memberId,
@@ -1017,6 +1047,7 @@ function Register() {
     setExchangeRef(order.exchangeRef ?? null);
     setMemberId(order.memberId ?? null);
     setCoupon((order.coupon as typeof coupon) ?? null);
+    setBillNo(order.billNo ?? null);
     removeHeldOrder(id);
     logTicketEvent(parked ? TICKET_ACTIONS.switched : TICKET_ACTIONS.resumed, {
       holdRef: order.id,
@@ -1328,52 +1359,79 @@ function Register() {
           />
         </section>
 
-        {/* Narrow windows: the catalog opens as a searchable popup instead. */}
-        <Dialog open={catalogOpen} onOpenChange={setCatalogOpen}>
-          <DialogContent className="flex h-[85vh] max-w-3xl flex-col gap-3 overflow-hidden">
-            <DialogHeader>
-              <DialogTitle>Search &amp; add products</DialogTitle>
-            </DialogHeader>
-            <CatalogPanel
-              query={query}
-              onQueryChange={setQuery}
-              onScanSubmit={(e) => {
-                scanSubmit(e);
-                setCatalogOpen(false);
-              }}
-              categories={categories}
-              category={category}
-              onCategoryChange={setCategory}
-              products={filtered}
-              storeId={currentStore.id}
-              storeName={currentStore.name}
-              shiftOpen={!!activeShift}
-              onAdd={(id) => {
-                addLine(id);
-                setCatalogOpen(false);
-              }}
-              onDetail={(id) => {
-                setDetailId(id);
-                setCatalogOpen(false);
-              }}
-              showHeaderActions={false}
-            />
-          </DialogContent>
-        </Dialog>
+        {/* Unknown scans and manual lookups land in the search & add modal. */}
+        <ProductSearchDialog
+          open={catalogOpen}
+          onOpenChange={(v) => {
+            setCatalogOpen(v);
+            if (!v) setUnknownCode(null);
+          }}
+          query={query}
+          onQueryChange={setQuery}
+          products={state.products.filter((p) => productVisibleAt(state.settings, p.id, state.currentStoreId))}
+          storeId={currentStore.id}
+          unknownCode={unknownCode}
+          onAdd={(id) => {
+            addLine(id);
+            setCatalogOpen(false);
+            setUnknownCode(null);
+            setQuery("");
+          }}
+          onLinkBarcode={async (id, code) => {
+            const product = state.products.find((p) => p.id === id);
+            if (!product) return;
+            await upsertProduct({
+              ...product,
+              barcodes: Array.from(new Set([...(product.barcodes ?? []), code])),
+              ...(product.barcode ? {} : { barcode: code }),
+            });
+            toast.success(`${code} linked to ${product.name}`);
+            addLine(id);
+            setUnknownCode(null);
+            setQuery("");
+          }}
+          onCreateProduct={async (draft) => {
+            const created = {
+              id: crypto.randomUUID(),
+              name: draft.name,
+              sku: draft.sku,
+              barcode: draft.barcode,
+              category: draft.category,
+              price: draft.price,
+              cost: 0,
+              stockByStore: { [currentStore.id]: 1 },
+              reorderLevel: 0,
+              taxRate: state.settings.tax.enabled ? state.settings.tax.rate : 0,
+            };
+            await upsertProduct(created);
+            toast.success(`${created.name} added to the catalogue`);
+            addLine(created.id);
+            setUnknownCode(null);
+            setQuery("");
+          }}
+        />
 
-        {/* ── CENTER: active cart & register (grows with the window) ───── */}
-        <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-sidebar">
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border px-4 py-3">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">Current ticket</p>
-              <p className="numeric truncate text-[11px] text-muted-foreground">
+        {/* ── CENTER: active bill (fixed width; only zoom resizes it) ───── */}
+        <section className="flex min-h-0 w-full flex-col bg-sidebar lg:w-[420px] lg:min-w-[420px] lg:max-w-[420px] lg:shrink-0">
+          <div className="flex flex-col gap-2 border-b border-border px-4 py-3">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold">Current Bill</p>
+                <p className="numeric truncate text-[11px] text-muted-foreground">
+                  {billNo ? `#${billNo}` : "New bill — scan an item to start"}
+                </p>
+              </div>
+              <span
+                className={`shrink-0 rounded-full border px-2 py-1 text-[11px] font-medium ${
+                  activeShift
+                    ? "border-success/40 bg-success/10 text-success"
+                    : "border-destructive/40 bg-destructive/10 text-destructive"
+                }`}
+              >
                 {activeShift ? `${activeShift.cashier} · shift open` : "No shift open"}
-              </p>
+              </span>
             </div>
-            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-              <Button size="sm" onClick={() => setCatalogOpen(true)}>
-                <Search className="size-4" /> Add product
-              </Button>
+            <div className="flex flex-wrap items-center gap-2">
               {visible("register.exchange") && (
                 <Button
                   variant="outline"
