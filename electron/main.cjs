@@ -613,6 +613,14 @@ function registerIpc() {
     }
   });
 
+  ipcMain.handle("pos:scan-network", async () => {
+    try {
+      return await discover.scan();
+    } catch (err) {
+      return { ok: false, servers: [], ...pool.describeSqlError(err) };
+    }
+  });
+
   ipcMain.handle("pos:write", async (_e, _context, op) => {
     try {
       await repo.applyOp(op);
