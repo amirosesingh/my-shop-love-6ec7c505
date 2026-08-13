@@ -137,7 +137,7 @@ function BookingsPage() {
 
   async function submitPayment() {
     if (!payFor) return;
-    if (!(await requirePermission("can_process_sale"))) return;
+    if (!(await requirePermission("can_collect_booking"))) return;
     const value = r2(Number(amount || 0));
     const balance = bookingBalance(payFor);
     if (value <= 0) {
@@ -389,7 +389,7 @@ function BookingsPage() {
                               icon={<Ban className="size-4" />}
                               className="text-destructive"
                               onClick={async () => {
-                                if (!(await requirePermission("can_void_item"))) return;
+                                if (!(await requirePermission("can_cancel_booking"))) return;
                                 cancelBooking(b.id, "Cancelled at counter");
                                 toast.success(`${b.ref} cancelled · stock released`);
                               }}
@@ -404,7 +404,7 @@ function BookingsPage() {
                           icon={<Trash2 className="size-4" />}
                           className="text-destructive"
                           onClick={async () => {
-                            if (!(await requirePermission("can_void_item"))) return;
+                            if (!(await requirePermission("can_cancel_booking"))) return;
                             setRemoving(b);
                             setRemoveReason(
                               b.status === "active" && jobStatus !== "collected"
