@@ -1,36 +1,47 @@
-# Booking hub: make it visible everywhere and fill the master lists
+# Add "Booking rules" to Settings
 
-## Audit result
+## What is actually there today
 
-The dual-flow booking hub asked for is already in the code and rendering:
+Settings has two booking pages and no rules page:
 
-- `src/routes/index.tsx:1991` — permanent `🏸 Create / Manage Booking` button with a live active-booking `Badge`, disabled only when the till is locked (never by an empty cart).
-- `src/routes/index.tsx:2920` — chooser modal with Racket service / stringing, Standard / general booking, and a "Manage bookings (n active)" link.
-- Racket flow: brand/model + string pickers, main/cross tension, stencil and overgrip toggles, ready-by picker, auto job tag via `newJobTag()` (`src/routes/index.tsx:765, 906`).
-- Cart integration: booking lines render spec chips and an `Edit specs` action (`src/routes/index.tsx:1770-1785`) wired to `updateBookingSpecs` in `src/lib/pos-store.tsx:1116`.
-- Types are in place: `RacketJob.stencil/overgrip`, `CartLine.job/bookingId`, `IntegrationSettings.racketModels/stringModels`.
+- `/settings/services` (`src/routes/settings.services.tsx`) — service list, default fees, "ask what the booking is for", allow typed-in service.
+- `/settings/booking-slip` (`src/routes/settings.booking-slip.tsx`) — terms wording and the signature block.
 
-Two verified reasons it can still look missing or half-working on a real till:
-
-1. **Custom canvas layouts don't have the button.** `actBooking` was added to the default layout (`src/lib/register-layout.ts:190`), but saved layouts are already at `version: 4`, so a till that saved a layout before this change loads it untouched and never shows the node. Only the classic (non-canvas) column shows it.
-2. **The racket/string master lists are empty.** `state.settings.integrations.racketModels` / `stringModels` are read in the register, but no settings screen writes them, so both pickers show no suggestions — it looks like the "master data link" was never built.
+`/settings/rules` (`src/lib/pos-rules.ts`, `RULE_GROUPS`) covers shift, shift close, discounts, inventory/refunds, terminal security and manager PIN gates — there is **no booking group at all**. So nothing controls deposits, ready-by times, job tags, cancellations or who may edit racket specs, and the racket/string master lists the register reads (`integrations.racketModels` / `stringModels`) have no editor anywhere, which is why the pickers look empty.
 
 ## Changes
 
-### 1. Ensure the booking button exists on every saved layout
-- Bump the layout schema to `version: 5` with a migration that takes any v4 layout and, if `actBooking` is absent, inserts it next to the existing charge / book-later atoms (or at the top of the bill footer column) without disturbing other nodes.
-- Keep everything else in the layout byte-identical so no till loses its customisation.
+### 1. New settings page: Booking rules (`/settings/booking-rules`)
+Listed in the hub under "Business & pricing", next to POS rules. Sections:
 
-### 2. Racket & string master lists in settings
-- Add a "Racket & string master lists" block to `src/routes/settings.booking-slip.tsx`: two editable tag lists (add / remove entries) saved into `integrations.racketModels` and `integrations.stringModels` through the existing settings patch path — no migration needed.
-- Seed sensible defaults on first use (Yonex Astrox / Nanoflare, Victor Thruster, Li-Ning; BG65, BG65 Ti, BG80, BG80 Power, Aerobite, Exbolt 63) so pickers are useful immediately.
+**Deposits & payment**
+- Require a deposit on every booking (on/off)
+- Minimum deposit — percent of the booking total, or a flat amount
+- Allowed payment timings: pay now / part deposit / pay on collection
+- Block collection while a balance is outstanding
 
-### 3. Picker upgrade
-- Replace the `datalist` inputs for racket and string with searchable comboboxes (shadcn Command popover) that filter the master list as you type and still accept free text for anything unlisted.
+**Scheduling**
+- Default turnaround (hours or days) used to pre-fill the ready-by date
+- Require a ready-by date and time
+- Warn when a promised time falls outside trading hours
+
+**Racket / stringing jobs**
+- Auto-generate a job tag on every racket booking (on/off)
+- Default tension unit (lb / kg) and default main / cross tension
+- Require racket model and string type before saving
+- Racket master list and string master list — editable lists that feed the register's brand/model and string pickers
+
+**Control**
+- Manager PIN to cancel a booking
+- Manager PIN to edit specs after a deposit has been taken
+- Auto-cancel uncollected bookings after N days (0 = never)
+
+### 2. Enforce them where bookings are raised
+The register intake dialog and `/bookings` read these values: deposit minimum validated before save, ready-by pre-filled from the default turnaround, tension defaults applied, job tag generated when enabled, and the PIN gates hooked into the existing manager-override dialog.
 
 ## Technical notes
 
-- `src/lib/register-layout.ts`: `version: 5`, `migrateV4` that appends the `actBooking` item; `sanitise` accepts both versions during read and writes back v5.
-- `src/routes/settings.booking-slip.tsx`: new section using the existing `SettingsSection` frame and `updateSettings({ integrations: { ... } })`.
-- `src/routes/index.tsx`: swap the two `Input` + `datalist` blocks for a small local `ModelCombobox` component; no change to the booking payload.
-- No database or schema changes.
+- Store the settings as a `bookingRules` block inside `pos_settings.integration_settings` (typed on `IntegrationSettings` in `src/lib/pos-types.ts`) with a `DEFAULT_BOOKING_RULES` constant — no migration needed, and branch overrides work automatically through the existing settings-section machinery.
+- New route `src/routes/settings.booking-rules.tsx` built with `SettingsFrame` / `SettingsSection`, saving via `updateSettings`, matching the pattern in `settings.services.tsx`.
+- Register the page in `src/routes/settings.index.tsx` (business group) and expose the master lists to `src/routes/index.tsx`, which already reads `integrations.racketModels` and `integrations.stringModels`.
+- PIN gates reuse `ManagerOverrideDialog`; no new permission flags beyond the existing `can_cancel_booking` / `can_create_booking`.
