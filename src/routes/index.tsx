@@ -1990,57 +1990,6 @@ function Register() {
           {slot_catalog}
         </section>
 
-        {/* Unknown scans and manual lookups land in the search & add modal. */}
-        <ProductSearchDialog
-          open={catalogOpen}
-          onOpenChange={(v) => {
-            setCatalogOpen(v);
-            if (!v) setUnknownCode(null);
-          }}
-          query={query}
-          onQueryChange={setQuery}
-          products={state.products.filter((p) => productVisibleAt(state.settings, p.id, state.currentStoreId))}
-          storeId={currentStore.id}
-          unknownCode={unknownCode}
-          onAdd={(id) => {
-            addLine(id);
-            setCatalogOpen(false);
-            setUnknownCode(null);
-            setQuery("");
-          }}
-          onLinkBarcode={async (id, code) => {
-            const product = state.products.find((p) => p.id === id);
-            if (!product) return;
-            await upsertProduct({
-              ...product,
-              barcodes: Array.from(new Set([...(product.barcodes ?? []), code])),
-              ...(product.barcode ? {} : { barcode: code }),
-            });
-            toast.success(`${code} linked to ${product.name}`);
-            addLine(id);
-            setUnknownCode(null);
-            setQuery("");
-          }}
-          onCreateProduct={async (draft) => {
-            const created = {
-              id: crypto.randomUUID(),
-              name: draft.name,
-              sku: draft.sku,
-              barcode: draft.barcode,
-              category: draft.category,
-              price: draft.price,
-              cost: 0,
-              stockByStore: { [currentStore.id]: 1 },
-              reorderLevel: 0,
-              taxRate: state.settings.tax.enabled ? state.settings.tax.rate : 0,
-            };
-            await upsertProduct(created);
-            toast.success(`${created.name} added to the catalogue`);
-            addLine(created.id);
-            setUnknownCode(null);
-            setQuery("");
-          }}
-        />
 
         {/* Drag bar — widens the bill column, Excel style. */}
         <ColumnResizer
@@ -2104,6 +2053,59 @@ function Register() {
           </div>
         </aside>
       </div>
+          }
+        />
+        {/* Unknown scans and manual lookups land in the search & add modal. */}
+        <ProductSearchDialog
+          open={catalogOpen}
+          onOpenChange={(v) => {
+            setCatalogOpen(v);
+            if (!v) setUnknownCode(null);
+          }}
+          query={query}
+          onQueryChange={setQuery}
+          products={state.products.filter((p) => productVisibleAt(state.settings, p.id, state.currentStoreId))}
+          storeId={currentStore.id}
+          unknownCode={unknownCode}
+          onAdd={(id) => {
+            addLine(id);
+            setCatalogOpen(false);
+            setUnknownCode(null);
+            setQuery("");
+          }}
+          onLinkBarcode={async (id, code) => {
+            const product = state.products.find((p) => p.id === id);
+            if (!product) return;
+            await upsertProduct({
+              ...product,
+              barcodes: Array.from(new Set([...(product.barcodes ?? []), code])),
+              ...(product.barcode ? {} : { barcode: code }),
+            });
+            toast.success(`${code} linked to ${product.name}`);
+            addLine(id);
+            setUnknownCode(null);
+            setQuery("");
+          }}
+          onCreateProduct={async (draft) => {
+            const created = {
+              id: crypto.randomUUID(),
+              name: draft.name,
+              sku: draft.sku,
+              barcode: draft.barcode,
+              category: draft.category,
+              price: draft.price,
+              cost: 0,
+              stockByStore: { [currentStore.id]: 1 },
+              reorderLevel: 0,
+              taxRate: state.settings.tax.enabled ? state.settings.tax.rate : 0,
+            };
+            await upsertProduct(created);
+            toast.success(`${created.name} added to the catalogue`);
+            addLine(created.id);
+            setUnknownCode(null);
+            setQuery("");
+          }}
+        />
       </ZoomCanvas>
 
       {/* Live receipt preview overlay */}
