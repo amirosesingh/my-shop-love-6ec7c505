@@ -38,8 +38,7 @@ export const REGISTER_ACTIONS: ActionDef[] = [
   { id: "cart.split", label: "Split bill", category: "Sales & register" },
 
   // Tickets & bookings
-  { id: "book.hub", label: "Create / manage booking", category: "Tickets & bookings" },
-  { id: "book.later", label: "Book & pay later", category: "Tickets & bookings" },
+  { id: "book.hub", label: "Manage Booking", category: "Tickets & bookings" },
   { id: "book.manage", label: "Bookings management", category: "Tickets & bookings", to: "/bookings" },
   { id: "hold.new", label: "Hold / park this order", category: "Tickets & bookings", hotkey: "F6" },
   { id: "hold.list", label: "Held orders list", category: "Tickets & bookings", to: "/holds", hotkey: "F7" },

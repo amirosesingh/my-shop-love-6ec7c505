@@ -47,6 +47,7 @@ import { ZoomCanvas } from "@/components/pos/ZoomCanvas";
 import { setTicketDirty } from "@/lib/desktop-window";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -76,7 +77,7 @@ import {
 } from "@/lib/coupons";
 import type { Campaign, VoucherView } from "@/lib/coupons";
 import type { Booking, CartLine, DiscountType, IntakeCharge, PaymentMethod, Sale } from "@/lib/pos-types";
-import { intakeTotals, newJobTag } from "@/lib/booking-charges";
+import { applyCombo, intakeTotals, newJobTag } from "@/lib/booking-charges";
 import type { Payment } from "@/lib/pos-types";
 import { TenderSplit, rememberBanks } from "@/components/pos/TenderSplit";
 import { lineUnitDiscount, paymentsLabel, paymentsTotal, PAYMENT_LABELS, r2, validateTenders } from "@/lib/pos-types";
@@ -258,6 +259,16 @@ function Register() {
   const [notifyWhatsApp, setNotifyWhatsApp] = useState(false);
   /** Itemised racket intake charges: labour, string, grip, add-ons. */
   const [intakeCharges, setIntakeCharges] = useState<IntakeCharge[]>([]);
+  /** Customer lookup inside the booking dialog (name or phone). */
+  const [bookMemberQuery, setBookMemberQuery] = useState("");
+  /** Racket / string sourced from stock, or brought in by the customer. */
+  const [racketProductId, setRacketProductId] = useState("");
+  const [racketCustomerOwned, setRacketCustomerOwned] = useState(true);
+  const [stringProductId, setStringProductId] = useState("");
+  const [stringCustomerOwned, setStringCustomerOwned] = useState(false);
+  /** Labour is locked to the configured fee until a cashier overrides it. */
+  const [labourUnlocked, setLabourUnlocked] = useState(false);
+  const [labourReason, setLabourReason] = useState("");
   /** Narrow windows: the action deck collapses so it can't cover the totals. */
   const [deckOpen, setDeckOpen] = useState(false);
   /* Operation deck state */
@@ -730,6 +741,13 @@ function Register() {
     setOvergrip(false);
     setJobTag("");
     setEditBookingId(null);
+    setBookMemberQuery("");
+    setRacketProductId("");
+    setRacketCustomerOwned(true);
+    setStringProductId("");
+    setStringCustomerOwned(false);
+    setLabourUnlocked(false);
+    setLabourReason("");
   }
 
   /** Master lists an admin curates in booking settings. */
@@ -786,7 +804,12 @@ function Register() {
       {
         kind: "labor",
         name: stringingService?.name || "Stringing labour",
-        price: r2(Math.max(0, Number(stringingService?.fee ?? 0))),
+        price: r2(
+          Math.max(
+            0,
+            Number(stringingService?.fee ?? state.settings.integrations.baseLaborFee ?? 0),
+          ),
+        ),
       },
     ]);
     if (bookingRules.autoJobTag) setJobTag(newJobTag());
@@ -881,8 +904,91 @@ function Register() {
   }
 
   const serviceLabel = pickedService?.name ?? customService.trim();
+  /* ---- racket intake: catalogue pickers, customer-provided gear, labour lock ---- */
+  const catalogueOptions = (match: RegExp) =>
+    state.products
+      .filter((p) => !p.archived && match.test(`${p.category} ${p.subCategory ?? ""} ${p.name}`))
+      .slice(0, 60)
+      .map((p) => ({ value: p.id, label: `${p.name} — ${money(p.price)}` }));
+  const racketOptions = catalogueOptions(/racket|frame/i);
+  const stringOptions = catalogueOptions(/string/i);
+  const addOnOptions = catalogueOptions(/grip|grommet|stencil|accessor|add-on/i);
+
+  /** Replace one charge line of a given kind (labour lines are never touched). */
+  const setChargeOfKind = (kind: IntakeCharge["kind"], next: IntakeCharge) =>
+    setIntakeCharges((rows) => [...rows.filter((r) => r.kind !== kind), next]);
+
+  function pickRacketProduct(id: string) {
+    const p = state.products.find((x) => x.id === id);
+    setRacketProductId(id);
+    if (!p) return;
+    setRacketCustomerOwned(false);
+    setRacketModel(p.name);
+    setIntakeCharges((rows) => [
+      ...rows.filter((r) => !(r.kind === "accessory" && /^racket/i.test(r.name))),
+      { kind: "accessory", name: `Racket — ${p.name}`, price: r2(p.price), productId: p.id },
+    ]);
+  }
+
+  function setCustomerRacket(on: boolean) {
+    setRacketCustomerOwned(on);
+    if (!on) return;
+    setRacketProductId("");
+    setIntakeCharges((rows) => rows.filter((r) => !(r.kind === "accessory" && /^racket/i.test(r.name))));
+  }
+
+  function pickStringProduct(id: string) {
+    const p = state.products.find((x) => x.id === id);
+    setStringProductId(id);
+    if (!p) return;
+    setStringCustomerOwned(false);
+    setStringType(p.name);
+    setChargeOfKind("string", {
+      kind: "string",
+      name: p.name,
+      price: r2(p.price),
+      productId: p.id,
+    });
+  }
+
+  function setCustomerString(on: boolean) {
+    setStringCustomerOwned(on);
+    if (!on) return;
+    setStringProductId("");
+    setIntakeCharges((rows) =>
+      rows.map((r) => (r.kind === "string" ? { ...r, price: 0, customerProvided: true, productId: undefined } : r)),
+    );
+  }
+
+  function addAddOnProduct(id: string) {
+    const p = state.products.find((x) => x.id === id);
+    if (!p) return;
+    setIntakeCharges((rows) => [
+      ...rows,
+      {
+        kind: /grip/i.test(p.category + p.name) ? "grip" : "accessory",
+        name: p.name,
+        price: r2(p.price),
+        productId: p.id,
+      },
+    ]);
+  }
+
+  /** Unlock the read-only labour fee — supervisor gate or a written reason. */
+  async function unlockLabour() {
+    if (labourUnlocked) return;
+    if (bookingRules.overrideNeedsSupervisor && !isSupervisor) {
+      const ok = await requirePermission("can_access_pos_settings");
+      if (!ok) return;
+    }
+    setLabourUnlocked(true);
+    toast.info("Labour fee unlocked — record the reason.");
+  }
+
+  /** Racket + string bought together earns the configured combo on labour. */
+  const combo = applyCombo(intakeCharges, bookingRules);
   const intake = intakeTotals(
-    intakeCharges,
+    combo.charges,
     state.settings.tax,
     0,
     state.settings.integrations.categoryMap,
@@ -900,7 +1006,7 @@ function Register() {
       return;
     }
     if (!racketMode && !lines.length) {
-      toast.error("Add at least one item to the cart before booking", {
+      toast.error("Please add at least one item to the cart before saving a pay-later booking.", {
         description: "Only racket / stringing jobs can be booked with an empty cart.",
       });
       return;
@@ -918,6 +1024,10 @@ function Register() {
       return;
     }
     if (racketMode) {
+      if (labourUnlocked && !labourReason.trim()) {
+        toast.error("Enter a reason for the labour override");
+        return;
+      }
       if (bookingRules.requireRacketModel && !racketModel.trim()) {
         toast.error("Enter the racket brand / model");
         return;
@@ -955,7 +1065,13 @@ function Register() {
         serviceTypeId: pickedService?.id,
         serviceName: serviceLabel || undefined,
         serviceFee: serviceCharge || undefined,
-        charges: racketMode && intake.charges.length ? intake.charges : undefined,
+        charges: racketMode && intake.charges.length
+          ? intake.charges.map((c) =>
+              c.kind === "labor" && labourUnlocked && labourReason.trim()
+                ? { ...c, overrideReason: labourReason.trim() }
+                : c,
+            )
+          : undefined,
         paymentTiming: payTiming,
         deposit: paidNow,
         depositMethod,
@@ -966,6 +1082,9 @@ function Register() {
         note: bookNote.trim(),
         cashier: activeCashier,
         tagId: racketMode ? jobTag || (bookingRules.autoJobTag ? newJobTag() : undefined) : undefined,
+        stringOrigin: racketMode ? (stringCustomerOwned ? "customer" : "store") : undefined,
+        stringProductId: racketMode && !stringCustomerOwned ? stringProductId || undefined : undefined,
+        intakeNote: racketMode ? grommetNotes.trim() || undefined : undefined,
         job: racketMode
           ? {
               racketModel: racketModel.trim() || undefined,
@@ -1552,7 +1671,6 @@ function Register() {
             onOpenCatalog={() => setCatalogOpen(true)}
             onOpenCustomerDisplay={visible("register.customerDisplay") ? openCustomerDisplay : undefined}
             onOpenShift={() => setOpenShiftOpen(true)}
-            onRacketBooking={startRacketBooking}
             onCloseShift={
               visible("register.closeShift")
                 ? async () => {
@@ -2034,21 +2152,6 @@ function Register() {
     </div>
   );
 
-  const atom_actBookLater = (
-    <div className="flex h-full min-w-0 items-center px-1">
-      <ActionButton
-        layout="inline"
-        variant="outline"
-        className="h-full w-full"
-        label="Book & pay later"
-        icon={<CalendarClock className="size-4" />}
-        disabled={tillLocked || refundDue > 0 || !lines.length}
-        disabledReason={tillLocked ? lockedReason : undefined}
-        onClick={startCartBooking}
-      />
-    </div>
-  );
-
   /** Always on the right panel, cart empty or not. */
   const atom_actBooking = (
     <div className="relative flex h-full min-w-0 items-center px-1">
@@ -2060,7 +2163,7 @@ function Register() {
       <ActionButton
         layout="inline"
         className="h-full w-full"
-        label="🏸 Create / Manage Booking"
+        label="Manage Booking"
         icon={<CalendarClock className="size-4" />}
         disabled={tillLocked}
         disabledReason={tillLocked ? lockedReason : undefined}
@@ -2156,7 +2259,6 @@ function Register() {
       <div className="h-12">{atom_balanceDue}</div>
       <div className="h-12 px-3">{atom_actCharge}</div>
       <div className="h-11 px-3">{atom_actBooking}</div>
-      <div className="h-11 px-3">{atom_actBookLater}</div>
       {lastSale && <div className="border-t border-border">{atom_reprintDeck}</div>}
     </div>
   );
@@ -2319,7 +2421,6 @@ function Register() {
       document.querySelector<HTMLInputElement>("[data-scan-focus] input")?.focus(),
     "hold.new": () => holdOrder(),
     "void.cart": () => void clearCart(),
-    "book.later": () => startCartBooking(),
     "book.hub": () => setBookingHubOpen(true),
     "shift.open": () => setOpenShiftOpen(true),
     "shift.close": () => setCloseShiftOpen(true),
@@ -2357,7 +2458,6 @@ function Register() {
             totalsBlock: atom_totalsBlock,
             balanceDue: atom_balanceDue,
             actCharge: atom_actCharge,
-            actBookLater: atom_actBookLater,
             actBooking: atom_actBooking,
             reprintDeck: atom_reprintDeck,
             actHold: atom_actHold,
@@ -2982,7 +3082,7 @@ function Register() {
       <Dialog open={bookingHubOpen} onOpenChange={setBookingHubOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Create / manage booking</DialogTitle>
+            <DialogTitle>Manage Booking</DialogTitle>
           </DialogHeader>
           <div className="space-y-2">
             <Button
@@ -3101,6 +3201,54 @@ function Register() {
             )}
             {racketMode && (
               <div className="space-y-2 rounded-md border border-border p-2">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label>Racket from catalogue</Label>
+                    <ThemedSelect
+                      ariaLabel="Racket from catalogue"
+                      value={racketProductId}
+                      placeholder="Pick a racket"
+                      onChange={(v) => pickRacketProduct(v)}
+                      options={racketOptions}
+                    />
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        checked={racketCustomerOwned}
+                        onChange={(e) => setCustomerRacket(e.target.checked)}
+                      />
+                      Customer provided racket (no charge)
+                    </label>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>String from catalogue</Label>
+                    <ThemedSelect
+                      ariaLabel="String from catalogue"
+                      value={stringProductId}
+                      placeholder="Pick a string"
+                      onChange={(v) => pickStringProduct(v)}
+                      options={stringOptions}
+                    />
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        checked={stringCustomerOwned}
+                        onChange={(e) => setCustomerString(e.target.checked)}
+                      />
+                      Customer provided string (no charge)
+                    </label>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label>Add-ons from stock</Label>
+                  <ThemedSelect
+                    ariaLabel="Add an add-on from stock"
+                    value=""
+                    placeholder="Grips, grommets, stencil work…"
+                    onChange={(v) => addAddOnProduct(v)}
+                    options={addOnOptions}
+                  />
+                </div>
                 <div className="flex items-center justify-between">
                   <Label>Job charges</Label>
                   <button
@@ -3113,7 +3261,9 @@ function Register() {
                     + Add charge
                   </button>
                 </div>
-                {intakeCharges.map((c, i) => (
+                {intakeCharges.map((c, i) => {
+                  const lockedLabour = c.kind === "labor" && !labourUnlocked;
+                  return (
                   <div key={i} className="grid grid-cols-[7rem_minmax(0,1fr)_6rem_1.5rem] items-center gap-1.5">
                     <ThemedSelect
                       ariaLabel="Charge type"
@@ -3143,6 +3293,7 @@ function Register() {
                       className="numeric text-right"
                       inputMode="decimal"
                       placeholder="0.00"
+                      disabled={lockedLabour || !!c.customerProvided}
                       value={c.price ? String(c.price) : ""}
                       onChange={(e) =>
                         setIntakeCharges((rows) =>
@@ -3161,7 +3312,26 @@ function Register() {
                       ×
                     </button>
                   </div>
-                ))}
+                  );
+                })}
+                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                  <span className="text-muted-foreground">
+                    Labour is locked to the fee set in Settings → Booking rules.
+                  </span>
+                  <Button size="sm" variant="outline" onClick={() => void unlockLabour()}>
+                    {labourUnlocked ? "Labour unlocked" : "Override / waive charge"}
+                  </Button>
+                </div>
+                {labourUnlocked && (
+                  <Input
+                    placeholder="Reason for the override (required)"
+                    value={labourReason}
+                    onChange={(e) => setLabourReason(e.target.value)}
+                  />
+                )}
+                {combo.label && (
+                  <p className="text-[11px] font-medium text-primary">{combo.label}</p>
+                )}
                 <div className="flex items-center justify-between border-t border-border pt-1 text-xs">
                   <span className="text-muted-foreground">Charges total</span>
                   <span className="numeric font-semibold">{money(intake.subtotal)}</span>
@@ -3240,14 +3410,73 @@ function Register() {
                 </div>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label>Customer name</Label>
-                <Input value={bookName} onChange={(e) => setBookName(e.target.value)} />
+            <div className="space-y-2 rounded-md border border-border p-2">
+              <div className="flex items-center justify-between">
+                <Label>Customer</Label>
+                <button
+                  type="button"
+                  className="text-[11px] text-primary hover:underline"
+                  onClick={() => {
+                    setMemberQuery(bookMemberQuery);
+                    setQuickMemberOpen(true);
+                  }}
+                >
+                  + Quick add customer
+                </button>
               </div>
-              <div className="space-y-1">
-                <Label>Phone</Label>
-                <Input value={bookPhone} onChange={(e) => setBookPhone(e.target.value)} className="numeric" />
+              <Input
+                value={bookMemberQuery}
+                onChange={(e) => setBookMemberQuery(e.target.value)}
+                placeholder="Search by name or phone…"
+              />
+              {bookMemberQuery.trim() && !member ? (
+                <div className="space-y-1">
+                  {state.members
+                    .filter((m) => {
+                      const q = bookMemberQuery.trim().toLowerCase();
+                      return (
+                        m.name.toLowerCase().includes(q) ||
+                        m.phone.replace(/\s/g, "").includes(q.replace(/\s/g, "")) ||
+                        m.code.toLowerCase().includes(q)
+                      );
+                    })
+                    .slice(0, 5)
+                    .map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        className="flex w-full items-center justify-between rounded-md border border-border px-2 py-1.5 text-left text-xs hover:bg-muted"
+                        onClick={() => {
+                          attachMember(m);
+                          setBookName(m.name);
+                          setBookPhone(m.phone);
+                          setBookMemberQuery("");
+                        }}
+                      >
+                        <span className="truncate">
+                          {m.name} · {m.phone}
+                        </span>
+                        <Badge variant="outline">
+                          {m.code} · {m.tier}
+                        </Badge>
+                      </button>
+                    ))}
+                </div>
+              ) : null}
+              {member ? (
+                <p className="text-[11px] text-muted-foreground">
+                  Attached: {member.name} · {member.code} · {member.tier}
+                </p>
+              ) : null}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>Customer name</Label>
+                  <Input value={bookName} onChange={(e) => setBookName(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Phone</Label>
+                  <Input value={bookPhone} onChange={(e) => setBookPhone(e.target.value)} className="numeric" />
+                </div>
               </div>
             </div>
             <div className="space-y-1">
@@ -3365,8 +3594,9 @@ function Register() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label>Grommet / grip notes</Label>
-                    <Input
+                    <Label>Racket inspection / pre-existing condition</Label>
+                    <Textarea
+                      rows={2}
                       value={grommetNotes}
                       onChange={(e) => setGrommetNotes(e.target.value)}
                       placeholder="Two cracked grommets at 12 o'clock, replace grip"
@@ -3399,8 +3629,23 @@ function Register() {
             <Button variant="outline" onClick={() => setBookOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={() => void bookAndPayLater()} disabled={saving}>
-              {saving ? "Saving…" : "Reserve & print slip"}
+            {allowedTimings.includes("now") && (
+              <Button
+                variant="secondary"
+                disabled={saving}
+                onClick={() => {
+                  setPayTiming("now");
+                  void bookAndPayLater();
+                }}
+              >
+                Pay now
+              </Button>
+            )}
+            <Button
+              onClick={() => void bookAndPayLater()}
+              disabled={saving || (!racketMode && !lines.length)}
+            >
+              {saving ? "Saving…" : racketMode ? "Save job & print ticket" : "Save pay-later booking"}
             </Button>
           </DialogFooter>
         </DialogContent>

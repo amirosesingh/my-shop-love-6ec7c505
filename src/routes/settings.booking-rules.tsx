@@ -327,6 +327,78 @@ function BookingRulesForm() {
           items={integrations.stringModels ?? []}
           onChange={(next) => setList("stringModels", next)}
         />
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Locked base labour fee</Label>
+          <Input
+            className="numeric text-right"
+            inputMode="decimal"
+            value={integrations.baseLaborFee || ""}
+            onChange={(e) =>
+              updateSettings({ integrations: { ...integrations, baseLaborFee: num(e.target.value) } })
+            }
+            placeholder="0.00"
+          />
+          <p className="text-xs text-muted-foreground">
+            Pre-filled and read-only on the intake screen. Cashiers must override it to change it.
+          </p>
+        </div>
+      </Section>
+
+      <Section
+        title="Combo & overrides"
+        blurb="What happens when a racket and string are bought together, and who may unlock the labour fee."
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Racket + string combo</Label>
+            <div className="grid grid-cols-2 gap-1 sm:grid-cols-4">
+              {(
+                [
+                  { v: "off", label: "Off" },
+                  { v: "waive_labour", label: "Waive labour" },
+                  { v: "percent", label: "% off labour" },
+                  { v: "amount", label: "Flat off" },
+                ] as const
+              ).map((o) => (
+                <button
+                  key={o.v}
+                  onClick={() => patch({ comboRule: o.v })}
+                  className={`rounded-md border border-border px-2 py-2 text-xs ${
+                    rules.comboRule === o.v
+                      ? "bg-primary/15 text-primary"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Combo discount value</Label>
+            <Input
+              className="numeric text-right"
+              inputMode="decimal"
+              disabled={rules.comboRule !== "percent" && rules.comboRule !== "amount"}
+              value={rules.comboValue || ""}
+              onChange={(e) => patch({ comboValue: num(e.target.value) })}
+              placeholder="0"
+            />
+            <p className="text-xs text-muted-foreground">
+              Applied to the labour line when a stock racket and a stock string are both on the job.
+            </p>
+          </div>
+        </div>
+        <Row
+          label="Overriding the labour fee needs a supervisor"
+          hint="Off means a written reason is enough."
+        >
+          <Switch
+            aria-label="Overriding the labour fee needs a supervisor"
+            checked={rules.overrideNeedsSupervisor}
+            onCheckedChange={(v) => patch({ overrideNeedsSupervisor: v })}
+          />
+        </Row>
       </Section>
 
       <Section title="Control" blurb="Who may undo or re-spec a booking once it exists.">

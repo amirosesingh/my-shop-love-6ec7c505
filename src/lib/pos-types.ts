@@ -394,6 +394,10 @@ export type IntakeCharge = {
   productId?: string;
   category?: string;
   subCategory?: string;
+  /** cashier waived / re-priced this line — the reason is kept for the audit */
+  overrideReason?: string;
+  /** the racket or string was brought in by the customer, so it is priced at 0 */
+  customerProvided?: boolean;
 };
 
 /** One-line summary of the string job, used on slips and tags. */
@@ -800,6 +804,12 @@ export type BookingRules = {
   managerOnlyEditPaidSpecs: boolean;
   /** flag uncollected bookings after this many days (0 = never) */
   staleAfterDays: number;
+  /** what happens to labour when a stock racket and a stock string are both on the job */
+  comboRule: "off" | "waive_labour" | "percent" | "amount";
+  /** discount value used by the percent / amount combo rules */
+  comboValue: number;
+  /** overriding the locked labour fee needs a supervisor, not just a reason */
+  overrideNeedsSupervisor: boolean;
 };
 
 export const DEFAULT_BOOKING_RULES: BookingRules = {
@@ -822,6 +832,9 @@ export const DEFAULT_BOOKING_RULES: BookingRules = {
   managerOnlyCancel: false,
   managerOnlyEditPaidSpecs: false,
   staleAfterDays: 0,
+  comboRule: "off",
+  comboValue: 0,
+  overrideNeedsSupervisor: true,
 };
 
 /** Merge stored rules over the defaults so a partial blob is always complete. */

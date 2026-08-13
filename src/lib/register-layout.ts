@@ -186,7 +186,6 @@ export function factoryLayout(): RegisterLayout {
       { i: "totalsBlock", x: 10, y: 27, w: 8, h: 8 },
       { i: "balanceDue", x: 10, y: 35, w: 8, h: 3 },
       { i: "actCharge", x: 10, y: 38, w: 8, h: 3 },
-      { i: "actBookLater", x: 10, y: 41, w: 8, h: 3 },
       { i: "actBooking", x: 10, y: 44, w: 8, h: 3 },
       { i: "actHold", x: 18, y: 3, w: 6, h: 3 },
       { i: "actVoid", x: 18, y: 6, w: 6, h: 3 },
