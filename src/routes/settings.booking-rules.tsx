@@ -37,6 +37,7 @@ export const Route = createFileRoute("/settings/booking-rules")({
     <SettingsFrame
       title="Booking rules"
       description="Deposits, turnaround, racket job requirements and who may cancel or re-spec a booking."
+      scopeSections={["booking"]}
     >
       <BookingRulesForm />
     </SettingsFrame>

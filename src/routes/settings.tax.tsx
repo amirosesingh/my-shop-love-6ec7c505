@@ -24,6 +24,7 @@ function TaxSettingsPage() {
     <SettingsFrame
       title="Tax & pricing"
       description="Tax rules apply to every register instantly."
+      scopeSections={["tax"]}
     >
       <TaxForm />
     </SettingsFrame>
