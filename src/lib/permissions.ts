@@ -41,6 +41,9 @@ export const PERMISSION_GROUPS = [
       "can_reprint_bill",
       "can_send_whatsapp_bill",
       "can_manage_bookings",
+      "can_create_booking",
+      "can_collect_booking",
+      "can_cancel_booking",
     ],
   },
   {
