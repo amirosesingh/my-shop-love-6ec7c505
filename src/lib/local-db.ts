@@ -55,6 +55,23 @@ export type LocalDbTestResult = {
   hint?: string | null;
 };
 
+/** One SQL Server instance found on this machine or the local network. */
+export type DiscoveredDbServer = {
+  address: string;
+  serverName: string;
+  instance: string;
+  port: number | null;
+  version: string | null;
+  source?: "browser" | "local";
+};
+
+export type ScanNetworkResult = {
+  ok: boolean;
+  servers?: DiscoveredDbServer[];
+  error?: string;
+  hint?: string;
+};
+
 export type LocalSyncStatus = {
   connected: boolean;
   error?: string;
@@ -75,6 +92,9 @@ export type PosBridge = {
   ) => Promise<LocalDbTestResult & { cloudError?: string }>;
   configureCloud: (cloud: CloudBridgeConfig) => Promise<{ ok: boolean; error?: string }>;
   test: (config: LocalDbConfig) => Promise<LocalDbTestResult>;
+  /** Discover local/LAN SQL Server instances (desktop shell only). */
+  scanNetwork?: () => Promise<ScanNetworkResult>;
+  scanLocalDatabases?: () => Promise<ScanNetworkResult>;
   status: () => Promise<LocalSyncStatus>;
   push: () => Promise<{ ok: boolean; pushed: number; failed: number; error?: string }>;
   pull: () => Promise<{ ok: boolean; merged: number; error?: string }>;
