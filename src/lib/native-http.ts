@@ -7,7 +7,26 @@
  * performs the request outside the webview, where CORS does not apply, so
  * every update-feed read and download goes through here.
  */
-import { isNative } from "./native";
+import { isElectron, isNative } from "./native";
+
+/**
+ * Desktop bridge for the same job: the till window is served from
+ * 127.0.0.1, so the update bucket is cross-origin and the browser blocks the
+ * response. The main process has no such restriction.
+ */
+type DesktopNet = {
+  netGetJson?: (url: string) => Promise<{ ok: boolean; status?: number; data?: unknown; error?: string }>;
+  netHead?: (url: string) => Promise<{ ok: boolean; status?: number; error?: string }>;
+  netGetBinary?: (
+    url: string,
+  ) => Promise<{ ok: boolean; status?: number; base64?: string; error?: string }>;
+};
+
+function desktopNet(): DesktopNet | null {
+  if (!isElectron() || typeof window === "undefined") return null;
+  const bridge = (window as unknown as { pos?: DesktopNet }).pos;
+  return bridge && typeof bridge.netGetJson === "function" ? bridge : null;
+}
 
 type CapHttp = {
   request: (o: {
@@ -63,6 +82,11 @@ export function describeNetworkError(err: unknown): string {
 /** True when the URL answers with a downloadable file. */
 export async function httpExists(url: string): Promise<boolean> {
   try {
+    const desktop = desktopNet();
+    if (desktop?.netHead) {
+      const res = await desktop.netHead(url);
+      return !!res?.ok;
+    }
     if (isNative()) {
       const native = await nativeHttp();
       if (native) {
@@ -97,6 +121,15 @@ export async function firstReachableUrl(urls: string[]): Promise<string | null> 
 /** GET a JSON document, using the native bridge on Android. */
 export async function httpGetJson<T>(url: string): Promise<T> {
   const bust = `${url}${url.includes("?") ? "&" : "?"}t=${Date.now()}`;
+  const desktop = desktopNet();
+  if (desktop?.netGetJson) {
+    const res = await desktop.netGetJson(bust);
+    if (res?.ok && res.data !== undefined) {
+      return (typeof res.data === "string" ? JSON.parse(res.data) : res.data) as T;
+    }
+    if (res?.status) throw new Error(`Update check failed (HTTP ${res.status}).`);
+    throw new Error(res?.error || "Could not reach the update server.");
+  }
   if (isNative()) {
     const native = await nativeHttp();
     if (native) {
@@ -131,6 +164,17 @@ export async function httpGetBase64(
   url: string,
   onProgress?: (pct: number) => void,
 ): Promise<string> {
+  const desktop = desktopNet();
+  if (desktop?.netGetBinary) {
+    onProgress?.(5);
+    const res = await desktop.netGetBinary(url);
+    if (res?.ok && res.base64) {
+      onProgress?.(100);
+      return res.base64;
+    }
+    if (res?.status) throw new Error(`Download failed (HTTP ${res.status}).`);
+    throw new Error(res?.error || "Could not reach the update server.");
+  }
   if (isNative()) {
     const native = await nativeHttp();
     if (native) {

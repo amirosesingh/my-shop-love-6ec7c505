@@ -27,6 +27,10 @@ contextBridge.exposeInMainWorld("pos", {
   housekeep: (options) => invoke("pos:housekeep", options),
   /* auto-update */
   appVersion: () => invoke("app:version"),
+  /* update-feed HTTP that is not subject to the window's CORS rules */
+  netGetJson: (url) => invoke("net:get-json", url),
+  netHead: (url) => invoke("net:head", url),
+  netGetBinary: (url) => invoke("net:get-binary", url),
   updateStatus: () => invoke("update:status"),
   checkForUpdates: () => invoke("update:check"),
   installUpdate: () => invoke("update:install"),
