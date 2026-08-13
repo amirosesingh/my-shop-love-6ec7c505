@@ -188,6 +188,8 @@ type Ctx = {
   changeSalePayment: (saleId: string, method: PaymentMethod, reason?: string) => void;
   createBooking: (input: NewBooking) => Promise<Booking>;
   setBookingJobStatus: (id: string, status: JobStatus, who: string) => Booking | null;
+  /** Edit the technical specs of an existing racket job before payment. */
+  updateBookingSpecs: (id: string, job: RacketJob) => Booking | null;
   addBookingPayment: (
     id: string,
     amount: number,
@@ -1110,6 +1112,21 @@ export function PosProvider({ children }: { children: ReactNode }) {
     return updated;
   }, []);
 
+  /** Rewrite the job card of a booking that has not been collected yet. */
+  const updateBookingSpecs = useCallback((id: string, job: RacketJob) => {
+    const current = stateRef.current.bookings.find((b) => b.id === id);
+    if (!current) return null;
+    const updated: Booking = { ...current, job: { ...current.job, ...job } };
+    setState((s) => ({ ...s, bookings: s.bookings.map((b) => (b.id === id ? updated : b)) }));
+    saveBookingQuietly(updated);
+    logger.log("sale_event", "Job card specs edited", "bookings", {
+      ref: updated.ref,
+      racket: updated.job?.racketModel,
+      string: updated.job?.stringType,
+    });
+    return updated;
+  }, []);
+
   const collectBooking = useCallback(
     async (id: string, amount: number, method: PaymentMethod) => {
       const current = stateRef.current.bookings.find((b) => b.id === id);
@@ -1914,6 +1931,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     cancelBooking,
     deleteBooking,
     setBookingJobStatus,
+    updateBookingSpecs,
     upsertProduct,
     removeProduct,
     syncProducts,
