@@ -759,7 +759,7 @@ function Register() {
       });
       return;
     }
-    if (!(await requirePermission("can_process_sale"))) return;
+    if (!(await requirePermission("can_create_booking"))) return;
     const paidNow =
       payTiming === "collection" ? 0 : payTiming === "now" ? bookingTotal : r2(Math.max(0, Number(deposit || 0)));
     if (paidNow > bookingTotal) {
