@@ -585,7 +585,7 @@ function registerIpc() {
       const saved = dbConfigStore.write(config);
       if (!saved.ok) console.warn("[pos] could not seal SQL config:", saved.error);
     } catch (err) {
-      return fail(err);
+      return { ok: false, ...pool.describeSqlError(err) };
     }
     try {
       await initializeWorker(cloud);
