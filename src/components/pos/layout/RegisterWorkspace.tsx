@@ -334,6 +334,7 @@ function CanvasItem({
   const def = nodeSpec(box);
   const pad = box.pad ?? DEFAULT_PAD;
   const bare = def?.chrome === "bare";
+  const group = isGroupId(box.i);
   const { ref, vars } = useAutoScale(pad, box.font ?? "md", bare);
   if (!def) return null;
   const panel = !bare;
@@ -342,12 +343,21 @@ function CanvasItem({
       ref={ref}
       style={{ padding: pad, ...vars }}
       className={`group relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden ${
-        panel ? "rounded-lg border border-border bg-card" : ""
-      } ${editing ? "rounded-lg outline-2 outline-dashed outline-primary/50" : ""} ${
+        group
+          ? `rounded-xl border border-dashed border-primary/40 bg-primary/5 ${editing ? "" : "pointer-events-none"}`
+          : panel
+            ? "rounded-lg border border-border bg-card"
+            : ""
+      } ${editing && !group ? "rounded-lg outline-2 outline-dashed outline-primary/50" : ""} ${
         TONE_CLASS[box.tone ?? "neutral"]
       }`}
       data-view={box.view ?? "list"}
     >
+      {group && (box.title || box.label) && (
+        <p className="pointer-events-none absolute left-2 top-1 text-[11px] font-semibold uppercase tracking-wide text-primary/70">
+          {box.label || box.title}
+        </p>
+      )}
       {editing && (
         <div className="absolute right-1 top-1 z-20 flex items-center gap-0.5 rounded-md border border-primary/40 bg-background/95 px-1 py-0.5 opacity-70 shadow-sm transition-opacity group-hover:opacity-100">
           <span
