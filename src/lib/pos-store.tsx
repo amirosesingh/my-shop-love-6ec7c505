@@ -1868,9 +1868,21 @@ export function PosProvider({ children }: { children: ReactNode }) {
 
   const reset = useCallback(() => setState(emptyState), []);
 
+  // Every consumer sees the resolved record: branch override over global.
+  const effectiveState = useMemo(() => {
+    const keys = Object.keys(scope.overrides) as SettingsSectionId[];
+    if (!keys.length) return state;
+    let settings = state.settings;
+    for (const key of keys) settings = mergePatch(settings, scope.overrides[key]);
+    return { ...state, settings };
+  }, [state, scope]);
+
   const value: Ctx = {
     ready,
-    state,
+    state: effectiveState,
+    settingsScope: scope,
+    setSectionScope,
+    setSectionLocked,
     stores: state.stores,
     currentStore,
     setCurrentStore,
