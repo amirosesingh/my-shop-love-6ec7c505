@@ -14,6 +14,7 @@ const dbConfigStore = require("./db-config-store.cjs");
 const brandingStore = require("./branding-store.cjs");
 const health = require("./health.cjs");
 const recovery = require("./recovery.cjs");
+const netHttp = require("./net.cjs");
 
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
 const DEBUG = process.env.POS_DEBUG === "1";
@@ -647,6 +648,14 @@ function registerIpc() {
   ipcMain.handle("update:check", () => updater.check());
   ipcMain.handle("update:install", () => updater.install());
   ipcMain.handle("app:version", () => app.getVersion());
+
+  /**
+   * Update-feed reads made outside the window: the renderer's own origin is
+   * 127.0.0.1, so a browser request to the update bucket is blocked by CORS.
+   */
+  ipcMain.handle("net:get-json", (_e, url) => netHttp.getJson(String(url)));
+  ipcMain.handle("net:head", (_e, url) => netHttp.head(String(url)));
+  ipcMain.handle("net:get-binary", (_e, url) => netHttp.getBinary(String(url)));
 
   /**
    * The branch database is the home for the activation token and the branch it

@@ -74,6 +74,13 @@ const GLOBAL_TABLES = new Set(["products", "members", "audit_logs"]);
 const TRANSFER_TABLE = "stock_transfers";
 
 /**
+ * The branch registry itself. Its branch column is the row's own `id`, so it
+ * cannot go through the ordinary store-pinning path: a supervisor may create
+ * or edit any branch, and everyone else may only touch their own row.
+ */
+const STORES_TABLE = "stores";
+
+/**
  * Who did it. These columns are written from the proven caller and any value
  * the till sent is discarded, so a receipt can never name another cashier.
  */
@@ -142,6 +149,7 @@ export const RELAY_WRITABLE_TABLES = new Set([
   ...Object.keys(PARENT_OF),
   ...GLOBAL_TABLES,
   TRANSFER_TABLE,
+  STORES_TABLE,
 ]);
 
 const deny = (code: RelayDenial["code"], error: string): RelayDenial => ({ ok: false, code, error });
@@ -307,6 +315,8 @@ export async function authorizeRelayOp(
   }
 
   op = stampActor(op, scope);
+
+  if (op.table === STORES_TABLE) return authorizeStores(op, scope);
 
   const storeColumn = STORE_COLUMN[op.table];
   if (storeColumn) return pinToStore(op, scope, storeColumn);
