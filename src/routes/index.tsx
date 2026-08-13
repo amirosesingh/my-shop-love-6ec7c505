@@ -239,6 +239,8 @@ function Register() {
   const [jobNotes, setJobNotes] = useState("");
   const [promisedAt, setPromisedAt] = useState("");
   const [notifyWhatsApp, setNotifyWhatsApp] = useState(false);
+  /** Itemised racket intake charges: labour, string, grip, add-ons. */
+  const [intakeCharges, setIntakeCharges] = useState<IntakeCharge[]>([]);
   /** Narrow windows: the action deck collapses so it can't cover the totals. */
   const [deckOpen, setDeckOpen] = useState(false);
   /* Operation deck state */
