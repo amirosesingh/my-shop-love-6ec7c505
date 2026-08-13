@@ -7,14 +7,15 @@
  * its handlers, permissions and state wherever it is placed.
  */
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Responsive, useContainerWidth, type Layout } from "react-grid-layout";
+import { GridLayout, type Layout } from "react-grid-layout";
+import { createScaledStrategy, noCompactor } from "react-grid-layout/core";
 import "react-grid-layout/css/styles.css";
 import {
   Eye,
   GripVertical,
   LayoutGrid,
   List,
-  PanelLeftOpen,
+  PanelRightOpen,
   Pencil,
   RotateCcw,
   Save,
@@ -28,11 +29,17 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useAuth } from "@/lib/pos-auth";
 import {
   DEFAULT_PAD,
-  GRID_COLS,
+  ASPECT_RATIO,
+  COL_CHOICES,
   MAX_PAD,
+  MAX_ROW_HEIGHT,
+  MIN_ROW_HEIGHT,
   isCustomId,
+  isGroupId,
   nodeSpec,
   useRegisterLayout,
+  type CanvasAspect,
+  type CanvasConfig,
   type CustomButtonSpec,
   type LayoutBox,
   type ModuleFont,
@@ -65,6 +72,43 @@ const DOT_GRID =
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
+/** Measures the live viewport the canvas has to fill. */
+function useViewportBox() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => setSize({ width: el.clientWidth, height: el.clientHeight });
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    window.addEventListener("resize", measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, []);
+  return { ref, ...size };
+}
+
+/**
+ * Uniform scale: the design is authored once on a logical canvas and every
+ * monitor renders that exact composition, only bigger or smaller. No
+ * breakpoints, so nothing reflows between the office PC and the till.
+ */
+function canvasMetrics(canvas: CanvasConfig, view: { width: number; height: number }) {
+  const ratio = ASPECT_RATIO[canvas.aspect];
+  const baseWidth = canvas.baseWidth;
+  const width = view.width || baseWidth;
+  const height = view.height || Math.round(baseWidth / (ratio ?? 16 / 9));
+  const baseHeight = ratio
+    ? Math.round(baseWidth / ratio)
+    : Math.max(1, Math.round(height / (width / baseWidth)));
+  const scale = ratio ? Math.min(width / baseWidth, height / baseHeight) : width / baseWidth;
+  return { baseWidth, baseHeight, scale: Math.max(0.2, scale) };
+}
+
 export function RegisterWorkspace({
   slots,
   terminalKey,
@@ -80,10 +124,15 @@ export function RegisterWorkspace({
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [dragging, setDragging] = useState<RegisterModuleId | null>(null);
-  const { containerRef, width } = useContainerWidth();
+  const view = useViewportBox();
 
   const editing = isAdmin && layout.editing;
   const showCanvas = !!layout.active && (editing || layout.previewing || !!layout.saved);
+  const canvas = layout.active?.canvas;
+  const metrics = useMemo(
+    () => (canvas ? canvasMetrics(canvas, { width: view.width, height: view.height }) : null),
+    [canvas, view.width, view.height],
+  );
 
   const boxes = useMemo<Layout>(
     () =>
@@ -110,6 +159,9 @@ export function RegisterWorkspace({
           editing={editing}
           previewing={layout.previewing}
           custom={!!layout.saved}
+          canvas={canvas ?? null}
+          scale={metrics?.scale ?? 1}
+          onCanvas={layout.setCanvas}
           onEdit={() => {
             layout.startEdit();
             setPaletteOpen(true);
@@ -142,6 +194,7 @@ export function RegisterWorkspace({
         onAdd={(id) => layout.addModule(id)}
         onDragStart={setDragging}
         onCreate={() => setCreateOpen(true)}
+        onAddGroup={() => layout.addGroup()}
       />
 
       <CustomButtonDialog
@@ -158,59 +211,78 @@ export function RegisterWorkspace({
         <div className="min-h-0 w-full flex-1">{classic}</div>
       ) : (
         <div
-          ref={containerRef}
-          className={`min-h-0 w-full flex-1 overflow-auto bg-background ${editing ? DOT_GRID : ""}`}
+          ref={view.ref}
+          className={`min-h-0 w-full flex-1 overflow-hidden bg-background ${editing ? DOT_GRID : ""}`}
           onDragOver={(e) => {
             if (editing && dragging) e.preventDefault();
           }}
         >
-          <Responsive
-            width={width || 1200}
-            className="pos-scaled w-full"
-            breakpoints={{ lg: 1200, md: 900, sm: 0 }}
-            cols={{ lg: GRID_COLS, md: 16, sm: 8 }}
-            rowHeight={20}
-            margin={[0, 0]}
-            containerPadding={[0, 0]}
-            layouts={{ lg: boxes, md: boxes, sm: boxes }}
-            dragConfig={{ enabled: editing, handle: ".rgl-drag-handle" }}
-            resizeConfig={{ enabled: editing }}
-            dropConfig={{
-              enabled: editing,
-              ...(dragging ? { defaultItem: { w: MODULE_BY_ID[dragging].w, h: MODULE_BY_ID[dragging].h } } : {}),
-            }}
-            onDrop={(_l, item) => {
-              if (!dragging) return;
-              layout.addModule(dragging, { x: item?.x ?? 0, y: item?.y ?? 0 });
-              setDragging(null);
-            }}
-            onLayoutChange={(next: Layout) => {
-              if (editing) layout.applyBoxes(next.map((b) => ({ i: String(b.i), x: b.x, y: b.y, w: b.w, h: b.h })));
-            }}
-          >
-            {(layout.active?.items ?? []).map((box) => (
-              <div key={box.i} className="min-h-0 min-w-0">
-                <CanvasItem
-                  box={box}
-                  editing={editing}
-                  onRemove={() => {
-                    const spec = nodeSpec(box);
-                    if (spec?.essential) {
-                      toast.warning(`${spec.label} removed — the till cannot take payment without it.`);
-                    }
-                    layout.removeModule(box.i);
-                  }}
-                  onOptions={(opts) => layout.setOptions(box.i, opts)}
-                >
-                  {isCustomId(box.i) && box.custom ? (
-                    <CustomActionButton spec={box.custom} />
-                  ) : (
-                    slots[box.i as RegisterModuleId]
-                  )}
-                </CanvasItem>
-              </div>
-            ))}
-          </Responsive>
+          {canvas && metrics && (
+            <div
+              className="origin-top-left"
+              style={{
+                width: metrics.baseWidth,
+                height: metrics.baseHeight,
+                transform: `scale(${metrics.scale})`,
+              }}
+            >
+              <GridLayout
+                width={metrics.baseWidth}
+                className="pos-scaled"
+                style={{ height: metrics.baseHeight }}
+                autoSize={false}
+                layout={boxes}
+                compactor={noCompactor}
+                positionStrategy={createScaledStrategy(metrics.scale)}
+                gridConfig={{
+                  cols: canvas.cols,
+                  rowHeight: canvas.rowHeight,
+                  margin: [0, 0],
+                  containerPadding: [0, 0],
+                }}
+                dragConfig={{ enabled: editing, handle: ".rgl-drag-handle" }}
+                resizeConfig={{ enabled: editing }}
+                dropConfig={{
+                  enabled: editing,
+                  ...(dragging
+                    ? { defaultItem: { w: MODULE_BY_ID[dragging].w, h: MODULE_BY_ID[dragging].h } }
+                    : {}),
+                }}
+                onDrop={(_l, item) => {
+                  if (!dragging) return;
+                  layout.addModule(dragging, { x: item?.x ?? 0, y: item?.y ?? 0 });
+                  setDragging(null);
+                }}
+                onLayoutChange={(next: Layout) => {
+                  if (editing)
+                    layout.applyBoxes(next.map((b) => ({ i: String(b.i), x: b.x, y: b.y, w: b.w, h: b.h })));
+                }}
+              >
+                {(layout.active?.items ?? []).map((box) => (
+                  <div key={box.i} className={`min-h-0 min-w-0 ${isGroupId(box.i) ? "z-0" : "z-10"}`}>
+                    <CanvasItem
+                      box={box}
+                      editing={editing}
+                      onRemove={() => {
+                        const spec = nodeSpec(box);
+                        if (spec?.essential) {
+                          toast.warning(`${spec.label} removed — the till cannot take payment without it.`);
+                        }
+                        layout.removeModule(box.i);
+                      }}
+                      onOptions={(opts) => layout.setOptions(box.i, opts)}
+                    >
+                      {isGroupId(box.i) ? null : isCustomId(box.i) && box.custom ? (
+                        <CustomActionButton spec={box.custom} />
+                      ) : (
+                        slots[box.i as RegisterModuleId]
+                      )}
+                    </CanvasItem>
+                  </div>
+                ))}
+              </GridLayout>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -458,6 +530,9 @@ function CustomizeBar({
   editing,
   previewing,
   custom,
+  canvas,
+  scale,
+  onCanvas,
   onEdit,
   onCancel,
   onPalette,
@@ -470,6 +545,9 @@ function CustomizeBar({
   editing: boolean;
   previewing: boolean;
   custom: boolean;
+  canvas: CanvasConfig | null;
+  scale: number;
+  onCanvas: (patch: Partial<CanvasConfig>) => void;
   onEdit: () => void;
   onCancel: () => void;
   onPalette: () => void;
@@ -501,8 +579,68 @@ function CustomizeBar({
       {editing && (
         <>
           <Button size="sm" variant="outline" className="h-8" onClick={onPalette}>
-            <PanelLeftOpen className="size-3.5" /> Feature hub
+            <PanelRightOpen className="size-3.5" /> Feature hub
           </Button>
+          {canvas && (
+            <>
+              <label className="flex items-center gap-1 text-[11px] text-primary">
+                Columns
+                <select
+                  value={canvas.cols}
+                  className="h-8 rounded-md border border-border bg-background px-1 text-xs"
+                  aria-label="Canvas columns"
+                  onChange={(e) => onCanvas({ cols: Number(e.target.value) })}
+                >
+                  {COL_CHOICES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex items-center gap-1 text-[11px] text-primary">
+                Row px
+                <input
+                  type="number"
+                  min={MIN_ROW_HEIGHT}
+                  max={MAX_ROW_HEIGHT}
+                  value={canvas.rowHeight}
+                  className="h-8 w-14 rounded-md border border-border bg-background px-2 text-xs"
+                  aria-label="Canvas row height"
+                  onChange={(e) => onCanvas({ rowHeight: Number(e.target.value) })}
+                />
+              </label>
+              <label className="flex items-center gap-1 text-[11px] text-primary">
+                Design width
+                <input
+                  type="number"
+                  min={800}
+                  max={3840}
+                  step={80}
+                  value={canvas.baseWidth}
+                  className="h-8 w-20 rounded-md border border-border bg-background px-2 text-xs"
+                  aria-label="Canvas design width"
+                  onChange={(e) => onCanvas({ baseWidth: Number(e.target.value) })}
+                />
+              </label>
+              <label className="flex items-center gap-1 text-[11px] text-primary">
+                Aspect
+                <select
+                  value={canvas.aspect}
+                  className="h-8 rounded-md border border-border bg-background px-1 text-xs"
+                  aria-label="Canvas aspect lock"
+                  onChange={(e) => onCanvas({ aspect: e.target.value as CanvasAspect })}
+                >
+                  <option value="free">Fill screen</option>
+                  <option value="16:9">16:9</option>
+                  <option value="4:3">4:3</option>
+                </select>
+              </label>
+              <span className="rounded-md bg-primary/15 px-2 py-1 text-[11px] font-semibold text-primary">
+                {Math.round(scale * 100)}%
+              </span>
+            </>
+          )}
           <label className="flex items-center gap-1 text-[11px] text-primary">
             Padding
             <input
