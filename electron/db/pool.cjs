@@ -68,6 +68,18 @@ const isLocalHost = (host) =>
   /^(localhost|127\.0\.0\.1|\.|\(local\))$/i.test(String(host || "")) ||
   String(host || "").toLowerCase() === String(process.env["COMPUTERNAME"] || "").toLowerCase();
 
+/**
+ * Private-LAN servers (the shop's back-office PC) almost never have a trusted
+ * certificate either, so they get the same relaxed TLS defaults as localhost.
+ */
+const isPrivateLan = (host) => {
+  const text = String(host || "").trim();
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(text);
+  if (!m) return !text.includes("."); // bare NetBIOS name => same LAN
+  const [a, b] = [Number(m[1]), Number(m[2])];
+  return a === 10 || (a === 192 && b === 168) || (a === 172 && b >= 16 && b <= 31);
+};
+
 /** Turns a driver failure into something a cashier or admin can act on. */
 function describeSqlError(err) {
   const code = err?.code || err?.originalError?.code || null;
@@ -78,6 +90,7 @@ function describeSqlError(err) {
     ELOGIN: "The server was reached but rejected the sign-in. Check the user name, password, or that the Windows account has access to this database.",
     ESOCKET: "Could not open a socket to SQL Server. Check the service is running, TCP/IP is enabled in SQL Server Configuration Manager, and the port is open.",
     ETIMEOUT: "The server did not answer in time. A firewall, a wrong port, or a stopped SQL Server Browser service are the usual causes.",
+    ETIMEDOUT: "The server did not answer in time. Check the firewall on the database machine and that TCP/IP is enabled in SQL Server Configuration Manager.",
     ETIMEOUT_INSTANCE_LOOKUP: "The named instance could not be resolved. Start the SQL Server Browser service or enter the instance's fixed TCP port.",
     EINSTLOOKUP: "The named instance could not be found. Check the instance name and that SQL Server Browser (UDP 1434) is running.",
     ECONNREFUSED: "The machine answered but nothing is listening on that port.",
@@ -113,7 +126,7 @@ function toDriverConfig(config) {
     config.server,
     config.port,
   );
-  const local = isLocalHost(host);
+  const local = isLocalHost(host) || isPrivateLan(host);
   const base = {
     server: host,
     database: config.database,
