@@ -1946,6 +1946,14 @@ export function usePos() {
   return ctx;
 }
 
+/**
+ * Same as usePos, but returns null instead of throwing when the provider is
+ * not mounted yet. Use in shell-level components that must never blank the app.
+ */
+export function usePosOptional() {
+  return useContext(PosContext);
+}
+
 export const money = (n: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
     Number.isFinite(n) ? n : 0,
