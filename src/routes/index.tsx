@@ -3110,6 +3110,54 @@ function Register() {
             )}
             {racketMode && (
               <div className="space-y-2 rounded-md border border-border p-2">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label>Racket from catalogue</Label>
+                    <ThemedSelect
+                      ariaLabel="Racket from catalogue"
+                      value={racketProductId}
+                      placeholder="Pick a racket"
+                      onChange={(v) => pickRacketProduct(v)}
+                      options={racketOptions}
+                    />
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        checked={racketCustomerOwned}
+                        onChange={(e) => setCustomerRacket(e.target.checked)}
+                      />
+                      Customer provided racket (no charge)
+                    </label>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>String from catalogue</Label>
+                    <ThemedSelect
+                      ariaLabel="String from catalogue"
+                      value={stringProductId}
+                      placeholder="Pick a string"
+                      onChange={(v) => pickStringProduct(v)}
+                      options={stringOptions}
+                    />
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        checked={stringCustomerOwned}
+                        onChange={(e) => setCustomerString(e.target.checked)}
+                      />
+                      Customer provided string (no charge)
+                    </label>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label>Add-ons from stock</Label>
+                  <ThemedSelect
+                    ariaLabel="Add an add-on from stock"
+                    value=""
+                    placeholder="Grips, grommets, stencil work…"
+                    onChange={(v) => addAddOnProduct(v)}
+                    options={addOnOptions}
+                  />
+                </div>
                 <div className="flex items-center justify-between">
                   <Label>Job charges</Label>
                   <button
@@ -3122,7 +3170,9 @@ function Register() {
                     + Add charge
                   </button>
                 </div>
-                {intakeCharges.map((c, i) => (
+                {intakeCharges.map((c, i) => {
+                  const lockedLabour = c.kind === "labor" && !labourUnlocked;
+                  return (
                   <div key={i} className="grid grid-cols-[7rem_minmax(0,1fr)_6rem_1.5rem] items-center gap-1.5">
                     <ThemedSelect
                       ariaLabel="Charge type"
@@ -3152,6 +3202,7 @@ function Register() {
                       className="numeric text-right"
                       inputMode="decimal"
                       placeholder="0.00"
+                      disabled={lockedLabour || !!c.customerProvided}
                       value={c.price ? String(c.price) : ""}
                       onChange={(e) =>
                         setIntakeCharges((rows) =>
@@ -3170,7 +3221,26 @@ function Register() {
                       ×
                     </button>
                   </div>
-                ))}
+                  );
+                })}
+                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                  <span className="text-muted-foreground">
+                    Labour is locked to the fee set in Settings → Booking rules.
+                  </span>
+                  <Button size="sm" variant="outline" onClick={() => void unlockLabour()}>
+                    {labourUnlocked ? "Labour unlocked" : "Override / waive charge"}
+                  </Button>
+                </div>
+                {labourUnlocked && (
+                  <Input
+                    placeholder="Reason for the override (required)"
+                    value={labourReason}
+                    onChange={(e) => setLabourReason(e.target.value)}
+                  />
+                )}
+                {combo.label && (
+                  <p className="text-[11px] font-medium text-primary">{combo.label}</p>
+                )}
                 <div className="flex items-center justify-between border-t border-border pt-1 text-xs">
                   <span className="text-muted-foreground">Charges total</span>
                   <span className="numeric font-semibold">{money(intake.subtotal)}</span>
