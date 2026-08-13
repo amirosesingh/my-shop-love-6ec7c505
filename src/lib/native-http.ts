@@ -45,10 +45,53 @@ async function nativeHttp(): Promise<{ http: CapHttp } | null> {
 /** Turn any transport failure into a sentence an operator can act on. */
 export function describeNetworkError(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
+  // A 404/410 is a missing file on the server, not a dead connection — saying
+  // "could not reach the server" sends the operator chasing the wrong problem.
+  if (/HTTP 40[0-9]|HTTP 41[0-9]/i.test(msg)) {
+    const code = msg.match(/HTTP (\d{3})/i)?.[1] ?? "404";
+    if (code === "404" || code === "410") {
+      return `The update file is missing on the server (HTTP ${code}). The release may still be uploading.`;
+    }
+    return `The update server refused the request (HTTP ${code}).`;
+  }
   if (/failed to fetch|network ?error|load failed/i.test(msg)) {
     return "Could not reach the update server. Check the internet connection on this device.";
   }
   return msg;
+}
+
+/** True when the URL answers with a downloadable file. */
+export async function httpExists(url: string): Promise<boolean> {
+  try {
+    if (isNative()) {
+      const native = await nativeHttp();
+      if (native) {
+        const res = await native.http.request({
+          url,
+          method: "HEAD",
+          connectTimeout: 10000,
+          readTimeout: 15000,
+        });
+        return res.status >= 200 && res.status < 300;
+      }
+    }
+    const res = await fetch(url, { method: "HEAD", cache: "no-store" });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * First URL in the list that actually exists. Release layouts have moved over
+ * time (and one platform's cleanup can remove another's folder), so downloads
+ * try the published link first and fall back to the older locations.
+ */
+export async function firstReachableUrl(urls: string[]): Promise<string | null> {
+  for (const url of urls.filter(Boolean)) {
+    if (await httpExists(url)) return url;
+  }
+  return null;
 }
 
 /** GET a JSON document, using the native bridge on Android. */

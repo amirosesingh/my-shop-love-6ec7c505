@@ -92,8 +92,12 @@ jobs:
           # Stable pointers the tills poll.
           # --delete clears anything left behind by earlier releases
           # (win-unpacked/ and friends) on the next run.
+          # The Android release owns latest/android/** and latest/manifest.json,
+          # so they are excluded from the prune — otherwise a Windows release
+          # silently deletes the APK the phones are told to download.
           aws s3 sync upload s3://updatelccms/pos-app/latest \
-            --endpoint-url "$R2_ENDPOINT" --cache-control "no-cache" --delete
+            --endpoint-url "$R2_ENDPOINT" --cache-control "no-cache" --delete \
+            --exclude "android/*" --exclude "manifest.json"
           # Tills already in the field read the top-level path, so the same
           # allowlisted files are mirrored there (without --delete, which
           # would wipe releases/ and latest/).

@@ -9,7 +9,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { APP_VERSION } from "./app-updates";
 import { isNative, isAndroid } from "./native";
-import { describeNetworkError, httpGetBase64, httpGetJson } from "./native-http";
+import {
+  describeNetworkError,
+  firstReachableUrl,
+  httpGetBase64,
+  httpGetJson,
+} from "./native-http";
 import { compareVersions, fetchManifest, resolvePlatformTarget, withTimeout } from "./update-manifest";
 
 const BASE = "https://updatecms.luckycharmsdnbhd.com/pos-app";
@@ -155,8 +160,15 @@ export function useAndroidUpdates() {
     try {
       const file = state.file;
       if (!file) throw new Error("No update file is available yet.");
-      const url =
-        state.url ?? `${state.feed ?? FEEDS[0]!}/${encodeURIComponent(file)}`;
+      // The published link can point at a folder another release pruned, so
+      // try it first and fall back to the older locations that still hold the
+      // same APK before telling the operator anything is wrong.
+      const candidates = [
+        state.url,
+        `${state.feed ?? FEEDS[0]!}/${encodeURIComponent(file)}`,
+        ...FEEDS.map((f) => `${f}/${encodeURIComponent(file)}`),
+      ].filter((u): u is string => Boolean(u));
+      const url = (await firstReachableUrl(candidates)) ?? candidates[0]!;
       await downloadAndInstall(url, file, (percent: number) =>
         setState((s) => ({ ...s, percent })),
       );
