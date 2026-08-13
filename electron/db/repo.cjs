@@ -52,7 +52,7 @@ const PRUNABLE_TABLES = [
   "audit_logs",
 ];
 
-const SYNC_COLUMNS = new Set(["is_synced", "sync_status", "synced_at"]);
+const SYNC_COLUMNS = new Set(["is_synced", "sync_status", "synced_at", "sync_error"]);
 
 const isUuid = (v) =>
   typeof v === "string" &&
