@@ -268,6 +268,52 @@ export function LocalDatabaseSettings() {
         )}
       </div>
 
+      {(scanning || found || scanNote) && (
+        <div className="rounded-md border border-border px-3 py-2 text-xs">
+          {scanning ? (
+            <p className="flex items-center gap-2 text-muted-foreground">
+              <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              Searching local network for database instances…
+            </p>
+          ) : found && found.length > 0 ? (
+            <div className="space-y-1">
+              <p className="text-muted-foreground">Discovered database servers</p>
+              {found.map((s) => (
+                <div
+                  key={`${s.address}\\${s.instance}`}
+                  className="flex flex-wrap items-center justify-between gap-2 border-t border-border py-1"
+                >
+                  <div>
+                    <p>
+                      {s.serverName}
+                      {s.serverName !== s.address ? ` (${s.address})` : ""}
+                      {s.instance ? ` \\ ${s.instance}` : " \\ default instance"}
+                    </p>
+                    <p className="text-muted-foreground">
+                      Port {s.port ?? "dynamic"}
+                      {s.version ? ` · SQL Server ${s.version}` : ""}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2 text-xs"
+                    disabled={busy}
+                    onClick={() => void selectServer(s)}
+                  >
+                    Select &amp; connect
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-muted-foreground">
+              {scanNote ?? "No database servers answered on this network."}
+            </p>
+          )}
+        </div>
+      )}
+
       {diagnostic && (
         <div
           className={`rounded-md border px-3 py-2 text-xs ${
