@@ -14,6 +14,10 @@ contextBridge.exposeInMainWorld("pos", {
   /** Discover SQL Server instances on this machine and the local network. */
   scanNetwork: () => invoke("pos:scan-network"),
   scanLocalDatabases: () => invoke("pos:scan-network"),
+  /** Registry + loopback discovery of instances installed on this PC. */
+  scanLocalInstances: () => invoke("db:scan-local-instances"),
+  /** Direct probe (no SQL Browser) used by the connection wizard. */
+  testDirectConnection: (params) => invoke("db:test-direct-connection", params),
   status: () => invoke("pos:status"),
   /** Silent receipt printing — no Windows print dialog. */
   print: (html, options) => invoke("print:silent", html, options),

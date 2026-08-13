@@ -136,12 +136,18 @@ function toDriverConfig(config) {
       // Local instances usually have no certificate; forcing encryption there
       // is what produces the "self signed certificate" handshake failures.
       encrypt: config.encrypt === undefined ? !local : !!config.encrypt,
-      trustServerCertificate: true,
-      enableArithAbort: true,
+      trustServerCertificate:
+        config.trustServerCertificate === undefined ? true : !!config.trustServerCertificate,
+      enableArithAbort: config.arithAbort === undefined ? true : !!config.arithAbort,
       connectTimeout: CONNECT_TIMEOUT_MS,
     },
     pool: { max: 10, min: 0, idleTimeoutMillis: 30000 },
   };
+  if (Number(config.timeout) > 0) {
+    base.connectionTimeout = Number(config.timeout);
+    base.requestTimeout = Number(config.timeout);
+    base.options.connectTimeout = Number(config.timeout);
+  }
   if (instanceName) {
     // With a named instance SQL Browser (UDP 1434) resolves the dynamic port,
     // so a fixed port must only be sent when the operator typed one.
@@ -160,7 +166,7 @@ function toDriverConfig(config) {
         `Server=${instanceName ? `${host}\\${instanceName}` : `${host},${port}`}`,
         `Database=${config.database}`,
         "Trusted_Connection=yes",
-        "TrustServerCertificate=yes",
+        `TrustServerCertificate=${base.options.trustServerCertificate ? "yes" : "no"}`,
       ].join(";");
     } else if (config.user) {
       // Fallback: tedious can do NTLM when a domain account is supplied.
@@ -251,6 +257,48 @@ async function test(config) {
   }
 }
 
+/**
+ * One-shot probe used by the connection wizard. Bypasses SQL Browser when a
+ * port is supplied and reports latency plus the active database.
+ */
+async function testDirect(input) {
+  const config = {
+    server: input?.host ?? input?.server ?? "localhost",
+    database: input?.database ?? "master",
+    auth: input?.authType === "sql" || input?.auth === "sql" ? "sql" : "windows",
+    user: input?.username ?? input?.user ?? "",
+    password: input?.password ?? "",
+    port: Number(input?.port) || 1433,
+    encrypt: input?.encrypt,
+    trustServerCertificate: input?.trustServerCertificate,
+    arithAbort: input?.arithAbort,
+    timeout: Number(input?.timeout) || undefined,
+  };
+  const started = Date.now();
+  let probe = null;
+  try {
+    probe = await new (loadDriver().ConnectionPool)(toDriverConfig(config)).connect();
+    const res = await probe
+      .request()
+      .query(
+        "SELECT 1 AS status, @@VERSION AS version, DB_NAME() AS activeDb, @@SERVERNAME AS serverName",
+      );
+    const row = res.recordset[0] ?? {};
+    return {
+      ok: true,
+      latencyMs: Date.now() - started,
+      status: row.status ?? 1,
+      version: row.version,
+      activeDb: row.activeDb,
+      serverName: row.serverName,
+    };
+  } catch (err) {
+    return { ok: false, latencyMs: Date.now() - started, ...describeSqlError(err) };
+  } finally {
+    if (probe) await probe.close().catch(() => {});
+  }
+}
+
 module.exports = {
   sql,
   connect,
@@ -258,6 +306,7 @@ module.exports = {
   getPool,
   getConfig,
   test,
+  testDirect,
   applySchema,
   describeSqlError,
   parseServerField,

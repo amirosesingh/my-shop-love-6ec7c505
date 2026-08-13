@@ -621,6 +621,22 @@ function registerIpc() {
     }
   });
 
+  ipcMain.handle("db:scan-local-instances", async () => {
+    try {
+      return await discover.scanLocalInstances();
+    } catch (err) {
+      return { ok: false, targets: [], servers: [], ...pool.describeSqlError(err) };
+    }
+  });
+
+  ipcMain.handle("db:test-direct-connection", async (_e, params) => {
+    try {
+      return await pool.testDirect(params);
+    } catch (err) {
+      return { ok: false, ...pool.describeSqlError(err) };
+    }
+  });
+
   ipcMain.handle("pos:write", async (_e, _context, op) => {
     try {
       await repo.applyOp(op);

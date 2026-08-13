@@ -18,6 +18,10 @@ export type LocalDbConfig = {
   password: string;
   port: number;
   encrypt: boolean;
+  /** Accept self-signed / internal certificates (default on). */
+  trustServerCertificate?: boolean;
+  /** SET ARITHABORT ON for the session (default on). */
+  arithAbort?: boolean;
 };
 
 export const defaultLocalDbConfig: LocalDbConfig = {
@@ -28,6 +32,8 @@ export const defaultLocalDbConfig: LocalDbConfig = {
   password: "",
   port: 1433,
   encrypt: false,
+  trustServerCertificate: true,
+  arithAbort: true,
 };
 
 export type TableSyncStat = {
@@ -49,6 +55,8 @@ export type LocalDbTestResult = {
   ok: boolean;
   version?: string;
   serverName?: string;
+  activeDb?: string;
+  latencyMs?: number;
   error?: string;
   code?: string | null;
   originalMessage?: string | null;
@@ -62,7 +70,7 @@ export type DiscoveredDbServer = {
   instance: string;
   port: number | null;
   version: string | null;
-  source?: "browser" | "local";
+  source?: "browser" | "local" | "registry";
 };
 
 export type ScanNetworkResult = {
@@ -70,6 +78,26 @@ export type ScanNetworkResult = {
   servers?: DiscoveredDbServer[];
   error?: string;
   hint?: string;
+};
+
+/** Result of the local (registry + loopback) instance scan. */
+export type LocalInstanceScan = ScanNetworkResult & {
+  hostname?: string;
+  targets?: string[];
+};
+
+/** Parameters accepted by the direct (Browser-free) connection probe. */
+export type DirectConnectionParams = {
+  host: string;
+  port: number;
+  database: string;
+  authType: "windows" | "sql";
+  username?: string;
+  password?: string;
+  encrypt: boolean;
+  trustServerCertificate: boolean;
+  arithAbort: boolean;
+  timeout?: number;
 };
 
 export type LocalSyncStatus = {
@@ -95,6 +123,10 @@ export type PosBridge = {
   /** Discover local/LAN SQL Server instances (desktop shell only). */
   scanNetwork?: () => Promise<ScanNetworkResult>;
   scanLocalDatabases?: () => Promise<ScanNetworkResult>;
+  /** Registry + loopback discovery of instances installed on this PC. */
+  scanLocalInstances?: () => Promise<LocalInstanceScan>;
+  /** Direct probe with explicit TLS/auth options. */
+  testDirectConnection?: (params: DirectConnectionParams) => Promise<LocalDbTestResult>;
   status: () => Promise<LocalSyncStatus>;
   push: () => Promise<{ ok: boolean; pushed: number; failed: number; error?: string }>;
   pull: () => Promise<{ ok: boolean; merged: number; error?: string }>;
@@ -259,6 +291,69 @@ export async function scanLocalDatabases(): Promise<ScanNetworkResult> {
 }
 
 const CONFIG_KEY = "pos.localdb.config";
+
+/**
+ * Registry + loopback discovery of SQL Server instances installed on this PC.
+ * Falls back to the LAN scan when the shell predates the dedicated channel.
+ */
+export async function scanLocalInstances(): Promise<LocalInstanceScan> {
+  const bridge = localDb();
+  if (!bridge) {
+    return {
+      ok: false,
+      servers: [],
+      targets: [],
+      error: "Instance discovery is only available in the Windows desktop app.",
+    };
+  }
+  try {
+    if (bridge.scanLocalInstances) {
+      const res = await bridge.scanLocalInstances();
+      return { ...res, servers: res.servers ?? [], targets: res.targets ?? [] };
+    }
+    const res = await scanLocalDatabases();
+    return {
+      ...res,
+      targets: (res.servers ?? []).map((s) =>
+        s.instance ? `${s.serverName}\\${s.instance}` : s.serverName,
+      ),
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      servers: [],
+      targets: [],
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+/** Direct connection probe with explicit TLS options; reports latency. */
+export async function testDirectConnection(
+  params: DirectConnectionParams,
+): Promise<LocalDbTestResult> {
+  const bridge = localDb();
+  if (!bridge) {
+    return { ok: false, error: "Only the Windows desktop app can reach a local SQL Server." };
+  }
+  try {
+    if (bridge.testDirectConnection) return await bridge.testDirectConnection(params);
+    return await bridge.test({
+      server: params.host,
+      database: params.database,
+      auth: params.authType,
+      user: params.username ?? "",
+      password: params.password ?? "",
+      port: params.port,
+      encrypt: params.encrypt,
+      trustServerCertificate: params.trustServerCertificate,
+      arithAbort: params.arithAbort,
+    });
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 const SECRET_NAME = "localdb.config";
 
 let cachedConfig: LocalDbConfig | null = null;
