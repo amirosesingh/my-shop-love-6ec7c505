@@ -11,6 +11,8 @@ const DRIVER_HINT =
 const WINDOWS_AUTH_HINT =
   "Windows authentication needs the msnodesqlv8 driver. Run: npm install msnodesqlv8 (requires Visual Studio Build Tools), or switch to a SQL Server login.";
 
+const CONNECT_TIMEOUT_MS = 15_000;
+
 let driver = null;
 
 /** Loads the mssql driver on first use so a missing module never kills boot. */
@@ -29,11 +31,65 @@ function loadDriver() {
 function requireWindowsDriver() {
   try {
     require.resolve("msnodesqlv8");
+    return true;
   } catch (err) {
-    const e = new Error(WINDOWS_AUTH_HINT);
-    e.cause = err;
-    throw e;
+    return false;
   }
+}
+
+/**
+ * `localhost\SQLEXPRESS`, `HOST\INST,1435`, `tcp:host,1433` and plain hosts all
+ * arrive in the same field. Tedious needs them split apart.
+ */
+function parseServerField(raw, fallbackPort) {
+  let text = String(raw ?? "").trim();
+  text = text.replace(/^tcp:/i, "");
+  let port = Number(fallbackPort) || 1433;
+  let explicitPort = false;
+  const comma = text.lastIndexOf(",");
+  if (comma > -1) {
+    const maybePort = Number(text.slice(comma + 1).trim());
+    if (Number.isFinite(maybePort) && maybePort > 0) {
+      port = maybePort;
+      explicitPort = true;
+      text = text.slice(0, comma).trim();
+    }
+  }
+  let instanceName = "";
+  const slash = text.indexOf("\\");
+  if (slash > -1) {
+    instanceName = text.slice(slash + 1).trim();
+    text = text.slice(0, slash).trim();
+  }
+  return { host: text || "localhost", instanceName, port, explicitPort };
+}
+
+const isLocalHost = (host) =>
+  /^(localhost|127\.0\.0\.1|\.|\(local\))$/i.test(String(host || "")) ||
+  String(host || "").toLowerCase() === String(process.env["COMPUTERNAME"] || "").toLowerCase();
+
+/** Turns a driver failure into something a cashier or admin can act on. */
+function describeSqlError(err) {
+  const code = err?.code || err?.originalError?.code || null;
+  const message = err instanceof Error ? err.message : String(err);
+  const originalMessage =
+    err?.originalError?.message || err?.originalError?.info?.message || null;
+  const hints = {
+    ELOGIN: "The server was reached but rejected the sign-in. Check the user name, password, or that the Windows account has access to this database.",
+    ESOCKET: "Could not open a socket to SQL Server. Check the service is running, TCP/IP is enabled in SQL Server Configuration Manager, and the port is open.",
+    ETIMEOUT: "The server did not answer in time. A firewall, a wrong port, or a stopped SQL Server Browser service are the usual causes.",
+    ETIMEOUT_INSTANCE_LOOKUP: "The named instance could not be resolved. Start the SQL Server Browser service or enter the instance's fixed TCP port.",
+    EINSTLOOKUP: "The named instance could not be found. Check the instance name and that SQL Server Browser (UDP 1434) is running.",
+    ECONNREFUSED: "The machine answered but nothing is listening on that port.",
+    ENOTFOUND: "The server name could not be resolved on the network.",
+    EDRIVER: "The database driver is missing on this machine.",
+  };
+  return {
+    error: message,
+    code,
+    originalMessage,
+    hint: (code && hints[code]) || null,
+  };
 }
 
 /**
@@ -53,22 +109,63 @@ let activeConfig = null;
 
 function toDriverConfig(config) {
   loadDriver();
+  const { host, instanceName, port, explicitPort } = parseServerField(
+    config.server,
+    config.port,
+  );
+  const local = isLocalHost(host);
   const base = {
-    server: config.server,
+    server: host,
     database: config.database,
-    port: Number(config.port) || 1433,
+    connectionTimeout: CONNECT_TIMEOUT_MS,
+    requestTimeout: CONNECT_TIMEOUT_MS,
     options: {
-      encrypt: !!config.encrypt,
+      // Local instances usually have no certificate; forcing encryption there
+      // is what produces the "self signed certificate" handshake failures.
+      encrypt: config.encrypt === undefined ? !local : !!config.encrypt,
       trustServerCertificate: true,
       enableArithAbort: true,
+      connectTimeout: CONNECT_TIMEOUT_MS,
     },
     pool: { max: 10, min: 0, idleTimeoutMillis: 30000 },
   };
+  if (instanceName) {
+    // With a named instance SQL Browser (UDP 1434) resolves the dynamic port,
+    // so a fixed port must only be sent when the operator typed one.
+    base.options.instanceName = instanceName;
+    if (explicitPort) base.port = port;
+  } else {
+    base.port = port;
+  }
   if (config.auth === "windows") {
-    // msnodesqlv8 driver handles integrated auth on Windows.
-    requireWindowsDriver();
-    base.driver = "msnodesqlv8";
-    base.options.trustedConnection = true;
+    if (requireWindowsDriver()) {
+      // Native driver: integrated auth straight through ODBC.
+      base.driver = "msnodesqlv8";
+      base.options.trustedConnection = true;
+      base.connectionString = [
+        "Driver={ODBC Driver 17 for SQL Server}",
+        `Server=${instanceName ? `${host}\\${instanceName}` : `${host},${port}`}`,
+        `Database=${config.database}`,
+        "Trusted_Connection=yes",
+        "TrustServerCertificate=yes",
+      ].join(";");
+    } else if (config.user) {
+      // Fallback: tedious can do NTLM when a domain account is supplied.
+      delete base.user;
+      delete base.password;
+      base.authentication = {
+        type: "ntlm",
+        options: {
+          userName: config.user,
+          password: config.password,
+          domain: config.domain || process.env["USERDOMAIN"] || host,
+        },
+      };
+    } else {
+      const e = new Error(WINDOWS_AUTH_HINT);
+      e.code = "EDRIVER";
+      throw e;
+    }
   } else {
     base.user = config.user;
     base.password = config.password;
@@ -125,14 +222,30 @@ async function applySchema() {
 }
 
 async function test(config) {
-  const driverConfig = toDriverConfig(config);
-  const probe = await new (loadDriver().ConnectionPool)(driverConfig).connect();
+  let probe = null;
   try {
-    const res = await probe.request().query("SELECT @@VERSION AS version");
-    return { ok: true, version: res.recordset[0].version };
+    const driverConfig = toDriverConfig(config);
+    probe = await new (loadDriver().ConnectionPool)(driverConfig).connect();
+    const res = await probe
+      .request()
+      .query("SELECT @@VERSION AS version, @@SERVERNAME AS name");
+    const row = res.recordset[0] ?? {};
+    return { ok: true, version: row.version, serverName: row.name };
+  } catch (err) {
+    return { ok: false, ...describeSqlError(err) };
   } finally {
-    await probe.close();
+    if (probe) await probe.close().catch(() => {});
   }
 }
 
-module.exports = { sql, connect, close, getPool, getConfig, test, applySchema };
+module.exports = {
+  sql,
+  connect,
+  close,
+  getPool,
+  getConfig,
+  test,
+  applySchema,
+  describeSqlError,
+  parseServerField,
+};
