@@ -296,6 +296,12 @@ export function PosProvider({ children }: { children: ReactNode }) {
   // Who is acting right now — stamped on transfer approvals and receipts.
   const actorRef = useRef("Manager");
   actorRef.current = terminalUser?.name || user?.email || "Manager";
+  // Branch overrides and global locks for the scopable settings blocks.
+  const [scope, setScope] = useState<BranchSettingsState>(emptyBranchSettings);
+  const scopeRef = useRef(scope);
+  scopeRef.current = scope;
+  const whoRef = useRef("Manager");
+  whoRef.current = actorRef.current;
   // Lets earlier callbacks reach the settings writer defined further down.
   const updateSettingsRef = useRef<((patch: Partial<AppSettings>) => void) | null>(null);
 
