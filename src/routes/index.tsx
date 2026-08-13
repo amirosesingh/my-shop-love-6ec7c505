@@ -803,7 +803,12 @@ function Register() {
       {
         kind: "labor",
         name: stringingService?.name || "Stringing labour",
-        price: r2(Math.max(0, Number(stringingService?.fee ?? 0))),
+        price: r2(
+          Math.max(
+            0,
+            Number(stringingService?.fee ?? state.settings.integrations.baseLaborFee ?? 0),
+          ),
+        ),
       },
     ]);
     if (bookingRules.autoJobTag) setJobTag(newJobTag());
