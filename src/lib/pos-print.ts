@@ -663,6 +663,7 @@ function bookingBody(booking: Booking, member: Member | null, pay: PaymentDetail
       ${booking.customerPhone ? `<tr><td>Phone</td><td class="r">${esc(booking.customerPhone)}</td></tr>` : ""}
     </table>
     <hr><table>${rows}</table>
+    ${chargesBlock(booking)}
     <hr><table>
       <tr><td>Subtotal</td><td class="r">${fmt(booking.subtotal)}</td></tr>
       <tr><td>Discount</td><td class="r">-${fmt(booking.discount)}</td></tr>
@@ -728,6 +729,24 @@ export function printBookingPayment(booking: Booking, payment: BookingPayment) {
 
 /** Job-card details, printed under the booking slip for string jobs. */
 function jobCardBlock(booking: Booking) {
+  return jobCardRows(booking);
+}
+
+/** Itemised intake charges (labour / string / grip / add-ons), when captured. */
+function chargesBlock(booking: Booking) {
+  const charges = booking.charges ?? [];
+  if (!charges.length) {
+    return booking.serviceFee
+      ? `<table><tr><td>${esc(booking.serviceName || "Service")}</td><td class="r">${fmt(booking.serviceFee)}</td></tr></table>`
+      : "";
+  }
+  const rows = charges
+    .map((c) => `<tr><td>${esc(c.name || c.kind)}</td><td class="r">${fmt(c.price)}</td></tr>`)
+    .join("");
+  return `<hr><div class="muted">Job charges</div><table>${rows}</table>`;
+}
+
+function jobCardRows(booking: Booking) {
   const j = booking.job;
   if (!j) return "";
   const unit = j.tensionUnit ?? "lb";

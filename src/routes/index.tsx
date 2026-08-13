@@ -75,7 +75,8 @@ import {
   voucherValue,
 } from "@/lib/coupons";
 import type { Campaign, VoucherView } from "@/lib/coupons";
-import type { Booking, CartLine, DiscountType, PaymentMethod, Sale } from "@/lib/pos-types";
+import type { Booking, CartLine, DiscountType, IntakeCharge, PaymentMethod, Sale } from "@/lib/pos-types";
+import { intakeTotals } from "@/lib/booking-charges";
 import type { Payment } from "@/lib/pos-types";
 import { TenderSplit, rememberBanks } from "@/components/pos/TenderSplit";
 import { lineUnitDiscount, paymentsLabel, paymentsTotal, PAYMENT_LABELS, r2, validateTenders } from "@/lib/pos-types";
@@ -238,6 +239,8 @@ function Register() {
   const [jobNotes, setJobNotes] = useState("");
   const [promisedAt, setPromisedAt] = useState("");
   const [notifyWhatsApp, setNotifyWhatsApp] = useState(false);
+  /** Itemised racket intake charges: labour, string, grip, add-ons. */
+  const [intakeCharges, setIntakeCharges] = useState<IntakeCharge[]>([]);
   /** Narrow windows: the action deck collapses so it can't cover the totals. */
   const [deckOpen, setDeckOpen] = useState(false);
   /* Operation deck state */
@@ -705,6 +708,7 @@ function Register() {
     setJobNotes("");
     setPromisedAt("");
     setNotifyWhatsApp(false);
+    setIntakeCharges([]);
   }
 
   /** Racket / stringing job started from the products card — cart independent. */
@@ -720,11 +724,28 @@ function Register() {
       setServiceId(stringingService.id);
       setServiceFee(stringingService.fee ? String(stringingService.fee) : "");
     }
+    setIntakeCharges([
+      {
+        kind: "labor",
+        name: stringingService?.name || "Stringing labour",
+        price: r2(Math.max(0, Number(stringingService?.fee ?? 0))),
+      },
+    ]);
     setBookMode("racket");
     setBookOpen(true);
   }
   const serviceLabel = pickedService?.name ?? customService.trim();
-  const serviceCharge = useServices || racketMode ? r2(Math.max(0, Number(serviceFee || 0))) : 0;
+  const intake = intakeTotals(
+    intakeCharges,
+    state.settings.tax,
+    0,
+    state.settings.integrations.categoryMap,
+  );
+  const serviceCharge = racketMode
+    ? intake.subtotal
+    : useServices
+      ? r2(Math.max(0, Number(serviceFee || 0)))
+      : 0;
   const bookingTotal = r2(totals.total + serviceCharge);
 
   async function bookAndPayLater() {
@@ -738,7 +759,7 @@ function Register() {
       });
       return;
     }
-    if (!(await requirePermission("can_process_sale"))) return;
+    if (!(await requirePermission("can_create_booking"))) return;
     const paidNow =
       payTiming === "collection" ? 0 : payTiming === "now" ? bookingTotal : r2(Math.max(0, Number(deposit || 0)));
     if (paidNow > bookingTotal) {
@@ -763,6 +784,7 @@ function Register() {
         serviceTypeId: pickedService?.id,
         serviceName: serviceLabel || undefined,
         serviceFee: serviceCharge || undefined,
+        charges: racketMode && intake.charges.length ? intake.charges : undefined,
         paymentTiming: payTiming,
         deposit: paidNow,
         depositMethod,
@@ -2804,15 +2826,72 @@ function Register() {
               </div>
             )}
             {racketMode && (
-              <div className="space-y-1">
-                <Label>Stringing fee</Label>
-                <Input
-                  className="numeric text-right"
-                  inputMode="decimal"
-                  placeholder="0.00"
-                  value={serviceFee}
-                  onChange={(e) => setServiceFee(e.target.value)}
-                />
+              <div className="space-y-2 rounded-md border border-border p-2">
+                <div className="flex items-center justify-between">
+                  <Label>Job charges</Label>
+                  <button
+                    type="button"
+                    className="text-[11px] text-primary hover:underline"
+                    onClick={() =>
+                      setIntakeCharges((c) => [...c, { kind: "accessory", name: "", price: 0 }])
+                    }
+                  >
+                    + Add charge
+                  </button>
+                </div>
+                {intakeCharges.map((c, i) => (
+                  <div key={i} className="grid grid-cols-[7rem_minmax(0,1fr)_6rem_1.5rem] items-center gap-1.5">
+                    <ThemedSelect
+                      ariaLabel="Charge type"
+                      value={c.kind}
+                      onChange={(v) =>
+                        setIntakeCharges((rows) =>
+                          rows.map((r, j) => (j === i ? { ...r, kind: v as IntakeCharge["kind"] } : r)),
+                        )
+                      }
+                      options={[
+                        { value: "labor", label: "Labour" },
+                        { value: "string", label: "String" },
+                        { value: "grip", label: "Grip" },
+                        { value: "accessory", label: "Add-on" },
+                      ]}
+                    />
+                    <Input
+                      placeholder="Description"
+                      value={c.name}
+                      onChange={(e) =>
+                        setIntakeCharges((rows) =>
+                          rows.map((r, j) => (j === i ? { ...r, name: e.target.value } : r)),
+                        )
+                      }
+                    />
+                    <Input
+                      className="numeric text-right"
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      value={c.price ? String(c.price) : ""}
+                      onChange={(e) =>
+                        setIntakeCharges((rows) =>
+                          rows.map((r, j) =>
+                            j === i ? { ...r, price: Math.max(0, Number(e.target.value) || 0) } : r,
+                          ),
+                        )
+                      }
+                    />
+                    <button
+                      type="button"
+                      aria-label="Remove charge"
+                      className="text-muted-foreground hover:text-destructive"
+                      onClick={() => setIntakeCharges((rows) => rows.filter((_, j) => j !== i))}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between border-t border-border pt-1 text-xs">
+                  <span className="text-muted-foreground">Charges total</span>
+                  <span className="numeric font-semibold">{money(intake.subtotal)}</span>
+                </div>
               </div>
             )}
             <div className="space-y-1">

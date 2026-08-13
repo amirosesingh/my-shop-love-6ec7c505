@@ -41,6 +41,9 @@ export const PERMISSION_GROUPS = [
       "can_reprint_bill",
       "can_send_whatsapp_bill",
       "can_manage_bookings",
+      "can_create_booking",
+      "can_collect_booking",
+      "can_cancel_booking",
     ],
   },
   {
@@ -118,6 +121,9 @@ export type PermissionKey =
   | "can_reprint_bill"
   | "can_send_whatsapp_bill"
   | "can_manage_bookings"
+  | "can_create_booking"
+  | "can_collect_booking"
+  | "can_cancel_booking"
   | "can_view_inventory"
   | "can_edit_product_price"
   | "can_add_new_product"
@@ -168,6 +174,9 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   can_reprint_bill: "Reprint / re-issue a bill",
   can_send_whatsapp_bill: "Send a bill by WhatsApp",
   can_manage_bookings: "Take and collect bookings (pay later)",
+  can_create_booking: "Create bookings / racket jobs",
+  can_collect_booking: "Collect bookings & take part payments",
+  can_cancel_booking: "Cancel or delete a booking / job",
   can_view_inventory: "View inventory",
   can_edit_product_price: "Edit product pricing",
   can_add_new_product: "Add new products",
@@ -219,6 +228,8 @@ export const CASHIER_PERMISSIONS: StaffPermissions = build([
   "can_hold_cart",
   "can_reprint_bill",
   "can_manage_bookings",
+  "can_create_booking",
+  "can_collect_booking",
   "can_view_inventory",
   "can_add_member",
   "can_apply_member_discount",
@@ -474,6 +485,9 @@ export const PERMISSION_TAGS: Record<
       "can_reprint_bill",
       "can_send_whatsapp_bill",
       "can_manage_bookings",
+      "can_create_booking",
+      "can_collect_booking",
+      "can_cancel_booking",
       "can_add_member",
       "can_apply_member_discount",
       "can_redeem_points",
