@@ -904,6 +904,92 @@ function Register() {
   }
 
   const serviceLabel = pickedService?.name ?? customService.trim();
+  /* ---- racket intake: catalogue pickers, customer-provided gear, labour lock ---- */
+  const catalogueOptions = (match: RegExp) =>
+    state.products
+      .filter((p) => !p.archived && match.test(`${p.category} ${p.subCategory ?? ""} ${p.name}`))
+      .slice(0, 60)
+      .map((p) => ({ value: p.id, label: `${p.name} — ${money(p.price)}` }));
+  const racketOptions = catalogueOptions(/racket|frame/i);
+  const stringOptions = catalogueOptions(/string/i);
+  const addOnOptions = catalogueOptions(/grip|grommet|stencil|accessor|add-on/i);
+
+  /** Replace (or clear) one charge line of a given kind. */
+  const setChargeOfKind = (kind: IntakeCharge["kind"], next: IntakeCharge | null) =>
+    setIntakeCharges((rows) => {
+      const rest = rows.filter((r) => !(r.kind === kind && r.productId !== undefined) && !(r.kind === kind && !r.name));
+      const without = rows.filter((r) => r.kind !== kind || r.kind === "labor");
+      const base = kind === "labor" ? rows : without.length ? without : rest;
+      return next ? [...base, next] : base;
+    });
+
+  function pickRacketProduct(id: string) {
+    const p = state.products.find((x) => x.id === id);
+    setRacketProductId(id);
+    if (!p) return;
+    setRacketCustomerOwned(false);
+    setRacketModel(p.name);
+    setIntakeCharges((rows) => [
+      ...rows.filter((r) => !(r.kind === "accessory" && /^racket/i.test(r.name))),
+      { kind: "accessory", name: `Racket — ${p.name}`, price: r2(p.price), productId: p.id },
+    ]);
+  }
+
+  function setCustomerRacket(on: boolean) {
+    setRacketCustomerOwned(on);
+    if (!on) return;
+    setRacketProductId("");
+    setIntakeCharges((rows) => rows.filter((r) => !(r.kind === "accessory" && /^racket/i.test(r.name))));
+  }
+
+  function pickStringProduct(id: string) {
+    const p = state.products.find((x) => x.id === id);
+    setStringProductId(id);
+    if (!p) return;
+    setStringCustomerOwned(false);
+    setStringType(p.name);
+    setChargeOfKind("string", {
+      kind: "string",
+      name: p.name,
+      price: r2(p.price),
+      productId: p.id,
+    });
+  }
+
+  function setCustomerString(on: boolean) {
+    setStringCustomerOwned(on);
+    if (!on) return;
+    setStringProductId("");
+    setIntakeCharges((rows) =>
+      rows.map((r) => (r.kind === "string" ? { ...r, price: 0, customerProvided: true, productId: undefined } : r)),
+    );
+  }
+
+  function addAddOnProduct(id: string) {
+    const p = state.products.find((x) => x.id === id);
+    if (!p) return;
+    setIntakeCharges((rows) => [
+      ...rows,
+      {
+        kind: /grip/i.test(p.category + p.name) ? "grip" : "accessory",
+        name: p.name,
+        price: r2(p.price),
+        productId: p.id,
+      },
+    ]);
+  }
+
+  /** Unlock the read-only labour fee — supervisor gate or a written reason. */
+  async function unlockLabour() {
+    if (labourUnlocked) return;
+    if (bookingRules.overrideNeedsSupervisor && !isSupervisor) {
+      const ok = await requirePermission("can_access_pos_settings");
+      if (!ok) return;
+    }
+    setLabourUnlocked(true);
+    toast.info("Labour fee unlocked — record the reason.");
+  }
+
   /** Racket + string bought together earns the configured combo on labour. */
   const combo = applyCombo(intakeCharges, bookingRules);
   const intake = intakeTotals(
