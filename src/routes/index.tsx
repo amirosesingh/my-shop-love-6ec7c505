@@ -60,7 +60,7 @@ import { nextBillNumber } from "@/lib/bill-number";
 import { useAuth } from "@/lib/pos-auth";
 import { productVisibleAt } from "@/lib/branch-policy";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
-import { BOOKING_TIMING_LABELS, type BookingPaymentTiming } from "@/lib/pos-types";
+import { BOOKING_TIMING_LABELS, bookingRulesOf, type BookingPaymentTiming } from "@/lib/pos-types";
 import { useUserPermissions } from "@/lib/pos-permissions";
 import { useVisibility } from "@/lib/ui-visibility";
 import { useUiScale } from "@/lib/use-ui-scale";
@@ -735,6 +735,33 @@ function Register() {
   /** Master lists an admin curates in booking settings. */
   const racketModelList = state.settings.integrations.racketModels ?? [];
   const stringModelList = state.settings.integrations.stringModels ?? [];
+
+  /** House rules for bookings, set in Settings → Booking rules. */
+  const bookingRules = bookingRulesOf(state.settings.integrations.bookingRules);
+  const isSupervisor = user?.role === "admin" || user?.role === "manager";
+  /** Payment timings the branch allows, in the order they are shown. */
+  const allowedTimings = (["now", "deposit", "collection"] as BookingPaymentTiming[]).filter((t) =>
+    t === "now"
+      ? bookingRules.allowPayNow
+      : t === "deposit"
+        ? bookingRules.allowPayDeposit
+        : bookingRules.allowPayOnCollection,
+  );
+  /** Ready-by value pre-filled from the branch's default turnaround. */
+  const proposedPromisedAt = () => {
+    const hours = bookingRules.defaultTurnaroundHours;
+    if (!hours) return "";
+    const at = new Date(Date.now() + hours * 3_600_000);
+    at.setMinutes(at.getMinutes() - at.getTimezoneOffset());
+    return at.toISOString().slice(0, 16);
+  };
+  /** Smallest deposit this branch will accept on a booking of `total`. */
+  const minDepositFor = (total: number) =>
+    !bookingRules.requireDeposit
+      ? 0
+      : bookingRules.depositMode === "percent"
+        ? r2((total * Math.max(0, bookingRules.depositMin)) / 100)
+        : r2(Math.max(0, bookingRules.depositMin));
 
   /** Jobs still on the bench today — drives the badge on the booking button. */
   const activeBookingCount = state.bookings.filter(

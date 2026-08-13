@@ -51,6 +51,7 @@ import { Route as ReportsStockRouteImport } from './routes/reports.stock'
 import { Route as ReportsVoidsRouteImport } from './routes/reports.voids'
 import { Route as SettingsIndexRouteImport } from './routes/settings.index'
 import { Route as SettingsAccountsRouteImport } from './routes/settings.accounts'
+import { Route as SettingsBookingRulesRouteImport } from './routes/settings.booking-rules'
 import { Route as SettingsBookingSlipRouteImport } from './routes/settings.booking-slip'
 import { Route as SettingsCatalogRouteImport } from './routes/settings.catalog'
 import { Route as SettingsDiagnosticsRouteImport } from './routes/settings.diagnostics'
@@ -299,6 +300,11 @@ const SettingsAccountsRoute = SettingsAccountsRouteImport.update({
   path: '/settings/accounts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsBookingRulesRoute = SettingsBookingRulesRouteImport.update({
+  id: '/settings/booking-rules',
+  path: '/settings/booking-rules',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsBookingSlipRoute = SettingsBookingSlipRouteImport.update({
   id: '/settings/booking-slip',
   path: '/settings/booking-slip',
@@ -526,6 +532,7 @@ export interface FileRoutesByFullPath {
   '/reports/stock': typeof ReportsStockRoute
   '/reports/voids': typeof ReportsVoidsRoute
   '/settings/accounts': typeof SettingsAccountsRoute
+  '/settings/booking-rules': typeof SettingsBookingRulesRoute
   '/settings/booking-slip': typeof SettingsBookingSlipRoute
   '/settings/catalog': typeof SettingsCatalogRoute
   '/settings/diagnostics': typeof SettingsDiagnosticsRoute
@@ -607,6 +614,7 @@ export interface FileRoutesByTo {
   '/reports/stock': typeof ReportsStockRoute
   '/reports/voids': typeof ReportsVoidsRoute
   '/settings/accounts': typeof SettingsAccountsRoute
+  '/settings/booking-rules': typeof SettingsBookingRulesRoute
   '/settings/booking-slip': typeof SettingsBookingSlipRoute
   '/settings/catalog': typeof SettingsCatalogRoute
   '/settings/diagnostics': typeof SettingsDiagnosticsRoute
@@ -689,6 +697,7 @@ export interface FileRoutesById {
   '/reports/stock': typeof ReportsStockRoute
   '/reports/voids': typeof ReportsVoidsRoute
   '/settings/accounts': typeof SettingsAccountsRoute
+  '/settings/booking-rules': typeof SettingsBookingRulesRoute
   '/settings/booking-slip': typeof SettingsBookingSlipRoute
   '/settings/catalog': typeof SettingsCatalogRoute
   '/settings/diagnostics': typeof SettingsDiagnosticsRoute
@@ -772,6 +781,7 @@ export interface FileRouteTypes {
     | '/reports/stock'
     | '/reports/voids'
     | '/settings/accounts'
+    | '/settings/booking-rules'
     | '/settings/booking-slip'
     | '/settings/catalog'
     | '/settings/diagnostics'
@@ -853,6 +863,7 @@ export interface FileRouteTypes {
     | '/reports/stock'
     | '/reports/voids'
     | '/settings/accounts'
+    | '/settings/booking-rules'
     | '/settings/booking-slip'
     | '/settings/catalog'
     | '/settings/diagnostics'
@@ -934,6 +945,7 @@ export interface FileRouteTypes {
     | '/reports/stock'
     | '/reports/voids'
     | '/settings/accounts'
+    | '/settings/booking-rules'
     | '/settings/booking-slip'
     | '/settings/catalog'
     | '/settings/diagnostics'
@@ -1016,6 +1028,7 @@ export interface RootRouteChildren {
   ReportsStockRoute: typeof ReportsStockRoute
   ReportsVoidsRoute: typeof ReportsVoidsRoute
   SettingsAccountsRoute: typeof SettingsAccountsRoute
+  SettingsBookingRulesRoute: typeof SettingsBookingRulesRoute
   SettingsBookingSlipRoute: typeof SettingsBookingSlipRoute
   SettingsCatalogRoute: typeof SettingsCatalogRoute
   SettingsDiagnosticsRoute: typeof SettingsDiagnosticsRoute
@@ -1351,6 +1364,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsAccountsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/booking-rules': {
+      id: '/settings/booking-rules'
+      path: '/settings/booking-rules'
+      fullPath: '/settings/booking-rules'
+      preLoaderRoute: typeof SettingsBookingRulesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/booking-slip': {
       id: '/settings/booking-slip'
       path: '/settings/booking-slip'
@@ -1668,6 +1688,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReportsStockRoute: ReportsStockRoute,
   ReportsVoidsRoute: ReportsVoidsRoute,
   SettingsAccountsRoute: SettingsAccountsRoute,
+  SettingsBookingRulesRoute: SettingsBookingRulesRoute,
   SettingsBookingSlipRoute: SettingsBookingSlipRoute,
   SettingsCatalogRoute: SettingsCatalogRoute,
   SettingsDiagnosticsRoute: SettingsDiagnosticsRoute,
