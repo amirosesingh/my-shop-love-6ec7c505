@@ -12,7 +12,7 @@
  */
 import { APP_VERSION } from "./app-updates";
 import { isNative } from "./native";
-import { httpGetBase64, httpGetJson } from "./native-http";
+import { firstReachableUrl, httpGetBase64, httpGetJson } from "./native-http";
 import { fetchManifest, withTimeout } from "./update-manifest";
 
 const BASE = "https://updatecms.luckycharmsdnbhd.com/pos-app";
@@ -102,7 +102,12 @@ export async function checkWebBundle(): Promise<string | null> {
     const current = readState()?.version ?? APP_VERSION;
     if (!manifest?.version || !isNewerBundle(manifest.version, current)) return null;
 
-    const url = manifest.url ?? `${feed}/${manifest.file}`;
+    const candidates = [
+      manifest.url,
+      `${feed}/${manifest.file}`,
+      ...WEB_FEEDS.map((f) => `${f}/${manifest!.file}`),
+    ].filter((u): u is string => Boolean(u));
+    const url = (await firstReachableUrl(candidates)) ?? candidates[0]!;
     const base64 = await httpGetBase64(url);
     if (!base64) return null;
 
