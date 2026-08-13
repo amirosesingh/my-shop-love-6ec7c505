@@ -2,6 +2,7 @@ import { useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { useNodeOptions } from "@/components/pos/layout/node-options";
 
 type ButtonProps = ComponentProps<typeof Button>;
 
@@ -23,14 +24,19 @@ export type ActionButtonProps = Omit<ButtonProps, "children"> & {
  * stays available through the tooltip and the accessible name.
  */
 export function ActionButton({
-  label,
-  icon,
+  label: labelProp,
+  icon: iconProp,
   layout = "stack",
   className,
   iconOnly = false,
   disabledReason,
   ...props
 }: ActionButtonProps) {
+  // An admin-customised canvas node can rename the control or drop its icon.
+  const node = useNodeOptions();
+  const label = node.label?.trim() ? node.label : labelProp;
+  const icon = node.style === "text" ? null : iconProp;
+  const forcedIconOnly = node.style === "icon";
   // Touch devices have no hover — a long press (450ms) reveals the label.
   const [held, setHeld] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -66,7 +72,7 @@ export function ActionButton({
               <span className="shrink-0" aria-hidden="true">
                 {icon}
               </span>
-              {!iconOnly && (
+              {!(iconOnly || forcedIconOnly) && (
                 <span className="line-clamp-2 min-w-0 leading-tight break-words">{label}</span>
               )}
             </Button>

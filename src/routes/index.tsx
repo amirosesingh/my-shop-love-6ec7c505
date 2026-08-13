@@ -1354,44 +1354,94 @@ function Register() {
     </>
   );
 
+  const atom_billNumber = (
+    <div className="flex h-full min-w-0 flex-col justify-center px-4 py-2">
+      <p className="truncate text-sm font-semibold">Current Bill</p>
+      <p className="numeric truncate text-[11px] text-muted-foreground">
+        {billNo ? `#${billNo}` : "New bill — scan an item to start"}
+      </p>
+    </div>
+  );
+
+  const atom_shiftBadge = (
+    <div className="flex h-full min-w-0 items-center px-2">
+      <span
+        className={`min-w-0 truncate rounded-full border px-2 py-1 text-[11px] font-medium ${
+          activeShift
+            ? "border-success/40 bg-success/10 text-success"
+            : "border-destructive/40 bg-destructive/10 text-destructive"
+        }`}
+      >
+        {activeShift ? `${activeShift.cashier} · shift open` : "No shift open"}
+      </span>
+    </div>
+  );
+
+  const atom_actExchange = visible("register.exchange") ? (
+    <div className="flex h-full min-w-0 items-center px-1">
+      <ActionButton
+        layout="inline"
+        variant="outline"
+        className="h-full"
+        label="Exchange"
+        icon={<Repeat className="size-4" />}
+        onClick={async () => {
+          if (await requirePermission("can_process_exchange")) setExchangeOpen(true);
+        }}
+      />
+    </div>
+  ) : null;
+
+  const atom_actClear = (
+    <div className="flex h-full min-w-0 items-center px-1">
+      <ActionButton
+        layout="inline"
+        variant="ghost"
+        className="h-full"
+        label="Clear"
+        icon={<Trash2 className="size-4" />}
+        disabled={!lines.length}
+        onClick={() => void clearCart("clear")}
+      />
+    </div>
+  );
+
   const slot_billHeader = (
-    <>
-          <div className="flex flex-col gap-2 border-b border-border px-4 py-3">
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold">Current Bill</p>
-                <p className="numeric truncate text-[11px] text-muted-foreground">
-                  {billNo ? `#${billNo}` : "New bill — scan an item to start"}
-                </p>
-              </div>
-              <span
-                className={`shrink-0 rounded-full border px-2 py-1 text-[11px] font-medium ${
-                  activeShift
-                    ? "border-success/40 bg-success/10 text-success"
-                    : "border-destructive/40 bg-destructive/10 text-destructive"
-                }`}
-              >
-                {activeShift ? `${activeShift.cashier} · shift open` : "No shift open"}
-              </span>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {visible("register.exchange") && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={async () => {
-                    if (await requirePermission("can_process_exchange")) setExchangeOpen(true);
-                  }}
-                >
-                  <Repeat className="size-4" /> Exchange
-                </Button>
-              )}
-              <Button variant="ghost" size="sm" disabled={!lines.length} onClick={() => void clearCart("clear")}>
-                <Trash2 className="size-4" /> Clear
-              </Button>
-            </div>
-          </div>
-    </>
+    <div className="flex flex-col gap-2 border-b border-border px-4 py-3">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold">Current Bill</p>
+          <p className="numeric truncate text-[11px] text-muted-foreground">
+            {billNo ? `#${billNo}` : "New bill — scan an item to start"}
+          </p>
+        </div>
+        <span
+          className={`shrink-0 rounded-full border px-2 py-1 text-[11px] font-medium ${
+            activeShift
+              ? "border-success/40 bg-success/10 text-success"
+              : "border-destructive/40 bg-destructive/10 text-destructive"
+          }`}
+        >
+          {activeShift ? `${activeShift.cashier} · shift open` : "No shift open"}
+        </span>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {visible("register.exchange") && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              if (await requirePermission("can_process_exchange")) setExchangeOpen(true);
+            }}
+          >
+            <Repeat className="size-4" /> Exchange
+          </Button>
+        )}
+        <Button variant="ghost" size="sm" disabled={!lines.length} onClick={() => void clearCart("clear")}>
+          <Trash2 className="size-4" /> Clear
+        </Button>
+      </div>
+    </div>
   );
 
   const slot_scanBar = (
@@ -1612,364 +1662,385 @@ function Register() {
     </>
   );
 
-  const slot_billFooter = (
-    <>
-          <div className="w-full min-w-0 shrink-0 space-y-2 border-t border-border px-4 py-3 text-sm">
-            {exchangeRef && (
-              <div className="flex items-center justify-between rounded-md border border-accent/40 bg-accent/10 px-2 py-1.5 text-[11px]">
-                <span className="min-w-0 truncate">Exchange against bill #{exchangeRef}</span>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  className="size-9 shrink-0"
-                  aria-label="Remove exchange"
-                  title="Remove exchange"
-                  onClick={() => {
-                    setLines((ls) => ls.filter((l) => !l.credit));
-                    setExchangeRef(null);
-                  }}
-                >
-                  <X className="size-4" />
-                </Button>
-              </div>
-            )}
-            <div className="grid w-full min-w-0 gap-2">
-              <div className="w-full min-w-0 space-y-2">
-                <Row label="Subtotal" value={money(totals.subtotal)} />
-                {totals.credit > 0 && (
-                  <Row label={`Store credit #${exchangeRef ?? ""}`} value={`-${money(totals.credit)}`} />
-                )}
-                {!discountAllowed && (
-                  <button
-                    onClick={() => void unlockDiscounts()}
-                    className="flex w-full min-w-0 items-center justify-between gap-3 text-muted-foreground"
-                  >
-                    <span className="min-w-0 truncate">Bill discount</span>
-                    <span className="shrink-0 text-[11px] underline-offset-2 hover:underline">
-                      locked · supervisor override
-                    </span>
-                  </button>
-                )}
-                {/* Label left, control flush right — sized by its own content so
-                    it can never push past the panel edge. */}
-                <div
-                  className={`flex w-full min-w-0 items-center justify-between gap-3 ${discountAllowed ? "" : "hidden"}`}
-                >
-                  <span className="min-w-0 flex-1 truncate text-muted-foreground">Bill discount</span>
-                  <ActionButton
-                    layout="inline"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPadTarget("bill")}
-                    className="numeric h-10 min-h-10 max-w-full shrink-0 justify-center gap-2 px-3 text-xs"
-                    label={
-                      cartDiscount ? `${cartDiscount}${cartDiscountType === "percent" ? "%" : ""}` : "Add discount"
-                    }
-                    icon={<Percent className="size-4" />}
-                  />
-                </div>
-                {promo.promoDiscount > 0 && <Row label="Promotion discount" value={`-${money(promo.promoDiscount)}`} />}
-                <Row label="Discount applied" value={`-${money(totals.discount)}`} />
-                {taxSettings.enabled && !!totals.tax && (
-                  <Row
-                    label={
-                      taxSettings.mode === "inclusive"
-                        ? `Tax ${taxSettings.rate}% (included)`
-                        : `Tax ${taxSettings.rate}%`
-                    }
-                    value={money(totals.tax)}
-                  />
-                )}
-              </div>
-
-              <div className="w-full min-w-0 space-y-2">
-                {promo.applied.length > 0 && (
-                  <div className="rounded-md border border-success/30 bg-success/5 px-2 py-2">
-                    <p className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-success">
-                      <Sparkles className="size-3" /> Active promotions applied
-                    </p>
-                    <ul className="mt-1 space-y-0.5">
-                      {promo.applied.map((a) => (
-                        <li key={a.id} className="text-[11px] text-muted-foreground">
-                          <span className="font-medium text-foreground">{a.name}</span> · {a.detail}
-                        </li>
-                      ))}
-                    </ul>
-                    {member && (
-                      <p className="numeric mt-1 text-[11px] text-muted-foreground">
-                        {member.name} earns {pointsEarned} pts on this bill
-                      </p>
-                    )}
-                  </div>
-                )}
-                {coupon && (
-                  <div className="flex items-center justify-between rounded-md border border-primary/40 bg-primary/10 px-2 py-1.5 text-[11px]">
-                    <span className="min-w-0 truncate">
-                      Coupon <span className="font-semibold">{coupon.code}</span> ·{" "}
-                      {coupon.scope === "item" ? coupon.productName : "whole bill"} ·{" "}
-                      <span className="numeric">-{money(coupon.discount)}</span>
-                    </span>
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      className="size-9 shrink-0"
-                      aria-label="Remove coupon"
-                      title="Remove coupon"
-                      onClick={removeCoupon}
-                    >
-                      <X className="size-4" />
-                    </Button>
-                  </div>
-                )}
-                <Separator />
-                <div className="flex items-center justify-between">
-                  <span className="text-base font-semibold">{refundDue > 0 ? "Refund due" : "Balance due"}</span>
-                  <span className={`numeric text-2xl font-bold ${refundDue > 0 ? "text-accent" : "text-primary"}`}>
-                    {money(refundDue > 0 ? refundDue : balanceDue)}
-                  </span>
-                </div>
-                <ActionButton
-                  layout="inline"
-                  className="h-12 w-full text-base"
-                  disabled={!lines.length || tillLocked || (refundDue > 0 && !canRefund)}
-                  disabledReason={tillLocked ? lockedReason : undefined}
-                  onClick={() => openPayment()}
-                  icon={<Banknote className="size-5" />}
-                  label={
-                    !activeShift
-                      ? "Shift closed — selling locked"
-                      : refundDue > 0
-                        ? canRefund
-                          ? `Refund ${money(refundDue)}`
-                          : "Refunds locked for this user"
-                        : `Charge ${money(balanceDue)}`
-                  }
-                />
-                <ActionButton
-                  layout="inline"
-                  variant="outline"
-                  className="h-11 w-full"
-                  label="Book & pay later"
-                  icon={<CalendarClock className="size-4" />}
-                  disabled={tillLocked || refundDue > 0 || !lines.length}
-                  disabledReason={tillLocked ? lockedReason : undefined}
-                  onClick={() => {
-                    setDeposit("");
-                    setBookName(member?.name ?? "");
-                    setBookPhone(member?.phone ?? "");
-                    setBookMode("cart");
-                    resetJobCard();
-                    setBookOpen(true);
-                  }}
-                />
-              </div>
-            </div>
-
-            {lastSale && (
-              <div className="flex flex-wrap items-center gap-2 border-t border-border pt-2">
-                {can("can_reprint_bill") && (
-                  <ActionButton
-                    layout="inline"
-                    variant="outline"
-                    size="sm"
-                    label="Reprint"
-                    icon={<Printer className="size-4" />}
-                    disabled={tillLocked}
-                    disabledReason={tillLocked ? lockedReason : undefined}
-                    onClick={() => {
-                      printSaleReceipt(
-                        lastSale,
-                        state.members.find((m) => m.id === lastSale.memberId) ?? null,
-                        "duplicate",
-                      );
-                      logTicketEvent(TICKET_ACTIONS.reprinted, {
-                        saleId: lastSale.id,
-                        receiptNo: lastSale.receiptNo,
-                        template: "duplicate",
-                        storeId: currentStore.id,
-                      });
-                    }}
-                  />
-                )}
-                <ActionButton
-                  layout="inline"
-                  variant="outline"
-                  size="sm"
-                  label="Gift"
-                  icon={<Gift className="size-4" />}
-                  disabled={tillLocked}
-                  disabledReason={tillLocked ? lockedReason : undefined}
-                  onClick={() => {
-                    printSaleReceipt(lastSale, null, "gift");
-                    logger.log("print", "Gift receipt printed", "register", {
-                      saleId: lastSale.id,
-                      receiptNo: lastSale.receiptNo,
-                    });
-                  }}
-                />
-                <ActionButton
-                  layout="inline"
-                  variant="outline"
-                  size="sm"
-                  label="Kitchen"
-                  icon={<ChefHat className="size-4" />}
-                  disabled={tillLocked}
-                  disabledReason={tillLocked ? lockedReason : undefined}
-                  onClick={() => {
-                    printSaleReceipt(lastSale, null, "kitchen");
-                    logger.log("print", "Kitchen receipt printed", "register", {
-                      saleId: lastSale.id,
-                      receiptNo: lastSale.receiptNo,
-                    });
-                  }}
-                />
-                {wa.enabled && can("can_send_whatsapp_bill") && (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Input
-                      value={waNumber}
-                      onChange={(e) => setWaNumber(e.target.value)}
-                      placeholder="WhatsApp number"
-                      className="numeric h-9 w-44"
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={waSending || !waNumber.trim()}
-                      onClick={() => void sendSaleOnWhatsApp(lastSale, waNumber)}
-                    >
-                      <MessageCircle className="size-4" />
-                      {waSending ? "Sending…" : "Send bill"}
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-    </>
+  const atom_totalsBlock = (
+    <div className="w-full min-w-0 space-y-2 px-4 py-2 text-sm">
+      {exchangeRef && (
+        <div className="flex items-center justify-between rounded-md border border-accent/40 bg-accent/10 px-2 py-1.5 text-[11px]">
+          <span className="min-w-0 truncate">Exchange against bill #{exchangeRef}</span>
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="size-9 shrink-0"
+            aria-label="Remove exchange"
+            title="Remove exchange"
+            onClick={() => {
+              setLines((ls) => ls.filter((l) => !l.credit));
+              setExchangeRef(null);
+            }}
+          >
+            <X className="size-4" />
+          </Button>
+        </div>
+      )}
+      <Row label="Subtotal" value={money(totals.subtotal)} />
+      {totals.credit > 0 && <Row label={`Store credit #${exchangeRef ?? ""}`} value={`-${money(totals.credit)}`} />}
+      {!discountAllowed && (
+        <button
+          onClick={() => void unlockDiscounts()}
+          className="flex w-full min-w-0 items-center justify-between gap-3 text-muted-foreground"
+        >
+          <span className="min-w-0 truncate">Bill discount</span>
+          <span className="shrink-0 text-[11px] underline-offset-2 hover:underline">locked · supervisor override</span>
+        </button>
+      )}
+      {/* Label left, control flush right — sized by its own content so it can
+          never push past the panel edge. */}
+      <div className={`flex w-full min-w-0 items-center justify-between gap-3 ${discountAllowed ? "" : "hidden"}`}>
+        <span className="min-w-0 flex-1 truncate text-muted-foreground">Bill discount</span>
+        <ActionButton
+          layout="inline"
+          variant="outline"
+          size="sm"
+          onClick={() => setPadTarget("bill")}
+          className="numeric h-10 min-h-10 max-w-full shrink-0 justify-center gap-2 px-3 text-xs"
+          label={cartDiscount ? `${cartDiscount}${cartDiscountType === "percent" ? "%" : ""}` : "Add discount"}
+          icon={<Percent className="size-4" />}
+        />
+      </div>
+      {promo.promoDiscount > 0 && <Row label="Promotion discount" value={`-${money(promo.promoDiscount)}`} />}
+      <Row label="Discount applied" value={`-${money(totals.discount)}`} />
+      {taxSettings.enabled && !!totals.tax && (
+        <Row
+          label={taxSettings.mode === "inclusive" ? `Tax ${taxSettings.rate}% (included)` : `Tax ${taxSettings.rate}%`}
+          value={money(totals.tax)}
+        />
+      )}
+      {promo.applied.length > 0 && (
+        <div className="rounded-md border border-success/30 bg-success/5 px-2 py-2">
+          <p className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-success">
+            <Sparkles className="size-3" /> Active promotions applied
+          </p>
+          <ul className="mt-1 space-y-0.5">
+            {promo.applied.map((a) => (
+              <li key={a.id} className="text-[11px] text-muted-foreground">
+                <span className="font-medium text-foreground">{a.name}</span> · {a.detail}
+              </li>
+            ))}
+          </ul>
+          {member && (
+            <p className="numeric mt-1 text-[11px] text-muted-foreground">
+              {member.name} earns {pointsEarned} pts on this bill
+            </p>
+          )}
+        </div>
+      )}
+      {coupon && (
+        <div className="flex items-center justify-between rounded-md border border-primary/40 bg-primary/10 px-2 py-1.5 text-[11px]">
+          <span className="min-w-0 truncate">
+            Coupon <span className="font-semibold">{coupon.code}</span> ·{" "}
+            {coupon.scope === "item" ? coupon.productName : "whole bill"} ·{" "}
+            <span className="numeric">-{money(coupon.discount)}</span>
+          </span>
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="size-9 shrink-0"
+            aria-label="Remove coupon"
+            title="Remove coupon"
+            onClick={removeCoupon}
+          >
+            <X className="size-4" />
+          </Button>
+        </div>
+      )}
+    </div>
   );
 
-  const slot_transactionActions = (
-    <>
-            {visible("register.transactionActions") && (
-              <div className="rounded-lg border border-border bg-card p-3">
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Transaction actions
-                </p>
-                <div className="grid auto-rows-fr grid-cols-1 gap-2">
-                  {/* Only offered while there is something to park. */}
-                  {visible("register.holdOrder") && lines.length > 0 && (
-                    <ActionButton
-                      variant="outline"
-                      layout="inline"
-                      className="h-12 min-w-0"
-                      label="Hold order"
-                      icon={<PauseCircle className="size-4" />}
-                      disabled={!lines.length || tillLocked}
-                      disabledReason={tillLocked ? lockedReason : undefined}
-                      onClick={() => holdOrder()}
-                    />
-                  )}
-                  <ActionButton
-                    variant="outline"
-                    layout="inline"
-                    className="h-12 min-w-0 text-destructive hover:text-destructive"
-                    label="Void cart"
-                    icon={<Trash2 className="size-4" />}
-                    disabled={!lines.length || tillLocked}
-                    disabledReason={tillLocked ? lockedReason : undefined}
-                    onClick={() => void clearCart()}
-                  />
-                  {visible("register.coupon") && (
-                    <ActionButton
-                      variant="outline"
-                      layout="inline"
-                      className="h-12 min-w-0"
-                      label="Apply coupon"
-                      icon={<TicketPercent className="size-4" />}
-                      disabled={tillLocked}
-                      disabledReason={tillLocked ? lockedReason : undefined}
-                      onClick={() => setCouponOpen(true)}
-                    />
-                  )}
-                  {visible("register.splitBill") && (
-                    <ActionButton
-                      variant="outline"
-                      layout="inline"
-                      className="h-12 min-w-0"
-                      label="Split bill"
-                      icon={<Split className="size-4" />}
-                      disabled={balanceDue <= 0 || tillLocked}
-                      disabledReason={tillLocked ? lockedReason : undefined}
-                      onClick={() => setSplitOpen(true)}
-                    />
-                  )}
-                </div>
-                {held.length > 0 && (
-                  <div className="mt-2 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[11px] text-muted-foreground">Held orders</p>
-                      <Link
-                        to="/holds"
-                        className="flex items-center gap-1.5 text-[11px] font-medium text-primary hover:underline"
-                      >
-                        Held bills
-                        <span className="numeric inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
-                          {held.length}
-                        </span>
-                      </Link>
-                    </div>
-                    {held.map((h) => (
-                      <button
-                        key={h.id}
-                        onClick={() => resumeHeld(h.id)}
-                        className="flex w-full items-center justify-between rounded-md border border-border px-2 py-1.5 text-[11px] hover:border-primary/60"
-                      >
-                        <span className="truncate">
-                          {h.cancelledFrom ? "↩ " : ""}
-                          {h.label}
-                        </span>
-                        <span className="numeric font-semibold">{money(h.total)}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-    </>
+  const atom_balanceDue = (
+    <div className="flex h-full min-w-0 items-center justify-between gap-3 px-4">
+      <span className="text-base font-semibold">{refundDue > 0 ? "Refund due" : "Balance due"}</span>
+      <span className={`numeric text-2xl font-bold ${refundDue > 0 ? "text-accent" : "text-primary"}`}>
+        {money(refundDue > 0 ? refundDue : balanceDue)}
+      </span>
+    </div>
+  );
+
+  const atom_actCharge = (
+    <div className="flex h-full min-w-0 items-center px-1">
+      <ActionButton
+        layout="inline"
+        className="h-full w-full text-base"
+        disabled={!lines.length || tillLocked || (refundDue > 0 && !canRefund)}
+        disabledReason={tillLocked ? lockedReason : undefined}
+        onClick={() => openPayment()}
+        icon={<Banknote className="size-5" />}
+        label={
+          !activeShift
+            ? "Shift closed — selling locked"
+            : refundDue > 0
+              ? canRefund
+                ? `Refund ${money(refundDue)}`
+                : "Refunds locked for this user"
+              : `Charge ${money(balanceDue)}`
+        }
+      />
+    </div>
+  );
+
+  const atom_actBookLater = (
+    <div className="flex h-full min-w-0 items-center px-1">
+      <ActionButton
+        layout="inline"
+        variant="outline"
+        className="h-full w-full"
+        label="Book & pay later"
+        icon={<CalendarClock className="size-4" />}
+        disabled={tillLocked || refundDue > 0 || !lines.length}
+        disabledReason={tillLocked ? lockedReason : undefined}
+        onClick={() => {
+          setDeposit("");
+          setBookName(member?.name ?? "");
+          setBookPhone(member?.phone ?? "");
+          setBookMode("cart");
+          resetJobCard();
+          setBookOpen(true);
+        }}
+      />
+    </div>
+  );
+
+  const atom_reprintDeck = lastSale ? (
+    <div className="flex flex-wrap items-center gap-2 px-3 py-2">
+      {can("can_reprint_bill") && (
+        <ActionButton
+          layout="inline"
+          variant="outline"
+          size="sm"
+          label="Reprint"
+          icon={<Printer className="size-4" />}
+          disabled={tillLocked}
+          disabledReason={tillLocked ? lockedReason : undefined}
+          onClick={() => {
+            printSaleReceipt(lastSale, state.members.find((m) => m.id === lastSale.memberId) ?? null, "duplicate");
+            logTicketEvent(TICKET_ACTIONS.reprinted, {
+              saleId: lastSale.id,
+              receiptNo: lastSale.receiptNo,
+              template: "duplicate",
+              storeId: currentStore.id,
+            });
+          }}
+        />
+      )}
+      <ActionButton
+        layout="inline"
+        variant="outline"
+        size="sm"
+        label="Gift"
+        icon={<Gift className="size-4" />}
+        disabled={tillLocked}
+        disabledReason={tillLocked ? lockedReason : undefined}
+        onClick={() => {
+          printSaleReceipt(lastSale, null, "gift");
+          logger.log("print", "Gift receipt printed", "register", {
+            saleId: lastSale.id,
+            receiptNo: lastSale.receiptNo,
+          });
+        }}
+      />
+      <ActionButton
+        layout="inline"
+        variant="outline"
+        size="sm"
+        label="Kitchen"
+        icon={<ChefHat className="size-4" />}
+        disabled={tillLocked}
+        disabledReason={tillLocked ? lockedReason : undefined}
+        onClick={() => {
+          printSaleReceipt(lastSale, null, "kitchen");
+          logger.log("print", "Kitchen receipt printed", "register", {
+            saleId: lastSale.id,
+            receiptNo: lastSale.receiptNo,
+          });
+        }}
+      />
+      {wa.enabled && can("can_send_whatsapp_bill") && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            value={waNumber}
+            onChange={(e) => setWaNumber(e.target.value)}
+            placeholder="WhatsApp number"
+            className="numeric h-9 w-44"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={waSending || !waNumber.trim()}
+            onClick={() => void sendSaleOnWhatsApp(lastSale, waNumber)}
+          >
+            <MessageCircle className="size-4" />
+            {waSending ? "Sending…" : "Send bill"}
+          </Button>
+        </div>
+      )}
+    </div>
+  ) : null;
+
+  const slot_billFooter = (
+    <div className="w-full min-w-0 shrink-0 space-y-2 border-t border-border py-1 text-sm">
+      {atom_totalsBlock}
+      <div className="px-4">
+        <Separator />
+      </div>
+      <div className="h-12">{atom_balanceDue}</div>
+      <div className="h-12 px-3">{atom_actCharge}</div>
+      <div className="h-11 px-3">{atom_actBookLater}</div>
+      {lastSale && <div className="border-t border-border">{atom_reprintDeck}</div>}
+    </div>
+  );
+
+  const atom_actHold =
+    visible("register.holdOrder") && lines.length > 0 ? (
+      <div className="flex h-full min-w-0 items-center px-1">
+        <ActionButton
+          variant="outline"
+          layout="inline"
+          className="h-full w-full min-w-0"
+          label="Hold order"
+          icon={<PauseCircle className="size-4" />}
+          disabled={!lines.length || tillLocked}
+          disabledReason={tillLocked ? lockedReason : undefined}
+          onClick={() => holdOrder()}
+        />
+      </div>
+    ) : null;
+
+  const atom_actVoid = (
+    <div className="flex h-full min-w-0 items-center px-1">
+      <ActionButton
+        variant="outline"
+        layout="inline"
+        className="h-full w-full min-w-0 text-destructive hover:text-destructive"
+        label="Void cart"
+        icon={<Trash2 className="size-4" />}
+        disabled={!lines.length || tillLocked}
+        disabledReason={tillLocked ? lockedReason : undefined}
+        onClick={() => void clearCart()}
+      />
+    </div>
+  );
+
+  const atom_actCoupon = visible("register.coupon") ? (
+    <div className="flex h-full min-w-0 items-center px-1">
+      <ActionButton
+        variant="outline"
+        layout="inline"
+        className="h-full w-full min-w-0"
+        label="Apply coupon"
+        icon={<TicketPercent className="size-4" />}
+        disabled={tillLocked}
+        disabledReason={tillLocked ? lockedReason : undefined}
+        onClick={() => setCouponOpen(true)}
+      />
+    </div>
+  ) : null;
+
+  const atom_actSplit = visible("register.splitBill") ? (
+    <div className="flex h-full min-w-0 items-center px-1">
+      <ActionButton
+        variant="outline"
+        layout="inline"
+        className="h-full w-full min-w-0"
+        label="Split bill"
+        icon={<Split className="size-4" />}
+        disabled={balanceDue <= 0 || tillLocked}
+        disabledReason={tillLocked ? lockedReason : undefined}
+        onClick={() => setSplitOpen(true)}
+      />
+    </div>
+  ) : null;
+
+  const atom_heldList = held.length ? (
+    <div className="space-y-1 px-2 py-1">
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] text-muted-foreground">Held orders</p>
+        <Link to="/holds" className="flex items-center gap-1.5 text-[11px] font-medium text-primary hover:underline">
+          Held bills
+          <span className="numeric inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
+            {held.length}
+          </span>
+        </Link>
+      </div>
+      {held.map((h) => (
+        <button
+          key={h.id}
+          onClick={() => resumeHeld(h.id)}
+          className="flex w-full items-center justify-between rounded-md border border-border px-2 py-1.5 text-[11px] hover:border-primary/60"
+        >
+          <span className="truncate">
+            {h.cancelledFrom ? "↩ " : ""}
+            {h.label}
+          </span>
+          <span className="numeric font-semibold">{money(h.total)}</span>
+        </button>
+      ))}
+    </div>
+  ) : null;
+
+  const slot_transactionActions = visible("register.transactionActions") ? (
+    <div className="rounded-lg border border-border bg-card p-3">
+      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        Transaction actions
+      </p>
+      <div className="grid auto-rows-fr grid-cols-1 gap-2">
+        {atom_actHold && <div className="h-12">{atom_actHold}</div>}
+        <div className="h-12">{atom_actVoid}</div>
+        {atom_actCoupon && <div className="h-12">{atom_actCoupon}</div>}
+        {atom_actSplit && <div className="h-12">{atom_actSplit}</div>}
+      </div>
+      {atom_heldList}
+    </div>
+  ) : null;
+
+  const atom_actDrawer = (
+    <div className="flex h-full min-w-0 items-center px-1">
+      <ActionButton
+        layout="inline"
+        variant="outline"
+        className="h-full w-full sm:gap-3"
+        label="Open cash drawer"
+        icon={<Vault className="size-4" />}
+        disabled={tillLocked}
+        disabledReason={tillLocked ? lockedReason : undefined}
+        onClick={async () => {
+          if (!(await requirePermission("can_open_drawer"))) return;
+          setNoSaleNote("");
+          setNoSaleReason("");
+          setNoSaleOpen(true);
+        }}
+      />
+    </div>
+  );
+
+  const atom_receiptToggle = (
+    <div className="flex h-full min-w-0 items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
+      <Label htmlFor="live-receipt" className="text-xs leading-tight">
+        Live receipt preview
+        <span className="block text-[11px] font-normal text-muted-foreground">Opens as an overlay</span>
+      </Label>
+      <Switch id="live-receipt" checked={receiptPreview} onCheckedChange={setReceiptPreview} />
+    </div>
   );
 
   const slot_devicePrinting = (
-    <>
-            <div className="rounded-lg border border-border bg-card p-3">
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Device &amp; printing
-              </p>
-              <ActionButton
-                layout="inline"
-                variant="outline"
-                className="h-12 w-full sm:gap-3"
-                label="Open cash drawer"
-                icon={<Vault className="size-4" />}
-                disabled={tillLocked}
-                disabledReason={tillLocked ? lockedReason : undefined}
-                onClick={async () => {
-                  if (!(await requirePermission("can_open_drawer"))) return;
-                  setNoSaleNote("");
-                  setNoSaleReason("");
-                  setNoSaleOpen(true);
-                }}
-              />
-              <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
-                <Label htmlFor="live-receipt" className="text-xs leading-tight">
-                  Live receipt preview
-                  <span className="block text-[11px] font-normal text-muted-foreground">Opens as an overlay</span>
-                </Label>
-                <Switch id="live-receipt" checked={receiptPreview} onCheckedChange={setReceiptPreview} />
-              </div>
-            </div>
-    </>
+    <div className="rounded-lg border border-border bg-card p-3">
+      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        Device &amp; printing
+      </p>
+      <div className="h-12">{atom_actDrawer}</div>
+      <div className="mt-3">{atom_receiptToggle}</div>
+    </div>
   );
 
   return (
@@ -1979,13 +2050,25 @@ function Register() {
           terminalKey={terminalKey}
           slots={{
             catalog: slot_catalog,
-            billHeader: slot_billHeader,
+            billNumber: atom_billNumber,
+            shiftBadge: atom_shiftBadge,
+            actExchange: atom_actExchange,
+            actClear: atom_actClear,
             scanBar: slot_scanBar,
             memberSearch: slot_memberSearch,
             cartLines: slot_cartLines,
-            billFooter: slot_billFooter,
-            transactionActions: slot_transactionActions,
-            devicePrinting: slot_devicePrinting,
+            totalsBlock: atom_totalsBlock,
+            balanceDue: atom_balanceDue,
+            actCharge: atom_actCharge,
+            actBookLater: atom_actBookLater,
+            reprintDeck: atom_reprintDeck,
+            actHold: atom_actHold,
+            actVoid: atom_actVoid,
+            actCoupon: atom_actCoupon,
+            actSplit: atom_actSplit,
+            heldList: atom_heldList,
+            actDrawer: atom_actDrawer,
+            receiptToggle: atom_receiptToggle,
           }}
           classic={
       <div className="pos-scaled flex h-full min-h-0 min-w-0 flex-col overflow-hidden lg:flex-row">
