@@ -202,6 +202,7 @@ export async function resolveRelayScope(caller: {
   label: string;
   storeId?: string | null;
   staffUserId?: string | null;
+  email?: string | null;
   authUserId?: string | null;
   claims?: CallerClaims | null;
 }): Promise<RelayScope> {
@@ -215,8 +216,14 @@ export async function resolveRelayScope(caller: {
       row = await fetchAppUser(`auth_user_id=eq.${encodeURIComponent(caller.authUserId)}`);
     if (!row && caller.staffUserId)
       row = await fetchAppUser(`user_id=eq.${encodeURIComponent(caller.staffUserId)}`);
+    // An account created before the auth link existed is still findable by the
+    // address it signs in with.
+    if (!row && caller.email)
+      row = await fetchAppUser(`email=eq.${encodeURIComponent(caller.email)}`);
     if (!row && caller.kind !== "terminal" && caller.label)
       row = await fetchAppUser(`user_id=eq.${encodeURIComponent(caller.label)}`);
+    if (!row && caller.kind !== "terminal" && caller.label.includes("@"))
+      row = await fetchAppUser(`email=eq.${encodeURIComponent(caller.label)}`);
   }
 
   const role = row?.role ?? claims?.role ?? null;
@@ -225,6 +232,7 @@ export async function resolveRelayScope(caller: {
     ? normalisePermissions(row.permissions)
     : (claims?.permissions ?? {});
   const staffUserId = row?.user_id ?? caller.staffUserId ?? claims?.staffUserId ?? null;
+  const isSupervisor = supervisorRole(role, roleSlug);
 
   return {
     kind: caller.kind,
@@ -235,12 +243,13 @@ export async function resolveRelayScope(caller: {
     role,
     roleSlug,
     permissions,
-    isSupervisor: supervisorRole(role, roleSlug),
+    isSupervisor,
     staffUserId,
     actorName: row?.full_name ?? claims?.actorName ?? caller.label ?? null,
     // No account row and no usable claims: the caller can still be identified
-    // but their permissions are unknown, so writes are refused as stale.
-    stale: !row && !fastEnough && caller.kind === "staff",
+    // but their permissions are unknown, so writes are refused as stale. A
+    // proven supervisor is never stale — their role already answers it.
+    stale: !row && !fastEnough && caller.kind === "staff" && !isSupervisor,
   };
 }
 
