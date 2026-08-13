@@ -1,52 +1,53 @@
-# POS Operations & Racket Hub + read-only service charge
+# Booking overhaul: one entry point, universal customer lookup, full racket service flow
 
-## What the audit found
+Audit of the current register found the booking system is ~70% there: a "Create / Manage Booking" hub button with a live badge, a dual-flow chooser modal, itemised intake charges, tension fields, promised date/time, job tags and a barcode job ticket already exist. The gaps below are what is still missing or duplicated.
 
-- The register is one big route, `src/routes/index.tsx` (~3.7k lines). Cart, payment deck, booking dialog and the canvas layout atoms all live there.
-- Cart maths is `cartTotals()` in `src/lib/pos-store.tsx` (subtotal, line + bill discount, tax inclusive/exclusive, credit). It has **no service-charge concept at all**.
-- The only "service charge" today is `serviceCharge` inside the racket booking dialog — a per-job fee added to the booking total, not a cart-wide charge. That stays.
-- Booking hub already exists in part: `atom_actBooking` ("🏸 Create / Manage Booking") with a live badge of active jobs, a chooser between `bookMode` "cart" and "racket", and the `book.hub` action in `src/lib/register-actions.tsx`.
-- Pay Later = bookings with `paymentTiming`, balances via `bookingBalance`, managed on `/bookings`. Hold tickets are separate: `src/lib/held-orders.ts` + `/holds`. Both stay untouched behaviourally.
-- Racket / string "master data" is a plain string list in booking rules (`racketModels`, `stringModels` in `IntegrationSettings`), edited on `settings.booking-rules.tsx`. There is **no** brand/series/tension-range schema anywhere, and no racket rows in `products`.
-- Settings pages exist for tax, printer, SQL/local database, layouts — reachable from the settings hub.
+## 1. Strict single entry point
 
-## Plan
+Today there are three booking triggers: the hub button (`actBooking`), a second "Book & pay later" button (`actBookLater`, rendered in the bill footer and offered in the layout palette / custom-button action list), and a "Racket booking" shortcut inside the products panel.
 
-### 1. Service charge in the money engine
-- Add a `ServiceChargeSettings` block (`enabled`, `type: percent | fixed`, `value`, optional `taxable`) to app settings, defaulting to off so nothing changes for existing tills.
-- Extend `cartTotals()` to return `serviceCharge` and fold it into `total`. Percent applies to the discounted net; fixed is a flat add. Default: the charge is taxable (added to net before tax) when tax is exclusive.
-- Persist the charge amount on the sale so receipts and reports reconcile.
+- Remove the `actBookLater` module (atom, bill-footer slot, default layout entry, palette module, `book.later` action id).
+- Stop passing `onRacketBooking` to the products panel so that shortcut disappears.
+- Rename the remaining button to exactly **"Manage Booking"** (keeps the active-bookings badge) and the modal title to match.
 
-### 2. Read-only display
-- Cart summary, checkout/payment panel, customer display and printed receipt show `Service charge (10%) $X.XX` as static text — no input, no click target, no clear button. It recalculates live from the cart.
-- Cashiers have no path to change it at the register.
+## 2. Universal customer lookup inside the booking modal
 
-### 3. Admin-only configuration
-- New "Service charge" section in POS settings (Tax/financials area), with type toggle, value input and enable switch, following the existing branch-aware settings frame so it can be global or per-branch.
-- Editing is gated to admin/supervisor permission; other roles see the values read-only. Saving propagates through the existing settings sync, so live registers pick it up.
+Replace the plain Customer name / Phone inputs with a search field over the existing member data:
 
-### 4. One hub button
-- Rename/repurpose the existing permanent booking atom into `⚡ POS Operations & Racket Hub`, always visible, never disabled by an empty cart (only by a locked till).
-- Badge shows three live counters: pending racket jobs, open bookings, unpaid pay-later tickets.
-- Keeps working as a canvas node; `book.hub` action stays so hotkeys/custom buttons don't break.
+- One input matching name OR phone; results list shows name, phone, member code and tier.
+- Selecting a member attaches them to the ticket and fills name, phone, member id and tier chip.
+- Inline "+ Quick Add Customer" opens the existing quick-member dialog and returns to the form with state intact.
+- Free-typed walk-in name/phone still allowed when no member matches.
 
-### 5. Master hub modal (3 tabs)
-- **Racket service** — the existing racket intake, upgraded: racket picker grouped by brand with model/series, string picker, mains/cross tension with a warning when outside the model's recommended range, stencil / overgrip / grommet toggles, ready-by date+time, auto job tag, auto-priced labour + string cost. Auto-fills the selected customer's last job.
-- **Booking & pay later** — the standard booking flow (pickup date, slot, deposit) plus a Pay Later toggle for the current cart that links the customer, sets a due date, tracks the balance and prints the claim slip. Also links to the existing hold-ticket flow rather than replacing it.
-- **Register & settings** — quick actions (close shift, open drawer, till reconciliation, daily sales summary) and an embedded admin service-charge editor; tax, printer, database and canvas layout open their existing settings pages.
+## 3. Workflow A — Standard / general booking (pay later)
 
-### 6. Cart integration
-- Racket jobs, bookings and pay-later tickets submitted from the hub land on the cart immediately as lines with metadata chips (`Yonex Astrox 99 | BG80 @ 26x28 lb | Ready Aug 15`, `Pay Later — due Aug 20`) and an `Edit specs` action.
-- Order total breakdown shows subtotal, discount, service charge (read-only), tax, total.
+Already guarded: saving with an empty cart is blocked. Only the copy changes to the requested wording: *"Please add at least one item to the cart before saving a pay-later booking."* The save button is additionally disabled (not just toast-blocked) while the cart is empty.
+
+## 4. Workflow B — Racket service & stringing
+
+Extend the existing racket intake section:
+
+- **Racket source:** searchable picker over the product catalogue plus the curated racket master list, and a "Customer provided racket" toggle that forces the racket line to 0.00.
+- **String source:** same picker over catalogue string products plus the string master list, and a "Customer provided string" toggle forcing that charge to 0.00 (stored as the existing `stringOrigin` field).
+- **Add-ons:** a picker that appends catalogue items (grips, grommets, stencil work) as charge lines at their catalogue price, on top of the manual "+ Add charge" rows.
+- **Inspection notes:** promote the existing notes field to a textarea labelled "Racket inspection / pre-existing condition".
+- **Locked labour fee:** the labour charge row becomes read-only, pre-filled from the configured base labour fee / stringing service fee. An "Override / waive charge" button unlocks it and requires either a supervisor PIN (existing manager gate) or a mandatory discount reason, which is stored on the charge line and printed on the slip.
+- **Combo rule:** when both a catalogue racket and a catalogue string are on the job, apply the configured combo behaviour (waive labour or apply the configured discount) automatically, shown as a visible line on the charge summary.
+- **Save actions:** keep "Pay later on pickup" and add a "Pay now" action that saves the booking and routes straight into the existing checkout deck.
+- **Job ticket:** add a QR code of the job reference next to the existing Code 39 barcode on the printed claim tag.
+
+## 5. Settings
+
+The base labour fee, stringing service list, racket/string master lists and booking rules already exist in Settings → Booking rules. Two new fields get added there:
+
+- Combo rule: off / waive labour / percent discount / flat discount, with its value.
+- Whether an override of the locked labour fee requires a supervisor PIN or just a written reason.
+
+No new database tables: bookings already persist charges, string origin, tension, notes, tag and job status.
 
 ## Technical notes
 
-- Racket master data grows from `string[]` to `{ brand, model, series?, tensionMin?, tensionMax? }` with a migration that keeps existing plain-string entries working; edited on `settings.booking-rules.tsx`. Strings become `{ brand, model }`. Stored in `pos_settings.integration_settings`, so no schema migration.
-- Rackets held as sellable stock in `products` are also offered in the picker, grouped under their brand, so real inventory shows up automatically.
-- `cartTotals()` gains an optional service-charge argument; both existing call sites (`src/routes/index.tsx`, `src/lib/pos-store.tsx`) pass the effective settings. Sales gain a `serviceCharge` field mirrored to the `sales` row (one additive column).
-- The hub is a new component under `src/components/pos/hub/` that receives the register's existing handlers, so no booking, hold, drawer or shift logic is duplicated or deleted — the current racket dialog moves into a tab.
-- The existing per-job booking `serviceFee` is unchanged and stays distinct from the new cart-wide service charge.
-
-## Not included
-
-- SQL Server 2025 connection editing stays on its own settings screen (linked from the hub) rather than embedded, since it is Electron-only and unsafe to duplicate.
+- All register work stays in `src/routes/index.tsx` (booking dialog + atoms), with shared helpers in `src/lib/booking-charges.ts` for combo maths.
+- Entry-point cleanup touches `src/lib/register-modules.ts`, `src/lib/register-layout.ts`, `src/lib/register-actions.tsx` and `src/components/pos/CatalogPanel.tsx` usage.
+- New settings fields extend `IntegrationSettings.bookingRules` in `src/lib/pos-types.ts` and the form in `src/routes/settings.booking-rules.tsx`.
+- The QR helper (`qrSvg`) already exists in `src/lib/pos-print.ts` and is reused for the job tag.
