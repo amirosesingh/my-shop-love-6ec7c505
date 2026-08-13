@@ -3171,14 +3171,46 @@ function Register() {
                       <Label>Racket brand / model</Label>
                       <Input
                         value={racketModel}
+                        list="racket-models"
                         onChange={(e) => setRacketModel(e.target.value)}
                         placeholder="Yonex Astrox 88D"
                       />
+                      <datalist id="racket-models">
+                        {racketModelList.map((m) => (
+                          <option key={m} value={m} />
+                        ))}
+                      </datalist>
                     </div>
                     <div className="space-y-1">
                       <Label>String type / brand</Label>
-                      <Input value={stringType} onChange={(e) => setStringType(e.target.value)} placeholder="BG65 Ti" />
+                      <Input
+                        value={stringType}
+                        list="string-models"
+                        onChange={(e) => setStringType(e.target.value)}
+                        placeholder="BG65 Ti"
+                      />
+                      <datalist id="string-models">
+                        {stringModelList.map((m) => (
+                          <option key={m} value={m} />
+                        ))}
+                      </datalist>
                     </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-4 text-xs">
+                    <label className="flex items-center gap-2">
+                      <input type="checkbox" checked={stencil} onChange={(e) => setStencil(e.target.checked)} />
+                      Stencil the string
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input type="checkbox" checked={overgrip} onChange={(e) => setOvergrip(e.target.checked)} />
+                      Replace overgrip
+                    </label>
+                    {jobTag && <Badge variant="outline">Job tag {jobTag}</Badge>}
+                    {editBookingId && (
+                      <Button size="sm" onClick={saveSpecEdits}>
+                        Save spec changes
+                      </Button>
+                    )}
                   </div>
                   <div className="grid grid-cols-3 gap-3">
                     <div className="space-y-1">
