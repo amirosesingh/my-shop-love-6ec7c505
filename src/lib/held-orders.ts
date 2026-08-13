@@ -21,6 +21,8 @@ export type HeldOrder = {
   cancelledFrom?: string;
   /** branch the ticket was parked at */
   storeId?: string;
+  /** bill number reserved when the ticket was started */
+  billNo?: string;
   /** who parked it */
   heldBy?: string;
   /** full ticket context so a reopened draft is identical to the parked one */
