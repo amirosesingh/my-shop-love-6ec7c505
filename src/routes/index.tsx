@@ -738,7 +738,7 @@ function Register() {
 
   /** House rules for bookings, set in Settings → Booking rules. */
   const bookingRules = bookingRulesOf(state.settings.integrations.bookingRules);
-  const isSupervisor = user?.role === "admin" || can("can_manage_settings");
+  const isSupervisor = user?.role === "admin" || can("can_access_pos_settings");
   /** Payment timings the branch allows, in the order they are shown. */
   const allowedTimings = (["now", "deposit", "collection"] as BookingPaymentTiming[]).filter((t) =>
     t === "now"
