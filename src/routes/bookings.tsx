@@ -391,6 +391,11 @@ function BookingsPage() {
                               {new Date(b.jobStatusAt).toLocaleString()}
                             </p>
                           )}
+                          {b.incidentNote && (
+                            <p className="mt-1 text-[11px] text-destructive">
+                              Incident: {b.incidentNote}
+                            </p>
+                          )}
                           {job?.notifyWhatsApp && (
                             <p className="mt-1 text-[11px] text-primary">
                               Customer wants a WhatsApp when it is ready.
