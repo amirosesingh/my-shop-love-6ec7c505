@@ -989,6 +989,11 @@ function Register() {
 
   /** Racket + string bought together earns the configured combo on labour. */
   const combo = applyCombo(intakeCharges, bookingRules);
+  /** Tension above the branch limit (or customer gear) flags the liability box. */
+  const highTension =
+    Number(tensionMain || 0) > bookingRules.highTensionThreshold ||
+    Number(tensionCross || 0) > bookingRules.highTensionThreshold ||
+    stringCustomerOwned;
   const intake = intakeTotals(
     combo.charges,
     state.settings.tax,
