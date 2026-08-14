@@ -62,6 +62,20 @@ export function setPrintSettings(receipt: ReceiptSettings, tax: TaxSettings) {
   taxCfg = tax;
 }
 
+/** Service & high-tension liability wording, pushed in from the booking rules. */
+let serviceTermsText = "";
+export function setServiceTerms(text: string) {
+  serviceTermsText = (text ?? "").trim();
+}
+
+/** Fine print carried on job tags and settlement receipts. */
+function serviceTermsBlock() {
+  if (!serviceTermsText) return "";
+  return `<hr><div class="muted" style="font-size:9px;line-height:1.25">
+    <span class="b">Service &amp; high-tension liability:</span> ${esc(serviceTermsText)}
+  </div>`;
+}
+
 /** Preview helper: render with an explicit, already-resolved profile. */
 export function setPreviewReceiptCfg(receipt: ReceiptSettings, tax: TaxSettings) {
   receiptCfg = receipt;
@@ -681,6 +695,8 @@ function bookingBody(booking: Booking, member: Member | null, pay: PaymentDetail
     ${booking.note ? `<div class="c muted">${esc(booking.note)}</div>` : ""}
     ${jobCardBlock(booking)}
     ${termsBlock()}
+    ${booking.job ? serviceTermsBlock() : ""}
+    ${booking.job && booking.liabilityAccepted ? `<div class="c muted" style="font-size:9px">Accepted at intake by ${esc(booking.customerName || "customer")}</div>` : ""}
     ${signatureBlock(booking.customerName)}
     ${transferBlock(pay)}
     ${member ? `<hr><div>Member ${esc(member.code)} · ${esc(member.name)}</div>` : ""}
@@ -706,6 +722,7 @@ function bookingPaymentBody(booking: Booking, payment: BookingPayment) {
     </table>
     <hr><div class="c">Collect &amp; settle by ${esc(new Date(booking.dueDate).toDateString())}</div>
     ${receiptCfg.bookingSlip?.termsOnPayment ? termsBlock() : ""}
+    ${booking.job ? serviceTermsBlock() : ""}
     <hr><div class="c muted rcpt-foot">${esc(receiptCfg.footerText || "")}</div>
     <div class="c muted">${esc(booking.ref)}</div>`;
 }
@@ -810,6 +827,7 @@ export function printJobTag(booking: Booking) {
     ${j?.jobNotes ? `<div class="muted">${esc(j.jobNotes)}</div>` : ""}
     <hr>${barcodeSvg(booking.ref)}
     <div class="c">${qrSvg(booking.ref, 96)}</div>
+    ${serviceTermsBlock()}
     <div class="c muted">${esc(booking.ref)}</div>`;
   printHtml(`${booking.ref} job tag`, body, true, booking.ref);
 }

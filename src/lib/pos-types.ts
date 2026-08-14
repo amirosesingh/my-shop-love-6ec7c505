@@ -344,16 +344,27 @@ export type BookingPayment = {
 };
 
 /** Where a racket sits in the stringing workflow. */
-export type JobStatus = "received" | "strung" | "ready" | "collected";
+export type JobStatus =
+  | "received"
+  | "strung"
+  | "ready"
+  | "collected"
+  | "damaged"
+  | "cancelled";
 
 export const JOB_STATUS_LABELS: Record<JobStatus, string> = {
   received: "Received",
   strung: "Strung",
   ready: "Ready to collect",
   collected: "Collected",
+  damaged: "Frame damaged / snapped",
+  cancelled: "Cancelled / refunded",
 };
 
 export const JOB_STATUS_FLOW: JobStatus[] = ["received", "strung", "ready", "collected"];
+
+/** Statuses outside the normal flow; each one needs an incident note. */
+export const JOB_STATUS_INCIDENT: JobStatus[] = ["damaged", "cancelled"];
 
 /** Everything the stringer needs written on the job card. */
 export type RacketJob = {
@@ -457,6 +468,12 @@ export type Booking = {
   charges?: IntakeCharge[];
   /** receipt number of the bill raised when the goods were collected */
   saleReceiptNo?: string;
+  /** customer accepted the service & high-tension liability terms at intake */
+  liabilityAccepted?: boolean;
+  /** who strung the racket */
+  technician?: string;
+  /** why the job was marked damaged or cancelled */
+  incidentNote?: string;
 };
 
 export const bookingBalance = (b: Pick<Booking, "total" | "paid">) =>
@@ -810,7 +827,16 @@ export type BookingRules = {
   comboValue: number;
   /** overriding the locked labour fee needs a supervisor, not just a reason */
   overrideNeedsSupervisor: boolean;
+  /** service & high-tension liability wording shown at intake and printed */
+  serviceTerms: string;
+  /** tension (in the branch unit) above which the job is flagged high-tension */
+  highTensionThreshold: number;
+  /** the customer must tick the liability agreement before a job can be saved */
+  requireLiabilityAccept: boolean;
 };
+
+export const DEFAULT_SERVICE_TERMS =
+  "The company/store shall not be held liable or responsible for any racket frame damage, cracking, or string breakage resulting from customer-requested high-tension stringing (over manufacturer recommended limits), pre-existing structural weakness, or normal wear during stringing.";
 
 export const DEFAULT_BOOKING_RULES: BookingRules = {
   requireDeposit: false,
@@ -835,6 +861,9 @@ export const DEFAULT_BOOKING_RULES: BookingRules = {
   comboRule: "off",
   comboValue: 0,
   overrideNeedsSupervisor: true,
+  serviceTerms: DEFAULT_SERVICE_TERMS,
+  highTensionThreshold: 26,
+  requireLiabilityAccept: true,
 };
 
 /** Merge stored rules over the defaults so a partial blob is always complete. */

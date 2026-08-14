@@ -259,6 +259,8 @@ function Register() {
   const [notifyWhatsApp, setNotifyWhatsApp] = useState(false);
   /** Itemised racket intake charges: labour, string, grip, add-ons. */
   const [intakeCharges, setIntakeCharges] = useState<IntakeCharge[]>([]);
+  /** Customer accepted the service & high-tension liability terms at intake. */
+  const [liabilityOk, setLiabilityOk] = useState(false);
   /** Customer lookup inside the booking dialog (name or phone). */
   const [bookMemberQuery, setBookMemberQuery] = useState("");
   /** Racket / string sourced from stock, or brought in by the customer. */
@@ -987,6 +989,11 @@ function Register() {
 
   /** Racket + string bought together earns the configured combo on labour. */
   const combo = applyCombo(intakeCharges, bookingRules);
+  /** Tension above the branch limit (or customer gear) flags the liability box. */
+  const highTension =
+    Number(tensionMain || 0) > bookingRules.highTensionThreshold ||
+    Number(tensionCross || 0) > bookingRules.highTensionThreshold ||
+    stringCustomerOwned;
   const intake = intakeTotals(
     combo.charges,
     state.settings.tax,
@@ -1040,6 +1047,18 @@ function Register() {
         toast.error("Choose a ready-by date and time");
         return;
       }
+      if (
+        bookingRules.requireLiabilityAccept &&
+        bookingRules.serviceTerms.trim() &&
+        !liabilityOk
+      ) {
+        toast.error("The customer must accept the service & liability terms", {
+          description: highTension
+            ? "This job is flagged high tension — acceptance is required."
+            : "Tick the agreement box on the intake form.",
+        });
+        return;
+      }
       if (bookingRules.warnOutsideTradingHours && promisedAt) {
         const hhmm = promisedAt.slice(11, 16);
         const { dayStart, dayEnd } = state.settings.hours;
@@ -1083,6 +1102,7 @@ function Register() {
         cashier: activeCashier,
         tagId: racketMode ? jobTag || (bookingRules.autoJobTag ? newJobTag() : undefined) : undefined,
         stringOrigin: racketMode ? (stringCustomerOwned ? "customer" : "store") : undefined,
+        liabilityAccepted: racketMode ? liabilityOk : undefined,
         stringProductId: racketMode && !stringCustomerOwned ? stringProductId || undefined : undefined,
         intakeNote: racketMode ? grommetNotes.trim() || undefined : undefined,
         job: racketMode
@@ -3618,6 +3638,36 @@ function Register() {
                     />
                     Notify the customer on WhatsApp when the racket is ready
                   </label>
+                  {bookingRules.serviceTerms.trim() ? (
+                    <div
+                      className={`space-y-2 rounded-md border p-3 ${
+                        highTension
+                          ? "border-warning/60 bg-warning/10"
+                          : "border-border bg-muted/30"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-medium">Service &amp; high-tension liability terms</p>
+                        {highTension ? (
+                          <span className="rounded border border-warning/60 px-2 py-0.5 text-[10px] uppercase tracking-wide text-warning">
+                            High tension
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="text-[11px] leading-snug text-muted-foreground">
+                        {bookingRules.serviceTerms}
+                      </p>
+                      <label className="flex items-start gap-2 text-xs">
+                        <input
+                          type="checkbox"
+                          checked={liabilityOk}
+                          onChange={(e) => setLiabilityOk(e.target.checked)}
+                        />
+                        Customer has read, acknowledged, and accepted the Service &amp; High-Tension
+                        Liability Terms.
+                      </label>
+                    </div>
+                  ) : null}
                   <p className="text-[11px] text-muted-foreground">
                     A job tag prints with the slip so it can be tied to the racket.
                   </p>

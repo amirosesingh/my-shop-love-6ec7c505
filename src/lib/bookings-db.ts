@@ -55,6 +55,9 @@ const toRow = (b: Booking): Row => ({
   string_source_product_id: b.stringProductId ?? null,
   grip_product_id: b.gripProductId ?? null,
   charges: b.charges ?? [],
+  liability_accepted: !!b.liabilityAccepted,
+  technician: b.technician ?? null,
+  incident_note: b.incidentNote ?? null,
 });
 
 const rowToBooking = (r: Row, payments: Row[]): Booking => ({
@@ -98,6 +101,9 @@ const rowToBooking = (r: Row, payments: Row[]): Booking => ({
   stringProductId: r.string_source_product_id ?? undefined,
   gripProductId: r.grip_product_id ?? undefined,
   charges: Array.isArray(r.charges) ? r.charges : [],
+  liabilityAccepted: !!r.liability_accepted,
+  technician: r.technician ?? undefined,
+  incidentNote: r.incident_note ?? undefined,
   job: {
     racketModel: r.racket_model ?? undefined,
     stringType: r.string_type ?? undefined,
