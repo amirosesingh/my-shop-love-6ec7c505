@@ -37,12 +37,37 @@ export type QueuedOp = {
   seq?: number;
   /** device clock reading when the action happened */
   occurredAt?: string;
+  /** device clock reading of the last send attempt */
+  lastAttemptAt?: string;
 };
 
 const QUEUE_KEY = "pos.sync.outbox";
 const FLAG_KEY = "pos.sync.enabled";
 const STAMP_KEY = "pos.sync.lastSyncedAt";
-export const MAX_ATTEMPTS = 6;
+/** After this many failed sends a change is parked as a dead letter. */
+export const MAX_ATTEMPTS = 10;
+/** Longest a change ever waits between attempts. */
+export const MAX_BACKOFF_MS = 30_000;
+
+/**
+ * Waiting time before the next attempt: 1s, 2s, 4s … capped at thirty
+ * seconds, plus a small spread so a whole shop's tills do not all retry on
+ * the same tick. The spread is derived from the entry id, so the countdown
+ * shown on screen matches the one the sync engine uses.
+ */
+export function backoffMs(entry: Pick<QueuedOp, "id" | "attempts">): number {
+  if (entry.attempts <= 0) return 0;
+  const base = Math.min(MAX_BACKOFF_MS, 2 ** (entry.attempts - 1) * 1000);
+  let hash = 0;
+  for (const ch of entry.id) hash = (hash * 31 + ch.charCodeAt(0)) % 1000;
+  return base + Math.round((hash / 1000) * Math.min(base, 5000));
+}
+
+/** When this entry may be tried again (epoch ms). */
+export function nextAttemptDue(entry: QueuedOp): number {
+  const from = entry.lastAttemptAt ?? entry.createdAt;
+  return new Date(from).getTime() + backoffMs(entry);
+}
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
@@ -141,6 +166,7 @@ export function failOp(id: string, message: string) {
             attempts: q.attempts + 1,
             lastError: message,
             status: "failed",
+            lastAttemptAt: new Date().toISOString(),
             quarantined: q.attempts + 1 >= MAX_ATTEMPTS,
           }
         : q,
@@ -162,6 +188,7 @@ export function refuseOp(id: string, message: string) {
             attempts: MAX_ATTEMPTS,
             lastError: message,
             status: "failed" as const,
+            lastAttemptAt: new Date().toISOString(),
             quarantined: true,
           }
         : q,
@@ -172,13 +199,23 @@ export function refuseOp(id: string, message: string) {
 export function retryQuarantined() {
   write(
     read().map((q) =>
-      q.quarantined ? { ...q, attempts: 0, quarantined: false, status: "pending" as const } : q,
+      q.quarantined
+        ? {
+            ...q,
+            attempts: 0,
+            quarantined: false,
+            status: "pending" as const,
+            lastAttemptAt: undefined,
+          }
+        : q,
     ),
   );
 }
 
 export function discardQuarantined() {
-  write(read().filter((q) => !q.quarantined));
+  const queue = read();
+  for (const entry of queue) if (entry.quarantined) rollbackLocally(entry);
+  write(queue.filter((q) => !q.quarantined));
 }
 
 /** Put one refused change back in line for another attempt. */
@@ -192,15 +229,47 @@ export function retryOp(id: string) {
             quarantined: false,
             status: "pending" as const,
             lastError: undefined,
+            lastAttemptAt: undefined,
           }
         : q,
     ),
   );
 }
 
-/** Drop one change for good. Only ever called from an explicit confirmation. */
+/**
+ * Drop one change for good. Only ever called from an explicit confirmation.
+ * The local copy is put back the way the central database has it, so the till
+ * never keeps showing a change that will never be sent.
+ */
 export function discardOp(id: string) {
-  write(read().filter((q) => q.id !== id));
+  const queue = read();
+  const entry = queue.find((q) => q.id === id);
+  if (entry) rollbackLocally(entry);
+  write(queue.filter((q) => q.id !== id));
+}
+
+/** Ids a change touched, so the local copy of those rows can be undone. */
+function touchedIds(op: SyncOp): string[] {
+  if (op.kind === "insert" || op.kind === "upsert")
+    return op.rows.map((r) => String(r["id"] ?? "")).filter(Boolean);
+  if (op.kind === "update") return [String(op.match["id"] ?? "")].filter(Boolean);
+  return [];
+}
+
+/**
+ * Undo a discarded change in this terminal's own copy. A removed row is
+ * re-fetched by the next pull, so what the till shows always matches what was
+ * really saved centrally. Deletions need no undo: the row simply comes back.
+ */
+function rollbackLocally(entry: QueuedOp) {
+  const bridge = isBrowser()
+    ? (window as unknown as { pos?: { localRollback?: (op: unknown) => Promise<unknown> } }).pos
+    : undefined;
+  const ids = touchedIds(entry.op);
+  if (!bridge?.localRollback || !ids.length) return;
+  void bridge.localRollback({ table: entry.op.table, ids }).catch(() => {
+    /* the local copy is rebuilt by the next pull anyway */
+  });
 }
 
 /** What the queue looks like to a person: state, reason and next attempt. */
@@ -213,14 +282,13 @@ export type QueueView = QueuedOp & {
 /** The queue with every entry described for the Sync & backup screen. */
 export function queueView(): QueueView[] {
   return read().map((q) => {
-    // The same backoff the sync engine applies: 0s, 5s, 20s, 45s …
-    const wait = q.attempts ** 2 * 5000;
-    const due = new Date(q.createdAt).getTime() + wait;
+    // The same backoff the sync engine applies: 1s, 2s, 4s … capped at 30s.
+    const wait = backoffMs(q);
     return {
       ...q,
       state: q.quarantined ? "refused" : q.attempts > 0 ? "retrying" : "waiting",
       reason: q.lastError ?? null,
-      nextAttemptAt: q.quarantined || !wait ? null : new Date(due).toISOString(),
+      nextAttemptAt: q.quarantined || !wait ? null : new Date(nextAttemptDue(q)).toISOString(),
     };
   });
 }

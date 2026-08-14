@@ -46,6 +46,7 @@ import { checkHealth } from "./connection-health";
 import {
   failOp,
   refuseOp,
+  nextAttemptDue,
   isOnline,
   isOnlineSyncEnabled,
   listQueue,
@@ -361,9 +362,8 @@ export async function drainOutbox(): Promise<{ pushed: number; failed: number }>
       if (!tableSyncAllowed(entry.op.table)) continue;
       const terminal = entry.terminalId ?? "legacy";
       if (blocked.has(terminal)) continue;
-      // Exponential backoff: 0s, 5s, 20s, 45s ... since the last attempt.
-      const wait = entry.attempts ** 2 * 5000;
-      if (wait && Date.now() - new Date(entry.createdAt).getTime() < wait) continue;
+      // Capped exponential backoff with spread: 1s, 2s, 4s … up to 30s.
+      if (entry.attempts > 0 && Date.now() < nextAttemptDue(entry)) continue;
       const ok = await runOne(entry);
       if (ok) pushed += 1;
       else {

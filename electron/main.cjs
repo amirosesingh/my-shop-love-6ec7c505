@@ -782,6 +782,7 @@ function registerIpc() {
     localDb.clearAudit();
     return { ok: true };
   });
+  ipcMain.handle("local:rollback", (_e, op) => localDb.rollbackOp(op ?? {}));
 
   /* branding mirror so first-run setup only ever runs once */
   ipcMain.handle("branding:read", () => ({ ok: true, branding: brandingStore.read() }));
