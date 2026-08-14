@@ -11,7 +11,7 @@ import {
 import { clearRevocation, useRevocationCheck } from "@/lib/use-revocation-check";
 import { useAutoLock } from "@/lib/auto-lock";
 import { SidebarNav, useSidebarCollapsed } from "@/components/pos/SidebarNav";
-import { SyncStatus } from "@/components/pos/SyncStatus";
+import { SyncBadge } from "@/components/pos/sync/SyncBadge";
 import { WindowControls } from "@/components/pos/WindowControls";
 import { SystemStatusPill } from "@/components/pos/SystemStatusPill";
 import { SecurityAlertBell } from "@/components/pos/SecurityAlertBell";
@@ -433,7 +433,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               {user.staffId} · {user.role}
             </p>
           </div>
-          <SyncStatus className="ml-auto" />
+          <SyncBadge className="ml-auto" />
           <LiveClock />
           <SystemStatusPill />
           <SecurityAlertBell />

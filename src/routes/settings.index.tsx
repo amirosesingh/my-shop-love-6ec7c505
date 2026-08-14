@@ -225,6 +225,12 @@ const GROUPS = [
         blurb: "Branch identity, offline sync queue and backups.",
       },
       {
+        to: "/settings/data-sync",
+        label: "Data sync & audit",
+        icon: RefreshCw,
+        blurb: "Live sync status, cloud vs local record counts, force push/pull and the audit ledger.",
+      },
+      {
         to: "/settings/system",
         label: "System status & integrations",
         icon: Activity,

@@ -12,6 +12,7 @@ import { CloudCheck, CloudOff, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { SyncStatus } from "@/components/pos/SyncStatus";
+import { SyncBadge } from "@/components/pos/sync/SyncBadge";
 import { SystemStatusPill } from "@/components/pos/SystemStatusPill";
 import { SecurityAlertBell } from "@/components/pos/SecurityAlertBell";
 import { ActivityBell } from "@/components/pos/ActivityBell";
@@ -101,6 +102,9 @@ export function MobileStatusSheet({ className }: { className?: string }) {
             <RefreshCw className={cn("mr-1.5 size-3.5", busy && "animate-spin")} /> Sync now
           </Button>
 
+          <Row label="Sync">
+            <SyncBadge />
+          </Row>
           <Row label="Sync detail">
             <SyncStatus />
           </Row>
