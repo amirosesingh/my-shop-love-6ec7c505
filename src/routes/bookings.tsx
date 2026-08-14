@@ -512,8 +512,58 @@ function BookingsPage() {
         )}
       </div>
 
-      <Dialog open={!!payFor} onOpenChange={(o) => !o && setPayFor(null)}>
+      <Dialog open={!!incidentFor} onOpenChange={(o) => !o && setIncidentFor(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {incidentFor?.status === "damaged" ? "Frame damaged / snapped" : "Cancel this job"} ·{" "}
+              {incidentFor?.booking.ref}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>What happened?</Label>
+            <Textarea
+              rows={3}
+              value={incidentNote}
+              onChange={(e) => setIncidentNote(e.target.value)}
+              placeholder="Frame cracked at 3 o'clock while tensioning the mains — customer informed."
+            />
+            <p className="text-[11px] text-muted-foreground">
+              The note is stored on the job card and shown in the history line.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIncidentFor(null)}>
+              Back
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!incidentFor) return;
+                const note = incidentNote.trim();
+                if (!note) {
+                  toast.error("An incident note is required");
+                  return;
+                }
+                if (!(await requirePermission("can_cancel_booking"))) return;
+                setBookingJobStatus(
+                  incidentFor.booking.id,
+                  incidentFor.status,
+                  user?.name || incidentFor.booking.cashier || "Counter",
+                  note,
+                );
+                toast.success(
+                  `${incidentFor.booking.ref} · ${JOB_STATUS_LABELS[incidentFor.status].toLowerCase()}`,
+                );
+                setIncidentFor(null);
+              }}
+            >
+              Record &amp; update
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
+      <Dialog open={!!payFor} onOpenChange={(o) => !o && setPayFor(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
