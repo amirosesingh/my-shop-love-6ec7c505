@@ -79,6 +79,8 @@ const jobTone: Record<JobStatus, string> = {
   strung: "border-primary/40 text-primary",
   ready: "border-success/40 text-success",
   collected: "border-success/40 text-success",
+  damaged: "border-destructive/50 text-destructive",
+  cancelled: "border-muted text-muted-foreground",
 };
 
 function BookingsPage() {
