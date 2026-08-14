@@ -57,6 +57,7 @@ import { Route as SettingsAccountsRouteImport } from './routes/settings.accounts
 import { Route as SettingsBookingRulesRouteImport } from './routes/settings.booking-rules'
 import { Route as SettingsBookingSlipRouteImport } from './routes/settings.booking-slip'
 import { Route as SettingsCatalogRouteImport } from './routes/settings.catalog'
+import { Route as SettingsDataSyncRouteImport } from './routes/settings.data-sync'
 import { Route as SettingsDiagnosticsRouteImport } from './routes/settings.diagnostics'
 import { Route as SettingsDisplayRouteImport } from './routes/settings.display'
 import { Route as SettingsElementsRouteImport } from './routes/settings.elements'
@@ -333,6 +334,11 @@ const SettingsCatalogRoute = SettingsCatalogRouteImport.update({
   path: '/settings/catalog',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsDataSyncRoute = SettingsDataSyncRouteImport.update({
+  id: '/settings/data-sync',
+  path: '/settings/data-sync',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsDiagnosticsRoute = SettingsDiagnosticsRouteImport.update({
   id: '/settings/diagnostics',
   path: '/settings/diagnostics',
@@ -556,6 +562,7 @@ export interface FileRoutesByFullPath {
   '/settings/booking-rules': typeof SettingsBookingRulesRoute
   '/settings/booking-slip': typeof SettingsBookingSlipRoute
   '/settings/catalog': typeof SettingsCatalogRoute
+  '/settings/data-sync': typeof SettingsDataSyncRoute
   '/settings/diagnostics': typeof SettingsDiagnosticsRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
@@ -641,6 +648,7 @@ export interface FileRoutesByTo {
   '/settings/booking-rules': typeof SettingsBookingRulesRoute
   '/settings/booking-slip': typeof SettingsBookingSlipRoute
   '/settings/catalog': typeof SettingsCatalogRoute
+  '/settings/data-sync': typeof SettingsDataSyncRoute
   '/settings/diagnostics': typeof SettingsDiagnosticsRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
@@ -727,6 +735,7 @@ export interface FileRoutesById {
   '/settings/booking-rules': typeof SettingsBookingRulesRoute
   '/settings/booking-slip': typeof SettingsBookingSlipRoute
   '/settings/catalog': typeof SettingsCatalogRoute
+  '/settings/data-sync': typeof SettingsDataSyncRoute
   '/settings/diagnostics': typeof SettingsDiagnosticsRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
@@ -814,6 +823,7 @@ export interface FileRouteTypes {
     | '/settings/booking-rules'
     | '/settings/booking-slip'
     | '/settings/catalog'
+    | '/settings/data-sync'
     | '/settings/diagnostics'
     | '/settings/display'
     | '/settings/elements'
@@ -899,6 +909,7 @@ export interface FileRouteTypes {
     | '/settings/booking-rules'
     | '/settings/booking-slip'
     | '/settings/catalog'
+    | '/settings/data-sync'
     | '/settings/diagnostics'
     | '/settings/display'
     | '/settings/elements'
@@ -984,6 +995,7 @@ export interface FileRouteTypes {
     | '/settings/booking-rules'
     | '/settings/booking-slip'
     | '/settings/catalog'
+    | '/settings/data-sync'
     | '/settings/diagnostics'
     | '/settings/display'
     | '/settings/elements'
@@ -1070,6 +1082,7 @@ export interface RootRouteChildren {
   SettingsBookingRulesRoute: typeof SettingsBookingRulesRoute
   SettingsBookingSlipRoute: typeof SettingsBookingSlipRoute
   SettingsCatalogRoute: typeof SettingsCatalogRoute
+  SettingsDataSyncRoute: typeof SettingsDataSyncRoute
   SettingsDiagnosticsRoute: typeof SettingsDiagnosticsRoute
   SettingsDisplayRoute: typeof SettingsDisplayRoute
   SettingsElementsRoute: typeof SettingsElementsRoute
@@ -1445,6 +1458,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsCatalogRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/data-sync': {
+      id: '/settings/data-sync'
+      path: '/settings/data-sync'
+      fullPath: '/settings/data-sync'
+      preLoaderRoute: typeof SettingsDataSyncRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/diagnostics': {
       id: '/settings/diagnostics'
       path: '/settings/diagnostics'
@@ -1754,6 +1774,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsBookingRulesRoute: SettingsBookingRulesRoute,
   SettingsBookingSlipRoute: SettingsBookingSlipRoute,
   SettingsCatalogRoute: SettingsCatalogRoute,
+  SettingsDataSyncRoute: SettingsDataSyncRoute,
   SettingsDiagnosticsRoute: SettingsDiagnosticsRoute,
   SettingsDisplayRoute: SettingsDisplayRoute,
   SettingsElementsRoute: SettingsElementsRoute,
