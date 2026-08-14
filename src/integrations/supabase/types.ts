@@ -216,6 +216,7 @@ export type Database = {
           grip_product_id: string | null
           grommet_notes: string | null
           id: string
+          incident_note: string | null
           intake_note: string | null
           job_notes: string | null
           job_status: string
@@ -264,6 +265,7 @@ export type Database = {
           grip_product_id?: string | null
           grommet_notes?: string | null
           id?: string
+          incident_note?: string | null
           intake_note?: string | null
           job_notes?: string | null
           job_status?: string
@@ -312,6 +314,7 @@ export type Database = {
           grip_product_id?: string | null
           grommet_notes?: string | null
           id?: string
+          incident_note?: string | null
           intake_note?: string | null
           job_notes?: string | null
           job_status?: string
@@ -966,6 +969,7 @@ export type Database = {
           archived_at: string | null
           barcode: string
           barcode_aliases: string[]
+          barcode_variants: Json
           brand: string | null
           category: string | null
           cost_price: number
@@ -994,6 +998,7 @@ export type Database = {
           archived_at?: string | null
           barcode: string
           barcode_aliases?: string[]
+          barcode_variants?: Json
           brand?: string | null
           category?: string | null
           cost_price?: number
@@ -1022,6 +1027,7 @@ export type Database = {
           archived_at?: string | null
           barcode?: string
           barcode_aliases?: string[]
+          barcode_variants?: Json
           brand?: string | null
           category?: string | null
           cost_price?: number
