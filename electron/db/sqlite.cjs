@@ -55,21 +55,10 @@ function init(directory) {
   try {
     const { DatabaseSync } = require("node:sqlite");
     db = new DatabaseSync(dbPath);
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS mirror (
-        entity TEXT NOT NULL, id TEXT NOT NULL, payload TEXT NOT NULL,
-        updated_at TEXT NOT NULL, PRIMARY KEY (entity, id));
-      CREATE TABLE IF NOT EXISTS outbox (
-        id TEXT PRIMARY KEY, entity TEXT NOT NULL, record_id TEXT,
-        payload TEXT NOT NULL, created_at TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'pending', attempts INTEGER NOT NULL DEFAULT 0,
-        error TEXT);
-      CREATE TABLE IF NOT EXISTS sync_audit (
-        id TEXT PRIMARY KEY, at TEXT NOT NULL, direction TEXT NOT NULL,
-        entity TEXT NOT NULL, record_id TEXT, records INTEGER NOT NULL DEFAULT 0,
-        status TEXT NOT NULL, error TEXT);
-      CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT);
-    `);
+    // Pragmas + typed mirrors + offline_sync_queue live in offline_sqlite_v2.sql
+    // so the local shape stays reviewable next to the cloud schema.
+    db.exec(fs.readFileSync(path.join(__dirname, "offline_sqlite_v2.sql"), "utf8"));
+    drainLegacyOutbox();
     return { ok: true, engine: "sqlite", path: dbPath };
   } catch (error) {
     db = null;
@@ -80,6 +69,23 @@ function init(directory) {
       path: jsonPath,
       note: error instanceof Error ? error.message : String(error),
     };
+  }
+}
+
+/** Moves rows written by pre-v2 builds into the new queue, once. */
+function drainLegacyOutbox() {
+  try {
+    db.exec(
+      `INSERT OR IGNORE INTO offline_sync_queue
+         (id, table_name, record_id, action_type, payload_json, status, error_message, attempts, created_at)
+       SELECT id, entity, record_id, 'INSERT', payload,
+              CASE WHEN status = 'failed' THEN 'failed' ELSE 'pending' END,
+              error, attempts, created_at
+       FROM outbox WHERE status IN ('pending', 'failed');
+       DELETE FROM outbox;`,
+    );
+  } catch {
+    /* legacy table absent or already drained */
   }
 }
 
@@ -138,7 +144,7 @@ function counts() {
 /* ------------------------------- outbox ------------------------------- */
 
 /** Append-only: offline sales/jobs/payments get a client UUID and UTC stamp. */
-function enqueue(entity, payload) {
+function enqueue(entity, payload, actionType = "INSERT") {
   if (!ready()) return null;
   const row = {
     id: uuid(),
@@ -152,9 +158,17 @@ function enqueue(entity, payload) {
   };
   if (db) {
     db.prepare(
-      `INSERT INTO outbox (id, entity, record_id, payload, created_at, status, attempts, error)
-       VALUES (?, ?, ?, ?, ?, 'pending', 0, NULL)`,
-    ).run(row.id, row.entity, row.record_id, JSON.stringify(row.payload), row.created_at);
+      `INSERT INTO offline_sync_queue
+         (id, table_name, record_id, action_type, payload_json, status, error_message, attempts, created_at)
+       VALUES (?, ?, ?, ?, ?, 'pending', NULL, 0, ?)`,
+    ).run(
+      row.id,
+      row.entity,
+      row.record_id,
+      actionType === "UPDATE" ? "UPDATE" : "INSERT",
+      JSON.stringify(row.payload),
+      row.created_at,
+    );
   } else {
     json.outbox.push(row);
     saveJson();
@@ -162,15 +176,28 @@ function enqueue(entity, payload) {
   return row;
 }
 
+/** Queue rows are exposed in the legacy `{ entity, payload, error }` shape. */
+const fromQueue = (r) => ({
+  id: r.id,
+  entity: r.table_name,
+  record_id: r.record_id,
+  action_type: r.action_type,
+  payload: JSON.parse(r.payload_json),
+  status: r.status,
+  attempts: r.attempts,
+  error: r.error_message,
+  created_at: r.created_at,
+});
+
 function pending(limit = 200) {
   if (!ready()) return [];
   if (db) {
     return db
       .prepare(
-        `SELECT * FROM outbox WHERE status IN ('pending','failed') ORDER BY created_at LIMIT ?`,
+        `SELECT * FROM offline_sync_queue WHERE status IN ('pending','failed') ORDER BY created_at LIMIT ?`,
       )
       .all(limit)
-      .map((r) => ({ ...r, payload: JSON.parse(r.payload) }));
+      .map(fromQueue);
   }
   return json.outbox.filter((r) => r.status !== "synced").slice(0, limit);
 }
@@ -185,10 +212,15 @@ function pendingCounts() {
 function markOutbox(id, status, error = null) {
   if (!ready()) return;
   if (db) {
+    if (status === "synced") {
+      db.prepare(`DELETE FROM offline_sync_queue WHERE id = ?`).run(id);
+      return;
+    }
     db.prepare(
-      `UPDATE outbox SET status = ?, error = ?, attempts = attempts + 1 WHERE id = ?`,
-    ).run(status, error, id);
-    if (status === "synced") db.prepare(`DELETE FROM outbox WHERE id = ?`).run(id);
+      `UPDATE offline_sync_queue
+         SET status = ?, error_message = ?, attempts = attempts + 1
+       WHERE id = ?`,
+    ).run(status === "failed" ? "failed" : "pending", error, id);
     return;
   }
   const row = json.outbox.find((r) => r.id === id);

@@ -702,6 +702,77 @@ export type Database = {
           },
         ]
       }
+      item_activity_logs: {
+        Row: {
+          activity_type: string
+          barcode: string | null
+          created_at: string
+          id: string
+          note: string
+          product_id: string | null
+          product_name: string | null
+          quantity_delta: number
+          reference: string | null
+          role: string | null
+          sku: string | null
+          staff_id: string | null
+          staff_name: string | null
+          stock_after: number | null
+          stock_before: number | null
+          store_id: string | null
+          terminal_id: string | null
+          unit_cost: number
+        }
+        Insert: {
+          activity_type: string
+          barcode?: string | null
+          created_at?: string
+          id?: string
+          note?: string
+          product_id?: string | null
+          product_name?: string | null
+          quantity_delta?: number
+          reference?: string | null
+          role?: string | null
+          sku?: string | null
+          staff_id?: string | null
+          staff_name?: string | null
+          stock_after?: number | null
+          stock_before?: number | null
+          store_id?: string | null
+          terminal_id?: string | null
+          unit_cost?: number
+        }
+        Update: {
+          activity_type?: string
+          barcode?: string | null
+          created_at?: string
+          id?: string
+          note?: string
+          product_id?: string | null
+          product_name?: string | null
+          quantity_delta?: number
+          reference?: string | null
+          role?: string | null
+          sku?: string | null
+          staff_id?: string | null
+          staff_name?: string | null
+          stock_after?: number | null
+          stock_before?: number | null
+          store_id?: string | null
+          terminal_id?: string | null
+          unit_cost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "item_activity_logs_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       members: {
         Row: {
           address: string | null
@@ -781,6 +852,136 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      offline_sync_audit_log: {
+        Row: {
+          created_at: string
+          direction: string
+          error_message: string | null
+          finished_at: string | null
+          id: string
+          record_id: string | null
+          records: number
+          started_at: string
+          status: string
+          store_id: string | null
+          table_name: string
+          terminal_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          direction: string
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          record_id?: string | null
+          records?: number
+          started_at?: string
+          status?: string
+          store_id?: string | null
+          table_name: string
+          terminal_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          direction?: string
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          record_id?: string | null
+          records?: number
+          started_at?: string
+          status?: string
+          store_id?: string | null
+          table_name?: string
+          terminal_id?: string | null
+        }
+        Relationships: []
+      }
+      payment_transactions: {
+        Row: {
+          amount: number
+          booking_id: string | null
+          cashier_id: string | null
+          cashier_name: string | null
+          created_at: string
+          id: string
+          kind: string
+          member_id: string | null
+          method: string
+          note: string
+          paid_at: string
+          reference: string | null
+          sale_id: string | null
+          shift_id: string | null
+          source_type: string
+          store_id: string | null
+          terminal_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          booking_id?: string | null
+          cashier_id?: string | null
+          cashier_name?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          member_id?: string | null
+          method?: string
+          note?: string
+          paid_at?: string
+          reference?: string | null
+          sale_id?: string | null
+          shift_id?: string | null
+          source_type: string
+          store_id?: string | null
+          terminal_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          booking_id?: string | null
+          cashier_id?: string | null
+          cashier_name?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          member_id?: string | null
+          method?: string
+          note?: string
+          paid_at?: string
+          reference?: string | null
+          sale_id?: string | null
+          shift_id?: string | null
+          source_type?: string
+          store_id?: string | null
+          terminal_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_transactions_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_transactions_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_transactions_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pin_attempts: {
         Row: {
@@ -928,6 +1129,47 @@ export type Database = {
           website?: string | null
         }
         Relationships: []
+      }
+      product_barcodes: {
+        Row: {
+          barcode: string
+          created_at: string
+          id: string
+          is_primary: boolean
+          label: string | null
+          pack_size: number
+          product_id: string
+          updated_at: string
+        }
+        Insert: {
+          barcode: string
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          label?: string | null
+          pack_size?: number
+          product_id: string
+          updated_at?: string
+        }
+        Update: {
+          barcode?: string
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          label?: string | null
+          pack_size?: number
+          product_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_barcodes_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       product_categories: {
         Row: {
