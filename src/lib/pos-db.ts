@@ -1492,6 +1492,12 @@ export const db = {
       { kind: "insert", table: "sales", rows: [saleToRow(sale)] },
       { kind: "insert", table: "sale_items", rows: saleItemRows(sale) },
     ];
+    const tenders = salePaymentRows(sale);
+    if (tenders.length)
+      ops.push({ kind: "insert", table: "payment_transactions", rows: tenders });
+    const movements = saleActivityRows(sale);
+    if (movements.length)
+      ops.push({ kind: "insert", table: "item_activity_logs", rows: movements });
     if (products.length)
       ops.push({ kind: "upsert", table: "products", rows: products.map(productToRow) });
     if (member) ops.push({ kind: "upsert", table: "members", rows: [memberToRow(member, tierId)] });
