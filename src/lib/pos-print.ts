@@ -62,6 +62,20 @@ export function setPrintSettings(receipt: ReceiptSettings, tax: TaxSettings) {
   taxCfg = tax;
 }
 
+/** Service & high-tension liability wording, pushed in from the booking rules. */
+let serviceTermsText = "";
+export function setServiceTerms(text: string) {
+  serviceTermsText = (text ?? "").trim();
+}
+
+/** Fine print carried on job tags and settlement receipts. */
+function serviceTermsBlock() {
+  if (!serviceTermsText) return "";
+  return `<hr><div class="muted" style="font-size:9px;line-height:1.25">
+    <span class="b">Service &amp; high-tension liability:</span> ${esc(serviceTermsText)}
+  </div>`;
+}
+
 /** Preview helper: render with an explicit, already-resolved profile. */
 export function setPreviewReceiptCfg(receipt: ReceiptSettings, tax: TaxSettings) {
   receiptCfg = receipt;
