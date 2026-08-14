@@ -23,6 +23,8 @@ export type Product = {
   sku: string;
   barcode: string;
   category: string;
+  /** middle classification level: Category > Group > Sub-category */
+  group?: string;
   /** optional second classification level under `category` */
   subCategory?: string;
   /** base unit of measure code, e.g. pcs / kg / m */
@@ -31,6 +33,8 @@ export type Product = {
   packs?: ProductPack[];
   /** extra barcodes that resolve to this same product */
   barcodes?: string[];
+  /** labelled barcode variants (colour / size / pack) for this same product */
+  variants?: BarcodeVariant[];
   price: number;
   cost: number;
   /** online storefront price */
@@ -52,6 +56,13 @@ export type ProductPack = {
   name: string;
   /** how many base units one pack contains */
   factor: number;
+};
+
+/** One labelled barcode that resolves to the parent product. */
+export type BarcodeVariant = {
+  code: string;
+  /** what makes this variant different, e.g. "Blue", "12 m pack" */
+  label?: string;
 };
 
 /** A catalogue classification. A row with `parentId` is a sub-category. */

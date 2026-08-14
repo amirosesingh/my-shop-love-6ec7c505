@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
@@ -11,14 +11,19 @@ import { Badge } from "@/components/ui/badge";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { useAuth } from "@/lib/pos-auth";
 import {
+  childrenOf,
   deleteCategory,
   deleteUnit,
+  reorderCategory,
+  reparentChildren,
   saveCategory,
   saveUnit,
   topCategories,
   useCategories,
   useUnits,
 } from "@/lib/catalog-meta";
+import { usePos } from "@/lib/pos-store";
+import type { ProductCategory } from "@/lib/pos-types";
 
 export const Route = createFileRoute("/settings/catalog")({
   head: () => ({
@@ -46,6 +51,7 @@ function CatalogMetaSettings() {
   const allowed = can("can_manage_categories");
   const categories = useCategories();
   const units = useUnits();
+  const { state } = usePos();
 
   const [catName, setCatName] = useState("");
   const [catParent, setCatParent] = useState("none");
@@ -54,8 +60,84 @@ function CatalogMetaSettings() {
   const [unitDecimal, setUnitDecimal] = useState(false);
 
   const parents = useMemo(() => topCategories(categories), [categories]);
-  const childrenOf = (id: string) =>
-    categories.filter((c) => c.parentId === id).sort((a, b) => a.name.localeCompare(b.name));
+  const kids = (id: string) => childrenOf(categories, id);
+
+  /** Every level a new node can hang under: top level, category or group. */
+  const parentOptions = useMemo(
+    () => [
+      { value: "none", label: "Top level (category)" },
+      ...parents.flatMap((c) => [
+        { value: c.id, label: `${c.name} › new group` },
+        ...childrenOf(categories, c.id).map((g) => ({
+          value: g.id,
+          label: `${c.name} › ${g.name} › new sub-category`,
+        })),
+      ]),
+    ],
+    [parents, categories],
+  );
+
+  /** How many catalogue items still carry this classification by name. */
+  const productsUsing = (node: ProductCategory, level: "category" | "group" | "sub") =>
+    state.products.filter((p) =>
+      level === "category"
+        ? p.category === node.name
+        : level === "group"
+          ? (p.group ?? "") === node.name
+          : (p.subCategory ?? "") === node.name,
+    ).length;
+
+  async function renameNode(node: ProductCategory) {
+    const next = window.prompt(`Rename "${node.name}" to`, node.name)?.trim();
+    if (!next || next === node.name) return;
+    try {
+      await saveCategory({ ...node, name: next });
+      toast.success("Renamed");
+    } catch {
+      toast.error("Could not rename that entry");
+    }
+  }
+
+  async function removeNode(node: ProductCategory, level: "category" | "group" | "sub") {
+    const inUse = productsUsing(node, level);
+    if (inUse) {
+      toast.error(`${inUse} product${inUse > 1 ? "s are" : " is"} still filed under ${node.name}`);
+      return;
+    }
+    const children = childrenOf(categories, node.id);
+    if (children.length) {
+      const keep = window.confirm(
+        `${node.name} has ${children.length} entr${children.length > 1 ? "ies" : "y"} under it.\n\nOK = move them up one level.\nCancel = stop and leave everything as it is.`,
+      );
+      if (!keep) return;
+      await reparentChildren(categories, node.id, node.parentId ?? null);
+    }
+    await deleteCategory(node.id);
+    toast.success(`${node.name} removed`);
+  }
+
+  const OrderButtons = ({ node }: { node: ProductCategory }) => (
+    <>
+      <Button
+        size="icon"
+        variant="ghost"
+        disabled={!allowed}
+        aria-label={`Move ${node.name} up`}
+        onClick={() => reorderCategory(categories, node.id, -1)}
+      >
+        <ChevronUp className="size-4" />
+      </Button>
+      <Button
+        size="icon"
+        variant="ghost"
+        disabled={!allowed}
+        aria-label={`Move ${node.name} down`}
+        onClick={() => reorderCategory(categories, node.id, 1)}
+      >
+        <ChevronDown className="size-4" />
+      </Button>
+    </>
+  );
 
   async function addCategory() {
     const name = catName.trim();
@@ -67,7 +149,7 @@ function CatalogMetaSettings() {
         sort: categories.length + 1,
       });
       setCatName("");
-      toast.success(catParent === "none" ? "Category added" : "Sub-category added");
+      toast.success("Saved");
     } catch {
       toast.error("Could not save that category");
     }
@@ -98,8 +180,8 @@ function CatalogMetaSettings() {
         <header>
           <h1 className="text-2xl font-semibold tracking-tight">Categories & Units</h1>
           <p className="text-sm text-muted-foreground">
-            Group the catalogue into categories and sub-categories, and set the units items are
-            sold in.
+            File the catalogue as Category › Group › Sub-category, and set the units items are sold
+            in.
           </p>
         </header>
 
@@ -110,7 +192,11 @@ function CatalogMetaSettings() {
         )}
 
         <section className="space-y-3 rounded-lg border border-border p-4">
-          <h2 className="font-medium">Product categories</h2>
+          <h2 className="font-medium">Product taxonomy</h2>
+          <p className="text-xs text-muted-foreground">
+            Three levels: Category › Group › Sub-category. Deleting a level offers to move whatever
+            sits under it up one level, and refuses while products are still filed there.
+          </p>
           <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-1">
               <Label className="text-xs">Name</Label>
@@ -128,11 +214,8 @@ function CatalogMetaSettings() {
                 value={catParent}
                 onChange={setCatParent}
                 ariaLabel="Parent category"
-                className="w-52"
-                options={[
-                  { value: "none", label: "Top level (group)" },
-                  ...parents.map((p) => ({ value: p.id, label: p.name })),
-                ]}
+                className="w-72"
+                options={parentOptions}
               />
             </div>
             <Button onClick={addCategory} disabled={!allowed}>
@@ -145,45 +228,95 @@ function CatalogMetaSettings() {
               <div key={p.id} className="p-3">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-medium">{p.name}</span>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    disabled={!allowed}
-                    aria-label={`Delete ${p.name}`}
-                    onClick={async () => {
-                      await deleteCategory(p.id);
-                      toast.success(`${p.name} removed`);
-                    }}
-                  >
-                    <Trash2 className="size-4 text-destructive" />
-                  </Button>
+                  <div className="flex items-center">
+                    <OrderButtons node={p} />
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      disabled={!allowed}
+                      aria-label={`Rename ${p.name}`}
+                      onClick={() => renameNode(p)}
+                    >
+                      <Pencil className="size-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      disabled={!allowed}
+                      aria-label={`Delete ${p.name}`}
+                      onClick={() => removeNode(p, "category")}
+                    >
+                      <Trash2 className="size-4 text-destructive" />
+                    </Button>
+                  </div>
                 </div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {childrenOf(p.id).map((c) => (
-                    <Badge key={c.id} variant="outline" className="gap-1">
-                      {c.name}
-                      <button
-                        type="button"
-                        className="text-destructive"
-                        aria-label={`Delete ${c.name}`}
-                        disabled={!allowed}
-                        onClick={async () => {
-                          await deleteCategory(c.id);
-                        }}
-                      >
-                        ×
-                      </button>
-                    </Badge>
+                <div className="mt-2 space-y-2 pl-4">
+                  {kids(p.id).map((g) => (
+                    <div key={g.id} className="rounded-md border border-border/70 p-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm">{g.name}</span>
+                        <div className="flex items-center">
+                          <OrderButtons node={g} />
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            disabled={!allowed}
+                            aria-label={`Rename ${g.name}`}
+                            onClick={() => renameNode(g)}
+                          >
+                            <Pencil className="size-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            disabled={!allowed}
+                            aria-label={`Delete ${g.name}`}
+                            onClick={() => removeNode(g, "group")}
+                          >
+                            <Trash2 className="size-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="mt-1 flex flex-wrap gap-2 pl-2">
+                        {kids(g.id).map((s) => (
+                          <Badge key={s.id} variant="outline" className="gap-1">
+                            {s.name}
+                            <button
+                              type="button"
+                              aria-label={`Rename ${s.name}`}
+                              disabled={!allowed}
+                              onClick={() => renameNode(s)}
+                            >
+                              <Pencil className="size-3" />
+                            </button>
+                            <button
+                              type="button"
+                              className="text-destructive"
+                              aria-label={`Delete ${s.name}`}
+                              disabled={!allowed}
+                              onClick={() => removeNode(s, "sub")}
+                            >
+                              ×
+                            </button>
+                          </Badge>
+                        ))}
+                        {!kids(g.id).length && (
+                          <span className="text-xs text-muted-foreground">
+                            No sub-categories yet.
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   ))}
-                  {!childrenOf(p.id).length && (
-                    <span className="text-xs text-muted-foreground">No sub-categories yet.</span>
+                  {!kids(p.id).length && (
+                    <span className="text-xs text-muted-foreground">No groups yet.</span>
                   )}
                 </div>
               </div>
             ))}
             {!parents.length && (
               <p className="p-4 text-sm text-muted-foreground">
-                No categories yet — add your first group above.
+                No categories yet — add your first category above.
               </p>
             )}
           </div>

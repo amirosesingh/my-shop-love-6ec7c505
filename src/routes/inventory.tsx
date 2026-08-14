@@ -49,8 +49,14 @@ import { ProductDeleteBlockedDialog } from "@/components/pos/ProductDeleteBlocke
 import type { BlockedDelete } from "@/lib/product-delete";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { exportProductsXlsx } from "@/lib/product-export";
-import { subCategoriesOf, topCategories, useCategories, useUnits } from "@/lib/catalog-meta";
-import { codeTakenBy } from "@/lib/product-lookup";
+import {
+  groupsOf,
+  subCategoriesOf,
+  topCategories,
+  useCategories,
+  useUnits,
+} from "@/lib/catalog-meta";
+import { checkCodeAvailable } from "@/lib/product-lookup";
 import { StockAdjustDialog, StockCountDialog } from "@/components/pos/StockAdjust";
 import { ItemActivityDrawer } from "@/components/pos/ItemActivityDrawer";
 import type { Product } from "@/lib/pos-types";
@@ -110,6 +116,7 @@ function Inventory() {
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState<Product | null>(null);
   const [aliasDraft, setAliasDraft] = useState("");
+  const [variantLabel, setVariantLabel] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const [importOpen, setImportOpen] = useState(false);
   const [mergeOpen, setMergeOpen] = useState(false);
@@ -117,6 +124,7 @@ function Inventory() {
   const [deleting, setDeleting] = useState<string[]>([]);
   const [showArchived, setShowArchived] = useState(false);
   const [catFilter, setCatFilter] = useState("all");
+  const [groupFilter, setGroupFilter] = useState("all");
   const [subFilter, setSubFilter] = useState("all");
   const [bulkCategory, setBulkCategory] = useState("");
   const [adjustTarget, setAdjustTarget] = useState<Product | null>(null);
@@ -134,14 +142,32 @@ function Inventory() {
     return [...names].sort();
   }, [categories, state.products]);
 
-  const subNames = useMemo(() => {
+  const groupNames = useMemo(() => {
     if (catFilter === "all") return [];
-    const names = new Set<string>(subCategoriesOf(categories, catFilter).map((c) => c.name));
+    const names = new Set<string>(groupsOf(categories, catFilter).map((c) => c.name));
     state.products
-      .filter((p) => p.category === catFilter && p.subCategory)
-      .forEach((p) => names.add(p.subCategory!));
+      .filter((p) => p.category === catFilter && p.group)
+      .forEach((p) => names.add(p.group!));
     return [...names].sort();
   }, [categories, state.products, catFilter]);
+
+  const subNames = useMemo(() => {
+    if (catFilter === "all") return [];
+    const names = new Set<string>(
+      subCategoriesOf(categories, catFilter, groupFilter === "all" ? undefined : groupFilter).map(
+        (c) => c.name,
+      ),
+    );
+    state.products
+      .filter(
+        (p) =>
+          p.category === catFilter &&
+          p.subCategory &&
+          (groupFilter === "all" || (p.group ?? "") === groupFilter),
+      )
+      .forEach((p) => names.add(p.subCategory!));
+    return [...names].sort();
+  }, [categories, state.products, catFilter, groupFilter]);
 
   const rows = state.products.filter(
     (p) =>
@@ -149,8 +175,11 @@ function Inventory() {
       productVisibleAt(state.settings, p.id, state.currentStoreId) &&
       (showArchived ? p.archived === true : p.archived !== true) &&
       (catFilter === "all" || p.category === catFilter) &&
+      (groupFilter === "all" || (p.group ?? "") === groupFilter) &&
       (subFilter === "all" || (p.subCategory ?? "") === subFilter) &&
-      `${p.name} ${p.sku} ${p.barcode} ${(p.barcodes ?? []).join(" ")} ${p.category} ${p.subCategory ?? ""}`
+      `${p.name} ${p.sku} ${p.barcode} ${(p.barcodes ?? []).join(" ")} ${(p.variants ?? [])
+        .map((v) => `${v.code} ${v.label ?? ""}`)
+        .join(" ")} ${p.category} ${p.group ?? ""} ${p.subCategory ?? ""}`
         .toLowerCase()
         .includes(query.toLowerCase()),
   );
@@ -276,6 +305,21 @@ function Inventory() {
                         onChange={(e) => setDraft({ ...draft, category: e.target.value })}
                       />
                     </Field>
+                    <Field label="Group">
+                      <Input
+                        value={draft.group ?? ""}
+                        placeholder="optional"
+                        list="inventory-groups"
+                        onChange={(e) =>
+                          setDraft({ ...draft, group: e.target.value, subCategory: "" })
+                        }
+                      />
+                      <datalist id="inventory-groups">
+                        {groupsOf(categories, draft.category).map((c) => (
+                          <option key={c.id} value={c.name} />
+                        ))}
+                      </datalist>
+                    </Field>
                     <Field label="Sub-category">
                       <Input
                         value={draft.subCategory ?? ""}
@@ -284,7 +328,7 @@ function Inventory() {
                         onChange={(e) => setDraft({ ...draft, subCategory: e.target.value })}
                       />
                       <datalist id="inventory-subcategories">
-                        {subCategoriesOf(categories, draft.category).map((c) => (
+                        {subCategoriesOf(categories, draft.category, draft.group || undefined).map((c) => (
                           <option key={c.id} value={c.name} />
                         ))}
                       </datalist>
@@ -300,8 +344,33 @@ function Inventory() {
                         }))}
                       />
                     </Field>
-                    <Field label="Extra barcodes" className="col-span-2">
+                    <Field label="Barcode variants" className="col-span-2">
                       <div className="flex flex-wrap gap-1">
+                        {(draft.variants ?? []).map((v) => (
+                          <Badge
+                            key={v.code}
+                            variant="outline"
+                            className="numeric gap-1 text-[11px]"
+                          >
+                            {v.code}
+                            {v.label ? ` · ${v.label}` : ""}
+                            <button
+                              type="button"
+                              className="text-destructive"
+                              aria-label={`Remove variant ${v.code}`}
+                              onClick={() =>
+                                setDraft({
+                                  ...draft,
+                                  variants: (draft.variants ?? []).filter(
+                                    (x) => x.code !== v.code,
+                                  ),
+                                })
+                              }
+                            >
+                              ×
+                            </button>
+                          </Badge>
+                        ))}
                         {(draft.barcodes ?? []).map((code) => (
                           <Badge key={code} variant="outline" className="numeric gap-1 text-[11px]">
                             {code}
@@ -331,22 +400,32 @@ function Inventory() {
                             e.preventDefault();
                             const code = aliasDraft.trim();
                             if (!code) return;
-                            const clash = codeTakenBy(state.products, code, draft.id);
-                            if (clash) {
-                              toast.error(`${code} already belongs to ${clash.name}`);
+                            const problem = checkCodeAvailable(state.products, code, draft.id);
+                            if (problem) {
+                              toast.error(problem);
                               return;
                             }
                             setDraft({
                               ...draft,
-                              barcodes: [...new Set([...(draft.barcodes ?? []), code])],
+                              variants: [
+                                ...(draft.variants ?? []).filter((v) => v.code !== code),
+                                { code, label: variantLabel.trim() || undefined },
+                              ],
                             });
                             setAliasDraft("");
+                            setVariantLabel("");
                           }}
+                        />
+                        <Input
+                          value={variantLabel}
+                          placeholder="Label (colour, size, pack)"
+                          className="w-56"
+                          onChange={(e) => setVariantLabel(e.target.value)}
                         />
                       </div>
                       <p className="mt-1 text-[11px] text-muted-foreground">
-                        Press Enter to add. A delivery with a different barcode still scans to this
-                        product.
+                        Press Enter in the barcode box to add. Codes already used anywhere in the
+                        catalogue are refused, and every variant scans to this product.
                       </p>
                     </Field>
                     <Field label="Tax rate %">
@@ -460,6 +539,7 @@ function Inventory() {
               value={catFilter}
               onChange={(v) => {
                 setCatFilter(v);
+                setGroupFilter("all");
                 setSubFilter("all");
               }}
               ariaLabel="Filter by category"
@@ -467,6 +547,22 @@ function Inventory() {
               options={[
                 { value: "all", label: "All categories" },
                 ...categoryNames.map((c) => ({ value: c, label: c })),
+              ]}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Group</Label>
+            <ThemedSelect
+              value={groupFilter}
+              onChange={(v) => {
+                setGroupFilter(v);
+                setSubFilter("all");
+              }}
+              ariaLabel="Filter by group"
+              className="w-48"
+              options={[
+                { value: "all", label: "All groups" },
+                ...groupNames.map((c) => ({ value: c, label: c })),
               ]}
             />
           </div>
