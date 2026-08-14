@@ -3620,6 +3620,36 @@ function Register() {
                     />
                     Notify the customer on WhatsApp when the racket is ready
                   </label>
+                  {bookingRules.serviceTerms.trim() ? (
+                    <div
+                      className={`space-y-2 rounded-md border p-3 ${
+                        highTension
+                          ? "border-warning/60 bg-warning/10"
+                          : "border-border bg-muted/30"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-medium">Service &amp; high-tension liability terms</p>
+                        {highTension ? (
+                          <span className="rounded border border-warning/60 px-2 py-0.5 text-[10px] uppercase tracking-wide text-warning">
+                            High tension
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="text-[11px] leading-snug text-muted-foreground">
+                        {bookingRules.serviceTerms}
+                      </p>
+                      <label className="flex items-start gap-2 text-xs">
+                        <input
+                          type="checkbox"
+                          checked={liabilityOk}
+                          onChange={(e) => setLiabilityOk(e.target.checked)}
+                        />
+                        Customer has read, acknowledged, and accepted the Service &amp; High-Tension
+                        Liability Terms.
+                      </label>
+                    </div>
+                  ) : null}
                   <p className="text-[11px] text-muted-foreground">
                     A job tag prints with the slip so it can be tied to the racket.
                   </p>
