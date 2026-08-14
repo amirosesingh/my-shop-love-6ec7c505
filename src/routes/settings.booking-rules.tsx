@@ -12,8 +12,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { usePos } from "@/lib/pos-store";
-import { bookingRulesOf, type BookingRules } from "@/lib/pos-types";
+import { bookingRulesOf, DEFAULT_SERVICE_TERMS, type BookingRules } from "@/lib/pos-types";
 
 export const Route = createFileRoute("/settings/booking-rules")({
   head: () => ({
