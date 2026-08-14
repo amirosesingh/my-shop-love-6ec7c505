@@ -1109,18 +1109,15 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
     }
   }
 
-  // Browser: queue to disk first (durable), then try to push it up now.
-  // In "Online only" mode the central database is tried first; the queue is
-  // still used the moment that attempt cannot reach the server.
+  // Browser build: there is no local SQL engine on this device, so every
+  // write goes to the central database or the action stops. Nothing about the
+  // business is parked in browser storage.
   const operational = ops.every((op) => isOperationalTable(op.table));
-  // Sales, shifts, drawer logs and stock movements must reach a real database
-  // engine. With no local SQL server on this device that means the central
-  // database — never the browser queue.
-  if (operational) {
+  {
     try {
       for (const op of ops) await runOpLive(context, op);
       noteConnectionRestored();
-      setCloudDirect(true);
+      setCloudDirect(operational);
       return noteCommitTarget("cloud");
     } catch (cloud) {
       if (!isConnectionError(cloud)) throw cloud;
@@ -1128,47 +1125,6 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
       throw new AllTargetsFailed(context, cloud);
     }
   }
-
-  if (effectiveDatabaseMode() === "online") {
-    try {
-      for (const op of ops) await runOpLive(context, op);
-      noteConnectionRestored();
-      setCloudDirect(false);
-      return noteCommitTarget("cloud");
-    } catch (e) {
-      if (!isConnectionError(e)) throw e;
-      noteConnectionLost();
-      /* fall through: store it locally so nothing is lost */
-    }
-  }
-  let ids: string[] = [];
-  try {
-    ids = ops.map((op) => enqueue(context, op).id);
-  } catch {
-    ids = [];
-  }
-  if (!persisted(ids) || !ids.length) {
-    // The on-disk queue would not take it (storage full or unavailable): try
-    // the central database directly before giving up on the action.
-    try {
-      for (const op of ops) await runOpLive(context, op);
-      setCloudDirect(true);
-      return noteCommitTarget("cloud");
-    } catch (cloud) {
-      if (!isConnectionError(cloud)) throw cloud;
-      throw new AllTargetsFailed(context, cloud);
-    }
-  }
-  setCloudDirect(false);
-  try {
-    await drainOutbox();
-  } catch {
-    /* still safely queued on disk */
-  }
-  const remaining = listQueue().filter((q) => ids.includes(q.id));
-  const stuck = remaining.find((q) => q.quarantined);
-  if (stuck) throw new Error(stuck.lastError ?? `${context} failed`);
-  return noteCommitTarget(remaining.length ? "outbox" : "cloud");
 }
 
 /** Human wording for a completed commit. */
