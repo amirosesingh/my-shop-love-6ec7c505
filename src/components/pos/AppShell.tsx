@@ -27,7 +27,7 @@ import { startSyncEngine } from "@/lib/sync-engine";
 import { startDatabaseModeWatch } from "@/lib/db-mode";
 import { DbConnectionModal } from "@/components/pos/DbConnectionModal";
 import type { NavItem } from "@/components/pos/nav-config";
-import { setPrintStore, setPrintSettings } from "@/lib/pos-print";
+import { setPrintStore, setPrintSettings, setServiceTerms } from "@/lib/pos-print";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -182,6 +182,14 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setPrintSettings(state.settings.receipt, state.settings.tax);
+  }, [state.settings]);
+
+  // The liability wording lives with the booking rules but is printed by the
+  // receipt layer, so push it across whenever the rules change.
+  useEffect(() => {
+    setServiceTerms(
+      bookingRulesOf(state.settings.integrations.bookingRules).serviceTerms,
+    );
   }, [state.settings]);
 
   // A registered till fixes the branch for everyone signed in on it; otherwise
