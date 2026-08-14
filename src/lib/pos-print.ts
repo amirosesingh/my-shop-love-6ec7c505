@@ -722,6 +722,7 @@ function bookingPaymentBody(booking: Booking, payment: BookingPayment) {
     </table>
     <hr><div class="c">Collect &amp; settle by ${esc(new Date(booking.dueDate).toDateString())}</div>
     ${receiptCfg.bookingSlip?.termsOnPayment ? termsBlock() : ""}
+    ${booking.job ? serviceTermsBlock() : ""}
     <hr><div class="c muted rcpt-foot">${esc(receiptCfg.footerText || "")}</div>
     <div class="c muted">${esc(booking.ref)}</div>`;
 }
