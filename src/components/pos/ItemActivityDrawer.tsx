@@ -37,7 +37,7 @@ export function ItemActivityDrawer({
     setLoading(true);
     setRows([]);
     void (async () => {
-      const [adjustments, transfers, meta] = await Promise.all([
+      const [adjustments, transfers, meta, merges] = await Promise.all([
         supabaseExternal
           .from("stock_adjustments")
           .select("id,created_at,reason,note,delta,cost_impact,staff_name,store_id")
@@ -55,6 +55,12 @@ export function ItemActivityDrawer({
           .select("created_at,updated_at")
           .eq("id", product.id)
           .maybeSingle(),
+        supabaseExternal
+          .from("audit_logs")
+          .select("id,created_at,user_name,details,action_name")
+          .eq("action_name", "Products merged")
+          .order("created_at", { ascending: false })
+          .limit(100),
       ]);
       if (!live) return;
       const list: Movement[] = [
@@ -78,6 +84,35 @@ export function ItemActivityDrawer({
           impact: 0,
           by: "—",
         })),
+        ...(merges.data ?? [])
+          .filter((r) => {
+            const d = (r.details ?? {}) as {
+              masterId?: string;
+              merged?: { id?: string }[];
+            };
+            return (
+              d.masterId === product.id || (d.merged ?? []).some((m) => m?.id === product.id)
+            );
+          })
+          .map((r) => {
+            const d = (r.details ?? {}) as {
+              masterId?: string;
+              merged?: { name?: string; barcode?: string }[];
+              aliasBarcodes?: string[];
+            };
+            return {
+              id: `mrg-${r.id}`,
+              at: r.created_at,
+              kind: "Products merged",
+              detail:
+                d.masterId === product.id
+                  ? `Folded in ${(d.merged ?? []).map((m) => m?.name).filter(Boolean).join(", ") || "—"} · barcodes ${(d.aliasBarcodes ?? []).join(", ") || "—"}`
+                  : "This record was folded into another product",
+              delta: 0,
+              impact: 0,
+              by: r.user_name ?? "—",
+            };
+          }),
       ].sort((a, b) => b.at.localeCompare(a.at));
       setRows(list);
       setCreated((meta.data?.created_at as string | undefined) ?? null);
