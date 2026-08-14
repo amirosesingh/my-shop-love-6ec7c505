@@ -124,6 +124,7 @@ export function RegisterWorkspace({
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [dragging, setDragging] = useState<RegisterModuleId | null>(null);
+  const [selected, setSelected] = useState<string[]>([]);
   const view = useViewportBox();
 
   const editing = isAdmin && layout.editing;
@@ -194,7 +195,15 @@ export function RegisterWorkspace({
         onAdd={(id) => layout.addModule(id)}
         onDragStart={setDragging}
         onCreate={() => setCreateOpen(true)}
-        onAddGroup={() => layout.addGroup()}
+        onAddGroup={() => {
+          if (!selected.length) {
+            toast.warning("Please select at least one item to group.");
+            return;
+          }
+          layout.addGroup(selected);
+          setSelected([]);
+          toast.success(`Grouped ${selected.length} item${selected.length > 1 ? "s" : ""}`);
+        }}
       />
 
       <CustomButtonDialog
@@ -263,6 +272,18 @@ export function RegisterWorkspace({
                     <CanvasItem
                       box={box}
                       editing={editing}
+                      selected={selected.includes(box.i)}
+                      onSelect={(additive) =>
+                        setSelected((prev) =>
+                          additive
+                            ? prev.includes(box.i)
+                              ? prev.filter((id) => id !== box.i)
+                              : [...prev, box.i]
+                            : prev.length === 1 && prev[0] === box.i
+                              ? []
+                              : [box.i],
+                        )
+                      }
                       onRemove={() => {
                         const spec = nodeSpec(box);
                         if (spec?.essential) {
@@ -321,12 +342,16 @@ function useAutoScale(pad: number, font: ModuleFont, bare: boolean) {
 function CanvasItem({
   box,
   editing,
+  selected,
+  onSelect,
   onRemove,
   onOptions,
   children,
 }: {
   box: LayoutBox;
   editing: boolean;
+  selected: boolean;
+  onSelect: (additive: boolean) => void;
   onRemove: () => void;
   onOptions: (opts: ModuleOptions) => void;
   children: ReactNode;
@@ -342,6 +367,11 @@ function CanvasItem({
     <section
       ref={ref}
       style={{ padding: pad, ...vars }}
+      onPointerDownCapture={(e) => {
+        if (!editing) return;
+        if ((e.target as HTMLElement).closest("button,[role='button'],input,select,textarea")) return;
+        onSelect(e.ctrlKey || e.metaKey || e.shiftKey);
+      }}
       className={`group relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden ${
         group
           ? `rounded-xl border border-dashed border-primary/40 bg-primary/5 ${editing ? "" : "pointer-events-none"}`
@@ -349,6 +379,8 @@ function CanvasItem({
             ? "rounded-lg border border-border bg-card"
             : ""
       } ${editing && !group ? "rounded-lg outline-2 outline-dashed outline-primary/50" : ""} ${
+        editing && selected ? "ring-2 ring-primary ring-offset-1" : ""
+      } ${
         TONE_CLASS[box.tone ?? "neutral"]
       }`}
       data-view={box.view ?? "list"}

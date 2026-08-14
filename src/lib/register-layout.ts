@@ -460,8 +460,34 @@ export function useRegisterLayout(terminal: string) {
 
   /** Adds an empty group container that other nodes can be docked into. */
   const addGroup = useCallback(
-    (at?: { x: number; y: number }) => {
+    (ids?: string[], at?: { x: number; y: number }) => {
       update((l) => {
+        const picked = l.items.filter((i) => (ids ?? []).includes(i.i) && !isGroupId(i.i));
+        if (picked.length) {
+          // Wrap the current selection: the box hugs the nodes with one cell of air.
+          const gid = newGroupId();
+          const x = Math.max(0, Math.min(...picked.map((p) => p.x)) - 1);
+          const y = Math.max(0, Math.min(...picked.map((p) => p.y)) - 1);
+          const right = Math.min(l.canvas.cols, Math.max(...picked.map((p) => p.x + p.w)) + 1);
+          const bottom = Math.max(...picked.map((p) => p.y + p.h)) + 1;
+          const group: LayoutBox = {
+            i: gid,
+            x,
+            y,
+            w: Math.max(2, right - x),
+            h: Math.max(2, bottom - y),
+            pad: DEFAULT_PAD,
+            title: "Group",
+          };
+          const picks = new Set(picked.map((p) => p.i));
+          return {
+            ...l,
+            items: [
+              group,
+              ...l.items.map((it) => (picks.has(it.i) ? { ...it, parent: gid } : it)),
+            ],
+          };
+        }
         const item: LayoutBox = {
           i: newGroupId(),
           x: at ? Math.max(0, Math.min(l.canvas.cols - 8, at.x)) : 0,
