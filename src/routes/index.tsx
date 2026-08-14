@@ -101,8 +101,14 @@ import { MemberHistoryDialog } from "@/components/pos/MemberHistoryDialog";
 const isoDaysFromNow = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
 
 export const Route = createFileRoute("/")({
-  validateSearch: (search: Record<string, unknown>): { resume?: string } =>
-    typeof search["resume"] === "string" ? { resume: search["resume"] as string } : {},
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { resume?: string; booking?: "general" | "racket" } => ({
+    ...(typeof search["resume"] === "string" ? { resume: search["resume"] as string } : {}),
+    ...(search["booking"] === "general" || search["booking"] === "racket"
+      ? { booking: search["booking"] as "general" | "racket" }
+      : {}),
+  }),
   head: () => ({
     meta: [
       { title: "Register — Northwind POS" },
@@ -939,8 +945,25 @@ function Register() {
     setIntakeCharges((rows) => rows.filter((r) => !(r.kind === "accessory" && /^racket/i.test(r.name))));
   }
 
-  function pickStringProduct(id: string) {
+  async function pickStringProduct(id: string) {
     const p = state.products.find((x) => x.id === id);
+    if (p) {
+      /* Inventory guard — never string from a reel the branch does not hold. */
+      const onHand = availableAt(p, currentStore.id, state.bookings);
+      if (onHand <= 0) {
+        const ok = await requirePermission("can_adjust_stock");
+        if (!ok) {
+          toast.error(`${p.name} is out of stock at ${currentStore.name}`);
+          return;
+        }
+        const reason = window.prompt(`${p.name} shows no stock here. Reason for using it anyway?`)?.trim();
+        if (!reason) {
+          toast.error("A reason is required to use out-of-stock string");
+          return;
+        }
+        toast.warning(`Out-of-stock string approved — ${reason}`);
+      }
+    }
     setStringProductId(id);
     if (!p) return;
     setStringCustomerOwned(false);
@@ -1421,7 +1444,7 @@ function Register() {
   }
 
   /** Arriving from the Hold tickets screen with ?resume=<id>. */
-  const { resume } = Route.useSearch();
+  const { resume, booking: bookingFlow } = Route.useSearch();
   const navigate = useNavigate();
   useEffect(() => {
     if (!resume) return;
@@ -1429,6 +1452,15 @@ function Register() {
     void navigate({ to: "/", search: {}, replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resume]);
+
+  /** Arriving from /pos/racket-service or /pos/general-booking. */
+  useEffect(() => {
+    if (!bookingFlow) return;
+    if (bookingFlow === "racket") startRacketBooking();
+    else startCartBooking();
+    void navigate({ to: "/", search: {}, replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookingFlow]);
 
   async function applyCoupon() {
     const code = couponCode.trim();
@@ -3109,7 +3141,7 @@ function Register() {
               className="h-auto w-full flex-col items-start gap-1 py-3 text-left"
               onClick={() => {
                 setBookingHubOpen(false);
-                startRacketBooking();
+                void navigate({ to: "/pos/racket-service" });
               }}
             >
               <span className="font-semibold">🏸 Racket service / stringing</span>
@@ -3120,7 +3152,7 @@ function Register() {
               className="h-auto w-full flex-col items-start gap-1 py-3 text-left"
               onClick={() => {
                 setBookingHubOpen(false);
-                startCartBooking();
+                void navigate({ to: "/pos/general-booking" });
               }}
             >
               <span className="font-semibold">🛒 Standard / general booking</span>
@@ -3147,11 +3179,23 @@ function Register() {
           if (!o && racketMode) resetJobCard();
         }}
       >
-        <DialogContent className="flex max-h-[90vh] max-w-lg flex-col">
+        <DialogContent
+          className={
+            racketMode
+              ? "flex h-[92vh] max-h-[92vh] w-[96vw] max-w-[1280px] flex-col"
+              : "flex h-[90vh] max-h-[90vh] w-[94vw] max-w-[1040px] flex-col"
+          }
+        >
           <DialogHeader>
             <DialogTitle>{racketMode ? "Racket / stringing booking" : "Book & pay later"}</DialogTitle>
           </DialogHeader>
-          <div className="-mr-2 flex-1 space-y-3 overflow-y-auto pr-2">
+          <div
+            className={`-mr-2 flex-1 overflow-y-auto pr-2 ${
+              racketMode
+                ? "space-y-3 xl:grid xl:grid-cols-3 xl:items-start xl:gap-3 xl:space-y-0 [&>*]:mb-3"
+                : "space-y-3 lg:grid lg:grid-cols-2 lg:items-start lg:gap-3 lg:space-y-0 [&>*]:mb-3"
+            }`}
+          >
             <div className="rounded-md border border-border px-3 py-2 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Booking total</span>
