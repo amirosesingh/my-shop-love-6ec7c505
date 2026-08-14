@@ -56,7 +56,7 @@ import {
   useCategories,
   useUnits,
 } from "@/lib/catalog-meta";
-import { codeTakenBy } from "@/lib/product-lookup";
+import { checkCodeAvailable } from "@/lib/product-lookup";
 import { StockAdjustDialog, StockCountDialog } from "@/components/pos/StockAdjust";
 import { ItemActivityDrawer } from "@/components/pos/ItemActivityDrawer";
 import type { Product } from "@/lib/pos-types";
@@ -116,6 +116,7 @@ function Inventory() {
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState<Product | null>(null);
   const [aliasDraft, setAliasDraft] = useState("");
+  const [variantLabel, setVariantLabel] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const [importOpen, setImportOpen] = useState(false);
   const [mergeOpen, setMergeOpen] = useState(false);
