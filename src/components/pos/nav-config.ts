@@ -164,6 +164,14 @@ export const navGroups: NavGroup[] = [
         blurb: "Move or request stock between branches.",
       },
       {
+        to: "/stock-operations",
+        label: "Stock Operations",
+        icon: ScanBarcode,
+        flag: "can_adjust_stock",
+        keywords: "count adjust scan barcode variance import",
+        blurb: "Barcode physical counts, adjustments and bulk imports.",
+      },
+      {
         to: "/stores",
         label: "Locations / Warehouses",
         icon: Truck,

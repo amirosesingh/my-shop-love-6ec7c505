@@ -6,7 +6,7 @@ import {
   Combine,
   FileSpreadsheet,
   Inbox,
-  Minus,
+  History,
   Plus,
   Scale,
   Search,
@@ -52,6 +52,7 @@ import { exportProductsXlsx } from "@/lib/product-export";
 import { subCategoriesOf, topCategories, useCategories, useUnits } from "@/lib/catalog-meta";
 import { codeTakenBy } from "@/lib/product-lookup";
 import { StockAdjustDialog, StockCountDialog } from "@/components/pos/StockAdjust";
+import { ItemActivityDrawer } from "@/components/pos/ItemActivityDrawer";
 import type { Product } from "@/lib/pos-types";
 import { nextSku, peekSku, readSkuSettings } from "@/lib/sku";
 
@@ -96,7 +97,6 @@ function Inventory() {
     patchProducts,
     archiveProducts,
     restoreProducts,
-    adjustStock,
   } = usePos();
   const { can } = useAuth();
   const showMoney = can("can_view_sales_reports");
@@ -120,6 +120,7 @@ function Inventory() {
   const [subFilter, setSubFilter] = useState("all");
   const [bulkCategory, setBulkCategory] = useState("");
   const [adjustTarget, setAdjustTarget] = useState<Product | null>(null);
+  const [logTarget, setLogTarget] = useState<Product | null>(null);
   const [countOpen, setCountOpen] = useState(false);
   const [skuOverride, setSkuOverride] = useState(false);
   const autoSku = readSkuSettings().mode === "auto";
@@ -579,6 +580,7 @@ function Inventory() {
                 </TableHead>
                 <TableHead>Product</TableHead>
                 <TableHead>Category</TableHead>
+                <TableHead>Sub-category</TableHead>
                 {showMoney && <TableHead className="text-right">Cost</TableHead>}
                 <TableHead className="text-right">Price</TableHead>
                 {showMoney && <TableHead className="text-right">Margin</TableHead>}
@@ -610,6 +612,7 @@ function Inventory() {
                     </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">{p.category}</TableCell>
+                  <TableCell className="text-muted-foreground">{p.subCategory || "—"}</TableCell>
                   {showMoney && (
                     <TableCell className="numeric text-right">{money(p.cost)}</TableCell>
                   )}
@@ -639,30 +642,24 @@ function Inventory() {
                   )}
                   <TableCell>
                     <div className="flex items-center justify-center gap-1">
-                      <Button size="icon" variant="outline" className="size-7" onClick={() => adjustStock(p.id, -1)}>
-                        <Minus className="size-3" />
-                      </Button>
                       <Badge
                         variant="outline"
-                        className={`numeric w-12 justify-center ${
+                        className={`numeric justify-center ${
                           stockAt(p, currentStore.id) <= p.reorderLevel
                             ? "border-warning/50 text-warning"
                             : ""
                         }`}
                       >
-                        {stockAt(p, currentStore.id)}
+                        {stockAt(p, currentStore.id)} in stock
                       </Badge>
-                      <Button size="icon" variant="outline" className="size-7" onClick={() => adjustStock(p.id, 1)}>
-                        <Plus className="size-3" />
-                      </Button>
                       {canAdjust && (
                         <Button
                           size="icon"
                           variant="ghost"
                           className="size-7"
-                          title="Adjust / recount stock"
+                          title="Count or adjust in Stock Operations"
                           aria-label={`Adjust stock for ${p.name}`}
-                          onClick={() => setAdjustTarget(p)}
+                          onClick={() => navigate({ to: "/stock-operations" })}
                         >
                           <Scale className="size-3.5" />
                         </Button>
@@ -684,6 +681,15 @@ function Inventory() {
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      title="View activity log"
+                      aria-label={`View activity for ${p.name}`}
+                      onClick={() => setLogTarget(p)}
+                    >
+                      <History className="size-4" />
+                    </Button>
                     {canEdit && (
                     <Button
                       size="icon"
@@ -765,6 +771,7 @@ function Inventory() {
           />
         </>
       )}
+      <ItemActivityDrawer product={logTarget} onClose={() => setLogTarget(null)} />
     </AppShell>
   );
 }
