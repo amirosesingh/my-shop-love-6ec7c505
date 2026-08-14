@@ -154,6 +154,10 @@ export type NewBooking = {
   gripProductId?: string;
   /** priced breakdown: labour, string, grip, add-ons */
   charges?: IntakeCharge[];
+  /** customer accepted the service & high-tension liability terms */
+  liabilityAccepted?: boolean;
+  /** stringer assigned at intake */
+  technician?: string;
 };
 
 /** Racket stringing job card captured with the booking. */
@@ -1019,6 +1023,8 @@ export function PosProvider({ children }: { children: ReactNode }) {
       stringProductId: input.stringProductId,
       gripProductId: input.gripProductId,
       charges: input.charges,
+      liabilityAccepted: input.liabilityAccepted,
+      technician: input.technician,
       jobStatus: input.job ? "received" : undefined,
       jobStatusBy: input.job ? input.cashier : undefined,
       jobStatusAt: input.job ? now : undefined,
