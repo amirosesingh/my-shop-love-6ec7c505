@@ -10,6 +10,7 @@ import {
   Wrench,
   Banknote,
   Trash2,
+  ScanLine,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -19,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { BOOKING_TIMING_LABELS, bookingRulesOf } from "@/lib/pos-types";
 import {
   Dialog,
@@ -115,6 +117,13 @@ function BookingsPage() {
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("cash");
   const [settle, setSettle] = useState(false);
+  /** Claim tag / reference scanned at the counter to pull a job up fast. */
+  const [claim, setClaim] = useState("");
+  /** Damaged or cancelled jobs must carry a written incident note. */
+  const [incidentFor, setIncidentFor] = useState<{ booking: Booking; status: JobStatus } | null>(
+    null,
+  );
+  const [incidentNote, setIncidentNote] = useState("");
 
   const bookings = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -147,6 +156,48 @@ function BookingsPage() {
     setSettle(full);
     setAmount(bookingBalance(b).toFixed(2));
     setMethod("cash");
+  }
+
+  /** Look a job up by its printed claim tag, or by the booking reference. */
+  function findByClaim(raw: string) {
+    const code = raw.trim().toLowerCase();
+    if (!code) return;
+    const hit = state.bookings.find(
+      (b) =>
+        (b.tagId ?? "").toLowerCase() === code ||
+        b.ref.toLowerCase() === code ||
+        (b.tagId ?? "").toLowerCase().endsWith(code),
+    );
+    if (!hit) {
+      toast.error(`No job matches “${raw.trim()}”`);
+      return;
+    }
+    setTab("all");
+    setJobFilter("all");
+    setQuery(hit.ref);
+    setClaim("");
+    toast.success(`${hit.ref} · ${hit.customerName}`);
+  }
+
+  /** Move a job card on, guarding incidents and unpaid handovers. */
+  async function changeJobStatus(b: Booking, s: JobStatus, balance: number) {
+    if (s === "damaged" || s === "cancelled") {
+      setIncidentFor({ booking: b, status: s });
+      setIncidentNote(b.incidentNote ?? "");
+      return;
+    }
+    if (s === "collected" && balance > 0) {
+      if (rules.blockCollectionWithBalance) {
+        toast.error(`Balance of ${money(balance)} must be settled before collection`, {
+          description: "Collect the balance to hand the racket over.",
+        });
+        openPay(b, true);
+        return;
+      }
+      if (!(await requirePermission("can_collect_booking"))) return;
+    }
+    setBookingJobStatus(b.id, s, user?.name || b.cashier || "Counter");
+    toast.success(`${b.ref} · ${JOB_STATUS_LABELS[s].toLowerCase()}`);
   }
 
   async function submitPayment() {
@@ -194,14 +245,29 @@ function BookingsPage() {
               until collection or cancellation.
             </p>
           </div>
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Ref, customer, phone, racket…"
-              className="pl-9"
-            />
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <div className="relative w-full sm:w-56">
+              <ScanLine className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-primary" />
+              <Input
+                value={claim}
+                onChange={(e) => setClaim(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") findByClaim(claim);
+                }}
+                placeholder="Scan claim tag…"
+                className="pl-9"
+                aria-label="Scan claim tag"
+              />
+            </div>
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Ref, customer, phone, racket…"
+                className="pl-9"
+              />
+            </div>
           </div>
         </header>
 
@@ -325,6 +391,11 @@ function BookingsPage() {
                               {new Date(b.jobStatusAt).toLocaleString()}
                             </p>
                           )}
+                          {b.incidentNote && (
+                            <p className="mt-1 text-[11px] text-destructive">
+                              Incident: {b.incidentNote}
+                            </p>
+                          )}
                           {job?.notifyWhatsApp && (
                             <p className="mt-1 text-[11px] text-primary">
                               Customer wants a WhatsApp when it is ready.
@@ -354,18 +425,7 @@ function BookingsPage() {
                             <button
                               key={s}
                               onClick={() => {
-                                if (
-                                  s === "collected" &&
-                                  rules.blockCollectionWithBalance &&
-                                  balance > 0
-                                ) {
-                                  toast.error(
-                                    `Balance of ${money(balance)} must be settled before collection`,
-                                  );
-                                  return;
-                                }
-                                setBookingJobStatus(b.id, s, b.cashier || "Counter");
-                                toast.success(`${b.ref} · ${JOB_STATUS_LABELS[s].toLowerCase()}`);
+                                void changeJobStatus(b, s, balance);
                               }}
                               className={`rounded-md border px-2 py-1 text-[11px] ${
                                 jobStatus === s
@@ -456,6 +516,57 @@ function BookingsPage() {
           </ul>
         )}
       </div>
+
+      <Dialog open={!!incidentFor} onOpenChange={(o) => !o && setIncidentFor(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {incidentFor?.status === "damaged" ? "Frame damaged / snapped" : "Cancel this job"} ·{" "}
+              {incidentFor?.booking.ref}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>What happened?</Label>
+            <Textarea
+              rows={3}
+              value={incidentNote}
+              onChange={(e) => setIncidentNote(e.target.value)}
+              placeholder="Frame cracked at 3 o'clock while tensioning the mains — customer informed."
+            />
+            <p className="text-[11px] text-muted-foreground">
+              The note is stored on the job card and shown in the history line.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIncidentFor(null)}>
+              Back
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!incidentFor) return;
+                const note = incidentNote.trim();
+                if (!note) {
+                  toast.error("An incident note is required");
+                  return;
+                }
+                if (!(await requirePermission("can_cancel_booking"))) return;
+                setBookingJobStatus(
+                  incidentFor.booking.id,
+                  incidentFor.status,
+                  user?.name || incidentFor.booking.cashier || "Counter",
+                  note,
+                );
+                toast.success(
+                  `${incidentFor.booking.ref} · ${JOB_STATUS_LABELS[incidentFor.status].toLowerCase()}`,
+                );
+                setIncidentFor(null);
+              }}
+            >
+              Record &amp; update
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!payFor} onOpenChange={(o) => !o && setPayFor(null)}>
         <DialogContent>

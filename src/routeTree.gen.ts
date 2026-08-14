@@ -38,6 +38,8 @@ import { Route as ApiCashierLoginRouteImport } from './routes/api/cashier-login'
 import { Route as ApiSettingsRouteImport } from './routes/api/settings'
 import { Route as CTokenSlugRouteImport } from './routes/c.$tokenSlug'
 import { Route as ClaimCampaignSlugRouteImport } from './routes/claim.$campaignSlug'
+import { Route as PosGeneralBookingRouteImport } from './routes/pos.general-booking'
+import { Route as PosRacketServiceRouteImport } from './routes/pos.racket-service'
 import { Route as ReportsIndexRouteImport } from './routes/reports.index'
 import { Route as ReportsActivityRouteImport } from './routes/reports.activity'
 import { Route as ReportsAnalyticsRouteImport } from './routes/reports.analytics'
@@ -234,6 +236,16 @@ const CTokenSlugRoute = CTokenSlugRouteImport.update({
 const ClaimCampaignSlugRoute = ClaimCampaignSlugRouteImport.update({
   id: '/claim/$campaignSlug',
   path: '/claim/$campaignSlug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PosGeneralBookingRoute = PosGeneralBookingRouteImport.update({
+  id: '/pos/general-booking',
+  path: '/pos/general-booking',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PosRacketServiceRoute = PosRacketServiceRouteImport.update({
+  id: '/pos/racket-service',
+  path: '/pos/racket-service',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReportsIndexRoute = ReportsIndexRouteImport.update({
@@ -527,6 +539,8 @@ export interface FileRoutesByFullPath {
   '/api/settings': typeof ApiSettingsRouteWithChildren
   '/c/$tokenSlug': typeof CTokenSlugRoute
   '/claim/$campaignSlug': typeof ClaimCampaignSlugRoute
+  '/pos/general-booking': typeof PosGeneralBookingRoute
+  '/pos/racket-service': typeof PosRacketServiceRoute
   '/reports/activity': typeof ReportsActivityRoute
   '/reports/analytics': typeof ReportsAnalyticsRoute
   '/reports/catalog': typeof ReportsCatalogRoute
@@ -610,6 +624,8 @@ export interface FileRoutesByTo {
   '/api/settings': typeof ApiSettingsRouteWithChildren
   '/c/$tokenSlug': typeof CTokenSlugRoute
   '/claim/$campaignSlug': typeof ClaimCampaignSlugRoute
+  '/pos/general-booking': typeof PosGeneralBookingRoute
+  '/pos/racket-service': typeof PosRacketServiceRoute
   '/reports/activity': typeof ReportsActivityRoute
   '/reports/analytics': typeof ReportsAnalyticsRoute
   '/reports/catalog': typeof ReportsCatalogRoute
@@ -694,6 +710,8 @@ export interface FileRoutesById {
   '/api/settings': typeof ApiSettingsRouteWithChildren
   '/c/$tokenSlug': typeof CTokenSlugRoute
   '/claim/$campaignSlug': typeof ClaimCampaignSlugRoute
+  '/pos/general-booking': typeof PosGeneralBookingRoute
+  '/pos/racket-service': typeof PosRacketServiceRoute
   '/reports/activity': typeof ReportsActivityRoute
   '/reports/analytics': typeof ReportsAnalyticsRoute
   '/reports/catalog': typeof ReportsCatalogRoute
@@ -779,6 +797,8 @@ export interface FileRouteTypes {
     | '/api/settings'
     | '/c/$tokenSlug'
     | '/claim/$campaignSlug'
+    | '/pos/general-booking'
+    | '/pos/racket-service'
     | '/reports/activity'
     | '/reports/analytics'
     | '/reports/catalog'
@@ -862,6 +882,8 @@ export interface FileRouteTypes {
     | '/api/settings'
     | '/c/$tokenSlug'
     | '/claim/$campaignSlug'
+    | '/pos/general-booking'
+    | '/pos/racket-service'
     | '/reports/activity'
     | '/reports/analytics'
     | '/reports/catalog'
@@ -945,6 +967,8 @@ export interface FileRouteTypes {
     | '/api/settings'
     | '/c/$tokenSlug'
     | '/claim/$campaignSlug'
+    | '/pos/general-booking'
+    | '/pos/racket-service'
     | '/reports/activity'
     | '/reports/analytics'
     | '/reports/catalog'
@@ -1029,6 +1053,8 @@ export interface RootRouteChildren {
   ApiSettingsRoute: typeof ApiSettingsRouteWithChildren
   CTokenSlugRoute: typeof CTokenSlugRoute
   ClaimCampaignSlugRoute: typeof ClaimCampaignSlugRoute
+  PosGeneralBookingRoute: typeof PosGeneralBookingRoute
+  PosRacketServiceRoute: typeof PosRacketServiceRoute
   ReportsActivityRoute: typeof ReportsActivityRoute
   ReportsAnalyticsRoute: typeof ReportsAnalyticsRoute
   ReportsCatalogRoute: typeof ReportsCatalogRoute
@@ -1284,6 +1310,20 @@ declare module '@tanstack/react-router' {
       path: '/claim/$campaignSlug'
       fullPath: '/claim/$campaignSlug'
       preLoaderRoute: typeof ClaimCampaignSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pos/general-booking': {
+      id: '/pos/general-booking'
+      path: '/pos/general-booking'
+      fullPath: '/pos/general-booking'
+      preLoaderRoute: typeof PosGeneralBookingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pos/racket-service': {
+      id: '/pos/racket-service'
+      path: '/pos/racket-service'
+      fullPath: '/pos/racket-service'
+      preLoaderRoute: typeof PosRacketServiceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reports/': {
@@ -1697,6 +1737,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSettingsRoute: ApiSettingsRouteWithChildren,
   CTokenSlugRoute: CTokenSlugRoute,
   ClaimCampaignSlugRoute: ClaimCampaignSlugRoute,
+  PosGeneralBookingRoute: PosGeneralBookingRoute,
+  PosRacketServiceRoute: PosRacketServiceRoute,
   ReportsActivityRoute: ReportsActivityRoute,
   ReportsAnalyticsRoute: ReportsAnalyticsRoute,
   ReportsCatalogRoute: ReportsCatalogRoute,

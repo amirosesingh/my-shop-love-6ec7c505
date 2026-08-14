@@ -196,7 +196,12 @@ type Ctx = {
   refundSale: (saleId: string) => void;
   changeSalePayment: (saleId: string, method: PaymentMethod, reason?: string) => void;
   createBooking: (input: NewBooking) => Promise<Booking>;
-  setBookingJobStatus: (id: string, status: JobStatus, who: string) => Booking | null;
+  setBookingJobStatus: (
+    id: string,
+    status: JobStatus,
+    who: string,
+    incidentNote?: string,
+  ) => Booking | null;
   /** Edit the technical specs of an existing racket job before payment. */
   updateBookingSpecs: (id: string, job: RacketJob) => Booking | null;
   addBookingPayment: (
@@ -1120,7 +1125,12 @@ export function PosProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /** Move a racket through received → strung → ready → collected. */
-  const setBookingJobStatus = useCallback((id: string, status: JobStatus, who: string) => {
+  const setBookingJobStatus = useCallback((
+    id: string,
+    status: JobStatus,
+    who: string,
+    incidentNote?: string,
+  ) => {
     const current = stateRef.current.bookings.find((b) => b.id === id);
     if (!current) return null;
     const updated: Booking = {
@@ -1128,6 +1138,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       jobStatus: status,
       jobStatusBy: who,
       jobStatusAt: new Date().toISOString(),
+      ...(incidentNote ? { incidentNote } : {}),
     };
     setState((s) => ({
       ...s,
@@ -1139,6 +1150,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       status,
       by: who,
       customer: updated.customerName,
+      ...(incidentNote ? { incident: incidentNote } : {}),
     });
     return updated;
   }, []);
