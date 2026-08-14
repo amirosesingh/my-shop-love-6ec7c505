@@ -1047,6 +1047,18 @@ function Register() {
         toast.error("Choose a ready-by date and time");
         return;
       }
+      if (
+        bookingRules.requireLiabilityAccept &&
+        bookingRules.serviceTerms.trim() &&
+        !liabilityOk
+      ) {
+        toast.error("The customer must accept the service & liability terms", {
+          description: highTension
+            ? "This job is flagged high tension — acceptance is required."
+            : "Tick the agreement box on the intake form.",
+        });
+        return;
+      }
       if (bookingRules.warnOutsideTradingHours && promisedAt) {
         const hhmm = promisedAt.slice(11, 16);
         const { dayStart, dayEnd } = state.settings.hours;
@@ -1090,6 +1102,7 @@ function Register() {
         cashier: activeCashier,
         tagId: racketMode ? jobTag || (bookingRules.autoJobTag ? newJobTag() : undefined) : undefined,
         stringOrigin: racketMode ? (stringCustomerOwned ? "customer" : "store") : undefined,
+        liabilityAccepted: racketMode ? liabilityOk : undefined,
         stringProductId: racketMode && !stringCustomerOwned ? stringProductId || undefined : undefined,
         intakeNote: racketMode ? grommetNotes.trim() || undefined : undefined,
         job: racketMode
