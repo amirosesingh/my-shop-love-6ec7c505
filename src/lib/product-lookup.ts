@@ -12,7 +12,9 @@ export const normaliseCode = (code: string) => code.trim().toLowerCase();
 
 /** Every code that resolves to this product. */
 export const productCodes = (p: Product) =>
-  [p.barcode, p.sku, ...(p.barcodes ?? [])].filter(Boolean).map(normaliseCode);
+  [p.barcode, p.sku, ...(p.barcodes ?? []), ...(p.variants ?? []).map((v) => v.code)]
+    .filter(Boolean)
+    .map(normaliseCode);
 
 export function resolveByBarcode(products: Product[], code: string): Product | undefined {
   const needle = normaliseCode(code);
@@ -24,6 +26,21 @@ export function resolveByBarcode(products: Product[], code: string): Product | u
 export function codeTakenBy(products: Product[], code: string, exceptId?: string) {
   const needle = normaliseCode(code);
   return products.find((p) => p.id !== exceptId && productCodes(p).includes(needle));
+}
+
+/**
+ * Duplicate guard for barcode / SKU entry. Returns a ready-to-show message
+ * when the code is blank or already lives on another catalogue record.
+ */
+export function checkCodeAvailable(
+  products: Product[],
+  code: string,
+  exceptId?: string,
+): string | null {
+  const trimmed = code.trim();
+  if (!trimmed) return "Enter a barcode";
+  const clash = codeTakenBy(products, trimmed, exceptId);
+  return clash ? `${trimmed} already belongs to ${clash.name} (${clash.sku || clash.barcode})` : null;
 }
 
 /** Products that look like the scanned item, for the "already exists?" hint. */
