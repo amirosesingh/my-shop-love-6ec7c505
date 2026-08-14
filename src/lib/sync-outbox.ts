@@ -49,9 +49,19 @@ const listeners = new Set<Listener>();
 
 const isBrowser = () => typeof window !== "undefined";
 
+/**
+ * Only the desktop shell has a real local SQL engine behind it. A plain
+ * browser build never queues: it either reaches the central database or the
+ * action stops, so no business data is ever parked in browser storage.
+ */
+const hasLocalEngine = () =>
+  isBrowser() && !!(window as unknown as { pos?: unknown }).pos;
+
+const canQueue = () => hasLocalEngine() && !isLiveOnly();
+
 function read(): QueuedOp[] {
-  // The phone never queues: writes go straight to the backend.
-  if (!isBrowser() || isLiveOnly()) return [];
+  // The phone and the web build never queue: writes go straight to the backend.
+  if (!canQueue()) return [];
   try {
     return JSON.parse(window.localStorage.getItem(QUEUE_KEY) ?? "[]") as QueuedOp[];
   } catch {
@@ -60,7 +70,7 @@ function read(): QueuedOp[] {
 }
 
 function write(queue: QueuedOp[]) {
-  if (!isBrowser() || isLiveOnly()) {
+  if (!canQueue()) {
     for (const l of listeners) l();
     return;
   }

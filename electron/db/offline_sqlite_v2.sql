@@ -10,6 +10,7 @@
 PRAGMA foreign_keys = ON;
 PRAGMA journal_mode = WAL;
 PRAGMA synchronous = NORMAL;
+PRAGMA busy_timeout = 5000;
 
 -- ---------------------------------------------------------------- generic mirror
 -- Catalogue rows pulled from the cloud (server-wins). Kept for entities that
