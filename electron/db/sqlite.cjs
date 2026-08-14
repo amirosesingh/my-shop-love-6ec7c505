@@ -238,6 +238,40 @@ function listAudit(limit = 200) {
   return db.prepare(`SELECT * FROM sync_audit ORDER BY at DESC LIMIT ?`).all(limit);
 }
 
+/* ------------------------ compensating rollback ------------------------ */
+
+/**
+ * A queued change was discarded for good. The local copy still shows it, so
+ * undo it here: the mirrored rows are removed inside one transaction and the
+ * next pull re-fetches whatever the central database actually holds. Nothing
+ * is left claiming a change that will never be sent.
+ */
+function rollbackOp(op) {
+  if (!ready() || !op || !op.table) return { ok: false, removed: 0 };
+  const ids = (Array.isArray(op.ids) ? op.ids : [op.ids]).map(String).filter(Boolean);
+  if (!ids.length) return { ok: true, removed: 0 };
+  try {
+    const removed = tx(() => {
+      const stmt = db.prepare(`DELETE FROM mirror WHERE entity = ? AND id = ?`);
+      let n = 0;
+      for (const id of ids) n += stmt.run(op.table, id).changes ?? 0;
+      return n;
+    });
+    logAudit({
+      direction: "rollback",
+      entity: op.table,
+      recordId: ids[0],
+      records: removed,
+      status: "success",
+    });
+    return { ok: true, removed };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logAudit({ direction: "rollback", entity: op.table, records: 0, status: "error", error: message });
+    return { ok: false, removed: 0, error: message };
+  }
+}
+
 function clearAudit() {
   if (!ready()) return;
   tx(() => db.exec(`DELETE FROM sync_audit`));
@@ -300,6 +334,7 @@ module.exports = {
   logAudit,
   listAudit,
   clearAudit,
+  rollbackOp,
   getState,
   setState,
   erase,

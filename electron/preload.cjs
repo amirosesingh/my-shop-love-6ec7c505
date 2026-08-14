@@ -69,6 +69,8 @@ contextBridge.exposeInMainWorld("pos", {
   localAuditLog: (entry) => invoke("local:audit-log", entry),
   localAuditList: (limit) => invoke("local:audit-list", limit),
   localAuditClear: () => invoke("local:audit-clear"),
+  /** Undo a discarded queued change in the local copy. */
+  localRollback: (op) => invoke("local:rollback", op),
   /* branding mirror — survives updates and cleared browser storage */
   readBranding: () => invoke("branding:read"),
   writeBranding: (branding) => invoke("branding:write", branding),
