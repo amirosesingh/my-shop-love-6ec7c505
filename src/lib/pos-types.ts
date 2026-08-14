@@ -344,16 +344,27 @@ export type BookingPayment = {
 };
 
 /** Where a racket sits in the stringing workflow. */
-export type JobStatus = "received" | "strung" | "ready" | "collected";
+export type JobStatus =
+  | "received"
+  | "strung"
+  | "ready"
+  | "collected"
+  | "damaged"
+  | "cancelled";
 
 export const JOB_STATUS_LABELS: Record<JobStatus, string> = {
   received: "Received",
   strung: "Strung",
   ready: "Ready to collect",
   collected: "Collected",
+  damaged: "Frame damaged / snapped",
+  cancelled: "Cancelled / refunded",
 };
 
 export const JOB_STATUS_FLOW: JobStatus[] = ["received", "strung", "ready", "collected"];
+
+/** Statuses outside the normal flow; each one needs an incident note. */
+export const JOB_STATUS_INCIDENT: JobStatus[] = ["damaged", "cancelled"];
 
 /** Everything the stringer needs written on the job card. */
 export type RacketJob = {
@@ -457,6 +468,12 @@ export type Booking = {
   charges?: IntakeCharge[];
   /** receipt number of the bill raised when the goods were collected */
   saleReceiptNo?: string;
+  /** customer accepted the service & high-tension liability terms at intake */
+  liabilityAccepted?: boolean;
+  /** who strung the racket */
+  technician?: string;
+  /** why the job was marked damaged or cancelled */
+  incidentNote?: string;
 };
 
 export const bookingBalance = (b: Pick<Booking, "total" | "paid">) =>
