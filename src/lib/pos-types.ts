@@ -861,6 +861,9 @@ export const DEFAULT_BOOKING_RULES: BookingRules = {
   comboRule: "off",
   comboValue: 0,
   overrideNeedsSupervisor: true,
+  serviceTerms: DEFAULT_SERVICE_TERMS,
+  highTensionThreshold: 26,
+  requireLiabilityAccept: true,
 };
 
 /** Merge stored rules over the defaults so a partial blob is always complete. */
