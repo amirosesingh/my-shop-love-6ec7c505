@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { ChevronDown, ChevronUp, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
@@ -8,22 +8,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { useAuth } from "@/lib/pos-auth";
 import {
-  childrenOf,
   deleteCategory,
   deleteUnit,
+  listOf,
   reorderCategory,
-  reparentChildren,
   saveCategory,
   saveUnit,
-  topCategories,
   useCategories,
   useUnits,
 } from "@/lib/catalog-meta";
 import { usePos } from "@/lib/pos-store";
-import type { ProductCategory } from "@/lib/pos-types";
+import type { CatalogKind, ProductCategory } from "@/lib/pos-types";
 
 export const Route = createFileRoute("/settings/catalog")({
   head: () => ({
@@ -46,6 +43,125 @@ export const Route = createFileRoute("/settings/catalog")({
   component: CatalogMetaSettings,
 });
 
+
+function ListEditor({
+kind,
+title,
+hint,
+placeholder,
+categories,
+allowed,
+onRename,
+onRemove,
+}: {
+  kind: CatalogKind;
+  title: string;
+  hint: string;
+  placeholder: string;
+  categories: ProductCategory[];
+  allowed: boolean;
+  onRename: (node: ProductCategory) => void;
+  onRemove: (node: ProductCategory, kind: CatalogKind) => void;
+}) {
+  const [name, setName] = useState("");
+  const items = listOf(categories, kind);
+
+  async function add() {
+    const value = name.trim();
+    if (!value) return toast.error(`Give the ${title.toLowerCase()} a name`);
+    if (items.some((i) => i.name.toLowerCase() === value.toLowerCase())) {
+      return toast.error(`${value} is already on the list`);
+    }
+    try {
+      await saveCategory({ name: value, kind, parentId: null, sort: items.length + 1 });
+      setName("");
+      toast.success("Saved");
+    } catch {
+      toast.error("Could not save that entry");
+    }
+  }
+
+  return (
+    <div className="space-y-3 rounded-lg border border-border p-4">
+      <div>
+        <h3 className="font-medium">{title}</h3>
+        <p className="text-xs text-muted-foreground">{hint}</p>
+      </div>
+      <div className="flex items-end gap-2">
+        <div className="flex-1 space-y-1">
+          <Label className="text-xs">Name</Label>
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={placeholder}
+            className="h-9"
+            disabled={!allowed}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void add();
+              }
+            }}
+          />
+        </div>
+        <Button onClick={add} disabled={!allowed}>
+          <Plus className="size-4" /> Add
+        </Button>
+      </div>
+
+      <div className="divide-y divide-border rounded-md border border-border">
+        {items.map((item) => (
+          <div key={item.id} className="flex items-center justify-between gap-2 px-3 py-2">
+            <span className="truncate text-sm">{item.name}</span>
+            <div className="flex items-center">
+              <Button
+                size="icon"
+                variant="ghost"
+                disabled={!allowed}
+                aria-label={`Move ${item.name} up`}
+                onClick={() => reorderCategory(categories, item.id, -1)}
+              >
+                <ChevronUp className="size-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                disabled={!allowed}
+                aria-label={`Move ${item.name} down`}
+                onClick={() => reorderCategory(categories, item.id, 1)}
+              >
+                <ChevronDown className="size-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                disabled={!allowed}
+                aria-label={`Rename ${item.name}`}
+                onClick={() => onRename(item)}
+              >
+                <Pencil className="size-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                disabled={!allowed}
+                aria-label={`Delete ${item.name}`}
+                onClick={() => onRemove(item, kind)}
+              >
+                <Trash2 className="size-4 text-destructive" />
+              </Button>
+            </div>
+          </div>
+        ))}
+        {!items.length && (
+          <p className="p-3 text-xs text-muted-foreground">Nothing on this list yet.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
 function CatalogMetaSettings() {
   const { can } = useAuth();
   const allowed = can("can_manage_categories");
@@ -53,36 +169,16 @@ function CatalogMetaSettings() {
   const units = useUnits();
   const { state } = usePos();
 
-  const [catName, setCatName] = useState("");
-  const [catParent, setCatParent] = useState("none");
   const [unitCode, setUnitCode] = useState("");
   const [unitName, setUnitName] = useState("");
   const [unitDecimal, setUnitDecimal] = useState(false);
 
-  const parents = useMemo(() => topCategories(categories), [categories]);
-  const kids = (id: string) => childrenOf(categories, id);
-
-  /** Every level a new node can hang under: top level, category or group. */
-  const parentOptions = useMemo(
-    () => [
-      { value: "none", label: "Top level (category)" },
-      ...parents.flatMap((c) => [
-        { value: c.id, label: `${c.name} › new group` },
-        ...childrenOf(categories, c.id).map((g) => ({
-          value: g.id,
-          label: `${c.name} › ${g.name} › new sub-category`,
-        })),
-      ]),
-    ],
-    [parents, categories],
-  );
-
-  /** How many catalogue items still carry this classification by name. */
-  const productsUsing = (node: ProductCategory, level: "category" | "group" | "sub") =>
+  /** How many catalogue items still carry this name at this level. */
+  const productsUsing = (node: ProductCategory, kind: CatalogKind) =>
     state.products.filter((p) =>
-      level === "category"
+      kind === "category"
         ? p.category === node.name
-        : level === "group"
+        : kind === "group"
           ? (p.group ?? "") === node.name
           : (p.subCategory ?? "") === node.name,
     ).length;
@@ -98,61 +194,14 @@ function CatalogMetaSettings() {
     }
   }
 
-  async function removeNode(node: ProductCategory, level: "category" | "group" | "sub") {
-    const inUse = productsUsing(node, level);
+  async function removeNode(node: ProductCategory, kind: CatalogKind) {
+    const inUse = productsUsing(node, kind);
     if (inUse) {
       toast.error(`${inUse} product${inUse > 1 ? "s are" : " is"} still filed under ${node.name}`);
       return;
     }
-    const children = childrenOf(categories, node.id);
-    if (children.length) {
-      const keep = window.confirm(
-        `${node.name} has ${children.length} entr${children.length > 1 ? "ies" : "y"} under it.\n\nOK = move them up one level.\nCancel = stop and leave everything as it is.`,
-      );
-      if (!keep) return;
-      await reparentChildren(categories, node.id, node.parentId ?? null);
-    }
     await deleteCategory(node.id);
     toast.success(`${node.name} removed`);
-  }
-
-  const OrderButtons = ({ node }: { node: ProductCategory }) => (
-    <>
-      <Button
-        size="icon"
-        variant="ghost"
-        disabled={!allowed}
-        aria-label={`Move ${node.name} up`}
-        onClick={() => reorderCategory(categories, node.id, -1)}
-      >
-        <ChevronUp className="size-4" />
-      </Button>
-      <Button
-        size="icon"
-        variant="ghost"
-        disabled={!allowed}
-        aria-label={`Move ${node.name} down`}
-        onClick={() => reorderCategory(categories, node.id, 1)}
-      >
-        <ChevronDown className="size-4" />
-      </Button>
-    </>
-  );
-
-  async function addCategory() {
-    const name = catName.trim();
-    if (!name) return toast.error("Give the category a name");
-    try {
-      await saveCategory({
-        name,
-        parentId: catParent === "none" ? null : catParent,
-        sort: categories.length + 1,
-      });
-      setCatName("");
-      toast.success("Saved");
-    } catch {
-      toast.error("Could not save that category");
-    }
   }
 
   async function addUnit() {
@@ -176,12 +225,12 @@ function CatalogMetaSettings() {
 
   return (
     <AppShell>
-      <div className="max-w-4xl space-y-6 p-6">
+      <div className="max-w-5xl space-y-6 p-6">
         <header>
           <h1 className="text-2xl font-semibold tracking-tight">Categories & Units</h1>
           <p className="text-sm text-muted-foreground">
-            File the catalogue as Category › Group › Sub-category, and set the units items are sold
-            in.
+            Keep three simple lists — categories, groups and sub-categories — and pick from them
+            when adding products.
           </p>
         </header>
 
@@ -191,136 +240,38 @@ function CatalogMetaSettings() {
           </p>
         )}
 
-        <section className="space-y-3 rounded-lg border border-border p-4">
-          <h2 className="font-medium">Product taxonomy</h2>
-          <p className="text-xs text-muted-foreground">
-            Three levels: Category › Group › Sub-category. Deleting a level offers to move whatever
-            sits under it up one level, and refuses while products are still filed there.
-          </p>
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs">Name</Label>
-              <Input
-                value={catName}
-                onChange={(e) => setCatName(e.target.value)}
-                placeholder="Rackets, Strings, Grips…"
-                className="h-9 w-56"
-                disabled={!allowed}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Sits under</Label>
-              <ThemedSelect
-                value={catParent}
-                onChange={setCatParent}
-                ariaLabel="Parent category"
-                className="w-72"
-                options={parentOptions}
-              />
-            </div>
-            <Button onClick={addCategory} disabled={!allowed}>
-              <Plus className="size-4" /> Add
-            </Button>
-          </div>
-
-          <div className="divide-y divide-border rounded-md border border-border">
-            {parents.map((p) => (
-              <div key={p.id} className="p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium">{p.name}</span>
-                  <div className="flex items-center">
-                    <OrderButtons node={p} />
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      disabled={!allowed}
-                      aria-label={`Rename ${p.name}`}
-                      onClick={() => renameNode(p)}
-                    >
-                      <Pencil className="size-4" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      disabled={!allowed}
-                      aria-label={`Delete ${p.name}`}
-                      onClick={() => removeNode(p, "category")}
-                    >
-                      <Trash2 className="size-4 text-destructive" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="mt-2 space-y-2 pl-4">
-                  {kids(p.id).map((g) => (
-                    <div key={g.id} className="rounded-md border border-border/70 p-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm">{g.name}</span>
-                        <div className="flex items-center">
-                          <OrderButtons node={g} />
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            disabled={!allowed}
-                            aria-label={`Rename ${g.name}`}
-                            onClick={() => renameNode(g)}
-                          >
-                            <Pencil className="size-4" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            disabled={!allowed}
-                            aria-label={`Delete ${g.name}`}
-                            onClick={() => removeNode(g, "group")}
-                          >
-                            <Trash2 className="size-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="mt-1 flex flex-wrap gap-2 pl-2">
-                        {kids(g.id).map((s) => (
-                          <Badge key={s.id} variant="outline" className="gap-1">
-                            {s.name}
-                            <button
-                              type="button"
-                              aria-label={`Rename ${s.name}`}
-                              disabled={!allowed}
-                              onClick={() => renameNode(s)}
-                            >
-                              <Pencil className="size-3" />
-                            </button>
-                            <button
-                              type="button"
-                              className="text-destructive"
-                              aria-label={`Delete ${s.name}`}
-                              disabled={!allowed}
-                              onClick={() => removeNode(s, "sub")}
-                            >
-                              ×
-                            </button>
-                          </Badge>
-                        ))}
-                        {!kids(g.id).length && (
-                          <span className="text-xs text-muted-foreground">
-                            No sub-categories yet.
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  {!kids(p.id).length && (
-                    <span className="text-xs text-muted-foreground">No groups yet.</span>
-                  )}
-                </div>
-              </div>
-            ))}
-            {!parents.length && (
-              <p className="p-4 text-sm text-muted-foreground">
-                No categories yet — add your first category above.
-              </p>
-            )}
-          </div>
-        </section>
+        <div className="grid gap-4 md:grid-cols-3">
+          <ListEditor
+            kind="category"
+            categories={categories}
+            allowed={allowed}
+            onRename={renameNode}
+            onRemove={removeNode}
+            title="Categories"
+            hint="The main list products are filed under."
+            placeholder="Rackets, Strings, Grips…"
+          />
+          <ListEditor
+            kind="group"
+            categories={categories}
+            allowed={allowed}
+            onRename={renameNode}
+            onRemove={removeNode}
+            title="Groups"
+            hint="A second free list, independent of categories."
+            placeholder="Yonex, Li-Ning…"
+          />
+          <ListEditor
+            kind="sub"
+            categories={categories}
+            allowed={allowed}
+            onRename={renameNode}
+            onRemove={removeNode}
+            title="Sub-categories"
+            hint="A third free list, independent of the others."
+            placeholder="Head heavy, Multifilament…"
+          />
+        </div>
 
         <section className="space-y-3 rounded-lg border border-border p-4">
           <h2 className="font-medium">Units of measure</h2>

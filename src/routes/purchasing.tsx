@@ -41,7 +41,25 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { money, stockAt, usePos } from "@/lib/pos-store";
+import { ThemedSelect } from "@/components/pos/ThemedSelect";
+import {
+  groupList,
+  subCategoryList,
+  topCategories,
+  useCategories,
+} from "@/lib/catalog-meta";
 import { resolveByBarcode } from "@/lib/product-lookup";
+
+/** Sentinel for "no value picked" — Radix selects cannot hold an empty value. */
+const PO_NONE = "__none";
+
+/** List options plus a blank choice, keeping any legacy value that is off-list. */
+const poOptions = (names: string[], current?: string) => [
+  { value: PO_NONE, label: "— none —" },
+  ...[...new Set([...names, ...(current ? [current] : [])])]
+    .sort()
+    .map((n) => ({ value: n, label: n })),
+];
 import { useAuth } from "@/lib/pos-auth";
 import { logger } from "@/lib/audit-log";
 import { logSystemAction } from "@/lib/system-audit";
@@ -104,6 +122,7 @@ function Purchasing() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [draft, setDraft] = useState<Product | null>(null);
   const [draftQty, setDraftQty] = useState("1");
+  const catalogLists = useCategories();
   const scanRef = useRef<HTMLInputElement>(null);
   const [suppliers, setSuppliers] = useState<Supplier[]>(cachedSuppliers());
   const fileRef = useRef<HTMLInputElement>(null);
@@ -1038,9 +1057,33 @@ function Purchasing() {
                 />
               </Field>
               <Field label="Category">
-                <Input
-                  value={draft.category}
-                  onChange={(e) => setDraft({ ...draft, category: e.target.value })}
+                <ThemedSelect
+                  value={draft.category || PO_NONE}
+                  ariaLabel="Category"
+                  placeholder="Choose a category"
+                  onChange={(v) => setDraft({ ...draft, category: v === PO_NONE ? "" : v })}
+                  options={poOptions(topCategories(catalogLists).map((c) => c.name), draft.category)}
+                />
+              </Field>
+              <Field label="Group">
+                <ThemedSelect
+                  value={draft.group || PO_NONE}
+                  ariaLabel="Group"
+                  placeholder="Choose a group"
+                  onChange={(v) => setDraft({ ...draft, group: v === PO_NONE ? "" : v })}
+                  options={poOptions(groupList(catalogLists).map((c) => c.name), draft.group)}
+                />
+              </Field>
+              <Field label="Sub-category">
+                <ThemedSelect
+                  value={draft.subCategory || PO_NONE}
+                  ariaLabel="Sub-category"
+                  placeholder="Choose a sub-category"
+                  onChange={(v) => setDraft({ ...draft, subCategory: v === PO_NONE ? "" : v })}
+                  options={poOptions(
+                    subCategoryList(catalogLists).map((c) => c.name),
+                    draft.subCategory,
+                  )}
                 />
               </Field>
               <div className="grid grid-cols-2 gap-3">

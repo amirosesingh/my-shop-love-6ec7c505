@@ -933,6 +933,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          kind: string
           name: string
           parent_id: string | null
           sort: number
@@ -941,6 +942,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          kind?: string
           name: string
           parent_id?: string | null
           sort?: number
@@ -949,6 +951,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          kind?: string
           name?: string
           parent_id?: string | null
           sort?: number

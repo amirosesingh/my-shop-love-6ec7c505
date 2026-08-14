@@ -7,7 +7,7 @@
  */
 import { useEffect, useState } from "react";
 import { supabaseExternal } from "@/integrations/supabase/external-client";
-import type { ProductCategory, UomUnit } from "./pos-types";
+import type { CatalogKind, ProductCategory, UomUnit } from "./pos-types";
 
 /** Table names are shared with the POS project's generated types. */
 const supabase = supabaseExternal;
@@ -67,6 +67,7 @@ export async function loadCatalogMeta() {
       cats.data.map((r) => ({
         id: r.id as string,
         name: r.name as string,
+        kind: ((r as { kind?: string }).kind as CatalogKind) ?? "category",
         parentId: (r.parent_id as string | null) ?? null,
         sort: Number(r.sort ?? 0),
       })),
@@ -90,6 +91,7 @@ export async function saveCategory(cat: Omit<ProductCategory, "id"> & { id?: str
   const row = {
     ...(cat.id ? { id: cat.id } : {}),
     name: cat.name,
+    kind: cat.kind ?? "category",
     parent_id: cat.parentId ?? null,
     sort: cat.sort ?? 0,
   };
@@ -102,6 +104,7 @@ export async function saveCategory(cat: Omit<ProductCategory, "id"> & { id?: str
   const saved: ProductCategory = {
     id: (data?.id as string) ?? cat.id ?? crypto.randomUUID(),
     name: cat.name,
+    kind: cat.kind ?? "category",
     parentId: cat.parentId ?? null,
     sort: cat.sort ?? 0,
   };
@@ -175,62 +178,27 @@ function useCatalogStore<T>(read: () => T): T {
 export const useCategories = () => useCatalogStore(readCategories);
 export const useUnits = () => useCatalogStore(readUnits);
 
-/** Top-level categories, alphabetical. */
-export const topCategories = (all: ProductCategory[]) =>
-  all.filter((c) => !c.parentId).sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name));
-
-/** Sub-categories of a named parent category. */
 const byOrder = (a: ProductCategory, b: ProductCategory) =>
   a.sort - b.sort || a.name.localeCompare(b.name);
 
-/** Direct children of a node. */
-export const childrenOf = (all: ProductCategory[], parentId: string) =>
-  all.filter((c) => c.parentId === parentId).sort(byOrder);
+/** One of the three independent lists, in display order. */
+export const listOf = (all: ProductCategory[], kind: CatalogKind) =>
+  all.filter((c) => (c.kind ?? "category") === kind).sort(byOrder);
 
-/** Groups (middle tier) sitting under a named category. */
-export const groupsOf = (all: ProductCategory[], categoryName: string) => {
-  const parent = all.find((c) => !c.parentId && c.name === categoryName);
-  return parent ? childrenOf(all, parent.id) : [];
-};
+export const topCategories = (all: ProductCategory[]) => listOf(all, "category");
+export const groupList = (all: ProductCategory[]) => listOf(all, "group");
+export const subCategoryList = (all: ProductCategory[]) => listOf(all, "sub");
 
-/**
- * Sub-categories under a category, optionally narrowed to one group.
- * Without a group name every sub-category across the category's groups is
- * returned, so older two-level pickers keep working.
- */
-export const subCategoriesOf = (
-  all: ProductCategory[],
-  categoryName: string,
-  groupName?: string,
-) => {
-  const groups = groupsOf(all, categoryName);
-  const scope = groupName ? groups.filter((g) => g.name === groupName) : groups;
-  return scope.flatMap((g) => childrenOf(all, g.id)).sort(byOrder);
-};
-
-/** Moves a node up or down among its siblings by swapping sort positions. */
+/** Moves an entry up or down within its own list by swapping sort positions. */
 export async function reorderCategory(all: ProductCategory[], id: string, dir: -1 | 1) {
   const node = all.find((c) => c.id === id);
   if (!node) return;
-  const siblings = all
-    .filter((c) => (c.parentId ?? null) === (node.parentId ?? null))
-    .sort(byOrder);
+  const siblings = listOf(all, node.kind ?? "category");
   const index = siblings.findIndex((c) => c.id === id);
   const swap = siblings[index + dir];
   if (!swap) return;
   await saveCategory({ ...node, sort: swap.sort });
   await saveCategory({ ...swap, sort: node.sort });
-}
-
-/** Points every child of `fromId` at a new parent (or to the top level). */
-export async function reparentChildren(
-  all: ProductCategory[],
-  fromId: string,
-  toParentId: string | null,
-) {
-  for (const child of childrenOf(all, fromId)) {
-    await saveCategory({ ...child, parentId: toParentId });
-  }
 }
 
 export const unitLabel = (units: UomUnit[], code: string | undefined) =>

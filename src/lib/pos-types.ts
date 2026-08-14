@@ -65,10 +65,14 @@ export type BarcodeVariant = {
   label?: string;
 };
 
-/** A catalogue classification. A row with `parentId` is a sub-category. */
+/** Which of the three flat catalogue lists an entry belongs to. */
+export type CatalogKind = "category" | "group" | "sub";
+
+/** One entry in a flat catalogue list (category, group or sub-category). */
 export type ProductCategory = {
   id: string;
   name: string;
+  kind: CatalogKind;
   parentId?: string | null;
   sort: number;
 };
