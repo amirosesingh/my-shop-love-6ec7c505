@@ -83,7 +83,7 @@ export const barcodeRowsFor = (p: Product) =>
       code: v.code,
       label: v.label ?? null,
       primary: false,
-      pack: v.packSize ?? 1,
+      pack: 1,
     })),
   ]
     .filter((r) => !!r.code?.trim())
