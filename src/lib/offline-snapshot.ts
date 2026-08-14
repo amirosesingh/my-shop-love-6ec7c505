@@ -21,7 +21,7 @@ const canSnapshot = () =>
 
 export type Snapshot = CloudSlice & { savedAt: string };
 
-const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
+const arr = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
 
 /** Snapshots written by older builds can be missing whole slices. */
 function normalise(raw: Partial<Snapshot>): Snapshot {

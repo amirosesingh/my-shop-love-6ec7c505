@@ -54,8 +54,7 @@ const isBrowser = () => typeof window !== "undefined";
  * browser build never queues: it either reaches the central database or the
  * action stops, so no business data is ever parked in browser storage.
  */
-const hasLocalEngine = () =>
-  isBrowser() && !!(window as unknown as { pos?: unknown }).pos;
+const hasLocalEngine = () => isBrowser() && !!(window as unknown as { pos?: unknown }).pos;
 
 const canQueue = () => hasLocalEngine() && !isLiveOnly();
 
@@ -158,7 +157,13 @@ export function refuseOp(id: string, message: string) {
   write(
     read().map((q) =>
       q.id === id
-        ? { ...q, attempts: MAX_ATTEMPTS, lastError: message, status: "failed" as const, quarantined: true }
+        ? {
+            ...q,
+            attempts: MAX_ATTEMPTS,
+            lastError: message,
+            status: "failed" as const,
+            quarantined: true,
+          }
         : q,
     ),
   );
