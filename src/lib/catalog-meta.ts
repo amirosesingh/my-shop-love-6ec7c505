@@ -180,13 +180,58 @@ export const topCategories = (all: ProductCategory[]) =>
   all.filter((c) => !c.parentId).sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name));
 
 /** Sub-categories of a named parent category. */
-export const subCategoriesOf = (all: ProductCategory[], parentName: string) => {
-  const parent = all.find((c) => !c.parentId && c.name === parentName);
-  if (!parent) return [];
-  return all
-    .filter((c) => c.parentId === parent.id)
-    .sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name));
+const byOrder = (a: ProductCategory, b: ProductCategory) =>
+  a.sort - b.sort || a.name.localeCompare(b.name);
+
+/** Direct children of a node. */
+export const childrenOf = (all: ProductCategory[], parentId: string) =>
+  all.filter((c) => c.parentId === parentId).sort(byOrder);
+
+/** Groups (middle tier) sitting under a named category. */
+export const groupsOf = (all: ProductCategory[], categoryName: string) => {
+  const parent = all.find((c) => !c.parentId && c.name === categoryName);
+  return parent ? childrenOf(all, parent.id) : [];
 };
+
+/**
+ * Sub-categories under a category, optionally narrowed to one group.
+ * Without a group name every sub-category across the category's groups is
+ * returned, so older two-level pickers keep working.
+ */
+export const subCategoriesOf = (
+  all: ProductCategory[],
+  categoryName: string,
+  groupName?: string,
+) => {
+  const groups = groupsOf(all, categoryName);
+  const scope = groupName ? groups.filter((g) => g.name === groupName) : groups;
+  return scope.flatMap((g) => childrenOf(all, g.id)).sort(byOrder);
+};
+
+/** Moves a node up or down among its siblings by swapping sort positions. */
+export async function reorderCategory(all: ProductCategory[], id: string, dir: -1 | 1) {
+  const node = all.find((c) => c.id === id);
+  if (!node) return;
+  const siblings = all
+    .filter((c) => (c.parentId ?? null) === (node.parentId ?? null))
+    .sort(byOrder);
+  const index = siblings.findIndex((c) => c.id === id);
+  const swap = siblings[index + dir];
+  if (!swap) return;
+  await saveCategory({ ...node, sort: swap.sort });
+  await saveCategory({ ...swap, sort: node.sort });
+}
+
+/** Points every child of `fromId` at a new parent (or to the top level). */
+export async function reparentChildren(
+  all: ProductCategory[],
+  fromId: string,
+  toParentId: string | null,
+) {
+  for (const child of childrenOf(all, fromId)) {
+    await saveCategory({ ...child, parentId: toParentId });
+  }
+}
 
 export const unitLabel = (units: UomUnit[], code: string | undefined) =>
   units.find((u) => u.code === code)?.code ?? code ?? "";
