@@ -53,6 +53,22 @@ contextBridge.exposeInMainWorld("pos", {
   /* device settings held in the branch SQL database */
   getSetting: (key) => invoke("settings:get", key),
   setSetting: (key, value) => invoke("settings:set", key, value),
+  /* permanent configuration in userData/pos_config.json */
+  readConfig: () => invoke("config:read"),
+  writeConfig: (patch) => invoke("config:write", patch),
+  getConfig: (key) => invoke("config:get", key),
+  setConfig: (key, value) => invoke("config:set", key, value),
+  resetConfig: () => invoke("config:reset"),
+  /* embedded local database (mirror + offline outbox + audit ledger) */
+  localInfo: () => invoke("local:info"),
+  localMirror: (entity, rows) => invoke("local:mirror", entity, rows),
+  localList: (entity, limit) => invoke("local:list", entity, limit),
+  localEnqueue: (entity, payload) => invoke("local:enqueue", entity, payload),
+  localPending: (limit) => invoke("local:pending", limit),
+  localMark: (id, status, error) => invoke("local:mark", id, status, error),
+  localAuditLog: (entry) => invoke("local:audit-log", entry),
+  localAuditList: (limit) => invoke("local:audit-list", limit),
+  localAuditClear: () => invoke("local:audit-clear"),
   /* branding mirror — survives updates and cleared browser storage */
   readBranding: () => invoke("branding:read"),
   writeBranding: (branding) => invoke("branding:write", branding),

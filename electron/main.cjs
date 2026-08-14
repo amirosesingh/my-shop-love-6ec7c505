@@ -12,6 +12,8 @@ const worker = require("./sync/worker.cjs");
 const updater = require("./updater.cjs");
 const terminalStore = require("./terminal-store.cjs");
 const dbConfigStore = require("./db-config-store.cjs");
+const configStore = require("./config-store.cjs");
+const localDb = require("./db/sqlite.cjs");
 const brandingStore = require("./branding-store.cjs");
 const health = require("./health.cjs");
 const recovery = require("./recovery.cjs");
@@ -585,6 +587,9 @@ function registerIpc() {
       await connectLocal(config);
       const saved = dbConfigStore.write(config);
       if (!saved.ok) console.warn("[pos] could not seal SQL config:", saved.error);
+      // Permanent copy: survives a missing OS keyring, so the till never
+      // forgets its database after a restart.
+      configStore.set("localDb", config);
     } catch (err) {
       return { ok: false, ...pool.describeSqlError(err) };
     }
@@ -714,16 +719,68 @@ function registerIpc() {
     try {
       return { ok: true, value: await repo.getSetting(String(key)) };
     } catch (error) {
-      return { ok: false, error: error.message };
+      // Offline fallback: the embedded database answers when SQL Server is out.
+      return { ok: true, value: localDb.getState(`setting:${String(key)}`), degraded: error.message };
     }
   });
   ipcMain.handle("settings:set", async (_e, key, value) => {
+    localDb.setState(`setting:${String(key)}`, value == null ? null : String(value));
     try {
       await repo.setSetting(String(key), value == null ? null : String(value));
       return { ok: true };
     } catch (error) {
-      return { ok: false, error: error.message };
+      return { ok: true, degraded: error.message };
     }
+  });
+
+  /* ---------- permanent configuration + embedded local database ---------- */
+
+  ipcMain.handle("config:read", () => ({
+    ok: true,
+    config: configStore.readAll(),
+    path: configStore.filePath(),
+    sealed: configStore.encryptionAvailable(),
+  }));
+  ipcMain.handle("config:write", (_e, patch) => configStore.merge(patch ?? {}));
+  ipcMain.handle("config:get", (_e, key) => ({ ok: true, value: configStore.get(String(key)) }));
+  ipcMain.handle("config:set", (_e, key, value) => configStore.set(String(key), value));
+  /** Admin-only hard reset: configuration AND the mirrored local database. */
+  ipcMain.handle("config:reset", () => {
+    const cfg = configStore.reset();
+    const wiped = localDb.erase();
+    localDb.init(app.getPath("userData"));
+    return { ok: cfg.ok && wiped.ok, error: cfg.error ?? wiped.error };
+  });
+
+  ipcMain.handle("local:info", () => ({
+    ok: true,
+    ...localDb.info(),
+    counts: localDb.counts(),
+    pending: localDb.pendingCounts(),
+  }));
+  ipcMain.handle("local:mirror", (_e, entity, rows) => ({
+    ok: true,
+    written: localDb.mirror(String(entity), rows ?? []),
+  }));
+  ipcMain.handle("local:list", (_e, entity, limit) =>
+    ({ ok: true, rows: localDb.listMirror(String(entity), Number(limit) || 500) }));
+  ipcMain.handle("local:enqueue", (_e, entity, payload) => ({
+    ok: true,
+    row: localDb.enqueue(String(entity), payload ?? {}),
+  }));
+  ipcMain.handle("local:pending", (_e, limit) => ({ ok: true, rows: localDb.pending(Number(limit) || 200) }));
+  ipcMain.handle("local:mark", (_e, id, status, error) => {
+    localDb.markOutbox(String(id), String(status), error ?? null);
+    return { ok: true };
+  });
+  ipcMain.handle("local:audit-log", (_e, entry) => ({ ok: true, row: localDb.logAudit(entry ?? {}) }));
+  ipcMain.handle("local:audit-list", (_e, limit) => ({
+    ok: true,
+    rows: localDb.listAudit(Number(limit) || 200),
+  }));
+  ipcMain.handle("local:audit-clear", () => {
+    localDb.clearAudit();
+    return { ok: true };
   });
 
   /* branding mirror so first-run setup only ever runs once */
@@ -853,6 +910,8 @@ function registerIpc() {
 }
 
 app.whenReady().then(async () => {
+  const engine = localDb.init(app.getPath("userData"));
+  if (DEBUG) console.log("[pos] local database:", engine.engine, engine.path);
   registerIpc();
   const boot = health.beginBoot();
   if (health.shouldEnterSafeMode(boot)) {
@@ -870,7 +929,8 @@ app.whenReady().then(async () => {
     return;
   }
   createWindows();
-  const savedDbConfig = dbConfigStore.read();
+  // The sealed store first, then the permanent JSON copy: whichever survived.
+  const savedDbConfig = dbConfigStore.read() ?? configStore.get("localDb");
   if (savedDbConfig) {
     try {
       await connectLocal(savedDbConfig);
