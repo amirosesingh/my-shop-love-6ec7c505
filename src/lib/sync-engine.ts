@@ -46,6 +46,7 @@ import { checkHealth } from "./connection-health";
 import {
   failOp,
   refuseOp,
+  nextAttemptDue,
   isOnline,
   isOnlineSyncEnabled,
   listQueue,
