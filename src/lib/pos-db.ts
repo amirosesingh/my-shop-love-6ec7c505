@@ -3,11 +3,10 @@ import { supabaseExternal as supabase } from "@/integrations/supabase/external-c
 import { defaultSettings, sampleState } from "./pos-seed";
 import { drainOutbox, runOpLive } from "./sync-engine";
 import { localDb } from "./local-db";
-import { enqueue, listQueue, persisted, type SyncOp } from "./sync-outbox";
+import { enqueue, type SyncOp } from "./sync-outbox";
 import { isLiveOnly } from "./live-mode";
 import {
   AllTargetsFailed,
-  effectiveDatabaseMode,
   isConnectionError,
   noteConnectionLost,
   noteConnectionRestored,
