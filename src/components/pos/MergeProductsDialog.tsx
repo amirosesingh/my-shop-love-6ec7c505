@@ -15,6 +15,8 @@ import { Label } from "@/components/ui/label";
 import { money, stockAt, usePos } from "@/lib/pos-store";
 import type { BlockedDelete } from "@/lib/product-delete";
 import type { Product } from "@/lib/pos-types";
+import { findMergeBlocks, type MergeBlock } from "@/lib/merge-guard";
+import { useHeldOrders } from "@/lib/held-orders";
 
 /**
  * Folds duplicate catalogue records (same item received twice under different
@@ -34,12 +36,32 @@ export function MergeProductsDialog({
   onMerged?: () => void;
   onBlocked?: (blocked: BlockedDelete[]) => void;
 }) {
-  const { mergeProducts, currentStore } = usePos();
+  const { mergeProducts, currentStore, state } = usePos();
+  const held = useHeldOrders();
   const [masterId, setMasterId] = useState(products[0]?.id ?? "");
+  const [blocks, setBlocks] = useState<MergeBlock[]>([]);
+  const [checking, setChecking] = useState(false);
 
   useEffect(() => {
     if (open) setMasterId(products[0]?.id ?? "");
   }, [open, products]);
+
+  useEffect(() => {
+    if (!open || products.length < 2) {
+      setBlocks([]);
+      return;
+    }
+    let live = true;
+    setChecking(true);
+    void findMergeBlocks(products, state.bookings, held).then((found) => {
+      if (!live) return;
+      setBlocks(found);
+      setChecking(false);
+    });
+    return () => {
+      live = false;
+    };
+  }, [open, products, state.bookings, held]);
 
   const master = products.find((p) => p.id === masterId);
   const losers = products.filter((p) => p.id !== masterId);
@@ -106,6 +128,19 @@ export function MergeProductsDialog({
                 ))}
               </ul>
             </div>
+
+            {blocks.length > 0 && (
+              <div className="rounded-md border border-warning/50 bg-warning/10 p-3 text-sm">
+                <p className="font-medium">Merging is on hold until this work is finished:</p>
+                <ul className="mt-1 list-disc pl-5">
+                  {blocks.map((b) => (
+                    <li key={`${b.productId}-${b.reason}`}>
+                      {b.name} — {b.reason}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         )}
 
@@ -114,7 +149,7 @@ export function MergeProductsDialog({
             Cancel
           </Button>
           <Button
-            disabled={products.length < 2 || !masterId}
+            disabled={products.length < 2 || !masterId || checking || blocks.length > 0}
             onClick={async () => {
               const blocked = await mergeProducts(
                 masterId,
