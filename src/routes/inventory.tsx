@@ -50,8 +50,8 @@ import type { BlockedDelete } from "@/lib/product-delete";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { exportProductsXlsx } from "@/lib/product-export";
 import {
-  groupsOf,
-  subCategoriesOf,
+  groupList,
+  subCategoryList,
   topCategories,
   useCategories,
   useUnits,
@@ -91,6 +91,17 @@ const blank = (storeId: string): Product => ({
   reorderLevel: 10,
   taxRate: 0.05,
 });
+
+/** Sentinel for "no value picked" — Radix selects cannot hold an empty value. */
+const NONE = "__none";
+
+/** List options plus a blank choice, keeping any legacy value that is off-list. */
+const pickerOptions = (names: string[], current?: string) => [
+  { value: NONE, label: "— none —" },
+  ...[...new Set([...names, ...(current ? [current] : [])])]
+    .sort()
+    .map((n) => ({ value: n, label: n })),
+];
 
 function Inventory() {
   const {
@@ -143,31 +154,16 @@ function Inventory() {
   }, [categories, state.products]);
 
   const groupNames = useMemo(() => {
-    if (catFilter === "all") return [];
-    const names = new Set<string>(groupsOf(categories, catFilter).map((c) => c.name));
-    state.products
-      .filter((p) => p.category === catFilter && p.group)
-      .forEach((p) => names.add(p.group!));
+    const names = new Set<string>(groupList(categories).map((c) => c.name));
+    state.products.forEach((p) => p.group && names.add(p.group));
     return [...names].sort();
-  }, [categories, state.products, catFilter]);
+  }, [categories, state.products]);
 
   const subNames = useMemo(() => {
-    if (catFilter === "all") return [];
-    const names = new Set<string>(
-      subCategoriesOf(categories, catFilter, groupFilter === "all" ? undefined : groupFilter).map(
-        (c) => c.name,
-      ),
-    );
-    state.products
-      .filter(
-        (p) =>
-          p.category === catFilter &&
-          p.subCategory &&
-          (groupFilter === "all" || (p.group ?? "") === groupFilter),
-      )
-      .forEach((p) => names.add(p.subCategory!));
+    const names = new Set<string>(subCategoryList(categories).map((c) => c.name));
+    state.products.forEach((p) => p.subCategory && names.add(p.subCategory));
     return [...names].sort();
-  }, [categories, state.products, catFilter, groupFilter]);
+  }, [categories, state.products]);
 
   const rows = state.products.filter(
     (p) =>
@@ -300,38 +296,31 @@ function Inventory() {
                       />
                     </Field>
                     <Field label="Category">
-                      <Input
-                        value={draft.category}
-                        onChange={(e) => setDraft({ ...draft, category: e.target.value })}
+                      <ThemedSelect
+                        value={draft.category || NONE}
+                        ariaLabel="Category"
+                        placeholder="Choose a category"
+                        onChange={(v) => setDraft({ ...draft, category: v === NONE ? "" : v })}
+                        options={pickerOptions(categoryNames, draft.category)}
                       />
                     </Field>
                     <Field label="Group">
-                      <Input
-                        value={draft.group ?? ""}
-                        placeholder="optional"
-                        list="inventory-groups"
-                        onChange={(e) =>
-                          setDraft({ ...draft, group: e.target.value, subCategory: "" })
-                        }
+                      <ThemedSelect
+                        value={draft.group || NONE}
+                        ariaLabel="Group"
+                        placeholder="Choose a group"
+                        onChange={(v) => setDraft({ ...draft, group: v === NONE ? "" : v })}
+                        options={pickerOptions(groupNames, draft.group)}
                       />
-                      <datalist id="inventory-groups">
-                        {groupsOf(categories, draft.category).map((c) => (
-                          <option key={c.id} value={c.name} />
-                        ))}
-                      </datalist>
                     </Field>
                     <Field label="Sub-category">
-                      <Input
-                        value={draft.subCategory ?? ""}
-                        placeholder="optional"
-                        list="inventory-subcategories"
-                        onChange={(e) => setDraft({ ...draft, subCategory: e.target.value })}
+                      <ThemedSelect
+                        value={draft.subCategory || NONE}
+                        ariaLabel="Sub-category"
+                        placeholder="Choose a sub-category"
+                        onChange={(v) => setDraft({ ...draft, subCategory: v === NONE ? "" : v })}
+                        options={pickerOptions(subNames, draft.subCategory)}
                       />
-                      <datalist id="inventory-subcategories">
-                        {subCategoriesOf(categories, draft.category, draft.group || undefined).map((c) => (
-                          <option key={c.id} value={c.name} />
-                        ))}
-                      </datalist>
                     </Field>
                     <Field label="Unit of measure">
                       <ThemedSelect
