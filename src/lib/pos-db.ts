@@ -602,6 +602,52 @@ const saleItemRows = (s: Sale) =>
     coupon_discount: l.couponDiscount ?? 0,
   }));
 
+/**
+ * One ledger row per tender on the bill, so partial settlements across sales
+ * and bookings can be read from a single place.
+ */
+const salePaymentRows = (s: Sale) => {
+  const tenders =
+    s.payments && s.payments.length
+      ? s.payments.map((p) => ({ method: String(p.method), amount: Number(p.amount) || 0 }))
+      : [{ method: String(s.method), amount: s.paid }];
+  return tenders
+    .filter((t) => t.amount !== 0)
+    .map((t) => ({
+      id: crypto.randomUUID(),
+      source_type: "sale",
+      sale_id: s.id,
+      member_id: s.memberId,
+      store_id: s.storeId,
+      shift_id: s.shiftId,
+      amount: t.amount,
+      method: t.method,
+      kind: s.refunded ? "refund" : "payment",
+      reference: s.receiptNo,
+      cashier_name: s.cashier,
+      note: "",
+      paid_at: s.createdAt,
+    }));
+};
+
+/** One inventory-movement row per sold line, for the unified item history. */
+const saleActivityRows = (s: Sale) =>
+  s.lines
+    .filter((l) => l.productId)
+    .map((l) => ({
+      id: crypto.randomUUID(),
+      product_id: l.productId,
+      product_name: l.name,
+      store_id: s.storeId,
+      activity_type: l.credit ? "return" : "sale",
+      reference: s.receiptNo,
+      quantity_delta: -Math.round(l.qty),
+      unit_cost: l.cost ?? 0,
+      staff_name: s.cashier,
+      note: "",
+      created_at: s.createdAt,
+    }));
+
 /* --------------------------- tier name cache --------------------------- */
 
 let tierIdByName: Record<string, string> = {};
