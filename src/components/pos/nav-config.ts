@@ -172,14 +172,6 @@ export const navGroups: NavGroup[] = [
         blurb: "Barcode physical counts, adjustments and bulk imports.",
       },
       {
-        to: "/__transfers_removed",
-        label: "Stock Transfers",
-        icon: ArrowLeftRight,
-        flag: "can_create_transfer",
-        keywords: "request move branch",
-        blurb: "Move or request stock between branches.",
-      },
-      {
         to: "/stores",
         label: "Locations / Warehouses",
         icon: Truck,
