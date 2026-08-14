@@ -404,6 +404,7 @@ function BookingRulesForm() {
       </Section>
 
       <Section title="Control" blurb="Who may undo or re-spec a booking once it exists.">
+        {null}
         <Row
           label="Only supervisors may cancel a booking"
           hint="Cashiers can raise and collect bookings, but not cancel them."
