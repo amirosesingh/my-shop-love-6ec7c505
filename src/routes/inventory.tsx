@@ -49,7 +49,13 @@ import { ProductDeleteBlockedDialog } from "@/components/pos/ProductDeleteBlocke
 import type { BlockedDelete } from "@/lib/product-delete";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { exportProductsXlsx } from "@/lib/product-export";
-import { subCategoriesOf, topCategories, useCategories, useUnits } from "@/lib/catalog-meta";
+import {
+  groupsOf,
+  subCategoriesOf,
+  topCategories,
+  useCategories,
+  useUnits,
+} from "@/lib/catalog-meta";
 import { codeTakenBy } from "@/lib/product-lookup";
 import { StockAdjustDialog, StockCountDialog } from "@/components/pos/StockAdjust";
 import { ItemActivityDrawer } from "@/components/pos/ItemActivityDrawer";
@@ -117,6 +123,7 @@ function Inventory() {
   const [deleting, setDeleting] = useState<string[]>([]);
   const [showArchived, setShowArchived] = useState(false);
   const [catFilter, setCatFilter] = useState("all");
+  const [groupFilter, setGroupFilter] = useState("all");
   const [subFilter, setSubFilter] = useState("all");
   const [bulkCategory, setBulkCategory] = useState("");
   const [adjustTarget, setAdjustTarget] = useState<Product | null>(null);
@@ -134,14 +141,32 @@ function Inventory() {
     return [...names].sort();
   }, [categories, state.products]);
 
-  const subNames = useMemo(() => {
+  const groupNames = useMemo(() => {
     if (catFilter === "all") return [];
-    const names = new Set<string>(subCategoriesOf(categories, catFilter).map((c) => c.name));
+    const names = new Set<string>(groupsOf(categories, catFilter).map((c) => c.name));
     state.products
-      .filter((p) => p.category === catFilter && p.subCategory)
-      .forEach((p) => names.add(p.subCategory!));
+      .filter((p) => p.category === catFilter && p.group)
+      .forEach((p) => names.add(p.group!));
     return [...names].sort();
   }, [categories, state.products, catFilter]);
+
+  const subNames = useMemo(() => {
+    if (catFilter === "all") return [];
+    const names = new Set<string>(
+      subCategoriesOf(categories, catFilter, groupFilter === "all" ? undefined : groupFilter).map(
+        (c) => c.name,
+      ),
+    );
+    state.products
+      .filter(
+        (p) =>
+          p.category === catFilter &&
+          p.subCategory &&
+          (groupFilter === "all" || (p.group ?? "") === groupFilter),
+      )
+      .forEach((p) => names.add(p.subCategory!));
+    return [...names].sort();
+  }, [categories, state.products, catFilter, groupFilter]);
 
   const rows = state.products.filter(
     (p) =>
@@ -149,8 +174,11 @@ function Inventory() {
       productVisibleAt(state.settings, p.id, state.currentStoreId) &&
       (showArchived ? p.archived === true : p.archived !== true) &&
       (catFilter === "all" || p.category === catFilter) &&
+      (groupFilter === "all" || (p.group ?? "") === groupFilter) &&
       (subFilter === "all" || (p.subCategory ?? "") === subFilter) &&
-      `${p.name} ${p.sku} ${p.barcode} ${(p.barcodes ?? []).join(" ")} ${p.category} ${p.subCategory ?? ""}`
+      `${p.name} ${p.sku} ${p.barcode} ${(p.barcodes ?? []).join(" ")} ${(p.variants ?? [])
+        .map((v) => `${v.code} ${v.label ?? ""}`)
+        .join(" ")} ${p.category} ${p.group ?? ""} ${p.subCategory ?? ""}`
         .toLowerCase()
         .includes(query.toLowerCase()),
   );
@@ -460,6 +488,7 @@ function Inventory() {
               value={catFilter}
               onChange={(v) => {
                 setCatFilter(v);
+                setGroupFilter("all");
                 setSubFilter("all");
               }}
               ariaLabel="Filter by category"
@@ -467,6 +496,22 @@ function Inventory() {
               options={[
                 { value: "all", label: "All categories" },
                 ...categoryNames.map((c) => ({ value: c, label: c })),
+              ]}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Group</Label>
+            <ThemedSelect
+              value={groupFilter}
+              onChange={(v) => {
+                setGroupFilter(v);
+                setSubFilter("all");
+              }}
+              ariaLabel="Filter by group"
+              className="w-48"
+              options={[
+                { value: "all", label: "All groups" },
+                ...groupNames.map((c) => ({ value: c, label: c })),
               ]}
             />
           </div>
