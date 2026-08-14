@@ -827,7 +827,16 @@ export type BookingRules = {
   comboValue: number;
   /** overriding the locked labour fee needs a supervisor, not just a reason */
   overrideNeedsSupervisor: boolean;
+  /** service & high-tension liability wording shown at intake and printed */
+  serviceTerms: string;
+  /** tension (in the branch unit) above which the job is flagged high-tension */
+  highTensionThreshold: number;
+  /** the customer must tick the liability agreement before a job can be saved */
+  requireLiabilityAccept: boolean;
 };
+
+export const DEFAULT_SERVICE_TERMS =
+  "The company/store shall not be held liable or responsible for any racket frame damage, cracking, or string breakage resulting from customer-requested high-tension stringing (over manufacturer recommended limits), pre-existing structural weakness, or normal wear during stringing.";
 
 export const DEFAULT_BOOKING_RULES: BookingRules = {
   requireDeposit: false,
