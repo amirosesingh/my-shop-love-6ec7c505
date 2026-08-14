@@ -6,7 +6,15 @@
  * route (or the action registry, for admin-created buttons), so a control keeps
  * its handlers, permissions and state wherever it is placed.
  */
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { GridLayout, type Layout } from "react-grid-layout";
 import { createScaledStrategy, noCompactor } from "react-grid-layout/core";
 import "react-grid-layout/css/styles.css";
@@ -126,6 +134,31 @@ export function RegisterWorkspace({
   const [dragging, setDragging] = useState<RegisterModuleId | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const view = useViewportBox();
+  const gridHostRef = useRef<HTMLDivElement | null>(null);
+
+  /**
+   * Container-relative drag math.
+   *
+   * The stock scaled strategy divides the pointer's *viewport* position by the
+   * scale, so a canvas that starts below the header makes every tile jump by
+   * the header's height the moment it is grabbed. Rebasing against the live
+   * `getBoundingClientRect()` of the canvas — and only then dividing by the
+   * scale — keeps the grab point exactly under the cursor at any zoom, scroll
+   * position or window size.
+   */
+  const containerStrategy = useCallback(
+    (scale: number) => ({
+      ...createScaledStrategy(scale),
+      calcDragPosition: (clientX: number, clientY: number, offsetX: number, offsetY: number) => {
+        const rect = gridHostRef.current?.getBoundingClientRect();
+        return {
+          left: (clientX - offsetX - (rect?.left ?? 0)) / scale,
+          top: (clientY - offsetY - (rect?.top ?? 0)) / scale,
+        };
+      },
+    }),
+    [],
+  );
 
   const editing = isAdmin && layout.editing;
   const showCanvas = !!layout.active && (editing || layout.previewing || !!layout.saved);
@@ -228,6 +261,7 @@ export function RegisterWorkspace({
         >
           {canvas && metrics && (
             <div
+              ref={gridHostRef}
               className="origin-top-left"
               style={{
                 width: metrics.baseWidth,
@@ -242,7 +276,7 @@ export function RegisterWorkspace({
                 autoSize={false}
                 layout={boxes}
                 compactor={noCompactor}
-                positionStrategy={createScaledStrategy(metrics.scale)}
+                positionStrategy={containerStrategy(metrics.scale)}
                 gridConfig={{
                   cols: canvas.cols,
                   rowHeight: canvas.rowHeight,

@@ -19,6 +19,27 @@ import {
   syncState,
 } from "./sync-status";
 import { writeSnapshot } from "./offline-snapshot";
+import { recordSync } from "./sync-audit";
+import { mirrorToLocal } from "./sync-audit";
+
+/**
+ * Copy the freshly pulled catalogue into the embedded local database.
+ * Catalogue is server-wins, so a straight overwrite is the correct merge.
+ */
+async function mirrorCloudState(state: unknown) {
+  const source = (state ?? {}) as Record<string, unknown>;
+  const map: Record<string, string> = {
+    products: "products",
+    members: "customers",
+    bookings: "service_jobs",
+  };
+  for (const [key, entity] of Object.entries(map)) {
+    const rows = source[key];
+    if (!Array.isArray(rows) || !rows.length) continue;
+    const written = await mirrorToLocal(entity, rows);
+    if (written) recordSync({ direction: "mirror", entity, records: written, status: "success" });
+  }
+}
 import { loadCloudState } from "./pos-db";
 import { localDb } from "./local-db";
 import { checkHealth } from "./connection-health";
@@ -422,21 +443,29 @@ export async function pullDelta(): Promise<{ merged: number }> {
       const { count, error } = await countChangedSince(table, since);
       if (error) {
         logSync("pull", table, false, error.message);
+        recordSync({ direction: "pull", entity: table, status: "failed", error: error.message });
         continue;
       }
       if (!count) continue;
       changed += count;
       logSync("pull", table, true, `${count} row(s) changed centrally`);
+      recordSync({ direction: "pull", entity: table, records: count, status: "success" });
     }
     // Something moved centrally: refresh the local copy in one consistent read.
     if (changed) {
-      writeSnapshot(await loadCloudState());
+      const state = await loadCloudState();
+      writeSnapshot(state);
+      // Server-wins mirror into the embedded database, so the till can open
+      // its catalogue with no network at all.
+      await mirrorCloudState(state);
       window.dispatchEvent(new CustomEvent("pos:cloud-refreshed"));
     }
     setLastSuccessfulPull(startedAt);
     setSyncState({ lastSyncAt: startedAt });
   } catch (e) {
-    setSyncState({ lastError: e instanceof Error ? e.message : String(e) });
+    const message = e instanceof Error ? e.message : String(e);
+    setSyncState({ lastError: message });
+    recordSync({ direction: "pull", entity: "catalogue", status: "failed", error: message });
   } finally {
     pulling = false;
   }
@@ -482,24 +511,77 @@ export async function pullIntoLocal(): Promise<{ merged: number }> {
 
 let started = false;
 
+/**
+ * One sync at a time, and never on a flapping network.
+ *
+ * `runExclusive` is the mutex: a cycle that is already running absorbs any
+ * request that arrives while it works, so a wobbling connection can't stack
+ * up overlapping pushes. `wake` is debounced by five seconds for the same
+ * reason — an access point that drops and returns three times in a row
+ * produces exactly one catch-up.
+ */
+let cycleRunning = false;
+let cycleQueued = false;
+
+async function runCycle() {
+  await drainOutbox();
+  await pullDelta();
+  await pushLocalPending();
+  await pullIntoLocal();
+  await checkHealth(true);
+}
+
+export async function runExclusive(reason: string = "timer"): Promise<void> {
+  if (cycleRunning) {
+    cycleQueued = true;
+    return;
+  }
+  cycleRunning = true;
+  setSyncState({ phase: "syncing" });
+  try {
+    await runCycle();
+    setSyncState({ phase: isOnline() ? "idle" : "offline" });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    setSyncState({ phase: "idle", lastError: message });
+    recordSync({ direction: "system", entity: reason, status: "failed", error: message });
+  } finally {
+    cycleRunning = false;
+    if (cycleQueued) {
+      cycleQueued = false;
+      void runExclusive("queued");
+    }
+  }
+}
+
+/** True while a sync cycle holds the mutex. */
+export const syncBusy = () => cycleRunning;
+
+const NETWORK_DEBOUNCE_MS = 5000;
+
 /** Start the background sync loop (called once from the app shell). */
 export function startSyncEngine() {
   if (started || typeof window === "undefined") return () => {};
   started = true;
   // Push queued work first, then bring central changes down, then converge the
-  // terminal's own database in both directions.
-  const tick = () =>
-    void drainOutbox()
-      .then(() => pullDelta())
-      .then(() => pushLocalPending())
-      .then(() => pullIntoLocal())
-      .then(() => checkHealth(true));
+  // terminal's own database in both directions — one cycle at a time.
+  const tick = () => void runExclusive("timer");
   const timer = window.setInterval(tick, 15000);
+  let debounce: number | undefined;
+  // Five seconds of quiet before reacting: network flap protection.
   const wake = () => {
-    setSyncState({ phase: "syncing" });
-    tick();
+    if (debounce) window.clearTimeout(debounce);
+    debounce = window.setTimeout(() => {
+      debounce = undefined;
+      if (!isOnline()) return;
+      void runExclusive("network");
+    }, NETWORK_DEBOUNCE_MS);
   };
-  const sleep = () => setSyncState({ phase: "offline" });
+  const sleep = () => {
+    if (debounce) window.clearTimeout(debounce);
+    debounce = undefined;
+    setSyncState({ phase: "offline" });
+  };
   window.addEventListener("online", wake);
   window.addEventListener("offline", sleep);
   // Flipping the switch back to online catches up immediately instead of
@@ -528,6 +610,7 @@ export function startSyncEngine() {
   return () => {
     window.clearInterval(timer);
     window.clearInterval(ping);
+    if (debounce) window.clearTimeout(debounce);
     window.removeEventListener("online", wake);
     window.removeEventListener("offline", sleep);
     offMode();
