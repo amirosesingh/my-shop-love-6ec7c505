@@ -102,10 +102,14 @@ export const rowToProduct = (r: Row): Product => ({
   sku: r.sku ?? r.barcode ?? "",
   barcode: r.barcode ?? "",
   category: r.category ?? "",
+  group: r.product_group ?? undefined,
   subCategory: r.sub_category ?? undefined,
   unit: r.unit ?? undefined,
   packs: Array.isArray(jsonValue(r.packs, [])) ? jsonValue(r.packs, []) : [],
   barcodes: Array.isArray(jsonValue(r.barcode_aliases, [])) ? jsonValue(r.barcode_aliases, []) : [],
+  variants: Array.isArray(jsonValue(r.barcode_variants, []))
+    ? (jsonValue(r.barcode_variants, []) as Product["variants"])
+    : [],
   price: num(r.selling_price),
   cost: num(r.cost_price),
   ecomPrice: r.ecom_price == null ? undefined : num(r.ecom_price),
@@ -166,12 +170,16 @@ export const productToRow = (p: Product): Row => {
   name: p.name,
   sku: p.sku ?? null,
   category: p.category ?? null,
+  product_group: p.group ?? null,
   sub_category: p.subCategory ?? null,
   unit: p.unit ?? null,
   packs: safeArray(p.packs),
   barcode_aliases: safeArray<string>(p.barcodes)
     .map((b) => String(b ?? "").trim())
     .filter(Boolean),
+  barcode_variants: safeArray<{ code?: string; label?: string }>(p.variants)
+    .map((v) => ({ code: String(v?.code ?? "").trim(), label: v?.label?.trim() || undefined }))
+    .filter((v) => v.code),
   cost_price: safeNum(p.cost),
   selling_price: safeNum(p.price),
   ecom_price: safeNumOrNull(p.ecomPrice),
