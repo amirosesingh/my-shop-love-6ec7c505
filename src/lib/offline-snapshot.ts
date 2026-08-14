@@ -12,9 +12,16 @@ const KEY = "pos.offline.snapshot.v1";
 
 const isBrowser = () => typeof window !== "undefined";
 
+/**
+ * Snapshots are a desktop-only convenience backed by the local SQL engine's
+ * host shell. A plain browser build keeps nothing: it reads live or not at all.
+ */
+const canSnapshot = () =>
+  isBrowser() && !!(window as unknown as { pos?: unknown }).pos && !isLiveOnly();
+
 export type Snapshot = CloudSlice & { savedAt: string };
 
-const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
+const arr = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
 
 /** Snapshots written by older builds can be missing whole slices. */
 function normalise(raw: Partial<Snapshot>): Snapshot {
@@ -32,8 +39,8 @@ function normalise(raw: Partial<Snapshot>): Snapshot {
 }
 
 export function writeSnapshot(slice: CloudSlice) {
-  // Android is live-only: nothing about the business is kept on the device.
-  if (!isBrowser() || isLiveOnly()) return;
+  // Android is live-only and the web build is cloud-only: nothing is kept.
+  if (!canSnapshot()) return;
   try {
     window.localStorage.setItem(
       KEY,
@@ -45,7 +52,7 @@ export function writeSnapshot(slice: CloudSlice) {
 }
 
 export function readSnapshot(): Snapshot | null {
-  if (!isBrowser() || isLiveOnly()) return null;
+  if (!canSnapshot()) return null;
   try {
     const raw = window.localStorage.getItem(KEY);
     if (!raw) return null;

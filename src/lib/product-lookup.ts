@@ -7,6 +7,7 @@
  * product.
  */
 import type { Product } from "./pos-types";
+import { dbProxy } from "./db-router";
 
 export const normaliseCode = (code: string) => code.trim().toLowerCase();
 
@@ -51,3 +52,45 @@ export function suggestSimilar(products: Product[], name: string, limit = 5): Pr
     .filter((p) => p.name.toLowerCase().includes(needle) || needle.includes(p.name.toLowerCase()))
     .slice(0, limit);
 }
+
+/**
+ * Ask the database which product owns a code, using the indexed barcode
+ * table. Used when the scanned code is not in the catalogue this till has
+ * loaded — a very large catalogue is never held in memory in full.
+ */
+export async function resolveByBarcodeIndexed(code: string): Promise<string | null> {
+  const needle = code.trim();
+  if (!needle) return null;
+  try {
+    const rows = await dbProxy.query("product_barcodes", {
+      columns: "product_id",
+      match: { barcode: needle },
+      limit: 1,
+    });
+    const hit = rows[0] as { product_id?: string } | undefined;
+    return hit?.product_id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Every barcode row this product should own in the indexed lookup table. */
+export const barcodeRowsFor = (p: Product) =>
+  [
+    { code: p.barcode, label: "Primary", primary: true, pack: 1 },
+    ...(p.barcodes ?? []).map((c) => ({ code: c, label: "Alias", primary: false, pack: 1 })),
+    ...(p.variants ?? []).map((v) => ({
+      code: v.code,
+      label: v.label ?? null,
+      primary: false,
+      pack: 1,
+    })),
+  ]
+    .filter((r) => !!r.code?.trim())
+    .map((r) => ({
+      product_id: p.id,
+      barcode: r.code.trim(),
+      label: r.label,
+      pack_size: r.pack,
+      is_primary: r.primary,
+    }));

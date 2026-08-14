@@ -3,11 +3,10 @@ import { supabaseExternal as supabase } from "@/integrations/supabase/external-c
 import { defaultSettings, sampleState } from "./pos-seed";
 import { drainOutbox, runOpLive } from "./sync-engine";
 import { localDb } from "./local-db";
-import { enqueue, listQueue, persisted, type SyncOp } from "./sync-outbox";
+import { enqueue, type SyncOp } from "./sync-outbox";
 import { isLiveOnly } from "./live-mode";
 import {
   AllTargetsFailed,
-  effectiveDatabaseMode,
   isConnectionError,
   noteConnectionLost,
   noteConnectionRestored,
@@ -603,6 +602,52 @@ const saleItemRows = (s: Sale) =>
     coupon_discount: l.couponDiscount ?? 0,
   }));
 
+/**
+ * One ledger row per tender on the bill, so partial settlements across sales
+ * and bookings can be read from a single place.
+ */
+const salePaymentRows = (s: Sale) => {
+  const tenders =
+    s.payments && s.payments.length
+      ? s.payments.map((p) => ({ method: String(p.method), amount: Number(p.amount) || 0 }))
+      : [{ method: String(s.method), amount: s.paid }];
+  return tenders
+    .filter((t) => t.amount !== 0)
+    .map((t) => ({
+      id: crypto.randomUUID(),
+      source_type: "sale",
+      sale_id: s.id,
+      member_id: s.memberId,
+      store_id: s.storeId,
+      shift_id: s.shiftId,
+      amount: t.amount,
+      method: t.method,
+      kind: s.refunded ? "refund" : "payment",
+      reference: s.receiptNo,
+      cashier_name: s.cashier,
+      note: "",
+      paid_at: s.createdAt,
+    }));
+};
+
+/** One inventory-movement row per sold line, for the unified item history. */
+const saleActivityRows = (s: Sale) =>
+  s.lines
+    .filter((l) => l.productId)
+    .map((l) => ({
+      id: crypto.randomUUID(),
+      product_id: l.productId,
+      product_name: l.name,
+      store_id: s.storeId,
+      activity_type: l.credit ? "return" : "sale",
+      reference: s.receiptNo,
+      quantity_delta: -Math.round(l.qty),
+      unit_cost: l.cost ?? 0,
+      staff_name: s.cashier,
+      note: "",
+      created_at: s.createdAt,
+    }));
+
 /* --------------------------- tier name cache --------------------------- */
 
 let tierIdByName: Record<string, string> = {};
@@ -1109,18 +1154,15 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
     }
   }
 
-  // Browser: queue to disk first (durable), then try to push it up now.
-  // In "Online only" mode the central database is tried first; the queue is
-  // still used the moment that attempt cannot reach the server.
+  // Browser build: there is no local SQL engine on this device, so every
+  // write goes to the central database or the action stops. Nothing about the
+  // business is parked in browser storage.
   const operational = ops.every((op) => isOperationalTable(op.table));
-  // Sales, shifts, drawer logs and stock movements must reach a real database
-  // engine. With no local SQL server on this device that means the central
-  // database — never the browser queue.
-  if (operational) {
+  {
     try {
       for (const op of ops) await runOpLive(context, op);
       noteConnectionRestored();
-      setCloudDirect(true);
+      setCloudDirect(operational);
       return noteCommitTarget("cloud");
     } catch (cloud) {
       if (!isConnectionError(cloud)) throw cloud;
@@ -1128,47 +1170,6 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
       throw new AllTargetsFailed(context, cloud);
     }
   }
-
-  if (effectiveDatabaseMode() === "online") {
-    try {
-      for (const op of ops) await runOpLive(context, op);
-      noteConnectionRestored();
-      setCloudDirect(false);
-      return noteCommitTarget("cloud");
-    } catch (e) {
-      if (!isConnectionError(e)) throw e;
-      noteConnectionLost();
-      /* fall through: store it locally so nothing is lost */
-    }
-  }
-  let ids: string[] = [];
-  try {
-    ids = ops.map((op) => enqueue(context, op).id);
-  } catch {
-    ids = [];
-  }
-  if (!persisted(ids) || !ids.length) {
-    // The on-disk queue would not take it (storage full or unavailable): try
-    // the central database directly before giving up on the action.
-    try {
-      for (const op of ops) await runOpLive(context, op);
-      setCloudDirect(true);
-      return noteCommitTarget("cloud");
-    } catch (cloud) {
-      if (!isConnectionError(cloud)) throw cloud;
-      throw new AllTargetsFailed(context, cloud);
-    }
-  }
-  setCloudDirect(false);
-  try {
-    await drainOutbox();
-  } catch {
-    /* still safely queued on disk */
-  }
-  const remaining = listQueue().filter((q) => ids.includes(q.id));
-  const stuck = remaining.find((q) => q.quarantined);
-  if (stuck) throw new Error(stuck.lastError ?? `${context} failed`);
-  return noteCommitTarget(remaining.length ? "outbox" : "cloud");
 }
 
 /** Human wording for a completed commit. */
@@ -1491,6 +1492,12 @@ export const db = {
       { kind: "insert", table: "sales", rows: [saleToRow(sale)] },
       { kind: "insert", table: "sale_items", rows: saleItemRows(sale) },
     ];
+    const tenders = salePaymentRows(sale);
+    if (tenders.length)
+      ops.push({ kind: "insert", table: "payment_transactions", rows: tenders });
+    const movements = saleActivityRows(sale);
+    if (movements.length)
+      ops.push({ kind: "insert", table: "item_activity_logs", rows: movements });
     if (products.length)
       ops.push({ kind: "upsert", table: "products", rows: products.map(productToRow) });
     if (member) ops.push({ kind: "upsert", table: "members", rows: [memberToRow(member, tierId)] });
