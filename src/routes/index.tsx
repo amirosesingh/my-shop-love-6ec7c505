@@ -259,6 +259,8 @@ function Register() {
   const [notifyWhatsApp, setNotifyWhatsApp] = useState(false);
   /** Itemised racket intake charges: labour, string, grip, add-ons. */
   const [intakeCharges, setIntakeCharges] = useState<IntakeCharge[]>([]);
+  /** Customer accepted the service & high-tension liability terms at intake. */
+  const [liabilityOk, setLiabilityOk] = useState(false);
   /** Customer lookup inside the booking dialog (name or phone). */
   const [bookMemberQuery, setBookMemberQuery] = useState("");
   /** Racket / string sourced from stock, or brought in by the customer. */
