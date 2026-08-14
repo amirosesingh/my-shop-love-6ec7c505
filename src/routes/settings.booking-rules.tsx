@@ -403,8 +403,55 @@ function BookingRulesForm() {
         </Row>
       </Section>
 
+      <Section
+        title="Service terms & high-tension liability"
+        blurb="Shown on the racket intake form and printed on job tags and settlement receipts."
+      >
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">
+            Service terms &amp; high-tension liability disclaimer
+          </Label>
+          <Textarea
+            rows={5}
+            value={rules.serviceTerms}
+            onChange={(e) => patch({ serviceTerms: e.target.value })}
+            placeholder={DEFAULT_SERVICE_TERMS}
+          />
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => patch({ serviceTerms: DEFAULT_SERVICE_TERMS })}
+            >
+              Restore default wording
+            </Button>
+          </div>
+        </div>
+        <Row
+          label="Require the liability agreement at intake"
+          hint="A racket job cannot be saved until the customer has accepted the terms."
+        >
+          <Switch
+            aria-label="Require the liability agreement at intake"
+            checked={rules.requireLiabilityAccept}
+            onCheckedChange={(v) => patch({ requireLiabilityAccept: v })}
+          />
+        </Row>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">
+            High-tension warning above ({rules.defaultTensionUnit})
+          </Label>
+          <Input
+            className="numeric text-right"
+            inputMode="decimal"
+            value={rules.highTensionThreshold || ""}
+            onChange={(e) => patch({ highTensionThreshold: num(e.target.value) })}
+            placeholder="26"
+          />
+        </div>
+      </Section>
+
       <Section title="Control" blurb="Who may undo or re-spec a booking once it exists.">
-        {null}
         <Row
           label="Only supervisors may cancel a booking"
           hint="Cashiers can raise and collect bookings, but not cancel them."
