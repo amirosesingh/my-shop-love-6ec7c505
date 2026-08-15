@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
 import { listDeviceSessions, revokeDeviceSessions } from "@/lib/user-sessions.functions";
+import { isConnectionError } from "@/lib/db-mode";
 
 type Row = {
   id: string;
@@ -25,19 +26,30 @@ function ActiveSessions() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [offline, setOffline] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const accessToken = (await supabase.auth.getSession()).data.session?.access_token ?? "";
-    if (!accessToken) {
-      setError("Sign in with an administrator account to manage terminals.");
-      setLoading(false);
-      return;
+    try {
+      const accessToken = (await supabase.auth.getSession()).data.session?.access_token ?? "";
+      if (!accessToken) {
+        setError("Sign in with an administrator account to manage terminals.");
+        setLoading(false);
+        return;
+      }
+      const res = await listDeviceSessions({ data: { accessToken } });
+      setOffline(false);
+      setError(res.ok ? "" : res.error);
+      setRows((res.sessions ?? []) as Row[]);
+    } catch (e) {
+      // Who is signed in right now can only be answered centrally, so say so
+      // plainly instead of showing a red failure.
+      if (!isConnectionError(e)) throw e;
+      setOffline(true);
+      setError("");
+      setRows([]);
     }
-    const res = await listDeviceSessions({ data: { accessToken } });
-    setError(res.ok ? "" : res.error);
-    setRows((res.sessions ?? []) as Row[]);
     setLoading(false);
   }, []);
 
@@ -61,6 +73,13 @@ function ActiveSessions() {
   };
 
   if (loading) return <p className="text-sm text-muted-foreground">Loading sessions…</p>;
+  if (offline)
+    return (
+      <p className="text-sm text-muted-foreground">
+        Connection is down. Signed-in terminals are only known centrally, so this list and
+        remote reset return as soon as the line is back.
+      </p>
+    );
   if (error) return <p className="text-sm text-destructive">{error}</p>;
   if (!rows.length)
     return <p className="text-sm text-muted-foreground">Nobody is signed in right now.</p>;
