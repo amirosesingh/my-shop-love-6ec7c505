@@ -1115,10 +1115,17 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
   const { hydrateTerminalConfig } = await import("./terminal-tokens");
   await hydrateTerminalConfig();
 
+  // Stock never travels centrally as an absolute figure: the movement rows go
+  // up and the central database applies each one as a relative change, keyed
+  // on the movement id so a retry can never deduct twice. The terminal copy
+  // still receives the full row, so the till shows the new count at once.
+  const { ops: cloudOps, deltas } = withRelativeStock(ops);
+
   // Android / live-only: the backend is the single source of truth.
   if (isLiveOnly()) {
     try {
-      for (const op of ops) await runOpLive(context, op);
+      for (const op of cloudOps) await runOpLive(context, op);
+      await applyStockDeltas(deltas);
     } catch (e) {
       if (isConnectionError(e)) throw new AllTargetsFailed(context, e);
       throw e;
@@ -1132,7 +1139,8 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
     // Desktop is always cloud first. Local SQL is a durable fallback only for
     // connection-class cloud failures; validation and permission errors remain visible.
     try {
-      for (const op of ops) await runOpLive(context, op);
+      for (const op of cloudOps) await runOpLive(context, op);
+      await applyStockDeltas(deltas);
       noteConnectionRestored();
       setCloudDirect(false);
       void mirrorToLocal(context, ops);
@@ -1160,7 +1168,8 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
   const operational = ops.every((op) => isOperationalTable(op.table));
   {
     try {
-      for (const op of ops) await runOpLive(context, op);
+      for (const op of cloudOps) await runOpLive(context, op);
+      await applyStockDeltas(deltas);
       noteConnectionRestored();
       setCloudDirect(operational);
       return noteCommitTarget("cloud");
