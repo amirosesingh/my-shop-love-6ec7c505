@@ -83,6 +83,11 @@ function init({ url, key, accessToken, sessionToken, cashierToken, terminalToken
     global: accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : undefined,
   });
   credentials = { accessToken, sessionToken, cashierToken, terminalToken, branchId };
+  // Watermarks are per branch and per till, so one machine moved between
+  // branches never resumes another branch's position.
+  if (typeof repo.setScope === "function") {
+    repo.setScope({ storeId: branchId, terminalId: credentials.terminalToken ?? "" });
+  }
   relayUrl = relay || null;
   if (onChange) notify = onChange;
 }
