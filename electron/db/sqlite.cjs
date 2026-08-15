@@ -492,8 +492,12 @@ function setState(key, value) {
 function getWatermark(table) {
   if (!ready()) return null;
   return (
-    db.prepare(`SELECT last_synced_at FROM sync_metadata WHERE table_name = ?`).get(table)
-      ?.last_synced_at ?? null
+    db
+      .prepare(
+        `SELECT last_synced_at FROM sync_metadata
+           WHERE table_name = ? AND store_id = ? AND terminal_id = ?`,
+      )
+      .get(table, scope.storeId, scope.terminalId)?.last_synced_at ?? null
   );
 }
 
@@ -502,9 +506,10 @@ function setWatermark(table, isoAt, { rowsPushed = 0, error = null, pushed = fal
   tx(() =>
     db
       .prepare(
-        `INSERT INTO sync_metadata (table_name, last_synced_at, last_pushed_at, rows_pushed, last_error, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?)
-         ON CONFLICT(table_name) DO UPDATE SET
+        `INSERT INTO sync_metadata
+           (table_name, store_id, terminal_id, last_synced_at, last_pushed_at, rows_pushed, last_error, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(table_name, store_id, terminal_id) DO UPDATE SET
            last_synced_at = COALESCE(excluded.last_synced_at, sync_metadata.last_synced_at),
            last_pushed_at = COALESCE(excluded.last_pushed_at, sync_metadata.last_pushed_at),
            rows_pushed = sync_metadata.rows_pushed + excluded.rows_pushed,
@@ -513,6 +518,8 @@ function setWatermark(table, isoAt, { rowsPushed = 0, error = null, pushed = fal
       )
       .run(
         table,
+        scope.storeId,
+        scope.terminalId,
         isoAt ?? null,
         pushed ? new Date().toISOString() : null,
         rowsPushed,
@@ -548,13 +555,18 @@ function info() {
 
 module.exports = {
   MIRROR_ENTITIES,
+  MAX_ATTEMPTS,
   init,
   info,
+  setScope,
   mirror,
   listMirror,
   counts,
   enqueue,
   pending,
+  deadLetters,
+  retryDeadLetters,
+  discardDeadLetters,
   pendingCounts,
   markOutbox,
   logAudit,
