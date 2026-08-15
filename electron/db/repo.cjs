@@ -172,6 +172,13 @@ async function upsertRow(tx, table, row, { markPending = true } = {}) {
     .map((c) => `t.[${c}] = s.[${c}]`)
     .concat("t.[updated_at] = SYSUTCDATETIME()")
     .concat(markPending ? ["t.[is_synced] = 0", "t.[sync_status] = N'pending'"] : [])
+    .concat(
+      // A local edit always advances the version so the cloud copy cannot
+      // silently win the next pull.
+      markPending && known.has("row_version")
+        ? ["t.[row_version] = ISNULL(t.[row_version], 0) + 1"]
+        : [],
+    )
     .join(", ");
 
   const insertCols = columns.map((c) => `[${c}]`).join(", ");
