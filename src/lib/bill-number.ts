@@ -12,6 +12,7 @@
  */
 import { isElectron, isNative } from "./native";
 import { readTerminalConfig } from "./terminal-tokens";
+import { readLocalSetting, writeLocalSetting } from "./local-db";
 
 export type Platform = "PC" | "MB" | "WB";
 
@@ -109,7 +110,36 @@ const writeSeq = (value: SeqStore) => {
   } catch {
     /* storage unavailable — the number still comes out, just unseeded */
   }
+  // The branch database is the durable home for the counter: browser storage
+  // can be cleared, the till database cannot.
+  void writeLocalSetting(SEQ_KEY, JSON.stringify(value));
 };
+
+/**
+ * Restores the running counter from the branch database at start-up, so a
+ * cleared browser profile or a reinstall never restarts numbering.
+ * Safe to call when there is no local database — it simply does nothing.
+ */
+export async function hydrateBillSequence(): Promise<void> {
+  if (typeof window === "undefined") return;
+  const raw = await readLocalSetting(SEQ_KEY);
+  if (!raw) {
+    const local = readSeq();
+    if (local) void writeLocalSetting(SEQ_KEY, JSON.stringify(local));
+    return;
+  }
+  try {
+    const stored = JSON.parse(raw) as SeqStore;
+    if (!stored || typeof stored.next !== "number") return;
+    const local = readSeq();
+    // Whichever source is further ahead wins; the counter never goes backwards.
+    if (!local || local.prefix !== stored.prefix || local.next < stored.next) {
+      window.localStorage.setItem(SEQ_KEY, JSON.stringify(stored));
+    }
+  } catch {
+    /* unreadable value — keep whatever the device already has */
+  }
+}
 
 /**
  * Highest sequence already used today by this device, read from bills the app
