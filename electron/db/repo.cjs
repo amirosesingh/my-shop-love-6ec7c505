@@ -47,6 +47,22 @@ const CATALOGUE_TABLES = [
   "suppliers",
 ];
 
+/**
+ * Operational data this branch also needs to see from elsewhere.
+ *
+ * Members are shared across the whole business: someone who signs up at one
+ * shop must earn points at the next. Transfers and bookings are pulled only
+ * where this branch is involved, so a till never downloads another shop's
+ * work — and so a transfer sent here can be received with no connection.
+ */
+const SCOPED_PULL_TABLES = [
+  { table: "members" },
+  { table: "stock_transfers", storeColumns: ["from_store_id", "to_store_id"] },
+  { table: "stock_transfer_items", parent: { table: "stock_transfers", column: "transfer_id" } },
+  { table: "bookings", storeColumns: ["store_id"] },
+  { table: "booking_payments", parent: { table: "bookings", column: "booking_id" } },
+];
+
 /** Branch and till this install acts as; scopes the sync watermarks. */
 let scope = { storeId: "", terminalId: "" };
 
@@ -353,6 +369,21 @@ async function retryRow(table, id) {
  * Row-level view behind the sync status table: everything not yet confirmed by
  * the cloud, failures first so a red badge is never buried.
  */
+/**
+ * Drops a change that can never succeed. The row stays in the local database
+ * for the record, but the queue stops trying to send it.
+ */
+async function discardRow(table, id) {
+  assertTable(table);
+  const request = getPool().request();
+  bind(request, "id", id);
+  await request.query(
+    `UPDATE dbo.[${table}]
+        SET is_synced = 1, sync_status = N'discarded', synced_at = SYSUTCDATETIME()
+      WHERE id = @id;`,
+  );
+}
+
 async function queueRows(limit = 100) {
   const rows = [];
   for (const table of TABLES) {
@@ -677,6 +708,7 @@ function toCloudRow(table, row) {
 module.exports = {
   TABLES,
   CATALOGUE_TABLES,
+  SCOPED_PULL_TABLES,
   PRUNABLE_TABLES,
   SETTINGS_ID,
   setScope,
@@ -692,6 +724,7 @@ module.exports = {
   markFailed,
   retryErrored,
   retryRow,
+  discardRow,
   queueRows,
   mergeFromCloud,
   stats,

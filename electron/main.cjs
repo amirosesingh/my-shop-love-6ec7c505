@@ -883,6 +883,16 @@ function registerIpc() {
     }
   });
 
+  ipcMain.handle("pos:discard-row", async (_e, table, id) => {
+    try {
+      await repo.discardRow(String(table), id);
+      broadcastStatus(await statusPayload());
+      return { ok: true };
+    } catch (err) {
+      return fail(err);
+    }
+  });
+
   ipcMain.handle("pos:backup", async (_e, target) => {
     try {
       const config = pool.getConfig();

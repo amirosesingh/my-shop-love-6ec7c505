@@ -37,6 +37,7 @@ import {
   type SyncAuditRow,
 } from "@/lib/sync-audit";
 import { discardOp, queueView, retryOp, type QueueView } from "@/lib/sync-outbox";
+import { localDb, type SyncQueueRow } from "@/lib/local-db";
 import {
   dismissConflict,
   listConflicts,
@@ -60,6 +61,7 @@ export function SyncHub() {
   const [rows, setRows] = useState<SyncAuditRow[]>([]);
   const [engine, setEngine] = useState<LocalEngineInfo | null>(null);
   const [queue, setQueue] = useState<QueueView[]>([]);
+  const [localQueue, setLocalQueue] = useState<SyncQueueRow[]>([]);
   const [conflicts, setConflicts] = useState<SyncConflict[]>([]);
   const [busy, setBusy] = useState<"push" | "pull" | "cycle" | null>(null);
   const [progress, setProgress] = useState(0);
@@ -70,6 +72,21 @@ export function SyncHub() {
     setRows(await listSyncAudit(200));
     setEngine(await localEngineInfo());
     setQueue(queueView());
+    // Desktop tills keep their own queue in the branch database; parked rows
+    // there belong in the same list as browser-queued ones.
+    const bridge = localDb();
+    if (bridge?.status) {
+      try {
+        const st = await bridge.status();
+        setLocalQueue(
+          (st.queue ?? []).filter((r) => r.status === "error" || r.status === "quarantined"),
+        );
+      } catch {
+        setLocalQueue([]);
+      }
+    } else {
+      setLocalQueue([]);
+    }
     setConflicts(listConflicts());
   }, []);
 
@@ -97,7 +114,9 @@ export function SyncHub() {
     try {
       await fn();
       setProgress(100);
-      toast.success(kind === "pull" ? "Pull finished" : kind === "push" ? "Push finished" : "Sync finished");
+      toast.success(
+        kind === "pull" ? "Pull finished" : kind === "push" ? "Push finished" : "Sync finished",
+      );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Sync failed");
     } finally {
@@ -208,7 +227,11 @@ export function SyncHub() {
               disabled={!!busy}
               onClick={() => void run("push", () => drainOutbox())}
             >
-              {busy === "push" ? <Loader2 className="size-4 animate-spin" /> : <CloudUpload className="size-4" />}
+              {busy === "push" ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <CloudUpload className="size-4" />
+              )}
               Force push
             </Button>
             <Button
@@ -217,7 +240,11 @@ export function SyncHub() {
               disabled={!!busy}
               onClick={() => void run("pull", () => pullDelta())}
             >
-              {busy === "pull" ? <Loader2 className="size-4 animate-spin" /> : <CloudDownload className="size-4" />}
+              {busy === "pull" ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <CloudDownload className="size-4" />
+              )}
               Force pull
             </Button>
             <Button
@@ -225,7 +252,11 @@ export function SyncHub() {
               disabled={!!busy}
               onClick={() => void run("cycle", () => runExclusive("manual"))}
             >
-              {busy === "cycle" ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+              {busy === "cycle" ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <RefreshCw className="size-4" />
+              )}
               Full sync cycle
             </Button>
           </div>
@@ -249,9 +280,8 @@ export function SyncHub() {
           </CardHeader>
           <CardContent className="space-y-2">
             <p className="text-xs text-muted-foreground">
-              Someone else changed these records while this till was working from an older copy.
-              The central version was kept — check it and make the change again if it is still
-              needed.
+              Someone else changed these records while this till was working from an older copy. The
+              central version was kept — check it and make the change again if it is still needed.
             </p>
             {conflicts.map((c) => (
               <div
@@ -279,12 +309,47 @@ export function SyncHub() {
         </Card>
       )}
 
-      {failedQueue.length > 0 && (
+      {(failedQueue.length > 0 || localQueue.length > 0) && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Changes needing attention</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
+            {localQueue.map((r) => (
+              <div
+                key={`local-${r.table}-${r.id}`}
+                className="flex flex-wrap items-center gap-2 rounded-md border border-border p-2 text-xs"
+              >
+                <span className="font-medium">This till</span>
+                <span className="text-muted-foreground">{r.table}</span>
+                <span className="text-destructive">{r.error ?? r.status}</span>
+                <div className="ml-auto flex gap-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      await localDb()?.retryRow?.(r.table, r.id);
+                      await refresh();
+                    }}
+                  >
+                    <RotateCcw className="size-3.5" /> Retry
+                  </Button>
+                  {isAdmin && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={async () => {
+                        const res = await localDb()?.discardRow?.(r.table, r.id);
+                        if (res && !res.ok) toast.error(res.error ?? "Could not discard");
+                        await refresh();
+                      }}
+                    >
+                      Discard
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
             {failedQueue.map((q) => (
               <div
                 key={q.id}
