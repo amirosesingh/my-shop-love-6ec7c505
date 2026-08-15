@@ -45,6 +45,8 @@ async function mirrorCloudState(state: unknown) {
 import { loadCloudState } from "./pos-db";
 import { localDb } from "./local-db";
 import { checkHealth } from "./connection-health";
+import { noteVersions } from "./row-versions";
+import { recordConflict } from "./sync-conflicts";
 import {
   failOp,
   refuseOp,
