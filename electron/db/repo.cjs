@@ -181,7 +181,17 @@ async function upsertRow(tx, table, row, { markPending = true } = {}) {
   await request.query(`
     MERGE dbo.[${table}] WITH (HOLDLOCK) AS t
     USING (SELECT ${source}) AS s ON t.[id] = s.[id]
-    WHEN MATCHED ${markPending ? "" : "AND t.[is_synced] = 1 "}THEN UPDATE SET ${setList}
+    WHEN MATCHED ${
+      markPending
+        ? ""
+        : // Server copy wins only when it is genuinely newer, and never over a
+          // local change that has not reached the cloud yet.
+          `AND t.[is_synced] = 1 ${
+            columns.includes("row_version")
+              ? "AND ISNULL(s.[row_version], 0) >= ISNULL(t.[row_version], 0) "
+              : ""
+          }`
+    }THEN UPDATE SET ${setList}
     WHEN NOT MATCHED THEN INSERT (${insertCols}, [is_synced], [sync_status])
       VALUES (${insertVals}, ${markPending ? 0 : 1}, ${markPending ? "N'pending'" : "N'synced'"});
   `);
