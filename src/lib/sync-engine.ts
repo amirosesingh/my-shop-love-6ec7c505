@@ -214,6 +214,7 @@ async function execute(op: SyncOp): Promise<QueryResult> {
 
 /** Codes the relay uses when a change is refused on principle. */
 const REFUSAL_CODES = new Set([
+
   "STORE_FORBIDDEN",
   "PERMISSION_DENIED",
   "SCOPE_MISSING",
