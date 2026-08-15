@@ -296,6 +296,39 @@ function setState(key, value) {
 }
 
 /** Wipes the local database file. Only reachable from an admin reset. */
+function getWatermark(table) {
+  if (!ready()) return null;
+  return (
+    db.prepare(`SELECT last_synced_at FROM sync_metadata WHERE table_name = ?`).get(table)
+      ?.last_synced_at ?? null
+  );
+}
+
+function setWatermark(table, isoAt, { rowsPushed = 0, error = null, pushed = false } = {}) {
+  if (!ready()) return;
+  tx(() =>
+    db
+      .prepare(
+        `INSERT INTO sync_metadata (table_name, last_synced_at, last_pushed_at, rows_pushed, last_error, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(table_name) DO UPDATE SET
+           last_synced_at = COALESCE(excluded.last_synced_at, sync_metadata.last_synced_at),
+           last_pushed_at = COALESCE(excluded.last_pushed_at, sync_metadata.last_pushed_at),
+           rows_pushed = sync_metadata.rows_pushed + excluded.rows_pushed,
+           last_error = excluded.last_error,
+           updated_at = excluded.updated_at`,
+      )
+      .run(
+        table,
+        isoAt ?? null,
+        pushed ? new Date().toISOString() : null,
+        rowsPushed,
+        error ? String(error).slice(0, 3000) : null,
+        new Date().toISOString(),
+      ),
+  );
+}
+
 function erase() {
   try {
     if (db) {
@@ -337,5 +370,7 @@ module.exports = {
   rollbackOp,
   getState,
   setState,
+  getWatermark,
+  setWatermark,
   erase,
 };

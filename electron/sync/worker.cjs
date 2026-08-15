@@ -9,7 +9,7 @@
 const { createClient } = require("@supabase/supabase-js");
 const repo = require("../db/repo.cjs");
 
-const BATCH = 200;
+const BATCH = 50;
 const INTERVAL_MS = 30_000;
 const MAX_ATTEMPTS = 5;
 
@@ -43,6 +43,38 @@ async function selectChangedSince(table, since) {
   res = await ask("created_at");
   if (!res.error) stampColumn.set(table, "created_at");
   return res;
+}
+
+/**
+ * Stock never travels as an absolute figure. A till pushes its movement rows
+ * and the central database applies each one as a relative delta, keyed on the
+ * movement id so a retry can never deduct twice.
+ */
+const STOCK_OWNED_COLUMNS = ["stock_by_store", "stock_quantity"];
+
+function stripAbsoluteStock(table, rows) {
+  if (table !== "products") return rows;
+  return rows.map((row) => {
+    const copy = { ...row };
+    for (const column of STOCK_OWNED_COLUMNS) delete copy[column];
+    return copy;
+  });
+}
+
+async function applyStockDeltas(rows) {
+  let failure = null;
+  for (const row of rows) {
+    const delta = Number(row.quantity_delta ?? 0);
+    if (!row.id || !row.product_id || !delta) continue;
+    const { error } = await supabase.rpc("stock_apply_delta", {
+      _movement_id: row.id,
+      _product_id: row.product_id,
+      _store_id: row.store_id ?? credentials.branchId ?? null,
+      _delta: Math.trunc(delta),
+    });
+    if (error) failure = error.message;
+  }
+  return failure;
 }
 
 function init({ url, key, accessToken, sessionToken, cashierToken, terminalToken, branchId, relayUrl: relay, onChange }) {
@@ -120,7 +152,10 @@ async function push() {
     if (!rows.length) continue;
 
     const ids = rows.map((r) => r.id);
-    const payload = rows.map((r) => repo.toCloudRow(table, r));
+    const payload = stripAbsoluteStock(
+      table,
+      rows.map((r) => repo.toCloudRow(table, r)),
+    );
     let error = null;
     try {
       await cloudUpsert(table, payload);
@@ -138,13 +173,23 @@ async function push() {
         if (n >= MAX_ATTEMPTS) quarantine = true;
       }
       await repo.markFailed(table, ids, error.message, quarantine);
+      await repo
+        .setWatermark(table, null, { error: error.message })
+        .catch(() => {});
       notify();
       continue;
     }
 
+    // Inventory moves only after the movement rows themselves are up.
+    let deltaError = null;
+    if (table === "item_activity_logs") deltaError = await applyStockDeltas(payload);
+
     await repo.markSynced(table, ids);
     for (const id of ids) attempts.delete(`${table}:${id}`);
     pushed += ids.length;
+    await repo
+      .setWatermark(table, null, { rowsPushed: ids.length, pushed: true, error: deltaError })
+      .catch(() => {});
     notify();
   }
   if (pushed) await repo.setState("last_push_at", new Date().toISOString());
@@ -155,16 +200,27 @@ async function push() {
 async function pull() {
   if (!supabase) return { ok: false, merged: 0, error: "Cloud client not ready" };
   setPhase("pulling");
-  const since = (await repo.getState("last_pull_at")) ?? "1970-01-01T00:00:00.000Z";
+  const fallback = (await repo.getState("last_pull_at")) ?? "1970-01-01T00:00:00.000Z";
   let merged = 0;
   for (const table of repo.CATALOGUE_TABLES) {
+    // Per-table high-water mark: one slow table never holds the others back.
+    let since = fallback;
+    try {
+      since = (await repo.getWatermark(table)) ?? fallback;
+    } catch {
+      /* pre-1.3.3 database without sync_metadata */
+    }
+    const startedAt = new Date().toISOString();
     // Delta only: anything the cloud has touched since our last clean pull.
     const { data, error } = await selectChangedSince(table, since);
     if (error) {
+      await repo.setWatermark(table, null, { error: error.message }).catch(() => {});
       setPhase("idle");
       return { ok: false, merged, error: error.message };
     }
     merged += await repo.mergeFromCloud(table, data ?? []);
+    // Watermark advances only after a clean merge.
+    await repo.setWatermark(table, startedAt, { error: null }).catch(() => {});
   }
   // Settings is a single wide row; fetch it whole.
   const { data: settings } = await supabase.from("pos_settings").select("*").maybeSingle();

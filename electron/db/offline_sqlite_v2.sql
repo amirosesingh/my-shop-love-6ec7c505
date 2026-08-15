@@ -269,3 +269,14 @@ CREATE TABLE IF NOT EXISTS outbox (
   attempts   INTEGER NOT NULL DEFAULT 0,
   error      TEXT
 );
+
+-- Per-table high-water marks. The puller resumes from last_synced_at, so one
+-- slow table never holds the others back.
+CREATE TABLE IF NOT EXISTS sync_metadata (
+  table_name     TEXT PRIMARY KEY,
+  last_synced_at TEXT,
+  last_pushed_at TEXT,
+  rows_pushed    INTEGER NOT NULL DEFAULT 0,
+  last_error     TEXT,
+  updated_at     TEXT
+);

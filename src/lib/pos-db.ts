@@ -1101,6 +1101,66 @@ export async function mirrorToLocal(context: string, ops: SyncOp[]) {
   }
 }
 
+/** One relative stock change, keyed on the movement row that caused it. */
+type StockDelta = { movementId: string; productId: string; storeId: string | null; delta: number };
+
+/**
+ * Split absolute stock out of a batch. When the batch carries stock movement
+ * rows, the products upsert loses its stock columns and the movements become
+ * relative deltas for the central database to apply.
+ */
+function withRelativeStock(ops: SyncOp[]): { ops: SyncOp[]; deltas: StockDelta[] } {
+  const movements = ops.flatMap((op) =>
+    op.kind === "insert" && op.table === "item_activity_logs" ? (op.rows as Row[]) : [],
+  );
+  if (!movements.length) return { ops, deltas: [] };
+
+  const deltas: StockDelta[] = movements
+    .filter((m) => m["product_id"] && Number(m["quantity_delta"] ?? 0) !== 0)
+    .map((m) => ({
+      movementId: String(m["id"]),
+      productId: String(m["product_id"]),
+      storeId: (m["store_id"] as string | null) ?? null,
+      delta: Number(m["quantity_delta"] ?? 0),
+    }));
+  if (!deltas.length) return { ops, deltas: [] };
+
+  const next = ops.map((op) => {
+    if (op.table !== "products" || (op.kind !== "upsert" && op.kind !== "insert")) return op;
+    const rows = (op.rows as Row[]).map((row) => {
+      const { stock_quantity: _q, stock_by_store: _s, ...rest } = row;
+      return rest as Row;
+    });
+    return { ...op, rows };
+  });
+  return { ops: next, deltas };
+}
+
+/**
+ * Ask the central database to apply each movement once. Failures are logged,
+ * not thrown: the movement row is already stored, so the figure can be
+ * reconciled without failing a completed sale.
+ */
+async function applyStockDeltas(deltas: StockDelta[]) {
+  for (const d of deltas) {
+    try {
+      const { error } = await (
+        supabase as unknown as {
+          rpc: (fn: string, args: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
+        }
+      ).rpc("stock_apply_delta", {
+        _movement_id: d.movementId,
+        _product_id: d.productId,
+        _store_id: d.storeId,
+        _delta: d.delta,
+      });
+      if (error) logSync("push", "products", false, `Stock delta: ${error.message}`);
+    } catch (e) {
+      logSync("push", "products", false, `Stock delta: ${(e as Error)?.message ?? String(e)}`);
+    }
+  }
+}
+
 /**
  * Store a group of writes and only resolve once they are safe somewhere:
  * the cloud database, the local desktop database, or the on-disk outbox.
@@ -1115,10 +1175,17 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
   const { hydrateTerminalConfig } = await import("./terminal-tokens");
   await hydrateTerminalConfig();
 
+  // Stock never travels centrally as an absolute figure: the movement rows go
+  // up and the central database applies each one as a relative change, keyed
+  // on the movement id so a retry can never deduct twice. The terminal copy
+  // still receives the full row, so the till shows the new count at once.
+  const { ops: cloudOps, deltas } = withRelativeStock(ops);
+
   // Android / live-only: the backend is the single source of truth.
   if (isLiveOnly()) {
     try {
-      for (const op of ops) await runOpLive(context, op);
+      for (const op of cloudOps) await runOpLive(context, op);
+      await applyStockDeltas(deltas);
     } catch (e) {
       if (isConnectionError(e)) throw new AllTargetsFailed(context, e);
       throw e;
@@ -1132,7 +1199,8 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
     // Desktop is always cloud first. Local SQL is a durable fallback only for
     // connection-class cloud failures; validation and permission errors remain visible.
     try {
-      for (const op of ops) await runOpLive(context, op);
+      for (const op of cloudOps) await runOpLive(context, op);
+      await applyStockDeltas(deltas);
       noteConnectionRestored();
       setCloudDirect(false);
       void mirrorToLocal(context, ops);
@@ -1160,7 +1228,8 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
   const operational = ops.every((op) => isOperationalTable(op.table));
   {
     try {
-      for (const op of ops) await runOpLive(context, op);
+      for (const op of cloudOps) await runOpLive(context, op);
+      await applyStockDeltas(deltas);
       noteConnectionRestored();
       setCloudDirect(operational);
       return noteCommitTarget("cloud");

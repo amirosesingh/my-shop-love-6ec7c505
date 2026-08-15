@@ -1230,6 +1230,7 @@ export type Database = {
           point_multiplier: number
           product_group: string | null
           reorder_level: number
+          row_version: number
           selling_price: number
           sku: string | null
           stock_by_store: Json
@@ -1259,6 +1260,7 @@ export type Database = {
           point_multiplier?: number
           product_group?: string | null
           reorder_level?: number
+          row_version?: number
           selling_price?: number
           sku?: string | null
           stock_by_store?: Json
@@ -1288,6 +1290,7 @@ export type Database = {
           point_multiplier?: number
           product_group?: string | null
           reorder_level?: number
+          row_version?: number
           selling_price?: number
           sku?: string | null
           stock_by_store?: Json
@@ -2072,6 +2075,30 @@ export type Database = {
           },
         ]
       }
+      stock_delta_applied: {
+        Row: {
+          applied_at: string
+          delta: number
+          movement_id: string
+          product_id: string | null
+          store_id: string | null
+        }
+        Insert: {
+          applied_at?: string
+          delta?: number
+          movement_id: string
+          product_id?: string | null
+          store_id?: string | null
+        }
+        Update: {
+          applied_at?: string
+          delta?: number
+          movement_id?: string
+          product_id?: string | null
+          store_id?: string | null
+        }
+        Relationships: []
+      }
       stock_transfer_items: {
         Row: {
           barcode: string | null
@@ -2266,6 +2293,45 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           tax_number?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      sync_metadata: {
+        Row: {
+          created_at: string
+          id: string
+          last_error: string | null
+          last_pushed_at: string | null
+          last_synced_at: string | null
+          rows_pushed: number
+          store_id: string | null
+          table_name: string
+          terminal_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          last_pushed_at?: string | null
+          last_synced_at?: string | null
+          rows_pushed?: number
+          store_id?: string | null
+          table_name: string
+          terminal_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          last_pushed_at?: string | null
+          last_synced_at?: string | null
+          rows_pushed?: number
+          store_id?: string | null
+          table_name?: string
+          terminal_id?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -2839,6 +2905,15 @@ export type Database = {
           _slug: string
         }
         Returns: undefined
+      }
+      stock_apply_delta: {
+        Args: {
+          _delta: number
+          _movement_id: string
+          _product_id: string
+          _store_id: string
+        }
+        Returns: number
       }
       stock_transfer_receive: {
         Args: {

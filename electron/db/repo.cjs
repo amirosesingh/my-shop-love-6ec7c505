@@ -272,7 +272,9 @@ async function markFailed(table, ids, message, quarantine) {
   ids.forEach((id, i) => bind(request, `id${i}`, id));
   await request.query(`
     UPDATE dbo.[${table}]
-       SET sync_status = @status, sync_error = @msg
+       SET sync_status = @status, sync_error = @msg,
+           sync_attempts = ISNULL(sync_attempts, 0) + 1,
+           last_error_at = SYSUTCDATETIME()
      WHERE id IN (${ids.map((_, i) => `@id${i}`).join(", ")});
     MERGE dbo.sync_state AS t
     USING (SELECT N'last_error' AS [key], @msg AS [value]) AS s ON t.[key] = s.[key]
@@ -286,7 +288,8 @@ async function retryErrored() {
     await getPool()
       .request()
       .query(
-        `UPDATE dbo.[${table}] SET sync_status = N'pending', sync_error = NULL
+        `UPDATE dbo.[${table}] SET sync_status = N'pending', sync_error = NULL,
+                sync_attempts = 0, last_error_at = NULL
           WHERE is_synced = 0 AND sync_status IN (N'error', N'quarantined');`,
       );
   }
@@ -391,6 +394,42 @@ async function getState(key) {
     .input("key", sql.NVarChar(60), key)
     .query("SELECT [value] FROM dbo.sync_state WHERE [key] = @key;");
   return res.recordset[0]?.value ?? null;
+}
+
+/**
+ * Per-table high-water marks. The puller resumes each table from its own
+ * `last_synced_at`, so one slow table never holds the others back.
+ */
+async function getWatermark(table) {
+  const res = await getPool()
+    .request()
+    .input("t", sql.NVarChar(120), table)
+    .query("SELECT last_synced_at FROM dbo.sync_metadata WHERE table_name = @t;");
+  const at = res.recordset[0]?.last_synced_at ?? null;
+  return at ? new Date(at).toISOString() : null;
+}
+
+async function setWatermark(table, isoAt, { rowsPushed = 0, error = null, pushed = false } = {}) {
+  await getPool()
+    .request()
+    .input("t", sql.NVarChar(120), table)
+    .input("at", sql.DateTime2, isoAt ? new Date(isoAt) : null)
+    .input("rows", sql.Int, rowsPushed)
+    .input("pushed", sql.Bit, pushed ? 1 : 0)
+    .input("err", sql.NVarChar(sql.MAX), error ? String(error).slice(0, 3000) : null)
+    .query(`
+      MERGE dbo.sync_metadata AS t
+      USING (SELECT @t AS table_name) AS s ON t.table_name = s.table_name
+      WHEN MATCHED THEN UPDATE SET
+        t.last_synced_at = ISNULL(@at, t.last_synced_at),
+        t.last_pushed_at = CASE WHEN @pushed = 1 THEN SYSUTCDATETIME() ELSE t.last_pushed_at END,
+        t.rows_pushed = t.rows_pushed + @rows,
+        t.last_error = @err,
+        t.updated_at = SYSUTCDATETIME()
+      WHEN NOT MATCHED THEN
+        INSERT (table_name, last_synced_at, last_pushed_at, rows_pushed, last_error)
+        VALUES (@t, @at, CASE WHEN @pushed = 1 THEN SYSUTCDATETIME() ELSE NULL END, @rows, @err);
+    `);
 }
 
 async function setState(key, value) {
@@ -559,7 +598,19 @@ async function housekeep({ retentionDays = 90 } = {}) {
 
 /** Strips local-only bookkeeping before a row is sent to the cloud. */
 function toCloudRow(table, row) {
-  const { is_synced: _s, sync_status: _st, ...rest } = row;
+  // Local-only bookkeeping never leaves the till.
+  const {
+    is_synced: _s,
+    sync_status: _st,
+    synced_at: _sa,
+    sync_error: _se,
+    sync_attempts: _at,
+    last_error_at: _le,
+    pending_sync: _ps,
+    temp_id: _ti,
+    row_version: _rv,
+    ...rest
+  } = row;
   if (table === "pos_settings") {
     const payload = typeof rest.payload === "string" ? JSON.parse(rest.payload) : rest.payload;
     return { id: 1, ...payload };
@@ -589,6 +640,8 @@ module.exports = {
   stats,
   getState,
   setState,
+  getWatermark,
+  setWatermark,
   getSetting,
   setSetting,
   toCloudRow,
