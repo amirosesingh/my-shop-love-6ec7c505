@@ -31,7 +31,27 @@ const TABLES = [
 ];
 
 /** Cloud is authoritative for these; they are the only tables ever pulled. */
-const CATALOGUE_TABLES = ["stores", "membership_tiers", "products", "promotions", "suppliers"];
+const CATALOGUE_TABLES = [
+  "stores",
+  "membership_tiers",
+  "products",
+  "product_barcodes",
+  "product_categories",
+  "uom_units",
+  "promotions",
+  "suppliers",
+];
+
+/** Branch and till this install acts as; scopes the sync watermarks. */
+let scope = { storeId: "", terminalId: "" };
+
+function setScope({ storeId, terminalId } = {}) {
+  scope = {
+    storeId: storeId ? String(storeId) : "",
+    terminalId: terminalId ? String(terminalId) : "",
+  };
+  return scope;
+}
 
 /**
  * Tables housekeeping may prune once the cloud has confirmed the row. Reference
@@ -404,7 +424,12 @@ async function getWatermark(table) {
   const res = await getPool()
     .request()
     .input("t", sql.NVarChar(120), table)
-    .query("SELECT last_synced_at FROM dbo.sync_metadata WHERE table_name = @t;");
+    .input("store", sql.NVarChar(60), scope.storeId)
+    .input("term", sql.NVarChar(80), scope.terminalId)
+    .query(
+      `SELECT last_synced_at FROM dbo.sync_metadata
+        WHERE table_name = @t AND store_id = @store AND terminal_id = @term;`,
+    );
   const at = res.recordset[0]?.last_synced_at ?? null;
   return at ? new Date(at).toISOString() : null;
 }
@@ -413,13 +438,16 @@ async function setWatermark(table, isoAt, { rowsPushed = 0, error = null, pushed
   await getPool()
     .request()
     .input("t", sql.NVarChar(120), table)
+    .input("store", sql.NVarChar(60), scope.storeId)
+    .input("term", sql.NVarChar(80), scope.terminalId)
     .input("at", sql.DateTime2, isoAt ? new Date(isoAt) : null)
     .input("rows", sql.Int, rowsPushed)
     .input("pushed", sql.Bit, pushed ? 1 : 0)
     .input("err", sql.NVarChar(sql.MAX), error ? String(error).slice(0, 3000) : null)
     .query(`
       MERGE dbo.sync_metadata AS t
-      USING (SELECT @t AS table_name) AS s ON t.table_name = s.table_name
+      USING (SELECT @t AS table_name, @store AS store_id, @term AS terminal_id) AS s
+        ON t.table_name = s.table_name AND t.store_id = s.store_id AND t.terminal_id = s.terminal_id
       WHEN MATCHED THEN UPDATE SET
         t.last_synced_at = ISNULL(@at, t.last_synced_at),
         t.last_pushed_at = CASE WHEN @pushed = 1 THEN SYSUTCDATETIME() ELSE t.last_pushed_at END,
@@ -427,8 +455,9 @@ async function setWatermark(table, isoAt, { rowsPushed = 0, error = null, pushed
         t.last_error = @err,
         t.updated_at = SYSUTCDATETIME()
       WHEN NOT MATCHED THEN
-        INSERT (table_name, last_synced_at, last_pushed_at, rows_pushed, last_error)
-        VALUES (@t, @at, CASE WHEN @pushed = 1 THEN SYSUTCDATETIME() ELSE NULL END, @rows, @err);
+        INSERT (table_name, store_id, terminal_id, last_synced_at, last_pushed_at, rows_pushed, last_error)
+        VALUES (@t, @store, @term, @at,
+                CASE WHEN @pushed = 1 THEN SYSUTCDATETIME() ELSE NULL END, @rows, @err);
     `);
 }
 
