@@ -435,12 +435,16 @@ async function countChangedSince(table: (typeof PULL_TABLES)[number], since: str
 export async function pullDelta(): Promise<{ merged: number }> {
   if (pulling || !isOnline() || !isOnlineSyncEnabled()) return { merged: 0 };
   pulling = true;
-  const since = lastSuccessfulPull() ?? "1970-01-01T00:00:00.000Z";
+  const fallbackSince = lastSuccessfulPull() ?? "1970-01-01T00:00:00.000Z";
   const startedAt = new Date().toISOString();
   let changed = 0;
+  const clean: string[] = [];
   try {
     for (const table of PULL_TABLES) {
       if (!tableSyncAllowed(table)) continue;
+      // Each table resumes from its own mark, so one failing table never
+      // drags the rest back or hides their changes.
+      const since = lastTablePull(table) ?? fallbackSince;
       // Only ask how many rows moved; the full refresh below does the reading.
       const { count, error } = await countChangedSince(table, since);
       if (error) {
@@ -448,6 +452,7 @@ export async function pullDelta(): Promise<{ merged: number }> {
         recordSync({ direction: "pull", entity: table, status: "failed", error: error.message });
         continue;
       }
+      clean.push(table);
       if (!count) continue;
       changed += count;
       logSync("pull", table, true, `${count} row(s) changed centrally`);
@@ -462,6 +467,8 @@ export async function pullDelta(): Promise<{ merged: number }> {
       await mirrorCloudState(state);
       window.dispatchEvent(new CustomEvent("pos:cloud-refreshed"));
     }
+    // Marks only advance for tables that answered and were merged cleanly.
+    for (const table of clean) setLastTablePull(table, startedAt);
     setLastSuccessfulPull(startedAt);
     setSyncState({ lastSyncAt: startedAt });
   } catch (e) {
