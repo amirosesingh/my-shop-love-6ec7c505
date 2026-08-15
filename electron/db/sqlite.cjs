@@ -24,6 +24,36 @@ const MIRROR_ENTITIES = [
 let db = null;
 let dbPath = null;
 let lastError = null;
+/** Branch/till this install is currently acting as (scopes the watermarks). */
+let scope = { storeId: "", terminalId: "" };
+
+/** Attempts a queued change gets before it is parked for an operator. */
+const MAX_ATTEMPTS = 10;
+
+/** Local mirror tables that carry sync bookkeeping columns. */
+const SYNCED_TABLES = [
+  "products",
+  "product_barcodes",
+  "members",
+  "shifts",
+  "sales",
+  "sale_items",
+  "bookings",
+  "booking_payments",
+  "payment_transactions",
+  "item_activity_logs",
+  "stock_adjustments",
+  "suppliers",
+  "product_categories",
+  "uom_units",
+  "membership_tiers",
+  "promotions",
+  "purchase_orders",
+  "purchase_order_items",
+  "stock_transfers",
+  "stock_transfer_items",
+  "held_orders",
+];
 
 const nowIso = () => new Date().toISOString();
 const uuid = () => require("node:crypto").randomUUID();
@@ -38,6 +68,7 @@ function init(directory) {
     // Pragmas + typed mirrors + offline_sync_queue live in offline_sqlite_v2.sql
     // so the local shape stays reviewable next to the cloud schema.
     db.exec(fs.readFileSync(path.join(__dirname, "offline_sqlite_v2.sql"), "utf8"));
+    migrate();
     drainLegacyOutbox();
     lastError = null;
     return { ok: true, engine: "sqlite", path: dbPath };
@@ -68,6 +99,122 @@ function tx(work) {
     }
     throw error;
   }
+}
+
+/** Which columns a table actually has right now. */
+function columnsOf(table) {
+  try {
+    return new Set(db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name));
+  } catch {
+    return new Set();
+  }
+}
+
+/**
+ * Brings a database created by an earlier build up to the current shape.
+ * SQLite cannot ALTER a CHECK constraint or a primary key, so the queue and
+ * the watermark table are rebuilt in place when their old shape is detected;
+ * everything else is a plain ADD COLUMN.
+ */
+function migrate() {
+  // 1. Sync bookkeeping on every mirror table.
+  for (const table of SYNCED_TABLES) {
+    const have = columnsOf(table);
+    if (!have.size) continue;
+    const add = (name, ddl) => {
+      if (!have.has(name)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${ddl}`);
+    };
+    add("is_synced", "INTEGER NOT NULL DEFAULT 0");
+    add("sync_status", "TEXT NOT NULL DEFAULT 'PENDING'");
+    add("row_version", "INTEGER NOT NULL DEFAULT 1");
+    if (!have.has("updated_at")) db.exec(`ALTER TABLE ${table} ADD COLUMN updated_at TEXT`);
+  }
+
+  // 2. Idempotency key on the transaction tables.
+  for (const table of ["sales", "sale_items"]) {
+    if (!columnsOf(table).size) continue;
+    if (!columnsOf(table).has("client_transaction_id")) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN client_transaction_id TEXT`);
+    }
+    db.exec(
+      `CREATE UNIQUE INDEX IF NOT EXISTS ${table}_client_txn_idx
+         ON ${table} (client_transaction_id) WHERE client_transaction_id IS NOT NULL`,
+    );
+  }
+
+  // 3. Queue: DELETE actions, dead letters and persistent retry state.
+  const queue = columnsOf("offline_sync_queue");
+  if (queue.size) {
+    if (!queue.has("last_attempt_at")) {
+      db.exec(`ALTER TABLE offline_sync_queue ADD COLUMN last_attempt_at TEXT`);
+    }
+    if (!queue.has("client_transaction_id")) {
+      db.exec(`ALTER TABLE offline_sync_queue ADD COLUMN client_transaction_id TEXT`);
+    }
+    const ddl =
+      db
+        .prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'offline_sync_queue'`)
+        .get()?.sql ?? "";
+    if (!ddl.includes("'DELETE'") || !ddl.includes("dead_letter")) {
+      tx(() => {
+        db.exec(`ALTER TABLE offline_sync_queue RENAME TO offline_sync_queue_old`);
+        db.exec(`CREATE TABLE offline_sync_queue (
+          id            TEXT PRIMARY KEY,
+          table_name    TEXT NOT NULL,
+          record_id     TEXT,
+          action_type   TEXT NOT NULL DEFAULT 'INSERT' CHECK (action_type IN ('INSERT', 'UPDATE', 'DELETE')),
+          payload_json  TEXT NOT NULL,
+          status        TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'failed', 'dead_letter')),
+          error_message TEXT,
+          attempts      INTEGER NOT NULL DEFAULT 0,
+          last_attempt_at TEXT,
+          client_transaction_id TEXT,
+          created_at    TEXT NOT NULL
+        )`);
+        db.exec(`INSERT INTO offline_sync_queue
+                   (id, table_name, record_id, action_type, payload_json, status,
+                    error_message, attempts, last_attempt_at, client_transaction_id, created_at)
+                 SELECT id, table_name, record_id, action_type, payload_json, status,
+                        error_message, attempts, last_attempt_at, client_transaction_id, created_at
+                 FROM offline_sync_queue_old`);
+        db.exec(`DROP TABLE offline_sync_queue_old`);
+        db.exec(
+          `CREATE INDEX IF NOT EXISTS offline_sync_queue_status_idx ON offline_sync_queue (status, created_at);
+           CREATE INDEX IF NOT EXISTS offline_sync_queue_table_idx ON offline_sync_queue (table_name, created_at);`,
+        );
+      });
+    }
+  }
+
+  // 4. Watermarks keyed by table + branch + till.
+  const meta = columnsOf("sync_metadata");
+  if (meta.size && !meta.has("store_id")) {
+    tx(() => {
+      db.exec(`ALTER TABLE sync_metadata RENAME TO sync_metadata_old`);
+      db.exec(`CREATE TABLE sync_metadata (
+        table_name     TEXT NOT NULL,
+        store_id       TEXT NOT NULL DEFAULT '',
+        terminal_id    TEXT NOT NULL DEFAULT '',
+        last_synced_at TEXT,
+        last_pushed_at TEXT,
+        rows_pushed    INTEGER NOT NULL DEFAULT 0,
+        last_error     TEXT,
+        updated_at     TEXT,
+        PRIMARY KEY (table_name, store_id, terminal_id)
+      )`);
+      db.exec(`INSERT INTO sync_metadata
+                 (table_name, store_id, terminal_id, last_synced_at, last_pushed_at, rows_pushed, last_error, updated_at)
+               SELECT table_name, '', '', last_synced_at, last_pushed_at, rows_pushed, last_error, updated_at
+               FROM sync_metadata_old`);
+      db.exec(`DROP TABLE sync_metadata_old`);
+    });
+  }
+}
+
+/** Called by the shell once the branch and till are known. */
+function setScope({ storeId, terminalId } = {}) {
+  scope = { storeId: storeId ? String(storeId) : "", terminalId: terminalId ? String(terminalId) : "" };
+  return scope;
 }
 
 /** Moves rows written by pre-v2 builds into the new queue, once. */
@@ -133,6 +280,8 @@ function counts() {
 /** Append-only: offline sales/jobs/payments get a client UUID and UTC stamp. */
 function enqueue(entity, payload, actionType = "INSERT") {
   if (!ready()) return null;
+  const action = ["INSERT", "UPDATE", "DELETE"].includes(actionType) ? actionType : "INSERT";
+  const clientTxnId = payload?.client_transaction_id ?? uuid();
   const row = {
     id: uuid(),
     entity,
@@ -142,20 +291,23 @@ function enqueue(entity, payload, actionType = "INSERT") {
     status: "pending",
     attempts: 0,
     error: null,
+    client_transaction_id: clientTxnId,
   };
   tx(() =>
     db
       .prepare(
         `INSERT INTO offline_sync_queue
-           (id, table_name, record_id, action_type, payload_json, status, error_message, attempts, created_at)
-         VALUES (?, ?, ?, ?, ?, 'pending', NULL, 0, ?)`,
+           (id, table_name, record_id, action_type, payload_json, status, error_message,
+            attempts, last_attempt_at, client_transaction_id, created_at)
+         VALUES (?, ?, ?, ?, ?, 'pending', NULL, 0, NULL, ?, ?)`,
       )
       .run(
         row.id,
         row.entity,
         row.record_id,
-        actionType === "UPDATE" ? "UPDATE" : "INSERT",
+        action,
         JSON.stringify(row.payload),
+        clientTxnId,
         row.created_at,
       ),
   );
@@ -172,6 +324,9 @@ const fromQueue = (r) => ({
   status: r.status,
   attempts: r.attempts,
   error: r.error_message,
+  lastAttemptAt: r.last_attempt_at ?? null,
+  clientTransactionId: r.client_transaction_id ?? null,
+  quarantined: r.status === "dead_letter",
   created_at: r.created_at,
 });
 
@@ -185,11 +340,44 @@ function pending(limit = 200) {
     .map(fromQueue);
 }
 
+/** Changes parked after too many refusals, for the admin retry/discard view. */
+function deadLetters(limit = 200) {
+  if (!ready()) return [];
+  return db
+    .prepare(`SELECT * FROM offline_sync_queue WHERE status = 'dead_letter' ORDER BY created_at LIMIT ?`)
+    .all(limit)
+    .map(fromQueue);
+}
+
+/** Put every parked change back in line. */
+function retryDeadLetters() {
+  if (!ready()) return 0;
+  return tx(
+    () =>
+      db
+        .prepare(
+          `UPDATE offline_sync_queue SET status = 'pending', attempts = 0, error_message = NULL
+             WHERE status = 'dead_letter'`,
+        )
+        .run().changes ?? 0,
+  );
+}
+
+function discardDeadLetters() {
+  if (!ready()) return 0;
+  return tx(
+    () => db.prepare(`DELETE FROM offline_sync_queue WHERE status = 'dead_letter'`).run().changes ?? 0,
+  );
+}
+
 function pendingCounts() {
   const rows = pending(1000);
   const grouped = {};
   for (const row of rows) grouped[row.entity] = (grouped[row.entity] ?? 0) + 1;
-  return { total: rows.length, byEntity: grouped };
+  const parked = ready()
+    ? db.prepare(`SELECT COUNT(*) AS n FROM offline_sync_queue WHERE status = 'dead_letter'`).get().n
+    : 0;
+  return { total: rows.length, byEntity: grouped, deadLetters: parked };
 }
 
 function markOutbox(id, status, error = null) {
@@ -199,11 +387,16 @@ function markOutbox(id, status, error = null) {
       db.prepare(`DELETE FROM offline_sync_queue WHERE id = ?`).run(id);
       return;
     }
+    // Retry state lives in the table, so it survives a restart. Past the cap
+    // the change is parked rather than retried forever.
     db.prepare(
       `UPDATE offline_sync_queue
-         SET status = ?, error_message = ?, attempts = attempts + 1
+         SET attempts = attempts + 1,
+             error_message = ?,
+             last_attempt_at = ?,
+             status = CASE WHEN attempts + 1 >= ? THEN 'dead_letter' ELSE ? END
        WHERE id = ?`,
-    ).run(status === "failed" ? "failed" : "pending", error, id);
+    ).run(error, nowIso(), MAX_ATTEMPTS, status === "failed" ? "failed" : "pending", id);
   });
 }
 
