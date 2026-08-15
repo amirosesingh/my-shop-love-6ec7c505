@@ -13,7 +13,7 @@ import {
   loadNotificationSettings,
   saveNotificationSettings,
 } from "@/lib/activity-events.functions";
-import { supabaseExternal } from "@/integrations/supabase/external-client";
+import { requireAdminToken } from "@/lib/admin-session";
 
 type Channel = "off" | "app" | "whatsapp";
 
@@ -53,14 +53,13 @@ function NotificationSettingsPage() {
   const save = async () => {
     if (!cfg) return;
     setBusy(true);
-    const { data } = await supabaseExternal.auth.getSession();
-    const token = data.session?.access_token ?? "";
-    if (!token) {
+    const auth = await requireAdminToken();
+    if (!auth.ok) {
       setBusy(false);
-      toast.error("Sign in as an admin to change alert settings");
+      toast.error(auth.message);
       return;
     }
-    const res = await saveNotificationSettings({ data: { accessToken: token, settings: cfg } });
+    const res = await saveNotificationSettings({ data: { accessToken: auth.token, settings: cfg } });
     setBusy(false);
     if (res.ok) toast.success("Alert settings saved");
     else toast.error(res.error ?? "Could not save");

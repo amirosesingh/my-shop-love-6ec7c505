@@ -3,6 +3,8 @@ import { supabaseExternal as supabase } from "@/integrations/supabase/external-c
 import { defaultSettings, sampleState } from "./pos-seed";
 import { drainOutbox, runOpLive } from "./sync-engine";
 import { localDb } from "./local-db";
+import { routedQuery } from "./db-query";
+import { readSnapshot } from "./offline-snapshot";
 import { enqueue, type SyncOp } from "./sync-outbox";
 import { isLiveOnly } from "./live-mode";
 import {
@@ -670,12 +672,16 @@ export async function importSampleData() {
     idMap.set(p.id, id);
     return productToRow({ ...p, id });
   });
-  await supabase.from("products").insert(products as never);
+  await commitOps("Loading sample catalogue", [
+    { kind: "insert", table: "products", rows: products as Row[] },
+  ]);
 
   const members = sampleState.members.map((m) =>
     memberToRow({ ...m, id: crypto.randomUUID() }, tierId),
   );
-  await supabase.from("members").insert(members as never);
+  await commitOps("Loading sample members", [
+    { kind: "insert", table: "members", rows: members as Row[] },
+  ]);
 
   const promotions = sampleState.promotions.map((p) =>
     promotionToRow({
@@ -684,7 +690,9 @@ export async function importSampleData() {
       focProductId: p.focProductId ? idMap.get(p.focProductId) : undefined,
     }),
   );
-  await supabase.from("promotions").insert(promotions as never);
+  await commitOps("Loading sample promotions", [
+    { kind: "insert", table: "promotions", rows: promotions as Row[] },
+  ]);
 }
 
 /** Load every cloud-backed slice of the POS state. */
@@ -775,7 +783,14 @@ export async function loadCloudState(): Promise<CloudSlice> {
 
 async function loadLocalState(cause: unknown): Promise<CloudSlice> {
   const bridge = localDb();
-  if (!bridge) throw cause;
+  if (!bridge) {
+    // No local SQL engine on this device: the last good copy this terminal
+    // kept on disk is still better than an empty register.
+    const snap = readSnapshot();
+    if (!snap) throw cause;
+    const { savedAt: _savedAt, ...slice } = snap;
+    return slice as CloudSlice;
+  }
   const result = await bridge.snapshot();
   if (!result.ok) throw cause;
   tierIdByName = {};
@@ -804,6 +819,18 @@ async function loadLocalState(cause: unknown): Promise<CloudSlice> {
  * Strictly status-driven: a shift opened on any past date stays active until
  * something explicitly closes it. No date or time filtering here, ever.
  */
+/**
+ * The open shift according to this terminal's own copy. `undefined` means the
+ * terminal has no copy to answer with, which is different from "no shift".
+ */
+function localOpenShift(storeId: string): Shift | null | undefined {
+  const snap = readSnapshot();
+  if (!snap) return undefined;
+  const open = (snap.shifts ?? []).filter((s) => s.storeId === storeId && s.status === "OPEN");
+  if (!open.length) return null;
+  return [...open].sort((a, b) => (a.openedAt < b.openedAt ? 1 : -1))[0];
+}
+
 export async function loadActiveShift(storeId: string): Promise<Shift | null> {
   // A cashier signed in with a PIN has no account on the central database, so
   // the direct read is refused or filtered out. The proven server relay answers
@@ -835,9 +862,17 @@ export async function loadActiveShift(storeId: string): Promise<Shift | null> {
     if (!canRelay()) throw res.error;
   }
 
-  if (!canRelay()) throw new Error("This till cannot read the central database yet");
+  if (!canRelay()) {
+    const local = localOpenShift(storeId);
+    if (local !== undefined) return local;
+    throw new Error("This till cannot read the central database yet");
+  }
   const relayed = await relayActiveShift(storeId);
-  if (!relayed.ok) throw new Error(relayed.error ?? "Could not read the open shift");
+  if (!relayed.ok) {
+    const local = localOpenShift(storeId);
+    if (local !== undefined) return local;
+    throw new Error(relayed.error ?? "Could not read the open shift");
+  }
   return relayed.row ? rowToShift(relayed.row as Row) : null;
 }
 
@@ -877,6 +912,25 @@ export async function openShiftOnServer(s: Shift): Promise<Shift | null> {
  * bills in memory, and history screens walk further back a page at a time
  * without ever paying for an OFFSET.
  */
+/** The same page of bills served from this terminal's copy. */
+function localSalesPage(storeId: string, cursor: Cursor, limit: number): Page<Sale> | null {
+  const snap = readSnapshot();
+  if (!snap) return null;
+  const all = (snap.sales ?? [])
+    .filter((s) => !storeId || s.storeId === storeId)
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
+  const after = cursor
+    ? all.filter((s) => s.createdAt < cursor.ts || (s.createdAt === cursor.ts && s.id < cursor.id))
+    : all;
+  const rows = after.slice(0, limit);
+  const last = rows[rows.length - 1];
+  return {
+    rows,
+    cursor: last ? { ts: last.createdAt, id: last.id } : null,
+    hasMore: after.length > limit,
+  };
+}
+
 export async function loadSalesPage(
   storeId: string,
   cursor: Cursor = null,
@@ -894,7 +948,11 @@ export async function loadSalesPage(
     res = await query();
     err = (res as { error?: { message: string } }).error;
   }
-  if (err) throw new Error(err.message);
+  if (err) {
+    const cached = localSalesPage(storeId, cursor, limit);
+    if (cached && isConnectionError(new Error(err.message))) return cached;
+    throw new Error(err.message);
+  }
   const rows = ((res as { data?: Row[] | null }).data ?? []) as Row[];
   return {
     rows: rows.map(rowToSale),
@@ -905,14 +963,12 @@ export async function loadSalesPage(
 
 /** Recent sign-in sessions for a branch, newest first. */
 export async function loadShiftSessions(storeId: string, limit = 200): Promise<ShiftSession[]> {
-  const res = await supabase
-    .from("shift_sessions" as never)
-    .select("*")
-    .eq("store_id", storeId)
-    .order("signed_in_at", { ascending: false })
-    .limit(limit);
-  if (res.error) throw res.error;
-  return ((res.data as Row[] | null) ?? []).map(rowToShiftSession);
+  const rows = await routedQuery("shift_sessions", {
+    match: { store_id: storeId },
+    orderBy: { column: "signed_in_at", ascending: false },
+    limit,
+  });
+  return rows.map(rowToShiftSession);
 }
 
 /* --------------------- receiving invoices (purchase orders) -------------- */
@@ -1041,9 +1097,17 @@ export async function invoiceNumberTaken(invoiceNo: string, exceptId?: string): 
 /** Latest catalogue rows for a set of products, straight from the database. */
 export async function loadProductsByIds(ids: string[]): Promise<Product[]> {
   if (!ids.length) return [];
-  const res = await supabase.from("products").select("*").in("id", ids);
-  if (res.error) throw res.error;
-  return ((res.data as Row[] | null) ?? []).map(rowToProduct);
+  try {
+    const res = await supabase.from("products").select("*").in("id", ids);
+    if (res.error) throw new Error(res.error.message);
+    return ((res.data as Row[] | null) ?? []).map(rowToProduct);
+  } catch (e) {
+    // Offline with a terminal copy on disk: those rows are already in the
+    // shape the app uses, so they are handed back as they are.
+    const snap = readSnapshot();
+    if (snap && isConnectionError(e)) return snap.products.filter((p) => ids.includes(p.id));
+    throw e;
+  }
 }
 
 /**
@@ -1353,8 +1417,21 @@ export const db = {
       if (!res.ok) throw new Error(res.error ?? "Local database write failed");
       return;
     }
-    const res = await supabase.from("pos_settings").upsert(settingsToRow(s) as never);
+    const op2: SyncOp = op;
+    let res: { error: { message: string } | null };
+    try {
+      res = await supabase.from("pos_settings").upsert(settingsToRow(s) as never);
+    } catch (e) {
+      // The line is down: park the change so it lands when it is back.
+      if (!isConnectionError(e)) throw e;
+      await commitOps("Saving settings", [op2]);
+      return;
+    }
     if (!res.error) return;
+    if (isConnectionError(new Error(res.error.message))) {
+      await commitOps("Saving settings", [op2]);
+      return;
+    }
     // The database is missing a newer column: drop it and save the rest, so a
     // single missing field never blocks the whole settings record.
     const col = unknownSettingsColumn(res.error.message);

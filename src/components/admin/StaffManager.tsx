@@ -25,6 +25,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { supabaseExternal } from "@/integrations/supabase/external-client";
+import { ADMIN_OFFLINE_MESSAGE } from "@/lib/admin-session";
 import { isConnectionError } from "@/lib/db-mode";
 import { notifyError } from "@/lib/notify";
 import {
@@ -256,6 +257,13 @@ export function StaffManager() {
     });
     setBusy("");
     if (error) {
+      // Permissions live centrally only; queueing them offline would let two
+      // tills disagree about who may do what, so the change is refused.
+      if (isConnectionError(error)) {
+        setOffline(true);
+        toast.error(ADMIN_OFFLINE_MESSAGE);
+        return;
+      }
       notifyError(error, "Could not save permissions");
       return;
     }
