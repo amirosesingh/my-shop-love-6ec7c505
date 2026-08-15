@@ -672,12 +672,16 @@ export async function importSampleData() {
     idMap.set(p.id, id);
     return productToRow({ ...p, id });
   });
-  await supabase.from("products").insert(products as never);
+  await commitOps("Loading sample catalogue", [
+    { kind: "insert", table: "products", rows: products as Row[] },
+  ]);
 
   const members = sampleState.members.map((m) =>
     memberToRow({ ...m, id: crypto.randomUUID() }, tierId),
   );
-  await supabase.from("members").insert(members as never);
+  await commitOps("Loading sample members", [
+    { kind: "insert", table: "members", rows: members as Row[] },
+  ]);
 
   const promotions = sampleState.promotions.map((p) =>
     promotionToRow({
@@ -686,7 +690,9 @@ export async function importSampleData() {
       focProductId: p.focProductId ? idMap.get(p.focProductId) : undefined,
     }),
   );
-  await supabase.from("promotions").insert(promotions as never);
+  await commitOps("Loading sample promotions", [
+    { kind: "insert", table: "promotions", rows: promotions as Row[] },
+  ]);
 }
 
 /** Load every cloud-backed slice of the POS state. */
@@ -1388,8 +1394,21 @@ export const db = {
       if (!res.ok) throw new Error(res.error ?? "Local database write failed");
       return;
     }
-    const res = await supabase.from("pos_settings").upsert(settingsToRow(s) as never);
+    const op2: SyncOp = op;
+    let res: { error: { message: string } | null };
+    try {
+      res = await supabase.from("pos_settings").upsert(settingsToRow(s) as never);
+    } catch (e) {
+      // The line is down: park the change so it lands when it is back.
+      if (!isConnectionError(e)) throw e;
+      await commitOps("Saving settings", [op2]);
+      return;
+    }
     if (!res.error) return;
+    if (isConnectionError(new Error(res.error.message))) {
+      await commitOps("Saving settings", [op2]);
+      return;
+    }
     // The database is missing a newer column: drop it and save the rest, so a
     // single missing field never blocks the whole settings record.
     const col = unknownSettingsColumn(res.error.message);
