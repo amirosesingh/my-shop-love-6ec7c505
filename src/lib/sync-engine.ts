@@ -243,16 +243,17 @@ async function runOne(entry: QueuedOp): Promise<boolean> {
     (entry.op.table === "stores" || refusedTables.has(entry.op.table) || preferRelay()) &&
     canRelay()
   ) {
-    const relayed = await viaRelay(entry.context, entry.op);
+    const relayed = await viaRelay(entry.context, versionedOp(entry));
     if (relayed.ok) {
       resolveOp(entry.id);
+      await reconcileVersions(entry);
       return true;
     }
     recordRelayFailure(entry, relayed);
     return false;
   }
 
-  let res = await execute(entry.op);
+  let res = await execute(versionedOp(entry));
   // PGRST204 = column missing from the schema cache. Older databases simply do
   // not have the newer columns yet, so drop whichever column the error names
   // (falling back to the known-optional list) and retry until the core row saves.
@@ -265,7 +266,7 @@ async function runOne(entry: QueuedOp): Promise<boolean> {
       if (!next.length || next.every((c) => dropped.includes(c))) break;
       dropped.push(...next);
       res = await execute({
-        ...entry.op,
+        ...versionedOp(entry),
         rows: strip(entry.op.rows, dropped),
       } as SyncOp);
     }
@@ -276,9 +277,10 @@ async function runOne(entry: QueuedOp): Promise<boolean> {
     // relay, which proves the till and writes on its behalf.
     if (isPermissionError(res.error) && canRelay()) {
       refusedTables.add(entry.op.table);
-      const relayed = await viaRelay(entry.context, entry.op);
+      const relayed = await viaRelay(entry.context, versionedOp(entry));
       if (relayed.ok) {
         resolveOp(entry.id);
+        await reconcileVersions(entry);
         return true;
       }
       recordRelayFailure(entry, relayed);
@@ -292,6 +294,7 @@ async function runOne(entry: QueuedOp): Promise<boolean> {
   }
   resolveOp(entry.id);
   logSync("push", entry.op.table, true, entry.context);
+  await reconcileVersions(entry);
   return true;
 }
 
