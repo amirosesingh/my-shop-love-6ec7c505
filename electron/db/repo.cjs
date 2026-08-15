@@ -47,6 +47,22 @@ const CATALOGUE_TABLES = [
   "suppliers",
 ];
 
+/**
+ * Operational data this branch also needs to see from elsewhere.
+ *
+ * Members are shared across the whole business: someone who signs up at one
+ * shop must earn points at the next. Transfers and bookings are pulled only
+ * where this branch is involved, so a till never downloads another shop's
+ * work — and so a transfer sent here can be received with no connection.
+ */
+const SCOPED_PULL_TABLES = [
+  { table: "members" },
+  { table: "stock_transfers", storeColumns: ["from_store_id", "to_store_id"] },
+  { table: "stock_transfer_items", parent: { table: "stock_transfers", column: "transfer_id" } },
+  { table: "bookings", storeColumns: ["store_id"] },
+  { table: "booking_payments", parent: { table: "bookings", column: "booking_id" } },
+];
+
 /** Branch and till this install acts as; scopes the sync watermarks. */
 let scope = { storeId: "", terminalId: "" };
 
