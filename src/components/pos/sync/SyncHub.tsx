@@ -37,6 +37,7 @@ import {
   type SyncAuditRow,
 } from "@/lib/sync-audit";
 import { discardOp, queueView, retryOp, type QueueView } from "@/lib/sync-outbox";
+import { localDb, type SyncQueueRow } from "@/lib/local-db";
 import {
   dismissConflict,
   listConflicts,
