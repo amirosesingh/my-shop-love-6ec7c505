@@ -598,7 +598,19 @@ async function housekeep({ retentionDays = 90 } = {}) {
 
 /** Strips local-only bookkeeping before a row is sent to the cloud. */
 function toCloudRow(table, row) {
-  const { is_synced: _s, sync_status: _st, ...rest } = row;
+  // Local-only bookkeeping never leaves the till.
+  const {
+    is_synced: _s,
+    sync_status: _st,
+    synced_at: _sa,
+    sync_error: _se,
+    sync_attempts: _at,
+    last_error_at: _le,
+    pending_sync: _ps,
+    temp_id: _ti,
+    row_version: _rv,
+    ...rest
+  } = row;
   if (table === "pos_settings") {
     const payload = typeof rest.payload === "string" ? JSON.parse(rest.payload) : rest.payload;
     return { id: 1, ...payload };
@@ -628,6 +640,8 @@ module.exports = {
   stats,
   getState,
   setState,
+  getWatermark,
+  setWatermark,
   getSetting,
   setSetting,
   toCloudRow,
