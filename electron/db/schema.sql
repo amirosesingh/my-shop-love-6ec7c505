@@ -674,3 +674,144 @@ END
 CLOSE metatbl;
 DEALLOCATE metatbl;
 GO
+
+/* =====================================================================
+   v1.3.5 alignment — mirrors the cloud shape so every entity the till
+   touches has a local home, an idempotency key and a branch-scoped
+   high-water mark. Idempotent: safe on every start.
+   ===================================================================== */
+
+IF OBJECT_ID('dbo.product_barcodes', 'U') IS NULL
+CREATE TABLE dbo.product_barcodes (
+  id          NVARCHAR(80)  NOT NULL PRIMARY KEY,
+  product_id  NVARCHAR(80)  NOT NULL,
+  barcode     NVARCHAR(120) NOT NULL,
+  label       NVARCHAR(120) NULL,
+  pack_size   DECIMAL(18,4) NOT NULL DEFAULT 1,
+  is_primary  BIT           NOT NULL DEFAULT 0,
+  is_synced   BIT           NOT NULL DEFAULT 0,
+  sync_status NVARCHAR(20)  NOT NULL DEFAULT N'pending',
+  created_at  DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at  DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+IF OBJECT_ID('dbo.product_categories', 'U') IS NULL
+CREATE TABLE dbo.product_categories (
+  id          NVARCHAR(80)  NOT NULL PRIMARY KEY,
+  name        NVARCHAR(200) NOT NULL,
+  kind        NVARCHAR(40)  NOT NULL DEFAULT N'category',
+  sort        INT           NOT NULL DEFAULT 0,
+  is_synced   BIT           NOT NULL DEFAULT 0,
+  sync_status NVARCHAR(20)  NOT NULL DEFAULT N'pending',
+  created_at  DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at  DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+IF OBJECT_ID('dbo.uom_units', 'U') IS NULL
+CREATE TABLE dbo.uom_units (
+  id            NVARCHAR(80)  NOT NULL PRIMARY KEY,
+  code          NVARCHAR(40)  NOT NULL,
+  name          NVARCHAR(120) NOT NULL,
+  allow_decimal BIT           NOT NULL DEFAULT 0,
+  sort          INT           NOT NULL DEFAULT 0,
+  is_synced     BIT           NOT NULL DEFAULT 0,
+  sync_status   NVARCHAR(20)  NOT NULL DEFAULT N'pending',
+  created_at    DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at    DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+IF OBJECT_ID('dbo.payment_transactions', 'U') IS NULL
+CREATE TABLE dbo.payment_transactions (
+  id           NVARCHAR(80)  NOT NULL PRIMARY KEY,
+  source_type  NVARCHAR(20)  NOT NULL DEFAULT N'sale',
+  sale_id      NVARCHAR(80)  NULL,
+  booking_id   NVARCHAR(80)  NULL,
+  member_id    NVARCHAR(80)  NULL,
+  store_id     NVARCHAR(60)  NULL,
+  shift_id     NVARCHAR(80)  NULL,
+  terminal_id  NVARCHAR(80)  NULL,
+  amount       DECIMAL(18,4) NOT NULL DEFAULT 0,
+  method       NVARCHAR(40)  NOT NULL DEFAULT N'cash',
+  kind         NVARCHAR(40)  NOT NULL DEFAULT N'payment',
+  reference    NVARCHAR(120) NULL,
+  cashier_name NVARCHAR(200) NULL,
+  note         NVARCHAR(400) NOT NULL DEFAULT N'',
+  paid_at      DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME(),
+  is_synced    BIT           NOT NULL DEFAULT 0,
+  sync_status  NVARCHAR(20)  NOT NULL DEFAULT N'pending',
+  created_at   DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at   DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+IF OBJECT_ID('dbo.item_activity_logs', 'U') IS NULL
+CREATE TABLE dbo.item_activity_logs (
+  id             NVARCHAR(80)  NOT NULL PRIMARY KEY,
+  product_id     NVARCHAR(80)  NULL,
+  product_name   NVARCHAR(300) NULL,
+  sku            NVARCHAR(120) NULL,
+  barcode        NVARCHAR(120) NULL,
+  store_id       NVARCHAR(60)  NULL,
+  terminal_id    NVARCHAR(80)  NULL,
+  activity_type  NVARCHAR(60)  NOT NULL,
+  reference      NVARCHAR(120) NULL,
+  quantity_delta INT           NOT NULL DEFAULT 0,
+  stock_before   INT           NULL,
+  stock_after    INT           NULL,
+  unit_cost      DECIMAL(18,4) NOT NULL DEFAULT 0,
+  staff_name     NVARCHAR(200) NULL,
+  note           NVARCHAR(400) NOT NULL DEFAULT N'',
+  is_synced      BIT           NOT NULL DEFAULT 0,
+  sync_status    NVARCHAR(20)  NOT NULL DEFAULT N'pending',
+  created_at     DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at     DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+/* Movements already applied to local stock — a replay cannot deduct twice. */
+IF OBJECT_ID('dbo.stock_delta_applied', 'U') IS NULL
+CREATE TABLE dbo.stock_delta_applied (
+  movement_id NVARCHAR(80) NOT NULL PRIMARY KEY,
+  product_id  NVARCHAR(80) NULL,
+  store_id    NVARCHAR(60) NULL,
+  delta       INT          NOT NULL DEFAULT 0,
+  applied_at  DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+/* Idempotency key on the transaction tables. */
+IF COL_LENGTH('dbo.sale_items', 'client_transaction_id') IS NULL
+  ALTER TABLE dbo.sale_items ADD client_transaction_id NVARCHAR(80) NULL;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UX_sale_items_client_txn')
+  CREATE UNIQUE INDEX UX_sale_items_client_txn ON dbo.sale_items (client_transaction_id)
+    WHERE client_transaction_id IS NOT NULL;
+GO
+
+/* Watermarks scoped to branch + till, so one machine can serve two branches. */
+IF COL_LENGTH('dbo.sync_metadata', 'store_id') IS NULL
+BEGIN
+  ALTER TABLE dbo.sync_metadata ADD store_id NVARCHAR(60) NOT NULL
+    CONSTRAINT DF_sync_metadata_store DEFAULT N'';
+  ALTER TABLE dbo.sync_metadata ADD terminal_id NVARCHAR(80) NOT NULL
+    CONSTRAINT DF_sync_metadata_terminal DEFAULT N'';
+END
+GO
+DECLARE @pk SYSNAME = (
+  SELECT name FROM sys.key_constraints
+   WHERE parent_object_id = OBJECT_ID('dbo.sync_metadata') AND type = 'PK'
+);
+IF @pk IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM sys.index_columns ic
+    JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
+   WHERE ic.object_id = OBJECT_ID('dbo.sync_metadata') AND c.name = 'terminal_id'
+)
+BEGIN
+  EXEC('ALTER TABLE dbo.sync_metadata DROP CONSTRAINT ' + @pk);
+  ALTER TABLE dbo.sync_metadata
+    ADD CONSTRAINT PK_sync_metadata PRIMARY KEY (table_name, store_id, terminal_id);
+END
+GO
