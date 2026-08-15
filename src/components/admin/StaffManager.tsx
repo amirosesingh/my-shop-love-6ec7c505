@@ -105,6 +105,7 @@ export function StaffManager() {
   const [permissionsFor, setPermissionsFor] = useState<Row | null>(null);
   const [deleteFor, setDeleteFor] = useState<Row | null>(null);
   const [confirmation, setConfirmation] = useState("");
+  const [offline, setOffline] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -114,6 +115,7 @@ export function StaffManager() {
         getRolesWithPermissions(),
       ]);
       if (error) throw error;
+      setOffline(false);
       setRoles(roleList);
       setRows(((data ?? []) as Record<string, unknown>[]).map((r) => {
         const role = fromDbRole(String(r["role"] ?? "staff"));
@@ -132,6 +134,13 @@ export function StaffManager() {
         };
       }));
     } catch (error) {
+      // Staff accounts are central by design: say the line is down rather
+      // than throwing a red failure at the administrator.
+      if (isConnectionError(error)) {
+        setOffline(true);
+        setRows([]);
+        return;
+      }
       notifyError(error, "Could not load staff accounts");
     } finally {
       setLoading(false);
@@ -281,9 +290,15 @@ export function StaffManager() {
           <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
             {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />} Refresh
           </Button>
-          <Button size="sm" onClick={openCreate}><Plus className="size-4" /> New account</Button>
+          <Button size="sm" onClick={openCreate} disabled={offline}><Plus className="size-4" /> New account</Button>
         </div>
       </header>
+      {offline && (
+        <p className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+          Connection is down. Staff accounts are held centrally, so they can only be viewed
+          and changed once the line is back — nothing is queued for later.
+        </p>
+      )}
       <Separator />
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
@@ -305,9 +320,9 @@ export function StaffManager() {
                 <td className="pr-3 text-xs text-muted-foreground">{row.last_login_at ? new Date(row.last_login_at).toLocaleString() : "Never"}</td>
                 <td className="pr-3"><Switch checked={row.is_active} disabled={busy === row.user_id || row.auth_user_id === authUserId} onCheckedChange={(active) => void setActive(row, active)} aria-label={`${row.full_name} active`} /></td>
                 <td><div className="flex justify-end gap-1">
-                  <Button size="icon" variant="ghost" title="Edit account" onClick={() => openEdit(row)}><Pencil className="size-4" /></Button>
-                  <Button size="icon" variant="ghost" title="Edit permissions" onClick={() => setPermissionsFor({ ...row, permissions: { ...row.permissions } })}><KeyRound className="size-4" /></Button>
-                  {!row.is_active && <Button size="icon" variant="ghost" title="Delete inactive account" disabled={row.auth_user_id === authUserId} onClick={() => { setDeleteFor(row); setConfirmation(""); }}><Trash2 className="size-4 text-destructive" /></Button>}
+                  <Button size="icon" variant="ghost" title="Edit account" disabled={offline} onClick={() => openEdit(row)}><Pencil className="size-4" /></Button>
+                  <Button size="icon" variant="ghost" title="Edit permissions" disabled={offline} onClick={() => setPermissionsFor({ ...row, permissions: { ...row.permissions } })}><KeyRound className="size-4" /></Button>
+                  {!row.is_active && <Button size="icon" variant="ghost" title="Delete inactive account" disabled={offline || row.auth_user_id === authUserId} onClick={() => { setDeleteFor(row); setConfirmation(""); }}><Trash2 className="size-4 text-destructive" /></Button>}
                 </div></td>
               </tr>;
             })}
