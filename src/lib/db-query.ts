@@ -13,6 +13,7 @@ import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { effectiveDatabaseMode, isConnectionError } from "./db-mode";
 import { readSnapshot } from "./offline-snapshot";
 import { lastHealth } from "./connection-health";
+import { noteVersions } from "./row-versions";
 import type { Row } from "./sync-outbox";
 
 /** Table names are dynamic here, so the generated row types do not apply. */
@@ -96,6 +97,9 @@ export async function routedQueryWithSource(
     if (options.limit) q = q.limit(options.limit);
     const { data, error } = await q;
     if (error) throw new Error(error.message);
+    // Remember what version the central copy is on, so a later edit from this
+    // till can say which version it was working from.
+    noteVersions(table, data);
     return { rows: (data as Row[]) ?? [], source: "cloud" };
   } catch (e) {
     const rows = cached();

@@ -37,6 +37,12 @@ import {
   type SyncAuditRow,
 } from "@/lib/sync-audit";
 import { discardOp, queueView, retryOp, type QueueView } from "@/lib/sync-outbox";
+import {
+  dismissConflict,
+  listConflicts,
+  subscribeConflicts,
+  type SyncConflict,
+} from "@/lib/sync-conflicts";
 
 const when = (iso?: string | null) => (iso ? new Date(iso).toLocaleString() : "—");
 
@@ -54,6 +60,7 @@ export function SyncHub() {
   const [rows, setRows] = useState<SyncAuditRow[]>([]);
   const [engine, setEngine] = useState<LocalEngineInfo | null>(null);
   const [queue, setQueue] = useState<QueueView[]>([]);
+  const [conflicts, setConflicts] = useState<SyncConflict[]>([]);
   const [busy, setBusy] = useState<"push" | "pull" | "cycle" | null>(null);
   const [progress, setProgress] = useState(0);
   const [direction, setDirection] = useState("all");
@@ -63,14 +70,17 @@ export function SyncHub() {
     setRows(await listSyncAudit(200));
     setEngine(await localEngineInfo());
     setQueue(queueView());
+    setConflicts(listConflicts());
   }, []);
 
   useEffect(() => {
     void refresh();
     const off = subscribeSyncAudit(() => void refresh());
+    const offConflicts = subscribeConflicts(() => setConflicts(listConflicts()));
     const timer = window.setInterval(() => void refresh(), 8000);
     return () => {
       off();
+      offConflicts();
       window.clearInterval(timer);
     };
   }, [refresh]);
@@ -230,6 +240,45 @@ export function SyncHub() {
       </Card>
 
       {/* ----------------------------- refusals ----------------------------- */}
+      {conflicts.length > 0 && (
+        <Card className="border-warning/40">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <TriangleAlert className="size-4 text-warning" /> Records changed elsewhere
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <p className="text-xs text-muted-foreground">
+              Someone else changed these records while this till was working from an older copy.
+              The central version was kept — check it and make the change again if it is still
+              needed.
+            </p>
+            {conflicts.map((c) => (
+              <div
+                key={c.id}
+                className="flex flex-wrap items-center gap-2 rounded-md border border-border p-2 text-xs"
+              >
+                <span className="font-medium">{c.context}</span>
+                <span className="text-muted-foreground">{c.table}</span>
+                <span className="font-mono text-muted-foreground">{c.recordId.slice(0, 8)}</span>
+                <span className="text-muted-foreground">
+                  this till had v{c.baseVersion}, central is on v{c.centralVersion}
+                </span>
+                <span className="text-muted-foreground">{when(c.at)}</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="ml-auto"
+                  onClick={() => dismissConflict(c.id)}
+                >
+                  Got it
+                </Button>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       {failedQueue.length > 0 && (
         <Card>
           <CardHeader className="pb-2">

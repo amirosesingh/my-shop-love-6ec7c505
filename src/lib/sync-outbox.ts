@@ -9,6 +9,7 @@
  */
 import { stamp } from "./activity-journal";
 import { isLiveOnly } from "./live-mode";
+import { touchedIds as versionedIds, versionsFor } from "./row-versions";
 
 export type Row = Record<string, unknown>;
 
@@ -39,6 +40,12 @@ export type QueuedOp = {
   occurredAt?: string;
   /** device clock reading of the last send attempt */
   lastAttemptAt?: string;
+  /**
+   * Version of each record this change was made from, keyed by record id.
+   * Sent along with the change so the central database can keep the newer
+   * copy when someone else edited the same record in the meantime.
+   */
+  baseVersions?: Record<string, number>;
 };
 
 const QUEUE_KEY = "pos.sync.outbox";
@@ -125,6 +132,7 @@ export function conflictCount(): number {
 
 export function enqueue(context: string, op: SyncOp): QueuedOp {
   const s = stamp();
+  const baseVersions = versionsFor(op.table, versionedIds(op as never));
   const entry: QueuedOp = {
     id: crypto.randomUUID(),
     context,
@@ -136,6 +144,7 @@ export function enqueue(context: string, op: SyncOp): QueuedOp {
     terminalId: s.terminalId,
     seq: s.seq,
     occurredAt: s.deviceTime,
+    ...(Object.keys(baseVersions).length ? { baseVersions } : {}),
   };
   write([...read(), entry]);
   return entry;

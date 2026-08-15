@@ -45,6 +45,8 @@ async function mirrorCloudState(state: unknown) {
 import { loadCloudState } from "./pos-db";
 import { localDb } from "./local-db";
 import { checkHealth } from "./connection-health";
+import { noteVersions } from "./row-versions";
+import { recordConflict } from "./sync-conflicts";
 import {
   failOp,
   refuseOp,
@@ -222,6 +224,87 @@ const REFUSAL_CODES = new Set([
 ]);
 
 /**
+ * Stamp the change with the record version this till was working from. The
+ * central database keeps whichever copy is newer, so an edit made from an
+ * hour-old copy can no longer undo work someone else did in the meantime.
+ */
+function versionedOp(entry: QueuedOp): SyncOp {
+  const versions = entry.baseVersions;
+  if (!versions || !Object.keys(versions).length) return entry.op;
+  if (entry.op.kind === "upsert") {
+    return {
+      ...entry.op,
+      rows: entry.op.rows.map((r) => {
+        const v = versions[String(r["id"] ?? "")];
+        return typeof v === "number" ? { ...r, row_version: v } : r;
+      }),
+    };
+  }
+  if (entry.op.kind === "update") {
+    const v = versions[String(entry.op.match["id"] ?? "")];
+    return typeof v === "number"
+      ? { ...entry.op, values: { ...entry.op.values, row_version: v } }
+      : entry.op;
+  }
+  return entry.op;
+}
+
+/**
+ * After a change goes up, check what version the central copy ended on. If it
+ * has moved further than this change could explain, someone else edited the
+ * same record and the central copy was kept — that is recorded so the person
+ * at the till is told rather than believing their edit stuck.
+ */
+async function reconcileVersions(entry: QueuedOp): Promise<void> {
+  const versions = entry.baseVersions;
+  if (!versions || !Object.keys(versions).length) return;
+  const ids = Object.keys(versions);
+  try {
+    const { data, error } = await (
+      supabaseExternal as unknown as {
+        from: (t: string) => {
+          select: (c: string) => {
+            in: (
+              col: string,
+              values: string[],
+            ) => PromiseLike<{ data: Record<string, unknown>[] | null; error: { message: string } | null }>;
+          };
+        };
+      }
+    )
+      .from(entry.op.table)
+      .select("id,row_version")
+      .in("id", ids);
+    if (error || !data) return;
+    noteVersions(entry.op.table, data);
+    for (const row of data) {
+      const id = String(row["id"] ?? "");
+      const central = row["row_version"];
+      const base = versions[id];
+      if (typeof central !== "number" || typeof base !== "number") continue;
+      // One step on is this till's own change landing. Anything beyond that
+      // means another change went in first and won.
+      if (central <= base + 1) continue;
+      recordConflict({
+        table: entry.op.table,
+        recordId: id,
+        context: entry.context,
+        baseVersion: base,
+        centralVersion: central,
+      });
+      logSync(
+        "push",
+        entry.op.table,
+        false,
+        `${entry.context}: the central copy of this record is newer (version ${central}), so it was kept`,
+      );
+    }
+  } catch {
+    /* the next pull brings the central copy down anyway */
+  }
+}
+
+/**
  * A refused change is parked immediately with its reason; anything else keeps
  * its place in the queue and is retried.
  */
@@ -243,16 +326,17 @@ async function runOne(entry: QueuedOp): Promise<boolean> {
     (entry.op.table === "stores" || refusedTables.has(entry.op.table) || preferRelay()) &&
     canRelay()
   ) {
-    const relayed = await viaRelay(entry.context, entry.op);
+    const relayed = await viaRelay(entry.context, versionedOp(entry));
     if (relayed.ok) {
       resolveOp(entry.id);
+      await reconcileVersions(entry);
       return true;
     }
     recordRelayFailure(entry, relayed);
     return false;
   }
 
-  let res = await execute(entry.op);
+  let res = await execute(versionedOp(entry));
   // PGRST204 = column missing from the schema cache. Older databases simply do
   // not have the newer columns yet, so drop whichever column the error names
   // (falling back to the known-optional list) and retry until the core row saves.
@@ -265,7 +349,7 @@ async function runOne(entry: QueuedOp): Promise<boolean> {
       if (!next.length || next.every((c) => dropped.includes(c))) break;
       dropped.push(...next);
       res = await execute({
-        ...entry.op,
+        ...versionedOp(entry),
         rows: strip(entry.op.rows, dropped),
       } as SyncOp);
     }
@@ -276,9 +360,10 @@ async function runOne(entry: QueuedOp): Promise<boolean> {
     // relay, which proves the till and writes on its behalf.
     if (isPermissionError(res.error) && canRelay()) {
       refusedTables.add(entry.op.table);
-      const relayed = await viaRelay(entry.context, entry.op);
+      const relayed = await viaRelay(entry.context, versionedOp(entry));
       if (relayed.ok) {
         resolveOp(entry.id);
+        await reconcileVersions(entry);
         return true;
       }
       recordRelayFailure(entry, relayed);
@@ -292,6 +377,7 @@ async function runOne(entry: QueuedOp): Promise<boolean> {
   }
   resolveOp(entry.id);
   logSync("push", entry.op.table, true, entry.context);
+  await reconcileVersions(entry);
   return true;
 }
 
