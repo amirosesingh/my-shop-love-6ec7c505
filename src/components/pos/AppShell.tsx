@@ -24,6 +24,7 @@ import { roleHasTag, tagOfPermission, type StaffRole } from "@/lib/permissions";
 import { LiveClock } from "@/components/pos/LiveClock";
 import { ThemeToggle } from "@/components/pos/ThemeToggle";
 import { startSyncEngine } from "@/lib/sync-engine";
+import { hydrateBillSequence } from "@/lib/bill-number";
 import { startDatabaseModeWatch } from "@/lib/db-mode";
 import { DbConnectionModal } from "@/components/pos/DbConnectionModal";
 import type { NavItem } from "@/components/pos/nav-config";
@@ -141,6 +142,11 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   // Background outbox drain: keeps offline sales flowing once the link returns.
   useEffect(() => startSyncEngine(), []);
+  // The bill counter lives in the branch database; restore it before the first
+  // sale so a cleared browser profile cannot restart numbering.
+  useEffect(() => {
+    void hydrateBillSequence();
+  }, []);
   // The web client already knows the activated tenant. Hand the same public
   // connection details to Electron's sync worker on every launch so desktop
   // catalogue pulls and local recovery do not depend on opening Settings first.
