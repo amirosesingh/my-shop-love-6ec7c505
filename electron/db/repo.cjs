@@ -168,7 +168,7 @@ async function upsertRow(tx, table, row, { markPending = true } = {}) {
   for (const col of columns) bind(request, col, record[col] ?? null);
 
   const setList = columns
-    .filter((c) => c !== "id")
+    .filter((c) => c !== "id" && !(markPending && c === "row_version"))
     .map((c) => `t.[${c}] = s.[${c}]`)
     .concat("t.[updated_at] = SYSUTCDATETIME()")
     .concat(markPending ? ["t.[is_synced] = 0", "t.[sync_status] = N'pending'"] : [])
