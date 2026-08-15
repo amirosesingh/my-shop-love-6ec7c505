@@ -229,17 +229,163 @@ CREATE TABLE IF NOT EXISTS system_settings (
   updated_at TEXT
 );
 
+-- ------------------------------------------------- catalogue + ops mirrors
+CREATE TABLE IF NOT EXISTS suppliers (
+  id           TEXT PRIMARY KEY,
+  name         TEXT NOT NULL,
+  contact_name TEXT,
+  phone        TEXT,
+  email        TEXT,
+  address      TEXT,
+  is_active    INTEGER NOT NULL DEFAULT 1,
+  created_at   TEXT,
+  updated_at   TEXT
+);
+
+CREATE TABLE IF NOT EXISTS product_categories (
+  id         TEXT PRIMARY KEY,
+  name       TEXT NOT NULL,
+  kind       TEXT NOT NULL DEFAULT 'category',
+  sort       INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT,
+  updated_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS uom_units (
+  id            TEXT PRIMARY KEY,
+  code          TEXT NOT NULL,
+  name          TEXT NOT NULL,
+  allow_decimal INTEGER NOT NULL DEFAULT 0,
+  sort          INTEGER NOT NULL DEFAULT 0,
+  created_at    TEXT,
+  updated_at    TEXT
+);
+
+CREATE TABLE IF NOT EXISTS membership_tiers (
+  id                  TEXT PRIMARY KEY,
+  name                TEXT NOT NULL,
+  discount_percentage REAL NOT NULL DEFAULT 0,
+  points_multiplier   REAL NOT NULL DEFAULT 1,
+  created_at          TEXT,
+  updated_at          TEXT
+);
+
+CREATE TABLE IF NOT EXISTS promotions (
+  id               TEXT PRIMARY KEY,
+  title            TEXT NOT NULL,
+  promo_type       TEXT NOT NULL,
+  min_spend        REAL NOT NULL DEFAULT 0,
+  discount_percent REAL NOT NULL DEFAULT 0,
+  discount_amount  REAL NOT NULL DEFAULT 0,
+  foc_product_id   TEXT,
+  points_per_dollar REAL NOT NULL DEFAULT 0,
+  tier_rates       TEXT,
+  is_active        INTEGER NOT NULL DEFAULT 1,
+  start_date       TEXT,
+  end_date         TEXT,
+  created_at       TEXT,
+  updated_at       TEXT
+);
+
+CREATE TABLE IF NOT EXISTS purchase_orders (
+  id                TEXT PRIMARY KEY,
+  po_number         TEXT NOT NULL,
+  supplier_id       TEXT,
+  supplier_name     TEXT,
+  operator_name     TEXT,
+  store_id          TEXT,
+  invoice_date      TEXT,
+  total_cost        REAL NOT NULL DEFAULT 0,
+  total_items_count INTEGER NOT NULL DEFAULT 0,
+  created_at        TEXT NOT NULL,
+  updated_at        TEXT
+);
+CREATE INDEX IF NOT EXISTS purchase_orders_created_idx ON purchase_orders (created_at DESC);
+
+CREATE TABLE IF NOT EXISTS purchase_order_items (
+  id                TEXT PRIMARY KEY,
+  po_id             TEXT NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
+  product_id        TEXT,
+  barcode           TEXT,
+  sku               TEXT,
+  product_name      TEXT,
+  cost_price        REAL NOT NULL DEFAULT 0,
+  selling_price     REAL NOT NULL DEFAULT 0,
+  quantity_received INTEGER NOT NULL DEFAULT 0,
+  subtotal_cost     REAL NOT NULL DEFAULT 0,
+  created_at        TEXT,
+  updated_at        TEXT
+);
+CREATE INDEX IF NOT EXISTS purchase_order_items_po_idx ON purchase_order_items (po_id);
+
+CREATE TABLE IF NOT EXISTS stock_transfers (
+  id            TEXT PRIMARY KEY,
+  ref           TEXT NOT NULL,
+  kind          TEXT NOT NULL DEFAULT 'transfer',
+  from_store_id TEXT NOT NULL,
+  to_store_id   TEXT NOT NULL,
+  status        TEXT NOT NULL DEFAULT 'pending',
+  note          TEXT NOT NULL DEFAULT '',
+  created_by    TEXT,
+  created_at    TEXT NOT NULL,
+  updated_at    TEXT
+);
+CREATE INDEX IF NOT EXISTS stock_transfers_status_idx ON stock_transfers (status, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS stock_transfer_items (
+  id                TEXT PRIMARY KEY,
+  transfer_id       TEXT NOT NULL REFERENCES stock_transfers(id) ON DELETE CASCADE,
+  product_id        TEXT,
+  barcode           TEXT,
+  sku               TEXT,
+  product_name      TEXT,
+  quantity          INTEGER NOT NULL DEFAULT 0,
+  quantity_received INTEGER NOT NULL DEFAULT 0,
+  unit_cost         REAL NOT NULL DEFAULT 0,
+  created_at        TEXT
+);
+CREATE INDEX IF NOT EXISTS stock_transfer_items_transfer_idx ON stock_transfer_items (transfer_id);
+
+CREATE TABLE IF NOT EXISTS held_orders (
+  id            TEXT PRIMARY KEY,
+  label         TEXT NOT NULL,
+  store_id      TEXT,
+  shift_id      TEXT,
+  held_by       TEXT,
+  total         REAL NOT NULL DEFAULT 0,
+  lines         TEXT NOT NULL DEFAULT '[]',
+  cart_discount REAL NOT NULL DEFAULT 0,
+  member_id     TEXT,
+  member_name   TEXT,
+  note          TEXT NOT NULL DEFAULT '',
+  held_at       TEXT NOT NULL,
+  created_at    TEXT,
+  updated_at    TEXT
+);
+CREATE INDEX IF NOT EXISTS held_orders_store_idx ON held_orders (store_id, held_at DESC);
+
+-- Inventory deltas already applied locally: a replay can never deduct twice.
+CREATE TABLE IF NOT EXISTS stock_delta_applied (
+  movement_id TEXT PRIMARY KEY,
+  product_id  TEXT,
+  store_id    TEXT,
+  delta       INTEGER NOT NULL DEFAULT 0,
+  applied_at  TEXT NOT NULL
+);
+
 -- ---------------------------------------------------------------- sync plumbing
 -- Every offline write lands here first and is drained by the sync engine.
 CREATE TABLE IF NOT EXISTS offline_sync_queue (
   id            TEXT PRIMARY KEY,
   table_name    TEXT NOT NULL,
   record_id     TEXT,
-  action_type   TEXT NOT NULL DEFAULT 'INSERT' CHECK (action_type IN ('INSERT', 'UPDATE')),
+  action_type   TEXT NOT NULL DEFAULT 'INSERT' CHECK (action_type IN ('INSERT', 'UPDATE', 'DELETE')),
   payload_json  TEXT NOT NULL,
-  status        TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'failed')),
+  status        TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'failed', 'dead_letter')),
   error_message TEXT,
   attempts      INTEGER NOT NULL DEFAULT 0,
+  last_attempt_at TEXT,
+  client_transaction_id TEXT,
   created_at    TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS offline_sync_queue_status_idx ON offline_sync_queue (status, created_at);
@@ -270,13 +416,17 @@ CREATE TABLE IF NOT EXISTS outbox (
   error      TEXT
 );
 
--- Per-table high-water marks. The puller resumes from last_synced_at, so one
--- slow table never holds the others back.
+-- Per-table high-water marks, scoped to the branch and till so one machine can
+-- serve two branches. The puller resumes from last_synced_at, so one slow
+-- table never holds the others back.
 CREATE TABLE IF NOT EXISTS sync_metadata (
-  table_name     TEXT PRIMARY KEY,
+  table_name     TEXT NOT NULL,
+  store_id       TEXT NOT NULL DEFAULT '',
+  terminal_id    TEXT NOT NULL DEFAULT '',
   last_synced_at TEXT,
   last_pushed_at TEXT,
   rows_pushed    INTEGER NOT NULL DEFAULT 0,
   last_error     TEXT,
-  updated_at     TEXT
+  updated_at     TEXT,
+  PRIMARY KEY (table_name, store_id, terminal_id)
 );
