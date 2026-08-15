@@ -819,6 +819,18 @@ async function loadLocalState(cause: unknown): Promise<CloudSlice> {
  * Strictly status-driven: a shift opened on any past date stays active until
  * something explicitly closes it. No date or time filtering here, ever.
  */
+/**
+ * The open shift according to this terminal's own copy. `undefined` means the
+ * terminal has no copy to answer with, which is different from "no shift".
+ */
+function localOpenShift(storeId: string): Shift | null | undefined {
+  const snap = readSnapshot();
+  if (!snap) return undefined;
+  const open = (snap.shifts ?? []).filter((s) => s.storeId === storeId && s.status === "OPEN");
+  if (!open.length) return null;
+  return [...open].sort((a, b) => (a.openedAt < b.openedAt ? 1 : -1))[0];
+}
+
 export async function loadActiveShift(storeId: string): Promise<Shift | null> {
   // A cashier signed in with a PIN has no account on the central database, so
   // the direct read is refused or filtered out. The proven server relay answers
@@ -850,9 +862,17 @@ export async function loadActiveShift(storeId: string): Promise<Shift | null> {
     if (!canRelay()) throw res.error;
   }
 
-  if (!canRelay()) throw new Error("This till cannot read the central database yet");
+  if (!canRelay()) {
+    const local = localOpenShift(storeId);
+    if (local !== undefined) return local;
+    throw new Error("This till cannot read the central database yet");
+  }
   const relayed = await relayActiveShift(storeId);
-  if (!relayed.ok) throw new Error(relayed.error ?? "Could not read the open shift");
+  if (!relayed.ok) {
+    const local = localOpenShift(storeId);
+    if (local !== undefined) return local;
+    throw new Error(relayed.error ?? "Could not read the open shift");
+  }
   return relayed.row ? rowToShift(relayed.row as Row) : null;
 }
 
