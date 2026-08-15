@@ -60,6 +60,7 @@ export function SyncHub() {
   const [rows, setRows] = useState<SyncAuditRow[]>([]);
   const [engine, setEngine] = useState<LocalEngineInfo | null>(null);
   const [queue, setQueue] = useState<QueueView[]>([]);
+  const [localQueue, setLocalQueue] = useState<SyncQueueRow[]>([]);
   const [conflicts, setConflicts] = useState<SyncConflict[]>([]);
   const [busy, setBusy] = useState<"push" | "pull" | "cycle" | null>(null);
   const [progress, setProgress] = useState(0);
@@ -70,6 +71,21 @@ export function SyncHub() {
     setRows(await listSyncAudit(200));
     setEngine(await localEngineInfo());
     setQueue(queueView());
+    // Desktop tills keep their own queue in the branch database; parked rows
+    // there belong in the same list as browser-queued ones.
+    const bridge = localDb();
+    if (bridge?.status) {
+      try {
+        const st = await bridge.status();
+        setLocalQueue(
+          (st.queue ?? []).filter((r) => r.status === "error" || r.status === "quarantined"),
+        );
+      } catch {
+        setLocalQueue([]);
+      }
+    } else {
+      setLocalQueue([]);
+    }
     setConflicts(listConflicts());
   }, []);
 
@@ -279,12 +295,47 @@ export function SyncHub() {
         </Card>
       )}
 
-      {failedQueue.length > 0 && (
+      {(failedQueue.length > 0 || localQueue.length > 0) && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Changes needing attention</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
+            {localQueue.map((r) => (
+              <div
+                key={`local-${r.table}-${r.id}`}
+                className="flex flex-wrap items-center gap-2 rounded-md border border-border p-2 text-xs"
+              >
+                <span className="font-medium">This till</span>
+                <span className="text-muted-foreground">{r.table}</span>
+                <span className="text-destructive">{r.error ?? r.status}</span>
+                <div className="ml-auto flex gap-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      await localDb()?.retryRow?.(r.table, r.id);
+                      await refresh();
+                    }}
+                  >
+                    <RotateCcw className="size-3.5" /> Retry
+                  </Button>
+                  {isAdmin && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={async () => {
+                        const res = await localDb()?.discardRow?.(r.table, r.id);
+                        if (res && !res.ok) toast.error(res.error ?? "Could not discard");
+                        await refresh();
+                      }}
+                    >
+                      Discard
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
             {failedQueue.map((q) => (
               <div
                 key={q.id}
