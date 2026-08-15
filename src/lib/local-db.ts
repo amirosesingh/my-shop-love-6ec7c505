@@ -134,6 +134,8 @@ export type PosBridge = {
   backup: (path?: string) => Promise<{ ok: boolean; path?: string; error?: string }>;
   retryErrored: () => Promise<{ ok: boolean }>;
   retryRow?: (table: string, id: string) => Promise<{ ok: boolean; error?: string }>;
+  /** Stop retrying a change that can never succeed (desktop shell only). */
+  discardRow?: (table: string, id: string) => Promise<{ ok: boolean; error?: string }>;
   /** Prunes rows the central database has confirmed plus orphaned temp files. */
   housekeep?: (options?: { retentionDays?: number }) => Promise<{
     ok: boolean;
