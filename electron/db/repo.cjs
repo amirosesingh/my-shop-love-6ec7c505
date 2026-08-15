@@ -708,6 +708,7 @@ function toCloudRow(table, row) {
 module.exports = {
   TABLES,
   CATALOGUE_TABLES,
+  SCOPED_PULL_TABLES,
   PRUNABLE_TABLES,
   SETTINGS_ID,
   setScope,
@@ -723,6 +724,7 @@ module.exports = {
   markFailed,
   retryErrored,
   retryRow,
+  discardRow,
   queueRows,
   mergeFromCloud,
   stats,
