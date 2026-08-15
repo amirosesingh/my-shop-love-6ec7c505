@@ -15,69 +15,18 @@
  * connection is down, the cloud otherwise.
  */
 import { commitOps, commitLabel, type CommitTarget } from "./pos-db";
+import { AllTargetsFailed, isCloudDirect, isConnectionError } from "./db-mode";
+import { checkHealth } from "./connection-health";
 import {
-  AllTargetsFailed,
-  effectiveDatabaseMode,
-  isCloudDirect,
-  isConnectionError,
-} from "./db-mode";
-import { supabaseExternal } from "@/integrations/supabase/external-client";
-import { readSnapshot } from "./offline-snapshot";
-import { checkHealth, lastHealth } from "./connection-health";
+  routedQuery,
+  routedQueryWithSource,
+  type QueryOptions,
+  type ReadSource,
+} from "./db-query";
 import type { Row, SyncOp } from "./sync-outbox";
 
 export { AllTargetsFailed, isCloudDirect };
-export type { CommitTarget };
-
-/** Table names are dynamic here, so the generated row types do not apply. */
-type LooseSelect = {
-  select: (columns: string) => LooseFilter;
-};
-type LooseFilter = PromiseLike<{ data: unknown; error: { message: string } | null }> & {
-  eq: (column: string, value: unknown) => LooseFilter;
-  order: (column: string, opts: { ascending: boolean }) => LooseFilter;
-  limit: (n: number) => LooseFilter;
-};
-
-const from = (table: string) =>
-  (supabaseExternal as unknown as { from: (t: string) => LooseSelect }).from(table);
-
-export type QueryOptions = {
-  columns?: string;
-  match?: Record<string, unknown>;
-  orderBy?: { column: string; ascending?: boolean };
-  limit?: number;
-};
-
-/** Slices of the last good central copy this device keeps on disk. */
-const localSlice = (table: string): Row[] | null => {
-  const snap = readSnapshot();
-  if (!snap) return null;
-  const slice = (snap as unknown as Record<string, unknown>)[table];
-  return Array.isArray(slice) ? (slice as Row[]) : null;
-};
-
-const matches = (row: Row, match?: Record<string, unknown>) =>
-  !match || Object.entries(match).every(([k, v]) => row[k] === v);
-
-/** Apply the same filtering to the local copy so both paths agree. */
-function localQuery(table: string, options: QueryOptions = {}): Row[] | null {
-  const rows = localSlice(table);
-  if (!rows) return null;
-  let out = rows.filter((r) => matches(r, options.match));
-  if (options.orderBy) {
-    const { column, ascending = true } = options.orderBy;
-    out = [...out].sort((a, b) => {
-      const x = a[column] as never;
-      const y = b[column] as never;
-      return (x > y ? 1 : x < y ? -1 : 0) * (ascending ? 1 : -1);
-    });
-  }
-  return options.limit ? out.slice(0, options.limit) : out;
-}
-
-/** Where a read was actually served from. */
-export type ReadSource = "cloud" | "local";
+export type { CommitTarget, QueryOptions, ReadSource };
 
 export const dbRouter = {
   /**
