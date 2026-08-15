@@ -207,14 +207,16 @@ async function pull() {
   setPhase("pulling");
   const fallback = (await repo.getState("last_pull_at")) ?? "1970-01-01T00:00:00.000Z";
   let merged = 0;
+  const markFor = async (table) => {
+    try {
+      return (await repo.getWatermark(table)) ?? fallback;
+    } catch {
+      return fallback; // pre-1.3.3 database without sync_metadata
+    }
+  };
   for (const table of repo.CATALOGUE_TABLES) {
     // Per-table high-water mark: one slow table never holds the others back.
-    let since = fallback;
-    try {
-      since = (await repo.getWatermark(table)) ?? fallback;
-    } catch {
-      /* pre-1.3.3 database without sync_metadata */
-    }
+    const since = await markFor(table);
     const startedAt = new Date().toISOString();
     // Delta only: anything the cloud has touched since our last clean pull.
     const { data, error } = await selectChangedSince(table, since);
@@ -227,11 +229,51 @@ async function pull() {
     // Watermark advances only after a clean merge.
     await repo.setWatermark(table, startedAt, { error: null }).catch(() => {});
   }
-  // Settings is a single wide row; fetch it whole.
-  const { data: settings } = await supabase.from("pos_settings").select("*").maybeSingle();
-  if (settings) {
+
+  // Work done elsewhere that this branch still needs: members, plus transfers
+  // and bookings that belong to us. Parents come first so their children can
+  // be fetched by id.
+  const parentIds = new Map();
+  for (const spec of repo.SCOPED_PULL_TABLES ?? []) {
+    const storeId = credentials.branchId ? String(credentials.branchId) : "";
+    if (spec.storeColumns && !storeId) continue; // unpinned till: stay out of other branches
+    let ids = null;
+    if (spec.parent) {
+      ids = parentIds.get(spec.parent.table) ?? [];
+      if (!ids.length) continue; // nothing new upstream this cycle
+    }
+    const since = await markFor(spec.table);
+    const startedAt = new Date().toISOString();
+    const { data, error } = await selectScoped(spec, since, storeId, ids);
+    if (error) {
+      // A branch-scoped table must never block catalogue sync.
+      await repo.setWatermark(spec.table, null, { error: error.message }).catch(() => {});
+      continue;
+    }
+    const rows = data ?? [];
+    if (!spec.parent) parentIds.set(spec.table, rows.map((row) => row.id).filter(Boolean));
+    try {
+      merged += await repo.mergeFromCloud(spec.table, rows);
+      await repo.setWatermark(spec.table, startedAt, { error: null }).catch(() => {});
+    } catch (err) {
+      await repo.setWatermark(spec.table, null, { error: String(err) }).catch(() => {});
+    }
+  }
+
+  // Settings is a single wide row, so we only re-read it once it changed.
+  const settingsSince = await markFor("pos_settings");
+  const settingsStartedAt = new Date().toISOString();
+  const { data: settings, error: settingsError } = await supabase
+    .from("pos_settings")
+    .select("*")
+    .gt("updated_at", settingsSince)
+    .maybeSingle();
+  if (settings && !settingsError) {
     await repo.mergeFromCloud("pos_settings", [{ ...settings, id: repo.SETTINGS_ID }]);
     merged += 1;
+  }
+  if (!settingsError) {
+    await repo.setWatermark("pos_settings", settingsStartedAt, { error: null }).catch(() => {});
   }
   await repo.setState("last_pull_at", new Date().toISOString());
   setPhase("idle");
