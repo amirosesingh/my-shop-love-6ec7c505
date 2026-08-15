@@ -919,11 +919,14 @@ function localSalesPage(storeId: string, cursor: Cursor, limit: number): Page<Sa
   const all = (snap.sales ?? [])
     .filter((s) => !storeId || s.storeId === storeId)
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
-  const after = cursor ? all.filter((s) => s.createdAt < (cursor as { createdAt: string }).createdAt) : all;
+  const after = cursor
+    ? all.filter((s) => s.createdAt < cursor.ts || (s.createdAt === cursor.ts && s.id < cursor.id))
+    : all;
   const rows = after.slice(0, limit);
+  const last = rows[rows.length - 1];
   return {
     rows,
-    cursor: rows.length ? ({ createdAt: rows[rows.length - 1].createdAt, id: rows[rows.length - 1].id } as unknown as Cursor) : null,
+    cursor: last ? { ts: last.createdAt, id: last.id } : null,
     hasMore: after.length > limit,
   };
 }
