@@ -56,8 +56,8 @@ export const dbRouter = {
    * Read a table without choosing a database: central first when this device
    * is set to work online and the line is up, the local copy otherwise.
    */
-  async query(table: string, options: QueryOptions = {}): Promise<Row[]> {
-    return (await dbRouter.queryWithSource(table, options)).rows;
+  query(table: string, options: QueryOptions = {}): Promise<Row[]> {
+    return routedQuery(table, options);
   },
 
   /**
@@ -65,34 +65,11 @@ export const dbRouter = {
    * from this terminal's copy, so a screen can tell the operator what they
    * are looking at.
    */
-  async queryWithSource(
+  queryWithSource(
     table: string,
     options: QueryOptions = {},
   ): Promise<{ rows: Row[]; source: ReadSource }> {
-    const cached = () => localQuery(table, options);
-    const health = lastHealth();
-    // Working locally, or the last probe says the central database is out of
-    // reach: serve the terminal copy without a doomed round trip.
-    if (effectiveDatabaseMode() === "local" || (health && !health.cloud)) {
-      const rows = cached();
-      if (rows) return { rows, source: "local" };
-    }
-    try {
-        let q = from(table).select(options.columns ?? "*");
-        for (const [k, v] of Object.entries(options.match ?? {})) q = q.eq(k, v);
-        if (options.orderBy)
-          q = q.order(options.orderBy.column, { ascending: options.orderBy.ascending ?? true });
-        if (options.limit) q = q.limit(options.limit);
-        const { data, error } = await q;
-        if (error) throw new Error(error.message);
-        return { rows: (data as Row[]) ?? [], source: "cloud" };
-    } catch (e) {
-      const rows = cached();
-      // Only a connection-class failure may fall back: a refusal or a bad
-      // query must stay visible instead of quietly serving stale rows.
-      if (rows && isConnectionError(e)) return { rows, source: "local" };
-      throw e;
-    }
+    return routedQueryWithSource(table, options);
   },
 
   /** Add rows. The row id doubles as the key, so a replay never duplicates. */
