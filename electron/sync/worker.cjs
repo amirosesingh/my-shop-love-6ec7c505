@@ -46,6 +46,33 @@ async function selectChangedSince(table, since) {
 }
 
 /**
+ * Same delta read, but limited to rows this branch is allowed to see: either a
+ * store column matches our branch, or the row hangs off a parent we just
+ * pulled.
+ */
+async function selectScoped(spec, since, storeId, parentIds) {
+  const stamp = stampColumn.get(spec.table);
+  const build = (column) => {
+    let query = supabase.from(spec.table).select("*").gt(column, since);
+    if (spec.storeColumns?.length === 1) query = query.eq(spec.storeColumns[0], storeId);
+    else if (spec.storeColumns?.length) {
+      query = query.or(spec.storeColumns.map((c) => `${c}.eq.${storeId}`).join(","));
+    }
+    if (spec.parent) query = query.in(spec.parent.column, parentIds ?? []);
+    return query;
+  };
+  if (stamp) return await build(stamp);
+  let res = await build("updated_at");
+  if (!res.error) {
+    stampColumn.set(spec.table, "updated_at");
+    return res;
+  }
+  res = await build("created_at");
+  if (!res.error) stampColumn.set(spec.table, "created_at");
+  return res;
+}
+
+/**
  * Stock never travels as an absolute figure. A till pushes its movement rows
  * and the central database applies each one as a relative delta, keyed on the
  * movement id so a retry can never deduct twice.
