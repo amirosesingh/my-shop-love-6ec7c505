@@ -94,6 +94,7 @@ export type Database = {
           pin_length: number
           role: Database["public"]["Enums"]["app_role"]
           role_slug: string | null
+          row_version: number
           store_id: string | null
           updated_at: string
           user_id: string
@@ -111,6 +112,7 @@ export type Database = {
           pin_length?: number
           role?: Database["public"]["Enums"]["app_role"]
           role_slug?: string | null
+          row_version?: number
           store_id?: string | null
           updated_at?: string
           user_id: string
@@ -128,6 +130,7 @@ export type Database = {
           pin_length?: number
           role?: Database["public"]["Enums"]["app_role"]
           role_slug?: string | null
+          row_version?: number
           store_id?: string | null
           updated_at?: string
           user_id?: string
@@ -173,6 +176,7 @@ export type Database = {
           id: string
           method: string
           paid_at: string
+          row_version: number
         }
         Insert: {
           amount?: number
@@ -182,6 +186,7 @@ export type Database = {
           id?: string
           method?: string
           paid_at?: string
+          row_version?: number
         }
         Update: {
           amount?: number
@@ -191,6 +196,7 @@ export type Database = {
           id?: string
           method?: string
           paid_at?: string
+          row_version?: number
         }
         Relationships: [
           {
@@ -232,6 +238,7 @@ export type Database = {
           promised_at: string | null
           racket_model: string | null
           ref: string
+          row_version: number
           sale_receipt_no: string | null
           service_fee: number
           service_name: string | null
@@ -281,6 +288,7 @@ export type Database = {
           promised_at?: string | null
           racket_model?: string | null
           ref: string
+          row_version?: number
           sale_receipt_no?: string | null
           service_fee?: number
           service_name?: string | null
@@ -330,6 +338,7 @@ export type Database = {
           promised_at?: string | null
           racket_model?: string | null
           ref?: string
+          row_version?: number
           sale_receipt_no?: string | null
           service_fee?: number
           service_name?: string | null
@@ -415,6 +424,7 @@ export type Database = {
           max_claims: number | null
           max_per_member: number | null
           name: string
+          row_version: number
           scope: string
           scope_value: string | null
           slug: string
@@ -433,6 +443,7 @@ export type Database = {
           max_claims?: number | null
           max_per_member?: number | null
           name: string
+          row_version?: number
           scope?: string
           scope_value?: string | null
           slug: string
@@ -451,6 +462,7 @@ export type Database = {
           max_claims?: number | null
           max_per_member?: number | null
           name?: string
+          row_version?: number
           scope?: string
           scope_value?: string | null
           slug?: string
@@ -583,6 +595,7 @@ export type Database = {
           member_id: string | null
           member_name: string | null
           note: string
+          row_version: number
           shift_id: string | null
           store_id: string | null
           total: number
@@ -603,6 +616,7 @@ export type Database = {
           member_id?: string | null
           member_name?: string | null
           note?: string
+          row_version?: number
           shift_id?: string | null
           store_id?: string | null
           total?: number
@@ -623,6 +637,7 @@ export type Database = {
           member_id?: string | null
           member_name?: string | null
           note?: string
+          row_version?: number
           shift_id?: string | null
           store_id?: string | null
           total?: number
@@ -645,6 +660,7 @@ export type Database = {
           redeemed_at: string | null
           redeemed_by: string | null
           redeemed_sale_id: string | null
+          row_version: number
           status: string
           store_id: string | null
           token_slug: string
@@ -663,6 +679,7 @@ export type Database = {
           redeemed_at?: string | null
           redeemed_by?: string | null
           redeemed_sale_id?: string | null
+          row_version?: number
           status?: string
           store_id?: string | null
           token_slug: string
@@ -681,6 +698,7 @@ export type Database = {
           redeemed_at?: string | null
           redeemed_by?: string | null
           redeemed_sale_id?: string | null
+          row_version?: number
           status?: string
           store_id?: string | null
           token_slug?: string
@@ -714,6 +732,7 @@ export type Database = {
           quantity_delta: number
           reference: string | null
           role: string | null
+          row_version: number
           sku: string | null
           staff_id: string | null
           staff_name: string | null
@@ -734,6 +753,7 @@ export type Database = {
           quantity_delta?: number
           reference?: string | null
           role?: string | null
+          row_version?: number
           sku?: string | null
           staff_id?: string | null
           staff_name?: string | null
@@ -754,6 +774,7 @@ export type Database = {
           quantity_delta?: number
           reference?: string | null
           role?: string | null
+          row_version?: number
           sku?: string | null
           staff_id?: string | null
           staff_name?: string | null
@@ -784,6 +805,7 @@ export type Database = {
           loyalty_points: number
           member_code: string
           phone: string
+          row_version: number
           tier_id: string | null
           total_spent: number
           updated_at: string
@@ -798,6 +820,7 @@ export type Database = {
           loyalty_points?: number
           member_code: string
           phone: string
+          row_version?: number
           tier_id?: string | null
           total_spent?: number
           updated_at?: string
@@ -812,6 +835,7 @@ export type Database = {
           loyalty_points?: number
           member_code?: string
           phone?: string
+          row_version?: number
           tier_id?: string | null
           total_spent?: number
           updated_at?: string
@@ -833,6 +857,7 @@ export type Database = {
           id: string
           name: string
           points_multiplier: number
+          row_version: number
           updated_at: string
         }
         Insert: {
@@ -841,6 +866,7 @@ export type Database = {
           id?: string
           name: string
           points_multiplier?: number
+          row_version?: number
           updated_at?: string
         }
         Update: {
@@ -849,6 +875,7 @@ export type Database = {
           id?: string
           name?: string
           points_multiplier?: number
+          row_version?: number
           updated_at?: string
         }
         Relationships: []
@@ -912,6 +939,7 @@ export type Database = {
           note: string
           paid_at: string
           reference: string | null
+          row_version: number
           sale_id: string | null
           shift_id: string | null
           source_type: string
@@ -932,6 +960,7 @@ export type Database = {
           note?: string
           paid_at?: string
           reference?: string | null
+          row_version?: number
           sale_id?: string | null
           shift_id?: string | null
           source_type: string
@@ -952,6 +981,7 @@ export type Database = {
           note?: string
           paid_at?: string
           reference?: string | null
+          row_version?: number
           sale_id?: string | null
           shift_id?: string | null
           source_type?: string
@@ -1036,6 +1066,7 @@ export type Database = {
           review_max_refund_value: number
           review_max_refunds: number
           review_max_voids: number
+          row_version: number
           shift_reminder_minutes: number
           show_barcode: boolean
           show_logo: boolean
@@ -1075,6 +1106,7 @@ export type Database = {
           review_max_refund_value?: number
           review_max_refunds?: number
           review_max_voids?: number
+          row_version?: number
           shift_reminder_minutes?: number
           show_barcode?: boolean
           show_logo?: boolean
@@ -1114,6 +1146,7 @@ export type Database = {
           review_max_refund_value?: number
           review_max_refunds?: number
           review_max_voids?: number
+          row_version?: number
           shift_reminder_minutes?: number
           show_barcode?: boolean
           show_logo?: boolean
@@ -1139,6 +1172,7 @@ export type Database = {
           label: string | null
           pack_size: number
           product_id: string
+          row_version: number
           updated_at: string
         }
         Insert: {
@@ -1149,6 +1183,7 @@ export type Database = {
           label?: string | null
           pack_size?: number
           product_id: string
+          row_version?: number
           updated_at?: string
         }
         Update: {
@@ -1159,6 +1194,7 @@ export type Database = {
           label?: string | null
           pack_size?: number
           product_id?: string
+          row_version?: number
           updated_at?: string
         }
         Relationships: [
@@ -1178,6 +1214,7 @@ export type Database = {
           kind: string
           name: string
           parent_id: string | null
+          row_version: number
           sort: number
           updated_at: string
         }
@@ -1187,6 +1224,7 @@ export type Database = {
           kind?: string
           name: string
           parent_id?: string | null
+          row_version?: number
           sort?: number
           updated_at?: string
         }
@@ -1196,6 +1234,7 @@ export type Database = {
           kind?: string
           name?: string
           parent_id?: string | null
+          row_version?: number
           sort?: number
           updated_at?: string
         }
@@ -1314,6 +1353,7 @@ export type Database = {
           min_spend: number
           points_per_dollar: number
           promo_type: string
+          row_version: number
           start_date: string | null
           tier_rates: Json | null
           title: string
@@ -1330,6 +1370,7 @@ export type Database = {
           min_spend?: number
           points_per_dollar?: number
           promo_type: string
+          row_version?: number
           start_date?: string | null
           tier_rates?: Json | null
           title: string
@@ -1346,6 +1387,7 @@ export type Database = {
           min_spend?: number
           points_per_dollar?: number
           promo_type?: string
+          row_version?: number
           start_date?: string | null
           tier_rates?: Json | null
           title?: string
@@ -1389,6 +1431,7 @@ export type Database = {
           product_id: string | null
           product_name: string | null
           quantity_received: number
+          row_version: number
           selling_price: number
           sku: string | null
           subtotal_cost: number
@@ -1403,6 +1446,7 @@ export type Database = {
           product_id?: string | null
           product_name?: string | null
           quantity_received?: number
+          row_version?: number
           selling_price?: number
           sku?: string | null
           subtotal_cost?: number
@@ -1417,6 +1461,7 @@ export type Database = {
           product_id?: string | null
           product_name?: string | null
           quantity_received?: number
+          row_version?: number
           selling_price?: number
           sku?: string | null
           subtotal_cost?: number
@@ -1447,6 +1492,7 @@ export type Database = {
           invoice_entry_date: string | null
           operator_name: string | null
           po_number: string
+          row_version: number
           store_code: string | null
           store_id: string | null
           supplier_id: string | null
@@ -1462,6 +1508,7 @@ export type Database = {
           invoice_entry_date?: string | null
           operator_name?: string | null
           po_number: string
+          row_version?: number
           store_code?: string | null
           store_id?: string | null
           supplier_id?: string | null
@@ -1477,6 +1524,7 @@ export type Database = {
           invoice_entry_date?: string | null
           operator_name?: string | null
           po_number?: string
+          row_version?: number
           store_code?: string | null
           store_id?: string | null
           supplier_id?: string | null
@@ -1509,6 +1557,7 @@ export type Database = {
           product_name: string
           promo_id: string | null
           quantity: number
+          row_version: number
           sale_id: string
           tax_rate: number
           unit_cost: number
@@ -1527,6 +1576,7 @@ export type Database = {
           product_name: string
           promo_id?: string | null
           quantity?: number
+          row_version?: number
           sale_id: string
           tax_rate?: number
           unit_cost?: number
@@ -1545,6 +1595,7 @@ export type Database = {
           product_name?: string
           promo_id?: string | null
           quantity?: number
+          row_version?: number
           sale_id?: string
           tax_rate?: number
           unit_cost?: number
@@ -1593,6 +1644,7 @@ export type Database = {
           payments: Json
           points_earned: number
           points_redeemed: number
+          row_version: number
           shift_id: string | null
           store_id: string | null
           subtotal_amount: number
@@ -1625,6 +1677,7 @@ export type Database = {
           payments?: Json
           points_earned?: number
           points_redeemed?: number
+          row_version?: number
           shift_id?: string | null
           store_id?: string | null
           subtotal_amount?: number
@@ -1657,6 +1710,7 @@ export type Database = {
           payments?: Json
           points_earned?: number
           points_redeemed?: number
+          row_version?: number
           shift_id?: string | null
           store_id?: string | null
           subtotal_amount?: number
@@ -1814,6 +1868,7 @@ export type Database = {
           created_at: string
           id: string
           role: string | null
+          row_version: number
           shift_id: string | null
           signed_in_at: string
           signed_out_at: string | null
@@ -1828,6 +1883,7 @@ export type Database = {
           created_at?: string
           id?: string
           role?: string | null
+          row_version?: number
           shift_id?: string | null
           signed_in_at?: string
           signed_out_at?: string | null
@@ -1842,6 +1898,7 @@ export type Database = {
           created_at?: string
           id?: string
           role?: string | null
+          row_version?: number
           shift_id?: string | null
           signed_in_at?: string
           signed_out_at?: string | null
@@ -1872,6 +1929,7 @@ export type Database = {
           opened_by_staff_id: string | null
           opening_float: number
           overdue: boolean
+          row_version: number
           status: string
           store_id: string
           terminal_id: string | null
@@ -1896,6 +1954,7 @@ export type Database = {
           opened_by_staff_id?: string | null
           opening_float?: number
           overdue?: boolean
+          row_version?: number
           status?: string
           store_id: string
           terminal_id?: string | null
@@ -1920,6 +1979,7 @@ export type Database = {
           opened_by_staff_id?: string | null
           opening_float?: number
           overdue?: boolean
+          row_version?: number
           status?: string
           store_id?: string
           terminal_id?: string | null
@@ -2020,6 +2080,7 @@ export type Database = {
           product_name: string | null
           reason: string
           role: string | null
+          row_version: number
           sku: string | null
           staff_id: string | null
           staff_name: string | null
@@ -2039,6 +2100,7 @@ export type Database = {
           product_name?: string | null
           reason?: string
           role?: string | null
+          row_version?: number
           sku?: string | null
           staff_id?: string | null
           staff_name?: string | null
@@ -2058,6 +2120,7 @@ export type Database = {
           product_name?: string | null
           reason?: string
           role?: string | null
+          row_version?: number
           sku?: string | null
           staff_id?: string | null
           staff_name?: string | null
@@ -2108,6 +2171,7 @@ export type Database = {
           product_name: string | null
           quantity: number
           quantity_received: number
+          row_version: number
           sku: string | null
           transfer_id: string
           unit_cost: number
@@ -2120,6 +2184,7 @@ export type Database = {
           product_name?: string | null
           quantity?: number
           quantity_received?: number
+          row_version?: number
           sku?: string | null
           transfer_id: string
           unit_cost?: number
@@ -2132,6 +2197,7 @@ export type Database = {
           product_name?: string | null
           quantity?: number
           quantity_received?: number
+          row_version?: number
           sku?: string | null
           transfer_id?: string
           unit_cost?: number
@@ -2169,6 +2235,7 @@ export type Database = {
           received_by: string | null
           ref: string
           rejected_reason: string | null
+          row_version: number
           status: string
           to_group_id: string | null
           to_store_id: string
@@ -2191,6 +2258,7 @@ export type Database = {
           received_by?: string | null
           ref: string
           rejected_reason?: string | null
+          row_version?: number
           status?: string
           to_group_id?: string | null
           to_store_id: string
@@ -2213,6 +2281,7 @@ export type Database = {
           received_by?: string | null
           ref?: string
           rejected_reason?: string | null
+          row_version?: number
           status?: string
           to_group_id?: string | null
           to_store_id?: string
@@ -2231,6 +2300,7 @@ export type Database = {
           id: string
           name: string
           phone: string | null
+          row_version: number
           updated_at: string
         }
         Insert: {
@@ -2241,6 +2311,7 @@ export type Database = {
           id: string
           name: string
           phone?: string | null
+          row_version?: number
           updated_at?: string
         }
         Update: {
@@ -2251,6 +2322,7 @@ export type Database = {
           id?: string
           name?: string
           phone?: string | null
+          row_version?: number
           updated_at?: string
         }
         Relationships: []
@@ -2266,6 +2338,7 @@ export type Database = {
           name: string
           notes: string | null
           phone: string | null
+          row_version: number
           tax_number: string | null
           updated_at: string
         }
@@ -2279,6 +2352,7 @@ export type Database = {
           name: string
           notes?: string | null
           phone?: string | null
+          row_version?: number
           tax_number?: string | null
           updated_at?: string
         }
@@ -2292,6 +2366,7 @@ export type Database = {
           name?: string
           notes?: string | null
           phone?: string | null
+          row_version?: number
           tax_number?: string | null
           updated_at?: string
         }
@@ -2402,6 +2477,7 @@ export type Database = {
           reissued_at: string | null
           replaced_by: string | null
           revoked_at: string | null
+          row_version: number
           status: string
         }
         Insert: {
@@ -2418,6 +2494,7 @@ export type Database = {
           reissued_at?: string | null
           replaced_by?: string | null
           revoked_at?: string | null
+          row_version?: number
           status?: string
         }
         Update: {
@@ -2434,6 +2511,7 @@ export type Database = {
           reissued_at?: string | null
           replaced_by?: string | null
           revoked_at?: string | null
+          row_version?: number
           status?: string
         }
         Relationships: [
@@ -2453,6 +2531,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          row_version: number
           sort: number
           updated_at: string
         }
@@ -2462,6 +2541,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          row_version?: number
           sort?: number
           updated_at?: string
         }
@@ -2471,6 +2551,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          row_version?: number
           sort?: number
           updated_at?: string
         }
@@ -2807,6 +2888,7 @@ export type Database = {
           opened_by_staff_id: string | null
           opening_float: number
           overdue: boolean
+          row_version: number
           status: string
           store_id: string
           terminal_id: string | null
@@ -2850,6 +2932,7 @@ export type Database = {
           opened_by_staff_id: string | null
           opening_float: number
           overdue: boolean
+          row_version: number
           status: string
           store_id: string
           terminal_id: string | null
@@ -3027,6 +3110,7 @@ export type Database = {
           redeemed_at: string | null
           redeemed_by: string | null
           redeemed_sale_id: string | null
+          row_version: number
           status: string
           store_id: string | null
           token_slug: string
@@ -3061,6 +3145,7 @@ export type Database = {
           redeemed_at: string | null
           redeemed_by: string | null
           redeemed_sale_id: string | null
+          row_version: number
           status: string
           store_id: string | null
           token_slug: string
