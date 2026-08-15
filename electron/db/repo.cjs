@@ -369,6 +369,21 @@ async function retryRow(table, id) {
  * Row-level view behind the sync status table: everything not yet confirmed by
  * the cloud, failures first so a red badge is never buried.
  */
+/**
+ * Drops a change that can never succeed. The row stays in the local database
+ * for the record, but the queue stops trying to send it.
+ */
+async function discardRow(table, id) {
+  assertTable(table);
+  const request = getPool().request();
+  bind(request, "id", id);
+  await request.query(
+    `UPDATE dbo.[${table}]
+        SET is_synced = 1, sync_status = N'discarded', synced_at = SYSUTCDATETIME()
+      WHERE id = @id;`,
+  );
+}
+
 async function queueRows(limit = 100) {
   const rows = [];
   for (const table of TABLES) {
