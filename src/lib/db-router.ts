@@ -76,6 +76,9 @@ function localQuery(table: string, options: QueryOptions = {}): Row[] | null {
   return options.limit ? out.slice(0, options.limit) : out;
 }
 
+/** Where a read was actually served from. */
+export type ReadSource = "cloud" | "local";
+
 export const dbRouter = {
   /**
    * Store a group of changes. Resolves once the data is genuinely saved;
@@ -105,16 +108,27 @@ export const dbRouter = {
    * is set to work online and the line is up, the local copy otherwise.
    */
   async query(table: string, options: QueryOptions = {}): Promise<Row[]> {
+    return (await dbRouter.queryWithSource(table, options)).rows;
+  },
+
+  /**
+   * Same read, but says whether the rows came from the central database or
+   * from this terminal's copy, so a screen can tell the operator what they
+   * are looking at.
+   */
+  async queryWithSource(
+    table: string,
+    options: QueryOptions = {},
+  ): Promise<{ rows: Row[]; source: ReadSource }> {
     const cached = () => localQuery(table, options);
     const health = lastHealth();
     // Working locally, or the last probe says the central database is out of
     // reach: serve the terminal copy without a doomed round trip.
     if (effectiveDatabaseMode() === "local" || (health && !health.cloud)) {
       const rows = cached();
-      if (rows) return rows;
+      if (rows) return { rows, source: "local" };
     }
-    return dbRouter.read(
-      async () => {
+    try {
         let q = from(table).select(options.columns ?? "*");
         for (const [k, v] of Object.entries(options.match ?? {})) q = q.eq(k, v);
         if (options.orderBy)
@@ -122,10 +136,14 @@ export const dbRouter = {
         if (options.limit) q = q.limit(options.limit);
         const { data, error } = await q;
         if (error) throw new Error(error.message);
-        return (data as Row[]) ?? [];
-      },
-      () => cached(),
-    );
+        return { rows: (data as Row[]) ?? [], source: "cloud" };
+    } catch (e) {
+      const rows = cached();
+      // Only a connection-class failure may fall back: a refusal or a bad
+      // query must stay visible instead of quietly serving stale rows.
+      if (rows && isConnectionError(e)) return { rows, source: "local" };
+      throw e;
+    }
   },
 
   /** Add rows. The row id doubles as the key, so a replay never duplicates. */

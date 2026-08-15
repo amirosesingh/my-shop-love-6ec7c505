@@ -6,7 +6,8 @@ import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
-import { supabaseExternal } from "@/integrations/supabase/external-client";
+import { dbRouter, type ReadSource } from "@/lib/db-router";
+import { OfflineDataNotice } from "@/components/pos/OfflineDataNotice";
 import { money } from "@/lib/pos-store";
 import type { Product } from "@/lib/pos-types";
 
@@ -20,6 +21,9 @@ type Movement = {
   by: string;
 };
 
+type LooseRow = Record<string, unknown>;
+const text = (v: unknown) => (v == null ? "" : String(v));
+
 export function ItemActivityDrawer({
   product,
   onClose,
@@ -30,6 +34,7 @@ export function ItemActivityDrawer({
   const [rows, setRows] = useState<Movement[]>([]);
   const [loading, setLoading] = useState(false);
   const [created, setCreated] = useState<string | null>(null);
+  const [source, setSource] = useState<ReadSource>("cloud");
 
   useEffect(() => {
     if (!product) return;
@@ -37,56 +42,66 @@ export function ItemActivityDrawer({
     setLoading(true);
     setRows([]);
     void (async () => {
+      // Every read goes through the router: live when the line is up, this
+      // terminal's copy when it is not, so history still opens offline.
+      const ask = async (table: string, options: Parameters<typeof dbRouter.queryWithSource>[1]) => {
+        try {
+          return await dbRouter.queryWithSource(table, options);
+        } catch {
+          return { rows: [] as LooseRow[], source: "local" as ReadSource };
+        }
+      };
       const [adjustments, transfers, meta, merges] = await Promise.all([
-        supabaseExternal
-          .from("stock_adjustments")
-          .select("id,created_at,reason,note,delta,cost_impact,staff_name,store_id")
-          .eq("product_id", product.id)
-          .order("created_at", { ascending: false })
-          .limit(100),
-        supabaseExternal
-          .from("stock_transfer_items")
-          .select("id,created_at,quantity,quantity_received,transfer_id")
-          .eq("product_id", product.id)
-          .order("created_at", { ascending: false })
-          .limit(50),
-        supabaseExternal
-          .from("products")
-          .select("created_at,updated_at")
-          .eq("id", product.id)
-          .maybeSingle(),
-        supabaseExternal
-          .from("audit_logs")
-          .select("id,created_at,user_name,details,action_name")
-          .eq("action_name", "Products merged")
-          .order("created_at", { ascending: false })
-          .limit(100),
+        ask("stock_adjustments", {
+          columns: "id,created_at,reason,note,delta,cost_impact,staff_name,store_id",
+          match: { product_id: product.id },
+          orderBy: { column: "created_at", ascending: false },
+          limit: 100,
+        }),
+        ask("stock_transfer_items", {
+          columns: "id,created_at,quantity,quantity_received,transfer_id",
+          match: { product_id: product.id },
+          orderBy: { column: "created_at", ascending: false },
+          limit: 50,
+        }),
+        ask("products", { columns: "id,created_at,updated_at", match: { id: product.id }, limit: 1 }),
+        ask("audit_logs", {
+          columns: "id,created_at,user_name,details,action_name",
+          match: { action_name: "Products merged" },
+          orderBy: { column: "created_at", ascending: false },
+          limit: 100,
+        }),
       ]);
       if (!live) return;
+      setSource(
+        [adjustments, transfers, meta, merges].some((r) => r.source === "local")
+          ? "local"
+          : "cloud",
+      );
       const list: Movement[] = [
-        ...(adjustments.data ?? []).map((r) => ({
+        ...(adjustments.rows as LooseRow[]).map((r) => ({
           id: `adj-${r.id}`,
-          at: r.created_at,
+          at: text(r["created_at"]),
           kind: "Stock adjustment",
-          detail: `${String(r.reason).replace(/_/g, " ")}${r.note ? ` — ${r.note}` : ""}${
-            r.store_id ? ` · ${r.store_id}` : ""
+          detail: `${text(r["reason"]).replace(/_/g, " ")}${r["note"] ? ` — ${text(r["note"])}` : ""}${
+            r["store_id"] ? ` · ${text(r["store_id"])}` : ""
           }`,
-          delta: Number(r.delta ?? 0),
-          impact: Number(r.cost_impact ?? 0),
-          by: r.staff_name ?? "—",
+          delta: Number(r["delta"] ?? 0),
+          impact: Number(r["cost_impact"] ?? 0),
+          by: text(r["staff_name"]) || "—",
         })),
-        ...(transfers.data ?? []).map((r) => ({
+        ...(transfers.rows as LooseRow[]).map((r) => ({
           id: `trf-${r.id}`,
-          at: r.created_at,
+          at: text(r["created_at"]),
           kind: "Transfer line",
-          detail: `Transfer ${String(r.transfer_id).slice(0, 8)} · received ${r.quantity_received ?? 0}`,
-          delta: Number(r.quantity ?? 0),
+          detail: `Transfer ${text(r["transfer_id"]).slice(0, 8)} · received ${Number(r["quantity_received"] ?? 0)}`,
+          delta: Number(r["quantity"] ?? 0),
           impact: 0,
           by: "—",
         })),
-        ...(merges.data ?? [])
+        ...(merges.rows as LooseRow[])
           .filter((r) => {
-            const d = (r.details ?? {}) as {
+            const d = (r["details"] ?? {}) as {
               masterId?: string;
               merged?: { id?: string }[];
             };
@@ -95,14 +110,14 @@ export function ItemActivityDrawer({
             );
           })
           .map((r) => {
-            const d = (r.details ?? {}) as {
+            const d = (r["details"] ?? {}) as {
               masterId?: string;
               merged?: { name?: string; barcode?: string }[];
               aliasBarcodes?: string[];
             };
             return {
               id: `mrg-${r.id}`,
-              at: r.created_at,
+              at: text(r["created_at"]),
               kind: "Products merged",
               detail:
                 d.masterId === product.id
@@ -110,12 +125,12 @@ export function ItemActivityDrawer({
                   : "This record was folded into another product",
               delta: 0,
               impact: 0,
-              by: r.user_name ?? "—",
+              by: text(r["user_name"]) || "—",
             };
           }),
       ].sort((a, b) => b.at.localeCompare(a.at));
       setRows(list);
-      setCreated((meta.data?.created_at as string | undefined) ?? null);
+      setCreated(text((meta.rows as LooseRow[])[0]?.["created_at"]) || null);
       setLoading(false);
     })();
     return () => {
@@ -131,6 +146,7 @@ export function ItemActivityDrawer({
         </SheetHeader>
         {product && (
           <div className="mt-4 space-y-4 text-sm">
+            <OfflineDataNotice source={source} what="history" />
             <div className="rounded-lg border border-border p-3">
               <p className="numeric text-xs text-muted-foreground">
                 {product.sku} · {product.barcode}
