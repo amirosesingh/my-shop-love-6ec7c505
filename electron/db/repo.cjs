@@ -272,7 +272,9 @@ async function markFailed(table, ids, message, quarantine) {
   ids.forEach((id, i) => bind(request, `id${i}`, id));
   await request.query(`
     UPDATE dbo.[${table}]
-       SET sync_status = @status, sync_error = @msg
+       SET sync_status = @status, sync_error = @msg,
+           sync_attempts = ISNULL(sync_attempts, 0) + 1,
+           last_error_at = SYSUTCDATETIME()
      WHERE id IN (${ids.map((_, i) => `@id${i}`).join(", ")});
     MERGE dbo.sync_state AS t
     USING (SELECT N'last_error' AS [key], @msg AS [value]) AS s ON t.[key] = s.[key]
@@ -286,7 +288,8 @@ async function retryErrored() {
     await getPool()
       .request()
       .query(
-        `UPDATE dbo.[${table}] SET sync_status = N'pending', sync_error = NULL
+        `UPDATE dbo.[${table}] SET sync_status = N'pending', sync_error = NULL,
+                sync_attempts = 0, last_error_at = NULL
           WHERE is_synced = 0 AND sync_status IN (N'error', N'quarantined');`,
       );
   }
