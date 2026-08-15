@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
+import { adminAccessToken } from "@/lib/admin-session";
 import { listDeviceSessions, revokeDeviceSessions } from "@/lib/user-sessions.functions";
 import { isConnectionError } from "@/lib/db-mode";
 
@@ -32,7 +32,7 @@ function ActiveSessions() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const accessToken = (await supabase.auth.getSession()).data.session?.access_token ?? "";
+      const accessToken = await adminAccessToken();
       if (!accessToken) {
         setError("Sign in with an administrator account to manage terminals.");
         setLoading(false);
@@ -59,7 +59,7 @@ function ActiveSessions() {
 
   const revoke = async (id: string) => {
     setBusy(id);
-    const accessToken = (await supabase.auth.getSession()).data.session?.access_token ?? "";
+    const accessToken = await adminAccessToken();
     const res = await revokeDeviceSessions({
       data: { accessToken, sessionId: id, reason: "remote reset" },
     });

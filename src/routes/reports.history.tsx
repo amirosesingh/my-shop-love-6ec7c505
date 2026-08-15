@@ -21,7 +21,7 @@ import {
   inRange,
   stamp,
 } from "@/components/pos/report-kit";
-import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
+import { adminAccessToken } from "@/lib/admin-session";
 import { listSystemAudit } from "@/lib/system-audit.functions";
 
 export const Route = createFileRoute("/reports/history")({
@@ -72,7 +72,7 @@ function EditHistoryReport() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const accessToken = (await supabase.auth.getSession()).data.session?.access_token ?? "";
+    const accessToken = await adminAccessToken();
     if (!accessToken) {
       setError("Sign in with a supervisor or administrator account to view the edit history.");
       setRows([]);

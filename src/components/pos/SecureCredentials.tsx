@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { supabaseExternal } from "@/integrations/supabase/external-client";
+import { adminAccessToken, ADMIN_SIGN_IN_MESSAGE } from "@/lib/admin-session";
 import {
   clearSecureSetting,
   listSecureSettings,
@@ -78,13 +78,12 @@ export function SecureCredentials() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const token = async () =>
-    (await supabaseExternal.auth.getSession()).data.session?.access_token ?? "";
+  const token = adminAccessToken;
 
   const refresh = async () => {
     const accessToken = await token();
     if (!accessToken) {
-      setError("Sign in with an admin account to manage credentials.");
+      setError(ADMIN_SIGN_IN_MESSAGE);
       return;
     }
     const res = await listSecureSettings({ data: { accessToken } });
