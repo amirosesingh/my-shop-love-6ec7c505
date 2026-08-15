@@ -652,6 +652,7 @@ module.exports = {
   CATALOGUE_TABLES,
   PRUNABLE_TABLES,
   SETTINGS_ID,
+  setScope,
   applyOp,
   createSale,
   forgetColumnCache,
