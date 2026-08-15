@@ -15,6 +15,8 @@ import {
 import {
   lastSuccessfulPull,
   setLastSuccessfulPull,
+  lastTablePull,
+  setLastTablePull,
   setSyncState,
   syncState,
 } from "./sync-status";
