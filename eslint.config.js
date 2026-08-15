@@ -36,5 +36,29 @@ export default tseslint.config(
       "@typescript-eslint/no-unused-vars": "off",
     },
   },
+  {
+    // Screens must go through the data layer (`dbRouter`/`db-query`), so an
+    // offline till keeps working instead of hitting the cloud directly.
+    files: ["src/components/**/*.{ts,tsx}", "src/routes/**/*.{ts,tsx}"],
+    ignores: [
+      // Sign-in and diagnostics are about the connection itself.
+      "src/components/admin/StaffManager.tsx",
+      "src/components/pos/ConnectionCheck.tsx",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["**/integrations/supabase/external-client", "@/integrations/supabase/external-client"],
+              message:
+                "Screens must not read or write the central database directly. Use dbRouter / routedQuery from @/lib/db-router so the till still works offline, or an admin helper from @/lib/admin-session.",
+            },
+          ],
+        },
+      ],
+    },
+  },
   eslintPluginPrettier,
 );
