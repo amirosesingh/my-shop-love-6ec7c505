@@ -483,6 +483,9 @@ const PULL_TABLES = [
   "promotions",
   "stores",
   "suppliers",
+  "bookings",
+  "stock_transfers",
+  "held_orders",
 ] as const;
 
 let pulling = false;
