@@ -1069,8 +1069,9 @@ export async function invoiceNumberTaken(invoiceNo: string, exceptId?: string): 
 export async function loadProductsByIds(ids: string[]): Promise<Product[]> {
   if (!ids.length) return [];
   try {
-    const rows = await routedQuery("products", { in: { column: "id", values: ids } });
-    return rows.map(rowToProduct);
+    const res = await supabase.from("products").select("*").in("id", ids);
+    if (res.error) throw new Error(res.error.message);
+    return ((res.data as Row[] | null) ?? []).map(rowToProduct);
   } catch (e) {
     // Offline with a terminal copy on disk: those rows are already in the
     // shape the app uses, so they are handed back as they are.
