@@ -58,3 +58,35 @@ export function setLastSuccessfulPull(iso: string) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(PULL_KEY, iso);
 }
+
+/* --------------------- per-table pull high-water marks -------------------- */
+
+const TABLE_PULL_KEY = "pos.sync.tablePullAt";
+
+const readTableMarks = (): Record<string, string> => {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(TABLE_PULL_KEY);
+    const parsed = raw ? (JSON.parse(raw) as Record<string, string>) : {};
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+};
+
+/** When this one table was last pulled cleanly, independent of the others. */
+export function lastTablePull(table: string): string | null {
+  return readTableMarks()[table] ?? null;
+}
+
+export function setLastTablePull(table: string, iso: string) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      TABLE_PULL_KEY,
+      JSON.stringify({ ...readTableMarks(), [table]: iso }),
+    );
+  } catch {
+    /* storage unavailable — the global watermark still applies */
+  }
+}
