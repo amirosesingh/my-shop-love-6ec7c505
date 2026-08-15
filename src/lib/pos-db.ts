@@ -3,6 +3,8 @@ import { supabaseExternal as supabase } from "@/integrations/supabase/external-c
 import { defaultSettings, sampleState } from "./pos-seed";
 import { drainOutbox, runOpLive } from "./sync-engine";
 import { localDb } from "./local-db";
+import { routedQuery } from "./db-query";
+import { readSnapshot } from "./offline-snapshot";
 import { enqueue, type SyncOp } from "./sync-outbox";
 import { isLiveOnly } from "./live-mode";
 import {
@@ -775,7 +777,14 @@ export async function loadCloudState(): Promise<CloudSlice> {
 
 async function loadLocalState(cause: unknown): Promise<CloudSlice> {
   const bridge = localDb();
-  if (!bridge) throw cause;
+  if (!bridge) {
+    // No local SQL engine on this device: the last good copy this terminal
+    // kept on disk is still better than an empty register.
+    const snap = readSnapshot();
+    if (!snap) throw cause;
+    const { savedAt: _savedAt, ...slice } = snap;
+    return slice as CloudSlice;
+  }
   const result = await bridge.snapshot();
   if (!result.ok) throw cause;
   tierIdByName = {};
@@ -877,6 +886,22 @@ export async function openShiftOnServer(s: Shift): Promise<Shift | null> {
  * bills in memory, and history screens walk further back a page at a time
  * without ever paying for an OFFSET.
  */
+/** The same page of bills served from this terminal's copy. */
+function localSalesPage(storeId: string, cursor: Cursor, limit: number): Page<Sale> | null {
+  const snap = readSnapshot();
+  if (!snap) return null;
+  const all = (snap.sales ?? [])
+    .filter((s) => !storeId || s.storeId === storeId)
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
+  const after = cursor ? all.filter((s) => s.createdAt < (cursor as { createdAt: string }).createdAt) : all;
+  const rows = after.slice(0, limit);
+  return {
+    rows,
+    cursor: rows.length ? ({ createdAt: rows[rows.length - 1].createdAt, id: rows[rows.length - 1].id } as unknown as Cursor) : null,
+    hasMore: after.length > limit,
+  };
+}
+
 export async function loadSalesPage(
   storeId: string,
   cursor: Cursor = null,
@@ -894,7 +919,11 @@ export async function loadSalesPage(
     res = await query();
     err = (res as { error?: { message: string } }).error;
   }
-  if (err) throw new Error(err.message);
+  if (err) {
+    const cached = localSalesPage(storeId, cursor, limit);
+    if (cached && isConnectionError(new Error(err.message))) return cached;
+    throw new Error(err.message);
+  }
   const rows = ((res as { data?: Row[] | null }).data ?? []) as Row[];
   return {
     rows: rows.map(rowToSale),
@@ -905,14 +934,12 @@ export async function loadSalesPage(
 
 /** Recent sign-in sessions for a branch, newest first. */
 export async function loadShiftSessions(storeId: string, limit = 200): Promise<ShiftSession[]> {
-  const res = await supabase
-    .from("shift_sessions" as never)
-    .select("*")
-    .eq("store_id", storeId)
-    .order("signed_in_at", { ascending: false })
-    .limit(limit);
-  if (res.error) throw res.error;
-  return ((res.data as Row[] | null) ?? []).map(rowToShiftSession);
+  const rows = await routedQuery("shift_sessions", {
+    match: { store_id: storeId },
+    orderBy: { column: "signed_in_at", ascending: false },
+    limit,
+  });
+  return rows.map(rowToShiftSession);
 }
 
 /* --------------------- receiving invoices (purchase orders) -------------- */
@@ -1041,9 +1068,16 @@ export async function invoiceNumberTaken(invoiceNo: string, exceptId?: string): 
 /** Latest catalogue rows for a set of products, straight from the database. */
 export async function loadProductsByIds(ids: string[]): Promise<Product[]> {
   if (!ids.length) return [];
-  const res = await supabase.from("products").select("*").in("id", ids);
-  if (res.error) throw res.error;
-  return ((res.data as Row[] | null) ?? []).map(rowToProduct);
+  try {
+    const rows = await routedQuery("products", { in: { column: "id", values: ids } });
+    return rows.map(rowToProduct);
+  } catch (e) {
+    // Offline with a terminal copy on disk: those rows are already in the
+    // shape the app uses, so they are handed back as they are.
+    const snap = readSnapshot();
+    if (snap && isConnectionError(e)) return snap.products.filter((p) => ids.includes(p.id));
+    throw e;
+  }
 }
 
 /**
