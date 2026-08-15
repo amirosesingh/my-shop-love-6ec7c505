@@ -659,14 +659,19 @@ function toCloudRow(table, row) {
     last_error_at: _le,
     pending_sync: _ps,
     temp_id: _ti,
-    row_version: _rv,
     ...rest
   } = row;
   if (table === "pos_settings") {
     const payload = typeof rest.payload === "string" ? JSON.parse(rest.payload) : rest.payload;
     return { id: 1, ...payload };
   }
-  return parseJsonColumns(table, rest);
+  // The version counter travels with the row on purpose: the central database
+  // compares it and keeps whichever copy is newer, so a till that was offline
+  // cannot overwrite an edit made elsewhere in the meantime. If this till's
+  // change is skipped centrally, the next pull brings the newer copy down.
+  const out = parseJsonColumns(table, rest);
+  if (typeof row.row_version !== "number") delete out.row_version;
+  return out;
 }
 
 module.exports = {
