@@ -157,10 +157,7 @@ export type PosBridge = {
   }>;
   /** Device settings stored in the branch SQL database. */
   getSetting?: (key: string) => Promise<{ ok: boolean; value?: string | null; error?: string }>;
-  setSetting?: (
-    key: string,
-    value: string | null,
-  ) => Promise<{ ok: boolean; error?: string }>;
+  setSetting?: (key: string, value: string | null) => Promise<{ ok: boolean; error?: string }>;
   onStatus: (cb: (s: LocalSyncStatus) => void) => () => void;
 };
 

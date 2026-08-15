@@ -114,7 +114,9 @@ export function SyncHub() {
     try {
       await fn();
       setProgress(100);
-      toast.success(kind === "pull" ? "Pull finished" : kind === "push" ? "Push finished" : "Sync finished");
+      toast.success(
+        kind === "pull" ? "Pull finished" : kind === "push" ? "Push finished" : "Sync finished",
+      );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Sync failed");
     } finally {
@@ -225,7 +227,11 @@ export function SyncHub() {
               disabled={!!busy}
               onClick={() => void run("push", () => drainOutbox())}
             >
-              {busy === "push" ? <Loader2 className="size-4 animate-spin" /> : <CloudUpload className="size-4" />}
+              {busy === "push" ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <CloudUpload className="size-4" />
+              )}
               Force push
             </Button>
             <Button
@@ -234,7 +240,11 @@ export function SyncHub() {
               disabled={!!busy}
               onClick={() => void run("pull", () => pullDelta())}
             >
-              {busy === "pull" ? <Loader2 className="size-4 animate-spin" /> : <CloudDownload className="size-4" />}
+              {busy === "pull" ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <CloudDownload className="size-4" />
+              )}
               Force pull
             </Button>
             <Button
@@ -242,7 +252,11 @@ export function SyncHub() {
               disabled={!!busy}
               onClick={() => void run("cycle", () => runExclusive("manual"))}
             >
-              {busy === "cycle" ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+              {busy === "cycle" ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <RefreshCw className="size-4" />
+              )}
               Full sync cycle
             </Button>
           </div>
@@ -266,9 +280,8 @@ export function SyncHub() {
           </CardHeader>
           <CardContent className="space-y-2">
             <p className="text-xs text-muted-foreground">
-              Someone else changed these records while this till was working from an older copy.
-              The central version was kept — check it and make the change again if it is still
-              needed.
+              Someone else changed these records while this till was working from an older copy. The
+              central version was kept — check it and make the change again if it is still needed.
             </p>
             {conflicts.map((c) => (
               <div

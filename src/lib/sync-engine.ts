@@ -123,10 +123,7 @@ const KEY_MISSING =
   "Your work is saved on this device and will upload automatically.";
 
 /** Relay the operation and report the outcome in plain language. */
-async function viaRelay(
-  context: string,
-  op: SyncOp,
-): Promise<{ ok: boolean; error?: string }> {
+async function viaRelay(context: string, op: SyncOp): Promise<{ ok: boolean; error?: string }> {
   const relayed = await relayOp(op);
   // The server relay cannot write without its key. Anyone signed in with a real
   // staff account still can, using their own session, so try that before giving
@@ -194,7 +191,9 @@ async function execute(op: SyncOp): Promise<QueryResult> {
       // shift.
       const keyed =
         op.rows.length > 0 &&
-        op.rows.every((r) => typeof (r as { id?: unknown }).id === "string" && (r as { id: string }).id);
+        op.rows.every(
+          (r) => typeof (r as { id?: unknown }).id === "string" && (r as { id: string }).id,
+        );
       return keyed
         ? from(op.table).upsert(op.rows, { onConflict: "id" })
         : from(op.table).insert(op.rows);
@@ -267,7 +266,10 @@ async function reconcileVersions(entry: QueuedOp): Promise<void> {
             in: (
               col: string,
               values: string[],
-            ) => PromiseLike<{ data: Record<string, unknown>[] | null; error: { message: string } | null }>;
+            ) => PromiseLike<{
+              data: Record<string, unknown>[] | null;
+              error: { message: string } | null;
+            }>;
           };
         };
       }
@@ -308,10 +310,7 @@ async function reconcileVersions(entry: QueuedOp): Promise<void> {
  * A refused change is parked immediately with its reason; anything else keeps
  * its place in the queue and is retried.
  */
-function recordRelayFailure(
-  entry: QueuedOp,
-  relayed: { error?: string; code?: string },
-) {
+function recordRelayFailure(entry: QueuedOp, relayed: { error?: string; code?: string }) {
   const message = relayed.error ?? "The server could not save this change";
   if (relayed.code && REFUSAL_CODES.has(relayed.code)) refuseOp(entry.id, message);
   else failOp(entry.id, message);
@@ -499,10 +498,7 @@ const stampColumn = new Map<string, "updated_at" | "created_at">();
 
 async function countChangedSince(table: (typeof PULL_TABLES)[number], since: string) {
   const ask = (column: string) =>
-    supabaseExternal
-      .from(table)
-      .select("id", { count: "exact", head: true })
-      .gt(column, since);
+    supabaseExternal.from(table).select("id", { count: "exact", head: true }).gt(column, since);
 
   const known = stampColumn.get(table);
   if (known) return await ask(known);
@@ -599,7 +595,8 @@ export async function pullIntoLocal(): Promise<{ merged: number }> {
   if (!bridge || !isOnline() || !isOnlineSyncEnabled()) return { merged: 0 };
   try {
     const res = await bridge.pull();
-    if (res.merged) logSync("pull", "local", true, `${res.merged} row(s) refreshed on this terminal`);
+    if (res.merged)
+      logSync("pull", "local", true, `${res.merged} row(s) refreshed on this terminal`);
     return { merged: res.merged ?? 0 };
   } catch (e) {
     logSync("pull", "local", false, e instanceof Error ? e.message : String(e));
