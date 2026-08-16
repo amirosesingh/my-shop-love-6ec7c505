@@ -11,11 +11,9 @@ import { SyncHub } from "@/components/pos/sync/SyncHub";
 import { SYSTEM_TAB_IDS, systemTab, type SystemTabId } from "@/lib/settings-groups";
 
 export const Route = createFileRoute("/settings/system")({
-  validateSearch: (search: Record<string, unknown>): { tab: SystemTabId } => {
+  validateSearch: (search: Record<string, unknown>): { tab?: SystemTabId } => {
     const tab = search["tab"];
-    return {
-      tab: SYSTEM_TAB_IDS.includes(tab as SystemTabId) ? (tab as SystemTabId) : "system",
-    };
+    return SYSTEM_TAB_IDS.includes(tab as SystemTabId) ? { tab: tab as SystemTabId } : {};
   },
   head: () => ({
     meta: [
@@ -38,7 +36,7 @@ export const Route = createFileRoute("/settings/system")({
 });
 
 function SystemSettingsPage() {
-  const { tab } = Route.useSearch();
+  const { tab = "system" } = Route.useSearch();
   const navigate = useNavigate({ from: "/settings/system" });
   const meta = systemTab(tab);
 
