@@ -1,10 +1,8 @@
-import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Layers, Loader2, RefreshCw, Save, TriangleAlert } from "lucide-react";
+import { Layers, Loader2, RefreshCw, Save, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { notifyError } from "@/lib/notify";
 
-import { AppShell } from "@/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { InheritedField } from "@/components/pos/settings/InheritedField";
@@ -195,15 +193,7 @@ export function InheritancePanel() {
   }, [choice, stores]);
 
   return (
-    <AppShell>
-      <div className="mx-auto w-full max-w-4xl space-y-5 p-6">
-        <div className="sticky top-0 z-20 -mx-6 -mt-6 border-b border-border bg-background/95 px-4 py-2 backdrop-blur">
-          <Button asChild variant="ghost" size="sm" className="h-8 text-xs">
-            <Link to="/settings">
-              <ArrowLeft className="size-4" /> All settings
-            </Link>
-          </Button>
-        </div>
+    <div className="w-full max-w-full space-y-5">
 
         <header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
           <div className="min-w-0">
@@ -300,7 +290,6 @@ export function InheritancePanel() {
             </div>
           </div>
         )}
-      </div>
-    </AppShell>
+    </div>
   );
 }
