@@ -182,7 +182,10 @@ export const blankCampaign = (): Campaign => ({
   isWelcome: false,
 });
 
-/** URL-safe slug from any campaign name. */
+/**
+ * URL-safe slug from any campaign name. Pure string work — no database call,
+ * so there is nothing here that can fail at runtime.
+ */
 export const slugify = (s: string) =>
   s
     .toLowerCase()
@@ -192,33 +195,61 @@ export const slugify = (s: string) =>
     .slice(0, 48);
 
 export async function loadCampaigns(): Promise<Campaign[]> {
-  const res = await sb.from("coupon_campaigns").select("*").order("created_at", { ascending: false });
-  if (res.error) throw new Error(res.error.message);
-  return ((res.data as Row[] | null) ?? []).map(toCampaign);
+  try {
+    const res = await sb
+      .from("coupon_campaigns")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (res.error) throw new Error(res.error.message);
+    return ((res.data as Row[] | null) ?? []).map(toCampaign);
+  } catch (e) {
+    logRead("loadCampaigns", e);
+    return [];
+  }
 }
 
-export async function saveCampaign(c: Campaign): Promise<void> {
-  const res = await sb.from("coupon_campaigns").upsert(toRow(c) as never);
-  if (res.error) throw new Error(res.error.message);
+export async function saveCampaign(c: Campaign): Promise<CouponResult> {
+  try {
+    const res = await sb.from("coupon_campaigns").upsert(toRow(c) as never);
+    if (res.error) throw new Error(res.error.message);
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: describeError(e, "Saving the campaign") };
+  }
 }
 
-export async function deleteCampaign(id: string): Promise<void> {
-  const res = await sb.from("coupon_campaigns").delete().eq("id", id);
-  if (res.error) throw new Error(res.error.message);
+export async function deleteCampaign(id: string): Promise<CouponResult> {
+  try {
+    const res = await sb.from("coupon_campaigns").delete().eq("id", id);
+    if (res.error) throw new Error(res.error.message);
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: describeError(e, "Deleting the campaign") };
+  }
 }
 
 export async function loadCampaignBySlug(slug: string): Promise<Campaign | null> {
-  const res = await sb.from("coupon_campaigns").select("*").eq("slug", slug).maybeSingle();
-  if (res.error) throw new Error(res.error.message);
-  return res.data ? toCampaign(res.data as Row) : null;
+  try {
+    const res = await sb.from("coupon_campaigns").select("*").eq("slug", slug).maybeSingle();
+    if (res.error) throw new Error(res.error.message);
+    return res.data ? toCampaign(res.data as Row) : null;
+  } catch (e) {
+    logRead("loadCampaignBySlug", e);
+    return null;
+  }
 }
 
 export async function loadVouchers(campaignId?: string): Promise<Voucher[]> {
-  let q = sb.from("issued_vouchers").select("*").order("issued_at", { ascending: false });
-  if (campaignId) q = q.eq("campaign_id", campaignId);
-  const res = await q;
-  if (res.error) throw new Error(res.error.message);
-  return ((res.data as Row[] | null) ?? []).map(toVoucher);
+  try {
+    let q = sb.from("issued_vouchers").select("*").order("issued_at", { ascending: false });
+    if (campaignId) q = q.eq("campaign_id", campaignId);
+    const res = await q;
+    if (res.error) throw new Error(res.error.message);
+    return ((res.data as Row[] | null) ?? []).map(toVoucher);
+  } catch (e) {
+    logRead("loadVouchers", e);
+    return [];
+  }
 }
 
 export type VoucherView = {
@@ -236,35 +267,45 @@ export type VoucherView = {
  * single voucher whose token was supplied.
  */
 export async function loadVoucherByToken(token: string): Promise<VoucherView | null> {
-  const res = await sb.rpc("voucher_by_token", { _token: token });
-  if (res.error) throw new Error(res.error.message);
-  const row = ((res.data as Row[] | null) ?? [])[0];
-  if (!row?.voucher || !row?.campaign) return null;
-  return {
-    voucher: toVoucher(row.voucher as Row),
-    campaign: toCampaign(row.campaign as Row),
-    memberName: (row.member_name as string) || "Lucky Charms member",
-    memberCode: (row.member_code as string) || "",
-  };
+  try {
+    const res = await sb.rpc("voucher_by_token", { _token: token });
+    if (res.error) throw new Error(res.error.message);
+    const row = ((res.data as Row[] | null) ?? [])[0];
+    if (!row?.voucher || !row?.campaign) return null;
+    return {
+      voucher: toVoucher(row.voucher as Row),
+      campaign: toCampaign(row.campaign as Row),
+      memberName: (row.member_name as string) || "Lucky Charms member",
+      memberCode: (row.member_code as string) || "",
+    };
+  } catch (e) {
+    logRead("loadVoucherByToken", e);
+    return null;
+  }
 }
 
 /** Member's live vouchers, campaign included, for the register. */
 export async function loadMemberVouchers(memberId: string): Promise<VoucherView[]> {
-  const res = await sb
-    .from("issued_vouchers")
-    .select("*, coupon_campaigns(*), members(full_name, member_code)")
-    .eq("member_id", memberId)
-    .eq("status", "ISSUED");
-  if (res.error) throw new Error(res.error.message);
-  return ((res.data as Row[] | null) ?? [])
-    .filter((r) => r.coupon_campaigns)
-    .map((r) => ({
-      voucher: toVoucher(r),
-      campaign: toCampaign(r.coupon_campaigns as Row),
-      memberName: r.members?.full_name ?? "",
-      memberCode: r.members?.member_code ?? "",
-    }))
-    .filter((v) => !isVoucherExpired(v.voucher, v.campaign));
+  try {
+    const res = await sb
+      .from("issued_vouchers")
+      .select("*, coupon_campaigns(*), members(full_name, member_code)")
+      .eq("member_id", memberId)
+      .eq("status", "ISSUED");
+    if (res.error) throw new Error(res.error.message);
+    return ((res.data as Row[] | null) ?? [])
+      .filter((r) => r.coupon_campaigns)
+      .map((r) => ({
+        voucher: toVoucher(r),
+        campaign: toCampaign(r.coupon_campaigns as Row),
+        memberName: r.members?.full_name ?? "",
+        memberCode: r.members?.member_code ?? "",
+      }))
+      .filter((v) => !isVoucherExpired(v.voucher, v.campaign));
+  } catch (e) {
+    logRead("loadMemberVouchers", e);
+    return [];
+  }
 }
 
 /** Columns the event trail actually renders — never `*`. */
