@@ -1,47 +1,77 @@
 #!/usr/bin/env node
 /**
- * Guarantees the generated Android project asks for the camera.
+ * Guarantees the generated Android project can scan barcodes and install its
+ * own updates.
  *
- * `npx cap add android` writes a stock manifest that has no camera permission,
- * so barcode/QR scanning silently fails on a real phone. This runs after
- * `cap sync` and injects the permission plus the optional-hardware feature
- * flags (optional so the APK still installs on camera-less devices).
+ * `npx cap add android` writes a stock manifest with neither the camera
+ * permission (barcode/QR scanning silently fails) nor permission to launch the
+ * package installer (the downloaded APK never opens). It also publishes only a
+ * couple of FileProvider folders, so the installer cannot read an APK saved to
+ * the external cache. This runs after `cap sync` and patches all three.
  */
 const fs = require("node:fs");
 const path = require("node:path");
 
-const manifest = path.resolve(
-  __dirname,
-  "..",
-  "android",
-  "app",
-  "src",
-  "main",
-  "AndroidManifest.xml",
-);
+const androidMain = path.resolve(__dirname, "..", "android", "app", "src", "main");
+const manifest = path.join(androidMain, "AndroidManifest.xml");
 
 if (!fs.existsSync(manifest)) {
   console.log("· no Android project yet — nothing to patch");
   process.exit(0);
 }
 
+/* ------------------------------ manifest ------------------------------ */
+
 const lines = [
   '    <uses-permission android:name="android.permission.CAMERA" />',
+  '    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />',
   '    <uses-feature android:name="android.hardware.camera" android:required="false" />',
   '    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />',
 ];
 
 let xml = fs.readFileSync(manifest, "utf8");
-const needed = [
-  "android.permission.CAMERA",
-  "android.hardware.camera",
-  "android.hardware.camera.autofocus",
+const missing = lines.filter((l) => {
+  const name = /android:name="([^"]+)"/.exec(l)[1];
+  return !xml.includes(name);
+});
+if (missing.length) {
+  xml = xml.replace("</manifest>", `${missing.join("\n")}\n</manifest>`);
+  fs.writeFileSync(manifest, xml, "utf8");
+  console.log(`✓ added ${missing.length} manifest entr${missing.length === 1 ? "y" : "ies"}`);
+} else {
+  console.log("✓ camera and install permissions already present");
+}
+
+/* --------------------------- FileProvider ----------------------------- */
+
+/**
+ * The package installer is a separate app: it can only read the APK through a
+ * `content://` URI, and only if the folder holding it is published here.
+ */
+const paths = path.join(androidMain, "res", "xml", "file_paths.xml");
+const entries = [
+  '    <external-cache-path name="external_cache" path="." />',
+  '    <cache-path name="cache" path="." />',
+  '    <external-path name="external_files" path="." />',
 ];
-if (needed.every((n) => xml.includes(n))) {
-  console.log("✓ camera permission already present");
+
+if (!fs.existsSync(paths)) {
+  fs.mkdirSync(path.dirname(paths), { recursive: true });
+  fs.writeFileSync(
+    paths,
+    `<?xml version="1.0" encoding="utf-8"?>\n<paths xmlns:android="http://schemas.android.com/apk/res/android">\n${entries.join("\n")}\n</paths>\n`,
+    "utf8",
+  );
+  console.log("✓ file_paths.xml created with the installer-readable folders");
   process.exit(0);
 }
 
-xml = xml.replace("</manifest>", `${lines.join("\n")}\n</manifest>`);
-fs.writeFileSync(manifest, xml, "utf8");
-console.log("✓ camera permission added to AndroidManifest.xml");
+let pathsXml = fs.readFileSync(paths, "utf8");
+const needed = entries.filter((e) => !pathsXml.includes(/name="([^"]+)"/.exec(e)[1]));
+if (!needed.length) {
+  console.log("✓ FileProvider already publishes the update folder");
+  process.exit(0);
+}
+pathsXml = pathsXml.replace("</paths>", `${needed.join("\n")}\n</paths>`);
+fs.writeFileSync(paths, pathsXml, "utf8");
+console.log("✓ FileProvider updated for the downloaded update file");

@@ -37,6 +37,8 @@ export type AndroidUpdateState = {
   percent: number;
   error: string | null;
   lastChecked: Date | null;
+  /** Set when the APK is on the phone but Android's installer did not open. */
+  readyUri: string | null;
 };
 
 const INITIAL: AndroidUpdateState = {
@@ -52,6 +54,7 @@ const INITIAL: AndroidUpdateState = {
   percent: 0,
   error: null,
   lastChecked: null,
+  readyUri: null,
 };
 
 /** "1.2.10" > "1.2.9" — plain numeric compare, missing parts count as 0. */
@@ -105,24 +108,53 @@ async function fetchLatest(): Promise<Latest> {
   throw new Error(describeNetworkError(last));
 }
 
-/** Download the APK into app storage and open Android's package installer. */
+/**
+ * Download the APK and open Android's package installer.
+ *
+ * The file goes into the app's *external* cache: the package installer is a
+ * different app, so it cannot read anything in private internal storage. The
+ * write is confirmed with a stat before the intent fires, so the installer
+ * never opens on a half-written file. Returns the content URI so the caller
+ * can offer a manual "Tap to install" if the intent was refused.
+ */
 async function downloadAndInstall(
   url: string,
   file: string,
   onProgress: (pct: number) => void,
-) {
-  const [{ Filesystem, Directory }, { FileOpener }] = await Promise.all([
-    import("@capacitor/filesystem"),
-    import("@capacitor-community/file-opener"),
-  ]);
+): Promise<{ uri: string; opened: boolean; error?: string }> {
+  const { Filesystem, Directory } = await import("@capacitor/filesystem");
 
   const base64 = await httpGetBase64(url, onProgress);
 
-  await Filesystem.writeFile({ path: file, data: base64, directory: Directory.Cache });
-  const { uri } = await Filesystem.getUri({ path: file, directory: Directory.Cache });
+  // ExternalCache is readable by the installer; Cache (internal) is not.
+  const directory = Directory.ExternalCache ?? Directory.Cache;
+  await Filesystem.writeFile({ path: file, data: base64, directory, recursive: true });
+
+  // Flush check: the stream must be closed and the file complete before the
+  // installer is handed the URI.
+  const stat = await Filesystem.stat({ path: file, directory });
+  if (!stat?.size) throw new Error("The update file did not finish saving on this device.");
+
+  const { uri } = await Filesystem.getUri({ path: file, directory });
+  try {
+    await openInstaller(uri);
+    return { uri, opened: true };
+  } catch (e) {
+    return { uri, opened: false, error: (e as Error)?.message ?? "Android refused to open the installer." };
+  }
+}
+
+/**
+ * Hand a saved APK to Android. FileOpener publishes the file through the
+ * app's FileProvider, so the installer receives a `content://` URI with read
+ * permission granted rather than a `file://` path it is not allowed to touch.
+ */
+export async function openInstaller(uri: string): Promise<void> {
+  const { FileOpener } = await import("@capacitor-community/file-opener");
   await FileOpener.open({
     filePath: uri,
     contentType: "application/vnd.android.package-archive",
+    openWithDefault: true,
   });
 }
 
@@ -169,10 +201,16 @@ export function useAndroidUpdates() {
         ...FEEDS.map((f) => `${f}/${encodeURIComponent(file)}`),
       ].filter((u): u is string => Boolean(u));
       const url = (await firstReachableUrl(candidates)) ?? candidates[0]!;
-      await downloadAndInstall(url, file, (percent: number) =>
+      const res = await downloadAndInstall(url, file, (percent: number) =>
         setState((s) => ({ ...s, percent })),
       );
-      setState((s) => ({ ...s, downloading: false, percent: 100 }));
+      setState((s) => ({
+        ...s,
+        downloading: false,
+        percent: 100,
+        readyUri: res.opened ? null : res.uri,
+        error: res.opened ? null : (res.error ?? null),
+      }));
     } catch (err) {
       setState((s) => ({
         ...s,
@@ -190,8 +228,19 @@ export function useAndroidUpdates() {
     return () => clearInterval(timer);
   }, [check]);
 
+  /** Manual retry for the "Update downloaded — tap to install" prompt. */
+  const installDownloaded = useCallback(async () => {
+    if (!state.readyUri) return;
+    try {
+      await openInstaller(state.readyUri);
+      setState((s) => ({ ...s, readyUri: null, error: null }));
+    } catch (err) {
+      setState((s) => ({ ...s, error: describeNetworkError(err) }));
+    }
+  }, [state.readyUri]);
+
   const available = Boolean(state.latest && isNewer(state.latest, state.installed));
-  return { state, available, check, install };
+  return { state, available, check, install, installDownloaded };
 }
 
 export function dismissAndroidUpdate(version: string) {
