@@ -13,6 +13,7 @@ import {
   type RecentRows,
 } from "@/lib/db-health";
 import { importSampleData } from "@/lib/pos-db";
+import { FeatureSchemaReport } from "@/components/pos/settings/panels/FeatureSchemaReport";
 import { RelationFlowGraph } from "@/components/pos/settings/RelationFlowGraph";
 import {
   formatRelationalReport,
@@ -174,6 +175,8 @@ export function DatabaseHealthPanel() {
           </ul>
         </section>
       )}
+
+      <FeatureSchemaReport />
 
       <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
