@@ -123,6 +123,7 @@ function AuditPage() {
   const [category, setCategory] = useState("all");
   const [module, setModule] = useState("all");
   const [showBrowse, setShowBrowse] = useState(false);
+  const [riskOnly, setRiskOnly] = useState(false);
   const [q, setQ] = useState("");
   const [detail, setDetail] = useState<AuditLog | null>(null);
   const [view, setView] = useState<"table" | "stream">("table");
@@ -151,6 +152,14 @@ function AuditPage() {
       // Screen views and searches are noise for a manager — off unless asked for.
       if (category !== "browse" && !showBrowse && cat === "browse") return false;
       if (module !== "all" && l.module !== module) return false;
+      // Cashier trail: voids, price overrides and no-sale drawer opens only.
+      if (
+        riskOnly &&
+        !["item_void", "price_override", "no_sale"].some(
+          (a) => `${l.action} ${JSON.stringify(l.details)}`.includes(a),
+        )
+      )
+        return false;
       if (
         text &&
         !`${describeLog(l)} ${l.action} ${l.module} ${l.staffName} ${l.staffId} ${l.route} ${JSON.stringify(
@@ -162,7 +171,7 @@ function AuditPage() {
         return false;
       return true;
     });
-  }, [logs, range, from, to, who, category, module, showBrowse, q]);
+  }, [logs, range, from, to, who, category, module, showBrowse, riskOnly, q]);
 
   const pager = usePagination(rows, 25);
 
@@ -289,6 +298,18 @@ function AuditPage() {
             >
               <Compass className="size-4" />
               {showBrowse ? "Shown" : "Hidden"}
+            </Button>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Cashier trail</Label>
+            <Button
+              type="button"
+              variant={riskOnly ? "secondary" : "outline"}
+              className="w-full justify-start"
+              onClick={() => setRiskOnly((v) => !v)}
+            >
+              <ShieldAlert className="size-4" />
+              {riskOnly ? "Voids, overrides & no-sales" : "All actions"}
             </Button>
           </div>
           {range === "custom" && (

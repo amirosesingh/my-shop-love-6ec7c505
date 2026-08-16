@@ -1,6 +1,5 @@
 import { useSyncExternalStore } from "react";
 import { db } from "./pos-db";
-import { logger } from "./audit-log";
 import { recordActivity } from "./activity-events";
 
 /** Minimum / maximum length of the typed no-sale reason. */
@@ -90,13 +89,17 @@ export function recordNoSale(input: Omit<DrawerEvent, "id" | "at">) {
     entityId: entry.id,
     meta: { approvedBy: entry.approvedBy ?? null },
   });
-  logger.log("cash", "Cash drawer opened without a sale", "register", {
-    reason: entry.reason,
-    note: entry.note,
-    storeId: entry.storeId,
-    shiftId: entry.shiftId,
-    approvedBy: entry.approvedBy,
-  });
+  // Filed as a cashier risk action so it shows in the cashier audit trail
+  // and in the immutable cloud history.
+  void import("./cashier-audit").then(({ logCashierAction }) =>
+    logCashierAction({
+      actionType: "no_sale",
+      storeId: entry.storeId,
+      terminalId: entry.terminalId,
+      reason: entry.reason + (entry.note ? ` — ${entry.note}` : ""),
+      approvedBy: entry.approvedBy,
+    }),
+  );
   return entry;
 }
 

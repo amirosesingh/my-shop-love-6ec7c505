@@ -39,7 +39,13 @@ import { getPosCallerAuth } from "@/lib/pos-caller-auth";
 import { assertShiftClosable } from "@/lib/pos-rules.functions";
 import { usePosRules } from "@/lib/pos-rules.tsx";
 import { useManagerGate } from "@/lib/manager-gate";
-import { closeScreenView, derivedCashSales, varianceNeedsPin } from "@/lib/shift-close";
+import {
+  closeScreenView,
+  derivedCashSales,
+  expectedFor,
+  reconcileShift,
+  varianceNeedsPin,
+} from "@/lib/shift-close";
 import { logSystemAction } from "@/lib/system-audit";
 
 export const Route = createFileRoute("/shifts")({
@@ -67,6 +73,8 @@ function Shifts() {
   const [cashier, setCashier] = useState(user?.name ?? "Cashier");
   const [float, setFloat] = useState("150");
   const [counted, setCounted] = useState("");
+  const [countedCard, setCountedCard] = useState("");
+  const [countedDigital, setCountedDigital] = useState("");
   const [note, setNote] = useState("");
   const [closeOpen, setCloseOpen] = useState(false);
   const [signIns, setSignIns] = useState<SignInEntry[]>([]);
@@ -488,6 +496,7 @@ function Shifts() {
                 <TableHead>Duration</TableHead>
                 <TableHead className="text-right">Float</TableHead>
                 <TableHead className="text-right">Closing float</TableHead>
+                <TableHead className="text-right">Over / short</TableHead>
                 <TableHead className="text-right">Z report</TableHead>
               </TableRow>
             </TableHeader>
@@ -530,6 +539,23 @@ function Shifts() {
                     {(sh.closingFloat ?? sh.countedCash) == null
                       ? "—"
                       : money((sh.closingFloat ?? sh.countedCash) as number)}
+                  </TableCell>
+                  <TableCell className="numeric text-right">
+                    {sh.varianceTotal == null ? (
+                      "—"
+                    ) : (
+                      <span
+                        className={
+                          Math.abs(sh.varianceTotal) <= 0.005
+                            ? "text-muted-foreground"
+                            : sh.varianceTotal > 0
+                              ? "text-success"
+                              : "text-destructive"
+                        }
+                      >
+                        {money(sh.varianceTotal)}
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button
@@ -610,6 +636,31 @@ function Shifts() {
                 </p>
               )}
             </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label>Card terminal total</Label>
+                <Input
+                  className="numeric"
+                  inputMode="decimal"
+                  placeholder="Optional"
+                  value={countedCard}
+                  onChange={(e) => setCountedCard(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Digital / wallet total</Label>
+                <Input
+                  className="numeric"
+                  inputMode="decimal"
+                  placeholder="Optional"
+                  value={countedDigital}
+                  onChange={(e) => setCountedDigital(e.target.value)}
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground sm:col-span-2">
+                Count each tender from its own terminal. Leave a box blank if it was not counted.
+              </p>
+            </div>
             {countedValue !== null && countedValue >= 0 && (
               <p className="numeric text-sm text-muted-foreground">
                 Cash sales {money(derivedCashSales(countedValue, closeView.openingFloat))}
@@ -640,14 +691,20 @@ function Shifts() {
                   return;
                 }
                 const variance = amount - closeView.expected;
+                // Blind count: the over/short only exists once the counts are in.
+                const recon = reconcileShift(activeShift, storeSales, {
+                  cash: amount,
+                  card: parsePositiveAmount(countedCard),
+                  digital: parsePositiveAmount(countedDigital),
+                });
                 // Large shortage or overage needs a manager before anything
                 // is written or printed.
                 let grantToken = "";
-                if (varianceNeedsPin(rules, variance)) {
+                if (varianceNeedsPin(rules, recon.total)) {
                   const res = await authorize({
                     action: "shift_close",
                     title: "Drawer variance approval",
-                    reason: `The drawer is out by ${money(variance)}.`,
+                    reason: `The takings are out by ${money(recon.total)}.`,
                     storeId: currentStore.id,
                     terminalId: hereId,
                     requestedBy: user?.name ?? null,
@@ -672,7 +729,20 @@ function Shifts() {
                   toast.error(gate.error);
                   return;
                 }
-                const closed = await closeShift(amount, note);
+                const cardCount = parsePositiveAmount(countedCard);
+                const digitalCount = parsePositiveAmount(countedDigital);
+                const closed = await closeShift(amount, note, {
+                  countedCard: cardCount,
+                  countedDigital: digitalCount,
+                  expectedCash: expectedFor(activeShift, storeSales, "cash"),
+                  expectedCard: expectedFor(activeShift, storeSales, "card"),
+                  expectedDigital: expectedFor(activeShift, storeSales, "digital"),
+                  varianceCash: recon.lines.find((l) => l.tender === "cash")?.variance ?? null,
+                  varianceCard: recon.lines.find((l) => l.tender === "card")?.variance ?? null,
+                  varianceDigital:
+                    recon.lines.find((l) => l.tender === "digital")?.variance ?? null,
+                  varianceTotal: recon.total,
+                });
                 if (!closed) {
                   toast.error("This shift can only be closed on the terminal that opened it.");
                   return;
@@ -681,10 +751,16 @@ function Shifts() {
                 // or pulse the drawer.
                 printShiftReport(closed, storeSales, "zreport");
                 openCashDrawer();
-                toast.success("Shift closed · Z report printed");
+                toast.success(
+                  Math.abs(recon.total) <= 0.005
+                    ? "Shift closed · drawer balanced · Z report printed"
+                    : `Shift closed · ${recon.total > 0 ? "over" : "short"} ${money(Math.abs(recon.total))}`,
+                );
                 setCloseOpen(false);
                 setNote("");
                 setCounted("");
+                setCountedCard("");
+                setCountedDigital("");
               }}
             >
               Close &amp; print Z

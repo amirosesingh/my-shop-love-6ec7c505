@@ -2023,9 +2023,13 @@ export type Database = {
           closed_by_role: string | null
           closed_by_staff_id: string | null
           closing_float: number | null
+          counted_card: number | null
           counted_cash: number | null
+          counted_digital: number | null
           created_at: string
+          expected_card: number | null
           expected_cash: number | null
+          expected_digital: number | null
           id: string
           note: string
           opened_at: string
@@ -2041,6 +2045,10 @@ export type Database = {
           terminal_name: string | null
           updated_at: string
           user_id: string | null
+          variance_card: number | null
+          variance_cash: number | null
+          variance_digital: number | null
+          variance_total: number | null
         }
         Insert: {
           closed_at?: string | null
@@ -2048,9 +2056,13 @@ export type Database = {
           closed_by_role?: string | null
           closed_by_staff_id?: string | null
           closing_float?: number | null
+          counted_card?: number | null
           counted_cash?: number | null
+          counted_digital?: number | null
           created_at?: string
+          expected_card?: number | null
           expected_cash?: number | null
+          expected_digital?: number | null
           id?: string
           note?: string
           opened_at?: string
@@ -2066,6 +2078,10 @@ export type Database = {
           terminal_name?: string | null
           updated_at?: string
           user_id?: string | null
+          variance_card?: number | null
+          variance_cash?: number | null
+          variance_digital?: number | null
+          variance_total?: number | null
         }
         Update: {
           closed_at?: string | null
@@ -2073,9 +2089,13 @@ export type Database = {
           closed_by_role?: string | null
           closed_by_staff_id?: string | null
           closing_float?: number | null
+          counted_card?: number | null
           counted_cash?: number | null
+          counted_digital?: number | null
           created_at?: string
+          expected_card?: number | null
           expected_cash?: number | null
+          expected_digital?: number | null
           id?: string
           note?: string
           opened_at?: string
@@ -2091,6 +2111,10 @@ export type Database = {
           terminal_name?: string | null
           updated_at?: string
           user_id?: string | null
+          variance_card?: number | null
+          variance_cash?: number | null
+          variance_digital?: number | null
+          variance_total?: number | null
         }
         Relationships: []
       }
@@ -3031,9 +3055,13 @@ export type Database = {
           closed_by_role: string | null
           closed_by_staff_id: string | null
           closing_float: number | null
+          counted_card: number | null
           counted_cash: number | null
+          counted_digital: number | null
           created_at: string
+          expected_card: number | null
           expected_cash: number | null
+          expected_digital: number | null
           id: string
           note: string
           opened_at: string
@@ -3049,6 +3077,10 @@ export type Database = {
           terminal_name: string | null
           updated_at: string
           user_id: string | null
+          variance_card: number | null
+          variance_cash: number | null
+          variance_digital: number | null
+          variance_total: number | null
         }
         SetofOptions: {
           from: "*"
@@ -3075,9 +3107,13 @@ export type Database = {
           closed_by_role: string | null
           closed_by_staff_id: string | null
           closing_float: number | null
+          counted_card: number | null
           counted_cash: number | null
+          counted_digital: number | null
           created_at: string
+          expected_card: number | null
           expected_cash: number | null
+          expected_digital: number | null
           id: string
           note: string
           opened_at: string
@@ -3093,6 +3129,10 @@ export type Database = {
           terminal_name: string | null
           updated_at: string
           user_id: string | null
+          variance_card: number | null
+          variance_cash: number | null
+          variance_digital: number | null
+          variance_total: number | null
         }
         SetofOptions: {
           from: "*"

@@ -184,7 +184,24 @@ type Ctx = {
   upsertStore: (store: Store) => void;
   removeStore: (id: string) => void;
   openShift: (cashier: string, openingFloat: number) => Promise<CommitTarget>;
-  closeShift: (countedCash: number, note: string) => Promise<Shift | null>;
+  closeShift: (
+    countedCash: number,
+    note: string,
+    extras?: Partial<
+      Pick<
+        Shift,
+        | "countedCard"
+        | "countedDigital"
+        | "expectedCash"
+        | "expectedCard"
+        | "expectedDigital"
+        | "varianceCash"
+        | "varianceCard"
+        | "varianceDigital"
+        | "varianceTotal"
+      >
+    >,
+  ) => Promise<Shift | null>;
   activeShift: Shift | null;
   /** Set when the last open-shift read failed; the till keeps trading. */
   shiftReadError: string | null;
@@ -792,7 +809,11 @@ export function PosProvider({ children }: { children: ReactNode }) {
   );
 
   const closeShift = useCallback(
-    async (countedCash: number, note: string) => {
+    async (
+      countedCash: number,
+      note: string,
+      extras: Partial<Shift> = {},
+    ) => {
       if (!activeShift) return null;
       // Only the PC that opened the shift may close it — unless a manager or
       // admin is signed in, who can close from anywhere.
@@ -801,6 +822,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       if (!sameTerminal && !isAdmin && !isSupervisor) return null;
       const closed: Shift = {
         ...activeShift,
+        ...extras,
         closedAt: new Date().toISOString(),
         countedCash,
         closingFloat: countedCash,
