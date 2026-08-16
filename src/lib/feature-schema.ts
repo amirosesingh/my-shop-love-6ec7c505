@@ -321,6 +321,17 @@ function namedColumn(message: string): string | null {
 
 type TableShape = { columns: Set<string>; required: Set<string> };
 
+/** Plain lists from the server relay turned into the sets used below. */
+function toShapes(
+  tables: Record<string, { columns: string[]; required: string[] }>,
+): Record<string, TableShape> {
+  const out: Record<string, TableShape> = {};
+  for (const [table, def] of Object.entries(tables)) {
+    out[table] = { columns: new Set(def.columns), required: new Set(def.required) };
+  }
+  return out;
+}
+
 /**
  * Published table definitions straight from the live Data API — no repo file
  * is consulted. Used to name every gap at once instead of one error per run.
