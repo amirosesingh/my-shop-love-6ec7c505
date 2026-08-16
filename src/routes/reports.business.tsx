@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Input } from "@/components/ui/input";
+import { AppShell } from "@/components/pos/AppShell";
 import { Label } from "@/components/ui/label";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import {
@@ -158,8 +158,8 @@ function BusinessReport() {
     return { revenue, profit, margin: revenue ? (profit / revenue) * 100 : 0, slow };
   }, [products]);
 
-  const prodPage = usePagination(products.length);
-  const cashPage = usePagination(cashiers.length);
+  const prodPage = usePagination(products);
+  const cashPage = usePagination(cashiers);
 
   const exportCsv = () => {
     if (view === "products") {
@@ -193,131 +193,157 @@ function BusinessReport() {
   };
 
   return (
-    <ReportHeader
-      title="Retail performance"
-      subtitle="Where the profit comes from, how fast stock moves, and how each cashier is trading."
-      onExport={exportCsv}
-    >
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">From</Label>
-          <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">To</Label>
-          <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Branch</Label>
-          <ThemedSelect
-            value={storeId}
-            onChange={setStoreId}
-            options={[
-              { value: "all", label: "All branches" },
-              ...stores.map((s) => ({ value: s.id, label: s.name })),
-            ]}
+    <AppShell>
+      <div className="space-y-5 p-6">
+        <ReportHeader
+          title="Retail performance"
+          subtitle="Where the profit comes from, how fast stock moves, and how each cashier is trading."
+          from={from}
+          to={to}
+          onFrom={setFrom}
+          onTo={setTo}
+          onExport={exportCsv}
+        >
+          <div className="space-y-1">
+            <Label className="text-xs">Branch</Label>
+            <div className="w-52">
+              <ThemedSelect
+                value={storeId}
+                onChange={setStoreId}
+                options={[
+                  { value: "all", label: "All branches" },
+                  ...stores.map((s) => ({ value: s.id, label: s.name })),
+                ]}
+              />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">View</Label>
+            <div className="w-64">
+              <ThemedSelect
+                value={view}
+                onChange={(v: string) => setView(v === "cashiers" ? "cashiers" : "products")}
+                options={[
+                  { value: "products", label: "Product profitability & velocity" },
+                  { value: "cashiers", label: "Cashier performance" },
+                ]}
+              />
+            </div>
+          </div>
+        </ReportHeader>
+
+        <div className="grid gap-4 sm:grid-cols-4">
+          <StatCard label="Revenue" value={money(totals.revenue)} />
+          <StatCard label="Gross profit" value={money(totals.profit)} />
+          <StatCard label="Margin" value={`${totals.margin.toFixed(1)}%`} />
+          <StatCard
+            label="Slow movers"
+            value={String(totals.slow)}
+            hint="More than 60 days of stock cover at the current selling rate"
           />
         </div>
-        <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">View</Label>
-          <ThemedSelect
-            value={view}
-            onChange={(v: string) => setView(v === "cashiers" ? "cashiers" : "products")}
-            options={[
-              { value: "products", label: "Product profitability & velocity" },
-              { value: "cashiers", label: "Cashier performance" },
-            ]}
-          />
-        </div>
-      </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Revenue" value={money(totals.revenue)} />
-        <StatCard label="Gross profit" value={money(totals.profit)} />
-        <StatCard label="Margin" value={`${totals.margin.toFixed(1)}%`} />
-        <StatCard
-          label="Slow movers"
-          value={String(totals.slow)}
-          hint="More than 60 days of stock cover at the current rate"
-        />
-      </div>
-
-      <div className="mt-6 overflow-x-auto rounded-lg border border-border">
-        {view === "products" ? (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Product</TableHead>
-                <TableHead className="text-right">Units</TableHead>
-                <TableHead className="text-right">Revenue</TableHead>
-                <TableHead className="text-right">Profit</TableHead>
-                <TableHead className="text-right">Margin</TableHead>
-                <TableHead className="text-right">Units/day</TableHead>
-                <TableHead className="text-right">On hand</TableHead>
-                <TableHead className="text-right">Days cover</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {products.length === 0 ? (
+        <div className="rounded-lg border border-border">
+          {view === "products" ? (
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
-                    Nothing sold in this period.
-                  </TableCell>
+                  <TableHead>Product</TableHead>
+                  <TableHead className="text-right">Units</TableHead>
+                  <TableHead className="text-right">Revenue</TableHead>
+                  <TableHead className="text-right">Profit</TableHead>
+                  <TableHead className="text-right">Margin</TableHead>
+                  <TableHead className="text-right">Units/day</TableHead>
+                  <TableHead className="text-right">On hand</TableHead>
+                  <TableHead className="text-right">Days cover</TableHead>
                 </TableRow>
-              ) : (
-                products.slice(prodPage.start, prodPage.end).map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="font-medium">{r.name}</TableCell>
-                    <TableCell className="text-right">{r.qty}</TableCell>
-                    <TableCell className="text-right">{money(r.revenue)}</TableCell>
-                    <TableCell className="text-right">{money(r.profit)}</TableCell>
-                    <TableCell className="text-right">{r.margin.toFixed(1)}%</TableCell>
-                    <TableCell className="text-right">{r.perDay.toFixed(2)}</TableCell>
-                    <TableCell className="text-right">{r.onHand}</TableCell>
-                    <TableCell className="text-right">
-                      {r.daysCover ? `${r.daysCover.toFixed(0)} d` : "—"}
+              </TableHeader>
+              <TableBody>
+                {products.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
+                      Nothing sold in this period.
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Cashier</TableHead>
-                <TableHead className="text-right">Bills</TableHead>
-                <TableHead className="text-right">Revenue</TableHead>
-                <TableHead className="text-right">Profit</TableHead>
-                <TableHead className="text-right">Discount given</TableHead>
-                <TableHead className="text-right">Average bill</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {cashiers.length === 0 ? (
+                ) : (
+                  prodPage.pageItems.map((r) => (
+                    <TableRow key={r.id}>
+                      <TableCell className="font-medium">{r.name}</TableCell>
+                      <TableCell className="text-right">{r.qty}</TableCell>
+                      <TableCell className="text-right">{money(r.revenue)}</TableCell>
+                      <TableCell className="text-right">{money(r.profit)}</TableCell>
+                      <TableCell className="text-right">{r.margin.toFixed(1)}%</TableCell>
+                      <TableCell className="text-right">{r.perDay.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{r.onHand}</TableCell>
+                      <TableCell className="text-right">
+                        {r.daysCover ? `${r.daysCover.toFixed(0)} d` : "—"}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          ) : (
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
-                    No bills in this period.
-                  </TableCell>
+                  <TableHead>Cashier</TableHead>
+                  <TableHead className="text-right">Bills</TableHead>
+                  <TableHead className="text-right">Revenue</TableHead>
+                  <TableHead className="text-right">Profit</TableHead>
+                  <TableHead className="text-right">Discount given</TableHead>
+                  <TableHead className="text-right">Average bill</TableHead>
                 </TableRow>
-              ) : (
-                cashiers.slice(cashPage.start, cashPage.end).map((r) => (
-                  <TableRow key={r.name}>
-                    <TableCell className="font-medium">{r.name}</TableCell>
-                    <TableCell className="text-right">{r.bills}</TableCell>
-                    <TableCell className="text-right">{money(r.revenue)}</TableCell>
-                    <TableCell className="text-right">{money(r.profit)}</TableCell>
-                    <TableCell className="text-right">{money(r.discount)}</TableCell>
-                    <TableCell className="text-right">{money(r.avgBill)}</TableCell>
+              </TableHeader>
+              <TableBody>
+                {cashiers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                      No bills in this period.
+                    </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        )}
+                ) : (
+                  cashPage.pageItems.map((r) => (
+                    <TableRow key={r.name}>
+                      <TableCell className="font-medium">{r.name}</TableCell>
+                      <TableCell className="text-right">{r.bills}</TableCell>
+                      <TableCell className="text-right">{money(r.revenue)}</TableCell>
+                      <TableCell className="text-right">{money(r.profit)}</TableCell>
+                      <TableCell className="text-right">{money(r.discount)}</TableCell>
+                      <TableCell className="text-right">{money(r.avgBill)}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          )}
+          {view === "products" ? (
+            <TablePagination
+              page={prodPage.page}
+              pageCount={prodPage.pageCount}
+              pageSize={prodPage.pageSize}
+              total={prodPage.total}
+              from={prodPage.from}
+              to={prodPage.to}
+              label="products"
+              onPage={prodPage.setPage}
+              onPageSize={prodPage.setPageSize}
+            />
+          ) : (
+            <TablePagination
+              page={cashPage.page}
+              pageCount={cashPage.pageCount}
+              pageSize={cashPage.pageSize}
+              total={cashPage.total}
+              from={cashPage.from}
+              to={cashPage.to}
+              label="cashiers"
+              onPage={cashPage.setPage}
+              onPageSize={cashPage.setPageSize}
+            />
+          )}
+        </div>
       </div>
-      {view === "products" ? <TablePagination {...prodPage} /> : <TablePagination {...cashPage} />}
-    </ReportHeader>
+    </AppShell>
   );
 }
