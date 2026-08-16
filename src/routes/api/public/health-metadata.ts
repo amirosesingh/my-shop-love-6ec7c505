@@ -87,11 +87,12 @@ async function handle({ request }: { request: Request }) {
         { properties?: Record<string, unknown>; required?: string[] }
       >;
     };
+    const { trulyRequired } = await import("@/lib/schema-required");
     const tables: Record<string, { columns: string[]; required: string[] }> = {};
     for (const [table, def] of Object.entries(spec.definitions ?? {})) {
       tables[table] = {
         columns: Object.keys(def.properties ?? {}),
-        required: def.required ?? [],
+        required: trulyRequired(def.required, def.properties),
       };
     }
     return Response.json({ ok: true, tables });

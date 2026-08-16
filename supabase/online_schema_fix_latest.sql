@@ -657,4 +657,42 @@ $$;
 REVOKE ALL ON FUNCTION public.schema_inventory() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.schema_inventory() TO authenticated, service_role;
 
+
+-- ---------------------------------------------------------------------------
+-- Terminal remote commands (Sync Now / Refresh catalog) -- needed by the
+-- terminal health scan, which reports the table as missing without it.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.terminal_commands (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  terminal_id text NOT NULL,
+  store_id text,
+  command text NOT NULL,
+  status text NOT NULL DEFAULT 'pending',
+  note text,
+  result text,
+  issued_by text,
+  issued_role text,
+  picked_up_at timestamptz,
+  finished_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS terminal_commands_pending_idx
+  ON public.terminal_commands (terminal_id, status, created_at);
+GRANT SELECT, INSERT, UPDATE ON public.terminal_commands TO authenticated;
+GRANT ALL ON public.terminal_commands TO service_role;
+ALTER TABLE public.terminal_commands ENABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='terminal_commands' AND policyname='terminal_commands_staff_read') THEN
+    CREATE POLICY terminal_commands_staff_read ON public.terminal_commands FOR SELECT TO authenticated USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='terminal_commands' AND policyname='terminal_commands_staff_write') THEN
+    CREATE POLICY terminal_commands_staff_write ON public.terminal_commands FOR INSERT TO authenticated WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='terminal_commands' AND policyname='terminal_commands_staff_update') THEN
+    CREATE POLICY terminal_commands_staff_update ON public.terminal_commands FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+
 NOTIFY pgrst, 'reload schema';
