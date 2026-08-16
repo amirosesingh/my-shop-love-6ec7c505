@@ -1041,6 +1041,13 @@ function Register() {
       ? r2(Math.max(0, Number(serviceFee || 0)))
       : 0;
   const bookingTotal = r2(totals.total + serviceCharge);
+  /* Live deposit breakdown shown on the booking form: what the branch demands
+     up front, what the cashier is taking now, and what is left to collect. */
+  const bookingMinDeposit = Math.min(minDepositFor(bookingTotal), bookingTotal);
+  const bookingPaidNow =
+    payTiming === "collection" ? 0 : payTiming === "now" ? bookingTotal : r2(Math.max(0, Number(deposit || 0)));
+  const bookingBalance = r2(Math.max(0, bookingTotal - bookingPaidNow));
+  const bookingDepositShort = bookingMinDeposit > 0 && bookingPaidNow + 0.001 < bookingMinDeposit;
 
   async function bookAndPayLater() {
     if (!activeShift) {
@@ -1063,6 +1070,12 @@ function Register() {
     const minDeposit = Math.min(minDepositFor(bookingTotal), bookingTotal);
     if (minDeposit > 0 && paidNow + 0.001 < minDeposit) {
       toast.error(`This branch needs a deposit of at least ${money(minDeposit)}`);
+      return;
+    }
+    if (!racketMode && bookingRules.serviceTerms.trim() && !liabilityOk) {
+      toast.error("The customer must accept the booking terms & conditions", {
+        description: "Tick the agreement box at the bottom of the booking form.",
+      });
       return;
     }
     if (racketMode) {
@@ -1137,7 +1150,7 @@ function Register() {
         cashier: activeCashier,
         tagId: racketMode ? jobTag || (bookingRules.autoJobTag ? newJobTag() : undefined) : undefined,
         stringOrigin: racketMode ? (stringCustomerOwned ? "customer" : "store") : undefined,
-        liabilityAccepted: racketMode ? liabilityOk : undefined,
+        liabilityAccepted: liabilityOk,
         stringProductId: racketMode && !stringCustomerOwned ? stringProductId || undefined : undefined,
         intakeNote: racketMode ? grommetNotes.trim() || undefined : undefined,
         job: racketMode
@@ -3231,7 +3244,7 @@ function Register() {
         <DialogContent
           className={
             racketMode
-              ? "flex h-[92vh] max-h-[92vh] w-[96vw] max-w-[1280px] flex-col"
+              ? "flex h-[92vh] max-h-[92vh] w-[94vw] max-w-[720px] flex-col"
               : "flex h-[90vh] max-h-[90vh] w-[94vw] max-w-[1040px] flex-col"
           }
         >
@@ -3241,7 +3254,7 @@ function Register() {
           <div
             className={`-mr-2 flex-1 overflow-y-auto pr-2 ${
               racketMode
-                ? "space-y-3 xl:grid xl:grid-cols-3 xl:items-start xl:gap-3 xl:space-y-0 [&>*]:mb-3"
+                ? "space-y-3"
                 : "space-y-3 lg:grid lg:grid-cols-2 lg:items-start lg:gap-3 lg:space-y-0 [&>*]:mb-3"
             }`}
           >
@@ -3250,20 +3263,25 @@ function Register() {
                 <span className="text-muted-foreground">Booking total</span>
                 <span className="numeric font-semibold">{money(bookingTotal)}</span>
               </div>
+              {bookingMinDeposit > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Minimum deposit</span>
+                  <span className="numeric font-medium">{money(bookingMinDeposit)}</span>
+                </div>
+              )}
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Balance after deposit</span>
-                <span className="numeric font-semibold text-primary">
-                  {money(
-                    r2(
-                      Math.max(
-                        0,
-                        bookingTotal -
-                          (payTiming === "collection" ? 0 : payTiming === "now" ? bookingTotal : Number(deposit || 0)),
-                      ),
-                    ),
-                  )}
-                </span>
+                <span className="text-muted-foreground">Paying now</span>
+                <span className="numeric font-medium">{money(bookingPaidNow)}</span>
               </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Balance on collection</span>
+                <span className="numeric font-semibold text-primary">{money(bookingBalance)}</span>
+              </div>
+              {bookingDepositShort && (
+                <p className="mt-1 rounded bg-destructive/10 px-2 py-1 text-[11px] font-medium text-destructive">
+                  This branch needs at least {money(bookingMinDeposit)} up front — {money(bookingPaidNow)} entered.
+                </p>
+              )}
               <p className="mt-1 text-[11px] text-muted-foreground">
                 {racketMode
                   ? `Job taken at ${currentStore.name} — no cart items needed.`
@@ -3767,7 +3785,32 @@ function Register() {
                 </div>
               </div>
             )}
+            {!racketMode && bookingRules.serviceTerms.trim() ? (
+              <div className="space-y-2 rounded-md border border-border bg-muted/30 p-3">
+                <p className="text-xs font-medium">Booking terms &amp; conditions</p>
+                <p className="text-[11px] leading-snug text-muted-foreground">{bookingRules.serviceTerms}</p>
+                <label className="flex items-start gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={liabilityOk}
+                    onChange={(e) => setLiabilityOk(e.target.checked)}
+                  />
+                  Customer has read and accepted the booking terms &amp; conditions.
+                </label>
+              </div>
+            ) : null}
           </div>
+          {racketMode && (
+            <div className="flex items-center justify-between gap-4 border-t border-border pt-2 text-sm">
+              <span className="text-muted-foreground">
+                Charges total <span className="numeric font-semibold text-foreground">{money(bookingTotal)}</span>
+              </span>
+              <span className="text-muted-foreground">
+                Paying now <span className="numeric font-semibold text-foreground">{money(bookingPaidNow)}</span> ·
+                Balance <span className="numeric font-semibold text-primary">{money(bookingBalance)}</span>
+              </span>
+            </div>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setBookOpen(false)}>
               Cancel
@@ -3786,7 +3829,12 @@ function Register() {
             )}
             <Button
               onClick={() => void bookAndPayLater()}
-              disabled={saving || (!racketMode && !lines.length)}
+              disabled={
+                saving ||
+                (!racketMode && !lines.length) ||
+                bookingDepositShort ||
+                (!racketMode && !!bookingRules.serviceTerms.trim() && !liabilityOk)
+              }
             >
               {saving ? "Saving…" : racketMode ? "Save job & print ticket" : "Save pay-later booking"}
             </Button>

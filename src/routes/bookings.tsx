@@ -109,6 +109,8 @@ function BookingsPage() {
   };
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<Booking["status"] | "all">("active");
+  /** Which kind of ticket the counter is looking at. */
+  const [kind, setKind] = useState<"racket" | "standard" | "done">("racket");
   /** Extra lens over the racket workflow, on top of the booking status. */
   const [jobFilter, setJobFilter] = useState<JobStatus | "all" | "jobs">("all");
   const [payFor, setPayFor] = useState<Booking | null>(null);
@@ -129,7 +131,12 @@ function BookingsPage() {
     const q = query.trim().toLowerCase();
     return state.bookings
       .filter((b) => b.storeId === currentStore.id)
-      .filter((b) => (tab === "all" ? true : b.status === tab))
+      .filter((b) =>
+        kind === "done"
+          ? b.status !== "active"
+          : b.status === "active" && (kind === "racket" ? !!b.job : !b.job),
+      )
+      .filter((b) => (kind !== "done" || tab === "all" ? true : b.status === tab))
       .filter((b) =>
         jobFilter === "all"
           ? true
@@ -146,7 +153,17 @@ function BookingsPage() {
           (b.job?.racketModel ?? "").toLowerCase().includes(q) ||
           (b.job?.stringType ?? "").toLowerCase().includes(q),
       );
-  }, [state.bookings, currentStore.id, tab, query, jobFilter]);
+  }, [state.bookings, currentStore.id, kind, tab, query, jobFilter]);
+
+  /** Counts for the tab badges, before the search / status lenses apply. */
+  const kindCounts = useMemo(() => {
+    const mine = state.bookings.filter((b) => b.storeId === currentStore.id);
+    return {
+      racket: mine.filter((b) => b.status === "active" && !!b.job).length,
+      standard: mine.filter((b) => b.status === "active" && !b.job).length,
+      done: mine.filter((b) => b.status !== "active").length,
+    };
+  }, [state.bookings, currentStore.id]);
 
   const memberOf = (b: Booking) => state.members.find((m) => m.id === b.memberId) ?? null;
   const today = new Date().toISOString().slice(0, 10);
@@ -272,7 +289,33 @@ function BookingsPage() {
         </header>
 
         <div className="flex flex-wrap gap-1">
-          {(["active", "collected", "cancelled", "all"] as const).map((t) => (
+          {(
+            [
+              ["racket", "Racket jobs", kindCounts.racket],
+              ["standard", "Standard bookings", kindCounts.standard],
+              ["done", "Completed / collected", kindCounts.done],
+            ] as const
+          ).map(([k, label, count]) => (
+            <button
+              key={k}
+              onClick={() => {
+                setKind(k);
+                if (k === "done") setTab("all");
+              }}
+              className={`rounded-md border px-3 py-1.5 text-xs ${
+                kind === k
+                  ? "border-primary/40 bg-primary/10 text-primary"
+                  : "border-border text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {label} ({count})
+            </button>
+          ))}
+        </div>
+
+        {kind === "done" && (
+        <div className="flex flex-wrap gap-1">
+          {(["collected", "cancelled", "all"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -286,7 +329,9 @@ function BookingsPage() {
             </button>
           ))}
         </div>
+        )}
 
+        {kind === "racket" && (
         <div className="flex flex-wrap items-center gap-1">
           <span className="mr-1 flex items-center gap-1 text-xs text-muted-foreground">
             <Wrench className="size-3.5" /> Job cards
@@ -305,6 +350,7 @@ function BookingsPage() {
             </button>
           ))}
         </div>
+        )}
 
         {bookings.length === 0 ? (
           <p className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
