@@ -480,12 +480,15 @@ function Inspector({
   label,
   supportsView,
   supportsLabel,
+  supportsStyle,
   onOptions,
 }: {
   box: LayoutBox;
   label: string;
   supportsView: boolean;
   supportsLabel: boolean;
+  /** Only icon-style controls can honour icon / text / icon + text. */
+  supportsStyle: boolean;
   onOptions: (opts: ModuleOptions) => void;
 }) {
   const pad = box.pad ?? DEFAULT_PAD;
@@ -554,6 +557,7 @@ function Inspector({
             ))}
           </div>
         </div>
+        {supportsStyle && (
         <div>
           <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Display</p>
           <div className="flex gap-1.5">
@@ -576,6 +580,7 @@ function Inspector({
             ))}
           </div>
         </div>
+        )}
         <div>
           <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Font size</p>
           <div className="flex gap-1.5">
