@@ -397,6 +397,10 @@ function CanvasItem({
   const { ref, vars } = useAutoScale(pad, box.font ?? "md", bare);
   if (!def) return null;
   const panel = !bare;
+  /* Panel tiles (cart, catalogue, totals …) cannot shrink-to-fit like an icon
+     tile, so the font size scales their whole content instead — the tile keeps
+     its own scroll area, the text inside simply reads bigger or smaller. */
+  const panelScale = FONT_SCALE[box.font ?? "md"];
   return (
     <section
       ref={ref}
@@ -437,6 +441,7 @@ function CanvasItem({
             label={def.label}
             supportsView={def.supportsView}
             supportsLabel={def.supportsLabel}
+            supportsStyle={bare}
             onOptions={onOptions}
           />
           <Button
@@ -450,7 +455,12 @@ function CanvasItem({
           </Button>
         </div>
       )}
-      <div className={`min-h-0 flex-1 ${panel ? "overflow-auto" : "overflow-hidden"}`}>
+      <div
+        className={`min-h-0 flex-1 ${panel ? "overflow-auto" : "overflow-hidden"}`}
+        {...(panel && panelScale !== 1
+          ? { style: { zoom: panelScale } as CSSProperties }
+          : {})}
+      >
         <NodeOptionsProvider
           value={{
             ...(box.label ? { label: box.label } : {}),
