@@ -109,6 +109,8 @@ function BookingsPage() {
   };
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<Booking["status"] | "all">("active");
+  /** Which kind of ticket the counter is looking at. */
+  const [kind, setKind] = useState<"racket" | "standard" | "done">("racket");
   /** Extra lens over the racket workflow, on top of the booking status. */
   const [jobFilter, setJobFilter] = useState<JobStatus | "all" | "jobs">("all");
   const [payFor, setPayFor] = useState<Booking | null>(null);
@@ -129,6 +131,11 @@ function BookingsPage() {
     const q = query.trim().toLowerCase();
     return state.bookings
       .filter((b) => b.storeId === currentStore.id)
+      .filter((b) =>
+        kind === "done"
+          ? b.status !== "active"
+          : b.status === "active" && (kind === "racket" ? !!b.job : !b.job),
+      )
       .filter((b) => (tab === "all" ? true : b.status === tab))
       .filter((b) =>
         jobFilter === "all"
@@ -146,7 +153,17 @@ function BookingsPage() {
           (b.job?.racketModel ?? "").toLowerCase().includes(q) ||
           (b.job?.stringType ?? "").toLowerCase().includes(q),
       );
-  }, [state.bookings, currentStore.id, tab, query, jobFilter]);
+  }, [state.bookings, currentStore.id, kind, tab, query, jobFilter]);
+
+  /** Counts for the tab badges, before the search / status lenses apply. */
+  const kindCounts = useMemo(() => {
+    const mine = state.bookings.filter((b) => b.storeId === currentStore.id);
+    return {
+      racket: mine.filter((b) => b.status === "active" && !!b.job).length,
+      standard: mine.filter((b) => b.status === "active" && !b.job).length,
+      done: mine.filter((b) => b.status !== "active").length,
+    };
+  }, [state.bookings, currentStore.id]);
 
   const memberOf = (b: Booking) => state.members.find((m) => m.id === b.memberId) ?? null;
   const today = new Date().toISOString().slice(0, 10);
