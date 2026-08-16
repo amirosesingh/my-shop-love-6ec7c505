@@ -6,6 +6,7 @@
  * customer.
  */
 import { createFileRoute } from "@tanstack/react-router";
+import { SettingsTabs } from "@/components/pos/settings/SettingsTabs";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
@@ -36,6 +37,8 @@ export const Route = createFileRoute("/settings/services")({
       title="Booking services"
       description="What customers book in for, and what you normally charge. The fee can still be changed on the booking itself."
     >
+      <SettingsTabs current="/settings/services" />
+
       <ServicesForm />
     </SettingsFrame>
   ),

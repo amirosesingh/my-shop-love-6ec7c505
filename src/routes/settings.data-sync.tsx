@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { SettingsTabs } from "@/components/pos/settings/SettingsTabs";
 import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
 import { SyncHub } from "@/components/pos/sync/SyncHub";
 
@@ -25,6 +26,8 @@ export const Route = createFileRoute("/settings/data-sync")({
       title="Data sync & audit"
       description="What this till has sent, what is still waiting, and every sync operation it has recorded."
     >
+      <SettingsTabs current="/settings/data-sync" />
+
       <SyncHub />
     </SettingsFrame>
   ),

@@ -6,6 +6,7 @@
  * allowed to undo one. The register and the bookings ledger both read these.
  */
 import { createFileRoute } from "@tanstack/react-router";
+import { SettingsTabs } from "@/components/pos/settings/SettingsTabs";
 import { Plus, Trash2 } from "lucide-react";
 import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,8 @@ export const Route = createFileRoute("/settings/booking-rules")({
       description="Deposits, turnaround, racket job requirements and who may cancel or re-spec a booking."
       scopeSections={["booking"]}
     >
+      <SettingsTabs current="/settings/booking-rules" />
+
       <BookingRulesForm />
     </SettingsFrame>
   ),

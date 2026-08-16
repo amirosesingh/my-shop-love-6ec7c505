@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { SettingsTabs } from "@/components/pos/settings/SettingsTabs";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Loader2, Save, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
@@ -121,6 +122,8 @@ function RulesSettings() {
             </Link>
           </Button>
         </div>
+
+        <SettingsTabs current="/settings/rules" />
 
         <header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
           <div className="min-w-0">

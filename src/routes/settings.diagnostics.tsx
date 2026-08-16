@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { SettingsTabs } from "@/components/pos/settings/SettingsTabs";
 import { useState } from "react";
 import { toast } from "sonner";
 import { notifyError } from "@/lib/notify";
@@ -15,6 +16,16 @@ import {
   type RecentRows,
 } from "@/lib/db-health";
 import { importSampleData } from "@/lib/pos-db";
+import { RelationFlowGraph } from "@/components/pos/settings/RelationFlowGraph";
+import {
+  formatRelationalReport,
+  runRelationalHealth,
+  STATUS_CLASS,
+  STATUS_LABEL,
+  type RelationalReport,
+} from "@/lib/db-relations";
+import { formatLogicReport, logicReport } from "@/lib/logic-health";
+import { settingsDuplicates } from "@/lib/settings-groups";
 
 export const Route = createFileRoute("/settings/diagnostics")({
   head: () => ({
@@ -47,6 +58,63 @@ function DiagnosticsPage() {
   const [peek, setPeek] = useState<RecentRows | null>(null);
   const [peeking, setPeeking] = useState<string | null>(null);
   const [seeding, setSeeding] = useState(false);
+  const [relations, setRelations] = useState<RelationalReport | null>(null);
+  const [relBusy, setRelBusy] = useState(false);
+  const [summary, setSummary] = useState<string[] | null>(null);
+
+  /** Relational picture of the trading tables — no sign-in tables are read. */
+  const runRelations = async () => {
+    setRelBusy(true);
+    try {
+      const rep = await runRelationalHealth();
+      setRelations(rep);
+      if (rep.error) toast.error("Could not read the table links", { description: rep.error });
+      return rep;
+    } finally {
+      setRelBusy(false);
+    }
+  };
+
+  /** One button: table links, read/write probe, settings duplicates, logic scan. */
+  const runEverything = async () => {
+    setBusy(true);
+    try {
+      const [health, cover, rel] = await Promise.all([
+        runDbHealth(),
+        runBranchCoverage(),
+        runRelationalHealth(),
+      ]);
+      setReport(health);
+      setCoverage(cover);
+      setRelations(rel);
+      const logic = logicReport();
+      const dupes = settingsDuplicates();
+      const risky = rel.tables.filter((t) => t.status !== "healthy");
+      setSummary([
+        `Database links: ${rel.error ? `check failed — ${rel.error}` : `${rel.tables.length - risky.length} of ${rel.tables.length} operational tables connected and clean`}`,
+        `Integrity risks: ${rel.tables.filter((t) => t.status === "integrity-risk").length} table(s) with orphan records`,
+        `Missing relations: ${rel.tables.filter((t) => t.status === "missing-fk").length} table(s) without a declared link`,
+        `Reading / saving: ${health.tables.filter((t) => t.read !== "ok" || t.write === "fail").length} table(s) need attention`,
+        `Logic flaws: ${logic.counts.critical} critical, ${logic.counts.warning} warning, ${logic.counts.info} info`,
+        `Duplicate settings: ${dupes.length === 0 ? "none — every page has one home" : dupes.map((d) => d.route).join(", ")}`,
+      ]);
+      toast.success("Full system scan finished");
+    } catch (e) {
+      notifyError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const copyAll = async () => {
+    const parts = [
+      relations ? formatRelationalReport(relations) : "",
+      report ? formatReport(report) : "",
+      formatLogicReport(logicReport()),
+    ].filter(Boolean);
+    await navigator.clipboard.writeText(parts.join("\n\n"));
+    toast.success("Consolidated report copied");
+  };
 
   /** Demo catalogue, on request only — nothing is ever inserted automatically. */
   const loadSample = async () => {
@@ -97,12 +165,20 @@ function DiagnosticsPage() {
       title="Database health"
       description="Checks that each POS table can be read and saved on the central database. Nothing is changed — the save test uses a request that matches no rows."
     >
+      <SettingsTabs current="/settings/diagnostics" />
+
       <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" disabled={busy || relBusy} onClick={() => void runEverything()}>
+          {busy ? "Scanning…" : "Run full system health & logic scan"}
+        </Button>
         <Button size="sm" disabled={busy} onClick={() => void run()}>
           {busy ? "Checking…" : "Run check"}
         </Button>
         <Button size="sm" variant="outline" disabled={!report} onClick={() => void copy()}>
           Copy report
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => void copyAll()}>
+          Copy everything
         </Button>
         <Button size="sm" variant="outline" disabled={seeding} onClick={() => void loadSample()}>
           {seeding ? "Adding…" : "Load sample data"}
@@ -115,6 +191,96 @@ function DiagnosticsPage() {
           </span>
         )}
       </div>
+
+      {summary && (
+        <section className="space-y-1 rounded-lg border border-border bg-muted/40 p-4">
+          <h2 className="text-sm font-semibold">Consolidated scan</h2>
+          <ul className="space-y-0.5 text-xs text-muted-foreground">
+            {summary.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-semibold">Operational table links</h2>
+            <p className="text-xs text-muted-foreground">
+              Trading data only — sales, bookings, catalogue, members, purchasing, stock and
+              coupons. Staff accounts, roles and sign-in tables are never inspected here.
+            </p>
+          </div>
+          <Button size="sm" variant="outline" disabled={relBusy} onClick={() => void runRelations()}>
+            {relBusy ? "Checking links…" : "Check table links"}
+          </Button>
+        </div>
+
+        {relations?.error && <p className="text-xs text-destructive">{relations.error}</p>}
+
+        {relations && !relations.error && (
+          <>
+            <div className="overflow-x-auto rounded-md border border-border">
+              <table className="w-full text-xs">
+                <thead className="bg-muted/50">
+                  <tr className="text-left">
+                    <th className="px-3 py-2 font-medium">Table</th>
+                    <th className="px-3 py-2 font-medium">Relationships</th>
+                    <th className="px-3 py-2 font-medium">Integrity</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {relations.tables.map((t) => (
+                    <tr key={t.table} className="border-t border-border align-top">
+                      <td className="px-3 py-2">
+                        <div className="font-medium">{t.label}</div>
+                        <div className="text-muted-foreground">
+                          {t.table} · {t.rows} rows
+                        </div>
+                      </td>
+                      <td className="px-3 py-2">
+                        {t.links.length === 0 ? (
+                          <span className="text-muted-foreground">Stands alone — no parents.</span>
+                        ) : (
+                          <ul className="space-y-0.5">
+                            {t.links.map((l) => (
+                              <li key={l.label}>
+                                <span className="font-medium">{l.label}</span>{" "}
+                                {!l.declared ? (
+                                  <span className="text-amber-600 dark:text-amber-400">
+                                    no link defined
+                                  </span>
+                                ) : l.orphans ? (
+                                  <span className="text-destructive">
+                                    {l.orphans} record{l.orphans === 1 ? "" : "s"} point at a
+                                    missing {l.parent} row
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground">linked, no orphans</span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        <span
+                          className={`whitespace-nowrap rounded-full border px-2 py-0.5 ${STATUS_CLASS[t.status]}`}
+                        >
+                          {STATUS_LABEL[t.status]}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <RelationFlowGraph tables={relations.tables} />
+          </>
+        )}
+      </section>
 
       {report && (
         <div className="space-y-4">

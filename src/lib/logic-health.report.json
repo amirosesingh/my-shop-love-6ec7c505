@@ -1,0 +1,1919 @@
+{
+  "generatedAt": "2026-08-16T02:20:33.747Z",
+  "filesScanned": 345,
+  "counts": {
+    "critical": 12,
+    "warning": 4,
+    "info": 196
+  },
+  "findings": [
+    {
+      "id": "src/components/pos/TenderSplit.tsx:77:No failure handling",
+      "file": "src/components/pos/TenderSplit.tsx",
+      "line": 77,
+      "rule": "No failure handling",
+      "severity": "critical",
+      "detail": "addTender() awaits work without a try/catch.",
+      "hint": "A dropped connection here can lose money or stock movements."
+    },
+    {
+      "id": "src/lib/coupons.ts:177:No failure handling",
+      "file": "src/lib/coupons.ts",
+      "line": 177,
+      "rule": "No failure handling",
+      "severity": "critical",
+      "detail": "slugify() awaits work without a try/catch.",
+      "hint": "A dropped connection here can lose money or stock movements."
+    },
+    {
+      "id": "src/lib/coupons.ts:185:No failure handling",
+      "file": "src/lib/coupons.ts",
+      "line": 185,
+      "rule": "No failure handling",
+      "severity": "critical",
+      "detail": "loadCampaigns() awaits work without a try/catch.",
+      "hint": "A dropped connection here can lose money or stock movements."
+    },
+    {
+      "id": "src/lib/coupons.ts:191:No failure handling",
+      "file": "src/lib/coupons.ts",
+      "line": 191,
+      "rule": "No failure handling",
+      "severity": "critical",
+      "detail": "saveCampaign() awaits work without a try/catch.",
+      "hint": "A dropped connection here can lose money or stock movements."
+    },
+    {
+      "id": "src/lib/coupons.ts:196:No failure handling",
+      "file": "src/lib/coupons.ts",
+      "line": 196,
+      "rule": "No failure handling",
+      "severity": "critical",
+      "detail": "deleteCampaign() awaits work without a try/catch.",
+      "hint": "A dropped connection here can lose money or stock movements."
+    },
+    {
+      "id": "src/lib/coupons.ts:201:No failure handling",
+      "file": "src/lib/coupons.ts",
+      "line": 201,
+      "rule": "No failure handling",
+      "severity": "critical",
+      "detail": "loadCampaignBySlug() awaits work without a try/catch.",
+      "hint": "A dropped connection here can lose money or stock movements."
+    },
+    {
+      "id": "src/lib/coupons.ts:207:No failure handling",
+      "file": "src/lib/coupons.ts",
+      "line": 207,
+      "rule": "No failure handling",
+      "severity": "critical",
+      "detail": "loadVouchers() awaits work without a try/catch.",
+      "hint": "A dropped connection here can lose money or stock movements."
+    },
+    {
+      "id": "src/lib/coupons.ts:229:No failure handling",
+      "file": "src/lib/coupons.ts",
+      "line": 229,
+      "rule": "No failure handling",
+      "severity": "critical",
+      "detail": "loadVoucherByToken() awaits work without a try/catch.",
+      "hint": "A dropped connection here can lose money or stock movements."
+    },
+    {
+      "id": "src/lib/coupons.ts:243:No failure handling",
+      "file": "src/lib/coupons.ts",
+      "line": 243,
+      "rule": "No failure handling",
+      "severity": "critical",
+      "detail": "loadMemberVouchers() awaits work without a try/catch.",
+      "hint": "A dropped connection here can lose money or stock movements."
+    },
+    {
+      "id": "src/lib/stock-transfers.ts:65:No failure handling",
+      "file": "src/lib/stock-transfers.ts",
+      "line": 65,
+      "rule": "No failure handling",
+      "severity": "critical",
+      "detail": "loadTransfers() awaits work without a try/catch.",
+      "hint": "A dropped connection here can lose money or stock movements."
+    },
+    {
+      "id": "src/lib/stock-transfers.ts:160:No failure handling",
+      "file": "src/lib/stock-transfers.ts",
+      "line": 160,
+      "rule": "No failure handling",
+      "severity": "critical",
+      "detail": "receiveTransferInDb() awaits work without a try/catch.",
+      "hint": "A dropped connection here can lose money or stock movements."
+    },
+    {
+      "id": "src/routes/coupons.tsx:190:No failure handling",
+      "file": "src/routes/coupons.tsx",
+      "line": 190,
+      "rule": "No failure handling",
+      "severity": "critical",
+      "detail": "copyLink() awaits work without a try/catch.",
+      "hint": "A dropped connection here can lose money or stock movements."
+    },
+    {
+      "id": "src/lib/native-http.ts:153:Placeholder logic",
+      "file": "src/lib/native-http.ts",
+      "line": 153,
+      "rule": "Placeholder logic",
+      "severity": "warning",
+      "detail": "if (!/not implemented/i.test(err instanceof Error ? err.message : String(err))) throw err;",
+      "hint": "This path tells the user nothing happens yet."
+    },
+    {
+      "id": "src/lib/native-http.ts:198:Placeholder logic",
+      "file": "src/lib/native-http.ts",
+      "line": 198,
+      "rule": "Placeholder logic",
+      "severity": "warning",
+      "detail": "if (!/not implemented/i.test(err instanceof Error ? err.message : String(err))) throw err;",
+      "hint": "This path tells the user nothing happens yet."
+    },
+    {
+      "id": "src/routes/coupons.tsx:524:Unvalidated number input",
+      "file": "src/routes/coupons.tsx",
+      "line": 524,
+      "rule": "Unvalidated number input",
+      "severity": "warning",
+      "detail": "maxClaims: e.target.value ? Number(e.target.value) : null,",
+      "hint": "An empty or bad entry becomes NaN."
+    },
+    {
+      "id": "src/routes/coupons.tsx:541:Unvalidated number input",
+      "file": "src/routes/coupons.tsx",
+      "line": 541,
+      "rule": "Unvalidated number input",
+      "severity": "warning",
+      "detail": "maxPerMember: e.target.value ? Number(e.target.value) : null,",
+      "hint": "An empty or bad entry becomes NaN."
+    },
+    {
+      "id": "src/components/admin/StaffManager.tsx:251:No failure handling",
+      "file": "src/components/admin/StaffManager.tsx",
+      "line": 251,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "savePermissions() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/components/database/SqlConnectionModal.tsx:257:Unvalidated number input",
+      "file": "src/components/database/SqlConnectionModal.tsx",
+      "line": 257,
+      "rule": "Unvalidated number input",
+      "severity": "info",
+      "detail": "onChange={(e) => set(\"port\", Number(e.target.value) || 1433)}",
+      "hint": "An empty or bad entry becomes NaN."
+    },
+    {
+      "id": "src/components/pos/ConnectionCheck.tsx:13:No failure handling",
+      "file": "src/components/pos/ConnectionCheck.tsx",
+      "line": 13,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "ConnectionCheck() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/components/pos/ConnectionCheck.tsx:17:No failure handling",
+      "file": "src/components/pos/ConnectionCheck.tsx",
+      "line": 17,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "run() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/components/pos/DisplayScalingSettings.tsx:184:Unvalidated number input",
+      "file": "src/components/pos/DisplayScalingSettings.tsx",
+      "line": 184,
+      "rule": "Unvalidated number input",
+      "severity": "info",
+      "detail": "const v = Number(e.target.value);",
+      "hint": "An empty or bad entry becomes NaN."
+    },
+    {
+      "id": "src/components/pos/DisplayScalingSettings.tsx:220:Unvalidated number input",
+      "file": "src/components/pos/DisplayScalingSettings.tsx",
+      "line": 220,
+      "rule": "Unvalidated number input",
+      "severity": "info",
+      "detail": "const v = Number(e.target.value);",
+      "hint": "An empty or bad entry becomes NaN."
+    },
+    {
+      "id": "src/components/pos/layout/CustomButtonDialog.tsx:181:Unvalidated number input",
+      "file": "src/components/pos/layout/CustomButtonDialog.tsx",
+      "line": 181,
+      "rule": "Unvalidated number input",
+      "severity": "info",
+      "detail": "onChange={(e) => setPad(Number(e.target.value))}",
+      "hint": "An empty or bad entry becomes NaN."
+    },
+    {
+      "id": "src/components/pos/layout/RegisterWorkspace.tsx:597:Unvalidated number input",
+      "file": "src/components/pos/layout/RegisterWorkspace.tsx",
+      "line": 597,
+      "rule": "Unvalidated number input",
+      "severity": "info",
+      "detail": "onChange={(e) => onOptions({ pad: Number(e.target.value) })}",
+      "hint": "An empty or bad entry becomes NaN."
+    },
+    {
+      "id": "src/components/pos/layout/RegisterWorkspace.tsx:668:Unvalidated number input",
+      "file": "src/components/pos/layout/RegisterWorkspace.tsx",
+      "line": 668,
+      "rule": "Unvalidated number input",
+      "severity": "info",
+      "detail": "onChange={(e) => onCanvas({ cols: Number(e.target.value) })}",
+      "hint": "An empty or bad entry becomes NaN."
+    },
+    {
+      "id": "src/components/pos/layout/RegisterWorkspace.tsx:686:Unvalidated number input",
+      "file": "src/components/pos/layout/RegisterWorkspace.tsx",
+      "line": 686,
+      "rule": "Unvalidated number input",
+      "severity": "info",
+      "detail": "onChange={(e) => onCanvas({ rowHeight: Number(e.target.value) })}",
+      "hint": "An empty or bad entry becomes NaN."
+    },
+    {
+      "id": "src/components/pos/layout/RegisterWorkspace.tsx:699:Unvalidated number input",
+      "file": "src/components/pos/layout/RegisterWorkspace.tsx",
+      "line": 699,
+      "rule": "Unvalidated number input",
+      "severity": "info",
+      "detail": "onChange={(e) => onCanvas({ baseWidth: Number(e.target.value) })}",
+      "hint": "An empty or bad entry becomes NaN."
+    },
+    {
+      "id": "src/components/pos/layout/RegisterWorkspace.tsx:729:Unvalidated number input",
+      "file": "src/components/pos/layout/RegisterWorkspace.tsx",
+      "line": 729,
+      "rule": "Unvalidated number input",
+      "severity": "info",
+      "detail": "onChange={(e) => onPadAll(Number(e.target.value))}",
+      "hint": "An empty or bad entry becomes NaN."
+    },
+    {
+      "id": "src/components/pos/LocalDatabaseSettings.tsx:141:No failure handling",
+      "file": "src/components/pos/LocalDatabaseSettings.tsx",
+      "line": 141,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "retryRow() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/components/pos/LocalDatabaseSettings.tsx:219:Unvalidated number input",
+      "file": "src/components/pos/LocalDatabaseSettings.tsx",
+      "line": 219,
+      "rule": "Unvalidated number input",
+      "severity": "info",
+      "detail": "onChange={(e) => set(\"port\", Number(e.target.value) || 1433)}",
+      "hint": "An empty or bad entry becomes NaN."
+    },
+    {
+      "id": "src/components/pos/ReceiptPrinterSettings.tsx:231:Unvalidated number input",
+      "file": "src/components/pos/ReceiptPrinterSettings.tsx",
+      "line": 231,
+      "rule": "Unvalidated number input",
+      "severity": "info",
+      "detail": "const n = Number(e.target.value);",
+      "hint": "An empty or bad entry becomes NaN."
+    },
+    {
+      "id": "src/components/pos/SecureCredentials.tsx:75:No failure handling",
+      "file": "src/components/pos/SecureCredentials.tsx",
+      "line": 75,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "SecureCredentials() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/components/pos/SecureCredentials.tsx:83:No failure handling",
+      "file": "src/components/pos/SecureCredentials.tsx",
+      "line": 83,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "refresh() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/components/pos/SecureCredentials.tsx:103:No failure handling",
+      "file": "src/components/pos/SecureCredentials.tsx",
+      "line": 103,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "save() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/components/pos/SecureCredentials.tsx:116:No failure handling",
+      "file": "src/components/pos/SecureCredentials.tsx",
+      "line": 116,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "clear() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/components/pos/SyncSettings.tsx:215:Unvalidated number input",
+      "file": "src/components/pos/SyncSettings.tsx",
+      "line": 215,
+      "rule": "Unvalidated number input",
+      "severity": "info",
+      "detail": "onChange={(e) => setDays(Number(e.target.value) || 90)}",
+      "hint": "An empty or bad entry becomes NaN."
+    },
+    {
+      "id": "src/components/pos/TerminalLogin.tsx:13:No failure handling",
+      "file": "src/components/pos/TerminalLogin.tsx",
+      "line": 13,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "TerminalLogin() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/components/pos/TerminalTokens.tsx:231:No failure handling",
+      "file": "src/components/pos/TerminalTokens.tsx",
+      "line": 231,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "copy() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/components/pos/TerminalTokens.tsx:302:No failure handling",
+      "file": "src/components/pos/TerminalTokens.tsx",
+      "line": 302,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "copyReissued() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/components/pos/UnpairTerminal.tsx:25:No failure handling",
+      "file": "src/components/pos/UnpairTerminal.tsx",
+      "line": 25,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "UnpairTerminalCard() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/components/pos/UnpairTerminal.tsx:38:No failure handling",
+      "file": "src/components/pos/UnpairTerminal.tsx",
+      "line": 38,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "ask() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/components/pos/UnpairTerminal.tsx:50:No failure handling",
+      "file": "src/components/pos/UnpairTerminal.tsx",
+      "line": 50,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "run() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/accent.ts:34:parseInt without a radix",
+      "file": "src/lib/accent.ts",
+      "line": 34,
+      "rule": "parseInt without a radix",
+      "severity": "info",
+      "detail": "const n = parseInt(hex.slice(1), 16);",
+      "hint": "Pass 10 as the radix."
+    },
+    {
+      "id": "src/lib/activity-events.server.ts:48:No failure handling",
+      "file": "src/lib/activity-events.server.ts",
+      "line": 48,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "writeNotificationSettings() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/activity-events.server.ts:93:No failure handling",
+      "file": "src/lib/activity-events.server.ts",
+      "line": 93,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "sendWhatsApp() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/activity-events.ts:152:No failure handling",
+      "file": "src/lib/activity-events.ts",
+      "line": 152,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "flushActivityQueue() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/activity-events.ts:163:No failure handling",
+      "file": "src/lib/activity-events.ts",
+      "line": 163,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "recordActivity() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/analytics-board.ts:90:No failure handling",
+      "file": "src/lib/analytics-board.ts",
+      "line": 90,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "fetchBoard() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/android-updates.ts:109:No failure handling",
+      "file": "src/lib/android-updates.ts",
+      "line": 109,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "downloadAndInstall() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/app-health.ts:36:No failure handling",
+      "file": "src/lib/app-health.ts",
+      "line": 36,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "useAppHealth() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/bookings-db.ts:132:No failure handling",
+      "file": "src/lib/bookings-db.ts",
+      "line": 132,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "saveBooking() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/bookings-db.ts:148:No failure handling",
+      "file": "src/lib/bookings-db.ts",
+      "line": 148,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "deleteBookingRow() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/bookings-db.ts:179:No failure handling",
+      "file": "src/lib/bookings-db.ts",
+      "line": 179,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "loadBookings() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/branch-settings.ts:83:No failure handling",
+      "file": "src/lib/branch-settings.ts",
+      "line": 83,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "saveSectionOverride() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/branch-settings.ts:104:No failure handling",
+      "file": "src/lib/branch-settings.ts",
+      "line": 104,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "clearSectionOverride() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/branch-settings.ts:119:No failure handling",
+      "file": "src/lib/branch-settings.ts",
+      "line": 119,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "setSectionLock() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/camera.ts:75:No failure handling",
+      "file": "src/lib/camera.ts",
+      "line": 75,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "scanOnceNative() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/catalog-meta.ts:59:No failure handling",
+      "file": "src/lib/catalog-meta.ts",
+      "line": 59,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "loadCatalogMeta() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/catalog-meta.ts:116:No failure handling",
+      "file": "src/lib/catalog-meta.ts",
+      "line": 116,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "deleteCategory() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/catalog-meta.ts:151:No failure handling",
+      "file": "src/lib/catalog-meta.ts",
+      "line": 151,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "deleteUnit() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/catalog-meta.ts:178:No failure handling",
+      "file": "src/lib/catalog-meta.ts",
+      "line": 178,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "useCategories() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/catalog-meta.ts:179:No failure handling",
+      "file": "src/lib/catalog-meta.ts",
+      "line": 179,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "useUnits() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/catalog-meta.ts:181:No failure handling",
+      "file": "src/lib/catalog-meta.ts",
+      "line": 181,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "byOrder() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/catalog-meta.ts:185:No failure handling",
+      "file": "src/lib/catalog-meta.ts",
+      "line": 185,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "listOf() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/catalog-meta.ts:188:No failure handling",
+      "file": "src/lib/catalog-meta.ts",
+      "line": 188,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "topCategories() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/catalog-meta.ts:189:No failure handling",
+      "file": "src/lib/catalog-meta.ts",
+      "line": 189,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "groupList() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/catalog-meta.ts:190:No failure handling",
+      "file": "src/lib/catalog-meta.ts",
+      "line": 190,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "subCategoryList() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/catalog-meta.ts:193:No failure handling",
+      "file": "src/lib/catalog-meta.ts",
+      "line": 193,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "reorderCategory() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/connection-health.ts:54:No failure handling",
+      "file": "src/lib/connection-health.ts",
+      "line": 54,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "probeCloud() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/connection-health.ts:61:No failure handling",
+      "file": "src/lib/connection-health.ts",
+      "line": 61,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "probeLocal() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/connection-health.ts:69:No failure handling",
+      "file": "src/lib/connection-health.ts",
+      "line": 69,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "lastHealth() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/connection-health.ts:72:No failure handling",
+      "file": "src/lib/connection-health.ts",
+      "line": 72,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "fresh() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/connection-health.ts:79:No failure handling",
+      "file": "src/lib/connection-health.ts",
+      "line": 79,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "checkHealth() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/connection-health.ts:97:No failure handling",
+      "file": "src/lib/connection-health.ts",
+      "line": 97,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "anyDatabaseReachable() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/db-health.ts:240:No failure handling",
+      "file": "src/lib/db-health.ts",
+      "line": 240,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "runDbHealth() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/desktop-window.ts:25:No failure handling",
+      "file": "src/lib/desktop-window.ts",
+      "line": 25,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "isTicketDirty() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/desktop-window.ts:27:No failure handling",
+      "file": "src/lib/desktop-window.ts",
+      "line": 27,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "useWindowControls() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/device-secrets.ts:55:No failure handling",
+      "file": "src/lib/device-secrets.ts",
+      "line": 55,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "setDeviceSecret() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/idle-timeout.functions.ts:8:No failure handling",
+      "file": "src/lib/idle-timeout.functions.ts",
+      "line": 8,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "rpc() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/layout-store.ts:46:No failure handling",
+      "file": "src/lib/layout-store.ts",
+      "line": 46,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "readLayoutRaw() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/layout-store.ts:56:No failure handling",
+      "file": "src/lib/layout-store.ts",
+      "line": 56,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "writeLayoutRaw() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/local-db.ts:396:No failure handling",
+      "file": "src/lib/local-db.ts",
+      "line": 396,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "writeLocalDbConfig() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/native-http.ts:114:No failure handling",
+      "file": "src/lib/native-http.ts",
+      "line": 114,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "firstReachableUrl() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/notification-guard.ts:35:No failure handling",
+      "file": "src/lib/notification-guard.ts",
+      "line": 35,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "connectivityWarningAllowed() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/offline-credentials.ts:24:No failure handling",
+      "file": "src/lib/offline-credentials.ts",
+      "line": 24,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "isBrowser() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/offline-credentials.ts:26:No failure handling",
+      "file": "src/lib/offline-credentials.ts",
+      "line": 26,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "toHex() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/offline-credentials.ts:31:No failure handling",
+      "file": "src/lib/offline-credentials.ts",
+      "line": 31,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "derive() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/offline-credentials.ts:33:parseInt without a radix",
+      "file": "src/lib/offline-credentials.ts",
+      "line": 33,
+      "rule": "parseInt without a radix",
+      "severity": "info",
+      "detail": "const salt = Uint8Array.from(saltHex.match(/.{2}/g) ?? [], (h) => parseInt(h, 16));",
+      "hint": "Pass 10 as the radix."
+    },
+    {
+      "id": "src/lib/offline-credentials.ts:67:No failure handling",
+      "file": "src/lib/offline-credentials.ts",
+      "line": 67,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "cacheCredential() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/offline-credentials.ts:87:No failure handling",
+      "file": "src/lib/offline-credentials.ts",
+      "line": 87,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "verifyCachedPin() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/pin-throttle.server.ts:42:No failure handling",
+      "file": "src/lib/pin-throttle.server.ts",
+      "line": 42,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "throttleStatus() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/pin-throttle.server.ts:48:No failure handling",
+      "file": "src/lib/pin-throttle.server.ts",
+      "line": 48,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "throttleFail() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/pin-throttle.server.ts:53:No failure handling",
+      "file": "src/lib/pin-throttle.server.ts",
+      "line": 53,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "throttleReset() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/pos-auth.tsx:828:No failure handling",
+      "file": "src/lib/pos-auth.tsx",
+      "line": 828,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "read() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/pos-credentials.ts:73:No failure handling",
+      "file": "src/lib/pos-credentials.ts",
+      "line": 73,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "loadSessionToken() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/pos-credentials.ts:142:No failure handling",
+      "file": "src/lib/pos-credentials.ts",
+      "line": 142,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "authHeaders() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/pos-db.ts:81:No failure handling",
+      "file": "src/lib/pos-db.ts",
+      "line": 81,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "probe() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/pos-db.ts:658:No failure handling",
+      "file": "src/lib/pos-db.ts",
+      "line": 658,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "tierId() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/pos-db.ts:659:No failure handling",
+      "file": "src/lib/pos-db.ts",
+      "line": 659,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "tierName() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/pos-db.ts:668:No failure handling",
+      "file": "src/lib/pos-db.ts",
+      "line": 668,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "importSampleData() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/pos-db.ts:784:No failure handling",
+      "file": "src/lib/pos-db.ts",
+      "line": 784,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "loadLocalState() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/pos-db.ts:834:No failure handling",
+      "file": "src/lib/pos-db.ts",
+      "line": 834,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "loadActiveShift() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/pos-db.ts:934:No failure handling",
+      "file": "src/lib/pos-db.ts",
+      "line": 934,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "loadSalesPage() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/pos-db.ts:965:No failure handling",
+      "file": "src/lib/pos-db.ts",
+      "line": 965,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "loadShiftSessions() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/pos-db.ts:1065:No failure handling",
+      "file": "src/lib/pos-db.ts",
+      "line": 1065,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "loadReceivingInvoices() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/pos-db.ts:1087:No failure handling",
+      "file": "src/lib/pos-db.ts",
+      "line": 1087,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "invoiceNumberTaken() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/pos-permissions.tsx:145:No failure handling",
+      "file": "src/lib/pos-permissions.tsx",
+      "line": 145,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "verify() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/pos-print.ts:510:No failure handling",
+      "file": "src/lib/pos-print.ts",
+      "line": 510,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "printHtml() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/pos-print.ts:517:No failure handling",
+      "file": "src/lib/pos-print.ts",
+      "line": 517,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "fallbackToBrowser() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/pos-users.ts:38:No failure handling",
+      "file": "src/lib/pos-users.ts",
+      "line": 38,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "createAccount() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/product-export.ts:7:No failure handling",
+      "file": "src/lib/product-export.ts",
+      "line": 7,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "exportProductsXlsx() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/public-flags.ts:21:No failure handling",
+      "file": "src/lib/public-flags.ts",
+      "line": 21,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "emit() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/public-flags.ts:23:No failure handling",
+      "file": "src/lib/public-flags.ts",
+      "line": 23,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "publicFlags() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/public-flags.ts:24:No failure handling",
+      "file": "src/lib/public-flags.ts",
+      "line": 24,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "memberDomainOn() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/public-flags.ts:25:No failure handling",
+      "file": "src/lib/public-flags.ts",
+      "line": 25,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "redeemDomainOn() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/public-flags.ts:27:No failure handling",
+      "file": "src/lib/public-flags.ts",
+      "line": 27,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "loadPublicFlags() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/public-flags.ts:47:No failure handling",
+      "file": "src/lib/public-flags.ts",
+      "line": 47,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "setPublicFlag() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/receipt-printer.ts:151:No failure handling",
+      "file": "src/lib/receipt-printer.ts",
+      "line": 151,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "listPrinters() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/register-layout.ts:359:No failure handling",
+      "file": "src/lib/register-layout.ts",
+      "line": 359,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "writeLayout() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/relay-policy.server.ts:177:No failure handling",
+      "file": "src/lib/relay-policy.server.ts",
+      "line": 177,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "fetchAppUser() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/relay-policy.server.ts:259:No failure handling",
+      "file": "src/lib/relay-policy.server.ts",
+      "line": 259,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "allowed() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/relay-policy.server.ts:262:No failure handling",
+      "file": "src/lib/relay-policy.server.ts",
+      "line": 262,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "parentStore() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/role-admin.ts:25:No failure handling",
+      "file": "src/lib/role-admin.ts",
+      "line": 25,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "createCustomRole() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/role-admin.ts:43:No failure handling",
+      "file": "src/lib/role-admin.ts",
+      "line": 43,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "updateRolePermissions() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/secure-settings.server.ts:79:No failure handling",
+      "file": "src/lib/secure-settings.server.ts",
+      "line": 79,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "failed() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/secure-settings.server.ts:84:No failure handling",
+      "file": "src/lib/secure-settings.server.ts",
+      "line": 84,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "writeSecureSetting() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/secure-settings.server.ts:105:No failure handling",
+      "file": "src/lib/secure-settings.server.ts",
+      "line": 105,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "removeSecureSetting() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/secure-settings.server.ts:114:No failure handling",
+      "file": "src/lib/secure-settings.server.ts",
+      "line": 114,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "listSecureSettingHints() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/security-alerts.ts:62:No failure handling",
+      "file": "src/lib/security-alerts.ts",
+      "line": 62,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "listSecurityFindings() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/security-alerts.ts:75:No failure handling",
+      "file": "src/lib/security-alerts.ts",
+      "line": 75,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "countOpenFindings() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/security-alerts.ts:84:No failure handling",
+      "file": "src/lib/security-alerts.ts",
+      "line": 84,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "setFindingStatus() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/session-guard.server.ts:179:No failure handling",
+      "file": "src/lib/session-guard.server.ts",
+      "line": 179,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "revokeSession() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/session-verify.server.ts:27:No failure handling",
+      "file": "src/lib/session-verify.server.ts",
+      "line": 27,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "branchExists() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/settings-scope.server.ts:29:No failure handling",
+      "file": "src/lib/settings-scope.server.ts",
+      "line": 29,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "readWithService() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/settings-scope.server.ts:136:No failure handling",
+      "file": "src/lib/settings-scope.server.ts",
+      "line": 136,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "writeScopedSettings() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/settings-scope.server.ts:166:No failure handling",
+      "file": "src/lib/settings-scope.server.ts",
+      "line": 166,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "writeScopedSettingsWithService() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/settings-scope.server.ts:218:No failure handling",
+      "file": "src/lib/settings-scope.server.ts",
+      "line": 218,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "pushScopedSettings() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/shift-alerts.ts:221:No failure handling",
+      "file": "src/lib/shift-alerts.ts",
+      "line": 221,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "listShiftSummaries() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/staff-admin.server.ts:29:No failure handling",
+      "file": "src/lib/staff-admin.server.ts",
+      "line": 29,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "serviceRpc() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/staff-admin.server.ts:40:No failure handling",
+      "file": "src/lib/staff-admin.server.ts",
+      "line": 40,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "requireSupervisor() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/staff-admin.server.ts:59:No failure handling",
+      "file": "src/lib/staff-admin.server.ts",
+      "line": 59,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "findUserId() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/staff-admin.server.ts:190:No failure handling",
+      "file": "src/lib/staff-admin.server.ts",
+      "line": 190,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "readStaffSnapshot() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/staff-admin.server.ts:201:No failure handling",
+      "file": "src/lib/staff-admin.server.ts",
+      "line": 201,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "setStaffActive() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/staff-admin.server.ts:229:No failure handling",
+      "file": "src/lib/staff-admin.server.ts",
+      "line": 229,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "staffProfile() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/staff-admin.server.ts:296:No failure handling",
+      "file": "src/lib/staff-admin.server.ts",
+      "line": 296,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "callerId() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/staff-admin.server.ts:307:No failure handling",
+      "file": "src/lib/staff-admin.server.ts",
+      "line": 307,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "permanentlyDeleteStaff() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/staff-admin.server.ts:326:No failure handling",
+      "file": "src/lib/staff-admin.server.ts",
+      "line": 326,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "usernameForIdentifier() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/staff-admin.server.ts:456:No failure handling",
+      "file": "src/lib/staff-admin.server.ts",
+      "line": 456,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "listTerminalStaff() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/staff-admin.ts:33:No failure handling",
+      "file": "src/lib/staff-admin.ts",
+      "line": 33,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "looksLikeEmail() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/staff-admin.ts:36:No failure handling",
+      "file": "src/lib/staff-admin.ts",
+      "line": 36,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "dbBaseRole() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/staff-admin.ts:39:No failure handling",
+      "file": "src/lib/staff-admin.ts",
+      "line": 39,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "accessToken() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/staff-admin.ts:47:No failure handling",
+      "file": "src/lib/staff-admin.ts",
+      "line": 47,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "createStaffMember() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/staff-admin.ts:73:No failure handling",
+      "file": "src/lib/staff-admin.ts",
+      "line": 73,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "toggleStaffStatus() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/staff-admin.ts:99:No failure handling",
+      "file": "src/lib/staff-admin.ts",
+      "line": 99,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "permanentlyDeleteStaffMember() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/staff-admin.ts:107:No failure handling",
+      "file": "src/lib/staff-admin.ts",
+      "line": 107,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "migrateLegacyCashiers() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/staff-roles.ts:72:No failure handling",
+      "file": "src/lib/staff-roles.ts",
+      "line": 72,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "listStaffRoles() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/staff-roles.ts:98:No failure handling",
+      "file": "src/lib/staff-roles.ts",
+      "line": 98,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "deleteStaffRole() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/suppliers.ts:77:No failure handling",
+      "file": "src/lib/suppliers.ts",
+      "line": 77,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "loadSuppliers() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/sync-engine.ts:31:No failure handling",
+      "file": "src/lib/sync-engine.ts",
+      "line": 31,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "mirrorCloudState() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/sync-engine.ts:320:No failure handling",
+      "file": "src/lib/sync-engine.ts",
+      "line": 320,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "runOne() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/sync-engine.ts:387:No failure handling",
+      "file": "src/lib/sync-engine.ts",
+      "line": 387,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "runOpLive() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/sync-engine.ts:499:No failure handling",
+      "file": "src/lib/sync-engine.ts",
+      "line": 499,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "countChangedSince() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/sync-engine.ts:621:No failure handling",
+      "file": "src/lib/sync-engine.ts",
+      "line": 621,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "runCycle() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/sync-relay.ts:40:No failure handling",
+      "file": "src/lib/sync-relay.ts",
+      "line": 40,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "relayHeaders() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/system-audit-access.server.ts:42:No failure handling",
+      "file": "src/lib/system-audit-access.server.ts",
+      "line": 42,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "verifySupervisorToken() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/system-audit.server.ts:67:No failure handling",
+      "file": "src/lib/system-audit.server.ts",
+      "line": 67,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "readSystemAudit() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/terminal-account.server.ts:40:No failure handling",
+      "file": "src/lib/terminal-account.server.ts",
+      "line": 40,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "ensureTerminalAccount() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/terminal-crypto.ts:55:No failure handling",
+      "file": "src/lib/terminal-crypto.ts",
+      "line": 55,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "getKey() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/terminal-crypto.ts:87:No failure handling",
+      "file": "src/lib/terminal-crypto.ts",
+      "line": 87,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "encryptActivation() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/terminal-crypto.ts:103:No failure handling",
+      "file": "src/lib/terminal-crypto.ts",
+      "line": 103,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "decryptActivation() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/terminal-crypto.ts:117:No failure handling",
+      "file": "src/lib/terminal-crypto.ts",
+      "line": 117,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "encryptActivationV1() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/terminal-crypto.ts:130:No failure handling",
+      "file": "src/lib/terminal-crypto.ts",
+      "line": 130,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "decryptActivationV1() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/terminal-tokens.ts:132:No failure handling",
+      "file": "src/lib/terminal-tokens.ts",
+      "line": 132,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "ensureLocations() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/terminal-tokens.ts:205:No failure handling",
+      "file": "src/lib/terminal-tokens.ts",
+      "line": 205,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "insertTokenRow() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/terminal-tokens.ts:242:No failure handling",
+      "file": "src/lib/terminal-tokens.ts",
+      "line": 242,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "listTerminalTokens() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/terminal-tokens.ts:286:No failure handling",
+      "file": "src/lib/terminal-tokens.ts",
+      "line": 286,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "revokeTerminalToken() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/terminal-tokens.ts:334:No failure handling",
+      "file": "src/lib/terminal-tokens.ts",
+      "line": 334,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "restoreTerminalToken() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/terminal-tokens.ts:343:No failure handling",
+      "file": "src/lib/terminal-tokens.ts",
+      "line": 343,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "deleteTerminalToken() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/terminal-tokens.ts:536:No failure handling",
+      "file": "src/lib/terminal-tokens.ts",
+      "line": 536,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "stampHeartbeat() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/terminal-tokens.ts:641:No failure handling",
+      "file": "src/lib/terminal-tokens.ts",
+      "line": 641,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "statusOf() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/lib/theme.tsx:29:parseInt without a radix",
+      "file": "src/lib/theme.tsx",
+      "line": 29,
+      "rule": "parseInt without a radix",
+      "severity": "info",
+      "detail": "try{var a=localStorage.getItem(\"pos.accent-color\");if(a&&/^#[0-9a-fA-F]{6}$/.test(a)){var n=parseInt(a.slice(1),16);var ch=[(n>>16)&255,(n>>",
+      "hint": "Pass 10 as the radix."
+    },
+    {
+      "id": "src/lib/user-sessions.functions.ts:82:No failure handling",
+      "file": "src/lib/user-sessions.functions.ts",
+      "line": 82,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "assertSupervisor() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/routes/bookings.tsx:183:No failure handling",
+      "file": "src/routes/bookings.tsx",
+      "line": 183,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "changeJobStatus() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/routes/bookings.tsx:203:No failure handling",
+      "file": "src/routes/bookings.tsx",
+      "line": 203,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "submitPayment() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/routes/holds.tsx:59:No failure handling",
+      "file": "src/routes/holds.tsx",
+      "line": 59,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "HoldTickets() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/routes/holds.tsx:74:No failure handling",
+      "file": "src/routes/holds.tsx",
+      "line": 74,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "discard() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/routes/index.tsx:152:No failure handling",
+      "file": "src/routes/index.tsx",
+      "line": 152,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "askManager() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/routes/index.tsx:181:No failure handling",
+      "file": "src/routes/index.tsx",
+      "line": 181,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "unlockDiscounts() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/routes/index.tsx:488:No failure handling",
+      "file": "src/routes/index.tsx",
+      "line": 488,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "setQty() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/routes/index.tsx:532:No failure handling",
+      "file": "src/routes/index.tsx",
+      "line": 532,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "clearCart() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/routes/index.tsx:714:No failure handling",
+      "file": "src/routes/index.tsx",
+      "line": 714,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "sendSaleOnWhatsApp() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/routes/index.tsx:948:No failure handling",
+      "file": "src/routes/index.tsx",
+      "line": 948,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "pickStringProduct() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/routes/index.tsx:1003:No failure handling",
+      "file": "src/routes/index.tsx",
+      "line": 1003,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "unlockLabour() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/routes/index.tsx:1465:No failure handling",
+      "file": "src/routes/index.tsx",
+      "line": 1465,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "applyCoupon() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/routes/index.tsx:2287:Unvalidated number input",
+      "file": "src/routes/index.tsx",
+      "line": 2287,
+      "rule": "Unvalidated number input",
+      "severity": "info",
+      "detail": "onChange={(e) => setWaNumber(e.target.value)}",
+      "hint": "An empty or bad entry becomes NaN."
+    },
+    {
+      "id": "src/routes/index.tsx:2421:No failure handling",
+      "file": "src/routes/index.tsx",
+      "line": 2421,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "atom_actDrawer() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/routes/promotions.tsx:285:Unvalidated number input",
+      "file": "src/routes/promotions.tsx",
+      "line": 285,
+      "rule": "Unvalidated number input",
+      "severity": "info",
+      "detail": "onChange={(e) => setDraft({ ...draft, focQty: Number(e.target.value) || 1 })}",
+      "hint": "An empty or bad entry becomes NaN."
+    },
+    {
+      "id": "src/routes/receipts.tsx:175:No failure handling",
+      "file": "src/routes/receipts.tsx",
+      "line": 175,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "openCancel() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/routes/receipts.tsx:212:No failure handling",
+      "file": "src/routes/receipts.tsx",
+      "line": 212,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "openPaymentFix() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/routes/reports.history.tsx:64:No failure handling",
+      "file": "src/routes/reports.history.tsx",
+      "line": 64,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "EditHistoryReport() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/routes/reports.notifications.tsx:49:No failure handling",
+      "file": "src/routes/reports.notifications.tsx",
+      "line": 49,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "NotificationsReport() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/routes/settings.catalog.tsx:197:No failure handling",
+      "file": "src/routes/settings.catalog.tsx",
+      "line": 197,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "removeNode() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/routes/settings.diagnostics.tsx:87:No failure handling",
+      "file": "src/routes/settings.diagnostics.tsx",
+      "line": 87,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "copy() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/routes/settings.inheritance.tsx:184:No failure handling",
+      "file": "src/routes/settings.inheritance.tsx",
+      "line": 184,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "push() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/routes/settings.notifications.tsx:53:No failure handling",
+      "file": "src/routes/settings.notifications.tsx",
+      "line": 53,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "save() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/routes/settings.notifications.tsx:160:Unvalidated number input",
+      "file": "src/routes/settings.notifications.tsx",
+      "line": 160,
+      "rule": "Unvalidated number input",
+      "severity": "info",
+      "detail": "onChange={(e) => setNewNumber(e.target.value)}",
+      "hint": "An empty or bad entry becomes NaN."
+    },
+    {
+      "id": "src/routes/settings.qr.tsx:61:Unvalidated number input",
+      "file": "src/routes/settings.qr.tsx",
+      "line": 61,
+      "rule": "Unvalidated number input",
+      "severity": "info",
+      "detail": "onChange={(e) => setField(\"qr\", { ...effective.qr, size: Number(e.target.value) || 96 })}",
+      "hint": "An empty or bad entry becomes NaN."
+    },
+    {
+      "id": "src/routes/settings.sessions.tsx:60:No failure handling",
+      "file": "src/routes/settings.sessions.tsx",
+      "line": 60,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "revoke() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/routes/settings.sku.tsx:86:Unvalidated number input",
+      "file": "src/routes/settings.sku.tsx",
+      "line": 86,
+      "rule": "Unvalidated number input",
+      "severity": "info",
+      "detail": "onChange={(e) => save({ next: Math.max(1, Number(e.target.value) || 1) })}",
+      "hint": "An empty or bad entry becomes NaN."
+    },
+    {
+      "id": "src/routes/settings.sku.tsx:94:Unvalidated number input",
+      "file": "src/routes/settings.sku.tsx",
+      "line": 94,
+      "rule": "Unvalidated number input",
+      "severity": "info",
+      "detail": "onChange={(e) => save({ pad: Math.min(12, Math.max(1, Number(e.target.value) || 1)) })}",
+      "hint": "An empty or bad entry becomes NaN."
+    },
+    {
+      "id": "src/routes/settings.type.tsx:70:Unvalidated number input",
+      "file": "src/routes/settings.type.tsx",
+      "line": 70,
+      "rule": "Unvalidated number input",
+      "severity": "info",
+      "detail": "onChange={(e) => setFont(scope.key, { size: Number(e.target.value) || 12 })}",
+      "hint": "An empty or bad entry becomes NaN."
+    },
+    {
+      "id": "src/server.ts:24:No failure handling",
+      "file": "src/server.ts",
+      "line": 24,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "normalizeCatastrophicSsrResponse() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    }
+  ]
+}

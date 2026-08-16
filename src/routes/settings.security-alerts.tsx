@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { SettingsTabs } from "@/components/pos/settings/SettingsTabs";
 import { useCallback, useEffect, useState } from "react";
 import { RefreshCw, ShieldAlert, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
@@ -65,6 +66,8 @@ function SecurityAlertsPage() {
   if (!isAdmin) {
     return (
       <SettingsFrame title="Security alerts" description="Administrators only.">
+      <SettingsTabs current="/settings/security-alerts" />
+
         <p className="text-sm text-muted-foreground">
           Ask an administrator to review security findings.
         </p>

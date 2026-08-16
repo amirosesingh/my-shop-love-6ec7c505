@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { SettingsTabs } from "@/components/pos/settings/SettingsTabs";
 import { SettingsFrame, useSettingsCtx } from "@/components/pos/settings/SettingsFrame";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,6 +32,8 @@ export const Route = createFileRoute("/settings/booking-slip")({
       description="Terms & conditions and the customer signature line printed on racket bookings and pay-later slips."
       branchAware
     >
+      <SettingsTabs current="/settings/booking-slip" />
+
       <BookingSlipForm />
     </SettingsFrame>
   ),
