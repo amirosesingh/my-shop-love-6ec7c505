@@ -326,9 +326,18 @@ type TableShape = { columns: Set<string>; required: Set<string> };
  */
 async function loadShapes(): Promise<Record<string, TableShape>> {
   const { url, key } = supabaseConfig();
-  const res = await fetch(`${url}/rest/v1/`, {
-    headers: { apikey: key, Accept: "application/openapi+json" },
-  });
+  // Use the signed-in staff session, exactly like every other health call.
+  const token = (await supabaseExternal.auth.getSession()).data.session?.access_token ?? "";
+  const headers: Record<string, string> = { apikey: key, Accept: "application/openapi+json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(`${url}/rest/v1/`, { headers });
+  if (res.status === 401 || res.status === 403) {
+    throw new Error(
+      token
+        ? "This account is not allowed to read the database's table list. Sign in with a staff account that has full access."
+        : "Sign in with a staff account to run the database checks.",
+    );
+  }
   if (!res.ok) throw new Error(`The database did not publish its table list (HTTP ${res.status})`);
   const spec = (await res.json()) as {
     definitions?: Record<string, { properties?: Record<string, { description?: string }>; required?: string[] }>;
