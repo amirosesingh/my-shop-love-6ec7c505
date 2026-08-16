@@ -139,30 +139,45 @@ export type Database = {
       }
       audit_logs: {
         Row: {
+          action: string | null
           action_category: string
           action_name: string
+          after_state: Json | null
+          before_state: Json | null
           created_at: string
           details: Json | null
+          entity: string | null
           id: string
           target_module: string | null
+          user_id: string | null
           user_name: string | null
         }
         Insert: {
+          action?: string | null
           action_category: string
           action_name: string
+          after_state?: Json | null
+          before_state?: Json | null
           created_at?: string
           details?: Json | null
+          entity?: string | null
           id?: string
           target_module?: string | null
+          user_id?: string | null
           user_name?: string | null
         }
         Update: {
+          action?: string | null
           action_category?: string
           action_name?: string
+          after_state?: Json | null
+          before_state?: Json | null
           created_at?: string
           details?: Json | null
+          entity?: string | null
           id?: string
           target_module?: string | null
+          user_id?: string | null
           user_name?: string | null
         }
         Relationships: []
@@ -372,16 +387,20 @@ export type Database = {
       branch_telemetry: {
         Row: {
           app_version: string | null
+          branch_id: string | null
           conflict_count: number
           connection_status: string
           created_at: string
           db_mode: string
+          last_ping: string | null
           last_seen_at: string
           last_synced_at: string | null
           pending_count: number
+          pending_queue_count: number | null
           platform: string | null
           staff_name: string | null
           staff_role: string | null
+          status: string | null
           storage_engine: string
           store_id: string | null
           terminal_id: string
@@ -390,16 +409,20 @@ export type Database = {
         }
         Insert: {
           app_version?: string | null
+          branch_id?: string | null
           conflict_count?: number
           connection_status?: string
           created_at?: string
           db_mode?: string
+          last_ping?: string | null
           last_seen_at?: string
           last_synced_at?: string | null
           pending_count?: number
+          pending_queue_count?: number | null
           platform?: string | null
           staff_name?: string | null
           staff_role?: string | null
+          status?: string | null
           storage_engine?: string
           store_id?: string | null
           terminal_id: string
@@ -408,16 +431,20 @@ export type Database = {
         }
         Update: {
           app_version?: string | null
+          branch_id?: string | null
           conflict_count?: number
           connection_status?: string
           created_at?: string
           db_mode?: string
+          last_ping?: string | null
           last_seen_at?: string
           last_synced_at?: string | null
           pending_count?: number
+          pending_queue_count?: number | null
           platform?: string | null
           staff_name?: string | null
           staff_role?: string | null
+          status?: string | null
           storage_engine?: string
           store_id?: string | null
           terminal_id?: string
@@ -702,6 +729,42 @@ export type Database = {
         }
         Relationships: []
       }
+      integration_settings: {
+        Row: {
+          api_keys_encrypted: Json
+          created_at: string
+          id: string
+          is_active: boolean
+          provider_name: string
+          strict_verification: boolean
+          updated_at: string
+          updated_by: string | null
+          verification_channel: string
+        }
+        Insert: {
+          api_keys_encrypted?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          provider_name: string
+          strict_verification?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          verification_channel?: string
+        }
+        Update: {
+          api_keys_encrypted?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          provider_name?: string
+          strict_verification?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          verification_channel?: string
+        }
+        Relationships: []
+      }
       issued_vouchers: {
         Row: {
           campaign_id: string
@@ -851,6 +914,62 @@ export type Database = {
           },
         ]
       }
+      member_verifications: {
+        Row: {
+          attempts: number
+          channel: string
+          created_at: string
+          email: string | null
+          expires_at: string
+          id: string
+          member_id: string | null
+          otp_code: string | null
+          phone: string | null
+          sent_by: string | null
+          status: string
+          store_id: string | null
+          verified_at: string | null
+        }
+        Insert: {
+          attempts?: number
+          channel?: string
+          created_at?: string
+          email?: string | null
+          expires_at?: string
+          id?: string
+          member_id?: string | null
+          otp_code?: string | null
+          phone?: string | null
+          sent_by?: string | null
+          status?: string
+          store_id?: string | null
+          verified_at?: string | null
+        }
+        Update: {
+          attempts?: number
+          channel?: string
+          created_at?: string
+          email?: string | null
+          expires_at?: string
+          id?: string
+          member_id?: string | null
+          otp_code?: string | null
+          phone?: string | null
+          sent_by?: string | null
+          status?: string
+          store_id?: string | null
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_member_verifications_member"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       members: {
         Row: {
           address: string | null
@@ -859,6 +978,7 @@ export type Database = {
           email: string | null
           full_name: string
           id: string
+          is_verified: boolean
           loyalty_points: number
           member_code: string
           phone: string
@@ -866,6 +986,8 @@ export type Database = {
           tier_id: string | null
           total_spent: number
           updated_at: string
+          verified_at: string | null
+          verified_channel: string | null
         }
         Insert: {
           address?: string | null
@@ -874,6 +996,7 @@ export type Database = {
           email?: string | null
           full_name: string
           id?: string
+          is_verified?: boolean
           loyalty_points?: number
           member_code: string
           phone: string
@@ -881,6 +1004,8 @@ export type Database = {
           tier_id?: string | null
           total_spent?: number
           updated_at?: string
+          verified_at?: string | null
+          verified_channel?: string | null
         }
         Update: {
           address?: string | null
@@ -889,6 +1014,7 @@ export type Database = {
           email?: string | null
           full_name?: string
           id?: string
+          is_verified?: boolean
           loyalty_points?: number
           member_code?: string
           phone?: string
@@ -896,6 +1022,8 @@ export type Database = {
           tier_id?: string | null
           total_spent?: number
           updated_at?: string
+          verified_at?: string | null
+          verified_channel?: string | null
         }
         Relationships: [
           {
@@ -1165,6 +1293,7 @@ export type Database = {
           paper_size: string
           phone: string | null
           qr: Json
+          receipt_design: Json
           reg_number: string | null
           region_country: string
           review_max_discount_pct: number
@@ -1206,6 +1335,7 @@ export type Database = {
           paper_size?: string
           phone?: string | null
           qr?: Json
+          receipt_design?: Json
           reg_number?: string | null
           region_country?: string
           review_max_discount_pct?: number
@@ -1247,6 +1377,7 @@ export type Database = {
           paper_size?: string
           phone?: string | null
           qr?: Json
+          receipt_design?: Json
           reg_number?: string | null
           region_country?: string
           review_max_discount_pct?: number
@@ -3018,6 +3149,7 @@ export type Database = {
       }
       pin_throttle_reset: { Args: { _key: string }; Returns: undefined }
       pin_throttle_status: { Args: { _key: string }; Returns: Json }
+      schema_inventory: { Args: never; Returns: Json }
       security_report_findings: {
         Args: { _deployment_ref: string; _findings: Json; _source: string }
         Returns: Json

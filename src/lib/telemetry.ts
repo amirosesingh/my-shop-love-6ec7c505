@@ -9,6 +9,7 @@
 import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
 import { terminalId } from "./activity-journal";
 import { activeBranchId, activeBranchName } from "./active-branch";
+import { isMissingSchema } from "./schema-guard";
 import { databaseModeLabel, effectiveDatabaseMode, isFailingOver } from "./db-mode";
 import { hasLocalSqlEngine } from "./local-db";
 import { isLiveOnly } from "./live-mode";
@@ -101,7 +102,12 @@ export async function listTelemetry(): Promise<TelemetryRow[]> {
     .from("branch_telemetry")
     .select("*")
     .order("last_seen_at", { ascending: false });
-  if (error) throw error;
+  if (error) {
+    // A database that has not had the repair script applied yet shows an
+    // empty telemetry board rather than taking the settings screen down.
+    if (isMissingSchema(error)) return [];
+    throw error;
+  }
   return (data ?? []) as unknown as TelemetryRow[];
 }
 

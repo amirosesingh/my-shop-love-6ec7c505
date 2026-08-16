@@ -4,6 +4,7 @@
  */
 import { SecureCredentials } from "@/components/pos/SecureCredentials";
 import { PanelSaveBar } from "@/components/pos/settings/PanelSaveBar";
+import { VerificationGatewayPanel } from "@/components/pos/settings/panels/VerificationGatewayPanel";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -100,6 +101,7 @@ export function WhatsAppFields({ whatsapp, setWhatsApp }: Fields) {
           onCheckedChange={(v) => setWhatsApp({ autoSendOnBooking: v })}
         />
       </div>
+      <VerificationGatewayPanel />
       <SecureCredentials />
     </div>
   );

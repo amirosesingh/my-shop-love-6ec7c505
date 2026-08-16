@@ -18,7 +18,12 @@ type Key =
   | "bank_name"
   | "update_feed_token"
   | "integration_api_key"
-  | "local_db_password";
+  | "local_db_password"
+  | "twilio_account_sid"
+  | "twilio_auth_token"
+  | "twilio_from"
+  | "sendgrid_api_key"
+  | "email_from";
 
 const FIELDS: { key: Key; label: string; hint: string; placeholder: string }[] = [
   {
@@ -68,6 +73,36 @@ const FIELDS: { key: Key; label: string; hint: string; placeholder: string }[] =
     label: "Local SQL Server password",
     hint: "Never written to the till in plain text; the device copy is sealed too.",
     placeholder: "••••••••",
+  },
+  {
+    key: "twilio_account_sid",
+    label: "SMS gateway account SID",
+    hint: "Used when member verification codes go out by SMS.",
+    placeholder: "AC...",
+  },
+  {
+    key: "twilio_auth_token",
+    label: "SMS gateway auth token",
+    hint: "Stored encrypted; never returned to the browser.",
+    placeholder: "••••••••",
+  },
+  {
+    key: "twilio_from",
+    label: "SMS sender number",
+    hint: "The number verification codes are sent from.",
+    placeholder: "+15550001111",
+  },
+  {
+    key: "sendgrid_api_key",
+    label: "Email provider API key",
+    hint: "Used when member verification codes go out by email.",
+    placeholder: "SG...",
+  },
+  {
+    key: "email_from",
+    label: "Email sender address",
+    hint: "Shown as the from address on verification emails.",
+    placeholder: "no-reply@yourshop.com",
   },
 ];
 

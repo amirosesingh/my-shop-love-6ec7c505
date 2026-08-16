@@ -10,6 +10,11 @@ const KEYS = [
   "update_feed_token",
   "integration_api_key",
   "local_db_password",
+  "twilio_account_sid",
+  "twilio_auth_token",
+  "twilio_from",
+  "sendgrid_api_key",
+  "email_from",
 ] as const;
 
 const saveInput = z.object({
