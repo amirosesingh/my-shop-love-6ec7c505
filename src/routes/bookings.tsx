@@ -289,7 +289,30 @@ function BookingsPage() {
         </header>
 
         <div className="flex flex-wrap gap-1">
-          {(["active", "collected", "cancelled", "all"] as const).map((t) => (
+          {(
+            [
+              ["racket", "Racket jobs", kindCounts.racket],
+              ["standard", "Standard bookings", kindCounts.standard],
+              ["done", "Completed / collected", kindCounts.done],
+            ] as const
+          ).map(([k, label, count]) => (
+            <button
+              key={k}
+              onClick={() => setKind(k)}
+              className={`rounded-md border px-3 py-1.5 text-xs ${
+                kind === k
+                  ? "border-primary/40 bg-primary/10 text-primary"
+                  : "border-border text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {label} ({count})
+            </button>
+          ))}
+        </div>
+
+        {kind === "done" && (
+        <div className="flex flex-wrap gap-1">
+          {(["collected", "cancelled", "all"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -303,7 +326,9 @@ function BookingsPage() {
             </button>
           ))}
         </div>
+        )}
 
+        {kind === "racket" && (
         <div className="flex flex-wrap items-center gap-1">
           <span className="mr-1 flex items-center gap-1 text-xs text-muted-foreground">
             <Wrench className="size-3.5" /> Job cards
@@ -322,6 +347,7 @@ function BookingsPage() {
             </button>
           ))}
         </div>
+        )}
 
         {bookings.length === 0 ? (
           <p className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
