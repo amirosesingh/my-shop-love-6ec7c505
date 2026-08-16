@@ -10,8 +10,17 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { r2 } from "./pos-types";
 import { keyset, nextCursor, PAGE_SIZE, type Cursor, type Page } from "./keyset";
+import { describeError } from "./notify";
 
 const sb = supabaseExternal as unknown as SupabaseClient;
+
+/** Outcome of a coupon write: never throws at the caller. */
+export type CouponResult = { success: boolean; error?: string };
+
+/** Log a swallowed read failure once, with the call that produced it. */
+function logRead(where: string, e: unknown) {
+  console.error(`[coupons] ${where} failed`, e);
+}
 
 export type DiscountKind = "PERCENTAGE" | "FIXED_AMOUNT";
 export type CampaignScope = "BILL" | "CATEGORY" | "PRODUCT";
