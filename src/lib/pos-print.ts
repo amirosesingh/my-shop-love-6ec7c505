@@ -275,6 +275,7 @@ const shell = (title: string, body: string, autoPrint = true) => {
   .muted { font-size: 0.85em; }
   .logo { text-align: center; margin-bottom: 4px; }
   .logo span { display: inline-block; border: 2px solid #000; border-radius: 4px; padding: 3px 8px; font-weight: 700; letter-spacing: 3px; font-size: 1.1em; }
+  .logo img { max-width: 60%; max-height: 22mm; object-fit: contain; }
   hr { border: none; border-top: 1px dashed #000; margin: 6px 0; }
   table { width: 100%; border-collapse: collapse; }
   td { vertical-align: top; padding: 1px 0; }
@@ -314,7 +315,13 @@ const header = (subtitle?: string) => {
   ].filter(Boolean);
   return `
   <div class="rcpt-head">
-  ${receiptCfg.showLogo ? `<div class="logo"><span>${esc(initials || "POS")}</span></div>` : ""}
+  ${
+    receiptCfg.showLogo
+      ? receiptCfg.logo
+        ? `<div class="logo"><img src="${esc(receiptCfg.logo)}" alt=""></div>`
+        : `<div class="logo"><span>${esc(initials || "POS")}</span></div>`
+      : ""
+  }
   <h1>${esc(receiptCfg.companyName || STORE.name)}</h1>
   </div>
   <div class="c muted">${esc(
