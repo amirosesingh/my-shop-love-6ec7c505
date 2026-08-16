@@ -216,6 +216,14 @@ export const navGroups: NavGroup[] = [
         keywords: "coupon voucher campaign claim link qr welcome member signup",
         blurb: "Digital coupon campaigns, claim links and voucher tracking.",
       },
+      {
+        to: "/verifications",
+        label: "Verification Log",
+        icon: ShieldCheck,
+        flag: "can_add_member",
+        keywords: "otp verify code sms whatsapp email member",
+        blurb: "Every one-time code sent to a member and whether it was confirmed.",
+      },
     ],
   },
   {

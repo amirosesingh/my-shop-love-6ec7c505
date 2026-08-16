@@ -214,6 +214,11 @@ const rowToMember = (r: Row, tierName: (id: string | null) => MemberTier): Membe
   joinedAt: (r.created_at ?? new Date().toISOString()).slice(0, 10),
   homeStoreId: r.address ?? undefined,
   birthday: r.date_of_birth ?? undefined,
+  // Verification is written by the gateway, so it is read here but never sent
+  // back up in `memberToRow` — a till edit must not un-verify anybody.
+  verified: r.is_verified === true,
+  verifiedAt: r.verified_at ?? undefined,
+  verifiedChannel: r.verified_channel ?? undefined,
 });
 
 const memberToRow = (m: Member, tierId: (name: MemberTier) => string | null): Row => ({
