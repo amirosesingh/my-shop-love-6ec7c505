@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { SettingsTabs } from "@/components/pos/settings/SettingsTabs";
 import { Plus, Trash2 } from "lucide-react";
 import { SettingsFrame, useSettingsCtx } from "@/components/pos/settings/SettingsFrame";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
@@ -24,6 +25,8 @@ export const Route = createFileRoute("/settings/lines")({
       branchAware
       showPreview
     >
+      <SettingsTabs current="/settings/lines" />
+
       <LinesForm />
     </SettingsFrame>
   ),

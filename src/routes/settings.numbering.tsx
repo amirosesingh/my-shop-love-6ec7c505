@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { SettingsTabs } from "@/components/pos/settings/SettingsTabs";
 import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,6 +54,8 @@ function NumberingPage() {
       title="Bill numbering"
       description="Every receipt number is branch, till, day and a running number, so two registers can never mint the same bill — even offline."
     >
+      <SettingsTabs current="/settings/numbering" />
+
       <div className="space-y-5">
         <div className="rounded-lg border border-border bg-surface-2 p-4">
           <p className="text-xs text-muted-foreground">Next number on this till</p>

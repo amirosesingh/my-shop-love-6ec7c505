@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { SettingsTabs } from "@/components/pos/settings/SettingsTabs";
 import { SettingsFrame, useSettingsCtx } from "@/components/pos/settings/SettingsFrame";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { Label } from "@/components/ui/label";
@@ -30,6 +31,8 @@ export const Route = createFileRoute("/settings/elements")({
       description="Paper size and which blocks appear on the printed slip."
       showPreview
     >
+      <SettingsTabs current="/settings/elements" />
+
       <ElementsForm />
     </SettingsFrame>
   ),

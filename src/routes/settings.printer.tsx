@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { SettingsTabs } from "@/components/pos/settings/SettingsTabs";
 import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
 import { ReceiptPrinterSettings } from "@/components/pos/ReceiptPrinterSettings";
 
@@ -22,6 +23,8 @@ export const Route = createFileRoute("/settings/printer")({
       title="Receipt printer"
       description="Printer hardware for this terminal: device, encoding, margins and the cash drawer pulse."
     >
+      <SettingsTabs current="/settings/printer" />
+
       <ReceiptPrinterSettings />
     </SettingsFrame>
   ),

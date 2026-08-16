@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { SettingsTabs } from "@/components/pos/settings/SettingsTabs";
 import { useState } from "react";
 import { toast } from "sonner";
 import { notifyError } from "@/lib/notify";
@@ -97,6 +98,8 @@ function DiagnosticsPage() {
       title="Database health"
       description="Checks that each POS table can be read and saved on the central database. Nothing is changed — the save test uses a request that matches no rows."
     >
+      <SettingsTabs current="/settings/diagnostics" />
+
       <div className="flex flex-wrap items-center gap-2">
         <Button size="sm" disabled={busy} onClick={() => void run()}>
           {busy ? "Checking…" : "Run check"}

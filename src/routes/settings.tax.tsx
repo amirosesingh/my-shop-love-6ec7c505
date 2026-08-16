@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { SettingsTabs } from "@/components/pos/settings/SettingsTabs";
 import { SettingsFrame, useSettingsCtx } from "@/components/pos/settings/SettingsFrame";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,6 +27,8 @@ function TaxSettingsPage() {
       description="Tax rules apply to every register instantly."
       scopeSections={["tax"]}
     >
+      <SettingsTabs current="/settings/tax" />
+
       <TaxForm />
     </SettingsFrame>
   );

@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { SettingsTabs } from "@/components/pos/settings/SettingsTabs";
 import { SettingsFrame, useSettingsCtx } from "@/components/pos/settings/SettingsFrame";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { Input } from "@/components/ui/input";
@@ -24,6 +25,8 @@ export const Route = createFileRoute("/settings/qr")({
       branchAware
       showPreview
     >
+      <SettingsTabs current="/settings/qr" />
+
       <QrForm />
     </SettingsFrame>
   ),

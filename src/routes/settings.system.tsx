@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { SettingsTabs } from "@/components/pos/settings/SettingsTabs";
 import { useEffect, useState } from "react";
 import {
   Activity,
@@ -184,6 +185,8 @@ Both subdomains serve the same build; only the landing path differs.`;
       title="System status & integrations"
       description="Live health of the services this till depends on, with recovery tools."
     >
+      <SettingsTabs current="/settings/system" />
+
       <section className="space-y-3">
         <div className="flex items-center gap-2">
           <Activity className="size-4 text-primary" />

@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { SettingsTabs } from "@/components/pos/settings/SettingsTabs";
 import { useState } from "react";
 import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
 import { Input } from "@/components/ui/input";
@@ -35,6 +36,8 @@ function SkuSettingsPage() {
       title="SKU numbering"
       description="New products can take a running number automatically, so no one has to invent a code at the counter."
     >
+      <SettingsTabs current="/settings/sku" />
+
       <SkuForm />
     </SettingsFrame>
   );
