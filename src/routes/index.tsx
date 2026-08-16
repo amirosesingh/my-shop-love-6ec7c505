@@ -223,6 +223,9 @@ function Register() {
   const [tendered, setTendered] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("cash");
   const [transferRef, setTransferRef] = useState("");
+  /** Serial / voucher number typed for a tender that demands one. */
+  const [tenderRef, setTenderRef] = useState("");
+  const [tenderRefNote, setTenderRefNote] = useState("");
   const [waNumber, setWaNumber] = useState("");
   const [waSending, setWaSending] = useState(false);
   const [lastSale, setLastSale] = useState<Sale | null>(null);
@@ -1245,6 +1248,10 @@ function Register() {
       toast.error("Enter the transfer reference shown on the customer's slip");
       return;
     }
+    if (!isRefund && !splitting && needsTenderRef && !tenderRef.trim()) {
+      toast.error(`Enter the serial / reference number for ${activeMethodName}`);
+      return;
+    }
     if (!isRefund && !splitting && method === "points" && (member?.points ?? 0) < totals.total * 100) {
       toast.error("Not enough points on this member");
       return;
@@ -1258,6 +1265,13 @@ function Register() {
             amount: r2(Math.abs(totals.total)),
             ...(method === "card" && bankName.trim() ? { bankName: bankName.trim() } : {}),
             ...(method === "bank_transfer" && transferRef.trim() ? { ref: transferRef.trim() } : {}),
+            ...(needsTenderRef
+              ? {
+                  requiresReference: true,
+                  reference: tenderRef.trim(),
+                  ...(tenderRefNote.trim() ? { referenceNote: tenderRefNote.trim() } : {}),
+                }
+              : {}),
           },
         ];
     // The headline method stays the largest tender so reports keep working.
@@ -1363,6 +1377,8 @@ function Register() {
     setMemberId(null);
     setTendered("");
     setTransferRef("");
+    setTenderRef("");
+    setTenderRefNote("");
     setTenders([]);
     setBankName("");
     setPayOpen(false);
