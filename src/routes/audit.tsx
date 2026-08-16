@@ -300,6 +300,18 @@ function AuditPage() {
               {showBrowse ? "Shown" : "Hidden"}
             </Button>
           </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Cashier trail</Label>
+            <Button
+              type="button"
+              variant={riskOnly ? "secondary" : "outline"}
+              className="w-full justify-start"
+              onClick={() => setRiskOnly((v) => !v)}
+            >
+              <ShieldAlert className="size-4" />
+              {riskOnly ? "Voids, overrides & no-sales" : "All actions"}
+            </Button>
+          </div>
           {range === "custom" && (
             <>
               <div className="space-y-1">
