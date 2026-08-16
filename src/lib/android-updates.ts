@@ -122,10 +122,7 @@ async function downloadAndInstall(
   file: string,
   onProgress: (pct: number) => void,
 ): Promise<{ uri: string; opened: boolean; error?: string }> {
-  const [{ Filesystem, Directory }, { FileOpener }] = await Promise.all([
-    import("@capacitor/filesystem"),
-    import("@capacitor-community/file-opener"),
-  ]);
+  const { Filesystem, Directory } = await import("@capacitor/filesystem");
 
   const base64 = await httpGetBase64(url, onProgress);
 
