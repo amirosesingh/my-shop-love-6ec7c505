@@ -225,46 +225,17 @@ const GROUPS = [
         blurb: "Branch identity, offline sync queue and backups.",
       },
       {
-        to: "/settings/data-sync",
-        label: "Data sync & audit",
-        icon: RefreshCw,
-        blurb: "Live sync status, cloud vs local record counts, force push/pull and the audit ledger.",
-      },
-      {
         to: "/settings/system",
         label: "System status & integrations",
         icon: Activity,
-        blurb: "Connection health, recovery tools, public domains and approval rules.",
-      },
-      {
-        to: "/settings/security-alerts",
-        label: "Security alerts",
-        icon: Activity,
-        blurb: "Findings from deployment scans and the nightly database posture check.",
-      },
-      {
-        to: "/settings/diagnostics",
-        label: "Database health",
-        icon: Activity,
-        blurb: "Per-table reading and saving status, with the exact reason when one fails.",
-      },
-      {
-        to: "/settings/logic-health",
-        label: "Logic health",
-        icon: ShieldCheck,
-        blurb: "Unfinished logic, controls with no action and money paths without failure handling.",
+        blurb:
+          "One window for connection health, database health, logic health, security alerts, data sync and inheritance.",
       },
       {
         to: "/settings/shift-alerts",
         label: "Shift alerts",
         icon: Activity,
         blurb: "How the day-end shift summary reaches this device: in-app, WhatsApp or phone notification.",
-      },
-      {
-        to: "/settings/inheritance",
-        label: "Settings inheritance",
-        icon: RefreshCw,
-        blurb: "Global, cluster and branch tiers with sync, override and push-down controls.",
       },
     ],
   },
