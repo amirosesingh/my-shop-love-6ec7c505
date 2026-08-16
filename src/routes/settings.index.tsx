@@ -23,6 +23,8 @@ import {
   Type,
 } from "lucide-react";
 import { AppShell } from "@/components/pos/AppShell";
+import { SettingsDrawer } from "@/components/pos/settings/SettingsDrawer";
+import { QUICK_CARDS, type QuickCardId } from "@/components/pos/settings/quick-cards";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/pos-auth";
 import { isDesktop } from "@/lib/branding";
@@ -305,6 +307,7 @@ function SettingsHub() {
     ),
   })).filter((g) => g.pages.length > 0);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [quickId, setQuickId] = useState<QuickCardId | null>(null);
   const [query, setQuery] = useState("");
   const term = query.trim().toLowerCase();
   const matches = term
@@ -316,6 +319,12 @@ function SettingsHub() {
         )
     : [];
   const open = groups.find((g) => g.id === openId) ?? null;
+  const quickMatches = term
+    ? QUICK_CARDS.filter(
+        (c) =>
+          c.label.toLowerCase().includes(term) || c.blurb.toLowerCase().includes(term),
+      )
+    : [];
 
   return (
     <AppShell>
