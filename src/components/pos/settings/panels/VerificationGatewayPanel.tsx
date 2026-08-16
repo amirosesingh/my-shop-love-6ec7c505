@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { adminAccessToken, ADMIN_SIGN_IN_MESSAGE } from "@/lib/admin-session";
 import { getPosCallerAuth } from "@/lib/pos-caller-auth";
+import { resetGateway } from "@/lib/verification-gateway";
 import {
   getVerificationSettings,
   saveVerificationSettings,
@@ -55,6 +56,7 @@ export function VerificationGatewayPanel() {
     }).catch((e: unknown) => ({ ok: false as const, error: String(e) }));
     setBusy(false);
     if (!res.ok) return toast.error(res.error ?? "Could not save");
+    resetGateway();
     toast.success("Verification gateway saved");
   };
 
