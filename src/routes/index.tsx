@@ -1065,6 +1065,12 @@ function Register() {
       toast.error(`This branch needs a deposit of at least ${money(minDeposit)}`);
       return;
     }
+    if (!racketMode && bookingRules.serviceTerms.trim() && !liabilityOk) {
+      toast.error("The customer must accept the booking terms & conditions", {
+        description: "Tick the agreement box at the bottom of the booking form.",
+      });
+      return;
+    }
     if (racketMode) {
       if (labourUnlocked && !labourReason.trim()) {
         toast.error("Enter a reason for the labour override");
