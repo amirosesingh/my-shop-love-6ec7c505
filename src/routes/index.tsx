@@ -1041,6 +1041,13 @@ function Register() {
       ? r2(Math.max(0, Number(serviceFee || 0)))
       : 0;
   const bookingTotal = r2(totals.total + serviceCharge);
+  /* Live deposit breakdown shown on the booking form: what the branch demands
+     up front, what the cashier is taking now, and what is left to collect. */
+  const bookingMinDeposit = Math.min(minDepositFor(bookingTotal), bookingTotal);
+  const bookingPaidNow =
+    payTiming === "collection" ? 0 : payTiming === "now" ? bookingTotal : r2(Math.max(0, Number(deposit || 0)));
+  const bookingBalance = r2(Math.max(0, bookingTotal - bookingPaidNow));
+  const bookingDepositShort = bookingMinDeposit > 0 && bookingPaidNow + 0.001 < bookingMinDeposit;
 
   async function bookAndPayLater() {
     if (!activeShift) {
