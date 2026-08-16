@@ -1,120 +1,12 @@
 {
-  "generatedAt": "2026-08-16T02:20:33.747Z",
-  "filesScanned": 345,
+  "generatedAt": "2026-08-16T03:16:27.986Z",
+  "filesScanned": 356,
   "counts": {
-    "critical": 12,
+    "critical": 0,
     "warning": 4,
-    "info": 196
+    "info": 199
   },
   "findings": [
-    {
-      "id": "src/components/pos/TenderSplit.tsx:77:No failure handling",
-      "file": "src/components/pos/TenderSplit.tsx",
-      "line": 77,
-      "rule": "No failure handling",
-      "severity": "critical",
-      "detail": "addTender() awaits work without a try/catch.",
-      "hint": "A dropped connection here can lose money or stock movements."
-    },
-    {
-      "id": "src/lib/coupons.ts:177:No failure handling",
-      "file": "src/lib/coupons.ts",
-      "line": 177,
-      "rule": "No failure handling",
-      "severity": "critical",
-      "detail": "slugify() awaits work without a try/catch.",
-      "hint": "A dropped connection here can lose money or stock movements."
-    },
-    {
-      "id": "src/lib/coupons.ts:185:No failure handling",
-      "file": "src/lib/coupons.ts",
-      "line": 185,
-      "rule": "No failure handling",
-      "severity": "critical",
-      "detail": "loadCampaigns() awaits work without a try/catch.",
-      "hint": "A dropped connection here can lose money or stock movements."
-    },
-    {
-      "id": "src/lib/coupons.ts:191:No failure handling",
-      "file": "src/lib/coupons.ts",
-      "line": 191,
-      "rule": "No failure handling",
-      "severity": "critical",
-      "detail": "saveCampaign() awaits work without a try/catch.",
-      "hint": "A dropped connection here can lose money or stock movements."
-    },
-    {
-      "id": "src/lib/coupons.ts:196:No failure handling",
-      "file": "src/lib/coupons.ts",
-      "line": 196,
-      "rule": "No failure handling",
-      "severity": "critical",
-      "detail": "deleteCampaign() awaits work without a try/catch.",
-      "hint": "A dropped connection here can lose money or stock movements."
-    },
-    {
-      "id": "src/lib/coupons.ts:201:No failure handling",
-      "file": "src/lib/coupons.ts",
-      "line": 201,
-      "rule": "No failure handling",
-      "severity": "critical",
-      "detail": "loadCampaignBySlug() awaits work without a try/catch.",
-      "hint": "A dropped connection here can lose money or stock movements."
-    },
-    {
-      "id": "src/lib/coupons.ts:207:No failure handling",
-      "file": "src/lib/coupons.ts",
-      "line": 207,
-      "rule": "No failure handling",
-      "severity": "critical",
-      "detail": "loadVouchers() awaits work without a try/catch.",
-      "hint": "A dropped connection here can lose money or stock movements."
-    },
-    {
-      "id": "src/lib/coupons.ts:229:No failure handling",
-      "file": "src/lib/coupons.ts",
-      "line": 229,
-      "rule": "No failure handling",
-      "severity": "critical",
-      "detail": "loadVoucherByToken() awaits work without a try/catch.",
-      "hint": "A dropped connection here can lose money or stock movements."
-    },
-    {
-      "id": "src/lib/coupons.ts:243:No failure handling",
-      "file": "src/lib/coupons.ts",
-      "line": 243,
-      "rule": "No failure handling",
-      "severity": "critical",
-      "detail": "loadMemberVouchers() awaits work without a try/catch.",
-      "hint": "A dropped connection here can lose money or stock movements."
-    },
-    {
-      "id": "src/lib/stock-transfers.ts:65:No failure handling",
-      "file": "src/lib/stock-transfers.ts",
-      "line": 65,
-      "rule": "No failure handling",
-      "severity": "critical",
-      "detail": "loadTransfers() awaits work without a try/catch.",
-      "hint": "A dropped connection here can lose money or stock movements."
-    },
-    {
-      "id": "src/lib/stock-transfers.ts:160:No failure handling",
-      "file": "src/lib/stock-transfers.ts",
-      "line": 160,
-      "rule": "No failure handling",
-      "severity": "critical",
-      "detail": "receiveTransferInDb() awaits work without a try/catch.",
-      "hint": "A dropped connection here can lose money or stock movements."
-    },
-    {
-      "id": "src/routes/coupons.tsx:190:No failure handling",
-      "file": "src/routes/coupons.tsx",
-      "line": 190,
-      "rule": "No failure handling",
-      "severity": "critical",
-      "detail": "copyLink() awaits work without a try/catch.",
-      "hint": "A dropped connection here can lose money or stock movements."
-    },
     {
       "id": "src/lib/native-http.ts:153:Placeholder logic",
       "file": "src/lib/native-http.ts",
@@ -134,18 +26,18 @@
       "hint": "This path tells the user nothing happens yet."
     },
     {
-      "id": "src/routes/coupons.tsx:524:Unvalidated number input",
+      "id": "src/routes/coupons.tsx:538:Unvalidated number input",
       "file": "src/routes/coupons.tsx",
-      "line": 524,
+      "line": 538,
       "rule": "Unvalidated number input",
       "severity": "warning",
       "detail": "maxClaims: e.target.value ? Number(e.target.value) : null,",
       "hint": "An empty or bad entry becomes NaN."
     },
     {
-      "id": "src/routes/coupons.tsx:541:Unvalidated number input",
+      "id": "src/routes/coupons.tsx:555:Unvalidated number input",
       "file": "src/routes/coupons.tsx",
-      "line": 541,
+      "line": 555,
       "rule": "Unvalidated number input",
       "severity": "warning",
       "detail": "maxPerMember: e.target.value ? Number(e.target.value) : null,",
@@ -320,6 +212,51 @@
       "rule": "No failure handling",
       "severity": "info",
       "detail": "clear() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/components/pos/settings/panels/DatabaseHealthPanel.tsx:85:No failure handling",
+      "file": "src/components/pos/settings/panels/DatabaseHealthPanel.tsx",
+      "line": 85,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "copyAll() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/components/pos/settings/panels/DatabaseHealthPanel.tsx:131:No failure handling",
+      "file": "src/components/pos/settings/panels/DatabaseHealthPanel.tsx",
+      "line": 131,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "copy() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/components/pos/settings/panels/InheritancePanel.tsx:161:No failure handling",
+      "file": "src/components/pos/settings/panels/InheritancePanel.tsx",
+      "line": 161,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "push() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/components/pos/settings/panels/LogicHealthPanel.tsx:29:No failure handling",
+      "file": "src/components/pos/settings/panels/LogicHealthPanel.tsx",
+      "line": 29,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "LogicHealthPanel() awaits work without a try/catch.",
+      "hint": "Consider reporting the failure to the user."
+    },
+    {
+      "id": "src/components/pos/settings/panels/LogicHealthPanel.tsx:45:No failure handling",
+      "file": "src/components/pos/settings/panels/LogicHealthPanel.tsx",
+      "line": 45,
+      "rule": "No failure handling",
+      "severity": "info",
+      "detail": "copy() awaits work without a try/catch.",
       "hint": "Consider reporting the failure to the user."
     },
     {
@@ -1826,24 +1763,6 @@
       "hint": "Consider reporting the failure to the user."
     },
     {
-      "id": "src/routes/settings.diagnostics.tsx:87:No failure handling",
-      "file": "src/routes/settings.diagnostics.tsx",
-      "line": 87,
-      "rule": "No failure handling",
-      "severity": "info",
-      "detail": "copy() awaits work without a try/catch.",
-      "hint": "Consider reporting the failure to the user."
-    },
-    {
-      "id": "src/routes/settings.inheritance.tsx:184:No failure handling",
-      "file": "src/routes/settings.inheritance.tsx",
-      "line": 184,
-      "rule": "No failure handling",
-      "severity": "info",
-      "detail": "push() awaits work without a try/catch.",
-      "hint": "Consider reporting the failure to the user."
-    },
-    {
       "id": "src/routes/settings.notifications.tsx:53:No failure handling",
       "file": "src/routes/settings.notifications.tsx",
       "line": 53,
@@ -1862,9 +1781,9 @@
       "hint": "An empty or bad entry becomes NaN."
     },
     {
-      "id": "src/routes/settings.qr.tsx:61:Unvalidated number input",
+      "id": "src/routes/settings.qr.tsx:64:Unvalidated number input",
       "file": "src/routes/settings.qr.tsx",
-      "line": 61,
+      "line": 64,
       "rule": "Unvalidated number input",
       "severity": "info",
       "detail": "onChange={(e) => setField(\"qr\", { ...effective.qr, size: Number(e.target.value) || 96 })}",
@@ -1880,27 +1799,27 @@
       "hint": "Consider reporting the failure to the user."
     },
     {
-      "id": "src/routes/settings.sku.tsx:86:Unvalidated number input",
+      "id": "src/routes/settings.sku.tsx:89:Unvalidated number input",
       "file": "src/routes/settings.sku.tsx",
-      "line": 86,
+      "line": 89,
       "rule": "Unvalidated number input",
       "severity": "info",
       "detail": "onChange={(e) => save({ next: Math.max(1, Number(e.target.value) || 1) })}",
       "hint": "An empty or bad entry becomes NaN."
     },
     {
-      "id": "src/routes/settings.sku.tsx:94:Unvalidated number input",
+      "id": "src/routes/settings.sku.tsx:97:Unvalidated number input",
       "file": "src/routes/settings.sku.tsx",
-      "line": 94,
+      "line": 97,
       "rule": "Unvalidated number input",
       "severity": "info",
       "detail": "onChange={(e) => save({ pad: Math.min(12, Math.max(1, Number(e.target.value) || 1)) })}",
       "hint": "An empty or bad entry becomes NaN."
     },
     {
-      "id": "src/routes/settings.type.tsx:70:Unvalidated number input",
+      "id": "src/routes/settings.type.tsx:73:Unvalidated number input",
       "file": "src/routes/settings.type.tsx",
-      "line": 70,
+      "line": 73,
       "rule": "Unvalidated number input",
       "severity": "info",
       "detail": "onChange={(e) => setFont(scope.key, { size: Number(e.target.value) || 12 })}",
