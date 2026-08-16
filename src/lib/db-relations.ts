@@ -135,10 +135,27 @@ export async function runRelationalHealth(): Promise<RelationalReport> {
   try {
     const { data, error } = await (
       supabaseExternal as unknown as {
-        rpc: (fn: string) => Promise<{ data: unknown; error: { message: string } | null }>;
+        rpc: (
+          fn: string,
+        ) => Promise<{ data: unknown; error: { message: string; code?: string } | null }>;
       }
     ).rpc("operational_relational_health");
-    if (error) throw new Error(error.message);
+    if (error) {
+      const code = error.code ?? "";
+      const msg = error.message ?? "";
+      // 42883 is the only answer that truly means "the function is not there".
+      if (code === "42883" || /could not find the function/i.test(msg)) {
+        throw new Error(
+          "The relationship check is not installed on this database (operational_relational_health is missing).",
+        );
+      }
+      if (code === "42501" || /permission denied/i.test(msg) || /jwt|unauthor/i.test(msg)) {
+        throw new Error(
+          "Sign in with a staff account to run the relationship check — it is only available to signed-in staff.",
+        );
+      }
+      throw new Error(msg);
+    }
 
     const payload = data as { at: string; tables: RawTable[] } | null;
     const raw = payload?.tables ?? [];
