@@ -80,7 +80,8 @@ import type { Booking, CartLine, DiscountType, IntakeCharge, PaymentMethod, Sale
 import { applyCombo, intakeTotals, newJobTag } from "@/lib/booking-charges";
 import type { Payment } from "@/lib/pos-types";
 import { TenderSplit, rememberBanks } from "@/components/pos/TenderSplit";
-import { lineUnitDiscount, paymentsLabel, paymentsTotal, PAYMENT_LABELS, r2, validateTenders } from "@/lib/pos-types";
+import { lineUnitDiscount, methodLabel, paymentsLabel, paymentsTotal, PAYMENT_LABELS, r2, validateTenders } from "@/lib/pos-types";
+import { activePaymentTypes, tenderIcon, usePaymentTypes } from "@/lib/payment-types";
 import { NO_SALE_REASON_MAX, NO_SALE_REASON_MIN, recordNoSale } from "@/lib/drawer-events";
 import { buildBookingMessage, buildSaleMessage, sendBillOnWhatsApp } from "@/lib/whatsapp";
 import { logger } from "@/lib/audit-log";
@@ -223,6 +224,17 @@ function Register() {
   const [tendered, setTendered] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("cash");
   const [transferRef, setTransferRef] = useState("");
+  /** Serial / voucher number typed for a tender that demands one. */
+  const [tenderRef, setTenderRef] = useState("");
+  const [tenderRefNote, setTenderRefNote] = useState("");
+  // Tenders are configured centrally, so a new collection type (a government
+  // voucher scheme, say) appears at the till without a new build.
+  const { types: paymentTypes } = usePaymentTypes();
+  const tenderOptions = activePaymentTypes(paymentTypes);
+  const activeTender = tenderOptions.find((t) => t.code === method);
+  const activeMethodName = activeTender?.name ?? methodLabel(method);
+  /** Voucher / coupon tenders cannot complete without their serial number. */
+  const needsTenderRef = !!activeTender?.requiresReference && method !== "bank_transfer";
   const [waNumber, setWaNumber] = useState("");
   const [waSending, setWaSending] = useState(false);
   const [lastSale, setLastSale] = useState<Sale | null>(null);
@@ -1245,6 +1257,10 @@ function Register() {
       toast.error("Enter the transfer reference shown on the customer's slip");
       return;
     }
+    if (!isRefund && !splitting && needsTenderRef && !tenderRef.trim()) {
+      toast.error(`Enter the serial / reference number for ${activeMethodName}`);
+      return;
+    }
     if (!isRefund && !splitting && method === "points" && (member?.points ?? 0) < totals.total * 100) {
       toast.error("Not enough points on this member");
       return;
@@ -1258,6 +1274,13 @@ function Register() {
             amount: r2(Math.abs(totals.total)),
             ...(method === "card" && bankName.trim() ? { bankName: bankName.trim() } : {}),
             ...(method === "bank_transfer" && transferRef.trim() ? { ref: transferRef.trim() } : {}),
+            ...(needsTenderRef
+              ? {
+                  requiresReference: true,
+                  reference: tenderRef.trim(),
+                  ...(tenderRefNote.trim() ? { referenceNote: tenderRefNote.trim() } : {}),
+                }
+              : {}),
           },
         ];
     // The headline method stays the largest tender so reports keep working.
@@ -1363,6 +1386,8 @@ function Register() {
     setMemberId(null);
     setTendered("");
     setTransferRef("");
+    setTenderRef("");
+    setTenderRefNote("");
     setTenders([]);
     setBankName("");
     setPayOpen(false);
@@ -2856,29 +2881,53 @@ function Register() {
             </p>
           )}
           <div className="grid grid-cols-5 gap-2">
-            {(
-              [
-                { m: "cash", icon: Banknote, label: "Cash" },
-                { m: "card", icon: CreditCard, label: "Card" },
-                { m: "wallet", icon: Wallet, label: "Wallet" },
-                { m: "points", icon: BadgeCheck, label: "Points" },
-                { m: "bank_transfer", icon: Landmark, label: "Transfer" },
-              ] as const
-            ).map((opt) => (
-              <button
-                key={opt.m}
-                onClick={() => setMethod(opt.m)}
-                className={`flex flex-col items-center gap-1 rounded-md border px-2 py-3 text-xs transition-colors ${
-                  method === opt.m
-                    ? "border-primary bg-primary/15 text-primary"
-                    : "border-border text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <opt.icon className="size-4" />
-                {opt.label}
-              </button>
-            ))}
+            {tenderOptions.map((opt) => {
+              const Icon = tenderIcon(opt.icon, opt.code);
+              return (
+                <button
+                  key={opt.code}
+                  onClick={() => {
+                    setMethod(opt.code);
+                    setTenderRef("");
+                    setTenderRefNote("");
+                  }}
+                  className={`flex flex-col items-center gap-1 rounded-md border px-2 py-3 text-xs transition-colors ${
+                    method === opt.code
+                      ? "border-primary bg-primary/15 text-primary"
+                      : "border-border text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Icon className="size-4" />
+                  {opt.name}
+                </button>
+              );
+            })}
           </div>
+
+          {needsTenderRef && refundDue === 0 && (
+            <div className="space-y-2 rounded-md border border-primary/40 bg-primary/5 p-3">
+              <Label htmlFor="tender-reference">
+                Enter voucher / coupon serial number & reference details
+              </Label>
+              <Input
+                id="tender-reference"
+                autoFocus
+                value={tenderRef}
+                onChange={(e) => setTenderRef(e.target.value)}
+                placeholder="e.g. GV-2026-004512"
+              />
+              <Input
+                value={tenderRefNote}
+                onChange={(e) => setTenderRefNote(e.target.value)}
+                placeholder="Issuer, batch or notes (optional)"
+                className="text-xs"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                {activeMethodName} cannot be completed without this reference. It is stored against
+                the bill for reconciliation.
+              </p>
+            </div>
+          )}
 
           {method === "cash" && refundDue > 0 && (
             <p className="numeric text-sm text-muted-foreground">

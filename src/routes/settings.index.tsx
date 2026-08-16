@@ -182,6 +182,12 @@ const GROUPS = [
     blurb: "How customers pay and how bills reach them.",
     pages: [
       {
+        to: "/settings/payment-methods",
+        label: "Payment methods",
+        icon: Landmark,
+        blurb: "Tenders cashiers can collect, including voucher and coupon redemptions.",
+      },
+      {
         to: "/settings/payment",
         label: "Bank transfer details",
         icon: Landmark,

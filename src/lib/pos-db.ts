@@ -611,8 +611,14 @@ const saleItemRows = (s: Sale) =>
 const salePaymentRows = (s: Sale) => {
   const tenders =
     s.payments && s.payments.length
-      ? s.payments.map((p) => ({ method: String(p.method), amount: Number(p.amount) || 0 }))
-      : [{ method: String(s.method), amount: s.paid }];
+      ? s.payments.map((p) => ({
+          method: String(p.method),
+          amount: Number(p.amount) || 0,
+          reference: (p.reference ?? p.ref ?? "").trim(),
+          referenceNote: (p.referenceNote ?? "").trim(),
+          bankName: (p.bankName ?? "").trim(),
+        }))
+      : [{ method: String(s.method), amount: s.paid, reference: "", referenceNote: "", bankName: "" }];
   return tenders
     .filter((t) => t.amount !== 0)
     .map((t) => ({
@@ -625,14 +631,21 @@ const salePaymentRows = (s: Sale) => {
       amount: t.amount,
       method: t.method,
       kind: s.refunded ? "refund" : "payment",
-      reference: s.receiptNo,
+      reference: t.reference || s.receiptNo,
       cashier_name: s.cashier,
       note: "",
       paid_at: s.createdAt,
       // The ledger columns are optional on older databases, so always send a
       // concrete value rather than relying on a column default that may be missing.
       status: "completed",
-      metadata: {},
+      metadata: {
+        bill: s.receiptNo,
+        ...(t.reference ? { voucher_reference: t.reference } : {}),
+        ...(t.referenceNote ? { reference_note: t.referenceNote } : {}),
+        ...(t.bankName ? { bank: t.bankName } : {}),
+        captured_at: s.createdAt,
+        captured_by: s.cashier,
+      },
     }));
 };
 

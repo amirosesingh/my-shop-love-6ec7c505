@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import {
-  PAYMENT_LABELS,
   paymentsLabel,
   validateTenders,
   type Payment,
   type PaymentMethod,
 } from "@/lib/pos-types";
+import { activePaymentTypes, usePaymentTypes } from "@/lib/payment-types";
 import { usePos } from "@/lib/pos-store";
 import { notifyError } from "@/lib/notify";
 
@@ -58,6 +58,12 @@ export function TenderSplit({ total, tenders, onChange, onBeforeAdd }: Props) {
   const [recent, setRecent] = useState<string[]>([]);
   useEffect(() => setRecent(readRecentBanks()), []);
 
+  // Tenders come from the configurable payment-types list, so a new collection
+  // method is available at the till the moment an administrator saves it.
+  const { types } = usePaymentTypes();
+  const methods = activePaymentTypes(types);
+  const needsReference = (code: string) => !!methods.find((m) => m.code === code)?.requiresReference;
+
   // Named card machines / bank accounts, so takings can be reconciled per
   // machine at close of day.
   const { state, currentStore } = usePos();
@@ -80,12 +86,14 @@ export function TenderSplit({ total, tenders, onChange, onBeforeAdd }: Props) {
     // line must never appear unless that check actually passed.
     try {
       if (onBeforeAdd && !(await onBeforeAdd())) return;
+      const next = tenders.length === 0 ? (methods[0]?.code ?? "cash") : (methods[1]?.code ?? "card");
       onChange([
         ...tenders,
         {
           id: crypto.randomUUID(),
-          method: tenders.length === 0 ? "cash" : "card",
+          method: next,
           amount: outstanding,
+          ...(needsReference(next) ? { requiresReference: true } : {}),
         },
       ]);
     } catch (e) {
@@ -131,12 +139,15 @@ export function TenderSplit({ total, tenders, onChange, onBeforeAdd }: Props) {
               <div className="grid grid-cols-2 gap-2">
                 <select
                   value={t.method}
-                  onChange={(e) => patch(i, { method: e.target.value as PaymentMethod })}
+                  onChange={(e) => {
+                    const code = e.target.value as PaymentMethod;
+                    patch(i, { method: code, requiresReference: needsReference(code) });
+                  }}
                   className="h-9 rounded-md border border-border bg-background px-2 text-xs"
                 >
-                  {(Object.keys(PAYMENT_LABELS) as PaymentMethod[]).map((m) => (
-                    <option key={m} value={m}>
-                      {PAYMENT_LABELS[m]}
+                  {methods.map((m) => (
+                    <option key={m.code} value={m.code}>
+                      {m.name}
                     </option>
                   ))}
                 </select>
@@ -150,10 +161,11 @@ export function TenderSplit({ total, tenders, onChange, onBeforeAdd }: Props) {
                   />
                 ) : (
                   <Input
-                    value={t.ref ?? ""}
-                    onChange={(e) => patch(i, { ref: e.target.value })}
-                    placeholder="Reference"
+                    value={t.reference ?? t.ref ?? ""}
+                    onChange={(e) => patch(i, { reference: e.target.value, ref: e.target.value })}
+                    placeholder={needsReference(t.method) ? "Serial / reference *" : "Reference"}
                     className="h-9 text-xs"
+                    aria-invalid={needsReference(t.method) && !(t.reference ?? t.ref ?? "").trim()}
                   />
                 )}
               </div>

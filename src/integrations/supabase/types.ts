@@ -1019,6 +1019,48 @@ export type Database = {
           },
         ]
       }
+      payment_types: {
+        Row: {
+          created_at: string
+          icon: string
+          id: string
+          is_active: boolean
+          is_system: boolean
+          name: string
+          requires_reference: boolean
+          row_version: number
+          sort_order: number
+          type_code: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          icon?: string
+          id?: string
+          is_active?: boolean
+          is_system?: boolean
+          name: string
+          requires_reference?: boolean
+          row_version?: number
+          sort_order?: number
+          type_code: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          icon?: string
+          id?: string
+          is_active?: boolean
+          is_system?: boolean
+          name?: string
+          requires_reference?: boolean
+          row_version?: number
+          sort_order?: number
+          type_code?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pin_attempts: {
         Row: {
           attempts: number

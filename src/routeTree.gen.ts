@@ -69,6 +69,7 @@ import { Route as SettingsMobileTerminalsRouteImport } from './routes/settings.m
 import { Route as SettingsNotificationsRouteImport } from './routes/settings.notifications'
 import { Route as SettingsNumberingRouteImport } from './routes/settings.numbering'
 import { Route as SettingsPaymentRouteImport } from './routes/settings.payment'
+import { Route as SettingsPaymentMethodsRouteImport } from './routes/settings.payment-methods'
 import { Route as SettingsPrinterRouteImport } from './routes/settings.printer'
 import { Route as SettingsQrRouteImport } from './routes/settings.qr'
 import { Route as SettingsRegionRouteImport } from './routes/settings.region'
@@ -396,6 +397,11 @@ const SettingsPaymentRoute = SettingsPaymentRouteImport.update({
   path: '/settings/payment',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsPaymentMethodsRoute = SettingsPaymentMethodsRouteImport.update({
+  id: '/settings/payment-methods',
+  path: '/settings/payment-methods',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsPrinterRoute = SettingsPrinterRouteImport.update({
   id: '/settings/printer',
   path: '/settings/printer',
@@ -586,6 +592,7 @@ export interface FileRoutesByFullPath {
   '/settings/notifications': typeof SettingsNotificationsRoute
   '/settings/numbering': typeof SettingsNumberingRoute
   '/settings/payment': typeof SettingsPaymentRoute
+  '/settings/payment-methods': typeof SettingsPaymentMethodsRoute
   '/settings/printer': typeof SettingsPrinterRoute
   '/settings/qr': typeof SettingsQrRoute
   '/settings/region': typeof SettingsRegionRoute
@@ -674,6 +681,7 @@ export interface FileRoutesByTo {
   '/settings/notifications': typeof SettingsNotificationsRoute
   '/settings/numbering': typeof SettingsNumberingRoute
   '/settings/payment': typeof SettingsPaymentRoute
+  '/settings/payment-methods': typeof SettingsPaymentMethodsRoute
   '/settings/printer': typeof SettingsPrinterRoute
   '/settings/qr': typeof SettingsQrRoute
   '/settings/region': typeof SettingsRegionRoute
@@ -763,6 +771,7 @@ export interface FileRoutesById {
   '/settings/notifications': typeof SettingsNotificationsRoute
   '/settings/numbering': typeof SettingsNumberingRoute
   '/settings/payment': typeof SettingsPaymentRoute
+  '/settings/payment-methods': typeof SettingsPaymentMethodsRoute
   '/settings/printer': typeof SettingsPrinterRoute
   '/settings/qr': typeof SettingsQrRoute
   '/settings/region': typeof SettingsRegionRoute
@@ -853,6 +862,7 @@ export interface FileRouteTypes {
     | '/settings/notifications'
     | '/settings/numbering'
     | '/settings/payment'
+    | '/settings/payment-methods'
     | '/settings/printer'
     | '/settings/qr'
     | '/settings/region'
@@ -941,6 +951,7 @@ export interface FileRouteTypes {
     | '/settings/notifications'
     | '/settings/numbering'
     | '/settings/payment'
+    | '/settings/payment-methods'
     | '/settings/printer'
     | '/settings/qr'
     | '/settings/region'
@@ -1029,6 +1040,7 @@ export interface FileRouteTypes {
     | '/settings/notifications'
     | '/settings/numbering'
     | '/settings/payment'
+    | '/settings/payment-methods'
     | '/settings/printer'
     | '/settings/qr'
     | '/settings/region'
@@ -1118,6 +1130,7 @@ export interface RootRouteChildren {
   SettingsNotificationsRoute: typeof SettingsNotificationsRoute
   SettingsNumberingRoute: typeof SettingsNumberingRoute
   SettingsPaymentRoute: typeof SettingsPaymentRoute
+  SettingsPaymentMethodsRoute: typeof SettingsPaymentMethodsRoute
   SettingsPrinterRoute: typeof SettingsPrinterRoute
   SettingsQrRoute: typeof SettingsQrRoute
   SettingsRegionRoute: typeof SettingsRegionRoute
@@ -1568,6 +1581,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsPaymentRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/payment-methods': {
+      id: '/settings/payment-methods'
+      path: '/settings/payment-methods'
+      fullPath: '/settings/payment-methods'
+      preLoaderRoute: typeof SettingsPaymentMethodsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/printer': {
       id: '/settings/printer'
       path: '/settings/printer'
@@ -1826,6 +1846,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsNotificationsRoute: SettingsNotificationsRoute,
   SettingsNumberingRoute: SettingsNumberingRoute,
   SettingsPaymentRoute: SettingsPaymentRoute,
+  SettingsPaymentMethodsRoute: SettingsPaymentMethodsRoute,
   SettingsPrinterRoute: SettingsPrinterRoute,
   SettingsQrRoute: SettingsQrRoute,
   SettingsRegionRoute: SettingsRegionRoute,

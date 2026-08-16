@@ -128,6 +128,7 @@ export const SETTINGS_VISIBILITY_ELEMENTS: VisibilityElement[] = (
     ["/settings/region", "Region & time", "Country, time zone and clock format.", "admin-only"],
     ["/settings/visibility", "Screen visibility", "What each role can see.", "admin-only"],
     ["/settings/payment", "Bank transfer details", "Bank account and payment QR.", "admin-only"],
+    ["/settings/payment-methods", "Payment methods", "Tenders cashiers can collect at checkout.", "admin-only"],
     ["/settings/accounts", "Payment accounts", "Card machines, banks and e-wallets.", "admin-only"],
     ["/settings/services", "Booking services", "Jobs and their default fee.", "supervisor-only"],
     ["/settings/whatsapp", "WhatsApp bills", "Send receipts over WhatsApp.", "admin-only"],
