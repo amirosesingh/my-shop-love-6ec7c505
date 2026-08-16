@@ -308,6 +308,16 @@ export type Shift = {
   closedByStaffId?: string;
   closedByRole?: string;
   expectedCash?: number | null;
+  /** Blind count: card and digital totals typed at close (null = not counted). */
+  countedCard?: number | null;
+  countedDigital?: number | null;
+  expectedCard?: number | null;
+  expectedDigital?: number | null;
+  /** Over (positive) / short (negative) per tender, worked out at close. */
+  varianceCash?: number | null;
+  varianceCard?: number | null;
+  varianceDigital?: number | null;
+  varianceTotal?: number | null;
   /** set when the shift ran past the trading-day window */
   overdue?: boolean;
 };

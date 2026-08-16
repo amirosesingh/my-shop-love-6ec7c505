@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/table";
 import { money, usePos } from "@/lib/pos-store";
 import { useDrawerEvents } from "@/lib/drawer-events";
+import { hourlyProfit, profitOf } from "@/lib/profit";
 import { paymentsLabel } from "@/lib/pos-types";
 
 export const Route = createFileRoute("/dashboard")({
@@ -64,17 +65,16 @@ function Dashboard() {
   const live = todaySales.filter((s) => !s.refunded);
 
   const revenue = live.reduce((a, s) => a + s.total, 0);
-  const cost = live.reduce(
-    (a, s) =>
-      a +
-      s.lines.reduce((la, l) => {
-        const p = state.products.find((x) => x.id === l.productId);
-        return la + (p?.cost ?? 0) * Math.abs(l.qty);
-      }, 0),
-    0,
-  );
-  const margin = revenue > 0 ? ((revenue - cost) / revenue) * 100 : 0;
+  // One shared profit helper, so this never drifts from the business report.
+  const profit = useMemo(() => profitOf(live, state.products), [live, state.products]);
+  const margin = profit.marginPct;
   const refunds = todaySales.filter((s) => s.refunded);
+
+  /** Revenue against gross profit, hour by hour. */
+  const profitByHour = useMemo(
+    () => hourlyProfit(live, state.products),
+    [live, state.products],
+  );
 
   /** Revenue for the last 14 calendar days. */
   const daily = useMemo(() => {
@@ -164,8 +164,10 @@ function Dashboard() {
           </p>
         </header>
 
-        <div className="grid gap-4 md:grid-cols-5">
+        <div className="grid gap-4 md:grid-cols-4 xl:grid-cols-7">
           <Kpi label="Revenue today" value={money(revenue)} highlight />
+          <Kpi label="Gross revenue" value={money(profit.revenue)} />
+          <Kpi label="Total COGS" value={money(profit.cogs)} />
           <Kpi label="Gross margin" value={`${margin.toFixed(1)}%`} />
           <Kpi label="Bills" value={String(live.length)} />
           <Kpi label="Refunds" value={`${refunds.length} · ${money(refunds.reduce((a, s) => a + Math.abs(s.total), 0))}`} />
@@ -205,6 +207,24 @@ function Dashboard() {
             </div>
           </section>
         </div>
+
+        <section className="rounded-lg border border-border bg-card p-4">
+          <h2 className="mb-3 text-sm font-semibold">
+            Profit by hour · gross profit {money(profit.profit)} today
+          </h2>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={profitByHour}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="hour" fontSize={10} interval={2} stroke="var(--muted-foreground)" />
+                <YAxis fontSize={11} stroke="var(--muted-foreground)" />
+                <Tooltip />
+                <Bar dataKey="revenue" name="Revenue" fill="var(--muted-foreground)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="profit" name="Gross profit" fill="var(--primary)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
 
         <section className="rounded-lg border border-border bg-card">
           <div className="flex items-center gap-2 px-5 py-3">

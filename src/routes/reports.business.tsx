@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/table";
 import { TablePagination, usePagination } from "@/components/pos/TablePagination";
 import { money, usePos } from "@/lib/pos-store";
+import { lineCost, lineRevenue } from "@/lib/profit";
 import { ReportHeader, StatCard, defaultRange, downloadCsv, inRange } from "@/components/pos/report-kit";
 
 export const Route = createFileRoute("/reports/business")({
@@ -87,10 +88,8 @@ function BusinessReport() {
     for (const s of sales) {
       for (const l of s.lines) {
         if (l.qty <= 0) continue;
-        const price = l.discountType === "percent" ? l.price * (1 - l.discount / 100) : l.price - l.discount;
-        const revenue = Math.max(0, price) * l.qty;
-        const unitCost = l.cost ?? state.products.find((p) => p.id === l.productId)?.cost ?? 0;
-        const cost = unitCost * l.qty;
+        const revenue = Math.max(0, lineRevenue(l));
+        const cost = lineCost(l, state.products);
         const row =
           map.get(l.productId) ??
           {
@@ -136,10 +135,7 @@ function BusinessReport() {
     for (const s of sales) {
       const key = s.cashier || "Unknown";
       const row = map.get(key) ?? { name: key, bills: 0, revenue: 0, profit: 0, discount: 0, avgBill: 0 };
-      const cost = s.lines.reduce(
-        (a, l) => a + (l.cost ?? state.products.find((p) => p.id === l.productId)?.cost ?? 0) * l.qty,
-        0,
-      );
+      const cost = s.lines.reduce((a, l) => a + lineCost(l, state.products), 0);
       row.bills += 1;
       row.revenue += s.total;
       row.profit += s.total - s.tax - cost;

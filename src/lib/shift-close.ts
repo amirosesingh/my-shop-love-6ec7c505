@@ -88,3 +88,80 @@ export function varianceNeedsPin(rules: PosRules, variance: number): boolean {
   const limit = Math.abs(Number(rules.variance_pin_threshold) || 0);
   return Math.abs(variance) > limit;
 }
+
+/* ------------------------ blind reconciliation ------------------------ */
+
+/** Payment codes that roll up into each counted box on the closing screen. */
+const TENDER_GROUPS = {
+  cash: ["cash"],
+  card: ["card"],
+  digital: ["wallet", "transfer", "qr", "online", "ewallet"],
+} as const;
+
+export type TenderKey = keyof typeof TENDER_GROUPS;
+
+/** Net sales taken this shift on one tender group. */
+export function tenderSales(shift: Shift | null, sales: Sale[], tender: TenderKey): number {
+  const codes = TENDER_GROUPS[tender] as readonly string[];
+  return shiftSalesOf(shift, sales)
+    .filter((s) => codes.includes(s.method))
+    .reduce((a, s) => a + s.total, 0);
+}
+
+/** What each tender should hold: cash carries the opening float, the rest do not. */
+export function expectedFor(shift: Shift | null, sales: Sale[], tender: TenderKey): number {
+  const base = tenderSales(shift, sales, tender);
+  return tender === "cash" ? (shift?.openingFloat ?? 0) + base : base;
+}
+
+/** What the cashier typed in. A blank card / digital box means "not counted". */
+export type CountedTotals = {
+  cash: number;
+  card: number | null;
+  digital: number | null;
+};
+
+export type TenderVariance = {
+  tender: TenderKey;
+  label: string;
+  counted: number | null;
+  expected: number;
+  /** counted − expected; null when the box was left blank */
+  variance: number | null;
+};
+
+export type Reconciliation = {
+  lines: TenderVariance[];
+  /** Combined over/short across the tenders that were actually counted. */
+  total: number;
+};
+
+const TENDER_LABELS: Record<TenderKey, string> = {
+  cash: "Cash",
+  card: "Card",
+  digital: "Digital / wallet",
+};
+
+/**
+ * Over/Short per tender: `Counted − (Starting float + Net shift sales)`.
+ * The float only applies to cash; card and digital settle against sales only.
+ */
+export function reconcileShift(
+  shift: Shift | null,
+  sales: Sale[],
+  counted: CountedTotals,
+): Reconciliation {
+  const lines = (Object.keys(TENDER_LABELS) as TenderKey[]).map((tender) => {
+    const expected = expectedFor(shift, sales, tender);
+    const typed = tender === "cash" ? counted.cash : counted[tender];
+    return {
+      tender,
+      label: TENDER_LABELS[tender],
+      counted: typed ?? null,
+      expected,
+      variance: typed == null ? null : Number((typed - expected).toFixed(2)),
+    };
+  });
+  const total = lines.reduce((a, l) => a + (l.variance ?? 0), 0);
+  return { lines, total: Number(total.toFixed(2)) };
+}
