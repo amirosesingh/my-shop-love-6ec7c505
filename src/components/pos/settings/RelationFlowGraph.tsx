@@ -27,11 +27,13 @@ const POS: Record<string, { x: number; y: number }> = {
 const W = 150;
 const H = 34;
 
-const EDGE_CLASS = {
+type EdgeKind = "healthy" | "missing" | "orphan";
+
+const EDGE_CLASS: Record<EdgeKind, string> = {
   healthy: "stroke-emerald-500",
   missing: "stroke-amber-500",
   orphan: "stroke-destructive",
-} as const;
+};
 
 /** Non-auth operational tables and how they connect, coloured by integrity. */
 export function RelationFlowGraph({ tables }: { tables: TableRelationHealth[] }) {
@@ -44,7 +46,7 @@ export function RelationFlowGraph({ tables }: { tables: TableRelationHealth[] })
       .map((l) => ({
         from: t.table,
         to: l.parent,
-        kind: !l.declared ? "missing" : (l.orphans ?? 0) > 0 ? "orphan" : "healthy",
+        kind: (!l.declared ? "missing" : (l.orphans ?? 0) > 0 ? "orphan" : "healthy") as EdgeKind,
         label: l.label,
       })),
   );
