@@ -62,6 +62,7 @@ import { Route as SettingsDataSyncRouteImport } from './routes/settings.data-syn
 import { Route as SettingsDiagnosticsRouteImport } from './routes/settings.diagnostics'
 import { Route as SettingsDisplayRouteImport } from './routes/settings.display'
 import { Route as SettingsElementsRouteImport } from './routes/settings.elements'
+import { Route as SettingsHardwareRouteImport } from './routes/settings.hardware'
 import { Route as SettingsIdentityRouteImport } from './routes/settings.identity'
 import { Route as SettingsInheritanceRouteImport } from './routes/settings.inheritance'
 import { Route as SettingsLinesRouteImport } from './routes/settings.lines'
@@ -363,6 +364,11 @@ const SettingsElementsRoute = SettingsElementsRouteImport.update({
   path: '/settings/elements',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsHardwareRoute = SettingsHardwareRouteImport.update({
+  id: '/settings/hardware',
+  path: '/settings/hardware',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsIdentityRoute = SettingsIdentityRouteImport.update({
   id: '/settings/identity',
   path: '/settings/identity',
@@ -591,6 +597,7 @@ export interface FileRoutesByFullPath {
   '/settings/diagnostics': typeof SettingsDiagnosticsRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
+  '/settings/hardware': typeof SettingsHardwareRoute
   '/settings/identity': typeof SettingsIdentityRoute
   '/settings/inheritance': typeof SettingsInheritanceRoute
   '/settings/lines': typeof SettingsLinesRoute
@@ -681,6 +688,7 @@ export interface FileRoutesByTo {
   '/settings/diagnostics': typeof SettingsDiagnosticsRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
+  '/settings/hardware': typeof SettingsHardwareRoute
   '/settings/identity': typeof SettingsIdentityRoute
   '/settings/inheritance': typeof SettingsInheritanceRoute
   '/settings/lines': typeof SettingsLinesRoute
@@ -772,6 +780,7 @@ export interface FileRoutesById {
   '/settings/diagnostics': typeof SettingsDiagnosticsRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
+  '/settings/hardware': typeof SettingsHardwareRoute
   '/settings/identity': typeof SettingsIdentityRoute
   '/settings/inheritance': typeof SettingsInheritanceRoute
   '/settings/lines': typeof SettingsLinesRoute
@@ -864,6 +873,7 @@ export interface FileRouteTypes {
     | '/settings/diagnostics'
     | '/settings/display'
     | '/settings/elements'
+    | '/settings/hardware'
     | '/settings/identity'
     | '/settings/inheritance'
     | '/settings/lines'
@@ -954,6 +964,7 @@ export interface FileRouteTypes {
     | '/settings/diagnostics'
     | '/settings/display'
     | '/settings/elements'
+    | '/settings/hardware'
     | '/settings/identity'
     | '/settings/inheritance'
     | '/settings/lines'
@@ -1044,6 +1055,7 @@ export interface FileRouteTypes {
     | '/settings/diagnostics'
     | '/settings/display'
     | '/settings/elements'
+    | '/settings/hardware'
     | '/settings/identity'
     | '/settings/inheritance'
     | '/settings/lines'
@@ -1135,6 +1147,7 @@ export interface RootRouteChildren {
   SettingsDiagnosticsRoute: typeof SettingsDiagnosticsRoute
   SettingsDisplayRoute: typeof SettingsDisplayRoute
   SettingsElementsRoute: typeof SettingsElementsRoute
+  SettingsHardwareRoute: typeof SettingsHardwareRoute
   SettingsIdentityRoute: typeof SettingsIdentityRoute
   SettingsInheritanceRoute: typeof SettingsInheritanceRoute
   SettingsLinesRoute: typeof SettingsLinesRoute
@@ -1545,6 +1558,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsElementsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/hardware': {
+      id: '/settings/hardware'
+      path: '/settings/hardware'
+      fullPath: '/settings/hardware'
+      preLoaderRoute: typeof SettingsHardwareRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/identity': {
       id: '/settings/identity'
       path: '/settings/identity'
@@ -1859,6 +1879,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsDiagnosticsRoute: SettingsDiagnosticsRoute,
   SettingsDisplayRoute: SettingsDisplayRoute,
   SettingsElementsRoute: SettingsElementsRoute,
+  SettingsHardwareRoute: SettingsHardwareRoute,
   SettingsIdentityRoute: SettingsIdentityRoute,
   SettingsInheritanceRoute: SettingsInheritanceRoute,
   SettingsLinesRoute: SettingsLinesRoute,
