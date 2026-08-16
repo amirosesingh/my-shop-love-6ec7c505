@@ -64,6 +64,7 @@ import { Route as SettingsElementsRouteImport } from './routes/settings.elements
 import { Route as SettingsIdentityRouteImport } from './routes/settings.identity'
 import { Route as SettingsInheritanceRouteImport } from './routes/settings.inheritance'
 import { Route as SettingsLinesRouteImport } from './routes/settings.lines'
+import { Route as SettingsLogicHealthRouteImport } from './routes/settings.logic-health'
 import { Route as SettingsMobileTerminalsRouteImport } from './routes/settings.mobile-terminals'
 import { Route as SettingsNotificationsRouteImport } from './routes/settings.notifications'
 import { Route as SettingsNumberingRouteImport } from './routes/settings.numbering'
@@ -369,6 +370,11 @@ const SettingsLinesRoute = SettingsLinesRouteImport.update({
   path: '/settings/lines',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsLogicHealthRoute = SettingsLogicHealthRouteImport.update({
+  id: '/settings/logic-health',
+  path: '/settings/logic-health',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsMobileTerminalsRoute = SettingsMobileTerminalsRouteImport.update({
   id: '/settings/mobile-terminals',
   path: '/settings/mobile-terminals',
@@ -569,6 +575,7 @@ export interface FileRoutesByFullPath {
   '/settings/identity': typeof SettingsIdentityRoute
   '/settings/inheritance': typeof SettingsInheritanceRoute
   '/settings/lines': typeof SettingsLinesRoute
+  '/settings/logic-health': typeof SettingsLogicHealthRoute
   '/settings/mobile-terminals': typeof SettingsMobileTerminalsRoute
   '/settings/notifications': typeof SettingsNotificationsRoute
   '/settings/numbering': typeof SettingsNumberingRoute
@@ -655,6 +662,7 @@ export interface FileRoutesByTo {
   '/settings/identity': typeof SettingsIdentityRoute
   '/settings/inheritance': typeof SettingsInheritanceRoute
   '/settings/lines': typeof SettingsLinesRoute
+  '/settings/logic-health': typeof SettingsLogicHealthRoute
   '/settings/mobile-terminals': typeof SettingsMobileTerminalsRoute
   '/settings/notifications': typeof SettingsNotificationsRoute
   '/settings/numbering': typeof SettingsNumberingRoute
@@ -742,6 +750,7 @@ export interface FileRoutesById {
   '/settings/identity': typeof SettingsIdentityRoute
   '/settings/inheritance': typeof SettingsInheritanceRoute
   '/settings/lines': typeof SettingsLinesRoute
+  '/settings/logic-health': typeof SettingsLogicHealthRoute
   '/settings/mobile-terminals': typeof SettingsMobileTerminalsRoute
   '/settings/notifications': typeof SettingsNotificationsRoute
   '/settings/numbering': typeof SettingsNumberingRoute
@@ -830,6 +839,7 @@ export interface FileRouteTypes {
     | '/settings/identity'
     | '/settings/inheritance'
     | '/settings/lines'
+    | '/settings/logic-health'
     | '/settings/mobile-terminals'
     | '/settings/notifications'
     | '/settings/numbering'
@@ -916,6 +926,7 @@ export interface FileRouteTypes {
     | '/settings/identity'
     | '/settings/inheritance'
     | '/settings/lines'
+    | '/settings/logic-health'
     | '/settings/mobile-terminals'
     | '/settings/notifications'
     | '/settings/numbering'
@@ -1002,6 +1013,7 @@ export interface FileRouteTypes {
     | '/settings/identity'
     | '/settings/inheritance'
     | '/settings/lines'
+    | '/settings/logic-health'
     | '/settings/mobile-terminals'
     | '/settings/notifications'
     | '/settings/numbering'
@@ -1089,6 +1101,7 @@ export interface RootRouteChildren {
   SettingsIdentityRoute: typeof SettingsIdentityRoute
   SettingsInheritanceRoute: typeof SettingsInheritanceRoute
   SettingsLinesRoute: typeof SettingsLinesRoute
+  SettingsLogicHealthRoute: typeof SettingsLogicHealthRoute
   SettingsMobileTerminalsRoute: typeof SettingsMobileTerminalsRoute
   SettingsNotificationsRoute: typeof SettingsNotificationsRoute
   SettingsNumberingRoute: typeof SettingsNumberingRoute
@@ -1507,6 +1520,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsLinesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/logic-health': {
+      id: '/settings/logic-health'
+      path: '/settings/logic-health'
+      fullPath: '/settings/logic-health'
+      preLoaderRoute: typeof SettingsLogicHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/mobile-terminals': {
       id: '/settings/mobile-terminals'
       path: '/settings/mobile-terminals'
@@ -1781,6 +1801,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsIdentityRoute: SettingsIdentityRoute,
   SettingsInheritanceRoute: SettingsInheritanceRoute,
   SettingsLinesRoute: SettingsLinesRoute,
+  SettingsLogicHealthRoute: SettingsLogicHealthRoute,
   SettingsMobileTerminalsRoute: SettingsMobileTerminalsRoute,
   SettingsNotificationsRoute: SettingsNotificationsRoute,
   SettingsNumberingRoute: SettingsNumberingRoute,
