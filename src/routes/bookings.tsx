@@ -298,7 +298,10 @@ function BookingsPage() {
           ).map(([k, label, count]) => (
             <button
               key={k}
-              onClick={() => setKind(k)}
+              onClick={() => {
+                setKind(k);
+                if (k === "done") setTab("all");
+              }}
               className={`rounded-md border px-3 py-1.5 text-xs ${
                 kind === k
                   ? "border-primary/40 bg-primary/10 text-primary"
