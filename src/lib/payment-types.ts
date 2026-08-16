@@ -10,6 +10,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { useEffect, useState } from "react";
+import * as Icons from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { describeError } from "./notify";
 
 const sb = supabaseExternal as unknown as SupabaseClient;
@@ -182,4 +184,17 @@ export function paymentTypeLabel(code: string, types: PaymentType[] = cachedPaym
   const hit = types.find((t) => t.code === code);
   if (hit) return hit.name;
   return code ? code.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase()) : "Unknown";
+}
+
+/**
+ * Icon for a tender button. Custom methods name a lucide icon in settings; a
+ * missing or unknown name falls back to a sensible built-in so a button never
+ * renders blank.
+ */
+export function tenderIcon(icon: string, code: string) {
+  const key = (icon || "").trim();
+  const pick =
+    (Icons as unknown as Record<string, LucideIcon | undefined>)[key] ??
+    ({ cash: Icons.Banknote, card: Icons.CreditCard, wallet: Icons.Wallet, points: Icons.BadgeCheck, bank_transfer: Icons.Landmark } as Record<string, LucideIcon | undefined>)[code];
+  return pick ?? Icons.Wallet;
 }
