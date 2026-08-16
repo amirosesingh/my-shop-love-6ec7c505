@@ -553,11 +553,58 @@ function info() {
   };
 }
 
+/**
+ * The same relationship picture the cloud RPC returns, derived from the local
+ * mirror's own catalogue so the health screen still answers when the terminal
+ * is offline. Read-only: table counts, declared foreign keys, orphan counts.
+ */
+function relationalHealth() {
+  if (!db) return { at: new Date().toISOString(), tables: [], error: "The local database is not open." };
+  const tables = [];
+  for (const entity of MIRROR_ENTITIES) {
+    let rows = 0;
+    try {
+      rows = Number(db.prepare(`SELECT count(*) AS n FROM ${entity}`).get()?.n ?? 0);
+    } catch {
+      continue; // this mirror table does not exist locally
+    }
+    const links = [];
+    let fks = [];
+    try {
+      fks = db.prepare(`PRAGMA foreign_key_list(${entity})`).all();
+    } catch {
+      fks = [];
+    }
+    for (const fk of fks) {
+      const child = fk.from;
+      const parent = fk.table;
+      const parentColumn = fk.to || "id";
+      let orphans = 0;
+      try {
+        orphans = Number(
+          db
+            .prepare(
+              `SELECT count(*) AS n FROM ${entity} ch WHERE ch.${child} IS NOT NULL
+                 AND NOT EXISTS (SELECT 1 FROM ${parent} pa WHERE pa.${parentColumn} = ch.${child})`,
+            )
+            .get()?.n ?? 0,
+        );
+      } catch {
+        orphans = 0;
+      }
+      links.push({ column: child, parent_table: parent, parent_column: parentColumn, orphans });
+    }
+    tables.push({ table: entity, rows, links });
+  }
+  return { at: new Date().toISOString(), tables };
+}
+
 module.exports = {
   MIRROR_ENTITIES,
   MAX_ATTEMPTS,
   init,
   info,
+  relationalHealth,
   setScope,
   mirror,
   listMirror,
