@@ -226,6 +226,14 @@ function Register() {
   /** Serial / voucher number typed for a tender that demands one. */
   const [tenderRef, setTenderRef] = useState("");
   const [tenderRefNote, setTenderRefNote] = useState("");
+  // Tenders are configured centrally, so a new collection type (a government
+  // voucher scheme, say) appears at the till without a new build.
+  const { types: paymentTypes } = usePaymentTypes();
+  const tenderOptions = activePaymentTypes(paymentTypes);
+  const activeTender = tenderOptions.find((t) => t.code === method);
+  const activeMethodName = activeTender?.name ?? methodLabel(method);
+  /** Voucher / coupon tenders cannot complete without their serial number. */
+  const needsTenderRef = !!activeTender?.requiresReference && method !== "bank_transfer";
   const [waNumber, setWaNumber] = useState("");
   const [waSending, setWaSending] = useState(false);
   const [lastSale, setLastSale] = useState<Sale | null>(null);
