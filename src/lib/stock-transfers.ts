@@ -63,27 +63,34 @@ const rowToTransfer = (r: Row, items: Row[]): StoredTransfer => ({
 
 /** Every note this branch raised or is due to receive. */
 export async function loadTransfers(): Promise<StoredTransfer[]> {
-  const heads = await sb
-    .from("stock_transfers")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(500);
-  if (heads.error) throw new Error(heads.error.message);
-  const rows = (heads.data as Row[] | null) ?? [];
-  if (!rows.length) return [];
+  try {
+    const heads = await sb
+      .from("stock_transfers")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(500);
+    if (heads.error) throw new Error(heads.error.message);
+    const rows = (heads.data as Row[] | null) ?? [];
+    if (!rows.length) return [];
 
-  const lines = await sb
-    .from("stock_transfer_items")
-    .select("*")
-    .in("transfer_id", rows.map((r) => r.id));
-  if (lines.error) throw new Error(lines.error.message);
-  const byTransfer = new Map<string, Row[]>();
-  for (const l of ((lines.data as Row[] | null) ?? [])) {
-    const list = byTransfer.get(l.transfer_id) ?? [];
-    list.push(l);
-    byTransfer.set(l.transfer_id, list);
+    const lines = await sb
+      .from("stock_transfer_items")
+      .select("*")
+      .in("transfer_id", rows.map((r) => r.id));
+    if (lines.error) throw new Error(lines.error.message);
+    const byTransfer = new Map<string, Row[]>();
+    for (const l of ((lines.data as Row[] | null) ?? [])) {
+      const list = byTransfer.get(l.transfer_id) ?? [];
+      list.push(l);
+      byTransfer.set(l.transfer_id, list);
+    }
+    return rows.map((r) => rowToTransfer(r, byTransfer.get(r.id) ?? []));
+  } catch (e) {
+    // A branch with no connection still opens the transfers screen; it just
+    // shows nothing rather than a crash.
+    console.error("[transfers] loadTransfers failed", e);
+    return [];
   }
-  return rows.map((r) => rowToTransfer(r, byTransfer.get(r.id) ?? []));
 }
 
 export type SaveTransferInput = {
@@ -156,8 +163,19 @@ export async function setTransferStatus(
  * Receiving is the only step that touches stock, so the database does it in
  * one transaction: out of the sender, into the receiver, re-mapped across
  * clusters where needed.
+ *
+ * Never throws: a failure leaves the note untouched and reports why, so stock
+ * is never half-moved on the screen while the database refused the write.
  */
-export async function receiveTransferInDb(id: string, who: string) {
-  const res = await sb.rpc("stock_transfer_receive", { p_transfer_id: id, p_received_by: who });
-  if (res.error) throw new Error(res.error.message);
+export async function receiveTransferInDb(
+  id: string,
+  who: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await sb.rpc("stock_transfer_receive", { p_transfer_id: id, p_received_by: who });
+    if (res.error) throw new Error(res.error.message);
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: describeError(e, "Receiving the transfer") };
+  }
 }
