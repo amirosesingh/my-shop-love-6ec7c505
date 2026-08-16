@@ -119,6 +119,30 @@ type RawLink = {
 };
 type RawTable = { table: string; rows: number; links: RawLink[] };
 
+type LocalBridge = {
+  localRelationalHealth?: () => Promise<{
+    ok: boolean;
+    data?: { at: string; tables: RawTable[] };
+    error?: string;
+  }>;
+};
+
+/**
+ * Desktop shell fallback: the same picture read from the local mirror's own
+ * catalogue, so an offline terminal still gets a real answer.
+ */
+async function localRelational(): Promise<{ at: string; tables: RawTable[] } | null> {
+  if (typeof window === "undefined") return null;
+  const shell = (window as unknown as { pos?: LocalBridge }).pos;
+  if (!shell?.localRelationalHealth) return null;
+  try {
+    const res = await shell.localRelationalHealth();
+    return res.ok && res.data ? res.data : null;
+  } catch {
+    return null;
+  }
+}
+
 export const STATUS_LABEL: Record<RelationStatus, string> = {
   healthy: "Connected & healthy",
   "missing-fk": "Disconnected / missing FK",
@@ -161,16 +185,22 @@ export async function runRelationalHealth(): Promise<RelationalReport> {
       const msg = error.message ?? "";
       // 42883 is the only answer that truly means "the function is not there".
       if (code === "42883" || /could not find the function/i.test(msg)) {
+        const local = await localRelational();
+        if (local) {
+          data = local;
+          error = null;
+        } else {
         throw new Error(
-          "The relationship check is not installed on this database (operational_relational_health is missing).",
+          "The relationship check is not installed on this database. Run supabase/online_schema_fix_latest.sql in the SQL editor of the database this till points at (or 'npx supabase db push' for the matching file in supabase/migrations/) to install operational_relational_health().",
         );
+        }
       }
-      if (code === "42501" || /permission denied/i.test(msg) || /jwt|unauthor/i.test(msg)) {
+      if (error && (code === "42501" || /permission denied/i.test(msg) || /jwt|unauthor/i.test(msg))) {
         throw new Error(
           "Sign in with a staff account to run the relationship check — it is only available to signed-in staff.",
         );
       }
-      throw new Error(msg);
+      if (error) throw new Error(msg);
     }
 
     const payload = data as { at: string; tables: RawTable[] } | null;
