@@ -84,6 +84,18 @@ const toLocalInput = (iso?: string | null) =>
   iso ? new Date(iso).toISOString().slice(0, 16) : "";
 const fromLocalInput = (v: string) => (v ? new Date(v).toISOString() : null);
 
+/**
+ * A blank or half-typed limit ("", "-", "1e") must never reach the draft as
+ * NaN: blank means unlimited, anything unreadable keeps the field empty.
+ */
+const toCountOrNull = (v: string): number | null => {
+  const trimmed = v.trim();
+  if (!trimmed) return null;
+  const n = Number(trimmed);
+  if (!Number.isFinite(n)) return null;
+  return Math.max(1, Math.floor(Math.abs(n)));
+};
+
 function CouponsPage() {
   const { isAdmin, user } = useAuth();
   const { state } = usePos();
@@ -535,7 +547,7 @@ function CouponsPage() {
                   onChange={(e) =>
                     setDraft({
                       ...draft,
-                      maxClaims: e.target.value ? Number(e.target.value) : null,
+                      maxClaims: toCountOrNull(e.target.value),
                     })
                   }
                   placeholder="Unlimited"
@@ -552,7 +564,7 @@ function CouponsPage() {
                   onChange={(e) =>
                     setDraft({
                       ...draft,
-                      maxPerMember: e.target.value ? Number(e.target.value) : null,
+                      maxPerMember: toCountOrNull(e.target.value),
                     })
                   }
                   placeholder="1"
