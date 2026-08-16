@@ -3800,6 +3800,17 @@ function Register() {
               </div>
             ) : null}
           </div>
+          {racketMode && (
+            <div className="flex items-center justify-between gap-4 border-t border-border pt-2 text-sm">
+              <span className="text-muted-foreground">
+                Charges total <span className="numeric font-semibold text-foreground">{money(bookingTotal)}</span>
+              </span>
+              <span className="text-muted-foreground">
+                Paying now <span className="numeric font-semibold text-foreground">{money(bookingPaidNow)}</span> ·
+                Balance <span className="numeric font-semibold text-primary">{money(bookingBalance)}</span>
+              </span>
+            </div>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setBookOpen(false)}>
               Cancel
