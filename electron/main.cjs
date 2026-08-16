@@ -783,6 +783,14 @@ function registerIpc() {
     return { ok: true };
   });
   ipcMain.handle("local:rollback", (_e, op) => localDb.rollbackOp(op ?? {}));
+  /** Offline relationship check straight from the local mirror's catalogue. */
+  ipcMain.handle("local:relational-health", () => {
+    try {
+      return { ok: true, data: localDb.relationalHealth() };
+    } catch (err) {
+      return fail(err);
+    }
+  });
 
   /* branding mirror so first-run setup only ever runs once */
   ipcMain.handle("branding:read", () => ({ ok: true, branding: brandingStore.read() }));
