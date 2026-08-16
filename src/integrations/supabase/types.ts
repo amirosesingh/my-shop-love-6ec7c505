@@ -2826,6 +2826,7 @@ export type Database = {
         Returns: string
       }
       normalize_phone: { Args: { _phone: string }; Returns: string }
+      operational_relational_health: { Args: never; Returns: Json }
       pin_throttle_fail: {
         Args: {
           _key: string
