@@ -535,7 +535,7 @@ function CouponsPage() {
                   onChange={(e) =>
                     setDraft({
                       ...draft,
-                      maxClaims: e.target.value ? Number(e.target.value) : null,
+                      maxClaims: toCountOrNull(e.target.value),
                     })
                   }
                   placeholder="Unlimited"
@@ -552,7 +552,7 @@ function CouponsPage() {
                   onChange={(e) =>
                     setDraft({
                       ...draft,
-                      maxPerMember: e.target.value ? Number(e.target.value) : null,
+                      maxPerMember: toCountOrNull(e.target.value),
                     })
                   }
                   placeholder="1"
