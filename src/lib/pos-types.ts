@@ -139,15 +139,34 @@ export const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 export const lineUnitDiscount = (l: Pick<CartLine, "price" | "discount" | "discountType">) =>
   l.discountType === "percent" ? r2((l.price * (l.discount || 0)) / 100) : r2(l.discount || 0);
 
-export type PaymentMethod = "cash" | "card" | "wallet" | "points" | "bank_transfer";
+/**
+ * A payment method is a code from the configurable payment-types list, so an
+ * administrator can add tenders without a new build. The built-in codes below
+ * keep their dedicated register behaviour (change, points, card machine).
+ */
+export type PaymentMethod = string;
 
-export const PAYMENT_LABELS: Record<PaymentMethod, string> = {
+export const BUILT_IN_METHODS = {
+  cash: "cash",
+  card: "card",
+  wallet: "wallet",
+  points: "points",
+  bankTransfer: "bank_transfer",
+} as const;
+
+/** Labels for the built-in tenders; custom codes resolve at render time. */
+export const PAYMENT_LABELS: Record<string, string> = {
   cash: "Cash",
   card: "Card",
   wallet: "Wallet",
   points: "Points",
   bank_transfer: "Bank transfer",
 };
+
+/** Readable name for any stored method code, including deleted tenders. */
+export const methodLabel = (code: string) =>
+  PAYMENT_LABELS[code] ??
+  (code ? code.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase()) : "Unknown");
 
 /** One tender line on a split payment. A bill may carry several. */
 export type Payment = {
@@ -158,6 +177,12 @@ export type Payment = {
   bankName?: string;
   /** slip, approval or transfer reference */
   ref?: string;
+  /** voucher / coupon serial captured for a tender that demands one */
+  reference?: string;
+  /** extra details typed with the reference (issuer, batch, notes) */
+  referenceNote?: string;
+  /** the tender may not complete without `reference` */
+  requiresReference?: boolean;
   /** id of the configured payment account (card machine / bank / e-wallet) */
   accountId?: string;
 };
@@ -170,7 +195,7 @@ export const paymentsLabel = (ps: Payment[] | undefined) =>
   (ps ?? [])
     .map(
       (p) =>
-        `${PAYMENT_LABELS[p.method]}${p.bankName ? ` (${p.bankName})` : ""} ${p.amount.toFixed(2)}`,
+        `${methodLabel(p.method)}${p.bankName ? ` (${p.bankName})` : ""} ${p.amount.toFixed(2)}`,
     )
     .join(" + ");
 
@@ -204,6 +229,8 @@ export function validateTenders(total: number, tenders: Payment[]): TenderCheck 
     error = "Every tender needs an amount above zero";
   else if (tenders.some((t) => t.method === "card" && !t.bankName?.trim()))
     error = "Enter the bank / card machine used for every card tender";
+  else if (tenders.some((t) => t.requiresReference && !t.reference?.trim()))
+    error = "Enter the voucher / reference number for every tender that needs one";
   else if (balance > 0) error = `Short by ${balance.toFixed(2)}`;
   else if (nonCash > target) error = "Only cash tenders may exceed the bill total";
 
