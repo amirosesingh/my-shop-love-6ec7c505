@@ -2,7 +2,7 @@
  * "Schema & Feature Health" — every POS feature checked against the live
  * database with the exact query shapes the screens use. Nothing is written.
  */
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -93,9 +93,8 @@ export function FeatureSchemaReport() {
                 const failed = f.ops.filter((o) => !o.ok);
                 const expanded = open === f.id;
                 return (
-                  <>
+                  <Fragment key={f.id}>
                     <tr
-                      key={f.id}
                       className="cursor-pointer border-t border-border hover:bg-muted/30"
                       onClick={() => setOpen(expanded ? null : f.id)}
                     >
@@ -124,7 +123,7 @@ export function FeatureSchemaReport() {
                       </td>
                     </tr>
                     {expanded && (
-                      <tr key={`${f.id}-detail`} className="border-t border-border bg-muted/20">
+                      <tr className="border-t border-border bg-muted/20">
                         <td colSpan={3} className="px-3 py-2">
                           <ul className="space-y-2">
                             {f.ops.map((op) => (
@@ -143,7 +142,7 @@ export function FeatureSchemaReport() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 );
               })}
             </tbody>
