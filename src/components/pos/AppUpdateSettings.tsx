@@ -195,7 +195,7 @@ function DesktopUpdateCard() {
 
 /** Android till: APK manifest plus the live web bundle, no store involved. */
 function AndroidUpdateCard() {
-  const { state, available, check, install } = useAndroidUpdates();
+  const { state, available, check, install, installDownloaded } = useAndroidUpdates();
   const [bundle, setBundle] = useState<string | null>(null);
 
   const status = state.checking
@@ -284,9 +284,14 @@ function AndroidUpdateCard() {
           )}
           Check for updates now
         </Button>
-        {available && (
+        {available && !state.readyUri && (
           <Button className="touch-target" disabled={state.downloading} onClick={() => void install()}>
             {state.downloading ? "Downloading…" : "Download and install"}
+          </Button>
+        )}
+        {state.readyUri && (
+          <Button className="touch-target" onClick={() => void installDownloaded()}>
+            Update downloaded — tap to install
           </Button>
         )}
       </div>
