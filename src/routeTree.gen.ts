@@ -43,6 +43,7 @@ import { Route as PosRacketServiceRouteImport } from './routes/pos.racket-servic
 import { Route as ReportsIndexRouteImport } from './routes/reports.index'
 import { Route as ReportsActivityRouteImport } from './routes/reports.activity'
 import { Route as ReportsAnalyticsRouteImport } from './routes/reports.analytics'
+import { Route as ReportsBusinessRouteImport } from './routes/reports.business'
 import { Route as ReportsCatalogRouteImport } from './routes/reports.catalog'
 import { Route as ReportsCouponsRouteImport } from './routes/reports.coupons'
 import { Route as ReportsHistoryRouteImport } from './routes/reports.history'
@@ -267,6 +268,11 @@ const ReportsActivityRoute = ReportsActivityRouteImport.update({
 const ReportsAnalyticsRoute = ReportsAnalyticsRouteImport.update({
   id: '/reports/analytics',
   path: '/reports/analytics',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsBusinessRoute = ReportsBusinessRouteImport.update({
+  id: '/reports/business',
+  path: '/reports/business',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReportsCatalogRoute = ReportsCatalogRouteImport.update({
@@ -579,6 +585,7 @@ export interface FileRoutesByFullPath {
   '/pos/racket-service': typeof PosRacketServiceRoute
   '/reports/activity': typeof ReportsActivityRoute
   '/reports/analytics': typeof ReportsAnalyticsRoute
+  '/reports/business': typeof ReportsBusinessRoute
   '/reports/catalog': typeof ReportsCatalogRoute
   '/reports/coupons': typeof ReportsCouponsRoute
   '/reports/history': typeof ReportsHistoryRoute
@@ -670,6 +677,7 @@ export interface FileRoutesByTo {
   '/pos/racket-service': typeof PosRacketServiceRoute
   '/reports/activity': typeof ReportsActivityRoute
   '/reports/analytics': typeof ReportsAnalyticsRoute
+  '/reports/business': typeof ReportsBusinessRoute
   '/reports/catalog': typeof ReportsCatalogRoute
   '/reports/coupons': typeof ReportsCouponsRoute
   '/reports/history': typeof ReportsHistoryRoute
@@ -762,6 +770,7 @@ export interface FileRoutesById {
   '/pos/racket-service': typeof PosRacketServiceRoute
   '/reports/activity': typeof ReportsActivityRoute
   '/reports/analytics': typeof ReportsAnalyticsRoute
+  '/reports/business': typeof ReportsBusinessRoute
   '/reports/catalog': typeof ReportsCatalogRoute
   '/reports/coupons': typeof ReportsCouponsRoute
   '/reports/history': typeof ReportsHistoryRoute
@@ -855,6 +864,7 @@ export interface FileRouteTypes {
     | '/pos/racket-service'
     | '/reports/activity'
     | '/reports/analytics'
+    | '/reports/business'
     | '/reports/catalog'
     | '/reports/coupons'
     | '/reports/history'
@@ -946,6 +956,7 @@ export interface FileRouteTypes {
     | '/pos/racket-service'
     | '/reports/activity'
     | '/reports/analytics'
+    | '/reports/business'
     | '/reports/catalog'
     | '/reports/coupons'
     | '/reports/history'
@@ -1037,6 +1048,7 @@ export interface FileRouteTypes {
     | '/pos/racket-service'
     | '/reports/activity'
     | '/reports/analytics'
+    | '/reports/business'
     | '/reports/catalog'
     | '/reports/coupons'
     | '/reports/history'
@@ -1129,6 +1141,7 @@ export interface RootRouteChildren {
   PosRacketServiceRoute: typeof PosRacketServiceRoute
   ReportsActivityRoute: typeof ReportsActivityRoute
   ReportsAnalyticsRoute: typeof ReportsAnalyticsRoute
+  ReportsBusinessRoute: typeof ReportsBusinessRoute
   ReportsCatalogRoute: typeof ReportsCatalogRoute
   ReportsCouponsRoute: typeof ReportsCouponsRoute
   ReportsHistoryRoute: typeof ReportsHistoryRoute
@@ -1423,6 +1436,13 @@ declare module '@tanstack/react-router' {
       path: '/reports/analytics'
       fullPath: '/reports/analytics'
       preLoaderRoute: typeof ReportsAnalyticsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports/business': {
+      id: '/reports/business'
+      path: '/reports/business'
+      fullPath: '/reports/business'
+      preLoaderRoute: typeof ReportsBusinessRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reports/catalog': {
@@ -1861,6 +1881,7 @@ const rootRouteChildren: RootRouteChildren = {
   PosRacketServiceRoute: PosRacketServiceRoute,
   ReportsActivityRoute: ReportsActivityRoute,
   ReportsAnalyticsRoute: ReportsAnalyticsRoute,
+  ReportsBusinessRoute: ReportsBusinessRoute,
   ReportsCatalogRoute: ReportsCatalogRoute,
   ReportsCouponsRoute: ReportsCouponsRoute,
   ReportsHistoryRoute: ReportsHistoryRoute,
