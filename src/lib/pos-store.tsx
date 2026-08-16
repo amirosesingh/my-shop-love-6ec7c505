@@ -1904,9 +1904,9 @@ export function PosProvider({ children }: { children: ReactNode }) {
     });
     // Stock already left the sender at dispatch, so the database only books
     // the goods in — and re-maps them when the branches sit in different groups.
-    void receiveTransferInDb(id, actorRef.current).catch((e: unknown) =>
-      dbError("Receiving transfer", e as Error),
-    );
+    void receiveTransferInDb(id, actorRef.current).then((r) => {
+      if (!r.success) dbError("Receiving transfer", new Error(r.error ?? "Unknown error"));
+    });
     const transfer = stateRef.current.transfers.find((x) => x.id === id);
     logger.log("inventory", "Stock transfer received", "transfers", {
       transferId: id,

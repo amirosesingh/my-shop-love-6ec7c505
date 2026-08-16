@@ -12,6 +12,11 @@ export type SettingsTab = {
   blurb: string;
   /** Intentionally reachable from two parents — not a duplicate. */
   shared?: boolean;
+  /**
+   * System diagnostics render inside `/settings/system?tab=<id>` instead of
+   * their own page, so the whole area reads as one window.
+   */
+  tab?: SystemTabId;
 };
 
 export type SettingsGroup = {
@@ -61,15 +66,72 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     label: "System & general",
     blurb: "Connection health, data sync, security and code health.",
     tabs: [
-      { to: "/settings/system", label: "System status", blurb: "Connections, recovery tools and domains." },
-      { to: "/settings/diagnostics", label: "Database health", blurb: "Table links, orphan records and read/write checks." },
-      { to: "/settings/logic-health", label: "Logic health", blurb: "Unfinished logic, dead actions and missing guards." },
-      { to: "/settings/security-alerts", label: "Security alerts", blurb: "Scan findings and posture checks." },
-      { to: "/settings/data-sync", label: "Data sync & audit", blurb: "Live sync status and the audit ledger." },
-      { to: "/settings/inheritance", label: "Inheritance", blurb: "Global, cluster and branch tiers." },
+      {
+        to: "/settings/system",
+        tab: "system",
+        label: "System status",
+        blurb: "Connections, recovery tools and domains.",
+      },
+      {
+        to: "/settings/system",
+        tab: "database-health",
+        label: "Database health",
+        blurb: "Table links, orphan records and read/write checks.",
+        shared: true,
+      },
+      {
+        to: "/settings/system",
+        tab: "logic-health",
+        label: "Logic health",
+        blurb: "Unfinished logic, dead actions and missing guards.",
+        shared: true,
+      },
+      {
+        to: "/settings/system",
+        tab: "security-alerts",
+        label: "Security alerts",
+        blurb: "Scan findings and posture checks.",
+        shared: true,
+      },
+      {
+        to: "/settings/system",
+        tab: "data-sync",
+        label: "Data sync & audit",
+        blurb: "Live sync status and the audit ledger.",
+        shared: true,
+      },
+      {
+        to: "/settings/system",
+        tab: "inheritance",
+        label: "Inheritance",
+        blurb: "Global, cluster and branch tiers.",
+        shared: true,
+      },
     ],
   },
 ];
+
+/** Tabs of the System & general hub, rendered in place rather than as routes. */
+export const SYSTEM_TAB_IDS = [
+  "system",
+  "database-health",
+  "logic-health",
+  "security-alerts",
+  "data-sync",
+  "inheritance",
+] as const;
+
+export type SystemTabId = (typeof SYSTEM_TAB_IDS)[number];
+
+/** Heading and blurb for the panel currently mounted in the hub. */
+export function systemTab(id: SystemTabId): { label: string; blurb: string } {
+  const group = SETTINGS_GROUPS.find((g) => g.id === "system");
+  const tab = group?.tabs.find((t) => t.tab === id);
+  return {
+    label: tab?.label ?? "System & general",
+    blurb: tab?.blurb ?? "Connection health, data sync, security and code health.",
+  };
+}
 
 /** The group a settings route belongs to, if any. */
 export function groupForRoute(route: string): SettingsGroup | null {

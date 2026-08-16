@@ -75,6 +75,8 @@ type Props = {
   showPreview?: boolean;
   /** Scopable blocks this page edits — renders the Global/Cluster/Branch/Private selector. */
   scopeSections?: SettingsSectionId[];
+  /** Diagnostics pages need the whole window: tables and graphs, no reading column. */
+  wide?: boolean;
 };
 
 export function SettingsFrame({
@@ -84,6 +86,7 @@ export function SettingsFrame({
   branchAware = false,
   showPreview = false,
   scopeSections,
+  wide = false,
 }: Props) {
   const { state, stores, currentStore, updateSettings, upsertStore } = usePos();
   const { isAdmin, can } = useAuth();
@@ -269,7 +272,9 @@ export function SettingsFrame({
   return (
     <AppShell>
       <SettingsCtx.Provider value={ctx}>
-        <div className="mx-auto w-full max-w-4xl space-y-5 p-6">
+        <div
+          className={`mx-auto w-full space-y-5 p-6 ${wide ? "max-w-full" : "max-w-4xl"}`}
+        >
           {/* Stays visible while the page scrolls, so there is always a way back. */}
           <div className="sticky top-0 z-20 -mx-6 -mt-6 border-b border-border bg-background/95 px-4 py-2 backdrop-blur">
             <Button asChild variant="ghost" size="sm" className="h-8 text-xs">
@@ -339,7 +344,9 @@ export function SettingsFrame({
 
           {scopeSections?.length ? <ScopePanel sections={scopeSections} /> : null}
 
-          <section className="space-y-4 rounded-lg border border-border bg-card p-5">{children}</section>
+          <section className="w-full min-w-0 max-w-full space-y-4 rounded-lg border border-border bg-card p-5">
+            {children}
+          </section>
 
           {/* Nothing is considered stored until this bar confirms it. */}
           <div className="sticky bottom-0 -mx-6 flex flex-wrap items-center gap-3 border-t border-border bg-background/95 px-6 py-3 backdrop-blur">
