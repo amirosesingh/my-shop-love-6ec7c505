@@ -935,6 +935,7 @@ export type Database = {
           id: string
           kind: string
           member_id: string | null
+          metadata: Json | null
           method: string
           note: string
           paid_at: string
@@ -943,6 +944,7 @@ export type Database = {
           sale_id: string | null
           shift_id: string | null
           source_type: string
+          status: string | null
           store_id: string | null
           terminal_id: string | null
           updated_at: string
@@ -956,6 +958,7 @@ export type Database = {
           id?: string
           kind?: string
           member_id?: string | null
+          metadata?: Json | null
           method?: string
           note?: string
           paid_at?: string
@@ -964,6 +967,7 @@ export type Database = {
           sale_id?: string | null
           shift_id?: string | null
           source_type: string
+          status?: string | null
           store_id?: string | null
           terminal_id?: string | null
           updated_at?: string
@@ -977,6 +981,7 @@ export type Database = {
           id?: string
           kind?: string
           member_id?: string | null
+          metadata?: Json | null
           method?: string
           note?: string
           paid_at?: string
@@ -985,6 +990,7 @@ export type Database = {
           sale_id?: string | null
           shift_id?: string | null
           source_type?: string
+          status?: string | null
           store_id?: string | null
           terminal_id?: string | null
           updated_at?: string
