@@ -362,8 +362,25 @@ function SettingsHub() {
             </div>
 
             {term ? (
-              matches.length ? (
+              matches.length || quickMatches.length ? (
                 <div className="grid gap-3 sm:grid-cols-2">
+                  {quickMatches.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => setQuickId(c.id)}
+                      className="flex items-start gap-3 rounded-lg border border-border bg-card p-4 text-left transition-colors hover:border-primary/60"
+                    >
+                      <c.icon className="mt-0.5 size-5 shrink-0 text-primary" />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-medium">{c.label}</span>
+                        <span className="block text-xs text-muted-foreground">{c.blurb}</span>
+                        <span className="mt-1 block text-[11px] text-muted-foreground">
+                          Opens here
+                        </span>
+                      </span>
+                    </button>
+                  ))}
                   {matches.map((p) => (
                     <Link
                       key={p.to}
@@ -388,6 +405,26 @@ function SettingsHub() {
               )
             ) : (
               <>
+            <section className="space-y-3">
+              <h2 className="text-sm font-semibold">Quick access</h2>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {QUICK_CARDS.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setQuickId(c.id)}
+                    className="flex items-start gap-3 rounded-lg border border-border bg-card p-4 text-left transition-colors hover:border-primary/60"
+                  >
+                    <c.icon className="mt-0.5 size-5 shrink-0 text-primary" />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium">{c.label}</span>
+                      <span className="block text-xs text-muted-foreground">{c.blurb}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {groups.map((g) => {
                 const Icon = (g.pages as readonly SettingsPage[])[0]?.icon ?? MonitorCog;
