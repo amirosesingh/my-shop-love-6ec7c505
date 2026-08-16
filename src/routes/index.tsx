@@ -3244,7 +3244,7 @@ function Register() {
         <DialogContent
           className={
             racketMode
-              ? "flex h-[92vh] max-h-[92vh] w-[96vw] max-w-[1280px] flex-col"
+              ? "flex h-[92vh] max-h-[92vh] w-[94vw] max-w-[720px] flex-col"
               : "flex h-[90vh] max-h-[90vh] w-[94vw] max-w-[1040px] flex-col"
           }
         >
@@ -3254,7 +3254,7 @@ function Register() {
           <div
             className={`-mr-2 flex-1 overflow-y-auto pr-2 ${
               racketMode
-                ? "space-y-3 xl:grid xl:grid-cols-3 xl:items-start xl:gap-3 xl:space-y-0 [&>*]:mb-3"
+                ? "space-y-3"
                 : "space-y-3 lg:grid lg:grid-cols-2 lg:items-start lg:gap-3 lg:space-y-0 [&>*]:mb-3"
             }`}
           >
