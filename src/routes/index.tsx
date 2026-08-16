@@ -3256,20 +3256,25 @@ function Register() {
                 <span className="text-muted-foreground">Booking total</span>
                 <span className="numeric font-semibold">{money(bookingTotal)}</span>
               </div>
+              {bookingMinDeposit > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Minimum deposit</span>
+                  <span className="numeric font-medium">{money(bookingMinDeposit)}</span>
+                </div>
+              )}
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Balance after deposit</span>
-                <span className="numeric font-semibold text-primary">
-                  {money(
-                    r2(
-                      Math.max(
-                        0,
-                        bookingTotal -
-                          (payTiming === "collection" ? 0 : payTiming === "now" ? bookingTotal : Number(deposit || 0)),
-                      ),
-                    ),
-                  )}
-                </span>
+                <span className="text-muted-foreground">Paying now</span>
+                <span className="numeric font-medium">{money(bookingPaidNow)}</span>
               </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Balance on collection</span>
+                <span className="numeric font-semibold text-primary">{money(bookingBalance)}</span>
+              </div>
+              {bookingDepositShort && (
+                <p className="mt-1 rounded bg-destructive/10 px-2 py-1 text-[11px] font-medium text-destructive">
+                  This branch needs at least {money(bookingMinDeposit)} up front — {money(bookingPaidNow)} entered.
+                </p>
+              )}
               <p className="mt-1 text-[11px] text-muted-foreground">
                 {racketMode
                   ? `Job taken at ${currentStore.name} — no cart items needed.`
