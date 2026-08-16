@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { History, Plus, Printer, Search, Trash2 } from "lucide-react";
+import { BadgeCheck, History, Plus, Printer, Search, ShieldCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { notifyError } from "@/lib/notify";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
@@ -20,6 +20,8 @@ import { money, usePos } from "@/lib/pos-store";
 import type { Member } from "@/lib/pos-types";
 import { printMemberStatement } from "@/lib/pos-print";
 import { MemberHistoryDialog } from "@/components/pos/MemberHistoryDialog";
+import { OtpVerificationModal } from "@/components/pos/OtpVerificationModal";
+import { useVerificationGateway } from "@/lib/verification-gateway";
 
 export const Route = createFileRoute("/members")({
   head: () => ({
@@ -54,6 +56,8 @@ function Members() {
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState<Member | null>(null);
   const [historyMember, setHistoryMember] = useState<Member | null>(null);
+  const [verifyMember, setVerifyMember] = useState<Member | null>(null);
+  const gateway = useVerificationGateway();
 
   const rows = state.members.filter((m) =>
     `${m.name} ${m.code} ${m.phone} ${m.email}`.toLowerCase().includes(query.toLowerCase()),
@@ -102,6 +106,12 @@ function Members() {
                     <p className="numeric text-[11px] text-muted-foreground">
                       {m.code} · joined {m.joinedAt}
                     </p>
+                    {m.verified && (
+                      <span className="mt-1 inline-flex items-center gap-1 text-[11px] text-primary">
+                        <BadgeCheck className="size-3.5" /> Verified
+                        {m.verifiedChannel ? ` · ${m.verifiedChannel}` : ""}
+                      </span>
+                    )}
                   </div>
                   <Badge
                     variant="outline"
@@ -135,6 +145,11 @@ function Members() {
                   >
                     <Printer className="size-4" /> Statement
                   </Button>
+                  {gateway?.active && !m.verified && (
+                    <Button size="sm" variant="outline" onClick={() => setVerifyMember(m)}>
+                      <ShieldCheck className="size-4" /> Verify
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="ghost"
@@ -153,6 +168,23 @@ function Members() {
       </div>
 
       <MemberHistoryDialog member={historyMember} onOpenChange={(o) => !o && setHistoryMember(null)} />
+
+      {verifyMember && (
+        <OtpVerificationModal
+          open
+          onOpenChange={(o) => !o && setVerifyMember(null)}
+          member={{
+            id: verifyMember.id,
+            name: verifyMember.name,
+            phone: verifyMember.phone,
+            email: verifyMember.email,
+          }}
+          onVerified={() => {
+            void upsertMember({ ...verifyMember, verified: true });
+            setVerifyMember(null);
+          }}
+        />
+      )}
 
       <Dialog open={!!draft} onOpenChange={(o) => !o && setDraft(null)}>
         <DialogContent>

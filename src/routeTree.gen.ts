@@ -34,6 +34,7 @@ import { Route as StockOperationsRouteImport } from './routes/stock-operations'
 import { Route as StoresRouteImport } from './routes/stores'
 import { Route as SuppliersRouteImport } from './routes/suppliers'
 import { Route as TransfersRouteImport } from './routes/transfers'
+import { Route as VerificationsRouteImport } from './routes/verifications'
 import { Route as ApiCashierLoginRouteImport } from './routes/api/cashier-login'
 import { Route as ApiSettingsRouteImport } from './routes/api/settings'
 import { Route as CTokenSlugRouteImport } from './routes/c.$tokenSlug'
@@ -223,6 +224,11 @@ const SuppliersRoute = SuppliersRouteImport.update({
 const TransfersRoute = TransfersRouteImport.update({
   id: '/transfers',
   path: '/transfers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VerificationsRoute = VerificationsRouteImport.update({
+  id: '/verifications',
+  path: '/verifications',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiCashierLoginRoute = ApiCashierLoginRouteImport.update({
@@ -577,6 +583,7 @@ export interface FileRoutesByFullPath {
   '/stores': typeof StoresRoute
   '/suppliers': typeof SuppliersRoute
   '/transfers': typeof TransfersRoute
+  '/verifications': typeof VerificationsRoute
   '/api/cashier-login': typeof ApiCashierLoginRoute
   '/api/settings': typeof ApiSettingsRouteWithChildren
   '/c/$tokenSlug': typeof CTokenSlugRoute
@@ -669,6 +676,7 @@ export interface FileRoutesByTo {
   '/stores': typeof StoresRoute
   '/suppliers': typeof SuppliersRoute
   '/transfers': typeof TransfersRoute
+  '/verifications': typeof VerificationsRoute
   '/api/cashier-login': typeof ApiCashierLoginRoute
   '/api/settings': typeof ApiSettingsRouteWithChildren
   '/c/$tokenSlug': typeof CTokenSlugRoute
@@ -762,6 +770,7 @@ export interface FileRoutesById {
   '/stores': typeof StoresRoute
   '/suppliers': typeof SuppliersRoute
   '/transfers': typeof TransfersRoute
+  '/verifications': typeof VerificationsRoute
   '/api/cashier-login': typeof ApiCashierLoginRoute
   '/api/settings': typeof ApiSettingsRouteWithChildren
   '/c/$tokenSlug': typeof CTokenSlugRoute
@@ -856,6 +865,7 @@ export interface FileRouteTypes {
     | '/stores'
     | '/suppliers'
     | '/transfers'
+    | '/verifications'
     | '/api/cashier-login'
     | '/api/settings'
     | '/c/$tokenSlug'
@@ -948,6 +958,7 @@ export interface FileRouteTypes {
     | '/stores'
     | '/suppliers'
     | '/transfers'
+    | '/verifications'
     | '/api/cashier-login'
     | '/api/settings'
     | '/c/$tokenSlug'
@@ -1040,6 +1051,7 @@ export interface FileRouteTypes {
     | '/stores'
     | '/suppliers'
     | '/transfers'
+    | '/verifications'
     | '/api/cashier-login'
     | '/api/settings'
     | '/c/$tokenSlug'
@@ -1133,6 +1145,7 @@ export interface RootRouteChildren {
   StoresRoute: typeof StoresRoute
   SuppliersRoute: typeof SuppliersRoute
   TransfersRoute: typeof TransfersRoute
+  VerificationsRoute: typeof VerificationsRoute
   ApiCashierLoginRoute: typeof ApiCashierLoginRoute
   ApiSettingsRoute: typeof ApiSettingsRouteWithChildren
   CTokenSlugRoute: typeof CTokenSlugRoute
@@ -1373,6 +1386,13 @@ declare module '@tanstack/react-router' {
       path: '/transfers'
       fullPath: '/transfers'
       preLoaderRoute: typeof TransfersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/verifications': {
+      id: '/verifications'
+      path: '/verifications'
+      fullPath: '/verifications'
+      preLoaderRoute: typeof VerificationsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/cashier-login': {
@@ -1873,6 +1893,7 @@ const rootRouteChildren: RootRouteChildren = {
   StoresRoute: StoresRoute,
   SuppliersRoute: SuppliersRoute,
   TransfersRoute: TransfersRoute,
+  VerificationsRoute: VerificationsRoute,
   ApiCashierLoginRoute: ApiCashierLoginRoute,
   ApiSettingsRoute: ApiSettingsRouteWithChildren,
   CTokenSlugRoute: CTokenSlugRoute,

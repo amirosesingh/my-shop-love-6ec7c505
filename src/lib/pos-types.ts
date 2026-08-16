@@ -100,6 +100,10 @@ export type Member = {
   homeStoreId?: string;
   /** date of birth, ISO yyyy-mm-dd — powers birthday promotions */
   birthday?: string;
+  /** set once the member has read back a one-time code; never edited by hand */
+  verified?: boolean;
+  verifiedAt?: string;
+  verifiedChannel?: string;
 };
 
 export type CartLine = {

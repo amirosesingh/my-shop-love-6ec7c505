@@ -16,7 +16,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
+import { OtpVerificationModal } from "@/components/pos/OtpVerificationModal";
 import { usePos } from "@/lib/pos-store";
+import { useVerificationGateway } from "@/lib/verification-gateway";
 import type { Member } from "@/lib/pos-types";
 
 const looksNumeric = (v: string) => /^[\d+\s-]+$/.test(v.trim());
@@ -38,6 +40,8 @@ export function QuickMemberDialog({
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [tier, setTier] = useState<Member["tier"]>("Bronze");
+  const [verifying, setVerifying] = useState<Member | null>(null);
+  const gateway = useVerificationGateway();
 
   useEffect(() => {
     if (!open) return;
@@ -68,7 +72,28 @@ export function QuickMemberDialog({
     onOpenChange(false);
     toast.success(`${member.name} enrolled and attached`);
     onCreated(member);
+    // Strict gateways want the number proven before the member earns points.
+    if (gateway?.active && (member.phone || member.email)) setVerifying(member);
   };
+
+  if (verifying) {
+    return (
+      <OtpVerificationModal
+        open
+        onOpenChange={(o) => !o && setVerifying(null)}
+        member={{
+          id: verifying.id,
+          name: verifying.name,
+          phone: verifying.phone,
+          email: verifying.email,
+        }}
+        onVerified={() => {
+          upsertMember({ ...verifying, verified: true });
+          setVerifying(null);
+        }}
+      />
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
