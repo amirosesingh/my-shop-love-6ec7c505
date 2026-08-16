@@ -123,6 +123,7 @@ const toRow = (c: Campaign): Row => ({
   scope_value: c.scopeValue || null,
   max_claims: c.maxClaims ?? null,
   max_per_member: c.maxPerMember ?? null,
+  claims_count: Number.isFinite(Number(c.claimsCount)) ? Number(c.claimsCount) : 0,
   starts_at: c.startsAt || null,
   expires_at: c.expiresAt || null,
   is_active: c.isActive,
