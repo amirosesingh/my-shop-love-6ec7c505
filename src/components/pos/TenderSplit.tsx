@@ -12,6 +12,7 @@ import {
   type PaymentMethod,
 } from "@/lib/pos-types";
 import { usePos } from "@/lib/pos-store";
+import { notifyError } from "@/lib/notify";
 
 const RECENT_BANKS_KEY = "pos.recent-banks";
 const money = (n: number) => n.toFixed(2);
@@ -75,11 +76,21 @@ export function TenderSplit({ total, tenders, onChange, onBeforeAdd }: Props) {
     onChange(tenders.map((t, ti) => (ti === i ? { ...t, ...next } : t)));
 
   const addTender = async () => {
-    if (onBeforeAdd && !(await onBeforeAdd())) return;
-    onChange([
-      ...tenders,
-      { id: crypto.randomUUID(), method: tenders.length === 0 ? "cash" : "card", amount: outstanding },
-    ]);
+    // The manager-override check can fail on a dropped connection; a payment
+    // line must never appear unless that check actually passed.
+    try {
+      if (onBeforeAdd && !(await onBeforeAdd())) return;
+      onChange([
+        ...tenders,
+        {
+          id: crypto.randomUUID(),
+          method: tenders.length === 0 ? "cash" : "card",
+          amount: outstanding,
+        },
+      ]);
+    } catch (e) {
+      notifyError(e, "Could not add the payment line");
+    }
   };
 
   /** Remaining for a given line = bill total minus every other line. */

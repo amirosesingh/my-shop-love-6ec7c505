@@ -165,7 +165,11 @@ function CouponsPage() {
     if (!slug) return toast.error("Give the campaign a link slug");
     setSaving(true);
     try {
-      await saveCampaign({ ...draft, slug });
+      const res = await saveCampaign({ ...draft, slug });
+      if (!res.success) {
+        toast.error(res.error ?? "Could not save the campaign");
+        return;
+      }
       toast.success("Campaign saved");
       setDraft(null);
       await refresh();
@@ -179,7 +183,11 @@ function CouponsPage() {
   async function remove(c: Campaign) {
     if (!confirm(`Delete “${c.name}” and every voucher issued from it?`)) return;
     try {
-      await deleteCampaign(c.id);
+      const res = await deleteCampaign(c.id);
+      if (!res.success) {
+        toast.error(res.error ?? "Could not delete the campaign");
+        return;
+      }
       toast.success("Campaign deleted");
       await refresh();
     } catch (e) {
@@ -188,8 +196,14 @@ function CouponsPage() {
   }
 
   const copyLink = async (c: Campaign) => {
-    await navigator.clipboard.writeText(claimUrl(c.slug));
-    toast.success("Claim link copied");
+    // Clipboard access is refused outright in some browsers and kiosks, so the
+    // link is shown instead of the copy silently doing nothing.
+    try {
+      await navigator.clipboard.writeText(claimUrl(c.slug));
+      toast.success("Claim link copied");
+    } catch {
+      toast.error("Could not copy — copy it by hand", { description: claimUrl(c.slug) });
+    }
   };
 
   if (!isAdmin) {
