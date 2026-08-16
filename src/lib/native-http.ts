@@ -10,6 +10,27 @@
 import { isElectron, isNative } from "./native";
 
 /**
+ * Warn the operator once per session when the native network bridge cannot
+ * serve a request and we quietly fall back to the webview's own `fetch`.
+ * Without this the failure is invisible and the slower path looks like a bug.
+ */
+const warned = new Set<string>();
+
+function warnBridgeUnavailable(operation: string, err: unknown) {
+  const detail = err instanceof Error ? err.message : String(err);
+  console.warn(`[native-http] ${operation}: native bridge unavailable — ${detail}`);
+  if (typeof window === "undefined" || warned.has(operation)) return;
+  warned.add(operation);
+  void import("sonner")
+    .then(({ toast }) =>
+      toast.warning("Native network bridge unavailable", {
+        description: `${operation} is not supported by this device shell — retrying through the app browser.`,
+      }),
+    )
+    .catch(() => {});
+}
+
+/**
  * Desktop bridge for the same job: the till window is served from
  * 127.0.0.1, so the update bucket is cross-origin and the browser blocks the
  * response. The main process has no such restriction.
