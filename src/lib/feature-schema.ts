@@ -297,6 +297,196 @@ export const FEATURES: FeatureDef[] = [
       },
     ],
   },
+  {
+    id: "inventory",
+    name: "Inventory & item activity",
+    ops: [
+      {
+        label: "Product saved from the catalogue",
+        table: "products",
+        kind: "write",
+        source: "src/lib/pos-db.ts (productToRow)",
+        columns: [
+          "barcode", "name", "sku", "category", "sub_category", "product_group", "brand", "unit",
+          "cost_price", "selling_price", "ecom_price", "ecom_visible", "stock_quantity",
+          "stock_by_store", "reorder_level", "tax_rate", "custom_points", "point_multiplier",
+          "packs", "barcode_aliases", "barcode_variants", "is_archived", "archived_at",
+        ],
+      },
+      {
+        label: "Extra barcodes and pack sizes",
+        table: "product_barcodes",
+        kind: "write",
+        source: "src/lib/pos-db.ts (product barcode rows)",
+        columns: ["product_id", "barcode", "label", "pack_size", "is_primary"],
+      },
+      {
+        label: "Category tree read",
+        table: "product_categories",
+        kind: "read",
+        source: "src/lib/taxonomy.ts (loadCategories)",
+        columns: ["id", "name", "parent_id", "kind", "sort"],
+      },
+      {
+        label: "Item history drawer",
+        table: "item_activity_logs",
+        kind: "read",
+        source: "src/components/pos/ItemActivityDrawer.tsx",
+        columns: [
+          "id", "product_id", "product_name", "sku", "store_id", "activity_type", "reference",
+          "quantity_delta", "stock_before", "stock_after", "unit_cost", "staff_name", "note",
+          "created_at",
+        ],
+      },
+    ],
+  },
+  {
+    id: "purchasing",
+    name: "Purchasing & suppliers",
+    ops: [
+      {
+        label: "Purchase order header saved",
+        table: "purchase_orders",
+        kind: "write",
+        source: "src/routes/purchasing.tsx (savePurchaseOrder)",
+        columns: [
+          "po_number", "supplier_id", "supplier_name", "operator_name", "store_id", "store_code",
+          "invoice_date", "invoice_entry_date", "total_cost", "total_items_count",
+        ],
+      },
+      {
+        label: "Purchase order lines",
+        table: "purchase_order_items",
+        kind: "write",
+        source: "src/routes/purchasing.tsx (line rows)",
+        columns: [
+          "po_id", "product_id", "barcode", "sku", "product_name", "cost_price", "selling_price",
+          "quantity_received", "subtotal_cost",
+        ],
+      },
+      {
+        label: "Supplier book",
+        table: "suppliers",
+        kind: "write",
+        source: "src/routes/suppliers.tsx (saveSupplier)",
+        columns: [
+          "name", "contact_name", "phone", "email", "address", "tax_number", "notes", "is_active",
+        ],
+      },
+    ],
+  },
+  {
+    id: "shifts",
+    name: "Shifts & cash-up",
+    ops: [
+      {
+        label: "Shift opened / closed",
+        table: "shifts",
+        kind: "write",
+        source: "src/lib/pos-db.ts (shiftToRow)",
+        columns: [
+          "store_id", "terminal_id", "terminal_name", "opened_by_name", "opened_by_staff_id",
+          "opened_by_role", "closed_by_name", "closed_by_staff_id", "closed_by_role", "opened_at",
+          "closed_at", "opening_float", "closing_float", "counted_cash", "expected_cash", "note",
+          "overdue", "status",
+        ],
+      },
+      {
+        label: "Mid-shift staff sign-ins",
+        table: "shift_sessions",
+        kind: "write",
+        source: "src/lib/pos-db.ts (shiftSessionToRow)",
+        columns: [
+          "shift_id", "store_id", "terminal_id", "terminal_name", "staff_id", "staff_name", "role",
+          "signed_in_at", "signed_out_at",
+        ],
+      },
+      {
+        label: "Cash drawer opens",
+        table: "drawer_events",
+        kind: "write",
+        source: "src/lib/drawer.ts (recordDrawerEvent)",
+        columns: [
+          "store_id", "terminal_id", "shift_id", "staff_id", "staff_name", "role", "reason",
+          "note", "approved_by",
+        ],
+      },
+    ],
+  },
+  {
+    id: "held-audit",
+    name: "Held orders & audit trail",
+    ops: [
+      {
+        label: "Ticket parked at the till",
+        table: "held_orders",
+        kind: "write",
+        source: "src/lib/held-orders.ts (saveHold)",
+        pk: "id",
+        columns: [
+          "label", "store_id", "shift_id", "held_by", "total", "lines", "cart_discount",
+          "cart_discount_type", "exchange_ref", "member_id", "member_name", "coupon", "note",
+          "cancelled_from", "held_at",
+        ],
+      },
+      {
+        label: "Activity feed entries",
+        table: "activity_events",
+        kind: "read",
+        source: "src/components/pos/ActivityBell.tsx",
+        columns: [
+          "id", "event_type", "severity", "title", "message", "actor_name", "terminal_name",
+          "store_id", "amount", "created_at",
+        ],
+      },
+      {
+        label: "Human-readable audit log",
+        table: "audit_logs",
+        kind: "read",
+        source: "src/routes/audit.tsx",
+        columns: [
+          "id", "user_name", "action_category", "action_name", "target_module", "details",
+          "created_at",
+        ],
+      },
+    ],
+  },
+  {
+    id: "coupons",
+    name: "Coupons & promotions",
+    ops: [
+      {
+        label: "Campaign saved",
+        table: "coupon_campaigns",
+        kind: "write",
+        source: "src/lib/coupons.ts (saveCampaign)",
+        columns: [
+          "name", "slug", "discount_type", "discount_value", "scope", "scope_value", "max_claims",
+          "max_per_member", "starts_at", "expires_at", "is_active", "is_welcome",
+        ],
+      },
+      {
+        label: "Promotion rules read by the cart",
+        table: "promotions",
+        kind: "read",
+        source: "src/lib/pos-promotions.ts",
+        columns: [
+          "id", "title", "promo_type", "min_spend", "discount_percent", "discount_amount",
+          "foc_product_id", "points_per_dollar", "tier_rates", "is_active", "start_date", "end_date",
+        ],
+      },
+      {
+        label: "Coupon audit trail",
+        table: "coupon_events",
+        kind: "read",
+        source: "src/components/pos/CouponAuditLog.tsx",
+        columns: [
+          "id", "event_type", "campaign_id", "campaign_name", "voucher_token", "member_id",
+          "store_id", "staff_name", "sale_id", "created_at",
+        ],
+      },
+    ],
+  },
 ];
 
 /* ------------------------------------------------------------------ */
