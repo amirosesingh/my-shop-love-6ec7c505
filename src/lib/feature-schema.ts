@@ -332,10 +332,13 @@ async function loadShapes(): Promise<Record<string, TableShape>> {
   if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`${url}/rest/v1/`, { headers });
   if (res.status === 401 || res.status === 403) {
+    // A PIN-signed till has no cloud account, and some staff accounts are not
+    // allowed to read the table list. Ask our own server instead: it proves
+    // the device and reads the list centrally.
+    const relayed = await relayTableShapes();
+    if (relayed.ok) return toShapes(relayed.tables);
     throw new Error(
-      token
-        ? "This account is not allowed to read the database's table list. Sign in with a staff account that has full access."
-        : "Sign in with a staff account to run the database checks.",
+      `The database would not hand this device its table list, and the server check also failed: ${relayed.error}`,
     );
   }
   if (!res.ok) throw new Error(`The database did not publish its table list (HTTP ${res.status})`);

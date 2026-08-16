@@ -87,6 +87,7 @@ import { Route as SettingsUpdatesRouteImport } from './routes/settings.updates'
 import { Route as SettingsVisibilityRouteImport } from './routes/settings.visibility'
 import { Route as SettingsWhatsappRouteImport } from './routes/settings.whatsapp'
 import { Route as ApiPublicCashierLoginRouteImport } from './routes/api/public/cashier-login'
+import { Route as ApiPublicHealthMetadataRouteImport } from './routes/api/public/health-metadata'
 import { Route as ApiPublicSecurityAlertsRouteImport } from './routes/api/public/security-alerts'
 import { Route as ApiPublicSyncRouteImport } from './routes/api/public/sync'
 import { Route as ApiPublicSyncHealthRouteImport } from './routes/api/public/sync-health'
@@ -485,6 +486,11 @@ const ApiPublicCashierLoginRoute = ApiPublicCashierLoginRouteImport.update({
   path: '/api/public/cashier-login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHealthMetadataRoute = ApiPublicHealthMetadataRouteImport.update({
+  id: '/api/public/health-metadata',
+  path: '/api/public/health-metadata',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicSecurityAlertsRoute = ApiPublicSecurityAlertsRouteImport.update({
   id: '/api/public/security-alerts',
   path: '/api/public/security-alerts',
@@ -600,6 +606,7 @@ export interface FileRoutesByFullPath {
   '/reports/': typeof ReportsIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/api/public/cashier-login': typeof ApiPublicCashierLoginRoute
+  '/api/public/health-metadata': typeof ApiPublicHealthMetadataRoute
   '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
   '/api/public/sync': typeof ApiPublicSyncRoute
   '/api/public/sync-health': typeof ApiPublicSyncHealthRoute
@@ -687,6 +694,7 @@ export interface FileRoutesByTo {
   '/reports': typeof ReportsIndexRoute
   '/settings': typeof SettingsIndexRoute
   '/api/public/cashier-login': typeof ApiPublicCashierLoginRoute
+  '/api/public/health-metadata': typeof ApiPublicHealthMetadataRoute
   '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
   '/api/public/sync': typeof ApiPublicSyncRoute
   '/api/public/sync-health': typeof ApiPublicSyncHealthRoute
@@ -775,6 +783,7 @@ export interface FileRoutesById {
   '/reports/': typeof ReportsIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/api/public/cashier-login': typeof ApiPublicCashierLoginRoute
+  '/api/public/health-metadata': typeof ApiPublicHealthMetadataRoute
   '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
   '/api/public/sync': typeof ApiPublicSyncRoute
   '/api/public/sync-health': typeof ApiPublicSyncHealthRoute
@@ -864,6 +873,7 @@ export interface FileRouteTypes {
     | '/reports/'
     | '/settings/'
     | '/api/public/cashier-login'
+    | '/api/public/health-metadata'
     | '/api/public/security-alerts'
     | '/api/public/sync'
     | '/api/public/sync-health'
@@ -951,6 +961,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/settings'
     | '/api/public/cashier-login'
+    | '/api/public/health-metadata'
     | '/api/public/security-alerts'
     | '/api/public/sync'
     | '/api/public/sync-health'
@@ -1038,6 +1049,7 @@ export interface FileRouteTypes {
     | '/reports/'
     | '/settings/'
     | '/api/public/cashier-login'
+    | '/api/public/health-metadata'
     | '/api/public/security-alerts'
     | '/api/public/sync'
     | '/api/public/sync-health'
@@ -1126,6 +1138,7 @@ export interface RootRouteChildren {
   ReportsIndexRoute: typeof ReportsIndexRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
   ApiPublicCashierLoginRoute: typeof ApiPublicCashierLoginRoute
+  ApiPublicHealthMetadataRoute: typeof ApiPublicHealthMetadataRoute
   ApiPublicSecurityAlertsRoute: typeof ApiPublicSecurityAlertsRoute
   ApiPublicSyncRoute: typeof ApiPublicSyncRoute
   ApiPublicSyncHealthRoute: typeof ApiPublicSyncHealthRoute
@@ -1681,6 +1694,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCashierLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/health-metadata': {
+      id: '/api/public/health-metadata'
+      path: '/api/public/health-metadata'
+      fullPath: '/api/public/health-metadata'
+      preLoaderRoute: typeof ApiPublicHealthMetadataRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/security-alerts': {
       id: '/api/public/security-alerts'
       path: '/api/public/security-alerts'
@@ -1826,6 +1846,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReportsIndexRoute: ReportsIndexRoute,
   SettingsIndexRoute: SettingsIndexRoute,
   ApiPublicCashierLoginRoute: ApiPublicCashierLoginRoute,
+  ApiPublicHealthMetadataRoute: ApiPublicHealthMetadataRoute,
   ApiPublicSecurityAlertsRoute: ApiPublicSecurityAlertsRoute,
   ApiPublicSyncRoute: ApiPublicSyncRoute,
   ApiPublicSyncHealthRoute: ApiPublicSyncHealthRoute,
