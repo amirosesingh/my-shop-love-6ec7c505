@@ -89,7 +89,12 @@ function scanFile(file) {
         "Finish the note or delete it.",
       );
     }
-    if (/not implemented|unimplemented|coming soon|placeholder/i.test(t) && !t.startsWith("*")) {
+    const isComment = t.startsWith("//") || t.startsWith("*") || t.startsWith("/*");
+    if (
+      /\b(not implemented|unimplemented|coming soon|stub(bed)? out|mock(ed)? (data|response|endpoint))\b/i.test(t) &&
+      !/placeholder=/.test(t) &&
+      !isComment
+    ) {
       add(money ? "critical" : "warning", "Placeholder logic", line, t.slice(0, 140),
         "This path tells the user nothing happens yet.");
     }
