@@ -104,7 +104,7 @@ export const FEATURES: FeatureDef[] = [
         source: "src/lib/pos-db.ts:611 (salePaymentRows)",
         columns: [
           "source_type", "sale_id", "member_id", "store_id", "shift_id", "amount", "method",
-          "kind", "reference", "cashier_name", "note", "paid_at",
+          "kind", "reference", "cashier_name", "note", "paid_at", "status", "metadata",
         ],
       },
       {
@@ -462,7 +462,7 @@ export const FEATURES: FeatureDef[] = [
         source: "src/lib/coupons.ts (saveCampaign)",
         columns: [
           "name", "slug", "discount_type", "discount_value", "scope", "scope_value", "max_claims",
-          "max_per_member", "starts_at", "expires_at", "is_active", "is_welcome",
+          "max_per_member", "claims_count", "starts_at", "expires_at", "is_active", "is_welcome",
         ],
       },
       {
@@ -545,13 +545,16 @@ async function loadShapes(): Promise<Record<string, TableShape>> {
   }
   if (!res.ok) throw new Error(`The database did not publish its table list (HTTP ${res.status})`);
   const spec = (await res.json()) as {
-    definitions?: Record<string, { properties?: Record<string, { description?: string }>; required?: string[] }>;
+    definitions?: Record<
+      string,
+      { properties?: Record<string, { description?: string; default?: unknown }>; required?: string[] }
+    >;
   };
   const out: Record<string, TableShape> = {};
   for (const [table, def] of Object.entries(spec.definitions ?? {})) {
     out[table] = {
       columns: new Set(Object.keys(def.properties ?? {})),
-      required: new Set(def.required ?? []),
+      required: new Set(trulyRequired(def.required, def.properties)),
     };
   }
   return out;
