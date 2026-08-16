@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { SettingsTabs } from "@/components/pos/settings/SettingsTabs";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Layers, Loader2, RefreshCw, Save, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
@@ -225,6 +226,8 @@ function InheritanceSettings() {
             </Link>
           </Button>
         </div>
+
+        <SettingsTabs current="/settings/inheritance" />
 
         <header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
           <div className="min-w-0">
