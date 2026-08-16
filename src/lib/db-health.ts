@@ -277,10 +277,40 @@ export async function runDbHealth(): Promise<DbHealthReport> {
   ];
 
   const tables: TableProbe[] = [];
-  for (const entry of CORE_TABLES) tables.push(await probeTable(entry));
+  for (const entry of await probeList()) tables.push(await probeTable(entry));
 
   return { at: new Date().toISOString(), header, tables };
 }
+
+/**
+ * The tables to probe: the core list, plus anything else the live database
+ * reports through `schema_inventory()`. New features therefore show up in the
+ * health report without anyone editing this file.
+ */
+async function probeList(): Promise<{ table: string; label: string; writable: boolean }[]> {
+  const list = [...CORE_TABLES];
+  try {
+    const rpc = supabaseExternal as unknown as {
+      rpc: (fn: string) => PromiseLike<{ data: unknown; error: unknown }>;
+    };
+    const { data, error } = await rpc.rpc("schema_inventory");
+    if (error || !data) return list;
+    const inventory = (data as { tables?: { name?: string }[] }).tables ?? [];
+    const known = new Set(list.map((t) => t.table));
+    for (const row of inventory) {
+      const name = String(row?.name ?? "").trim();
+      if (!name || known.has(name)) continue;
+      known.add(name);
+      list.push({ table: name, label: prettyTable(name), writable: false });
+    }
+  } catch {
+    // An older database without the inventory helper simply keeps the core list.
+  }
+  return list;
+}
+
+const prettyTable = (name: string) =>
+  name.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 
 /** Plain-text version of the report, for pasting into a support message. */
 export function formatReport(report: DbHealthReport): string {
