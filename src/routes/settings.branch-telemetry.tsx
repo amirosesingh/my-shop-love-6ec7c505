@@ -1,0 +1,256 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useCallback, useEffect, useState } from "react";
+import { RefreshCw, Send } from "lucide-react";
+import { toast } from "sonner";
+import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { useAuth } from "@/lib/pos-auth";
+import {
+  CONNECTION_LABEL,
+  ENGINE_LABEL,
+  isStale,
+  listTelemetry,
+  type TelemetryRow,
+} from "@/lib/telemetry";
+import {
+  COMMAND_LABEL,
+  issueCommand,
+  listCommands,
+  type CommandName,
+  type TerminalCommand,
+} from "@/lib/terminal-commands";
+
+export const Route = createFileRoute("/settings/branch-telemetry")({
+  head: () => ({
+    meta: [
+      { title: "Branch Telemetry Centre — Northwind POS" },
+      {
+        name: "description",
+        content:
+          "Live health of every till: connection state, storage engine, unsynced changes and the last successful sync, with data-only remote commands.",
+      },
+      { property: "og:title", content: "Branch Telemetry Centre — Northwind POS" },
+      {
+        property: "og:description",
+        content: "Monitor every terminal and send sync or catalogue refresh requests.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
+  component: BranchTelemetry,
+});
+
+const when = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "—";
+
+function statusTone(row: TelemetryRow) {
+  if (isStale(row)) return "bg-muted text-muted-foreground";
+  if (row.connection_status === "online") return "bg-emerald-500/15 text-emerald-600";
+  if (row.connection_status === "local") return "bg-amber-500/15 text-amber-600";
+  return "bg-destructive/15 text-destructive";
+}
+
+function BranchTelemetry() {
+  const { user } = useAuth();
+  const [rows, setRows] = useState<TelemetryRow[]>([]);
+  const [commands, setCommands] = useState<TerminalCommand[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const [t, c] = await Promise.all([listTelemetry(), listCommands()]);
+      setRows(t);
+      setCommands(c);
+    } catch (e) {
+      toast.error("Could not load terminal health", { description: (e as Error).message });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+    const timer = window.setInterval(() => void load(), 60_000);
+    return () => window.clearInterval(timer);
+  }, [load]);
+
+  const send = async (row: TelemetryRow, command: CommandName) => {
+    setBusy(`${row.terminal_id}:${command}`);
+    try {
+      await issueCommand({
+        terminalId: row.terminal_id,
+        storeId: row.store_id,
+        command,
+        issuedBy: user?.name ?? null,
+        issuedRole: user?.role ?? null,
+      });
+      toast.success("Request sent", {
+        description: "The terminal runs it after its own unsynced sales have gone up.",
+      });
+      await load();
+    } catch (e) {
+      toast.error("Could not send the request", { description: (e as Error).message });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <SettingsFrame
+      title="Branch telemetry centre"
+      description="Read-only health of every till. Nothing here changes a terminal's own settings — the only actions available are data requests, and each one waits until that till's unsynced sales have reached the central database."
+    >
+      <section className="rounded-lg border border-border bg-card p-5">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold">Terminals</h2>
+          <Button variant="outline" size="sm" onClick={() => void load()}>
+            <RefreshCw className="mr-2 size-4" /> Refresh
+          </Button>
+        </div>
+
+        <div className="mt-4 overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Terminal</TableHead>
+                <TableHead>Branch</TableHead>
+                <TableHead>Signed in</TableHead>
+                <TableHead>Connection</TableHead>
+                <TableHead>Storage</TableHead>
+                <TableHead className="text-right">Waiting</TableHead>
+                <TableHead>Last sync</TableHead>
+                <TableHead>Last seen</TableHead>
+                <TableHead className="text-right">Requests</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="py-8 text-center text-sm text-muted-foreground">
+                    Loading terminal health…
+                  </TableCell>
+                </TableRow>
+              ) : rows.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="py-8 text-center text-sm text-muted-foreground">
+                    No terminal has reported in yet.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                rows.map((r) => (
+                  <TableRow key={r.terminal_id}>
+                    <TableCell className="font-medium">
+                      {r.terminal_name || r.terminal_id.slice(0, 8)}
+                      <div className="text-[11px] text-muted-foreground">
+                        {r.app_version ? `v${r.app_version}` : ""} {r.platform ?? ""}
+                      </div>
+                    </TableCell>
+                    <TableCell>{r.store_id ?? "—"}</TableCell>
+                    <TableCell>
+                      {r.staff_name ?? "—"}
+                      {r.staff_role ? (
+                        <div className="text-[11px] capitalize text-muted-foreground">{r.staff_role}</div>
+                      ) : null}
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={statusTone(r)} variant="secondary">
+                        {isStale(r) ? "Not reporting" : CONNECTION_LABEL[r.connection_status] ?? r.connection_status}
+                      </Badge>
+                      <div className="text-[11px] text-muted-foreground">{r.db_mode}</div>
+                    </TableCell>
+                    <TableCell>{ENGINE_LABEL[r.storage_engine] ?? r.storage_engine}</TableCell>
+                    <TableCell className="text-right">
+                      <span className={r.pending_count > 0 ? "font-semibold text-amber-600" : ""}>
+                        {r.pending_count}
+                      </span>
+                      {r.conflict_count > 0 ? (
+                        <div className="text-[11px] text-destructive">{r.conflict_count} held back</div>
+                      ) : null}
+                    </TableCell>
+                    <TableCell className="text-xs">{when(r.last_synced_at)}</TableCell>
+                    <TableCell className="text-xs">{when(r.last_seen_at)}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={busy !== null}
+                          onClick={() => void send(r, "sync_now")}
+                        >
+                          <Send className="mr-1 size-3.5" /> Sync now
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={busy !== null}
+                          onClick={() => void send(r, "refresh_catalog")}
+                        >
+                          Refresh data
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-border bg-card p-5">
+        <h2 className="text-lg font-semibold">Recent requests</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          A request marked “waiting” means that till still has sales to send up; it retries on its
+          own and runs as soon as the queue is empty.
+        </p>
+        <div className="mt-4 overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Sent</TableHead>
+                <TableHead>Terminal</TableHead>
+                <TableHead>Request</TableHead>
+                <TableHead>By</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Outcome</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {commands.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="py-6 text-center text-sm text-muted-foreground">
+                    No requests sent yet.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                commands.map((c) => (
+                  <TableRow key={c.id}>
+                    <TableCell className="text-xs">{when(c.created_at)}</TableCell>
+                    <TableCell className="text-xs">{c.terminal_id.slice(0, 8)}</TableCell>
+                    <TableCell>{COMMAND_LABEL[c.command] ?? c.command}</TableCell>
+                    <TableCell className="text-xs">{c.issued_by ?? "—"}</TableCell>
+                    <TableCell className="capitalize">
+                      {c.status === "blocked" ? "waiting" : c.status}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{c.result ?? "—"}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </section>
+    </SettingsFrame>
+  );
+}

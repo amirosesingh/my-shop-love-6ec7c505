@@ -369,6 +369,63 @@ export type Database = {
           },
         ]
       }
+      branch_telemetry: {
+        Row: {
+          app_version: string | null
+          conflict_count: number
+          connection_status: string
+          created_at: string
+          db_mode: string
+          last_seen_at: string
+          last_synced_at: string | null
+          pending_count: number
+          platform: string | null
+          staff_name: string | null
+          staff_role: string | null
+          storage_engine: string
+          store_id: string | null
+          terminal_id: string
+          terminal_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          app_version?: string | null
+          conflict_count?: number
+          connection_status?: string
+          created_at?: string
+          db_mode?: string
+          last_seen_at?: string
+          last_synced_at?: string | null
+          pending_count?: number
+          platform?: string | null
+          staff_name?: string | null
+          staff_role?: string | null
+          storage_engine?: string
+          store_id?: string | null
+          terminal_id: string
+          terminal_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          app_version?: string | null
+          conflict_count?: number
+          connection_status?: string
+          created_at?: string
+          db_mode?: string
+          last_seen_at?: string
+          last_synced_at?: string | null
+          pending_count?: number
+          platform?: string | null
+          staff_name?: string | null
+          staff_role?: string | null
+          storage_engine?: string
+          store_id?: string | null
+          terminal_id?: string
+          terminal_name?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       cashiers: {
         Row: {
           created_at: string
@@ -2507,6 +2564,54 @@ export type Database = {
           old_value?: Json | null
           store_id?: string | null
           terminal_id?: string | null
+        }
+        Relationships: []
+      }
+      terminal_commands: {
+        Row: {
+          command: string
+          created_at: string
+          finished_at: string | null
+          id: string
+          issued_by: string | null
+          issued_role: string | null
+          note: string | null
+          picked_up_at: string | null
+          result: string | null
+          status: string
+          store_id: string | null
+          terminal_id: string
+          updated_at: string
+        }
+        Insert: {
+          command: string
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          issued_by?: string | null
+          issued_role?: string | null
+          note?: string | null
+          picked_up_at?: string | null
+          result?: string | null
+          status?: string
+          store_id?: string | null
+          terminal_id: string
+          updated_at?: string
+        }
+        Update: {
+          command?: string
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          issued_by?: string | null
+          issued_role?: string | null
+          note?: string | null
+          picked_up_at?: string | null
+          result?: string | null
+          status?: string
+          store_id?: string | null
+          terminal_id?: string
+          updated_at?: string
         }
         Relationships: []
       }

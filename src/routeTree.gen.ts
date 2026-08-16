@@ -43,6 +43,7 @@ import { Route as PosRacketServiceRouteImport } from './routes/pos.racket-servic
 import { Route as ReportsIndexRouteImport } from './routes/reports.index'
 import { Route as ReportsActivityRouteImport } from './routes/reports.activity'
 import { Route as ReportsAnalyticsRouteImport } from './routes/reports.analytics'
+import { Route as ReportsBusinessRouteImport } from './routes/reports.business'
 import { Route as ReportsCatalogRouteImport } from './routes/reports.catalog'
 import { Route as ReportsCouponsRouteImport } from './routes/reports.coupons'
 import { Route as ReportsHistoryRouteImport } from './routes/reports.history'
@@ -56,11 +57,13 @@ import { Route as SettingsIndexRouteImport } from './routes/settings.index'
 import { Route as SettingsAccountsRouteImport } from './routes/settings.accounts'
 import { Route as SettingsBookingRulesRouteImport } from './routes/settings.booking-rules'
 import { Route as SettingsBookingSlipRouteImport } from './routes/settings.booking-slip'
+import { Route as SettingsBranchTelemetryRouteImport } from './routes/settings.branch-telemetry'
 import { Route as SettingsCatalogRouteImport } from './routes/settings.catalog'
 import { Route as SettingsDataSyncRouteImport } from './routes/settings.data-sync'
 import { Route as SettingsDiagnosticsRouteImport } from './routes/settings.diagnostics'
 import { Route as SettingsDisplayRouteImport } from './routes/settings.display'
 import { Route as SettingsElementsRouteImport } from './routes/settings.elements'
+import { Route as SettingsHardwareRouteImport } from './routes/settings.hardware'
 import { Route as SettingsIdentityRouteImport } from './routes/settings.identity'
 import { Route as SettingsInheritanceRouteImport } from './routes/settings.inheritance'
 import { Route as SettingsLinesRouteImport } from './routes/settings.lines'
@@ -267,6 +270,11 @@ const ReportsAnalyticsRoute = ReportsAnalyticsRouteImport.update({
   path: '/reports/analytics',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReportsBusinessRoute = ReportsBusinessRouteImport.update({
+  id: '/reports/business',
+  path: '/reports/business',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReportsCatalogRoute = ReportsCatalogRouteImport.update({
   id: '/reports/catalog',
   path: '/reports/catalog',
@@ -332,6 +340,11 @@ const SettingsBookingSlipRoute = SettingsBookingSlipRouteImport.update({
   path: '/settings/booking-slip',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsBranchTelemetryRoute = SettingsBranchTelemetryRouteImport.update({
+  id: '/settings/branch-telemetry',
+  path: '/settings/branch-telemetry',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsCatalogRoute = SettingsCatalogRouteImport.update({
   id: '/settings/catalog',
   path: '/settings/catalog',
@@ -355,6 +368,11 @@ const SettingsDisplayRoute = SettingsDisplayRouteImport.update({
 const SettingsElementsRoute = SettingsElementsRouteImport.update({
   id: '/settings/elements',
   path: '/settings/elements',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsHardwareRoute = SettingsHardwareRouteImport.update({
+  id: '/settings/hardware',
+  path: '/settings/hardware',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsIdentityRoute = SettingsIdentityRouteImport.update({
@@ -567,6 +585,7 @@ export interface FileRoutesByFullPath {
   '/pos/racket-service': typeof PosRacketServiceRoute
   '/reports/activity': typeof ReportsActivityRoute
   '/reports/analytics': typeof ReportsAnalyticsRoute
+  '/reports/business': typeof ReportsBusinessRoute
   '/reports/catalog': typeof ReportsCatalogRoute
   '/reports/coupons': typeof ReportsCouponsRoute
   '/reports/history': typeof ReportsHistoryRoute
@@ -579,11 +598,13 @@ export interface FileRoutesByFullPath {
   '/settings/accounts': typeof SettingsAccountsRoute
   '/settings/booking-rules': typeof SettingsBookingRulesRoute
   '/settings/booking-slip': typeof SettingsBookingSlipRoute
+  '/settings/branch-telemetry': typeof SettingsBranchTelemetryRoute
   '/settings/catalog': typeof SettingsCatalogRoute
   '/settings/data-sync': typeof SettingsDataSyncRoute
   '/settings/diagnostics': typeof SettingsDiagnosticsRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
+  '/settings/hardware': typeof SettingsHardwareRoute
   '/settings/identity': typeof SettingsIdentityRoute
   '/settings/inheritance': typeof SettingsInheritanceRoute
   '/settings/lines': typeof SettingsLinesRoute
@@ -656,6 +677,7 @@ export interface FileRoutesByTo {
   '/pos/racket-service': typeof PosRacketServiceRoute
   '/reports/activity': typeof ReportsActivityRoute
   '/reports/analytics': typeof ReportsAnalyticsRoute
+  '/reports/business': typeof ReportsBusinessRoute
   '/reports/catalog': typeof ReportsCatalogRoute
   '/reports/coupons': typeof ReportsCouponsRoute
   '/reports/history': typeof ReportsHistoryRoute
@@ -668,11 +690,13 @@ export interface FileRoutesByTo {
   '/settings/accounts': typeof SettingsAccountsRoute
   '/settings/booking-rules': typeof SettingsBookingRulesRoute
   '/settings/booking-slip': typeof SettingsBookingSlipRoute
+  '/settings/branch-telemetry': typeof SettingsBranchTelemetryRoute
   '/settings/catalog': typeof SettingsCatalogRoute
   '/settings/data-sync': typeof SettingsDataSyncRoute
   '/settings/diagnostics': typeof SettingsDiagnosticsRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
+  '/settings/hardware': typeof SettingsHardwareRoute
   '/settings/identity': typeof SettingsIdentityRoute
   '/settings/inheritance': typeof SettingsInheritanceRoute
   '/settings/lines': typeof SettingsLinesRoute
@@ -746,6 +770,7 @@ export interface FileRoutesById {
   '/pos/racket-service': typeof PosRacketServiceRoute
   '/reports/activity': typeof ReportsActivityRoute
   '/reports/analytics': typeof ReportsAnalyticsRoute
+  '/reports/business': typeof ReportsBusinessRoute
   '/reports/catalog': typeof ReportsCatalogRoute
   '/reports/coupons': typeof ReportsCouponsRoute
   '/reports/history': typeof ReportsHistoryRoute
@@ -758,11 +783,13 @@ export interface FileRoutesById {
   '/settings/accounts': typeof SettingsAccountsRoute
   '/settings/booking-rules': typeof SettingsBookingRulesRoute
   '/settings/booking-slip': typeof SettingsBookingSlipRoute
+  '/settings/branch-telemetry': typeof SettingsBranchTelemetryRoute
   '/settings/catalog': typeof SettingsCatalogRoute
   '/settings/data-sync': typeof SettingsDataSyncRoute
   '/settings/diagnostics': typeof SettingsDiagnosticsRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
+  '/settings/hardware': typeof SettingsHardwareRoute
   '/settings/identity': typeof SettingsIdentityRoute
   '/settings/inheritance': typeof SettingsInheritanceRoute
   '/settings/lines': typeof SettingsLinesRoute
@@ -837,6 +864,7 @@ export interface FileRouteTypes {
     | '/pos/racket-service'
     | '/reports/activity'
     | '/reports/analytics'
+    | '/reports/business'
     | '/reports/catalog'
     | '/reports/coupons'
     | '/reports/history'
@@ -849,11 +877,13 @@ export interface FileRouteTypes {
     | '/settings/accounts'
     | '/settings/booking-rules'
     | '/settings/booking-slip'
+    | '/settings/branch-telemetry'
     | '/settings/catalog'
     | '/settings/data-sync'
     | '/settings/diagnostics'
     | '/settings/display'
     | '/settings/elements'
+    | '/settings/hardware'
     | '/settings/identity'
     | '/settings/inheritance'
     | '/settings/lines'
@@ -926,6 +956,7 @@ export interface FileRouteTypes {
     | '/pos/racket-service'
     | '/reports/activity'
     | '/reports/analytics'
+    | '/reports/business'
     | '/reports/catalog'
     | '/reports/coupons'
     | '/reports/history'
@@ -938,11 +969,13 @@ export interface FileRouteTypes {
     | '/settings/accounts'
     | '/settings/booking-rules'
     | '/settings/booking-slip'
+    | '/settings/branch-telemetry'
     | '/settings/catalog'
     | '/settings/data-sync'
     | '/settings/diagnostics'
     | '/settings/display'
     | '/settings/elements'
+    | '/settings/hardware'
     | '/settings/identity'
     | '/settings/inheritance'
     | '/settings/lines'
@@ -1015,6 +1048,7 @@ export interface FileRouteTypes {
     | '/pos/racket-service'
     | '/reports/activity'
     | '/reports/analytics'
+    | '/reports/business'
     | '/reports/catalog'
     | '/reports/coupons'
     | '/reports/history'
@@ -1027,11 +1061,13 @@ export interface FileRouteTypes {
     | '/settings/accounts'
     | '/settings/booking-rules'
     | '/settings/booking-slip'
+    | '/settings/branch-telemetry'
     | '/settings/catalog'
     | '/settings/data-sync'
     | '/settings/diagnostics'
     | '/settings/display'
     | '/settings/elements'
+    | '/settings/hardware'
     | '/settings/identity'
     | '/settings/inheritance'
     | '/settings/lines'
@@ -1105,6 +1141,7 @@ export interface RootRouteChildren {
   PosRacketServiceRoute: typeof PosRacketServiceRoute
   ReportsActivityRoute: typeof ReportsActivityRoute
   ReportsAnalyticsRoute: typeof ReportsAnalyticsRoute
+  ReportsBusinessRoute: typeof ReportsBusinessRoute
   ReportsCatalogRoute: typeof ReportsCatalogRoute
   ReportsCouponsRoute: typeof ReportsCouponsRoute
   ReportsHistoryRoute: typeof ReportsHistoryRoute
@@ -1117,11 +1154,13 @@ export interface RootRouteChildren {
   SettingsAccountsRoute: typeof SettingsAccountsRoute
   SettingsBookingRulesRoute: typeof SettingsBookingRulesRoute
   SettingsBookingSlipRoute: typeof SettingsBookingSlipRoute
+  SettingsBranchTelemetryRoute: typeof SettingsBranchTelemetryRoute
   SettingsCatalogRoute: typeof SettingsCatalogRoute
   SettingsDataSyncRoute: typeof SettingsDataSyncRoute
   SettingsDiagnosticsRoute: typeof SettingsDiagnosticsRoute
   SettingsDisplayRoute: typeof SettingsDisplayRoute
   SettingsElementsRoute: typeof SettingsElementsRoute
+  SettingsHardwareRoute: typeof SettingsHardwareRoute
   SettingsIdentityRoute: typeof SettingsIdentityRoute
   SettingsInheritanceRoute: typeof SettingsInheritanceRoute
   SettingsLinesRoute: typeof SettingsLinesRoute
@@ -1399,6 +1438,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReportsAnalyticsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reports/business': {
+      id: '/reports/business'
+      path: '/reports/business'
+      fullPath: '/reports/business'
+      preLoaderRoute: typeof ReportsBusinessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reports/catalog': {
       id: '/reports/catalog'
       path: '/reports/catalog'
@@ -1490,6 +1536,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsBookingSlipRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/branch-telemetry': {
+      id: '/settings/branch-telemetry'
+      path: '/settings/branch-telemetry'
+      fullPath: '/settings/branch-telemetry'
+      preLoaderRoute: typeof SettingsBranchTelemetryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/catalog': {
       id: '/settings/catalog'
       path: '/settings/catalog'
@@ -1523,6 +1576,13 @@ declare module '@tanstack/react-router' {
       path: '/settings/elements'
       fullPath: '/settings/elements'
       preLoaderRoute: typeof SettingsElementsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/hardware': {
+      id: '/settings/hardware'
+      path: '/settings/hardware'
+      fullPath: '/settings/hardware'
+      preLoaderRoute: typeof SettingsHardwareRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings/identity': {
@@ -1821,6 +1881,7 @@ const rootRouteChildren: RootRouteChildren = {
   PosRacketServiceRoute: PosRacketServiceRoute,
   ReportsActivityRoute: ReportsActivityRoute,
   ReportsAnalyticsRoute: ReportsAnalyticsRoute,
+  ReportsBusinessRoute: ReportsBusinessRoute,
   ReportsCatalogRoute: ReportsCatalogRoute,
   ReportsCouponsRoute: ReportsCouponsRoute,
   ReportsHistoryRoute: ReportsHistoryRoute,
@@ -1833,11 +1894,13 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsAccountsRoute: SettingsAccountsRoute,
   SettingsBookingRulesRoute: SettingsBookingRulesRoute,
   SettingsBookingSlipRoute: SettingsBookingSlipRoute,
+  SettingsBranchTelemetryRoute: SettingsBranchTelemetryRoute,
   SettingsCatalogRoute: SettingsCatalogRoute,
   SettingsDataSyncRoute: SettingsDataSyncRoute,
   SettingsDiagnosticsRoute: SettingsDiagnosticsRoute,
   SettingsDisplayRoute: SettingsDisplayRoute,
   SettingsElementsRoute: SettingsElementsRoute,
+  SettingsHardwareRoute: SettingsHardwareRoute,
   SettingsIdentityRoute: SettingsIdentityRoute,
   SettingsInheritanceRoute: SettingsInheritanceRoute,
   SettingsLinesRoute: SettingsLinesRoute,

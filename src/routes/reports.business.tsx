@@ -1,0 +1,349 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
+import { AppShell } from "@/components/pos/AppShell";
+import { Label } from "@/components/ui/label";
+import { ThemedSelect } from "@/components/pos/ThemedSelect";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { TablePagination, usePagination } from "@/components/pos/TablePagination";
+import { money, usePos } from "@/lib/pos-store";
+import { ReportHeader, StatCard, defaultRange, downloadCsv, inRange } from "@/components/pos/report-kit";
+
+export const Route = createFileRoute("/reports/business")({
+  head: () => ({
+    meta: [
+      { title: "Retail Performance Report — Northwind POS" },
+      {
+        name: "description",
+        content:
+          "Profitability by product, stock movement speed and cashier performance across every branch and date range.",
+      },
+      { property: "og:title", content: "Retail Performance Report — Northwind POS" },
+      {
+        property: "og:description",
+        content: "Margin, sell-through speed and takings per cashier in one report.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
+  }),
+  component: BusinessReport,
+});
+
+type ProductRow = {
+  id: string;
+  name: string;
+  qty: number;
+  revenue: number;
+  cost: number;
+  profit: number;
+  margin: number;
+  perDay: number;
+  onHand: number;
+  daysCover: number;
+};
+
+type CashierRow = {
+  name: string;
+  bills: number;
+  revenue: number;
+  profit: number;
+  discount: number;
+  avgBill: number;
+};
+
+function BusinessReport() {
+  const { state, stores } = usePos();
+  const init = defaultRange(30);
+  const [from, setFrom] = useState(init.from);
+  const [to, setTo] = useState(init.to);
+  const [storeId, setStoreId] = useState("all");
+  const [view, setView] = useState<"products" | "cashiers">("products");
+
+  const sales = useMemo(
+    () =>
+      state.sales.filter(
+        (s) =>
+          inRange(s.createdAt, from, to) &&
+          (storeId === "all" || s.storeId === storeId) &&
+          !s.refunded,
+      ),
+    [state.sales, from, to, storeId],
+  );
+
+  const days = Math.max(
+    1,
+    Math.round((new Date(to).getTime() - new Date(from).getTime()) / 86_400_000) + 1,
+  );
+
+  const products = useMemo(() => {
+    const map = new Map<string, ProductRow>();
+    for (const s of sales) {
+      for (const l of s.lines) {
+        if (l.qty <= 0) continue;
+        const price = l.discountType === "percent" ? l.price * (1 - l.discount / 100) : l.price - l.discount;
+        const revenue = Math.max(0, price) * l.qty;
+        const unitCost = l.cost ?? state.products.find((p) => p.id === l.productId)?.cost ?? 0;
+        const cost = unitCost * l.qty;
+        const row =
+          map.get(l.productId) ??
+          {
+            id: l.productId,
+            name: l.name,
+            qty: 0,
+            revenue: 0,
+            cost: 0,
+            profit: 0,
+            margin: 0,
+            perDay: 0,
+            onHand: 0,
+            daysCover: 0,
+          };
+        row.qty += l.qty;
+        row.revenue += revenue;
+        row.cost += cost;
+        map.set(l.productId, row);
+      }
+    }
+    const out = [...map.values()].map((r) => {
+      const product = state.products.find((p) => p.id === r.id);
+      const onHand = product
+        ? storeId === "all"
+          ? Object.values(product.stockByStore).reduce((a, b) => a + b, 0)
+          : (product.stockByStore[storeId] ?? 0)
+        : 0;
+      const perDay = r.qty / days;
+      return {
+        ...r,
+        profit: r.revenue - r.cost,
+        margin: r.revenue > 0 ? ((r.revenue - r.cost) / r.revenue) * 100 : 0,
+        onHand,
+        perDay,
+        daysCover: perDay > 0 ? onHand / perDay : 0,
+      };
+    });
+    return out.sort((a, b) => b.profit - a.profit);
+  }, [sales, state.products, storeId, days]);
+
+  const cashiers = useMemo(() => {
+    const map = new Map<string, CashierRow>();
+    for (const s of sales) {
+      const key = s.cashier || "Unknown";
+      const row = map.get(key) ?? { name: key, bills: 0, revenue: 0, profit: 0, discount: 0, avgBill: 0 };
+      const cost = s.lines.reduce(
+        (a, l) => a + (l.cost ?? state.products.find((p) => p.id === l.productId)?.cost ?? 0) * l.qty,
+        0,
+      );
+      row.bills += 1;
+      row.revenue += s.total;
+      row.profit += s.total - s.tax - cost;
+      row.discount += s.discount;
+      map.set(key, row);
+    }
+    return [...map.values()]
+      .map((r) => ({ ...r, avgBill: r.bills ? r.revenue / r.bills : 0 }))
+      .sort((a, b) => b.revenue - a.revenue);
+  }, [sales, state.products]);
+
+  const totals = useMemo(() => {
+    const revenue = products.reduce((a, r) => a + r.revenue, 0);
+    const profit = products.reduce((a, r) => a + r.profit, 0);
+    const slow = products.filter((r) => r.daysCover > 60).length;
+    return { revenue, profit, margin: revenue ? (profit / revenue) * 100 : 0, slow };
+  }, [products]);
+
+  const prodPage = usePagination(products);
+  const cashPage = usePagination(cashiers);
+
+  const exportCsv = () => {
+    if (view === "products") {
+      downloadCsv("retail-performance-products", [
+        ["Product", "Units", "Revenue", "Cost", "Profit", "Margin %", "Units/day", "On hand", "Days cover"],
+        ...products.map((r) => [
+          r.name,
+          r.qty,
+          r.revenue.toFixed(2),
+          r.cost.toFixed(2),
+          r.profit.toFixed(2),
+          r.margin.toFixed(1),
+          r.perDay.toFixed(2),
+          r.onHand,
+          r.daysCover ? r.daysCover.toFixed(1) : "",
+        ]),
+      ]);
+    } else {
+      downloadCsv("retail-performance-cashiers", [
+        ["Cashier", "Bills", "Revenue", "Profit", "Discount given", "Average bill"],
+        ...cashiers.map((r) => [
+          r.name,
+          r.bills,
+          r.revenue.toFixed(2),
+          r.profit.toFixed(2),
+          r.discount.toFixed(2),
+          r.avgBill.toFixed(2),
+        ]),
+      ]);
+    }
+  };
+
+  return (
+    <AppShell>
+      <div className="space-y-5 p-6">
+        <ReportHeader
+          title="Retail performance"
+          subtitle="Where the profit comes from, how fast stock moves, and how each cashier is trading."
+          from={from}
+          to={to}
+          onFrom={setFrom}
+          onTo={setTo}
+          onExport={exportCsv}
+        >
+          <div className="space-y-1">
+            <Label className="text-xs">Branch</Label>
+            <div className="w-52">
+              <ThemedSelect
+                value={storeId}
+                onChange={setStoreId}
+                options={[
+                  { value: "all", label: "All branches" },
+                  ...stores.map((s) => ({ value: s.id, label: s.name })),
+                ]}
+              />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">View</Label>
+            <div className="w-64">
+              <ThemedSelect
+                value={view}
+                onChange={(v: string) => setView(v === "cashiers" ? "cashiers" : "products")}
+                options={[
+                  { value: "products", label: "Product profitability & velocity" },
+                  { value: "cashiers", label: "Cashier performance" },
+                ]}
+              />
+            </div>
+          </div>
+        </ReportHeader>
+
+        <div className="grid gap-4 sm:grid-cols-4">
+          <StatCard label="Revenue" value={money(totals.revenue)} />
+          <StatCard label="Gross profit" value={money(totals.profit)} />
+          <StatCard label="Margin" value={`${totals.margin.toFixed(1)}%`} />
+          <StatCard
+            label="Slow movers"
+            value={String(totals.slow)}
+            hint="More than 60 days of stock cover at the current selling rate"
+          />
+        </div>
+
+        <div className="rounded-lg border border-border">
+          {view === "products" ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Product</TableHead>
+                  <TableHead className="text-right">Units</TableHead>
+                  <TableHead className="text-right">Revenue</TableHead>
+                  <TableHead className="text-right">Profit</TableHead>
+                  <TableHead className="text-right">Margin</TableHead>
+                  <TableHead className="text-right">Units/day</TableHead>
+                  <TableHead className="text-right">On hand</TableHead>
+                  <TableHead className="text-right">Days cover</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {products.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
+                      Nothing sold in this period.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  prodPage.pageItems.map((r) => (
+                    <TableRow key={r.id}>
+                      <TableCell className="font-medium">{r.name}</TableCell>
+                      <TableCell className="text-right">{r.qty}</TableCell>
+                      <TableCell className="text-right">{money(r.revenue)}</TableCell>
+                      <TableCell className="text-right">{money(r.profit)}</TableCell>
+                      <TableCell className="text-right">{r.margin.toFixed(1)}%</TableCell>
+                      <TableCell className="text-right">{r.perDay.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{r.onHand}</TableCell>
+                      <TableCell className="text-right">
+                        {r.daysCover ? `${r.daysCover.toFixed(0)} d` : "—"}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Cashier</TableHead>
+                  <TableHead className="text-right">Bills</TableHead>
+                  <TableHead className="text-right">Revenue</TableHead>
+                  <TableHead className="text-right">Profit</TableHead>
+                  <TableHead className="text-right">Discount given</TableHead>
+                  <TableHead className="text-right">Average bill</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {cashiers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                      No bills in this period.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  cashPage.pageItems.map((r) => (
+                    <TableRow key={r.name}>
+                      <TableCell className="font-medium">{r.name}</TableCell>
+                      <TableCell className="text-right">{r.bills}</TableCell>
+                      <TableCell className="text-right">{money(r.revenue)}</TableCell>
+                      <TableCell className="text-right">{money(r.profit)}</TableCell>
+                      <TableCell className="text-right">{money(r.discount)}</TableCell>
+                      <TableCell className="text-right">{money(r.avgBill)}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          )}
+          {view === "products" ? (
+            <TablePagination
+              page={prodPage.page}
+              pageCount={prodPage.pageCount}
+              pageSize={prodPage.pageSize}
+              total={prodPage.total}
+              from={prodPage.from}
+              to={prodPage.to}
+              label="products"
+              onPage={prodPage.setPage}
+              onPageSize={prodPage.setPageSize}
+            />
+          ) : (
+            <TablePagination
+              page={cashPage.page}
+              pageCount={cashPage.pageCount}
+              pageSize={cashPage.pageSize}
+              total={cashPage.total}
+              from={cashPage.from}
+              to={cashPage.to}
+              label="cashiers"
+              onPage={cashPage.setPage}
+              onPageSize={cashPage.setPageSize}
+            />
+          )}
+        </div>
+      </div>
+    </AppShell>
+  );
+}
