@@ -3785,6 +3785,20 @@ function Register() {
                 </div>
               </div>
             )}
+            {!racketMode && bookingRules.serviceTerms.trim() ? (
+              <div className="space-y-2 rounded-md border border-border bg-muted/30 p-3">
+                <p className="text-xs font-medium">Booking terms &amp; conditions</p>
+                <p className="text-[11px] leading-snug text-muted-foreground">{bookingRules.serviceTerms}</p>
+                <label className="flex items-start gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={liabilityOk}
+                    onChange={(e) => setLiabilityOk(e.target.checked)}
+                  />
+                  Customer has read and accepted the booking terms &amp; conditions.
+                </label>
+              </div>
+            ) : null}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBookOpen(false)}>
@@ -3804,7 +3818,12 @@ function Register() {
             )}
             <Button
               onClick={() => void bookAndPayLater()}
-              disabled={saving || (!racketMode && !lines.length)}
+              disabled={
+                saving ||
+                (!racketMode && !lines.length) ||
+                bookingDepositShort ||
+                (!racketMode && !!bookingRules.serviceTerms.trim() && !liabilityOk)
+              }
             >
               {saving ? "Saving…" : racketMode ? "Save job & print ticket" : "Save pay-later booking"}
             </Button>
