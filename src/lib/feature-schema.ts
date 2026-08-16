@@ -16,6 +16,7 @@
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { supabaseConfig } from "./external-supabase-config";
 import { explainError } from "./db-health";
+import { relayTableShapes } from "./health-relay";
 
 export type OpKind = "read" | "write";
 
@@ -320,6 +321,17 @@ function namedColumn(message: string): string | null {
 
 type TableShape = { columns: Set<string>; required: Set<string> };
 
+/** Plain lists from the server relay turned into the sets used below. */
+function toShapes(
+  tables: Record<string, { columns: string[]; required: string[] }>,
+): Record<string, TableShape> {
+  const out: Record<string, TableShape> = {};
+  for (const [table, def] of Object.entries(tables)) {
+    out[table] = { columns: new Set(def.columns), required: new Set(def.required) };
+  }
+  return out;
+}
+
 /**
  * Published table definitions straight from the live Data API — no repo file
  * is consulted. Used to name every gap at once instead of one error per run.
@@ -332,10 +344,13 @@ async function loadShapes(): Promise<Record<string, TableShape>> {
   if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`${url}/rest/v1/`, { headers });
   if (res.status === 401 || res.status === 403) {
+    // A PIN-signed till has no cloud account, and some staff accounts are not
+    // allowed to read the table list. Ask our own server instead: it proves
+    // the device and reads the list centrally.
+    const relayed = await relayTableShapes();
+    if (relayed.ok) return toShapes(relayed.tables);
     throw new Error(
-      token
-        ? "This account is not allowed to read the database's table list. Sign in with a staff account that has full access."
-        : "Sign in with a staff account to run the database checks.",
+      `The database would not hand this device its table list, and the server check also failed: ${relayed.error}`,
     );
   }
   if (!res.ok) throw new Error(`The database did not publish its table list (HTTP ${res.status})`);

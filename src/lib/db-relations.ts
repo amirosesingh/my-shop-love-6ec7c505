@@ -11,6 +11,7 @@
  * Nothing is written.
  */
 import { supabaseExternal } from "@/integrations/supabase/external-client";
+import { relayRelationalHealth } from "./health-relay";
 
 /** Never inspected here, whatever the database contains. */
 export const IDENTITY_TABLES = [
@@ -133,13 +134,28 @@ export const STATUS_CLASS: Record<RelationStatus, string> = {
 /** Read the live relational picture from the central database. */
 export async function runRelationalHealth(): Promise<RelationalReport> {
   try {
-    const { data, error } = await (
+    let { data, error } = await (
       supabaseExternal as unknown as {
         rpc: (
           fn: string,
         ) => Promise<{ data: unknown; error: { message: string; code?: string } | null }>;
       }
     ).rpc("operational_relational_health");
+    if (error) {
+      const code = error.code ?? "";
+      const msg = error.message ?? "";
+      const refused =
+        code === "42501" || /permission denied/i.test(msg) || /jwt|unauthor/i.test(msg);
+      // A till signed in with a PIN has no cloud account, so the database
+      // refuses it. Our own server can run the same check on its behalf.
+      if (refused) {
+        const relayed = await relayRelationalHealth();
+        if (relayed.ok) {
+          data = relayed.data;
+          error = null;
+        }
+      }
+    }
     if (error) {
       const code = error.code ?? "";
       const msg = error.message ?? "";
