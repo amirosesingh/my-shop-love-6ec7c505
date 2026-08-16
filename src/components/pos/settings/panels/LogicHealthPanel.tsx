@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { AlertTriangle, Copy, Info, ShieldAlert, Layers } from "lucide-react";
+import { AlertTriangle, Copy, Info, ShieldAlert, Layers, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -11,6 +11,14 @@ import {
   type LogicSeverity,
 } from "@/lib/logic-health";
 import { settingsDuplicates } from "@/lib/settings-groups";
+import {
+  AREA_LABEL,
+  formatScanResult,
+  runIssueScan,
+  STEP_LABEL,
+  type ScanResult,
+  type ScanStep,
+} from "@/lib/health-scan";
 
 const ORDER: LogicSeverity[] = ["critical", "warning", "info"];
 
@@ -31,24 +39,80 @@ export function LogicHealthPanel() {
   const duplicates = useMemo(() => settingsDuplicates(), []);
   const [query, setQuery] = useState("");
   const [only, setOnly] = useState<LogicSeverity | "all">("all");
+  const [scan, setScan] = useState<ScanResult | null>(null);
+  const [step, setStep] = useState<ScanStep | null>(null);
 
   const term = query.trim().toLowerCase();
-  const rows = report.findings.filter(
+  const counts = scan ? scan.counts : report.counts;
+  const merged = scan
+    ? scan.findings
+    : report.findings.map((f) => ({
+        id: f.id,
+        area: "code" as const,
+        severity: f.severity,
+        title: f.rule,
+        detail: f.detail,
+        where: `${f.file}:${f.line}`,
+        fix: f.hint,
+      }));
+  const rows = merged.filter(
     (f) =>
       (only === "all" || f.severity === only) &&
       (!term ||
-        f.file.toLowerCase().includes(term) ||
-        f.rule.toLowerCase().includes(term) ||
+        f.where.toLowerCase().includes(term) ||
+        f.title.toLowerCase().includes(term) ||
         f.detail.toLowerCase().includes(term)),
   );
 
   const copy = async () => {
-    await navigator.clipboard.writeText(formatLogicReport(report));
-    toast.success("Logic report copied");
+    try {
+      await navigator.clipboard.writeText(
+        scan ? formatScanResult(scan) : formatLogicReport(report),
+      );
+      toast.success("Report copied");
+    } catch {
+      toast.error("This device would not let the report be copied.");
+    }
+  };
+
+  const scanNow = async () => {
+    setStep("readwrite");
+    try {
+      const result = await runIssueScan(setStep);
+      setScan(result);
+      toast.success(
+        `Scan finished — ${result.counts.critical} critical, ${result.counts.warning} warning, ${result.counts.info} info`,
+      );
+    } catch (e) {
+      toast.error((e as Error).message || "The scan could not finish.");
+    } finally {
+      setStep(null);
+    }
   };
 
   return (
     <div className="w-full max-w-full space-y-5">
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/30 p-3">
+        <Button size="sm" onClick={() => void scanNow()} disabled={!!step}>
+          {step ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
+          {step ? "Scanning…" : "Scan issues"}
+        </Button>
+        <span className="text-xs text-muted-foreground">
+          {step
+            ? STEP_LABEL[step]
+            : scan
+              ? `Live scan run ${new Date(scan.at).toLocaleString()} — database and code findings combined.`
+              : "Checks the live database now and combines it with the stored code findings."}
+        </span>
+      </div>
+
+      {scan && scan.notes.length > 0 && (
+        <ul className="space-y-1 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
+          {scan.notes.map((n) => (
+            <li key={n}>{n}</li>
+          ))}
+        </ul>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-3">
         {ORDER.map((sev) => {
@@ -67,7 +131,7 @@ export function LogicHealthPanel() {
                 <Icon className="size-4" /> {SEVERITY_LABEL[sev]}
               </span>
               <span className="numeric mt-1 block text-2xl font-semibold">
-                {report.counts[sev]}
+                {counts[sev]}
               </span>
               <span className="mt-1 block text-xs opacity-80">{SEVERITY_BLURB[sev]}</span>
             </button>
@@ -92,8 +156,8 @@ export function LogicHealthPanel() {
           <Copy className="size-3.5" /> Copy report
         </Button>
         <span className="text-xs text-muted-foreground">
-          {report.filesScanned} files scanned{" "}
-          {new Date(report.generatedAt).toLocaleString()} · {rows.length} shown
+          {report.filesScanned} files scanned {new Date(report.generatedAt).toLocaleString()} ·{" "}
+          {rows.length} shown
         </span>
       </div>
 
@@ -123,6 +187,7 @@ export function LogicHealthPanel() {
           <thead className="bg-muted/50">
             <tr className="text-left">
               <th className="px-3 py-2 font-medium">Severity</th>
+              <th className="px-3 py-2 font-medium">Area</th>
               <th className="px-3 py-2 font-medium">What was found</th>
               <th className="px-3 py-2 font-medium">Where</th>
             </tr>
@@ -130,7 +195,7 @@ export function LogicHealthPanel() {
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={3} className="px-3 py-4 text-center text-muted-foreground">
+                <td colSpan={4} className="px-3 py-4 text-center text-muted-foreground">
                   Nothing matches that filter.
                 </td>
               </tr>
@@ -142,15 +207,16 @@ export function LogicHealthPanel() {
                     {SEVERITY_LABEL[f.severity]}
                   </span>
                 </td>
+                <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
+                  {AREA_LABEL[f.area]}
+                </td>
                 <td className="px-3 py-2">
-                  <div className="font-medium">{f.rule}</div>
+                  <div className="font-medium">{f.title}</div>
                   <div className="break-all text-muted-foreground">{f.detail}</div>
-                  <div className="text-muted-foreground/80">{f.hint}</div>
+                  <div className="text-muted-foreground/80">{f.fix}</div>
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap">
-                  <code className="text-muted-foreground">
-                    {f.file}:{f.line}
-                  </code>
+                  <code className="text-muted-foreground">{f.where}</code>
                 </td>
               </tr>
             ))}
