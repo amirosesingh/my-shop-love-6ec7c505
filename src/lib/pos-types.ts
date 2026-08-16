@@ -694,6 +694,8 @@ export type ReceiptSettings = {
   /** bottom thank-you note */
   footerText: string;
   showLogo: boolean;
+  /** transparent PNG logo as a data URL; falls back to initials when empty */
+  logo?: string;
   showPoints: boolean;
   showBarcode: boolean;
   showTax: boolean;

@@ -31,6 +31,7 @@ export const defaultReceiptSettings: ReceiptSettings = {
   headerText: "42 Harbour Street, Unit 3\nTel 555-0100 · VAT 88-2201194",
   footerText: "Thank you — see you again soon",
   showLogo: true,
+  logo: "",
   showPoints: true,
   showBarcode: true,
   showTax: true,

@@ -23,6 +23,8 @@ import {
   Type,
 } from "lucide-react";
 import { AppShell } from "@/components/pos/AppShell";
+import { SettingsDrawer } from "@/components/pos/settings/SettingsDrawer";
+import { QUICK_CARDS, type QuickCardId } from "@/components/pos/settings/quick-cards";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/pos-auth";
 import { isDesktop } from "@/lib/branding";
@@ -305,6 +307,7 @@ function SettingsHub() {
     ),
   })).filter((g) => g.pages.length > 0);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [quickId, setQuickId] = useState<QuickCardId | null>(null);
   const [query, setQuery] = useState("");
   const term = query.trim().toLowerCase();
   const matches = term
@@ -316,6 +319,12 @@ function SettingsHub() {
         )
     : [];
   const open = groups.find((g) => g.id === openId) ?? null;
+  const quickMatches = term
+    ? QUICK_CARDS.filter(
+        (c) =>
+          c.label.toLowerCase().includes(term) || c.blurb.toLowerCase().includes(term),
+      )
+    : [];
 
   return (
     <AppShell>
@@ -353,8 +362,25 @@ function SettingsHub() {
             </div>
 
             {term ? (
-              matches.length ? (
+              matches.length || quickMatches.length ? (
                 <div className="grid gap-3 sm:grid-cols-2">
+                  {quickMatches.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => setQuickId(c.id)}
+                      className="flex items-start gap-3 rounded-lg border border-border bg-card p-4 text-left transition-colors hover:border-primary/60"
+                    >
+                      <c.icon className="mt-0.5 size-5 shrink-0 text-primary" />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-medium">{c.label}</span>
+                        <span className="block text-xs text-muted-foreground">{c.blurb}</span>
+                        <span className="mt-1 block text-[11px] text-muted-foreground">
+                          Opens here
+                        </span>
+                      </span>
+                    </button>
+                  ))}
                   {matches.map((p) => (
                     <Link
                       key={p.to}
@@ -379,6 +405,26 @@ function SettingsHub() {
               )
             ) : (
               <>
+            <section className="space-y-3">
+              <h2 className="text-sm font-semibold">Quick access</h2>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {QUICK_CARDS.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setQuickId(c.id)}
+                    className="flex items-start gap-3 rounded-lg border border-border bg-card p-4 text-left transition-colors hover:border-primary/60"
+                  >
+                    <c.icon className="mt-0.5 size-5 shrink-0 text-primary" />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium">{c.label}</span>
+                      <span className="block text-xs text-muted-foreground">{c.blurb}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {groups.map((g) => {
                 const Icon = (g.pages as readonly SettingsPage[])[0]?.icon ?? MonitorCog;
@@ -440,6 +486,7 @@ function SettingsHub() {
           </div>
         )}
       </div>
+      <SettingsDrawer openId={quickId} onClose={() => setQuickId(null)} />
     </AppShell>
   );
 }

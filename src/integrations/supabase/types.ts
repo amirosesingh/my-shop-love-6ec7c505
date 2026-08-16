@@ -1159,6 +1159,7 @@ export type Database = {
           header_text: string | null
           id: number
           integration_settings: Json
+          logo_data_url: string | null
           max_shift_hours: number
           notification_settings: Json
           paper_size: string
@@ -1199,6 +1200,7 @@ export type Database = {
           header_text?: string | null
           id?: number
           integration_settings?: Json
+          logo_data_url?: string | null
           max_shift_hours?: number
           notification_settings?: Json
           paper_size?: string
@@ -1239,6 +1241,7 @@ export type Database = {
           header_text?: string | null
           id?: number
           integration_settings?: Json
+          logo_data_url?: string | null
           max_shift_hours?: number
           notification_settings?: Json
           paper_size?: string
