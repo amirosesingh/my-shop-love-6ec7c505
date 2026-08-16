@@ -56,6 +56,7 @@ import { Route as SettingsIndexRouteImport } from './routes/settings.index'
 import { Route as SettingsAccountsRouteImport } from './routes/settings.accounts'
 import { Route as SettingsBookingRulesRouteImport } from './routes/settings.booking-rules'
 import { Route as SettingsBookingSlipRouteImport } from './routes/settings.booking-slip'
+import { Route as SettingsBranchTelemetryRouteImport } from './routes/settings.branch-telemetry'
 import { Route as SettingsCatalogRouteImport } from './routes/settings.catalog'
 import { Route as SettingsDataSyncRouteImport } from './routes/settings.data-sync'
 import { Route as SettingsDiagnosticsRouteImport } from './routes/settings.diagnostics'
@@ -332,6 +333,11 @@ const SettingsBookingSlipRoute = SettingsBookingSlipRouteImport.update({
   path: '/settings/booking-slip',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsBranchTelemetryRoute = SettingsBranchTelemetryRouteImport.update({
+  id: '/settings/branch-telemetry',
+  path: '/settings/branch-telemetry',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsCatalogRoute = SettingsCatalogRouteImport.update({
   id: '/settings/catalog',
   path: '/settings/catalog',
@@ -579,6 +585,7 @@ export interface FileRoutesByFullPath {
   '/settings/accounts': typeof SettingsAccountsRoute
   '/settings/booking-rules': typeof SettingsBookingRulesRoute
   '/settings/booking-slip': typeof SettingsBookingSlipRoute
+  '/settings/branch-telemetry': typeof SettingsBranchTelemetryRoute
   '/settings/catalog': typeof SettingsCatalogRoute
   '/settings/data-sync': typeof SettingsDataSyncRoute
   '/settings/diagnostics': typeof SettingsDiagnosticsRoute
@@ -668,6 +675,7 @@ export interface FileRoutesByTo {
   '/settings/accounts': typeof SettingsAccountsRoute
   '/settings/booking-rules': typeof SettingsBookingRulesRoute
   '/settings/booking-slip': typeof SettingsBookingSlipRoute
+  '/settings/branch-telemetry': typeof SettingsBranchTelemetryRoute
   '/settings/catalog': typeof SettingsCatalogRoute
   '/settings/data-sync': typeof SettingsDataSyncRoute
   '/settings/diagnostics': typeof SettingsDiagnosticsRoute
@@ -758,6 +766,7 @@ export interface FileRoutesById {
   '/settings/accounts': typeof SettingsAccountsRoute
   '/settings/booking-rules': typeof SettingsBookingRulesRoute
   '/settings/booking-slip': typeof SettingsBookingSlipRoute
+  '/settings/branch-telemetry': typeof SettingsBranchTelemetryRoute
   '/settings/catalog': typeof SettingsCatalogRoute
   '/settings/data-sync': typeof SettingsDataSyncRoute
   '/settings/diagnostics': typeof SettingsDiagnosticsRoute
@@ -849,6 +858,7 @@ export interface FileRouteTypes {
     | '/settings/accounts'
     | '/settings/booking-rules'
     | '/settings/booking-slip'
+    | '/settings/branch-telemetry'
     | '/settings/catalog'
     | '/settings/data-sync'
     | '/settings/diagnostics'
@@ -938,6 +948,7 @@ export interface FileRouteTypes {
     | '/settings/accounts'
     | '/settings/booking-rules'
     | '/settings/booking-slip'
+    | '/settings/branch-telemetry'
     | '/settings/catalog'
     | '/settings/data-sync'
     | '/settings/diagnostics'
@@ -1027,6 +1038,7 @@ export interface FileRouteTypes {
     | '/settings/accounts'
     | '/settings/booking-rules'
     | '/settings/booking-slip'
+    | '/settings/branch-telemetry'
     | '/settings/catalog'
     | '/settings/data-sync'
     | '/settings/diagnostics'
@@ -1117,6 +1129,7 @@ export interface RootRouteChildren {
   SettingsAccountsRoute: typeof SettingsAccountsRoute
   SettingsBookingRulesRoute: typeof SettingsBookingRulesRoute
   SettingsBookingSlipRoute: typeof SettingsBookingSlipRoute
+  SettingsBranchTelemetryRoute: typeof SettingsBranchTelemetryRoute
   SettingsCatalogRoute: typeof SettingsCatalogRoute
   SettingsDataSyncRoute: typeof SettingsDataSyncRoute
   SettingsDiagnosticsRoute: typeof SettingsDiagnosticsRoute
@@ -1490,6 +1503,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsBookingSlipRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/branch-telemetry': {
+      id: '/settings/branch-telemetry'
+      path: '/settings/branch-telemetry'
+      fullPath: '/settings/branch-telemetry'
+      preLoaderRoute: typeof SettingsBranchTelemetryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/catalog': {
       id: '/settings/catalog'
       path: '/settings/catalog'
@@ -1833,6 +1853,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsAccountsRoute: SettingsAccountsRoute,
   SettingsBookingRulesRoute: SettingsBookingRulesRoute,
   SettingsBookingSlipRoute: SettingsBookingSlipRoute,
+  SettingsBranchTelemetryRoute: SettingsBranchTelemetryRoute,
   SettingsCatalogRoute: SettingsCatalogRoute,
   SettingsDataSyncRoute: SettingsDataSyncRoute,
   SettingsDiagnosticsRoute: SettingsDiagnosticsRoute,
