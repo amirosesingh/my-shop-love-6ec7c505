@@ -1143,7 +1143,7 @@ function Register() {
         cashier: activeCashier,
         tagId: racketMode ? jobTag || (bookingRules.autoJobTag ? newJobTag() : undefined) : undefined,
         stringOrigin: racketMode ? (stringCustomerOwned ? "customer" : "store") : undefined,
-        liabilityAccepted: racketMode ? liabilityOk : undefined,
+        liabilityAccepted: liabilityOk,
         stringProductId: racketMode && !stringCustomerOwned ? stringProductId || undefined : undefined,
         intakeNote: racketMode ? grommetNotes.trim() || undefined : undefined,
         job: racketMode
