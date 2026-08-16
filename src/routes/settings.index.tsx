@@ -249,6 +249,12 @@ const GROUPS = [
         blurb: "Per-table reading and saving status, with the exact reason when one fails.",
       },
       {
+        to: "/settings/logic-health",
+        label: "Logic health",
+        icon: ShieldCheck,
+        blurb: "Unfinished logic, controls with no action and money paths without failure handling.",
+      },
+      {
         to: "/settings/shift-alerts",
         label: "Shift alerts",
         icon: Activity,
