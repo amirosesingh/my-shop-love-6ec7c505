@@ -20,6 +20,7 @@ import { PermissionsProvider } from "@/lib/pos-permissions";
 import { Toaster } from "../components/ui/sonner";
 import { ErrorNotifier } from "../components/pos/ErrorNotifier";
 import { AuditTracker } from "../components/pos/AuditTracker";
+import { TelemetryAgent } from "../components/pos/TelemetryAgent";
 import { TerminalActivation } from "@/components/pos/TerminalActivation";
 import { isTerminalApp } from "@/lib/native";
 import { readTerminalConfig } from "@/lib/terminal-tokens";
@@ -206,6 +207,7 @@ function RootComponent() {
           <ManagerGateProvider>
           {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
           <AuditTracker />
+          <TelemetryAgent />
           <FirstRunSetup>
             <Outlet />
           </FirstRunSetup>
