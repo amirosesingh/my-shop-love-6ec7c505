@@ -17,6 +17,7 @@ import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { supabaseConfig } from "./external-supabase-config";
 import { explainError } from "./db-health";
 import { relayTableShapes } from "./health-relay";
+import { trulyRequired } from "./schema-required";
 
 export type OpKind = "read" | "write";
 
