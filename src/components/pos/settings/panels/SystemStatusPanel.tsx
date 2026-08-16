@@ -50,10 +50,6 @@ const dot: Record<ServiceState, string> = {
   checking: "bg-muted-foreground",
 };
 
-function SystemSettingsPage() {
-  return <SystemSettingsBody />;
-}
-
 /** On/off switch for a public subdomain, saved straight to the database. */
 function DomainSwitch({
   label,

@@ -197,9 +197,9 @@ export function InheritancePanel() {
 
         <header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
           <div className="min-w-0">
-            <h1 className="flex items-center gap-2 text-2xl font-semibold">
+            <h2 className="flex items-center gap-2 text-lg font-semibold">
               <Layers className="size-5 shrink-0 text-primary" /> Settings inheritance
-            </h1>
+            </h2>
             <p className="text-sm text-muted-foreground">
               Values flow Global → Cluster → Branch. Leave a row on “Sync” to follow the tier above
               it, or switch it to “Custom” to keep a local value.
