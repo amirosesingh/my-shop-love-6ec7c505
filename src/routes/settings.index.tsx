@@ -486,6 +486,7 @@ function SettingsHub() {
           </div>
         )}
       </div>
+      <SettingsDrawer openId={quickId} onClose={() => setQuickId(null)} />
     </AppShell>
   );
 }
