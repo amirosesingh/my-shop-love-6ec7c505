@@ -2881,29 +2881,53 @@ function Register() {
             </p>
           )}
           <div className="grid grid-cols-5 gap-2">
-            {(
-              [
-                { m: "cash", icon: Banknote, label: "Cash" },
-                { m: "card", icon: CreditCard, label: "Card" },
-                { m: "wallet", icon: Wallet, label: "Wallet" },
-                { m: "points", icon: BadgeCheck, label: "Points" },
-                { m: "bank_transfer", icon: Landmark, label: "Transfer" },
-              ] as const
-            ).map((opt) => (
-              <button
-                key={opt.m}
-                onClick={() => setMethod(opt.m)}
-                className={`flex flex-col items-center gap-1 rounded-md border px-2 py-3 text-xs transition-colors ${
-                  method === opt.m
-                    ? "border-primary bg-primary/15 text-primary"
-                    : "border-border text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <opt.icon className="size-4" />
-                {opt.label}
-              </button>
-            ))}
+            {tenderOptions.map((opt) => {
+              const Icon = tenderIcon(opt.icon, opt.code);
+              return (
+                <button
+                  key={opt.code}
+                  onClick={() => {
+                    setMethod(opt.code);
+                    setTenderRef("");
+                    setTenderRefNote("");
+                  }}
+                  className={`flex flex-col items-center gap-1 rounded-md border px-2 py-3 text-xs transition-colors ${
+                    method === opt.code
+                      ? "border-primary bg-primary/15 text-primary"
+                      : "border-border text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Icon className="size-4" />
+                  {opt.name}
+                </button>
+              );
+            })}
           </div>
+
+          {needsTenderRef && refundDue === 0 && (
+            <div className="space-y-2 rounded-md border border-primary/40 bg-primary/5 p-3">
+              <Label htmlFor="tender-reference">
+                Enter voucher / coupon serial number & reference details
+              </Label>
+              <Input
+                id="tender-reference"
+                autoFocus
+                value={tenderRef}
+                onChange={(e) => setTenderRef(e.target.value)}
+                placeholder="e.g. GV-2026-004512"
+              />
+              <Input
+                value={tenderRefNote}
+                onChange={(e) => setTenderRefNote(e.target.value)}
+                placeholder="Issuer, batch or notes (optional)"
+                className="text-xs"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                {activeMethodName} cannot be completed without this reference. It is stored against
+                the bill for reconciliation.
+              </p>
+            </div>
+          )}
 
           {method === "cash" && refundDue > 0 && (
             <p className="numeric text-sm text-muted-foreground">
