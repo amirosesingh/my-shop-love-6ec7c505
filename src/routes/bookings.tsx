@@ -136,7 +136,7 @@ function BookingsPage() {
           ? b.status !== "active"
           : b.status === "active" && (kind === "racket" ? !!b.job : !b.job),
       )
-      .filter((b) => (tab === "all" ? true : b.status === tab))
+      .filter((b) => (kind !== "done" || tab === "all" ? true : b.status === tab))
       .filter((b) =>
         jobFilter === "all"
           ? true
