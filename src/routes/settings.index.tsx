@@ -247,6 +247,62 @@ const GROUPS = [
       },
     ],
   },
+  {
+    id: "diagnostics",
+    label: "Diagnostics & maintenance",
+    blurb: "Health scanners, alerts and the tools support asks for.",
+    pages: [
+      {
+        to: "/settings/diagnostics",
+        label: "Terminal diagnostics",
+        icon: Activity,
+        blurb: "Connection, storage and hardware checks for this machine.",
+      },
+      {
+        to: "/settings/logic-health",
+        label: "Database & logic health",
+        icon: ShieldCheck,
+        blurb: "Live schema scan, table links and the code checks, refreshed on every run.",
+      },
+      {
+        to: "/settings/data-sync",
+        label: "Data sync & audit",
+        icon: RefreshCw,
+        blurb: "Every push and pull between this till and the cloud.",
+      },
+      {
+        to: "/settings/inheritance",
+        label: "Settings inheritance",
+        icon: Building2,
+        blurb: "Which values come from global, cluster or this branch.",
+      },
+      {
+        to: "/settings/security-alerts",
+        label: "Security alerts",
+        icon: ShieldCheck,
+        blurb: "Findings raised by the security scanner, with acknowledgement.",
+      },
+      {
+        to: "/settings/notifications",
+        label: "Notification delivery",
+        icon: MessageCircle,
+        blurb: "Which events raise an alert and how they are delivered.",
+      },
+      {
+        to: "/settings/branch-telemetry",
+        label: "Branch telemetry centre",
+        icon: MonitorSmartphone,
+        blurb: "Live health of every till, with remote data-only sync requests.",
+        cloudOnly: true,
+      },
+      {
+        to: "/settings/hardware",
+        label: "Hardware & drawer",
+        icon: Printer,
+        blurb: "Printer, cash drawer and device identity for this machine only.",
+      },
+    ],
+  },
 ] as const;
 
 type SettingsPage = {
@@ -328,7 +384,7 @@ function SettingsHub() {
 
   return (
     <AppShell>
-      <div className="mx-auto w-full max-w-4xl space-y-5 p-6">
+      <div className="w-full space-y-5 p-6">
         <div className="sticky top-0 z-20 -mx-6 -mt-6 border-b border-border bg-background/95 px-4 py-2 backdrop-blur">
           <Link
             to="/"

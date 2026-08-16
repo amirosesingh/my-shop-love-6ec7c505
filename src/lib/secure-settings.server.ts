@@ -9,7 +9,12 @@ export type SecureSettingKey =
   | "bank_name"
   | "update_feed_token"
   | "integration_api_key"
-  | "local_db_password";
+  | "local_db_password"
+  | "twilio_account_sid"
+  | "twilio_auth_token"
+  | "twilio_from"
+  | "sendgrid_api_key"
+  | "email_from";
 
 export const SECURE_SETTING_KEYS: SecureSettingKey[] = [
   "whatsapp_token",
@@ -20,6 +25,11 @@ export const SECURE_SETTING_KEYS: SecureSettingKey[] = [
   "update_feed_token",
   "integration_api_key",
   "local_db_password",
+  "twilio_account_sid",
+  "twilio_auth_token",
+  "twilio_from",
+  "sendgrid_api_key",
+  "email_from",
 ];
 
 /**
