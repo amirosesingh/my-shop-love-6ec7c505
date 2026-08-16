@@ -67,7 +67,7 @@ export function snapshot(staff?: { name?: string | null; role?: string | null })
   return {
     terminal_id: terminalId(),
     store_id: activeBranchId() ?? null,
-    terminal_name: cfg?.deviceName ?? activeBranchName() ?? null,
+    terminal_name: cfg?.locationName ?? activeBranchName() ?? null,
     staff_name: staff?.name ?? null,
     staff_role: staff?.role ?? null,
     db_mode: databaseModeLabel(),
