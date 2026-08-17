@@ -8,6 +8,7 @@ const { app, BrowserWindow, ipcMain, screen, dialog, shell } = require("electron
 const pool = require("./db/pool.cjs");
 const repo = require("./db/repo.cjs");
 const discover = require("./db/discover.cjs");
+const sqlAdmin = require("./db/admin-pool.cjs");
 const worker = require("./sync/worker.cjs");
 const updater = require("./updater.cjs");
 const terminalStore = require("./terminal-store.cjs");
