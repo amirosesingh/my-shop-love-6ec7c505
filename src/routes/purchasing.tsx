@@ -49,6 +49,7 @@ import {
   useCategories,
 } from "@/lib/catalog-meta";
 import { resolveByBarcode } from "@/lib/product-lookup";
+import { centralHub, locationPath, routingTargets } from "@/lib/locations";
 
 /** Sentinel for "no value picked" — Radix selects cannot hold an empty value. */
 const PO_NONE = "__none";
@@ -96,6 +97,16 @@ type Line = {
   qty: number;
 };
 
+/** A received line still sitting in the hub, waiting to be routed onward. */
+type PutAwayLine = {
+  id: string;
+  productId: string;
+  name: string;
+  qty: number;
+  invoiceNo: string;
+  targetId: string;
+};
+
 const today = () => new Date().toISOString().slice(0, 10);
 const localDateTime = (iso: string) => {
   const d = new Date(iso);
@@ -105,7 +116,7 @@ const localDateTime = (iso: string) => {
 const units = (inv: ReceivingInvoice) => inv.lines.reduce((a, l) => a + l.qty, 0);
 
 function Purchasing() {
-  const { state, currentStore, upsertProduct, adjustStock, syncProducts } = usePos();
+  const { state, currentStore, allStores, upsertProduct, adjustStock, syncProducts } = usePos();
   const { can, user, isAdmin, isSupervisor } = useAuth();
   const [invoiceNo, setInvoiceNo] = useState("");
   const [supplier, setSupplier] = useState("");
@@ -126,6 +137,17 @@ function Purchasing() {
   const scanRef = useRef<HTMLInputElement>(null);
   const [suppliers, setSuppliers] = useState<Supplier[]>(cachedSuppliers());
   const fileRef = useRef<HTMLInputElement>(null);
+  /*
+    Central-first receiving. Every delivery lands in the hub, and only a
+    deliberate put-away moves it onto a shop floor or sub-warehouse, so stock
+    is never in two places at once and nothing is silently absorbed.
+  */
+  const hub = useMemo(() => centralHub(allStores) ?? currentStore, [allStores, currentStore]);
+  const putAwayTargets = useMemo(
+    () => routingTargets(allStores, currentStore.id).filter((s) => s.id !== hub.id),
+    [allStores, currentStore.id, hub.id],
+  );
+  const [pending, setPending] = useState<PutAwayLine[]>([]);
 
   const totals = useMemo(
     () => ({
@@ -318,6 +340,24 @@ function Purchasing() {
     }
   }
 
+  /** Moves one received line out of the hub onto its final location. */
+  function movePutAway(row: PutAwayLine) {
+    const target = putAwayTargets.find((s) => s.id === row.targetId);
+    if (!target) return toast.error("Pick a destination first");
+    adjustStock(row.productId, -row.qty, hub.id);
+    adjustStock(row.productId, row.qty, target.id);
+    logger.log("inventory_edit", "Received stock put away", "purchasing", {
+      invoiceNo: row.invoiceNo,
+      productId: row.productId,
+      name: row.name,
+      qty: row.qty,
+      from: hub.name,
+      to: locationPath(allStores, target.id),
+    });
+    setPending((q) => q.filter((r) => r.id !== row.id));
+    toast.success(`${row.qty} × ${row.name} moved to ${target.name}`);
+  }
+
   function saveDraftInner() {
     if (!draft) return;
     if (!draft.name.trim()) return toast.error("Item name is required");
@@ -358,6 +398,7 @@ function Purchasing() {
       const picked = suppliers.find((s) => s.name === supplier.trim());
       // A receiving order must never land without a branch: fall back to the
       // branch this terminal is bound to when the view has not resolved one.
+      // Stock itself is always posted into the hub, never straight to a floor.
       const storeId = currentStore.id || activeBranchId(currentStore.id);
       if (!storeId) {
         toast.error("This terminal has no branch yet", {
@@ -365,6 +406,7 @@ function Purchasing() {
         });
         return;
       }
+      const hubId = hub.id || storeId;
       const invoice: ReceivingInvoice = {
         id: crypto.randomUUID(),
         invoiceNo: ref,
@@ -395,9 +437,9 @@ function Purchasing() {
       const movements = lines.map((l) => {
         const previousStock = stockAt(
           state.products.find((p) => p.id === l.productId) ?? ({ stockByStore: {} } as Product),
-          currentStore.id,
+          hubId,
         );
-        applyLineToStock(l.productId, l.qty, l.cost, l.price);
+        applyLineToStock(l.productId, l.qty, l.cost, l.price, hubId);
         return {
           productId: l.productId,
           barcode: l.barcode,
@@ -407,7 +449,7 @@ function Purchasing() {
           lineCost: Number((l.cost * l.qty).toFixed(2)),
           previousStock,
           updatedStock: previousStock + l.qty,
-          storeId: currentStore.id,
+          storeId: hubId,
         };
       });
 
@@ -421,10 +463,26 @@ function Purchasing() {
         totalCost: totals.cost,
         operator: invoice.operator,
         storeCode: currentStore.code,
+        receivedInto: hub.name,
         stockMovements: movements,
       });
 
-      toast.success(`Invoice ${ref} received · ${totals.units} units · ${money(totals.cost)}`);
+      toast.success(`Invoice ${ref} received into ${hub.name}`, {
+        description: `${totals.units} units · ${money(totals.cost)}`,
+      });
+      // Queue put-away when this branch has somewhere else the stock can go.
+      if (putAwayTargets.length)
+        setPending((q) => [
+          ...q,
+          ...lines.map((l) => ({
+            id: crypto.randomUUID(),
+            productId: l.productId,
+            name: l.name,
+            qty: l.qty,
+            invoiceNo: ref,
+            targetId: putAwayTargets[0].id,
+          })),
+        ]);
       setInvoiceNo("");
       setSupplier("");
       setInvoiceDate(today());
@@ -445,8 +503,14 @@ function Purchasing() {
    * Post a stock delta for one line and merge cost/price into the product as
    * it is *after* the movement, never a stale copy.
    */
-  function applyLineToStock(productId: string, delta: number, cost: number, price?: number) {
-    if (delta) adjustStock(productId, delta, currentStore.id);
+  function applyLineToStock(
+    productId: string,
+    delta: number,
+    cost: number,
+    price?: number,
+    locationId: string = currentStore.id,
+  ) {
+    if (delta) adjustStock(productId, delta, locationId);
     const current = state.products.find((p) => p.id === productId);
     if (!current) return;
     const nextCost = cost;
@@ -459,7 +523,7 @@ function Purchasing() {
       // Take the quantity we just posted with us — never the pre-adjust map.
       stockByStore: {
         ...current.stockByStore,
-        [currentStore.id]: stockAt(current, currentStore.id) + delta,
+        [locationId]: stockAt(current, locationId) + delta,
       },
     });
   }
@@ -761,6 +825,58 @@ function Purchasing() {
             </Button>
           </div>
         </section>
+
+        {pending.length > 0 && (
+          <section className="space-y-3 rounded-lg border border-primary/40 bg-primary/5 p-5">
+            <div>
+              <h2 className="text-sm font-semibold">Put-away from {hub.name}</h2>
+              <p className="text-xs text-muted-foreground">
+                These units are booked into the hub. Send each line on to the shelf, floor or
+                sub-warehouse that will actually hold it.
+              </p>
+            </div>
+            <div className="space-y-2">
+              {pending.map((row) => (
+                <div
+                  key={row.id}
+                  className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-card p-2"
+                >
+                  <div className="min-w-[180px] flex-1">
+                    <p className="truncate text-sm font-medium">{row.name}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      Invoice {row.invoiceNo} · {row.qty} units
+                    </p>
+                  </div>
+                  <div className="w-56">
+                    <ThemedSelect
+                      value={row.targetId}
+                      onChange={(v: string) =>
+                        setPending((q) =>
+                          q.map((r) => (r.id === row.id ? { ...r, targetId: v } : r)),
+                        )
+                      }
+                      options={putAwayTargets.map((s) => ({
+                        value: s.id,
+                        label: locationPath(allStores, s.id),
+                      }))}
+                    />
+                  </div>
+                  <Button size="sm" className="h-9" onClick={() => movePutAway(row)}>
+                    Move
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-9"
+                    onClick={() => setPending((q) => q.filter((r) => r.id !== row.id))}
+                  >
+                    Keep at hub
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         <section className="rounded-lg border border-border bg-card">
           <div className="flex items-center justify-between px-5 py-3">
