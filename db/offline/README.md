@@ -63,3 +63,10 @@ engine relies on, so pending rows upload automatically once the link returns.
 Run the same file again. It only adds what is missing — existing rows are never
 touched — and it retires the obsolete `BranchSales` / `BranchSaleItems` views
 from the first offline release.
+
+## Tills without SQL Server
+
+A till with no SQL Server installed uses the app's own local database
+(`electron/db/offline_sqlite_v2.sql`, stored as `local_pos_database.db`). It
+holds the same tables with the same column names, so a branch can move between
+the two engines without changing anything in the POS.
