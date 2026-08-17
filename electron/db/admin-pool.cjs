@@ -7,9 +7,11 @@
  * session until the operator disconnects or the app exits.
  */
 const { parseServerField, describeSqlError } = require("./pool.cjs");
+const net = require("node:net");
 
 const CONNECT_TIMEOUT_MS = 15_000;
 const MAX_ROWS = 1000;
+const SOCKET_TIMEOUT_MS = 2_000;
 
 let driver = null;
 let pool = null;
@@ -159,6 +161,77 @@ async function disconnect() {
 }
 
 /**
+ * Wizard step 1 — raw TCP reachability.
+ *
+ * Opening a plain socket answers the "is the port open at all" question in two
+ * seconds, long before the SQL driver would give up with a generic timeout, so
+ * a blocked firewall or a disabled TCP/IP protocol is named for what it is.
+ */
+function probePort(input) {
+  const { host, port } = parseServerField(input?.server ?? input?.host, input?.port);
+  const started = Date.now();
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    let settled = false;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      resolve({ host, port, elapsedMs: Date.now() - started, ...result });
+    };
+    const blocked = () =>
+      finish({
+        ok: false,
+        code: "EPORTCLOSED",
+        error: `Firewall/Port Error: TCP Port ${port} on ${host} is closed or blocked. Ensure SQL Server TCP/IP protocol is enabled in SQL Server Configuration Manager.`,
+        hint: "Also allow the port through Windows Defender Firewall and restart the SQL Server service after enabling TCP/IP.",
+      });
+    socket.setTimeout(SOCKET_TIMEOUT_MS);
+    socket.once("connect", () => finish({ ok: true }));
+    socket.once("timeout", blocked);
+    socket.once("error", blocked);
+    socket.connect(port, host);
+  });
+}
+
+/**
+ * Wizard step 4 — lock the chosen database.
+ *
+ * Re-opens the administration pool directly against the target so the operator
+ * finds out now, not at first sale, whether their login can actually use it.
+ */
+async function lockDatabase(input) {
+  const wanted = String(input?.database ?? "").trim();
+  if (!wanted) return { ok: false, error: "Choose a target database first.", code: "EBADDB" };
+  try {
+    safeDatabase(wanted);
+  } catch (err) {
+    return { ok: false, ...diagnose(err) };
+  }
+  const previous = session;
+  try {
+    const opened = await openPool({ ...input, database: wanted });
+    if (pool) await pool.close().catch(() => {});
+    pool = opened.pool;
+    const meta = await pool
+      .request()
+      .query("SELECT DB_NAME() AS activeDb, @@SERVERNAME AS serverName");
+    const row = meta.recordset[0] ?? {};
+    session = {
+      server: String(input?.server ?? previous?.server ?? ""),
+      database: String(row.activeDb ?? wanted),
+      auth: input?.auth === "sql" ? "sql" : "windows",
+      serverName: row.serverName ?? previous?.serverName ?? null,
+      version: previous?.version ?? null,
+      trustFallback: opened.trustFallback,
+    };
+    return { ok: true, activeDb: session.database, usedTrustFallback: opened.trustFallback };
+  } catch (err) {
+    return { ok: false, ...diagnose(err) };
+  }
+}
+
+/**
  * Phase 1: handshake against `master`.
  * Phase 2: discover every ONLINE database so the UI can populate itself.
  */
@@ -174,7 +247,7 @@ async function connectInstance(input) {
     const list = await pool
       .request()
       .query(
-        "SELECT name, state_desc FROM sys.databases WHERE state_desc = 'ONLINE' ORDER BY name ASC",
+        "SELECT name, state_desc FROM sys.databases WHERE state_desc = 'ONLINE' AND HAS_DBACCESS(name) = 1 ORDER BY name ASC",
       );
     databases = list.recordset.map((r) => String(r.name));
     session = {
@@ -239,7 +312,7 @@ async function listDatabases() {
     const res = await requirePool()
       .request()
       .query(
-        "SELECT name, state_desc FROM sys.databases WHERE state_desc = 'ONLINE' ORDER BY name ASC",
+        "SELECT name, state_desc FROM sys.databases WHERE state_desc = 'ONLINE' AND HAS_DBACCESS(name) = 1 ORDER BY name ASC",
       );
     databases = res.recordset.map((r) => String(r.name));
     return {
@@ -305,23 +378,34 @@ async function getTableColumns(dbName, tableName, schemaName) {
 }
 
 const FORBIDDEN =
-  /\b(insert|update|delete|merge|drop|create|alter|truncate|grant|revoke|backup|restore|exec|execute|sp_|xp_|shutdown|reconfigure|into)\b/i;
+  /\b(insert|update|delete|merge|drop|create|alter|truncate|grant|revoke|deny|backup|restore|exec|execute|sp_\w*|xp_\w*|shutdown|reconfigure|openrowset|opendatasource|bulk|waitfor|into)\b/i;
 
-/** The explorer is read-only: one SELECT/WITH statement, nothing else. */
+/**
+ * The explorer is read-only: exactly one SELECT/WITH statement, nothing else.
+ * Comments are stripped before the keyword scan so `/*x*\/DROP` cannot sneak
+ * past, and any remaining `;` is treated as a second statement.
+ */
 function validateReadOnly(text) {
-  const query = String(text ?? "").trim().replace(/;+\s*$/, "");
-  if (!query) return { ok: false, error: "Enter a query to run." };
-  if (query.includes(";"))
+  const raw = String(text ?? "").trim();
+  if (!raw) return { ok: false, error: "Enter a query to run." };
+  // Comment-free, literal-free copy used for every structural check.
+  const stripped = raw
+    .replace(/'(?:[^']|'')*'/g, "''")
+    .replace(/--[^\n]*/g, " ")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .trim()
+    .replace(/;+\s*$/, "");
+  if (!stripped) return { ok: false, error: "Enter a query to run." };
+  if (stripped.includes(";"))
     return { ok: false, error: "Run one statement at a time — remove the extra ';'." };
-  if (!/^(select|with)\b/i.test(query))
+  if (!/^(select|with)\b/i.test(stripped))
     return { ok: false, error: "Only SELECT statements can be run here." };
-  const stripped = query.replace(/'[^']*'/g, "''").replace(/--[^\n]*/g, "");
   if (FORBIDDEN.test(stripped))
     return {
       ok: false,
       error: "This editor is read-only — statements that change data or schema are blocked.",
     };
-  return { ok: true, query };
+  return { ok: true, query: raw.replace(/;+\s*$/, "") };
 }
 
 async function executeQuery(dbName, queryText) {
@@ -364,6 +448,8 @@ function status() {
 
 module.exports = {
   connectInstance,
+  probePort,
+  lockDatabase,
   listDatabases,
   getTables,
   getTableColumns,

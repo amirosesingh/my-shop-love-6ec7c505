@@ -11,6 +11,9 @@ contextBridge.exposeInMainWorld("pos", {
   connect: (config, cloud) => invoke("pos:connect", config, cloud),
   configureCloud: (cloud) => invoke("pos:configure-cloud", cloud),
   test: (config) => invoke("pos:test", config),
+  /* schema lifecycle — read is passive, apply needs an operator click */
+  readSchema: () => invoke("pos:read-schema"),
+  applySchema: () => invoke("pos:apply-schema"),
   /** Discover SQL Server instances on this machine and the local network. */
   scanNetwork: () => invoke("pos:scan-network"),
   scanLocalDatabases: () => invoke("pos:scan-network"),
@@ -114,6 +117,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
  */
 contextBridge.exposeInMainWorld("sqlAdmin", {
   connectInstance: (credentials) => invoke("sqladmin:connect", credentials),
+  probePort: (credentials) => invoke("sqladmin:probe-port", credentials),
+  lockDatabase: (credentials) => invoke("sqladmin:lock", credentials),
   listDatabases: () => invoke("sqladmin:databases"),
   getTables: (dbName) => invoke("sqladmin:tables", dbName),
   getTableColumns: (dbName, tableName, schemaName) =>
