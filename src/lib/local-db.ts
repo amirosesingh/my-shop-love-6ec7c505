@@ -125,8 +125,6 @@ export type PosBridge = {
   scanLocalDatabases?: () => Promise<ScanNetworkResult>;
   /** Registry + loopback discovery of instances installed on this PC. */
   scanLocalInstances?: () => Promise<LocalInstanceScan>;
-  /** Direct probe with explicit TLS/auth options. */
-  testDirectConnection?: (params: DirectConnectionParams) => Promise<LocalDbTestResult>;
   status: () => Promise<LocalSyncStatus>;
   push: () => Promise<{ ok: boolean; pushed: number; failed: number; error?: string }>;
   pull: () => Promise<{ ok: boolean; merged: number; error?: string }>;
@@ -327,7 +325,7 @@ export async function scanLocalInstances(): Promise<LocalInstanceScan> {
   }
 }
 
-/** Direct connection probe with explicit TLS options; reports latency. */
+/** Single connection probe with explicit TLS options; reports latency. */
 export async function testDirectConnection(
   params: DirectConnectionParams,
 ): Promise<LocalDbTestResult> {
@@ -336,7 +334,6 @@ export async function testDirectConnection(
     return { ok: false, error: "Only the Windows desktop app can reach a local SQL Server." };
   }
   try {
-    if (bridge.testDirectConnection) return await bridge.testDirectConnection(params);
     return await bridge.test({
       server: params.host,
       database: params.database,

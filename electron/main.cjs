@@ -8,6 +8,7 @@ const { app, BrowserWindow, ipcMain, screen, dialog, shell } = require("electron
 const pool = require("./db/pool.cjs");
 const repo = require("./db/repo.cjs");
 const discover = require("./db/discover.cjs");
+const sqlAdmin = require("./db/admin-pool.cjs");
 const worker = require("./sync/worker.cjs");
 const updater = require("./updater.cjs");
 const terminalStore = require("./terminal-store.cjs");
@@ -653,13 +654,19 @@ function registerIpc() {
     }
   });
 
-  ipcMain.handle("db:test-direct-connection", async (_e, params) => {
-    try {
-      return await pool.testDirect(params);
-    } catch (err) {
-      return { ok: false, ...pool.describeSqlError(err) };
-    }
-  });
+  /* ---------------- SSMS-style administration connection ---------------- */
+
+  ipcMain.handle("sqladmin:connect", (_e, credentials) => sqlAdmin.connectInstance(credentials));
+  ipcMain.handle("sqladmin:databases", () => sqlAdmin.listDatabases());
+  ipcMain.handle("sqladmin:tables", (_e, dbName) => sqlAdmin.getTables(dbName));
+  ipcMain.handle("sqladmin:columns", (_e, dbName, tableName, schemaName) =>
+    sqlAdmin.getTableColumns(dbName, tableName, schemaName),
+  );
+  ipcMain.handle("sqladmin:query", (_e, dbName, queryText) =>
+    sqlAdmin.executeQuery(dbName, queryText),
+  );
+  ipcMain.handle("sqladmin:disconnect", () => sqlAdmin.disconnect());
+  ipcMain.handle("sqladmin:status", () => sqlAdmin.status());
 
   ipcMain.handle("pos:write", async (_e, _context, op) => {
     try {
@@ -1009,5 +1016,6 @@ app.on("window-all-closed", async () => {
   updater.stop();
   stopAppServer();
   await pool.close();
+  await sqlAdmin.disconnect().catch(() => {});
   if (process.platform !== "darwin") app.quit();
 });

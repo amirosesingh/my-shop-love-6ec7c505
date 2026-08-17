@@ -61,6 +61,7 @@ import { Route as SettingsBookingSlipRouteImport } from './routes/settings.booki
 import { Route as SettingsBranchTelemetryRouteImport } from './routes/settings.branch-telemetry'
 import { Route as SettingsCatalogRouteImport } from './routes/settings.catalog'
 import { Route as SettingsDataSyncRouteImport } from './routes/settings.data-sync'
+import { Route as SettingsDatabaseExplorerRouteImport } from './routes/settings.database-explorer'
 import { Route as SettingsDiagnosticsRouteImport } from './routes/settings.diagnostics'
 import { Route as SettingsDisplayRouteImport } from './routes/settings.display'
 import { Route as SettingsElementsRouteImport } from './routes/settings.elements'
@@ -361,6 +362,12 @@ const SettingsDataSyncRoute = SettingsDataSyncRouteImport.update({
   path: '/settings/data-sync',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsDatabaseExplorerRoute =
+  SettingsDatabaseExplorerRouteImport.update({
+    id: '/settings/database-explorer',
+    path: '/settings/database-explorer',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const SettingsDiagnosticsRoute = SettingsDiagnosticsRouteImport.update({
   id: '/settings/diagnostics',
   path: '/settings/diagnostics',
@@ -608,6 +615,7 @@ export interface FileRoutesByFullPath {
   '/settings/branch-telemetry': typeof SettingsBranchTelemetryRoute
   '/settings/catalog': typeof SettingsCatalogRoute
   '/settings/data-sync': typeof SettingsDataSyncRoute
+  '/settings/database-explorer': typeof SettingsDatabaseExplorerRoute
   '/settings/diagnostics': typeof SettingsDiagnosticsRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
@@ -701,6 +709,7 @@ export interface FileRoutesByTo {
   '/settings/branch-telemetry': typeof SettingsBranchTelemetryRoute
   '/settings/catalog': typeof SettingsCatalogRoute
   '/settings/data-sync': typeof SettingsDataSyncRoute
+  '/settings/database-explorer': typeof SettingsDatabaseExplorerRoute
   '/settings/diagnostics': typeof SettingsDiagnosticsRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
@@ -795,6 +804,7 @@ export interface FileRoutesById {
   '/settings/branch-telemetry': typeof SettingsBranchTelemetryRoute
   '/settings/catalog': typeof SettingsCatalogRoute
   '/settings/data-sync': typeof SettingsDataSyncRoute
+  '/settings/database-explorer': typeof SettingsDatabaseExplorerRoute
   '/settings/diagnostics': typeof SettingsDiagnosticsRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
@@ -890,6 +900,7 @@ export interface FileRouteTypes {
     | '/settings/branch-telemetry'
     | '/settings/catalog'
     | '/settings/data-sync'
+    | '/settings/database-explorer'
     | '/settings/diagnostics'
     | '/settings/display'
     | '/settings/elements'
@@ -983,6 +994,7 @@ export interface FileRouteTypes {
     | '/settings/branch-telemetry'
     | '/settings/catalog'
     | '/settings/data-sync'
+    | '/settings/database-explorer'
     | '/settings/diagnostics'
     | '/settings/display'
     | '/settings/elements'
@@ -1076,6 +1088,7 @@ export interface FileRouteTypes {
     | '/settings/branch-telemetry'
     | '/settings/catalog'
     | '/settings/data-sync'
+    | '/settings/database-explorer'
     | '/settings/diagnostics'
     | '/settings/display'
     | '/settings/elements'
@@ -1170,6 +1183,7 @@ export interface RootRouteChildren {
   SettingsBranchTelemetryRoute: typeof SettingsBranchTelemetryRoute
   SettingsCatalogRoute: typeof SettingsCatalogRoute
   SettingsDataSyncRoute: typeof SettingsDataSyncRoute
+  SettingsDatabaseExplorerRoute: typeof SettingsDatabaseExplorerRoute
   SettingsDiagnosticsRoute: typeof SettingsDiagnosticsRoute
   SettingsDisplayRoute: typeof SettingsDisplayRoute
   SettingsElementsRoute: typeof SettingsElementsRoute
@@ -1577,6 +1591,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsDataSyncRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/database-explorer': {
+      id: '/settings/database-explorer'
+      path: '/settings/database-explorer'
+      fullPath: '/settings/database-explorer'
+      preLoaderRoute: typeof SettingsDatabaseExplorerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/diagnostics': {
       id: '/settings/diagnostics'
       path: '/settings/diagnostics'
@@ -1918,6 +1939,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsBranchTelemetryRoute: SettingsBranchTelemetryRoute,
   SettingsCatalogRoute: SettingsCatalogRoute,
   SettingsDataSyncRoute: SettingsDataSyncRoute,
+  SettingsDatabaseExplorerRoute: SettingsDatabaseExplorerRoute,
   SettingsDiagnosticsRoute: SettingsDiagnosticsRoute,
   SettingsDisplayRoute: SettingsDisplayRoute,
   SettingsElementsRoute: SettingsElementsRoute,
