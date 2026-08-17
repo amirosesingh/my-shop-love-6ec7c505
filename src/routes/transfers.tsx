@@ -119,6 +119,15 @@ function Transfers() {
   const storeOf = (id: string) => stores.find((s) => s.id === id);
   const productOf = (id: string) => state.products.find((p) => p.id === id) ?? null;
 
+  /** Levels underneath the sending location, if it is split into floors. */
+  const sourceLevels = subWarehouses(allStores, currentStore.id);
+  /** Where each line will physically be picked from — primary level first. */
+  const pickPlan = (productId: string, qty: number) => {
+    const p = productOf(productId);
+    if (!p) return null;
+    return planDeduction(p, allStores, currentStore.id, qty);
+  };
+
   // Prefilled multi-item basket handed over from the inventory page.
   useEffect(() => {
     if (!others.some((store) => store.id === otherStoreId)) {
