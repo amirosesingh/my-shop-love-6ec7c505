@@ -2572,6 +2572,7 @@ export type Database = {
           id: string
           is_active: boolean
           is_central: boolean
+          is_primary_sub: boolean
           location_type: string
           name: string
           parent_id: string | null
@@ -2590,6 +2591,7 @@ export type Database = {
           id: string
           is_active?: boolean
           is_central?: boolean
+          is_primary_sub?: boolean
           location_type?: string
           name: string
           parent_id?: string | null
@@ -2608,6 +2610,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           is_central?: boolean
+          is_primary_sub?: boolean
           location_type?: string
           name?: string
           parent_id?: string | null
