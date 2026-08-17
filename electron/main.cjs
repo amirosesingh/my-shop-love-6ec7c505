@@ -638,6 +638,19 @@ function registerIpc() {
     }
   });
 
+  /*
+    Schema lifecycle. Reading the master file is always safe; applying it only
+    ever happens because an operator pressed the button in settings.
+  */
+  ipcMain.handle("pos:read-schema", () => pool.readSchema());
+  ipcMain.handle("pos:apply-schema", async () => {
+    try {
+      return await pool.applySchemaNow();
+    } catch (err) {
+      return { ok: false, ...pool.describeSqlError(err) };
+    }
+  });
+
   ipcMain.handle("pos:scan-network", async () => {
     try {
       return await discover.scan();
@@ -657,6 +670,8 @@ function registerIpc() {
   /* ---------------- SSMS-style administration connection ---------------- */
 
   ipcMain.handle("sqladmin:connect", (_e, credentials) => sqlAdmin.connectInstance(credentials));
+  ipcMain.handle("sqladmin:probe-port", (_e, credentials) => sqlAdmin.probePort(credentials));
+  ipcMain.handle("sqladmin:lock", (_e, credentials) => sqlAdmin.lockDatabase(credentials));
   ipcMain.handle("sqladmin:databases", () => sqlAdmin.listDatabases());
   ipcMain.handle("sqladmin:tables", (_e, dbName) => sqlAdmin.getTables(dbName));
   ipcMain.handle("sqladmin:columns", (_e, dbName, tableName, schemaName) =>

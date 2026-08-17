@@ -125,6 +125,7 @@
     "productName": "LovablePOS",
     "files": [
       "electron/**",
+      "database/**",
       "dist-desktop/**",
       "package.json",
       "node_modules/**"

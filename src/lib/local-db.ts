@@ -120,6 +120,16 @@ export type PosBridge = {
   ) => Promise<LocalDbTestResult & { cloudError?: string }>;
   configureCloud: (cloud: CloudBridgeConfig) => Promise<{ ok: boolean; error?: string }>;
   test: (config: LocalDbConfig) => Promise<LocalDbTestResult>;
+  /** Read the single master schema file — passive, never executes anything. */
+  readSchema?: () => Promise<{
+    ok: boolean;
+    file?: string;
+    text?: string;
+    tables?: string[];
+    error?: string;
+  }>;
+  /** Apply database/schema.sql. Only ever called from an explicit user click. */
+  applySchema?: () => Promise<{ ok: boolean; file?: string; error?: string }>;
   /** Discover local/LAN SQL Server instances (desktop shell only). */
   scanNetwork?: () => Promise<ScanNetworkResult>;
   scanLocalDatabases?: () => Promise<ScanNetworkResult>;

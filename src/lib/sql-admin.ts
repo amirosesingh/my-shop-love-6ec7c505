@@ -64,8 +64,20 @@ export type SqlQueryResult =
     }
   | (SqlAdminFailure & { elapsedMs?: number });
 
+export type SqlPortProbe =
+  | { ok: true; host: string; port: number; elapsedMs: number }
+  | (SqlAdminFailure & { host?: string; port?: number; elapsedMs?: number });
+
+export type SqlLockResult =
+  | { ok: true; activeDb: string; usedTrustFallback: boolean }
+  | SqlAdminFailure;
+
 export type SqlAdminBridge = {
   connectInstance: (credentials: SqlAdminCredentials) => Promise<SqlAdminConnectResult>;
+  /** Raw 2-second TCP reachability probe — names firewall/port problems. */
+  probePort?: (credentials: SqlAdminCredentials) => Promise<SqlPortProbe>;
+  /** Re-point the administration pool at the operator's chosen database. */
+  lockDatabase?: (credentials: SqlAdminCredentials) => Promise<SqlLockResult>;
   listDatabases: () => Promise<{ ok: true; databases: SqlDatabase[] } | SqlAdminFailure>;
   getTables: (
     dbName: string,
@@ -100,14 +112,20 @@ export const DESKTOP_ONLY: SqlAdminFailure = {
 
 /** Same read-only gate the main process enforces, so mistakes are caught early. */
 const FORBIDDEN =
-  /\b(insert|update|delete|merge|drop|create|alter|truncate|grant|revoke|backup|restore|exec|execute|sp_|xp_|shutdown|reconfigure|into)\b/i;
+  /\b(insert|update|delete|merge|drop|create|alter|truncate|grant|revoke|deny|backup|restore|exec|execute|sp_\w*|xp_\w*|shutdown|reconfigure|openrowset|opendatasource|bulk|waitfor|into)\b/i;
 
 export function checkReadOnly(text: string): string | null {
-  const query = text.trim().replace(/;+\s*$/, "");
-  if (!query) return "Enter a query to run.";
-  if (query.includes(";")) return "Run one statement at a time — remove the extra ';'.";
-  if (!/^(select|with)\b/i.test(query)) return "Only SELECT statements can be run here.";
-  const stripped = query.replace(/'[^']*'/g, "''").replace(/--[^\n]*/g, "");
+  // Strip literals and comments first, so a commented-out prefix cannot hide a
+  // second statement from the structural checks.
+  const stripped = text
+    .replace(/'(?:[^']|'')*'/g, "''")
+    .replace(/--[^\n]*/g, " ")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .trim()
+    .replace(/;+\s*$/, "");
+  if (!stripped) return "Enter a query to run.";
+  if (stripped.includes(";")) return "Run one statement at a time — remove the extra ';'.";
+  if (!/^(select|with)\b/i.test(stripped)) return "Only SELECT statements can be run here.";
   if (FORBIDDEN.test(stripped))
     return "This editor is read-only — statements that change data or schema are blocked.";
   return null;

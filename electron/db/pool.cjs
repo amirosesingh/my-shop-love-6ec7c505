@@ -197,13 +197,8 @@ async function connect(config) {
   const driverConfig = toDriverConfig(config);
   pool = await new (loadDriver().ConnectionPool)(driverConfig).connect();
   activeConfig = config;
-  await applySchema();
-  // Newly added columns must become visible to the write layer.
-  try {
-    require("./repo.cjs").forgetColumnCache();
-  } catch {
-    /* repo not loaded yet */
-  }
+  // Passive startup: connecting NEVER creates or alters tables. The operator
+  // applies database/schema.sql explicitly from Local Database settings.
   return pool;
 }
 
@@ -227,9 +222,22 @@ function getConfig() {
   return activeConfig;
 }
 
-/** Runs schema.sql batch-by-batch (mssql cannot execute GO separators). */
+/** Absolute path of the single master schema file, packaged or in-repo. */
+function schemaFile() {
+  const candidates = [
+    path.join(__dirname, "..", "..", "database", "schema.sql"),
+    path.join(process.resourcesPath ?? "", "database", "schema.sql"),
+    path.join(process.cwd(), "database", "schema.sql"),
+  ];
+  return candidates.find((p) => p && fs.existsSync(p)) ?? candidates[0];
+}
+
+/**
+ * Runs database/schema.sql batch-by-batch (mssql cannot execute GO separators).
+ * Only ever called from an explicit operator action in the UI.
+ */
 async function applySchema() {
-  const file = path.join(__dirname, "schema.sql");
+  const file = schemaFile();
   const text = fs.readFileSync(file, "utf8");
   const batches = text
     .split(/^\s*GO\s*$/gim)
@@ -264,6 +272,36 @@ async function test(config) {
   }
 }
 
+/** Reads the master schema file so the UI can show it before anything runs. */
+function readSchema() {
+  try {
+    const file = schemaFile();
+    const text = fs.readFileSync(file, "utf8");
+    const tables = [...text.matchAll(/CREATE TABLE dbo\.(\w+)/gi)].map((m) => m[1]);
+    return { ok: true, file, text, tables };
+  } catch (err) {
+    return { ok: false, error: err?.message ?? "Schema file could not be read" };
+  }
+}
+
+/**
+ * Explicit, operator-initiated schema apply. Never called on boot.
+ */
+async function applySchemaNow() {
+  if (!pool) return { ok: false, error: "Connect to the local database first." };
+  try {
+    await applySchema();
+    try {
+      require("./repo.cjs").forgetColumnCache();
+    } catch {
+      /* repo not loaded yet */
+    }
+    return { ok: true, file: schemaFile() };
+  } catch (err) {
+    return { ok: false, ...describeSqlError(err) };
+  }
+}
+
 module.exports = {
   sql,
   connect,
@@ -272,6 +310,9 @@ module.exports = {
   getConfig,
   test,
   applySchema,
+  applySchemaNow,
+  readSchema,
+  schemaFile,
   describeSqlError,
   parseServerField,
 };
