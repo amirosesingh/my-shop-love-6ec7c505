@@ -368,52 +368,6 @@ export const navGroups: NavGroup[] = [
       },
     ],
   },
-  {
-    id: "system",
-    label: "System & Settings",
-    icon: SettingsIcon,
-    hubTo: "/settings",
-    blurb: "Every configuration area for this install.",
-    items: [
-      {
-        to: "/settings",
-        label: "System & Settings",
-        icon: SettingsIcon,
-        adminOnly: true,
-        flag: "can_access_pos_settings",
-        keywords:
-          "configuration hub display text size font scaling theme dark light tax vat pricing business identity company name receipt typography extra lines qr elements bank transfer payment whatsapp sync backup terminal activation software updates system health",
-        blurb: "Display, tax, receipts, sync, terminals and updates.",
-      },
-      {
-        to: "/promotions",
-        label: "Point Rules",
-        icon: Sparkles,
-        adminOnly: true,
-        flag: "can_manage_promotions",
-        hash: "points",
-        keywords: "loyalty points per dollar policy",
-        blurb: "Loyalty points earned per dollar spent.",
-      },
-      {
-        to: "/settings/hardware",
-        label: "Terminal Hardware",
-        icon: MonitorCog,
-        flag: "can_access_pos_settings",
-        keywords: "printer drawer local only device this terminal hardware",
-        blurb: "Printer and cash drawer settings stored on this till alone.",
-      },
-      {
-        to: "/settings/branch-telemetry",
-        label: "Branch Telemetry Centre",
-        icon: MonitorSmartphone,
-        adminOnly: true,
-        flag: "can_access_pos_settings",
-        keywords: "monitor terminal health connection pending sync remote command refresh",
-        blurb: "Live health of every till, with data-only sync requests.",
-      },
-    ],
-  },
 ];
 
 export const navItemKey = (i: NavItem) => `${i.to}#${i.hash ?? ""}?${i.section ?? ""}`;
