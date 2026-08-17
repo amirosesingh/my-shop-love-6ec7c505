@@ -60,7 +60,7 @@ export const Route = createFileRoute("/settings/")({
 function SettingsHub() {
   const { isAdmin, can } = useAuth();
   const { visibleRoute } = useVisibility();
-  const navigate = useNavigate({ from: "/settings" });
+  const navigate = useNavigate({ from: "/settings/" });
   const { cat, card: openId } = Route.useSearch();
   const allowed = isAdmin || can("can_access_pos_settings");
 
@@ -90,10 +90,10 @@ function SettingsHub() {
 
   const open = settingsCard(openId);
   const openCard = (id: string) =>
-    void navigate({ search: (s) => ({ ...s, card: id }), replace: false });
+    void navigate({ search: { cat: activeCat, card: id } as never, replace: false });
   const closeCard = () => {
     setExpanded(false);
-    void navigate({ search: (s) => ({ ...s, card: undefined }), replace: false });
+    void navigate({ search: { cat: activeCat } as never, replace: false });
   };
 
   const Card = ({ c }: { c: (typeof cards)[number] }) => (
@@ -170,7 +170,7 @@ function SettingsHub() {
                           title={g.blurb}
                           aria-current={active ? "page" : undefined}
                           onClick={() =>
-                            void navigate({ search: (s) => ({ ...s, cat: g.id }), replace: true })
+                            void navigate({ search: { cat: g.id } as never, replace: true })
                           }
                           className={`whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                             active
