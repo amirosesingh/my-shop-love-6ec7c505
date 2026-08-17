@@ -45,6 +45,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { stockAt, usePos } from "@/lib/pos-store";
+import { availableAt, planDeduction, subWarehouses } from "@/lib/locations";
 import { printTransferNote } from "@/lib/pos-print";
 import type { Transfer, TransferItem, TransferKind } from "@/lib/pos-types";
 import { branchPolicy } from "@/lib/branch-policy";
@@ -86,12 +87,14 @@ function Transfers() {
   const {
     state,
     stores,
+    allStores,
     currentStore,
     activeShift,
     createTransfer,
     approveTransfer,
     receiveTransfer,
     rejectTransfer,
+    adjustStock,
   } = usePos();
   const { can } = useAuth();
   const search = Route.useSearch();
@@ -115,6 +118,15 @@ function Transfers() {
 
   const storeOf = (id: string) => stores.find((s) => s.id === id);
   const productOf = (id: string) => state.products.find((p) => p.id === id) ?? null;
+
+  /** Levels underneath the sending location, if it is split into floors. */
+  const sourceLevels = subWarehouses(allStores, currentStore.id);
+  /** Where each line will physically be picked from — primary level first. */
+  const pickPlan = (productId: string, qty: number) => {
+    const p = productOf(productId);
+    if (!p) return null;
+    return planDeduction(p, allStores, currentStore.id, qty);
+  };
 
   // Prefilled multi-item basket handed over from the inventory page.
   useEffect(() => {
@@ -253,17 +265,30 @@ function Transfers() {
     const fromStoreId = kind === "transfer" ? currentStore.id : otherStoreId;
     const toStoreId = kind === "transfer" ? otherStoreId : currentStore.id;
     if (kind === "transfer") {
-      const short = clean.find((i) => {
+      // With sub-warehouse levels the check — and the pick — spans every level.
+      for (const i of clean) {
         const p = productOf(i.productId);
-        return !p || stockAt(p, currentStore.id) < i.qty;
-      });
-      if (short) {
-        const p = productOf(short.productId);
-        toast.error(
-          `Only ${p ? stockAt(p, currentStore.id) : 0} × ${p?.name ?? "item"} on hand at ${currentStore.name}`,
-        );
-        return;
+        const plan = p ? planDeduction(p, allStores, currentStore.id, i.qty) : null;
+        if (!p || !plan || plan.shortBy > 0) {
+          toast.error(
+            `Short by ${plan?.shortBy ?? i.qty} × ${p?.name ?? "item"} at ${currentStore.name}`,
+            { description: "Nothing has been moved. Reduce the quantity or restock first." },
+          );
+          return;
+        }
       }
+      // Consolidate the picked levels into the sending location so the
+      // dispatch deduction below leaves the right shelf empty.
+      if (sourceLevels.length)
+        for (const i of clean) {
+          const p = productOf(i.productId);
+          if (!p) continue;
+          for (const pick of planDeduction(p, allStores, currentStore.id, i.qty).picks) {
+            if (pick.storeId === currentStore.id) continue;
+            adjustStock(i.productId, -pick.qty, pick.storeId);
+            adjustStock(i.productId, pick.qty, currentStore.id);
+          }
+        }
     }
     const t = createTransfer({
       kind,
@@ -539,6 +564,23 @@ function Transfers() {
                           ? ` · ${storeOf(otherStoreId)?.code} on hand: ${stockAt(p, otherStoreId)}`
                           : ""}
                       </p>
+                      {kind === "transfer" &&
+                        sourceLevels.length > 0 &&
+                        p &&
+                        (() => {
+                          const plan = pickPlan(i.productId, i.qty);
+                          if (!plan) return null;
+                          return plan.shortBy > 0 ? (
+                            <p className="numeric text-[11px] text-destructive">
+                              Short by {plan.shortBy} · {availableAt(p, allStores, currentStore.id)}{" "}
+                              across all levels
+                            </p>
+                          ) : (
+                            <p className="numeric text-[11px] text-primary">
+                              Picking {plan.picks.map((x) => `${x.qty} from ${x.name}`).join(" · ")}
+                            </p>
+                          );
+                        })()}
                     </div>
                     <Input
                       className="numeric h-9 w-20"

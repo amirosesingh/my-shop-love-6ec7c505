@@ -21,6 +21,8 @@ export type Store = {
   parentId?: string | null;
   /** the single central hub every inbound delivery lands in first */
   isCentral?: boolean;
+  /** the sub-warehouse level stock is picked from first */
+  isPrimarySub?: boolean;
   /** building this location sits in, e.g. "Riverside Tower" */
   buildingName?: string;
   /** floor or room designation, e.g. "2nd Floor Vault" */

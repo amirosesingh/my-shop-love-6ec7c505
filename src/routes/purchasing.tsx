@@ -49,7 +49,7 @@ import {
   useCategories,
 } from "@/lib/catalog-meta";
 import { resolveByBarcode } from "@/lib/product-lookup";
-import { centralHub, locationPath, routingTargets } from "@/lib/locations";
+import { centralHub, locationPath, primarySub, routingTargets } from "@/lib/locations";
 
 /** Sentinel for "no value picked" — Radix selects cannot hold an empty value. */
 const PO_NONE = "__none";
@@ -148,6 +148,12 @@ function Purchasing() {
     [allStores, currentStore.id, hub.id],
   );
   const [pending, setPending] = useState<PutAwayLine[]>([]);
+  /** Levels default to the warehouse's primary pick location when there is one. */
+  const defaultPutAwayId = useMemo(() => {
+    const primary = primarySub(allStores, hub.id) ?? primarySub(allStores, currentStore.id);
+    if (primary && putAwayTargets.some((s) => s.id === primary.id)) return primary.id;
+    return putAwayTargets[0]?.id ?? "";
+  }, [allStores, hub.id, currentStore.id, putAwayTargets]);
 
   const totals = useMemo(
     () => ({
@@ -480,7 +486,7 @@ function Purchasing() {
             name: l.name,
             qty: l.qty,
             invoiceNo: ref,
-            targetId: putAwayTargets[0].id,
+            targetId: defaultPutAwayId,
           })),
         ]);
       setInvoiceNo("");

@@ -261,6 +261,7 @@ export const rowToStore = (r: Row): Store => ({
   locationType: (r.location_type ?? "store") as Store["locationType"],
   parentId: r.parent_id ?? null,
   isCentral: !!r.is_central,
+  isPrimarySub: !!r.is_primary_sub,
   buildingName: r.building_name ?? "",
   floorLabel: r.floor_label ?? "",
   // Databases that predate the column report `undefined`; treat those as live.
@@ -278,6 +279,7 @@ export const storeToRow = (s: Store): Row => ({
   location_type: s.locationType ?? "store",
   parent_id: s.parentId || null,
   is_central: !!s.isCentral,
+  is_primary_sub: !!s.isPrimarySub,
   building_name: s.buildingName?.trim() || null,
   floor_label: s.floorLabel?.trim() || null,
   is_active: s.active !== false,

@@ -133,3 +133,73 @@ export function archiveBlockers(
     };
   return null;
 }
+
+/* ------------------------------------------------------------------ *
+ * Sub-warehouse levels
+ * ------------------------------------------------------------------ */
+
+/** The levels (floors / rooms) nested directly under a warehouse. */
+export const subWarehouses = (stores: Store[], id: string) =>
+  childrenOf(stores, id).filter((s) => s.locationType === "sub_warehouse");
+
+/** The level stock is picked from first. Falls back to the first level. */
+export const primarySub = (stores: Store[], id: string) => {
+  const subs = subWarehouses(stores, id);
+  return subs.find((s) => s.isPrimarySub) ?? subs[0] ?? null;
+};
+
+/** Pick order: default primary first, then the remaining levels, then the
+ *  warehouse's own bucket (stock booked in before levels existed). */
+export function pickOrder(stores: Store[], id: string): Store[] {
+  const subs = subWarehouses(stores, id);
+  if (!subs.length) return [];
+  const primary = primarySub(stores, id);
+  const rest = subs.filter((s) => s.id !== primary?.id);
+  const self = stores.find((s) => s.id === id);
+  return [...(primary ? [primary] : []), ...rest, ...(self ? [self] : [])];
+}
+
+export type DeductionPick = { storeId: string; name: string; qty: number };
+export type DeductionPlan = { picks: DeductionPick[]; taken: number; shortBy: number };
+
+/**
+ * Works out which levels a quantity actually leaves from.
+ *
+ * One level holding the item → it all comes from there. Both holding it →
+ * the default primary empties first and the balance tops up from the next
+ * level. Not enough anywhere → `shortBy` is set and nothing should move.
+ */
+export function planDeduction(
+  product: Product,
+  stores: Store[],
+  warehouseId: string,
+  qty: number,
+): DeductionPlan {
+  const want = Math.max(0, Math.floor(qty) || 0);
+  const order = pickOrder(stores, warehouseId);
+  if (!order.length) {
+    const have = stockAtLocation(product, warehouseId);
+    const taken = Math.min(have, want);
+    const self = stores.find((s) => s.id === warehouseId);
+    return {
+      picks: taken > 0 ? [{ storeId: warehouseId, name: self?.name ?? "Location", qty: taken }] : [],
+      taken,
+      shortBy: want - taken,
+    };
+  }
+  const picks: DeductionPick[] = [];
+  let left = want;
+  for (const level of order) {
+    if (left <= 0) break;
+    const have = stockAtLocation(product, level.id);
+    if (have <= 0) continue;
+    const take = Math.min(have, left);
+    picks.push({ storeId: level.id, name: level.name, qty: take });
+    left -= take;
+  }
+  return { picks, taken: want - left, shortBy: left };
+}
+
+/** Units of one product across a warehouse and every level under it. */
+export const availableAt = (product: Product, stores: Store[], id: string) =>
+  descendants(stores, id).reduce((a, s) => a + stockAtLocation(product, s.id), 0);
