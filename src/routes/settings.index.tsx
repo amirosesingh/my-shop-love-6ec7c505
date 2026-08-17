@@ -1,355 +1,54 @@
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import {
-  Activity,
-  Building2,
-  Database,
-  Landmark,
-  ListPlus,
-  EyeOff,
-  Globe,
-  MessageCircle,
-  MonitorCog,
-  MonitorSmartphone,
-  Smartphone,
-  DownloadCloud,
-  ArrowLeft,
-  Printer,
-  QrCode,
-  ReceiptText,
-  RefreshCw,
-  ScanBarcode,
-  Search,
-  ShieldCheck,
-  Type,
-} from "lucide-react";
+import { ArrowLeft, Search } from "lucide-react";
 import { AppShell } from "@/components/pos/AppShell";
-import { SettingsDrawer } from "@/components/pos/settings/SettingsDrawer";
-import { QUICK_CARDS, type QuickCardId } from "@/components/pos/settings/quick-cards";
+import { SettingsSheet } from "@/components/pos/settings/SettingsSheet";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/pos-auth";
 import { isDesktop } from "@/lib/branding";
 import { useVisibility } from "@/lib/ui-visibility";
+import {
+  PINNED_SETTINGS,
+  SETTINGS_CARDS,
+  SETTINGS_CATEGORIES,
+  settingsCard,
+  type SettingsCategoryId,
+} from "@/lib/settings-catalog";
 
-/** Settings live in categories: printer options with printing, messaging with
- *  messaging, and so on — nothing sits in an unrelated page any more. */
-const GROUPS = [
-  {
-    id: "terminal",
-    label: "Terminal & display",
-    blurb: "How this till looks and stays up to date.",
-    pages: [
-      {
-        to: "/settings/display",
-        label: "Display & text size",
-        icon: MonitorCog,
-        blurb: "Interface scale, density and light / dark theme.",
-      },
-      {
-        to: "/settings/updates",
-        label: "Software updates",
-        icon: DownloadCloud,
-        blurb: "App version, background updates and system health.",
-      },
-      {
-        to: "/settings/terminals",
-        label: "Terminal activation",
-        icon: MonitorSmartphone,
-        blurb: "Register Windows tills, issue and revoke activation codes.",
-        cloudOnly: true,
-      },
-      {
-        to: "/settings/mobile-terminals",
-        label: "Mobile terminals",
-        icon: Smartphone,
-        blurb: "Phones and tablets running the POS, managed separately from the tills.",
-        cloudOnly: true,
-      },
-      {
-        to: "/settings/sessions",
-        label: "Active sessions",
-        icon: MonitorSmartphone,
-        blurb: "Everyone signed in right now, with an instant remote sign-out.",
-        cloudOnly: true,
-      },
-    ],
-  },
-  {
-    id: "printing",
-    label: "Printing & receipts",
-    blurb: "The printer itself and everything that prints on the slip.",
-    pages: [
-      {
-        to: "/settings/printer",
-        label: "Receipt printer",
-        icon: Printer,
-        blurb: "Device, encoding, margins, drawer pin and a test print.",
-      },
-      {
-        to: "/settings/elements",
-        label: "Receipt elements",
-        icon: ReceiptText,
-        blurb: "Paper size, logo, points, barcode and tax blocks.",
-      },
-      {
-        to: "/settings/type",
-        label: "Receipt typography",
-        icon: Type,
-        blurb: "Fonts, sizes and spacing for printed slips.",
-      },
-      {
-        to: "/settings/lines",
-        label: "Receipt extra lines",
-        icon: ListPlus,
-        blurb: "Policy notes, promotions and opening hours.",
-      },
-      {
-        to: "/settings/qr",
-        label: "Receipt QR code",
-        icon: QrCode,
-        blurb: "QR payload, size and placement on the slip.",
-      },
-      {
-        to: "/settings/booking-slip",
-        label: "Booking slip wording",
-        icon: ReceiptText,
-        blurb: "Terms & conditions and the customer signature line.",
-      },
-    ],
-  },
-  {
-    id: "business",
-    label: "Business & pricing",
-    blurb: "Who you are, what you charge and when you trade.",
-    pages: [
-      {
-        to: "/settings/identity",
-        label: "Business identity",
-        icon: Building2,
-        blurb: "Company name, tax numbers, header and footer.",
-      },
-      {
-        to: "/settings/tax",
-        label: "Tax & pricing",
-        icon: ReceiptText,
-        blurb: "Global tax rate and inclusive or exclusive pricing.",
-      },
-      {
-        to: "/settings/rules",
-        label: "POS rules & enforcement",
-        icon: ShieldCheck,
-        blurb: "Shift, discount, refund and terminal security limits.",
-      },
-      {
-        to: "/settings/sku",
-        label: "SKU numbering",
-        icon: ScanBarcode,
-        blurb: "Automatic running-number product codes, or manual entry.",
-      },
-      {
-        to: "/settings/numbering",
-        label: "Bill numbering",
-        icon: ReceiptText,
-        blurb: "Branch, till, date and running number on every receipt.",
-      },
-      {
-        to: "/settings/catalog",
-        label: "Categories & units",
-        icon: ScanBarcode,
-        blurb: "Category groups, sub-categories and units of measure.",
-      },
-      {
-        to: "/settings/region",
-        label: "Region & time",
-        icon: Globe,
-        blurb: "Country, time zone, date order and 12 / 24-hour clock.",
-      },
-    ],
-  },
-  {
-    id: "access",
-    label: "Access & visibility",
-    blurb: "What each role can see on the busiest screens.",
-    pages: [
-      {
-        to: "/settings/visibility",
-        label: "Screen visibility",
-        icon: EyeOff,
-        blurb: "Hide register actions, payments or cost columns per role.",
-      },
-    ],
-  },
-  {
-    id: "payments",
-    label: "Payments & messaging",
-    blurb: "How customers pay and how bills reach them.",
-    pages: [
-      {
-        to: "/settings/payment-methods",
-        label: "Payment methods",
-        icon: Landmark,
-        blurb: "Tenders cashiers can collect, including voucher and coupon redemptions.",
-      },
-      {
-        to: "/settings/payment",
-        label: "Bank transfer details",
-        icon: Landmark,
-        blurb: "Bank account and payment QR for the customer display.",
-      },
-      {
-        to: "/settings/accounts",
-        label: "Payment accounts",
-        icon: Landmark,
-        blurb: "Card machines, bank accounts and e-wallets cashiers can pick at the till.",
-      },
-      {
-        to: "/settings/services",
-        label: "Booking services",
-        icon: Landmark,
-        blurb: "Re-stringing, repairs and other jobs with their default fee.",
-      },
-      {
-        to: "/settings/booking-rules",
-        label: "Booking rules",
-        icon: ShieldCheck,
-        blurb: "Deposits, turnaround, racket job requirements and who may cancel.",
-      },
-      {
-        to: "/settings/whatsapp",
-        label: "WhatsApp bills",
-        icon: MessageCircle,
-        blurb: "Send receipts over the WhatsApp Cloud API.",
-      },
-    ],
-  },
-  {
-    id: "data",
-    label: "Data & sync",
-    blurb: "Keeping this till in step with the cloud.",
-    pages: [
-      {
-        to: "/settings/sync",
-        label: "Sync & backup",
-        icon: RefreshCw,
-        blurb: "Branch identity, offline sync queue and backups.",
-      },
-      {
-        to: "/settings/system",
-        label: "System status & integrations",
-        icon: Activity,
-        blurb:
-          "One window for connection health, database health, logic health, security alerts, data sync and inheritance.",
-      },
-      {
-        to: "/settings/shift-alerts",
-        label: "Shift alerts",
-        icon: Activity,
-        blurb: "How the day-end shift summary reaches this device: in-app, WhatsApp or phone notification.",
-      },
-    ],
-  },
-  {
-    id: "diagnostics",
-    label: "Diagnostics & maintenance",
-    blurb: "Health scanners, alerts and the tools support asks for.",
-    pages: [
-      {
-        to: "/settings/diagnostics",
-        label: "Terminal diagnostics",
-        icon: Activity,
-        blurb: "Connection, storage and hardware checks for this machine.",
-      },
-      {
-        to: "/settings/logic-health",
-        label: "Database & logic health",
-        icon: ShieldCheck,
-        blurb: "Live schema scan, table links and the code checks, refreshed on every run.",
-      },
-      {
-        to: "/settings/database-explorer",
-        label: "Database explorer",
-        icon: Database,
-        blurb:
-          "Connect to the SQL Server on this machine, browse databases, tables and columns, run read-only checks.",
-      },
-      {
-        to: "/settings/data-sync",
-        label: "Data sync & audit",
-        icon: RefreshCw,
-        blurb: "Every push and pull between this till and the cloud.",
-      },
-      {
-        to: "/settings/inheritance",
-        label: "Settings inheritance",
-        icon: Building2,
-        blurb: "Which values come from global, cluster or this branch.",
-      },
-      {
-        to: "/settings/security-alerts",
-        label: "Security alerts",
-        icon: ShieldCheck,
-        blurb: "Findings raised by the security scanner, with acknowledgement.",
-      },
-      {
-        to: "/settings/notifications",
-        label: "Notification delivery",
-        icon: MessageCircle,
-        blurb: "Which events raise an alert and how they are delivered.",
-      },
-      {
-        to: "/settings/branch-telemetry",
-        label: "Branch telemetry centre",
-        icon: MonitorSmartphone,
-        blurb: "Live health of every till, with remote data-only sync requests.",
-        cloudOnly: true,
-      },
-      {
-        to: "/settings/hardware",
-        label: "Hardware & drawer",
-        icon: Printer,
-        blurb: "Printer, cash drawer and device identity for this machine only.",
-      },
-    ],
-  },
-] as const;
+type Search = { cat?: SettingsCategoryId; card?: string; section?: string };
 
-type SettingsPage = {
-  to: string;
-  label: string;
-  icon: typeof MonitorCog;
-  blurb: string;
-  cloudOnly?: boolean;
-};
-
-const PAGES: SettingsPage[] = GROUPS.flatMap((g) => g.pages as readonly SettingsPage[]);
-
-const LEGACY: Record<string, string> = Object.fromEntries(
-  PAGES.map((p) => [p.to.split("/").pop() as string, p.to]),
-);
+const CATEGORY_IDS = SETTINGS_CATEGORIES.map((c) => c.id) as string[];
 
 export const Route = createFileRoute("/settings/")({
-  validateSearch: (search: Record<string, unknown>) =>
-    typeof search["section"] === "string" && search["section"]
-      ? { section: search["section"] }
-      : {},
-  // Older links used /settings?section=tax — send them to the real page.
+  validateSearch: (search: Record<string, unknown>): Search => {
+    const out: Search = {};
+    const cat = search["cat"];
+    if (typeof cat === "string" && CATEGORY_IDS.includes(cat)) out.cat = cat as SettingsCategoryId;
+    const card = search["card"];
+    if (typeof card === "string" && settingsCard(card)) out.card = card;
+    const section = search["section"];
+    if (typeof section === "string" && section) out.section = section;
+    return out;
+  },
+  // Older links used /settings?section=tax — open that card in the workspace.
   beforeLoad: ({ search }) => {
-    const section = (search as { section?: string }).section;
-    const target = section ? LEGACY[section] : undefined;
-    if (target) throw redirect({ to: target });
+    const section = (search as Search).section;
+    if (!section) return;
+    const card = settingsCard(section);
+    throw redirect({ to: "/settings", search: card ? { card: card.id } : {} });
   },
   head: () => ({
     meta: [
-      { title: "System & Settings — Northwind POS" },
+      { title: "Settings Workspace — Northwind POS" },
       {
         name: "description",
         content:
-          "Every POS configuration area in one place: display scaling, tax, receipt design, payment details, WhatsApp bills and offline sync.",
+          "Every POS configuration area as a card: display, receipts, tax, payments, WhatsApp bills, sync and health checks, each opening in a half window over your work.",
       },
-      { property: "og:title", content: "System & Settings — Northwind POS" },
+      { property: "og:title", content: "Settings Workspace — Northwind POS" },
       {
         property: "og:description",
-        content: "All register configuration areas for the point of sale.",
+        content: "All register configuration in one workspace, opening in place.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -361,34 +60,56 @@ export const Route = createFileRoute("/settings/")({
 function SettingsHub() {
   const { isAdmin, can } = useAuth();
   const { visibleRoute } = useVisibility();
+  const navigate = useNavigate({ from: "/settings" });
+  const { cat, card: openId } = Route.useSearch();
   const allowed = isAdmin || can("can_access_pos_settings");
+
   const [desktop, setDesktop] = useState(false);
   useEffect(() => setDesktop(isDesktop()), []);
-  const groups = GROUPS.map((g) => ({
-    ...g,
-    pages: (g.pages as readonly SettingsPage[]).filter(
-      (p) => !(p.cloudOnly && desktop) && visibleRoute(p.to),
-    ),
-  })).filter((g) => g.pages.length > 0);
-  const [openId, setOpenId] = useState<string | null>(null);
-  const [quickId, setQuickId] = useState<QuickCardId | null>(null);
+  const [expanded, setExpanded] = useState(false);
   const [query, setQuery] = useState("");
   const term = query.trim().toLowerCase();
+
+  const cards = SETTINGS_CARDS.filter(
+    (c) => !(c.cloudOnly && desktop) && visibleRoute(c.to.split("?")[0] as string),
+  );
+  const categories = SETTINGS_CATEGORIES.filter((g) => cards.some((c) => c.category === g.id));
+  const activeCat = cat && categories.some((g) => g.id === cat) ? cat : categories[0]?.id;
+
   const matches = term
-    ? groups
-        .flatMap((g) => g.pages.map((p) => ({ ...p, group: g.label })))
-        .filter(
-          (p) =>
-            p.label.toLowerCase().includes(term) || p.blurb.toLowerCase().includes(term),
-        )
-    : [];
-  const open = groups.find((g) => g.id === openId) ?? null;
-  const quickMatches = term
-    ? QUICK_CARDS.filter(
-        (c) =>
-          c.label.toLowerCase().includes(term) || c.blurb.toLowerCase().includes(term),
+    ? cards.filter((c) =>
+        `${c.label} ${c.blurb} ${c.keywords ?? ""}`.toLowerCase().includes(term),
       )
     : [];
+  const shown = term ? matches : cards.filter((c) => c.category === activeCat);
+  const pinned = term
+    ? []
+    : PINNED_SETTINGS.map((id) => cards.find((c) => c.id === id)).filter(
+        (c): c is (typeof cards)[number] => !!c,
+      );
+
+  const open = settingsCard(openId);
+  const openCard = (id: string) =>
+    void navigate({ search: (s) => ({ ...s, card: id }), replace: false });
+  const closeCard = () => {
+    setExpanded(false);
+    void navigate({ search: (s) => ({ ...s, card: undefined }), replace: false });
+  };
+
+  const Card = ({ c }: { c: (typeof cards)[number] }) => (
+    <button
+      key={c.id}
+      type="button"
+      onClick={() => openCard(c.id)}
+      className="flex items-start gap-3 rounded-lg border border-border bg-card p-4 text-left transition-colors hover:border-primary/60"
+    >
+      <c.icon className="mt-0.5 size-5 shrink-0 text-primary" />
+      <span className="min-w-0">
+        <span className="block text-sm font-medium">{c.label}</span>
+        <span className="block text-xs text-muted-foreground">{c.blurb}</span>
+      </span>
+    </button>
+  );
 
   return (
     <AppShell>
@@ -401,10 +122,12 @@ function SettingsHub() {
             <ArrowLeft className="size-4" /> Back to register
           </Link>
         </div>
+
         <header>
-          <h1 className="text-2xl font-semibold">System & settings</h1>
+          <h1 className="text-2xl font-semibold">Settings workspace</h1>
           <p className="text-sm text-muted-foreground">
-            Each area opens as its own page, so nothing scrolls out from under you.
+            Pick a category, then open any card in a half window over your work. Staff accounts and
+            audit logs live under Staff &amp; Admin in the menu.
           </p>
         </header>
 
@@ -425,132 +148,66 @@ function SettingsHub() {
               />
             </div>
 
-            {term ? (
-              matches.length || quickMatches.length ? (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {quickMatches.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => setQuickId(c.id)}
-                      className="flex items-start gap-3 rounded-lg border border-border bg-card p-4 text-left transition-colors hover:border-primary/60"
-                    >
-                      <c.icon className="mt-0.5 size-5 shrink-0 text-primary" />
-                      <span className="min-w-0">
-                        <span className="block text-sm font-medium">{c.label}</span>
-                        <span className="block text-xs text-muted-foreground">{c.blurb}</span>
-                        <span className="mt-1 block text-[11px] text-muted-foreground">
-                          Opens here
-                        </span>
-                      </span>
-                    </button>
-                  ))}
-                  {matches.map((p) => (
-                    <Link
-                      key={p.to}
-                      to={p.to as never}
-                      className="flex items-start gap-3 rounded-lg border border-border bg-card p-4 transition-colors hover:border-primary/60"
-                    >
-                      <p.icon className="mt-0.5 size-5 shrink-0 text-primary" />
-                      <span className="min-w-0">
-                        <span className="block text-sm font-medium">{p.label}</span>
-                        <span className="block text-xs text-muted-foreground">{p.blurb}</span>
-                        <span className="mt-1 block text-[11px] text-muted-foreground">
-                          {p.group}
-                        </span>
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Nothing matches “{query}”. Try a shorter word.
-                </p>
-              )
-            ) : (
+            {!term && (
               <>
-            <section className="space-y-3">
-              <h2 className="text-sm font-semibold">Quick access</h2>
+                <section className="space-y-2">
+                  <h2 className="text-sm font-semibold">Quick access</h2>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {pinned.map((c) => (
+                      <Card key={c.id} c={c} />
+                    ))}
+                  </div>
+                </section>
+
+                <nav aria-label="Settings categories" className="w-full max-w-full">
+                  <div className="flex w-full flex-wrap gap-1 rounded-lg border border-border bg-card p-1">
+                    {categories.map((g) => {
+                      const active = g.id === activeCat;
+                      return (
+                        <button
+                          key={g.id}
+                          type="button"
+                          title={g.blurb}
+                          aria-current={active ? "page" : undefined}
+                          onClick={() =>
+                            void navigate({ search: (s) => ({ ...s, cat: g.id }), replace: true })
+                          }
+                          className={`whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                            active
+                              ? "bg-primary text-primary-foreground"
+                              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                          }`}
+                        >
+                          {g.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </nav>
+              </>
+            )}
+
+            {shown.length ? (
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {QUICK_CARDS.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => setQuickId(c.id)}
-                    className="flex items-start gap-3 rounded-lg border border-border bg-card p-4 text-left transition-colors hover:border-primary/60"
-                  >
-                    <c.icon className="mt-0.5 size-5 shrink-0 text-primary" />
-                    <span className="min-w-0">
-                      <span className="block text-sm font-medium">{c.label}</span>
-                      <span className="block text-xs text-muted-foreground">{c.blurb}</span>
-                    </span>
-                  </button>
+                {shown.map((c) => (
+                  <Card key={c.id} c={c} />
                 ))}
               </div>
-            </section>
-
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {groups.map((g) => {
-                const Icon = (g.pages as readonly SettingsPage[])[0]?.icon ?? MonitorCog;
-                const active = g.id === openId;
-                return (
-                  <button
-                    key={g.id}
-                    type="button"
-                    onClick={() => setOpenId(active ? null : g.id)}
-                    aria-expanded={active}
-                    className={`flex items-start gap-3 rounded-lg border p-4 text-left transition-colors ${
-                      active
-                        ? "border-primary bg-primary/5"
-                        : "border-border bg-card hover:border-primary/60"
-                    }`}
-                  >
-                    <Icon className="mt-0.5 size-5 shrink-0 text-primary" />
-                    <span className="min-w-0">
-                      <span className="block text-sm font-medium">{g.label}</span>
-                      <span className="block text-xs text-muted-foreground">{g.blurb}</span>
-                      <span className="mt-1 block text-[11px] text-muted-foreground">
-                        {g.pages.length} {g.pages.length === 1 ? "page" : "pages"}
-                      </span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {open ? (
-              <section className="space-y-3 rounded-lg border border-border bg-surface-2 p-4">
-                <div>
-                  <h2 className="text-sm font-semibold">{open.label}</h2>
-                  <p className="text-xs text-muted-foreground">{open.blurb}</p>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {open.pages.map((p) => (
-                    <Link
-                      key={p.to}
-                      to={p.to as never}
-                      className="flex items-start gap-3 rounded-lg border border-border bg-card p-4 transition-colors hover:border-primary/60"
-                    >
-                      <p.icon className="mt-0.5 size-5 shrink-0 text-primary" />
-                      <span className="min-w-0">
-                        <span className="block text-sm font-medium">{p.label}</span>
-                        <span className="block text-xs text-muted-foreground">{p.blurb}</span>
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              </section>
             ) : (
-              <p className="text-xs text-muted-foreground">
-                Pick a category to see the pages inside it.
+              <p className="text-sm text-muted-foreground">
+                Nothing matches “{query}”. Try a shorter word.
               </p>
-            )}
-              </>
             )}
           </div>
         )}
       </div>
-      <SettingsDrawer openId={quickId} onClose={() => setQuickId(null)} />
+
+      <SettingsSheet
+        card={open}
+        expanded={expanded}
+        onExpandedChange={setExpanded}
+        onClose={closeCard}
+      />
     </AppShell>
   );
 }
