@@ -4254,342 +4254,478 @@ $$;
 DO $do$ BEGIN
 ALTER TABLE ONLY public.activity_events
     ADD CONSTRAINT activity_events_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.app_users
     ADD CONSTRAINT app_users_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.app_users
     ADD CONSTRAINT app_users_user_id_key UNIQUE (user_id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.audit_logs
     ADD CONSTRAINT audit_logs_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.booking_payments
     ADD CONSTRAINT booking_payments_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.bookings
     ADD CONSTRAINT bookings_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.branch_telemetry
     ADD CONSTRAINT branch_telemetry_pkey PRIMARY KEY (terminal_id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.cashiers
     ADD CONSTRAINT cashiers_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.coupon_campaigns
     ADD CONSTRAINT coupon_campaigns_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.coupon_campaigns
     ADD CONSTRAINT coupon_campaigns_slug_key UNIQUE (slug);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.coupon_events
     ADD CONSTRAINT coupon_events_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.drawer_events
     ADD CONSTRAINT drawer_events_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.held_orders
     ADD CONSTRAINT held_orders_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.integration_settings
     ADD CONSTRAINT integration_settings_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.issued_vouchers
     ADD CONSTRAINT issued_vouchers_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.issued_vouchers
     ADD CONSTRAINT issued_vouchers_token_slug_key UNIQUE (token_slug);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.item_activity_logs
     ADD CONSTRAINT item_activity_logs_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.member_verifications
     ADD CONSTRAINT member_verifications_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.members
     ADD CONSTRAINT members_member_code_key UNIQUE (member_code);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.members
     ADD CONSTRAINT members_phone_key UNIQUE (phone);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.members
     ADD CONSTRAINT members_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.membership_tiers
     ADD CONSTRAINT membership_tiers_name_key UNIQUE (name);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.membership_tiers
     ADD CONSTRAINT membership_tiers_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.offline_sync_audit_log
     ADD CONSTRAINT offline_sync_audit_log_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.payment_transactions
     ADD CONSTRAINT payment_transactions_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.payment_types
     ADD CONSTRAINT payment_types_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.payment_types
     ADD CONSTRAINT payment_types_type_code_key UNIQUE (type_code);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.pin_attempts
     ADD CONSTRAINT pin_attempts_pkey PRIMARY KEY (key);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.pos_settings
     ADD CONSTRAINT pos_settings_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.product_barcodes
     ADD CONSTRAINT product_barcodes_barcode_key UNIQUE (barcode);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.product_barcodes
     ADD CONSTRAINT product_barcodes_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.product_categories
     ADD CONSTRAINT product_categories_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.products
     ADD CONSTRAINT products_barcode_key UNIQUE (barcode);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.products
     ADD CONSTRAINT products_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.promotions
     ADD CONSTRAINT promotions_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.public_flags
     ADD CONSTRAINT public_flags_pkey PRIMARY KEY (key);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.purchase_order_items
     ADD CONSTRAINT purchase_order_items_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.purchase_orders
     ADD CONSTRAINT purchase_orders_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.purchase_orders
     ADD CONSTRAINT purchase_orders_po_number_key UNIQUE (po_number);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.sale_items
     ADD CONSTRAINT sale_items_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.sales
     ADD CONSTRAINT sales_bill_number_key UNIQUE (bill_number);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.sales
     ADD CONSTRAINT sales_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.secure_settings
     ADD CONSTRAINT secure_settings_pkey PRIMARY KEY (key);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.security_findings
     ADD CONSTRAINT security_findings_fingerprint_key UNIQUE (fingerprint);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.security_findings
     ADD CONSTRAINT security_findings_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.settings_locks
     ADD CONSTRAINT settings_locks_pkey PRIMARY KEY (section);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.settings_overrides
     ADD CONSTRAINT settings_overrides_pkey PRIMARY KEY (scope, scope_id, section);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.shift_sessions
     ADD CONSTRAINT shift_sessions_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.shifts
     ADD CONSTRAINT shifts_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.sku_audit
     ADD CONSTRAINT sku_audit_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.staff_roles
     ADD CONSTRAINT staff_roles_pkey PRIMARY KEY (slug);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.stock_adjustments
     ADD CONSTRAINT stock_adjustments_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.stock_delta_applied
     ADD CONSTRAINT stock_delta_applied_pkey PRIMARY KEY (movement_id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.stock_transfer_items
     ADD CONSTRAINT stock_transfer_items_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.stock_transfers
     ADD CONSTRAINT stock_transfers_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.stock_transfers
     ADD CONSTRAINT stock_transfers_ref_key UNIQUE (ref);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.stores
     ADD CONSTRAINT stores_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.suppliers
     ADD CONSTRAINT suppliers_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.sync_metadata
     ADD CONSTRAINT sync_metadata_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.sync_metadata
     ADD CONSTRAINT sync_metadata_store_id_terminal_id_table_name_key UNIQUE (store_id, terminal_id, table_name);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.system_audit_logs
     ADD CONSTRAINT system_audit_logs_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.terminal_commands
     ADD CONSTRAINT terminal_commands_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.terminal_tokens
     ADD CONSTRAINT terminal_tokens_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.uom_units
     ADD CONSTRAINT uom_units_code_key UNIQUE (code);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.uom_units
     ADD CONSTRAINT uom_units_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.user_roles
     ADD CONSTRAINT user_roles_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.user_roles
     ADD CONSTRAINT user_roles_user_id_role_key UNIQUE (user_id, role);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.whatsapp_queue
     ADD CONSTRAINT whatsapp_queue_pkey PRIMARY KEY (id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS activity_events_client_event_id_key ON public.activity_events USING btree (client_event_id) WHERE (client_event_id IS NOT NULL);
 
@@ -5210,132 +5346,184 @@ CREATE TRIGGER whatsapp_queue_touch_updated_at BEFORE UPDATE ON public.whatsapp_
 DO $do$ BEGIN
 ALTER TABLE ONLY public.booking_payments
     ADD CONSTRAINT booking_payments_booking_id_fkey FOREIGN KEY (booking_id) REFERENCES public.bookings(id) ON DELETE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.bookings
     ADD CONSTRAINT bookings_member_id_fkey FOREIGN KEY (member_id) REFERENCES public.members(id) ON DELETE SET NULL;
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.coupon_events
     ADD CONSTRAINT coupon_events_campaign_id_fkey FOREIGN KEY (campaign_id) REFERENCES public.coupon_campaigns(id) ON DELETE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.coupon_events
     ADD CONSTRAINT coupon_events_member_id_fkey FOREIGN KEY (member_id) REFERENCES public.members(id) ON DELETE SET NULL;
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.member_verifications
     ADD CONSTRAINT fk_member_verifications_member FOREIGN KEY (member_id) REFERENCES public.members(id) ON DELETE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.issued_vouchers
     ADD CONSTRAINT issued_vouchers_campaign_id_fkey FOREIGN KEY (campaign_id) REFERENCES public.coupon_campaigns(id) ON DELETE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.issued_vouchers
     ADD CONSTRAINT issued_vouchers_member_id_fkey FOREIGN KEY (member_id) REFERENCES public.members(id) ON DELETE SET NULL;
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.item_activity_logs
     ADD CONSTRAINT item_activity_logs_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.members
     ADD CONSTRAINT members_tier_id_fkey FOREIGN KEY (tier_id) REFERENCES public.membership_tiers(id) ON DELETE SET NULL;
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.payment_transactions
     ADD CONSTRAINT payment_transactions_booking_id_fkey FOREIGN KEY (booking_id) REFERENCES public.bookings(id) ON DELETE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.payment_transactions
     ADD CONSTRAINT payment_transactions_member_id_fkey FOREIGN KEY (member_id) REFERENCES public.members(id) ON DELETE SET NULL;
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.payment_transactions
     ADD CONSTRAINT payment_transactions_sale_id_fkey FOREIGN KEY (sale_id) REFERENCES public.sales(id) ON DELETE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.product_barcodes
     ADD CONSTRAINT product_barcodes_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.product_categories
     ADD CONSTRAINT product_categories_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES public.product_categories(id) ON DELETE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.promotions
     ADD CONSTRAINT promotions_foc_product_id_fkey FOREIGN KEY (foc_product_id) REFERENCES public.products(id) ON DELETE SET NULL;
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.purchase_order_items
     ADD CONSTRAINT purchase_order_items_po_id_fkey FOREIGN KEY (po_id) REFERENCES public.purchase_orders(id) ON DELETE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.purchase_order_items
     ADD CONSTRAINT purchase_order_items_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE SET NULL;
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.purchase_orders
     ADD CONSTRAINT purchase_orders_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES public.suppliers(id);
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.sale_items
     ADD CONSTRAINT sale_items_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE SET NULL;
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.sale_items
     ADD CONSTRAINT sale_items_sale_id_fkey FOREIGN KEY (sale_id) REFERENCES public.sales(id) ON DELETE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.sales
     ADD CONSTRAINT sales_member_id_fkey FOREIGN KEY (member_id) REFERENCES public.members(id) ON DELETE SET NULL;
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.stock_adjustments
     ADD CONSTRAINT stock_adjustments_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE SET NULL;
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.stock_transfer_items
     ADD CONSTRAINT stock_transfer_items_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE SET NULL;
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.stock_transfer_items
     ADD CONSTRAINT stock_transfer_items_transfer_id_fkey FOREIGN KEY (transfer_id) REFERENCES public.stock_transfers(id) ON DELETE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.stores
     ADD CONSTRAINT stores_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES public.stores(id) ON DELETE SET NULL;
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DO $do$ BEGIN
 ALTER TABLE ONLY public.terminal_tokens
     ADD CONSTRAINT terminal_tokens_location_id_fkey FOREIGN KEY (location_id) REFERENCES public.stores(id) ON DELETE SET NULL;
-EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL; END $do$;
+EXCEPTION WHEN duplicate_object THEN NULL; WHEN duplicate_table THEN NULL;
+          WHEN duplicate_column THEN NULL; WHEN invalid_table_definition THEN NULL;
+          WHEN unique_violation THEN NULL; END $do$;
 
 DROP POLICY IF EXISTS "Admins manage roles" ON public.user_roles;
 
