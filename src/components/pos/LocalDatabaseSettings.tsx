@@ -15,9 +15,7 @@ import {
   hasLocalDb,
   localDb,
   loadLocalDbConfig,
-  scanLocalDatabases,
   writeLocalDbConfig,
-  type DiscoveredDbServer,
   type LocalDbConfig,
   type LocalDbTestResult,
   type LocalSyncStatus,
@@ -35,9 +33,6 @@ export function LocalDatabaseSettings() {
   const [status, setStatus] = useState<LocalSyncStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [diagnostic, setDiagnostic] = useState<LocalDbTestResult | null>(null);
-  const [scanning, setScanning] = useState(false);
-  const [found, setFound] = useState<DiscoveredDbServer[] | null>(null);
-  const [scanNote, setScanNote] = useState<string | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
 
   useEffect(() => {
@@ -69,9 +64,6 @@ export function LocalDatabaseSettings() {
     );
   }
 
-  const set = <K extends keyof LocalDbConfig>(key: K, value: LocalDbConfig[K]) =>
-    setConfig((c) => ({ ...c, [key]: value }));
-
   const run = async (label: string, fn: () => Promise<{ ok: boolean; error?: string }>) => {
     setBusy(true);
     try {
@@ -94,45 +86,6 @@ export function LocalDatabaseSettings() {
       if (res.ok) toast.success("Connection works");
       else toast.error(res.error ?? "Could not connect");
       await refresh();
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  /** One-click look-up of SQL Server instances on this PC and the shop LAN. */
-  const scanNetwork = async () => {
-    setScanning(true);
-    setFound(null);
-    setScanNote(null);
-    try {
-      const res = await scanLocalDatabases();
-      setFound(res.servers ?? []);
-      setScanNote(res.hint ?? res.error ?? null);
-      if (res.servers?.length) toast.success(`Found ${res.servers.length} database server(s)`);
-      else if (res.error) toast.error(res.error);
-      else toast.message("No database servers answered");
-    } finally {
-      setScanning(false);
-    }
-  };
-
-  /** Fill the form from a discovered instance, then verify it straight away. */
-  const selectServer = async (server: DiscoveredDbServer) => {
-    const host = server.serverName || server.address;
-    const next: LocalDbConfig = {
-      ...config,
-      server: server.instance ? `${host}\\${server.instance}` : host,
-      port: server.port ?? config.port,
-    };
-    setConfig(next);
-    setFound(null);
-    setBusy(true);
-    setDiagnostic(null);
-    try {
-      const res = await localDb()!.test(next);
-      setDiagnostic(res);
-      if (res.ok) toast.success("Connection works");
-      else toast.error(res.error ?? "Could not connect");
     } finally {
       setBusy(false);
     }
@@ -179,60 +132,17 @@ export function LocalDatabaseSettings() {
         }}
       />
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Server / instance">
-          <div className="flex gap-2">
-            <Input value={config.server} onChange={(e) => set("server", e.target.value)} />
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="shrink-0"
-              disabled={scanning || busy}
-              onClick={scanNetwork}
-            >
-              {scanning ? "Scanning…" : "Scan network"}
-            </Button>
-          </div>
-        </Field>
-        <Field label="Database">
-          <Input value={config.database} onChange={(e) => set("database", e.target.value)} />
-        </Field>
-        <Field label="Sign-in">
-          <Select
-            value={config.auth}
-            onValueChange={(v) => set("auth", v as LocalDbConfig["auth"])}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="windows">Windows account</SelectItem>
-              <SelectItem value="sql">SQL Server login</SelectItem>
-            </SelectContent>
-          </Select>
-        </Field>
-        <Field label="Port">
-          <Input
-            type="number"
-            value={config.port}
-            onChange={(e) => set("port", Number(e.target.value) || 1433)}
-          />
-        </Field>
-        {config.auth === "sql" && (
-          <>
-            <Field label="User">
-              <Input value={config.user} onChange={(e) => set("user", e.target.value)} />
-            </Field>
-            <Field label="Password">
-              <Input
-                type="password"
-                value={config.password}
-                onChange={(e) => set("password", e.target.value)}
-              />
-            </Field>
-          </>
-        )}
+      <div className="rounded-md border border-border px-3 py-2 text-xs">
+        <p>
+          <span className="text-muted-foreground">Server</span> {config.server || "not set"}
+          {" · "}
+          <span className="text-muted-foreground">Database</span> {config.database || "not set"}
+        </p>
+        <p className="text-muted-foreground">
+          {config.auth === "windows"
+            ? "Signs in with this Windows account."
+            : `SQL Server login${config.user ? ` (${config.user})` : ""}`}
+        </p>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -283,52 +193,6 @@ export function LocalDatabaseSettings() {
           </Button>
         )}
       </div>
-
-      {(scanning || found || scanNote) && (
-        <div className="rounded-md border border-border px-3 py-2 text-xs">
-          {scanning ? (
-            <p className="flex items-center gap-2 text-muted-foreground">
-              <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-              Searching local network for database instances…
-            </p>
-          ) : found && found.length > 0 ? (
-            <div className="space-y-1">
-              <p className="text-muted-foreground">Discovered database servers</p>
-              {found.map((s) => (
-                <div
-                  key={`${s.address}\\${s.instance}`}
-                  className="flex flex-wrap items-center justify-between gap-2 border-t border-border py-1"
-                >
-                  <div>
-                    <p>
-                      {s.serverName}
-                      {s.serverName !== s.address ? ` (${s.address})` : ""}
-                      {s.instance ? ` \\ ${s.instance}` : " \\ default instance"}
-                    </p>
-                    <p className="text-muted-foreground">
-                      Port {s.port ?? "dynamic"}
-                      {s.version ? ` · SQL Server ${s.version}` : ""}
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 px-2 text-xs"
-                    disabled={busy}
-                    onClick={() => void selectServer(s)}
-                  >
-                    Select &amp; connect
-                  </Button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-muted-foreground">
-              {scanNote ?? "No database servers answered on this network."}
-            </p>
-          )}
-        </div>
-      )}
 
       {diagnostic && (
         <div
