@@ -49,7 +49,7 @@ import {
   useCategories,
 } from "@/lib/catalog-meta";
 import { resolveByBarcode } from "@/lib/product-lookup";
-import { centralHub, locationPath, routingTargets } from "@/lib/locations";
+import { centralHub, locationPath, primarySub, routingTargets } from "@/lib/locations";
 
 /** Sentinel for "no value picked" — Radix selects cannot hold an empty value. */
 const PO_NONE = "__none";
