@@ -1016,5 +1016,6 @@ app.on("window-all-closed", async () => {
   updater.stop();
   stopAppServer();
   await pool.close();
+  await sqlAdmin.disconnect().catch(() => {});
   if (process.platform !== "darwin") app.quit();
 });
