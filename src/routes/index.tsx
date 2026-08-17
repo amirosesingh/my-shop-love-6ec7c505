@@ -254,7 +254,6 @@ function Register() {
   // What the booking is for (re-stringing, repair …) and when it gets paid.
   const [serviceId, setServiceId] = useState("");
   const [customService, setCustomService] = useState("");
-  const [serviceFee, setServiceFee] = useState("");
   const [payTiming, setPayTiming] = useState<BookingPaymentTiming>("deposit");
   /* Racket stringing job card */
   /** Which flow opened the booking dialog: goods booking vs racket job. */
@@ -740,11 +739,8 @@ function Register() {
   }
 
   const serviceTypes = (state.settings.integrations.serviceTypes ?? []).filter((s2) => s2.active && s2.name.trim());
-  const useServices = !!state.settings.integrations.useServiceTypes;
   const pickedService = serviceTypes.find((s2) => s2.id === serviceId) ?? null;
   const stringingService = serviceTypes.find((s2) => s2.isStringingJob) ?? null;
-  /** Goods bookings never offer stringing work — that is the racket flow. */
-  const cartServiceTypes = serviceTypes.filter((s2) => !s2.isStringingJob);
   const racketMode = bookMode === "racket";
 
   function resetJobCard() {
@@ -817,10 +813,7 @@ function Register() {
     setDeposit("");
     setBookName(member?.name ?? "");
     setBookPhone(member?.phone ?? "");
-    if (stringingService) {
-      setServiceId(stringingService.id);
-      setServiceFee(stringingService.fee ? String(stringingService.fee) : "");
-    }
+    if (stringingService) setServiceId(stringingService.id);
     setIntakeCharges([
       {
         kind: "labor",
@@ -1223,7 +1216,6 @@ function Register() {
     setBookNote("");
     setServiceId("");
     setCustomService("");
-    setServiceFee("");
     resetJobCard();
     setBookMode("cart");
     setPayTiming("deposit");
