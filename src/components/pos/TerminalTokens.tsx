@@ -106,7 +106,7 @@ export function TerminalTokens({
     } catch (e) {
       setError(
         (e as { message?: string })?.message ??
-          "Could not load terminal tokens. Has schema10.sql been applied?",
+          "Could not load terminal tokens. Has supabase/schema.sql been applied?",
       );
     } finally {
       setLoading(false);
