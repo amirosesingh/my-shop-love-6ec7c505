@@ -751,3 +751,308 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   updated_at      TEXT
 );
 CREATE INDEX IF NOT EXISTS audit_logs_created_idx ON audit_logs (created_at DESC);
+
+
+-- ==========================================================================
+--  Cloud-parity top-up: tables added since the last revision.
+--  Additive only; the runtime column check in sqlite.cjs fills in any
+--  column added to an existing table.
+-- ==========================================================================
+
+-- ---- integration_settings ----
+CREATE TABLE IF NOT EXISTS integration_settings (
+  id TEXT PRIMARY KEY NOT NULL,
+  provider_name TEXT,
+  api_keys_encrypted TEXT DEFAULT '{}' NOT NULL,
+  verification_channel TEXT DEFAULT 'whatsapp' NOT NULL,
+  strict_verification INTEGER DEFAULT 0 NOT NULL,
+  is_active INTEGER DEFAULT 1 NOT NULL,
+  updated_by TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  is_synced INTEGER DEFAULT 0,
+  sync_status TEXT DEFAULT 'pending',
+  row_version INTEGER DEFAULT 0,
+  sync_attempts INTEGER DEFAULT 0,
+  last_error_at TEXT,
+  client_transaction_id TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_integration_settings_created_at ON integration_settings (created_at);
+
+-- ---- offline_sync_audit_log ----
+CREATE TABLE IF NOT EXISTS offline_sync_audit_log (
+  id TEXT PRIMARY KEY NOT NULL,
+  terminal_id TEXT,
+  store_id TEXT,
+  direction TEXT,
+  table_name TEXT,
+  record_id TEXT,
+  records INTEGER DEFAULT 0 NOT NULL,
+  status TEXT DEFAULT 'ok' NOT NULL,
+  error_message TEXT,
+  started_at TEXT NOT NULL,
+  finished_at TEXT,
+  created_at TEXT NOT NULL,
+  is_synced INTEGER DEFAULT 0,
+  sync_status TEXT DEFAULT 'pending',
+  row_version INTEGER DEFAULT 0,
+  sync_attempts INTEGER DEFAULT 0,
+  last_error_at TEXT,
+  client_transaction_id TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_offline_sync_audit_log_store_id ON offline_sync_audit_log (store_id);
+CREATE INDEX IF NOT EXISTS ix_offline_sync_audit_log_status ON offline_sync_audit_log (status);
+CREATE INDEX IF NOT EXISTS ix_offline_sync_audit_log_created_at ON offline_sync_audit_log (created_at);
+
+-- ---- pin_attempts ----
+CREATE TABLE IF NOT EXISTS pin_attempts (
+  key TEXT PRIMARY KEY NOT NULL,
+  attempts INTEGER DEFAULT 0 NOT NULL,
+  window_started_at TEXT NOT NULL,
+  locked_until TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  is_synced INTEGER DEFAULT 0,
+  sync_status TEXT DEFAULT 'pending',
+  row_version INTEGER DEFAULT 0,
+  sync_attempts INTEGER DEFAULT 0,
+  last_error_at TEXT,
+  client_transaction_id TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_pin_attempts_created_at ON pin_attempts (created_at);
+
+-- ---- pos_settings ----
+CREATE TABLE IF NOT EXISTS pos_settings (
+  id INTEGER PRIMARY KEY DEFAULT 1 NOT NULL,
+  tax_percentage REAL DEFAULT 0 NOT NULL,
+  enable_tax INTEGER DEFAULT 1 NOT NULL,
+  tax_mode TEXT DEFAULT 'exclusive' NOT NULL,
+  paper_size TEXT DEFAULT '80mm' NOT NULL,
+  header_text TEXT,
+  footer_text TEXT,
+  show_logo INTEGER DEFAULT 1 NOT NULL,
+  show_points INTEGER DEFAULT 1 NOT NULL,
+  show_barcode INTEGER DEFAULT 1 NOT NULL,
+  show_tax_details INTEGER DEFAULT 1 NOT NULL,
+  updated_at TEXT NOT NULL,
+  company_name TEXT DEFAULT 'NORTHWIND & CO.' NOT NULL,
+  tax_number TEXT,
+  reg_number TEXT,
+  phone TEXT,
+  website TEXT,
+  fonts TEXT DEFAULT '{}' NOT NULL,
+  custom_lines TEXT DEFAULT '[]' NOT NULL,
+  qr TEXT DEFAULT '{}' NOT NULL,
+  review_max_voids INTEGER DEFAULT 5 NOT NULL,
+  review_max_refunds INTEGER DEFAULT 3 NOT NULL,
+  review_max_refund_value REAL DEFAULT 200 NOT NULL,
+  review_max_nosale INTEGER DEFAULT 5 NOT NULL,
+  review_max_discount_pct REAL DEFAULT 15 NOT NULL,
+  day_start_time TEXT DEFAULT '09:00' NOT NULL,
+  day_end_time TEXT DEFAULT '22:00' NOT NULL,
+  max_shift_hours REAL DEFAULT 12 NOT NULL,
+  shift_reminder_minutes INTEGER DEFAULT 30 NOT NULL,
+  ui_visibility TEXT DEFAULT '{"hidden": {}}' NOT NULL,
+  integration_settings TEXT DEFAULT '{}' NOT NULL,
+  region_country TEXT DEFAULT '' NOT NULL,
+  time_zone TEXT DEFAULT '' NOT NULL,
+  date_format TEXT DEFAULT 'dd/MM/yyyy' NOT NULL,
+  time_format TEXT DEFAULT '24h' NOT NULL,
+  booking_slip TEXT DEFAULT '{}' NOT NULL,
+  notification_settings TEXT DEFAULT '{}' NOT NULL,
+  row_version INTEGER DEFAULT 1 NOT NULL,
+  logo_data_url TEXT,
+  receipt_design TEXT DEFAULT '{}' NOT NULL,
+  is_synced INTEGER DEFAULT 0,
+  sync_status TEXT DEFAULT 'pending',
+  sync_attempts INTEGER DEFAULT 0,
+  last_error_at TEXT,
+  client_transaction_id TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_pos_settings_phone ON pos_settings (phone);
+
+-- ---- public_flags ----
+CREATE TABLE IF NOT EXISTS public_flags (
+  key TEXT PRIMARY KEY NOT NULL,
+  enabled INTEGER DEFAULT 1 NOT NULL,
+  updated_at TEXT NOT NULL,
+  is_synced INTEGER DEFAULT 0,
+  sync_status TEXT DEFAULT 'pending',
+  row_version INTEGER DEFAULT 0,
+  sync_attempts INTEGER DEFAULT 0,
+  last_error_at TEXT,
+  client_transaction_id TEXT
+);
+
+-- ---- secure_settings ----
+CREATE TABLE IF NOT EXISTS secure_settings (
+  key TEXT PRIMARY KEY NOT NULL,
+  ciphertext TEXT,
+  hint TEXT,
+  updated_by TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  is_synced INTEGER DEFAULT 0,
+  sync_status TEXT DEFAULT 'pending',
+  row_version INTEGER DEFAULT 0,
+  sync_attempts INTEGER DEFAULT 0,
+  last_error_at TEXT,
+  client_transaction_id TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_secure_settings_created_at ON secure_settings (created_at);
+
+-- ---- security_findings ----
+CREATE TABLE IF NOT EXISTS security_findings (
+  id TEXT PRIMARY KEY NOT NULL,
+  fingerprint TEXT,
+  source TEXT,
+  severity TEXT DEFAULT 'medium' NOT NULL,
+  title TEXT,
+  detail TEXT DEFAULT '' NOT NULL,
+  deployment_ref TEXT,
+  status TEXT DEFAULT 'open' NOT NULL,
+  first_seen_at TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL,
+  acknowledged_by TEXT,
+  acknowledged_at TEXT,
+  resolved_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  is_synced INTEGER DEFAULT 0,
+  sync_status TEXT DEFAULT 'pending',
+  row_version INTEGER DEFAULT 0,
+  sync_attempts INTEGER DEFAULT 0,
+  last_error_at TEXT,
+  client_transaction_id TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_security_findings_status ON security_findings (status);
+CREATE INDEX IF NOT EXISTS ix_security_findings_created_at ON security_findings (created_at);
+
+-- ---- settings_locks ----
+CREATE TABLE IF NOT EXISTS settings_locks (
+  section TEXT PRIMARY KEY NOT NULL,
+  locked INTEGER DEFAULT 0 NOT NULL,
+  updated_by TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  is_synced INTEGER DEFAULT 0,
+  sync_status TEXT DEFAULT 'pending',
+  row_version INTEGER DEFAULT 0,
+  sync_attempts INTEGER DEFAULT 0,
+  last_error_at TEXT,
+  client_transaction_id TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_settings_locks_created_at ON settings_locks (created_at);
+
+-- ---- settings_overrides ----
+CREATE TABLE IF NOT EXISTS settings_overrides (
+  scope TEXT DEFAULT 'BRANCH' NOT NULL,
+  scope_id TEXT DEFAULT '' NOT NULL,
+  section TEXT NOT NULL,
+  patch TEXT DEFAULT '{}' NOT NULL,
+  updated_by TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  is_synced INTEGER DEFAULT 0,
+  sync_status TEXT DEFAULT 'pending',
+  row_version INTEGER DEFAULT 0,
+  sync_attempts INTEGER DEFAULT 0,
+  last_error_at TEXT,
+  client_transaction_id TEXT,
+  PRIMARY KEY (scope, scope_id, section)
+);
+CREATE INDEX IF NOT EXISTS ix_settings_overrides_created_at ON settings_overrides (created_at);
+
+-- ---- sku_audit ----
+CREATE TABLE IF NOT EXISTS sku_audit (
+  id TEXT PRIMARY KEY NOT NULL,
+  sku TEXT,
+  product_id TEXT,
+  product_name TEXT,
+  source TEXT DEFAULT 'auto' NOT NULL,
+  previous_sku TEXT,
+  store_id TEXT,
+  store_name TEXT,
+  terminal_id TEXT,
+  staff_id TEXT,
+  staff_name TEXT,
+  role TEXT,
+  created_at TEXT NOT NULL,
+  is_synced INTEGER DEFAULT 0,
+  sync_status TEXT DEFAULT 'pending',
+  row_version INTEGER DEFAULT 0,
+  sync_attempts INTEGER DEFAULT 0,
+  last_error_at TEXT,
+  client_transaction_id TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_sku_audit_sku ON sku_audit (sku);
+CREATE INDEX IF NOT EXISTS ix_sku_audit_product_id ON sku_audit (product_id);
+CREATE INDEX IF NOT EXISTS ix_sku_audit_store_id ON sku_audit (store_id);
+CREATE INDEX IF NOT EXISTS ix_sku_audit_created_at ON sku_audit (created_at);
+
+-- ---- system_audit_logs ----
+CREATE TABLE IF NOT EXISTS system_audit_logs (
+  id TEXT PRIMARY KEY NOT NULL,
+  actor_id TEXT,
+  actor_name TEXT,
+  actor_role TEXT,
+  action_type TEXT,
+  entity_affected TEXT,
+  entity_id TEXT,
+  old_value TEXT,
+  new_value TEXT,
+  terminal_id TEXT,
+  ip_address TEXT,
+  store_id TEXT,
+  note TEXT,
+  created_at TEXT NOT NULL,
+  is_synced INTEGER DEFAULT 0,
+  sync_status TEXT DEFAULT 'pending',
+  row_version INTEGER DEFAULT 0,
+  sync_attempts INTEGER DEFAULT 0,
+  last_error_at TEXT,
+  client_transaction_id TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_system_audit_logs_store_id ON system_audit_logs (store_id);
+CREATE INDEX IF NOT EXISTS ix_system_audit_logs_created_at ON system_audit_logs (created_at);
+
+-- ---- terminal_tokens ----
+CREATE TABLE IF NOT EXISTS terminal_tokens (
+  id TEXT PRIMARY KEY NOT NULL,
+  location_id TEXT,
+  location_name TEXT,
+  device_name TEXT,
+  status TEXT DEFAULT 'active' NOT NULL,
+  created_at TEXT NOT NULL,
+  activated_at TEXT,
+  revoked_at TEXT,
+  last_seen_at TEXT,
+  reissued_at TEXT,
+  replaced_by TEXT,
+  claimed_by_device TEXT,
+  claimed_at TEXT,
+  platform TEXT DEFAULT 'unknown' NOT NULL,
+  row_version INTEGER DEFAULT 1 NOT NULL,
+  is_synced INTEGER DEFAULT 0,
+  sync_status TEXT DEFAULT 'pending',
+  sync_attempts INTEGER DEFAULT 0,
+  last_error_at TEXT,
+  client_transaction_id TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_terminal_tokens_status ON terminal_tokens (status);
+CREATE INDEX IF NOT EXISTS ix_terminal_tokens_created_at ON terminal_tokens (created_at);
+
+-- ---- user_roles ----
+CREATE TABLE IF NOT EXISTS user_roles (
+  id TEXT PRIMARY KEY NOT NULL,
+  user_id TEXT,
+  role TEXT,
+  created_at TEXT NOT NULL,
+  is_synced INTEGER DEFAULT 0,
+  sync_status TEXT DEFAULT 'pending',
+  row_version INTEGER DEFAULT 0,
+  sync_attempts INTEGER DEFAULT 0,
+  last_error_at TEXT,
+  client_transaction_id TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_user_roles_created_at ON user_roles (created_at);
