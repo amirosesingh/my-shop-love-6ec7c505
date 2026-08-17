@@ -258,6 +258,14 @@ export const rowToStore = (r: Row): Store => ({
   address: r.address ?? "",
   phone: r.phone ?? "",
   groupId: r.group_id ?? "default",
+  locationType: (r.location_type ?? "store") as Store["locationType"],
+  parentId: r.parent_id ?? null,
+  isCentral: !!r.is_central,
+  buildingName: r.building_name ?? "",
+  floorLabel: r.floor_label ?? "",
+  // Databases that predate the column report `undefined`; treat those as live.
+  active: r.is_active === undefined || r.is_active === null ? true : !!r.is_active,
+  archivedAt: r.archived_at ?? null,
 });
 
 export const storeToRow = (s: Store): Row => ({
@@ -267,6 +275,12 @@ export const storeToRow = (s: Store): Row => ({
   address: s.address || null,
   phone: s.phone || null,
   group_id: s.groupId?.trim() || "default",
+  location_type: s.locationType ?? "store",
+  parent_id: s.parentId || null,
+  is_central: !!s.isCentral,
+  building_name: s.buildingName?.trim() || null,
+  floor_label: s.floorLabel?.trim() || null,
+  is_active: s.active !== false,
 });
 
 const promotionToRow = (p: Promotion): Row => ({
@@ -516,6 +530,7 @@ const SALE_COLUMNS_BASE =
   "discount_amount, tax_amount, total_amount, paid_amount, change_amount, payment_type, " +
   "payments, points_earned, is_refunded, original_bill_number, exchanged_to_bill_number, " +
   "exchange_credit, coupon_code, coupon_promo_id, coupon_scope, coupon_discount, created_at, " +
+  "store_name_snapshot, store_address_snapshot, " +
   "sale_items(product_id, product_name, unit_price, quantity, tax_rate, discount_percent, " +
   "discount_amount, is_return, is_foc, promo_id, coupon_code, coupon_discount, unit_cost)";
 
@@ -525,16 +540,27 @@ const SALE_COLUMNS_BASE =
  * query to the columns that definitely exist.
  */
 let hasClientTxnColumn = true;
+/** Same story for the branch-name snapshot columns. */
+let hasStoreSnapshotColumns = true;
 
 const saleColumns = () =>
-  hasClientTxnColumn ? `${SALE_COLUMNS_BASE}, client_transaction_id` : SALE_COLUMNS_BASE;
+  [
+    SALE_COLUMNS_BASE,
+    hasStoreSnapshotColumns ? "store_name_snapshot, store_address_snapshot" : "",
+    hasClientTxnColumn ? "client_transaction_id" : "",
+  ]
+    .filter(Boolean)
+    .join(", ");
 
 /** True when a failure is "that column is not in this database (yet)". */
 export const isMissingTxnColumn = (message: string | undefined | null) =>
-  !!message && /client_transaction_id/.test(message) && /does not exist|schema cache/i.test(message);
+  !!message &&
+  /client_transaction_id|store_name_snapshot|store_address_snapshot/.test(message) &&
+  /does not exist|schema cache/i.test(message);
 
-const forgetTxnColumn = () => {
-  hasClientTxnColumn = false;
+const forgetTxnColumn = (message?: string | null) => {
+  if (!message || /client_transaction_id/.test(message)) hasClientTxnColumn = false;
+  if (!message || /store_(name|address)_snapshot/.test(message)) hasStoreSnapshotColumns = false;
 };
 
 const rowToSale = (r: Row): Sale => ({
@@ -542,6 +568,8 @@ const rowToSale = (r: Row): Sale => ({
   receiptNo: r.bill_number,
   clientTxnId: r.client_transaction_id ?? undefined,
   storeId: r.store_id ?? "",
+  storeName: r.store_name_snapshot ?? undefined,
+  storeAddress: r.store_address_snapshot ?? undefined,
   shiftId: r.shift_id ?? "",
   lines: ((r.sale_items ?? []) as Row[]).map((l) => ({
     productId: l.product_id ?? "",
@@ -586,6 +614,14 @@ const saleToRow = (s: Sale): Row => ({
   client_transaction_id: s.clientTxnId ?? null,
   member_id: s.memberId,
   store_id: s.storeId,
+  // Only sent to databases that carry the snapshot columns, so an older
+  // schema still accepts the bill.
+  ...(hasStoreSnapshotColumns
+    ? {
+        store_name_snapshot: s.storeName ?? null,
+        store_address_snapshot: s.storeAddress ?? null,
+      }
+    : {}),
   shift_id: s.shiftId,
   cashier_name: s.cashier,
   subtotal_amount: s.subtotal,
@@ -760,7 +796,7 @@ export async function loadCloudState(): Promise<CloudSlice> {
           .limit(500);
       const first = await read();
       if (first.error && isMissingTxnColumn(first.error.message)) {
-        forgetTxnColumn();
+        forgetTxnColumn(first.error.message);
         return await read();
       }
       return first;
@@ -984,7 +1020,7 @@ export async function loadSalesPage(
   let res = await query();
   let err = (res as { error?: { message: string } }).error;
   if (err && isMissingTxnColumn(err.message)) {
-    forgetTxnColumn();
+    forgetTxnColumn(err.message);
     res = await query();
     err = (res as { error?: { message: string } }).error;
   }
@@ -1411,8 +1447,8 @@ export const db = {
     if (!list.length) return;
     queue("Saving locations", { kind: "upsert", table: "stores", rows: list.map(storeToRow) });
   },
-  deleteStore: (id: string) =>
-    queue("Deleting location", { kind: "delete", table: "stores", match: { id } }),
+  // Locations are archived, never deleted — receipts and reports must keep
+  // resolving them forever.
 
   upsertMember: (m: Member) =>
     queue("Saving member", { kind: "upsert", table: "members", rows: [memberToRow(m, tierId)] }),

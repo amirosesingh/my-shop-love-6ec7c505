@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Building2, Plus, ShieldAlert, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, Building2, Plus, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,8 @@ import { usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
 import { ConfirmSwitch } from "@/components/pos/ConfirmSwitch";
 import { BRANCH_POLICY_COPY, branchPolicy, type BranchPolicyKey } from "@/lib/branch-policy";
-import type { BranchPolicy, Store } from "@/lib/pos-types";
+import type { BranchPolicy, LocationType, Store } from "@/lib/pos-types";
+import { LOCATION_TYPES, isActiveLocation, locationPath, locationTypeLabel } from "@/lib/locations";
 
 export const Route = createFileRoute("/stores")({
   head: () => ({
@@ -30,8 +31,16 @@ export const Route = createFileRoute("/stores")({
 });
 
 function Locations() {
-  const { stores, currentStore, upsertStore, removeStore, setCurrentStore, state, updateSettings } =
-    usePos();
+  const {
+    stores,
+    allStores,
+    currentStore,
+    upsertStore,
+    archiveStore,
+    setCurrentStore,
+    state,
+    updateSettings,
+  } = usePos();
   const { isAdmin } = useAuth();
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
@@ -66,6 +75,9 @@ function Locations() {
       name: trimmed,
       address: address.trim() || "Address pending",
       phone: phone.trim() || "—",
+      locationType: "store",
+      parentId: null,
+      active: true,
     });
     setName("");
     setCode("");
@@ -125,7 +137,7 @@ function Locations() {
         </section>
 
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {stores.map((s, i) => (
+          {allStores.map((s, i) => (
             <div key={s.id} className="space-y-3 rounded-lg border border-border bg-card p-4">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2">
@@ -133,12 +145,87 @@ function Locations() {
                     <Building2 className="size-4" />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold">Store {i + 1}</p>
-                    <p className="text-[11px] text-muted-foreground">{s.code}</p>
+                    <p className="text-sm font-semibold">
+                      {locationTypeLabel(s.locationType)} {i + 1}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {s.code} · {locationPath(allStores, s.id)}
+                    </p>
                   </div>
                 </div>
-                {currentStore.id === s.id && <Badge variant="outline">Active</Badge>}
+                {!isActiveLocation(s) ? (
+                  <Badge variant="secondary">Archived</Badge>
+                ) : (
+                  currentStore.id === s.id && <Badge variant="outline">Active</Badge>
+                )}
               </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label className="text-[11px] text-muted-foreground">Location type</Label>
+                  <select
+                    className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                    value={s.locationType ?? "store"}
+                    onChange={(e) =>
+                      upsertStore({ ...s, locationType: e.target.value as LocationType })
+                    }
+                  >
+                    {LOCATION_TYPES.map((t) => (
+                      <option key={t.value} value={t.value}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] text-muted-foreground">Parent location</Label>
+                  <select
+                    className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                    value={s.parentId ?? ""}
+                    onChange={(e) => upsertStore({ ...s, parentId: e.target.value || null })}
+                  >
+                    <option value="">None (top level)</option>
+                    {stores
+                      .filter((x) => x.id !== s.id)
+                      .map((x) => (
+                        <option key={x.id} value={x.id}>
+                          {x.name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] text-muted-foreground">Building name</Label>
+                  <Input
+                    className="h-9"
+                    value={s.buildingName ?? ""}
+                    onChange={(e) => upsertStore({ ...s, buildingName: e.target.value })}
+                    placeholder="Riverside Tower"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] text-muted-foreground">Floor / room</Label>
+                  <Input
+                    className="h-9"
+                    value={s.floorLabel ?? ""}
+                    onChange={(e) => upsertStore({ ...s, floorLabel: e.target.value })}
+                    placeholder="2nd Floor Vault"
+                  />
+                </div>
+              </div>
+              <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={!!s.isCentral}
+                  onChange={(e) => {
+                    const on = e.target.checked;
+                    if (on)
+                      for (const other of allStores.filter((x) => x.isCentral && x.id !== s.id))
+                        upsertStore({ ...other, isCentral: false });
+                    upsertStore({ ...s, isCentral: on });
+                  }}
+                />
+                Central hub — all inbound stock is received here first
+              </label>
               <Input
                 value={s.name}
                 onChange={(e) => upsertStore({ ...s, name: e.target.value })}
@@ -225,6 +312,7 @@ function Locations() {
                   size="sm"
                   variant="outline"
                   className="flex-1"
+                  disabled={!isActiveLocation(s)}
                   onClick={() => setCurrentStore(s.id)}
                 >
                   View this store
@@ -232,13 +320,18 @@ function Locations() {
                 <Button
                   size="sm"
                   variant="ghost"
-                  disabled={stores.length <= 1}
                   onClick={() => {
-                    removeStore(s.id);
-                    toast.success(`${s.name} removed`);
+                    const archiving = isActiveLocation(s);
+                    const refusal = archiveStore(s.id, archiving);
+                    if (refusal) return toast.error(`${s.name} cannot be archived`, { description: refusal });
+                    toast.success(`${s.name} ${archiving ? "archived" : "restored"}`);
                   }}
                 >
-                  <Trash2 className="size-4 text-destructive" />
+                  {isActiveLocation(s) ? (
+                    <Archive className="size-4 text-destructive" />
+                  ) : (
+                    <ArchiveRestore className="size-4 text-success" />
+                  )}
                 </Button>
               </div>
             </div>

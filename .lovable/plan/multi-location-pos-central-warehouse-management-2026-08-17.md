@@ -1,48 +1,56 @@
 # Multi-Location POS & Central Warehouse Management
 
-Turns the flat store list into a proper location hierarchy (stores, main buildings, sub-warehouses on floors/annexes), routes all inbound stock through a central warehouse first, archives locations instead of deleting them, and blocks the app on first launch until a primary location exists.
+## What this delivers
 
-## 1. Location model and metadata
+A location model that supports real buildings — a central hub, branch stores, and nested sub-warehouses (floors, vaults, annex rooms) — plus a receiving pipeline where every inbound delivery lands at the central hub first and is then routed to a precise sub-location. Locations can be renamed or archived at any time without corrupting past receipts, and the app refuses to open the register until at least one active location exists.
 
-Extend a location record with: type (`store`, `warehouse_main`, `sub_warehouse`), parent location, building name, floor/room designation, active/archived flag, plus the existing name, code, address, phone, group and receipt prefix. Everything stays fully editable at any time — renaming never touches historical rows.
+## 1. Location model and hierarchy
 
-New Locations screen (replacing the current Manage Locations page):
-- Tree view: Main Building -> Ground Floor Outlet / 2nd Floor Vault / Annex Room.
-- Create/edit form with type, parent picker (only non-sub locations can be parents), building, floor/room, address, contact.
-- One location per company may be flagged **Central Warehouse** — the inbound entry point.
-- Archive button instead of delete. Archiving is refused with a clear message while the location still holds positive stock; the operator must transfer stock out first.
+Extend the locations record with:
+- Location type: Store, Main Building, Sub-Warehouse, Central Warehouse
+- Parent location (nesting; a branch can hold many floors/rooms)
+- Building name, floor/room designation, address, contact details
+- Active/archived flag, and a single "is central hub" flag
 
-## 2. Non-destructive data lifecycle
+Location Setup screen gains a tree view (parent → children), inline create/edit for every field, and an Archive action instead of Delete.
 
-- Nothing auto-runs at launch: no schema creation, no reset, no seeding, no demo rows. All writes stay behind explicit UI actions.
-- Locations are soft-deleted (archived) only; archived locations disappear from pickers but stay in reports.
-- Receipts store a permanent snapshot of the store name and address at the moment of sale, so reprints and history stay correct after a rename.
+Archiving rules:
+- Hard delete is removed everywhere.
+- Archiving is blocked while the location holds positive stock; the dialog names the remaining items and links to a transfer.
+- Archiving a parent requires its children be archived first.
+
+## 2. Receipt and history integrity
+
+Each sale stores a permanent snapshot of the location name and address at the moment of sale. Receipts, reprints, and reports render the snapshot, so renaming a store later never rewrites printed history. Older sales without a snapshot fall back to the current location record.
 
 ## 3. Central-first inbound routing
 
-Purchase receiving, external returns and multi-branch distributions all land in the Central Warehouse context first, then route onward:
-- If the destination branch has exactly one sub-warehouse, the system picks it automatically.
-- If it has several, a target selector appears (floor / room / annex) before posting.
-- The onward move posts as a single atomic operation: source balance down, destination balance up, in one write, with an item activity log entry.
+All inbound stock (supplier purchase orders, external returns, inter-branch distribution) is received into the Central Hub context first. After receiving, a routing step asks where the stock goes:
+- Destination branch has exactly one sub-location → auto-selected, no extra click.
+- Destination branch has several → a target selector lists the exact floor/room/annex.
+- Movements execute as a single atomic operation that debits the hub and credits the target in the same write, reflected immediately on one PC.
 
-## 4. Inventory visibility
+Inventory dashboard gains a breakdown toggle: company-wide totals, per-branch, and per-floor/sub-warehouse.
 
-The inventory dashboard gains a breakdown by location node — company-wide total, per branch, and per floor/sub-warehouse — with a toggle to roll children up into their parent.
+## 4. Connection pool isolation (desktop)
 
-## 5. Connection pool isolation and admin query tool
+Keep the two pools fully separate: the operational POS pool stays reserved for register, stock, and cashier work, and the admin explorer pool handles schema browsing and inspection. Admin context switches and long inspection queries run only on the admin pool so the register is never blocked.
 
-Already in place from the previous change and kept as-is: the operational POS pool and the Admin Explorer pool are separate, and the Database Explorer is admin-only. This work re-verifies the read-only guard so anything other than a plain read (insert, update, delete, drop, alter, truncate, exec, merge) is rejected before it reaches the server, and confirms admin context switches never touch the POS pool.
+The inspection panel stays permission-gated to Admin and read-only: submitted SQL is parsed before execution, only a single SELECT/WITH retrieval is allowed, and anything that writes data or changes structure is rejected with a security error. This tightens the existing validator to also reject multiple statements, comment-obfuscated payloads, and procedure execution.
 
-## 6. Boot check
+## 5. No automatic writes
 
-On startup the app reads the location list once. With zero active locations it blocks the register and inventory, shows a modal — "No active store or warehouse found. Please create your primary location to continue." — and sends the user to the Locations setup screen. With at least one active location the app boots normally.
+Audit and remove any startup path that creates tables, resets state, or seeds sample rows. Schema scripts remain manual files the operator applies deliberately; the app only writes in response to an explicit user action (save location, receive stock, complete sale, edit profile). Boot performs read-only checks only.
+
+## 6. Boot check and mandatory setup
+
+On startup the app runs a read-only count of active locations.
+- Zero active locations → register and inventory are blocked, a modal reads "No active store or warehouse found. Please create your primary location to continue.", and the user is sent to Location Setup.
+- One or more → normal dashboard load.
 
 ## Technical notes
 
-- Migration adds to `public.stores`: `location_type text not null default 'store'`, `parent_id text references public.stores(id)`, `building_name text`, `floor_label text`, `is_active boolean not null default true`, `is_central boolean not null default false`; partial unique index so only one central location exists. No data seeding.
-- Migration adds to `public.sales`: `store_name_snapshot text`, `store_address_snapshot text`; populated by `saleToRow` in `src/lib/pos-db.ts` at commit time. Receipt rendering in `src/lib/pos-print.ts` prefers the snapshot.
-- Same columns mirrored into `db/offline/pos-offline-sqlserver.sql` and `electron/db/offline_sqlite_v2.sql` with idempotent guards.
-- `Store` type in `src/lib/pos-types.ts` plus `rowToStore`/`storeToRow` extended; `removeStore` becomes `archiveStore` (sets `is_active=false`) with a stock-balance precheck against `stock_by_store`.
-- `src/routes/stores.tsx` rebuilt as a tree + editor; `src/routes/purchasing.tsx` and transfer creation get the central-first target selector; `src/routes/inventory-hub.tsx` gains the per-node breakdown.
-- Boot gate added as a small guard component rendered in `src/components/pos/AppShell.tsx`, reading already-loaded state — no extra query on every page.
-- `electron/db/admin-pool.cjs` read-only validator re-checked; POS pool in `electron/db/pool.cjs` untouched.
+- Migration adds `location_type`, `parent_id`, `is_central`, `building_name`, `floor_label`, `is_active` to `stores`, plus `store_name_snapshot` / `store_address_snapshot` on `sales`; grants and RLS follow the existing store-visibility pattern. Mirrored into the offline SQL Server and SQLite schema files.
+- Stock-by-location continues to use the existing `stock_by_store` map, keyed by sub-location id so floors roll up to their parent for branch totals.
+- Routing reuses `stock_transfers` / `stock_transfer_items` with a `transfer_scope` of `intra_branch`, executed through the existing atomic receive function.
+- Boot check runs in a router-level guard alongside the current shift guard; archive safety and hierarchy validation are enforced by database triggers so offline terminals obey the same rules.
