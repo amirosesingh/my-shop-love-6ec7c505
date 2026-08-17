@@ -751,9 +751,3 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   updated_at      TEXT
 );
 CREATE INDEX IF NOT EXISTS audit_logs_created_idx ON audit_logs (created_at DESC);
-
--- ------------------------------------------------- lookup paths used offline
-CREATE INDEX IF NOT EXISTS products_barcode_idx ON products (barcode);
-CREATE INDEX IF NOT EXISTS products_sku_idx ON products (sku);
-CREATE INDEX IF NOT EXISTS members_phone_idx ON members (phone);
-CREATE INDEX IF NOT EXISTS sales_created_idx ON sales (created_at DESC);
