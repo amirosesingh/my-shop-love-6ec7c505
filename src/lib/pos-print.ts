@@ -702,8 +702,8 @@ function bookingBody(booking: Booking, member: Member | null, pay: PaymentDetail
     ${booking.note ? `<div class="c muted">${esc(booking.note)}</div>` : ""}
     ${jobCardBlock(booking)}
     ${termsBlock()}
-    ${booking.job ? serviceTermsBlock() : ""}
-    ${booking.job && booking.liabilityAccepted ? `<div class="c muted" style="font-size:9px">Accepted at intake by ${esc(booking.customerName || "customer")}</div>` : ""}
+    ${serviceTermsBlock()}
+    ${booking.liabilityAccepted ? `<div class="c muted" style="font-size:9px">Accepted at intake by ${esc(booking.customerName || "customer")}</div>` : ""}
     ${signatureBlock(booking.customerName)}
     ${transferBlock(pay)}
     ${member ? `<hr><div>Member ${esc(member.code)} · ${esc(member.name)}</div>` : ""}
