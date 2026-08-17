@@ -1,15 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   defaultLocalDbConfig,
   hasLocalDb,
@@ -338,15 +330,6 @@ function StatusBadge({ status }: { status: string }) {
   const tone = map[status] ?? { label: status, className: "bg-muted text-muted-foreground" };
   return (
     <span className={`rounded-full px-2 py-0.5 text-[11px] ${tone.className}`}>{tone.label}</span>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-1">
-      <Label className="text-xs text-muted-foreground">{label}</Label>
-      {children}
-    </div>
   );
 }
 
