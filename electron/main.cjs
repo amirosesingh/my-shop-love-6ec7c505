@@ -22,6 +22,25 @@ const netHttp = require("./net.cjs");
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
 const DEBUG = process.env.POS_DEBUG === "1";
 
+/* ---------------------------------------------------------------------------
+   One till per PC.
+
+   Two copies of the register on the same machine would each hold their own
+   bill number, drawer state and sync queue, so the second launch is refused
+   outright and the window that is already open is brought to the front.
+   --------------------------------------------------------------------------- */
+const singleInstance = app.requestSingleInstanceLock();
+if (!singleInstance) {
+  dialog.showErrorBox(
+    "This terminal is already running",
+    "The point of sale software is already open on this PC.\n\n" +
+      "Switch to the window that is already running — only one till may run " +
+      "on a machine at a time.",
+  );
+  app.quit();
+  process.exit(0);
+}
+
 /** Built Node server produced by `DESKTOP_BUILD=1 vite build`. */
 const serverEntry = path.join(__dirname, "..", "dist-desktop", "server", "index.mjs");
 
