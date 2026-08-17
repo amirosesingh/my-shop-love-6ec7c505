@@ -224,6 +224,16 @@ export const navGroups: NavGroup[] = [
         keywords: "otp verify code sms whatsapp email member",
         blurb: "Every one-time code sent to a member and whether it was confirmed.",
       },
+      {
+        to: "/promotions",
+        label: "Point Rules",
+        icon: Sparkles,
+        adminOnly: true,
+        flag: "can_manage_promotions",
+        hash: "points",
+        keywords: "loyalty points per dollar policy",
+        blurb: "Loyalty points earned per dollar spent.",
+      },
     ],
   },
   {
