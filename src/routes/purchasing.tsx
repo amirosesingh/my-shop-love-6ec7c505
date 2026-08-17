@@ -480,7 +480,7 @@ function Purchasing() {
             name: l.name,
             qty: l.qty,
             invoiceNo: ref,
-            targetId: putAwayTargets[0].id,
+            targetId: defaultPutAwayId,
           })),
         ]);
       setInvoiceNo("");
