@@ -564,6 +564,23 @@ function Transfers() {
                           ? ` · ${storeOf(otherStoreId)?.code} on hand: ${stockAt(p, otherStoreId)}`
                           : ""}
                       </p>
+                      {kind === "transfer" &&
+                        sourceLevels.length > 0 &&
+                        p &&
+                        (() => {
+                          const plan = pickPlan(i.productId, i.qty);
+                          if (!plan) return null;
+                          return plan.shortBy > 0 ? (
+                            <p className="numeric text-[11px] text-destructive">
+                              Short by {plan.shortBy} · {availableAt(p, allStores, currentStore.id)}{" "}
+                              across all levels
+                            </p>
+                          ) : (
+                            <p className="numeric text-[11px] text-primary">
+                              Picking {plan.picks.map((x) => `${x.qty} from ${x.name}`).join(" · ")}
+                            </p>
+                          );
+                        })()}
                     </div>
                     <Input
                       className="numeric h-9 w-20"
