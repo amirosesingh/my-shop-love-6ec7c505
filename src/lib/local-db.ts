@@ -125,8 +125,6 @@ export type PosBridge = {
   scanLocalDatabases?: () => Promise<ScanNetworkResult>;
   /** Registry + loopback discovery of instances installed on this PC. */
   scanLocalInstances?: () => Promise<LocalInstanceScan>;
-  /** Direct probe with explicit TLS/auth options. */
-  testDirectConnection?: (params: DirectConnectionParams) => Promise<LocalDbTestResult>;
   status: () => Promise<LocalSyncStatus>;
   push: () => Promise<{ ok: boolean; pushed: number; failed: number; error?: string }>;
   pull: () => Promise<{ ok: boolean; merged: number; error?: string }>;
