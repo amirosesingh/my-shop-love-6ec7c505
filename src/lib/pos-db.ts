@@ -805,7 +805,7 @@ export async function loadCloudState(): Promise<CloudSlice> {
     })(),
     supabase.from("promotions").select("*").order("created_at"),
     supabase.from("pos_settings").select("*").eq("id", 1).maybeSingle(),
-    // The stores table only exists once schema10.sql has been applied; a
+    // The stores table only exists once supabase/schema.sql has been applied; a
     // missing table must not stop the till from loading. Supabase query
     // builders are thenables, not Promises, so guard with try/catch.
     (async (): Promise<{ data: Row[] | null }> => {

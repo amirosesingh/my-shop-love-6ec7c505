@@ -1,9 +1,0 @@
--- ============================================================
--- MOVED — this single file has been split by feature.
---
--- Use supabase/sql/ instead:
---   supabase/sql/README.md        which file covers which feature
---   supabase/sql/99_run_all.sql   fresh install, in dependency order
---
--- Kept as a pointer for one release so old bookmarks still land somewhere.
--- ============================================================

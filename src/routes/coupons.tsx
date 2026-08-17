@@ -128,7 +128,7 @@ function CouponsPage() {
     } catch (e) {
       setError(
         e instanceof Error
-          ? `${e.message} — run supabase/schema19.sql and schema20.sql on the POS database if the tables are missing.`
+          ? `${e.message} — run supabase/schema.sql on the POS database if the tables are missing.`
           : "Could not load campaigns.",
       );
     } finally {

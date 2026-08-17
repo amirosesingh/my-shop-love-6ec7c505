@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { groupForRoute } from "@/lib/settings-groups";
+import { useEmbeddedSettings } from "@/components/pos/settings/embed";
 
 const BASE =
   "rounded-md px-3 py-1.5 text-xs font-medium transition-colors whitespace-nowrap";
@@ -24,7 +25,10 @@ export function SettingsTabs({
   onTab?: (tab: string) => void;
 }) {
   const group = groupForRoute(current);
-  if (!group) return null;
+  // Inside the workspace sheet the category strip above the cards already does
+  // this job, so the page-level tab strip is dropped.
+  const embedded = useEmbeddedSettings();
+  if (!group || embedded) return null;
 
   return (
     <nav aria-label={`${group.label} sections`} className="w-full max-w-full space-y-2">

@@ -75,7 +75,7 @@ and activation then fails with:
 
 > This database is missing the terminal activation setup.
 
-Fix it by running `supabase/schema15.sql` once in the **separate POS database
+Fix it by running `supabase/schema.sql` once in the **separate POS database
 used to issue terminal tokens**. Do not run it against the app's Lovable Cloud
 database. The script consolidates the current activation columns, status rule,
 three functions, and their permissions. It is safe to re-run and does not
@@ -139,7 +139,7 @@ the workflow's build step; nothing else changes.
 
 Settings → Terminal activation → **Re-issue code** on an existing row gives that
 same counter a fresh activation code (old one stops working) without creating a
-second entry. Requires `supabase/schema12.sql` to be run once.
+second entry. Requires `supabase/schema.sql` to be run once.
 
 ## Safe mode and rollback
 
