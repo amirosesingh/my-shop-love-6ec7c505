@@ -1447,8 +1447,8 @@ export const db = {
     if (!list.length) return;
     queue("Saving locations", { kind: "upsert", table: "stores", rows: list.map(storeToRow) });
   },
-  deleteStore: (id: string) =>
-    queue("Deleting location", { kind: "delete", table: "stores", match: { id } }),
+  // Locations are archived, never deleted — receipts and reports must keep
+  // resolving them forever.
 
   upsertMember: (m: Member) =>
     queue("Saving member", { kind: "upsert", table: "members", rows: [memberToRow(m, tierId)] }),
