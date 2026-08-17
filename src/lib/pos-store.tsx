@@ -54,6 +54,7 @@ import {
 import { isShiftOverdue, localTerminalId } from "./shift-hours";
 import { beginShiftSession, endShiftSessions } from "./shift-sessions";
 import { setPublicHosts } from "./coupon-hosts";
+import { activeLocations, archiveBlockers } from "./locations";
 import { branchPolicy } from "./branch-policy";
 import { setActiveBranchSyncPolicy } from "./sync-policy";
 import { setPosFormats, setPosTimeZone } from "./time-zone";
@@ -179,10 +180,13 @@ type Ctx = {
   ready: boolean;
   state: PosState;
   stores: Store[];
+  /** every location including archived ones — for the setup screen only */
+  allStores: Store[];
   currentStore: Store;
   setCurrentStore: (id: string) => void;
   upsertStore: (store: Store) => void;
-  removeStore: (id: string) => void;
+  /** archive (never delete) a location; returns why it was refused, if it was */
+  archiveStore: (id: string, archived: boolean) => string | null;
   openShift: (cashier: string, openingFloat: number) => Promise<CommitTarget>;
   closeShift: (
     countedCash: number,
@@ -723,17 +727,38 @@ export function PosProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
-  const removeStore = useCallback((id: string) => {
-    db.deleteStore(id);
+  /**
+   * Locations are never hard-deleted: history has to keep resolving them.
+   * Archiving is refused while the location still holds stock or still has
+   * live sub-locations underneath it.
+   */
+  const archiveStore = useCallback((id: string, archived: boolean): string | null => {
+    const snapshot = stateRef.current;
+    const target = snapshot.stores.find((x) => x.id === id);
+    if (!target) return "That location no longer exists.";
+    if (archived) {
+      const blocker = archiveBlockers(snapshot.products, snapshot.stores, id);
+      if (blocker) return blocker.reason;
+      if (activeLocations(snapshot.stores).length <= 1)
+        return "At least one active location must remain.";
+    }
+    const next: Store = {
+      ...target,
+      active: !archived,
+      archivedAt: archived ? new Date().toISOString() : null,
+    };
+    db.upsertStore(next);
     setState((s) => {
-      if (s.stores.length <= 1) return s;
-      const stores = s.stores.filter((x) => x.id !== id);
+      const stores = s.stores.map((x) => (x.id === id ? next : x));
+      const stillActive = activeLocations(stores);
       return {
         ...s,
         stores,
-        currentStoreId: s.currentStoreId === id ? (stores[0]?.id ?? "") : s.currentStoreId,
+        currentStoreId:
+          archived && s.currentStoreId === id ? (stillActive[0]?.id ?? "") : s.currentStoreId,
       };
     });
+    return null;
   }, []);
 
   const openShift = useCallback(
@@ -893,6 +918,10 @@ export function PosProvider({ children }: { children: ReactNode }) {
     const store = snapshot.stores.find((x) => x.id === branchId);
     const sale: Sale = {
       ...input,
+      // Freeze how this branch reads right now, so a later rename never
+      // rewrites a printed bill or a historical report.
+      storeName: input.storeName ?? store?.name ?? "",
+      storeAddress: input.storeAddress ?? store?.address ?? "",
       // Stamp the cost price of every line at the moment of sale so margin
       // reports stay accurate when prices change later.
       lines: input.lines.map((l) => ({
@@ -2025,11 +2054,12 @@ export function PosProvider({ children }: { children: ReactNode }) {
     sourceOfPath,
     setSectionScope,
     setSectionLocked,
-    stores: state.stores,
+    stores: activeLocations(state.stores),
+    allStores: state.stores,
     currentStore,
     setCurrentStore,
     upsertStore,
-    removeStore,
+    archiveStore,
     activeShift,
     shiftReadError,
     shiftChecked,

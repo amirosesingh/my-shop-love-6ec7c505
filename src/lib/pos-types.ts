@@ -15,7 +15,22 @@ export type Store = {
   receiptPrefix?: string;
   /** optional branch-level receipt branding overrides */
   receiptOverrides?: ReceiptOverride;
+  /** what this location physically is */
+  locationType?: LocationType;
+  /** parent location id — a floor/room/annex nests under its building */
+  parentId?: string | null;
+  /** the single central hub every inbound delivery lands in first */
+  isCentral?: boolean;
+  /** building this location sits in, e.g. "Riverside Tower" */
+  buildingName?: string;
+  /** floor or room designation, e.g. "2nd Floor Vault" */
+  floorLabel?: string;
+  /** archived locations keep their history but leave every picker */
+  active?: boolean;
+  archivedAt?: string | null;
 };
+
+export type LocationType = "store" | "main_building" | "sub_warehouse" | "central_warehouse";
 
 export type Product = {
   id: string;
@@ -245,6 +260,12 @@ export type Sale = {
   id: string;
   receiptNo: string;
   storeId: string;
+  /**
+   * Branch name / address exactly as they read when the bill was raised.
+   * Renaming a location later never rewrites printed history.
+   */
+  storeName?: string;
+  storeAddress?: string;
   shiftId: string;
   /** one id per checkout attempt, so a retry returns the same bill */
   clientTxnId?: string;

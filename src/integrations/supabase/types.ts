@@ -1885,7 +1885,9 @@ export type Database = {
           points_redeemed: number
           row_version: number
           shift_id: string | null
+          store_address_snapshot: string | null
           store_id: string | null
+          store_name_snapshot: string | null
           subtotal_amount: number
           tax_amount: number
           total_amount: number
@@ -1918,7 +1920,9 @@ export type Database = {
           points_redeemed?: number
           row_version?: number
           shift_id?: string | null
+          store_address_snapshot?: string | null
           store_id?: string | null
+          store_name_snapshot?: string | null
           subtotal_amount?: number
           tax_amount?: number
           total_amount?: number
@@ -1951,7 +1955,9 @@ export type Database = {
           points_redeemed?: number
           row_version?: number
           shift_id?: string | null
+          store_address_snapshot?: string | null
           store_id?: string | null
+          store_name_snapshot?: string | null
           subtotal_amount?: number
           tax_amount?: number
           total_amount?: number
@@ -2557,38 +2563,67 @@ export type Database = {
       stores: {
         Row: {
           address: string | null
+          archived_at: string | null
+          building_name: string | null
           code: string
           created_at: string
+          floor_label: string | null
           group_id: string | null
           id: string
+          is_active: boolean
+          is_central: boolean
+          location_type: string
           name: string
+          parent_id: string | null
           phone: string | null
           row_version: number
           updated_at: string
         }
         Insert: {
           address?: string | null
+          archived_at?: string | null
+          building_name?: string | null
           code: string
           created_at?: string
+          floor_label?: string | null
           group_id?: string | null
           id: string
+          is_active?: boolean
+          is_central?: boolean
+          location_type?: string
           name: string
+          parent_id?: string | null
           phone?: string | null
           row_version?: number
           updated_at?: string
         }
         Update: {
           address?: string | null
+          archived_at?: string | null
+          building_name?: string | null
           code?: string
           created_at?: string
+          floor_label?: string | null
           group_id?: string | null
           id?: string
+          is_active?: boolean
+          is_central?: boolean
+          location_type?: string
           name?: string
+          parent_id?: string | null
           phone?: string | null
           row_version?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "stores_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       suppliers: {
         Row: {
