@@ -3287,47 +3287,14 @@ function Register() {
                   : `${lines.reduce((a, l) => a + l.qty, 0)} unit(s) are reserved at ${currentStore.name} until the collect-by date.`}
               </p>
             </div>
-            {useServices && !racketMode && (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label>What is this booking for?</Label>
-                  <ThemedSelect
-                    ariaLabel="Booking service"
-                    value={serviceId}
-                    placeholder="Choose a service"
-                    onChange={(v) => {
-                      setServiceId(v);
-                      const hit = serviceTypes.find((s2) => s2.id === v);
-                      if (hit) setServiceFee(hit.fee ? String(hit.fee) : "");
-                    }}
-                    options={[
-                      ...cartServiceTypes.map((s2) => ({ value: s2.id, label: s2.name })),
-                      ...(state.settings.integrations.allowCustomServiceType !== false
-                        ? [{ value: "", label: "Something else…" }]
-                        : []),
-                    ]}
-                  />
-                  {!serviceId && state.settings.integrations.allowCustomServiceType !== false && (
-                    <Input
-                      className="mt-1"
-                      placeholder="Describe the job"
-                      value={customService}
-                      onChange={(e) => setCustomService(e.target.value)}
-                    />
-                  )}
-                </div>
-                <div className="space-y-1">
-                  <Label>Service fee</Label>
-                  <Input
-                    className="numeric text-right"
-                    inputMode="decimal"
-                    placeholder="0.00"
-                    value={serviceFee}
-                    onChange={(e) => setServiceFee(e.target.value)}
-                  />
-                  <p className="text-[11px] text-muted-foreground">Added on top of the items in the cart.</p>
-                </div>
-              </div>
+            {!racketMode && (
+              <BookingCartPanel
+                lines={lines}
+                money={money}
+                onScan={scanCode}
+                onSearch={() => setCatalogOpen(true)}
+                onQty={(i, d) => void setQty(i, d)}
+              />
             )}
             {racketMode && (
               <div className="space-y-2 rounded-md border border-border p-2">
