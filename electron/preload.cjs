@@ -16,8 +16,6 @@ contextBridge.exposeInMainWorld("pos", {
   scanLocalDatabases: () => invoke("pos:scan-network"),
   /** Registry + loopback discovery of instances installed on this PC. */
   scanLocalInstances: () => invoke("db:scan-local-instances"),
-  /** Direct probe (no SQL Browser) used by the connection wizard. */
-  testDirectConnection: (params) => invoke("db:test-direct-connection", params),
   status: () => invoke("pos:status"),
   /** Silent receipt printing — no Windows print dialog. */
   print: (html, options) => invoke("print:silent", html, options),
@@ -108,4 +106,19 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getPendingSyncCount: () => invoke("db:get-pending-sync-count"),
   getBranch: () => invoke("db:get-branch"),
   setBranch: (branch) => invoke("db:set-branch", branch),
+});
+
+/**
+ * SSMS-style administration surface. A pool separate from the operational one
+ * so browsing schema never interferes with sales or sync.
+ */
+contextBridge.exposeInMainWorld("sqlAdmin", {
+  connectInstance: (credentials) => invoke("sqladmin:connect", credentials),
+  listDatabases: () => invoke("sqladmin:databases"),
+  getTables: (dbName) => invoke("sqladmin:tables", dbName),
+  getTableColumns: (dbName, tableName, schemaName) =>
+    invoke("sqladmin:columns", dbName, tableName, schemaName),
+  executeQuery: (dbName, queryText) => invoke("sqladmin:query", dbName, queryText),
+  disconnect: () => invoke("sqladmin:disconnect"),
+  status: () => invoke("sqladmin:status"),
 });
