@@ -948,6 +948,15 @@ function registerIpc() {
 }
 
 app.whenReady().then(async () => {
+  // A second launch (double-clicked shortcut) surfaces the running till
+  // instead of doing nothing.
+  app.on("second-instance", () => {
+    const win = mainWindow ?? BrowserWindow.getAllWindows()[0];
+    if (!win || win.isDestroyed()) return;
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+  });
   const engine = localDb.init(app.getPath("userData"));
   if (DEBUG) console.log("[pos] local database:", engine.engine, engine.path);
   registerIpc();
