@@ -70,3 +70,21 @@ A till with no SQL Server installed uses the app's own local database
 (`electron/db/offline_sqlite_v2.sql`, stored as `local_pos_database.db`). It
 holds the same tables with the same column names, so a branch can move between
 the two engines without changing anything in the POS.
+
+## Cloud-parity top-up (v1.3.9)
+
+The bottom of `pos-offline-sqlserver.sql` now carries a generated block that
+mirrors every table in the cloud database — 52 in total. Tables added in this
+revision: `integration_settings`, `offline_sync_audit_log`, `pin_attempts`,
+`public_flags`, `secure_settings`, `security_findings`, `settings_locks`,
+`settings_overrides`, `sku_audit`, `system_audit_logs`, `terminal_tokens` and
+`user_roles`.
+
+The same block also contains an `IF COL_LENGTH(...) IS NULL ALTER TABLE ... ADD`
+line for every column of every table, so a branch database installed months ago
+gains the newer columns in place. Nothing is dropped, emptied or recreated, and
+the file can be run again at any time.
+
+The cloud counterpart is `supabase/schema.sql`: one file that installs the whole
+Postgres schema on an empty project and tops up a live one, including grants,
+row-level security and every policy and routine.
