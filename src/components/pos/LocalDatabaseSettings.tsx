@@ -13,6 +13,7 @@ import {
 } from "@/lib/local-db";
 import { supabaseConfig } from "@/lib/external-supabase-config";
 import { SqlConnectionModal } from "@/components/database/SqlConnectionModal";
+import { SchemaPanel } from "@/components/database/SchemaPanel";
 
 /**
  * Local Microsoft SQL Server controls. Only meaningful inside the Windows
@@ -135,6 +136,8 @@ export function LocalDatabaseSettings() {
             : `SQL Server login${config.user ? ` (${config.user})` : ""}`}
         </p>
       </div>
+
+      <SchemaPanel />
 
       <div className="flex flex-wrap gap-2">
         <Button

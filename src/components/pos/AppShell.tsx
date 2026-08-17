@@ -53,6 +53,7 @@ import { localDb } from "@/lib/local-db";
 import { supabaseConfig } from "@/lib/external-supabase-config";
 import { readCredentials } from "@/lib/pos-credentials";
 import { TillLoader } from "@/components/pos/TillLoader";
+import { LocationBootGuard } from "@/components/pos/LocationBootGuard";
 
 /** Permission required to open each screen. Keys are path prefixes, so child
  *  pages (/settings/tax, /reports/sales …) inherit the parent gate unless they
@@ -228,6 +229,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   if (!user) return <TerminalLogin />;
   if (!dataReady && !offlineBypass)
     return <TillLoader onContinueOffline={() => setOfflineBypass(true)} />;
+  // Nothing can be sold, received or moved without somewhere to book it to.
+  if (!stores.length && !location.pathname.startsWith("/stores"))
+    return <LocationBootGuard />;
 
   const inbound = (state.transfers ?? []).filter(
     (t) =>
