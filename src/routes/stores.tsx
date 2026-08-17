@@ -1,18 +1,31 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { Archive, ArchiveRestore, Building2, Plus, ShieldAlert } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Archive, ArchiveRestore, Building2, Layers, Plus, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
 import { ConfirmSwitch } from "@/components/pos/ConfirmSwitch";
 import { BRANCH_POLICY_COPY, branchPolicy, type BranchPolicyKey } from "@/lib/branch-policy";
-import type { BranchPolicy, LocationType, Store } from "@/lib/pos-types";
-import { LOCATION_TYPES, isActiveLocation, locationPath, locationTypeLabel } from "@/lib/locations";
+import type { BranchPolicy, Store } from "@/lib/pos-types";
+import {
+  isActiveLocation,
+  locationPath,
+  locationTypeLabel,
+  rolledUpStock,
+  subWarehouses,
+} from "@/lib/locations";
 
 export const Route = createFileRoute("/stores")({
   head: () => ({
@@ -21,13 +34,53 @@ export const Route = createFileRoute("/stores")({
       {
         name: "description",
         content:
-          "Create an unlimited number of storefront locations and edit the address, code and phone of every branch.",
+          "Create stores and warehouses, nest sub-warehouse levels underneath them and choose the level stock is picked from first.",
       },
       { property: "og:title", content: "Manage Locations — Northwind POS" },
-      { property: "og:description", content: "Infinite store builder for multi-branch retail." },
+      {
+        property: "og:description",
+        content: "Multi-level location and sub-warehouse builder for multi-branch retail.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: Locations,
+});
+
+/** Everything the drawer edits, kept apart from the saved record. */
+type Draft = {
+  id: string | null;
+  name: string;
+  code: string;
+  address: string;
+  phone: string;
+  kind: "store" | "warehouse";
+  isCentral: boolean;
+  parentId: string;
+  buildingName: string;
+  floorLabel: string;
+  receiptPrefix: string;
+  groupId: string;
+  wantsSubs: boolean;
+  subs: { id: string | null; name: string; primary: boolean }[];
+};
+
+const blankDraft = (): Draft => ({
+  id: null,
+  name: "",
+  code: "",
+  address: "",
+  phone: "",
+  kind: "store",
+  isCentral: false,
+  parentId: "",
+  buildingName: "",
+  floorLabel: "",
+  receiptPrefix: "",
+  groupId: "",
+  wantsSubs: false,
+  subs: [],
 });
 
 function Locations() {
@@ -42,10 +95,12 @@ function Locations() {
     updateSettings,
   } = usePos();
   const { isAdmin } = useAuth();
-  const [name, setName] = useState("");
-  const [code, setCode] = useState("");
-  const [address, setAddress] = useState("");
-  const [phone, setPhone] = useState("");
+  const [draft, setDraft] = useState<Draft | null>(null);
+
+  const roots = useMemo(
+    () => allStores.filter((s) => s.locationType !== "sub_warehouse"),
+    [allStores],
+  );
 
   if (!isAdmin) {
     return (
@@ -63,27 +118,27 @@ function Locations() {
     );
   }
 
-  function addStore() {
-    const trimmed = name.trim();
-    if (!trimmed) return toast.error("Location name is required");
-    const auto =
-      code.trim().toUpperCase() ||
-      `${trimmed.replace(/[^a-zA-Z]/g, "").slice(0, 3).toUpperCase() || "STR"}${stores.length + 1}`;
-    upsertStore({
-      id: crypto.randomUUID(),
-      code: auto,
-      name: trimmed,
-      address: address.trim() || "Address pending",
-      phone: phone.trim() || "—",
-      locationType: "store",
-      parentId: null,
-      active: true,
+  function openFor(store: Store) {
+    const subs = subWarehouses(allStores, store.id);
+    setDraft({
+      id: store.id,
+      name: store.name,
+      code: store.code,
+      address: store.address ?? "",
+      phone: store.phone ?? "",
+      kind:
+        store.locationType === "central_warehouse" || store.locationType === "main_building"
+          ? "warehouse"
+          : "store",
+      isCentral: !!store.isCentral,
+      parentId: store.parentId ?? "",
+      buildingName: store.buildingName ?? "",
+      floorLabel: store.floorLabel ?? "",
+      receiptPrefix: store.receiptPrefix ?? "",
+      groupId: store.groupId ?? "",
+      wantsSubs: subs.length > 0,
+      subs: subs.map((s) => ({ id: s.id, name: s.name, primary: !!s.isPrimarySub })),
     });
-    setName("");
-    setCode("");
-    setAddress("");
-    setPhone("");
-    toast.success(`${trimmed} added — now ${stores.length + 1} locations`);
   }
 
   function setPolicy(store: Store, key: BranchPolicyKey, value: boolean) {
@@ -100,244 +155,467 @@ function Locations() {
     );
   }
 
+  /** Saves the parent, then creates or renames each level underneath it. */
+  function save() {
+    if (!draft) return;
+    const name = draft.name.trim();
+    if (!name) return toast.error("Location name is required");
+    const isNew = !draft.id;
+    const id = draft.id ?? crypto.randomUUID();
+    const code =
+      draft.code.trim().toUpperCase() ||
+      `${name.replace(/[^a-zA-Z]/g, "").slice(0, 3).toUpperCase() || "STR"}${stores.length + 1}`;
+    const existing = allStores.find((s) => s.id === id);
+
+    if (draft.isCentral)
+      for (const other of allStores.filter((x) => x.isCentral && x.id !== id))
+        upsertStore({ ...other, isCentral: false });
+
+    upsertStore({
+      ...(existing ?? { id, active: true }),
+      id,
+      code,
+      name,
+      address: draft.address.trim() || "Address pending",
+      phone: draft.phone.trim() || "—",
+      locationType:
+        draft.kind === "warehouse"
+          ? draft.isCentral
+            ? "central_warehouse"
+            : "main_building"
+          : "store",
+      parentId: draft.parentId || null,
+      isCentral: draft.kind === "warehouse" && draft.isCentral,
+      buildingName: draft.buildingName.trim(),
+      floorLabel: draft.floorLabel.trim(),
+      receiptPrefix: draft.receiptPrefix.trim().toUpperCase(),
+      groupId: draft.groupId.trim() || undefined,
+      active: existing ? existing.active !== false : true,
+    } as Store);
+
+    if (draft.kind === "warehouse" && draft.wantsSubs) {
+      const wanted = draft.subs.filter((s) => s.name.trim());
+      const primaryIdx = Math.max(
+        0,
+        wanted.findIndex((s) => s.primary),
+      );
+      wanted.forEach((sub, i) => {
+        const subId = sub.id ?? crypto.randomUUID();
+        const prior = allStores.find((s) => s.id === subId);
+        upsertStore({
+          ...(prior ?? { id: subId, active: true }),
+          id: subId,
+          code: prior?.code || `${code}-L${i + 1}`,
+          name: sub.name.trim(),
+          address: prior?.address ?? draft.address.trim() ?? "",
+          phone: prior?.phone ?? "—",
+          locationType: "sub_warehouse",
+          parentId: id,
+          isCentral: false,
+          isPrimarySub: i === primaryIdx,
+          groupId: draft.groupId.trim() || prior?.groupId,
+          active: prior ? prior.active !== false : true,
+        } as Store);
+      });
+    }
+
+    toast.success(`${name} ${isNew ? "created" : "saved"}`);
+    setDraft(null);
+  }
+
   return (
     <AppShell>
       <div className="space-y-5 p-6">
-        <header>
-          <h1 className="text-2xl font-semibold">Manage locations</h1>
-          <p className="text-sm text-muted-foreground">
-            <span className="numeric">{stores.length}</span> storefronts · every new location gets
-            its own stock bucket on all {state.products.length} products.
-          </p>
+        <header className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold">Manage locations</h1>
+            <p className="text-sm text-muted-foreground">
+              <span className="numeric">{roots.length}</span> stores and warehouses · every new
+              location gets its own stock bucket on all {state.products.length} products.
+            </p>
+          </div>
+          <Button onClick={() => setDraft(blankDraft())}>
+            <Plus className="size-4" /> New location
+          </Button>
         </header>
 
-        <section className="rounded-lg border border-border bg-card p-5">
-          <h2 className="mb-3 text-sm font-semibold">Add a location</h2>
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Location name</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Riverside Mall" />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Code (optional)</Label>
-              <Input className="w-28 numeric" value={code} onChange={(e) => setCode(e.target.value)} placeholder="RVS" />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Address</Label>
-              <Input value={address} onChange={(e) => setAddress(e.target.value)} className="w-64" />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Phone</Label>
-              <Input value={phone} onChange={(e) => setPhone(e.target.value)} className="w-36 numeric" />
-            </div>
-            <Button onClick={addStore}>
-              <Plus className="size-4" /> Create location
-            </Button>
-          </div>
-        </section>
-
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {allStores.map((s, i) => (
-            <div key={s.id} className="space-y-3 rounded-lg border border-border bg-card p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <div className="flex size-9 items-center justify-center rounded-md bg-primary/15 text-primary">
-                    <Building2 className="size-4" />
+          {roots.map((s) => {
+            const subs = subWarehouses(allStores, s.id);
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => openFor(s)}
+                className="space-y-3 rounded-lg border border-border bg-card p-4 text-left transition hover:border-primary/60"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="flex size-9 items-center justify-center rounded-md bg-primary/15 text-primary">
+                      <Building2 className="size-4" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold">{s.name}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {s.code} · {locationTypeLabel(s.locationType)}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-semibold">
-                      {locationTypeLabel(s.locationType)} {i + 1}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {s.code} · {locationPath(allStores, s.id)}
-                    </p>
-                  </div>
-                </div>
-                {!isActiveLocation(s) ? (
-                  <Badge variant="secondary">Archived</Badge>
-                ) : (
-                  currentStore.id === s.id && <Badge variant="outline">Active</Badge>
-                )}
-              </div>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <div className="space-y-1">
-                  <Label className="text-[11px] text-muted-foreground">Location type</Label>
-                  <select
-                    className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
-                    value={s.locationType ?? "store"}
-                    onChange={(e) =>
-                      upsertStore({ ...s, locationType: e.target.value as LocationType })
-                    }
-                  >
-                    {LOCATION_TYPES.map((t) => (
-                      <option key={t.value} value={t.value}>
-                        {t.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px] text-muted-foreground">Parent location</Label>
-                  <select
-                    className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
-                    value={s.parentId ?? ""}
-                    onChange={(e) => upsertStore({ ...s, parentId: e.target.value || null })}
-                  >
-                    <option value="">None (top level)</option>
-                    {stores
-                      .filter((x) => x.id !== s.id)
-                      .map((x) => (
-                        <option key={x.id} value={x.id}>
-                          {x.name}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px] text-muted-foreground">Building name</Label>
-                  <Input
-                    className="h-9"
-                    value={s.buildingName ?? ""}
-                    onChange={(e) => upsertStore({ ...s, buildingName: e.target.value })}
-                    placeholder="Riverside Tower"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px] text-muted-foreground">Floor / room</Label>
-                  <Input
-                    className="h-9"
-                    value={s.floorLabel ?? ""}
-                    onChange={(e) => upsertStore({ ...s, floorLabel: e.target.value })}
-                    placeholder="2nd Floor Vault"
-                  />
-                </div>
-              </div>
-              <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                <input
-                  type="checkbox"
-                  checked={!!s.isCentral}
-                  onChange={(e) => {
-                    const on = e.target.checked;
-                    if (on)
-                      for (const other of allStores.filter((x) => x.isCentral && x.id !== s.id))
-                        upsertStore({ ...other, isCentral: false });
-                    upsertStore({ ...s, isCentral: on });
-                  }}
-                />
-                Central hub — all inbound stock is received here first
-              </label>
-              <Input
-                value={s.name}
-                onChange={(e) => upsertStore({ ...s, name: e.target.value })}
-                className="h-9"
-              />
-              <Input
-                value={s.code}
-                onChange={(e) => upsertStore({ ...s, code: e.target.value.toUpperCase() })}
-                className="numeric h-9"
-              />
-              <div className="space-y-1">
-                <Label className="text-[11px] text-muted-foreground">
-                  Receipt number prefix
-                </Label>
-                <Input
-                  value={s.receiptPrefix ?? ""}
-                  onChange={(e) =>
-                    upsertStore({ ...s, receiptPrefix: e.target.value.toUpperCase() })
-                  }
-                  placeholder={s.code}
-                  className="numeric h-9"
-                />
-                <p className="text-[10px] text-muted-foreground">
-                  Receipts raised here are numbered {(s.receiptPrefix?.trim() || s.code || "R")}
-                  -000123, keeping every branch unique. Leave blank to use the store code.
-                </p>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-[11px] text-muted-foreground">Group / cluster</Label>
-                <Input
-                  value={s.groupId ?? ""}
-                  onChange={(e) => upsertStore({ ...s, groupId: e.target.value.trim() })}
-                  placeholder="default"
-                  className="h-9"
-                />
-                <p className="text-[10px] text-muted-foreground">
-                  Branches sharing a group move stock as an internal transfer. Sending to a
-                  different group is an inter-group transfer and re-maps the item into that
-                  group's catalogue on arrival.
-                </p>
-              </div>
-              <Input
-                value={s.address}
-                onChange={(e) => upsertStore({ ...s, address: e.target.value })}
-                className="h-9"
-              />
-              <Input
-                value={s.phone}
-                onChange={(e) => upsertStore({ ...s, phone: e.target.value })}
-                className="numeric h-9"
-              />
-
-              <div className="space-y-2 rounded-md border border-border/70 bg-muted/30 p-2">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Branch independence
-                </p>
-                {(
-                  [
-                    "privateStock",
-                    "privateCatalogue",
-                    "allowTransfers",
-                    "syncInventory",
-                    "syncOther",
-                  ] as BranchPolicyKey[]
-                ).map((key) => {
-                  const copy = BRANCH_POLICY_COPY[key];
-                  return (
-                    <ConfirmSwitch
-                      key={key}
-                      label={copy.label}
-                      hint={copy.hint}
-                      subject={s.name}
-                      onWarning={copy.onWarning}
-                      offWarning={copy.offWarning}
-                      checked={branchPolicy(state.settings, s.id)[key]}
-                      onConfirmedChange={(v) => setPolicy(s, key, v)}
-                    />
-                  );
-                })}
-              </div>
-
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="flex-1"
-                  disabled={!isActiveLocation(s)}
-                  onClick={() => setCurrentStore(s.id)}
-                >
-                  View this store
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    const archiving = isActiveLocation(s);
-                    const refusal = archiveStore(s.id, archiving);
-                    if (refusal) return toast.error(`${s.name} cannot be archived`, { description: refusal });
-                    toast.success(`${s.name} ${archiving ? "archived" : "restored"}`);
-                  }}
-                >
-                  {isActiveLocation(s) ? (
-                    <Archive className="size-4 text-destructive" />
+                  {!isActiveLocation(s) ? (
+                    <Badge variant="secondary">Archived</Badge>
                   ) : (
-                    <ArchiveRestore className="size-4 text-success" />
+                    <div className="flex gap-1">
+                      {s.isCentral && <Badge variant="outline">Hub</Badge>}
+                      {currentStore.id === s.id && <Badge variant="outline">Active</Badge>}
+                    </div>
                   )}
-                </Button>
-              </div>
-            </div>
-          ))}
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  <span className="numeric">{rolledUpStock(state.products, allStores, s.id)}</span>{" "}
+                  units on hand
+                  {subs.length > 0 && (
+                    <>
+                      {" · "}
+                      <span className="numeric">{subs.length}</span> sub-warehouse
+                      {subs.length > 1 ? "s" : ""}
+                    </>
+                  )}
+                </p>
+                {subs.length > 0 && (
+                  <ul className="space-y-1">
+                    {subs.map((sub) => (
+                      <li
+                        key={sub.id}
+                        className="flex items-center justify-between rounded-md bg-muted/40 px-2 py-1 text-[11px]"
+                      >
+                        <span className="flex items-center gap-1">
+                          <Layers className="size-3 text-muted-foreground" /> {sub.name}
+                          {sub.isPrimarySub && (
+                            <Badge variant="outline" className="ml-1 h-4 px-1 text-[9px]">
+                              Primary
+                            </Badge>
+                          )}
+                        </span>
+                        <span className="numeric text-muted-foreground">
+                          {rolledUpStock(state.products, allStores, sub.id)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
+
+      <Sheet open={!!draft} onOpenChange={(o) => !o && setDraft(null)}>
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
+          {draft && (
+            <>
+              <SheetHeader>
+                <SheetTitle>{draft.id ? draft.name || "Edit location" : "New location"}</SheetTitle>
+                <SheetDescription>
+                  {draft.id
+                    ? locationPath(allStores, draft.id)
+                    : "Stores sell to customers. Warehouses hold stock and can be split into levels."}
+                </SheetDescription>
+              </SheetHeader>
+
+              <div className="mt-4 space-y-4 pb-24">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Location name">
+                    <Input
+                      value={draft.name}
+                      onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                      placeholder="Riverside Mall"
+                    />
+                  </Field>
+                  <Field label="Code">
+                    <Input
+                      className="numeric"
+                      value={draft.code}
+                      onChange={(e) => setDraft({ ...draft, code: e.target.value.toUpperCase() })}
+                      placeholder="RVS"
+                    />
+                  </Field>
+                  <Field label="Address">
+                    <Input
+                      value={draft.address}
+                      onChange={(e) => setDraft({ ...draft, address: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="Phone">
+                    <Input
+                      className="numeric"
+                      value={draft.phone}
+                      onChange={(e) => setDraft({ ...draft, phone: e.target.value })}
+                    />
+                  </Field>
+                </div>
+
+                <Field label="Location type">
+                  <div className="grid grid-cols-2 gap-2">
+                    {(
+                      [
+                        { v: "store", t: "Store", h: "Sells to customers" },
+                        { v: "warehouse", t: "Warehouse", h: "Holds and issues stock" },
+                      ] as const
+                    ).map((opt) => (
+                      <button
+                        key={opt.v}
+                        type="button"
+                        onClick={() =>
+                          setDraft({
+                            ...draft,
+                            kind: opt.v,
+                            wantsSubs: opt.v === "warehouse" && draft.wantsSubs,
+                          })
+                        }
+                        className={`rounded-md border p-3 text-left text-sm ${
+                          draft.kind === opt.v
+                            ? "border-primary bg-primary/10"
+                            : "border-border bg-background"
+                        }`}
+                      >
+                        <p className="font-medium">{opt.t}</p>
+                        <p className="text-[11px] text-muted-foreground">{opt.h}</p>
+                      </button>
+                    ))}
+                  </div>
+                </Field>
+
+                {draft.kind === "warehouse" && (
+                  <div className="space-y-3 rounded-md border border-border/70 bg-muted/30 p-3">
+                    <label className="flex items-center gap-2 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={draft.isCentral}
+                        onChange={(e) => setDraft({ ...draft, isCentral: e.target.checked })}
+                      />
+                      Central hub — all inbound stock is received here first
+                    </label>
+                    <label className="flex items-center gap-2 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={draft.wantsSubs}
+                        onChange={(e) =>
+                          setDraft({
+                            ...draft,
+                            wantsSubs: e.target.checked,
+                            subs:
+                              e.target.checked && draft.subs.length === 0
+                                ? [
+                                    { id: null, name: "Warehouse 1 — Ground Floor", primary: true },
+                                    { id: null, name: "Warehouse 2 — Upper Floor", primary: false },
+                                  ]
+                                : draft.subs,
+                          })
+                        }
+                      />
+                      Create sub-warehouses for this location?
+                    </label>
+
+                    {draft.wantsSubs && (
+                      <div className="space-y-2">
+                        {draft.subs.map((sub, i) => (
+                          <div key={i} className="flex items-center gap-2">
+                            <Input
+                              className="h-9"
+                              value={sub.name}
+                              placeholder={`Warehouse ${i + 1}`}
+                              onChange={(e) => {
+                                const subs = [...draft.subs];
+                                subs[i] = { ...sub, name: e.target.value };
+                                setDraft({ ...draft, subs });
+                              }}
+                            />
+                            <label className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">
+                              <input
+                                type="radio"
+                                name="primary-sub"
+                                checked={sub.primary}
+                                onChange={() =>
+                                  setDraft({
+                                    ...draft,
+                                    subs: draft.subs.map((x, j) => ({ ...x, primary: j === i })),
+                                  })
+                                }
+                              />
+                              Primary
+                            </label>
+                          </div>
+                        ))}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            setDraft({
+                              ...draft,
+                              subs: [
+                                ...draft.subs,
+                                {
+                                  id: null,
+                                  name: `Warehouse ${draft.subs.length + 1}`,
+                                  primary: draft.subs.length === 0,
+                                },
+                              ],
+                            })
+                          }
+                        >
+                          <Plus className="size-3" /> Add level
+                        </Button>
+                        <p className="text-[10px] text-muted-foreground">
+                          Stock is picked from the primary level first; any shortfall is topped up
+                          from the next level automatically.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Parent location">
+                    <select
+                      className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                      value={draft.parentId}
+                      onChange={(e) => setDraft({ ...draft, parentId: e.target.value })}
+                    >
+                      <option value="">None (top level)</option>
+                      {roots
+                        .filter((x) => x.id !== draft.id)
+                        .map((x) => (
+                          <option key={x.id} value={x.id}>
+                            {x.name}
+                          </option>
+                        ))}
+                    </select>
+                  </Field>
+                  <Field label="Group / cluster">
+                    <Input
+                      className="h-9"
+                      value={draft.groupId}
+                      placeholder="default"
+                      onChange={(e) => setDraft({ ...draft, groupId: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="Building name">
+                    <Input
+                      className="h-9"
+                      value={draft.buildingName}
+                      placeholder="Riverside Tower"
+                      onChange={(e) => setDraft({ ...draft, buildingName: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="Floor / room">
+                    <Input
+                      className="h-9"
+                      value={draft.floorLabel}
+                      placeholder="2nd Floor Vault"
+                      onChange={(e) => setDraft({ ...draft, floorLabel: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="Receipt number prefix">
+                    <Input
+                      className="numeric h-9"
+                      value={draft.receiptPrefix}
+                      placeholder={draft.code}
+                      onChange={(e) =>
+                        setDraft({ ...draft, receiptPrefix: e.target.value.toUpperCase() })
+                      }
+                    />
+                  </Field>
+                </div>
+
+                {draft.id && (
+                  <div className="space-y-2 rounded-md border border-border/70 bg-muted/30 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Branch independence
+                    </p>
+                    {(
+                      [
+                        "privateStock",
+                        "privateCatalogue",
+                        "allowTransfers",
+                        "syncInventory",
+                        "syncOther",
+                      ] as BranchPolicyKey[]
+                    ).map((key) => {
+                      const store = allStores.find((x) => x.id === draft.id);
+                      if (!store) return null;
+                      const copy = BRANCH_POLICY_COPY[key];
+                      return (
+                        <ConfirmSwitch
+                          key={key}
+                          label={copy.label}
+                          hint={copy.hint}
+                          subject={store.name}
+                          onWarning={copy.onWarning}
+                          offWarning={copy.offWarning}
+                          checked={branchPolicy(state.settings, store.id)[key]}
+                          onConfirmedChange={(v) => setPolicy(store, key, v)}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-2">
+                  <Button className="flex-1" onClick={save}>
+                    {draft.id ? "Save location" : "Create location"}
+                  </Button>
+                  {draft.id && (
+                    <>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setCurrentStore(draft.id!);
+                          toast.success(`Now viewing ${draft.name}`);
+                        }}
+                      >
+                        View this store
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        onClick={() => {
+                          const store = allStores.find((x) => x.id === draft.id);
+                          if (!store) return;
+                          const archiving = isActiveLocation(store);
+                          const refusal = archiveStore(store.id, archiving);
+                          if (refusal)
+                            return toast.error(`${store.name} cannot be archived`, {
+                              description: refusal,
+                            });
+                          toast.success(`${store.name} ${archiving ? "archived" : "restored"}`);
+                          setDraft(null);
+                        }}
+                      >
+                        {isActiveLocation(
+                          allStores.find((x) => x.id === draft.id) ?? ({} as Store),
+                        ) ? (
+                          <Archive className="size-4 text-destructive" />
+                        ) : (
+                          <ArchiveRestore className="size-4 text-success" />
+                        )}
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     </AppShell>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <Label className="text-[11px] text-muted-foreground">{label}</Label>
+      {children}
+    </div>
   );
 }
