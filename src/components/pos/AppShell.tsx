@@ -1,4 +1,4 @@
-import { Loader2, Lock, LogOut, Menu, MapPin, ReceiptText, Store } from "lucide-react";
+import { Loader2, Lock, LogOut, Menu, MapPin, ReceiptText, Settings as SettingsIcon, Store } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { usePos } from "@/lib/pos-store";
 import { useAuth, type PermissionFlag } from "@/lib/pos-auth";
@@ -425,6 +425,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             <LiveClock compact />
           </span>
           <MobileStatusSheet />
+          <Button asChild variant="ghost" size="icon" className="shrink-0" aria-label="Settings">
+            <Link to="/settings">
+              <SettingsIcon className="size-4" />
+            </Link>
+          </Button>
           <ThemeToggle />
           <Button
             variant="outline"
@@ -459,6 +464,11 @@ export function AppShell({ children }: { children: ReactNode }) {
               {terminal.config.locationName || currentStore.name}
             </Badge>
           )}
+          <Button asChild variant="ghost" size="icon" className="shrink-0" aria-label="Settings">
+            <Link to="/settings">
+              <SettingsIcon className="size-4" />
+            </Link>
+          </Button>
           <ThemeToggle />
           <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => void lock()}>
             <Lock className="size-3.5" /> Lock / Switch user
