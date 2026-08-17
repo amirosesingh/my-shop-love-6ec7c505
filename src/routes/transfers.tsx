@@ -45,6 +45,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { stockAt, usePos } from "@/lib/pos-store";
+import { availableAt, planDeduction, subWarehouses } from "@/lib/locations";
 import { printTransferNote } from "@/lib/pos-print";
 import type { Transfer, TransferItem, TransferKind } from "@/lib/pos-types";
 import { branchPolicy } from "@/lib/branch-policy";
@@ -86,12 +87,14 @@ function Transfers() {
   const {
     state,
     stores,
+    allStores,
     currentStore,
     activeShift,
     createTransfer,
     approveTransfer,
     receiveTransfer,
     rejectTransfer,
+    adjustStock,
   } = usePos();
   const { can } = useAuth();
   const search = Route.useSearch();
