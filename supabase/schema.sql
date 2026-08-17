@@ -6333,7 +6333,9 @@ GRANT USAGE ON SCHEMA public TO authenticated;
 
 GRANT USAGE ON SCHEMA public TO service_role;
 
-GRANT USAGE ON SCHEMA public TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT USAGE ON SCHEMA public TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON FUNCTION public.activity_events_immutable() TO service_role;
 
@@ -6349,7 +6351,9 @@ GRANT ALL ON TABLE public.coupon_campaigns TO authenticated;
 
 GRANT ALL ON TABLE public.coupon_campaigns TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.coupon_campaigns TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.coupon_campaigns TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON FUNCTION public.campaign_is_live(_c public.coupon_campaigns) TO service_role;
 
@@ -6489,7 +6493,9 @@ GRANT ALL ON TABLE public.shifts TO authenticated;
 
 GRANT ALL ON TABLE public.shifts TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.shifts TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.shifts TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON FUNCTION public.shift_active_for_branch(p_store_id text) TO service_role;
 
@@ -6601,7 +6607,9 @@ GRANT ALL ON TABLE public.issued_vouchers TO authenticated;
 
 GRANT ALL ON TABLE public.issued_vouchers TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.issued_vouchers TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.issued_vouchers TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON FUNCTION public.voucher_redeem(_token text, _sale_id text, _store_id text, _staff text) TO service_role;
 
@@ -6619,11 +6627,15 @@ GRANT ALL ON TABLE public.activity_events TO authenticated;
 
 GRANT ALL ON TABLE public.activity_events TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.activity_events TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.activity_events TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.app_users TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.app_users TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.app_users TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT SELECT ON TABLE public.app_users TO authenticated;
 
@@ -6631,7 +6643,9 @@ GRANT ALL ON TABLE public.audit_logs TO authenticated;
 
 GRANT ALL ON TABLE public.audit_logs TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.audit_logs TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.audit_logs TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.booking_payments TO anon;
 
@@ -6639,7 +6653,9 @@ GRANT ALL ON TABLE public.booking_payments TO authenticated;
 
 GRANT ALL ON TABLE public.booking_payments TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.booking_payments TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.booking_payments TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.bookings TO anon;
 
@@ -6647,7 +6663,9 @@ GRANT ALL ON TABLE public.bookings TO authenticated;
 
 GRANT ALL ON TABLE public.bookings TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.bookings TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.bookings TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.branch_telemetry TO anon;
 
@@ -6655,17 +6673,23 @@ GRANT ALL ON TABLE public.branch_telemetry TO authenticated;
 
 GRANT ALL ON TABLE public.branch_telemetry TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.branch_telemetry TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.branch_telemetry TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.cashiers TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.cashiers TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.cashiers TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.coupon_events TO authenticated;
 
 GRANT ALL ON TABLE public.coupon_events TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.coupon_events TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.coupon_events TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.drawer_events TO anon;
 
@@ -6673,7 +6697,9 @@ GRANT ALL ON TABLE public.drawer_events TO authenticated;
 
 GRANT ALL ON TABLE public.drawer_events TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.drawer_events TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.drawer_events TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.held_orders TO anon;
 
@@ -6681,7 +6707,9 @@ GRANT ALL ON TABLE public.held_orders TO authenticated;
 
 GRANT ALL ON TABLE public.held_orders TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.held_orders TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.held_orders TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.integration_settings TO anon;
 
@@ -6689,7 +6717,9 @@ GRANT ALL ON TABLE public.integration_settings TO authenticated;
 
 GRANT ALL ON TABLE public.integration_settings TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.integration_settings TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.integration_settings TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.item_activity_logs TO anon;
 
@@ -6697,7 +6727,9 @@ GRANT ALL ON TABLE public.item_activity_logs TO authenticated;
 
 GRANT ALL ON TABLE public.item_activity_logs TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.item_activity_logs TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.item_activity_logs TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.member_verifications TO anon;
 
@@ -6705,19 +6737,25 @@ GRANT ALL ON TABLE public.member_verifications TO authenticated;
 
 GRANT ALL ON TABLE public.member_verifications TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.member_verifications TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.member_verifications TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.members TO authenticated;
 
 GRANT ALL ON TABLE public.members TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.members TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.members TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.membership_tiers TO authenticated;
 
 GRANT ALL ON TABLE public.membership_tiers TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.membership_tiers TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.membership_tiers TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.offline_sync_audit_log TO anon;
 
@@ -6725,7 +6763,9 @@ GRANT ALL ON TABLE public.offline_sync_audit_log TO authenticated;
 
 GRANT ALL ON TABLE public.offline_sync_audit_log TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.offline_sync_audit_log TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.offline_sync_audit_log TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.payment_transactions TO anon;
 
@@ -6733,7 +6773,9 @@ GRANT ALL ON TABLE public.payment_transactions TO authenticated;
 
 GRANT ALL ON TABLE public.payment_transactions TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.payment_transactions TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.payment_transactions TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.payment_types TO anon;
 
@@ -6741,7 +6783,9 @@ GRANT ALL ON TABLE public.payment_types TO authenticated;
 
 GRANT ALL ON TABLE public.payment_types TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.payment_types TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.payment_types TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.pin_attempts TO anon;
 
@@ -6749,13 +6793,17 @@ GRANT ALL ON TABLE public.pin_attempts TO authenticated;
 
 GRANT ALL ON TABLE public.pin_attempts TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.pin_attempts TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.pin_attempts TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.pos_settings TO authenticated;
 
 GRANT ALL ON TABLE public.pos_settings TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.pos_settings TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.pos_settings TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.product_barcodes TO anon;
 
@@ -6763,7 +6811,9 @@ GRANT ALL ON TABLE public.product_barcodes TO authenticated;
 
 GRANT ALL ON TABLE public.product_barcodes TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.product_barcodes TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.product_barcodes TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.product_categories TO anon;
 
@@ -6771,19 +6821,25 @@ GRANT ALL ON TABLE public.product_categories TO authenticated;
 
 GRANT ALL ON TABLE public.product_categories TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.product_categories TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.product_categories TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.products TO authenticated;
 
 GRANT ALL ON TABLE public.products TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.products TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.products TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.promotions TO authenticated;
 
 GRANT ALL ON TABLE public.promotions TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.promotions TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.promotions TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.public_flags TO anon;
 
@@ -6791,31 +6847,41 @@ GRANT ALL ON TABLE public.public_flags TO authenticated;
 
 GRANT ALL ON TABLE public.public_flags TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.public_flags TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.public_flags TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.purchase_order_items TO authenticated;
 
 GRANT ALL ON TABLE public.purchase_order_items TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.purchase_order_items TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.purchase_order_items TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.purchase_orders TO authenticated;
 
 GRANT ALL ON TABLE public.purchase_orders TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.purchase_orders TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.purchase_orders TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.sale_items TO authenticated;
 
 GRANT ALL ON TABLE public.sale_items TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.sale_items TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.sale_items TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.sales TO authenticated;
 
 GRANT ALL ON TABLE public.sales TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.sales TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.sales TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.secure_settings TO anon;
 
@@ -6823,7 +6889,9 @@ GRANT ALL ON TABLE public.secure_settings TO authenticated;
 
 GRANT ALL ON TABLE public.secure_settings TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.secure_settings TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.secure_settings TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.security_findings TO anon;
 
@@ -6831,7 +6899,9 @@ GRANT ALL ON TABLE public.security_findings TO authenticated;
 
 GRANT ALL ON TABLE public.security_findings TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.security_findings TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.security_findings TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.settings_locks TO anon;
 
@@ -6839,7 +6909,9 @@ GRANT ALL ON TABLE public.settings_locks TO authenticated;
 
 GRANT ALL ON TABLE public.settings_locks TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.settings_locks TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.settings_locks TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.settings_overrides TO anon;
 
@@ -6847,7 +6919,9 @@ GRANT ALL ON TABLE public.settings_overrides TO authenticated;
 
 GRANT ALL ON TABLE public.settings_overrides TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.settings_overrides TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.settings_overrides TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.shift_sessions TO anon;
 
@@ -6855,7 +6929,9 @@ GRANT ALL ON TABLE public.shift_sessions TO authenticated;
 
 GRANT ALL ON TABLE public.shift_sessions TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.shift_sessions TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.shift_sessions TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.sku_audit TO anon;
 
@@ -6863,7 +6939,9 @@ GRANT ALL ON TABLE public.sku_audit TO authenticated;
 
 GRANT ALL ON TABLE public.sku_audit TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.sku_audit TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.sku_audit TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.staff_roles TO anon;
 
@@ -6871,7 +6949,9 @@ GRANT ALL ON TABLE public.staff_roles TO authenticated;
 
 GRANT ALL ON TABLE public.staff_roles TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.staff_roles TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.staff_roles TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.stock_adjustments TO anon;
 
@@ -6879,7 +6959,9 @@ GRANT ALL ON TABLE public.stock_adjustments TO authenticated;
 
 GRANT ALL ON TABLE public.stock_adjustments TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.stock_adjustments TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.stock_adjustments TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.stock_delta_applied TO anon;
 
@@ -6887,7 +6969,9 @@ GRANT ALL ON TABLE public.stock_delta_applied TO authenticated;
 
 GRANT ALL ON TABLE public.stock_delta_applied TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.stock_delta_applied TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.stock_delta_applied TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.stock_transfer_items TO anon;
 
@@ -6895,7 +6979,9 @@ GRANT ALL ON TABLE public.stock_transfer_items TO authenticated;
 
 GRANT ALL ON TABLE public.stock_transfer_items TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.stock_transfer_items TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.stock_transfer_items TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.stock_transfers TO anon;
 
@@ -6903,7 +6989,9 @@ GRANT ALL ON TABLE public.stock_transfers TO authenticated;
 
 GRANT ALL ON TABLE public.stock_transfers TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.stock_transfers TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.stock_transfers TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.stores TO anon;
 
@@ -6911,13 +6999,17 @@ GRANT ALL ON TABLE public.stores TO authenticated;
 
 GRANT ALL ON TABLE public.stores TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.stores TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.stores TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.suppliers TO authenticated;
 
 GRANT ALL ON TABLE public.suppliers TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.suppliers TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.suppliers TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.sync_metadata TO anon;
 
@@ -6925,7 +7017,9 @@ GRANT ALL ON TABLE public.sync_metadata TO authenticated;
 
 GRANT ALL ON TABLE public.sync_metadata TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.sync_metadata TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.sync_metadata TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.system_audit_logs TO anon;
 
@@ -6933,7 +7027,9 @@ GRANT ALL ON TABLE public.system_audit_logs TO authenticated;
 
 GRANT ALL ON TABLE public.system_audit_logs TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.system_audit_logs TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.system_audit_logs TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.terminal_commands TO anon;
 
@@ -6941,13 +7037,17 @@ GRANT ALL ON TABLE public.terminal_commands TO authenticated;
 
 GRANT ALL ON TABLE public.terminal_commands TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.terminal_commands TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.terminal_commands TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.terminal_tokens TO authenticated;
 
 GRANT ALL ON TABLE public.terminal_tokens TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.terminal_tokens TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.terminal_tokens TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.uom_units TO anon;
 
@@ -6955,7 +7055,9 @@ GRANT ALL ON TABLE public.uom_units TO authenticated;
 
 GRANT ALL ON TABLE public.uom_units TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.uom_units TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.uom_units TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.user_roles TO anon;
 
@@ -6963,7 +7065,9 @@ GRANT ALL ON TABLE public.user_roles TO authenticated;
 
 GRANT ALL ON TABLE public.user_roles TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.user_roles TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.user_roles TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.v_sale_line_facts TO anon;
 
@@ -6971,7 +7075,9 @@ GRANT ALL ON TABLE public.v_sale_line_facts TO authenticated;
 
 GRANT ALL ON TABLE public.v_sale_line_facts TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.v_sale_line_facts TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.v_sale_line_facts TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.v_daily_item_sales TO anon;
 
@@ -6979,7 +7085,9 @@ GRANT ALL ON TABLE public.v_daily_item_sales TO authenticated;
 
 GRANT ALL ON TABLE public.v_daily_item_sales TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.v_daily_item_sales TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.v_daily_item_sales TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.v_daily_store_sales TO anon;
 
@@ -6987,7 +7095,9 @@ GRANT ALL ON TABLE public.v_daily_store_sales TO authenticated;
 
 GRANT ALL ON TABLE public.v_daily_store_sales TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.v_daily_store_sales TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.v_daily_store_sales TO sandbox_exec';
+END IF; END $sbx$;
 
 GRANT ALL ON TABLE public.whatsapp_queue TO anon;
 
@@ -6995,7 +7105,9 @@ GRANT ALL ON TABLE public.whatsapp_queue TO authenticated;
 
 GRANT ALL ON TABLE public.whatsapp_queue TO service_role;
 
-GRANT SELECT,INSERT ON TABLE public.whatsapp_queue TO sandbox_exec;
+DO $sbx$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+  EXECUTE 'GRANT SELECT,INSERT ON TABLE public.whatsapp_queue TO sandbox_exec';
+END IF; END $sbx$;
 
 -- ============================================================
 -- Verification: anything listed below is still missing.
