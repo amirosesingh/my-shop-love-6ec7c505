@@ -39,6 +39,7 @@ import { CatalogPanel } from "@/components/pos/CatalogPanel";
 import { ColumnResizer, usePanelWidth } from "@/components/pos/ColumnResizer";
 import { ProductSearchDialog } from "@/components/pos/ProductSearchDialog";
 import { ScanBar } from "@/components/pos/ScanBar";
+import { BookingCartPanel } from "@/components/pos/booking/BookingCartPanel";
 import { QuickMemberDialog } from "@/components/pos/QuickMemberDialog";
 import { RegisterWorkspace } from "@/components/pos/layout/RegisterWorkspace";
 import { RegisterActionsProvider, type ActionHandlers } from "@/lib/register-actions";
@@ -1037,9 +1038,7 @@ function Register() {
   );
   const serviceCharge = racketMode
     ? intake.subtotal
-    : useServices
-      ? r2(Math.max(0, Number(serviceFee || 0)))
-      : 0;
+    : 0;
   const bookingTotal = r2(totals.total + serviceCharge);
   /* Live deposit breakdown shown on the booking form: what the branch demands
      up front, what the cashier is taking now, and what is left to collect. */
@@ -1129,8 +1128,8 @@ function Register() {
         discount: totals.discount,
         tax: totals.tax,
         total: bookingTotal,
-        serviceTypeId: pickedService?.id,
-        serviceName: serviceLabel || undefined,
+        serviceTypeId: racketMode ? pickedService?.id : undefined,
+        serviceName: racketMode ? serviceLabel || undefined : undefined,
         serviceFee: serviceCharge || undefined,
         charges: racketMode && intake.charges.length
           ? intake.charges.map((c) =>
