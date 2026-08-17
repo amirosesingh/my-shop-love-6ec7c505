@@ -13,6 +13,7 @@ import { ArrowLeft, Eye, Loader2, RotateCcw, Save } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
 import { SaveIndicator } from "@/components/pos/settings/SaveIndicator";
+import { useEmbeddedSettings } from "@/components/pos/settings/embed";
 import { ScopePanel } from "@/components/pos/settings/ScopeControls";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { Button } from "@/components/ui/button";
@@ -91,6 +92,8 @@ export function SettingsFrame({
   const { state, stores, currentStore, updateSettings, upsertStore } = usePos();
   const { isAdmin, can } = useAuth();
   const canSettings = isAdmin || can("can_access_pos_settings");
+  // Rendered inside the settings workspace sheet: no app shell, no back link.
+  const embedded = useEmbeddedSettings();
 
   /* ---- Save / discard -------------------------------------------------- */
   // Edits apply live so the preview stays honest, but nothing is considered
@@ -239,15 +242,17 @@ export function SettingsFrame({
   }, [effective, receipt, tax, sample]);
 
   if (!canSettings) {
+    const denied = (
+      <div className={embedded ? "" : "p-6"}>
+        <h1 className="text-2xl font-semibold">{title}</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          This configuration is managed by an administrator.
+        </p>
+      </div>
+    );
+    if (embedded) return denied;
     return (
-      <AppShell>
-        <div className="p-6">
-          <h1 className="text-2xl font-semibold">{title}</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            This configuration is managed by an administrator.
-          </p>
-        </div>
-      </AppShell>
+      <AppShell>{denied}</AppShell>
     );
   }
 
@@ -269,26 +274,35 @@ export function SettingsFrame({
     paymentQr,
   };
 
-  return (
-    <AppShell>
-      <SettingsCtx.Provider value={ctx}>
+  const body = (
+    <SettingsCtx.Provider value={ctx}>
         <div
-          className={`mx-auto w-full space-y-5 p-6 ${wide ? "max-w-full" : "max-w-4xl"}`}
+          className={
+            embedded
+              ? "w-full max-w-full space-y-4"
+              : `mx-auto w-full space-y-5 p-6 ${wide ? "max-w-full" : "max-w-4xl"}`
+          }
         >
           {/* Stays visible while the page scrolls, so there is always a way back. */}
-          <div className="sticky top-0 z-20 -mx-6 -mt-6 border-b border-border bg-background/95 px-4 py-2 backdrop-blur">
-            <Button asChild variant="ghost" size="sm" className="h-8 text-xs">
-              <Link to="/settings">
-                <ArrowLeft className="size-4" /> All settings
-              </Link>
-            </Button>
-          </div>
+          {!embedded && (
+            <div className="sticky top-0 z-20 -mx-6 -mt-6 border-b border-border bg-background/95 px-4 py-2 backdrop-blur">
+              <Button asChild variant="ghost" size="sm" className="h-8 text-xs">
+                <Link to="/settings">
+                  <ArrowLeft className="size-4" /> All settings
+                </Link>
+              </Button>
+            </div>
+          )}
 
           <header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
-            <div className="min-w-0">
-              <h1 className="text-2xl font-semibold">{title}</h1>
-              <p className="text-sm text-muted-foreground">{description}</p>
-            </div>
+            {embedded ? (
+              <div />
+            ) : (
+              <div className="min-w-0">
+                <h1 className="text-2xl font-semibold">{title}</h1>
+                <p className="text-sm text-muted-foreground">{description}</p>
+              </div>
+            )}
             {showPreview && (
               <Sheet>
                 <SheetTrigger asChild>
@@ -349,7 +363,11 @@ export function SettingsFrame({
           </section>
 
           {/* Nothing is considered stored until this bar confirms it. */}
-          <div className="sticky bottom-0 -mx-6 flex flex-wrap items-center gap-3 border-t border-border bg-background/95 px-6 py-3 backdrop-blur">
+          <div
+            className={`sticky bottom-0 flex flex-wrap items-center gap-3 border-t border-border bg-background/95 py-3 backdrop-blur ${
+              embedded ? "px-1" : "-mx-6 px-6"
+            }`}
+          >
             <SaveIndicator dirty={dirty} saving={saving} savedAt={savedAt} error={saveError} />
             <div className="ml-auto flex gap-2">
               <Button variant="ghost" size="sm" disabled={!dirty || saving} onClick={discard}>
@@ -362,7 +380,8 @@ export function SettingsFrame({
             </div>
           </div>
         </div>
-      </SettingsCtx.Provider>
-    </AppShell>
+    </SettingsCtx.Provider>
   );
+
+  return embedded ? body : <AppShell>{body}</AppShell>;
 }
