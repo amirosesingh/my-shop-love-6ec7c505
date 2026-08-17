@@ -815,3 +815,42 @@ BEGIN
     ADD CONSTRAINT PK_sync_metadata PRIMARY KEY (table_name, store_id, terminal_id);
 END
 GO
+
+/* ------------------------------------------------------------------ *
+ * Multi-level locations (stores, warehouses, sub-warehouse levels).
+ * Additive only: existing rows keep every value they already hold.
+ * ------------------------------------------------------------------ */
+IF COL_LENGTH('dbo.stores', 'location_type') IS NULL
+  ALTER TABLE dbo.stores ADD location_type NVARCHAR(40) NOT NULL
+    CONSTRAINT DF_stores_location_type DEFAULT N'store';
+GO
+IF COL_LENGTH('dbo.stores', 'parent_id') IS NULL
+  ALTER TABLE dbo.stores ADD parent_id NVARCHAR(60) NULL;
+GO
+IF COL_LENGTH('dbo.stores', 'is_central') IS NULL
+  ALTER TABLE dbo.stores ADD is_central BIT NOT NULL
+    CONSTRAINT DF_stores_is_central DEFAULT 0;
+GO
+IF COL_LENGTH('dbo.stores', 'is_primary_sub') IS NULL
+  ALTER TABLE dbo.stores ADD is_primary_sub BIT NOT NULL
+    CONSTRAINT DF_stores_is_primary_sub DEFAULT 0;
+GO
+IF COL_LENGTH('dbo.stores', 'building_name') IS NULL
+  ALTER TABLE dbo.stores ADD building_name NVARCHAR(200) NULL;
+GO
+IF COL_LENGTH('dbo.stores', 'floor_label') IS NULL
+  ALTER TABLE dbo.stores ADD floor_label NVARCHAR(200) NULL;
+GO
+IF COL_LENGTH('dbo.stores', 'is_active') IS NULL
+  ALTER TABLE dbo.stores ADD is_active BIT NOT NULL
+    CONSTRAINT DF_stores_is_active DEFAULT 1;
+GO
+IF COL_LENGTH('dbo.stores', 'archived_at') IS NULL
+  ALTER TABLE dbo.stores ADD archived_at DATETIME2(3) NULL;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_stores_parent_id')
+  CREATE INDEX IX_stores_parent_id ON dbo.stores (parent_id);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_stores_location_type')
+  CREATE INDEX IX_stores_location_type ON dbo.stores (location_type);
+GO
