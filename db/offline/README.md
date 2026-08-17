@@ -40,12 +40,19 @@ with the machine key, so they cannot be read or edited outside the app.
 
 ## What it creates
 
-Branches (`stores`), device settings (`system_settings`), products, members and
-tiers, sales and sale items, purchase orders and their items, promotions,
-shifts, day-end shift summaries, activity notifications (`activity_events`),
-bookings and booking payments, transfers and stock transfers with their items,
-suppliers, stock adjustments, held orders, audit logs, POS settings, and the
-`sync_state` bookkeeping table.
+Branches (`stores`), device settings (`system_settings`), products with their
+extra barcodes, categories and units, members and tiers, sales and sale items,
+the split-tender ledger (`payment_transactions`) and the tender types behind it
+(`payment_types`), purchase orders and their items, promotions, shifts and
+shift sign-ins (`shift_sessions`), day-end shift summaries, bookings and
+booking payments, transfers and stock transfers with their items, suppliers,
+stock adjustments and the unified stock trail (`item_activity_logs`), held
+orders, coupon campaigns, issued vouchers and coupon events, cash drawer opens,
+member OTP verifications, staff accounts and roles so PIN sign-in works with no
+network, terminal health (`branch_telemetry`) and remote commands
+(`terminal_commands`), the outbound WhatsApp queue, activity notifications and
+audit logs, POS settings, and the sync bookkeeping tables (`sync_state`,
+`offline_sync_queue`, `stock_delta_applied`, `sync_metadata`).
 
 Every table carries `is_synced` / `sync_status`, a computed `pending_sync`
 flag, `temp_id` and `synced_at`, plus the indexes and touch triggers the sync
