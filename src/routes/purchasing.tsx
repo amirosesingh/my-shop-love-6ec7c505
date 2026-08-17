@@ -148,6 +148,12 @@ function Purchasing() {
     [allStores, currentStore.id, hub.id],
   );
   const [pending, setPending] = useState<PutAwayLine[]>([]);
+  /** Levels default to the warehouse's primary pick location when there is one. */
+  const defaultPutAwayId = useMemo(() => {
+    const primary = primarySub(allStores, hub.id) ?? primarySub(allStores, currentStore.id);
+    if (primary && putAwayTargets.some((s) => s.id === primary.id)) return primary.id;
+    return putAwayTargets[0]?.id ?? "";
+  }, [allStores, hub.id, currentStore.id, putAwayTargets]);
 
   const totals = useMemo(
     () => ({
