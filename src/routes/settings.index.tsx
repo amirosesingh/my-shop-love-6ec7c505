@@ -265,6 +265,13 @@ const GROUPS = [
         blurb: "Live schema scan, table links and the code checks, refreshed on every run.",
       },
       {
+        to: "/settings/database-explorer",
+        label: "Database explorer",
+        icon: Database,
+        blurb:
+          "Connect to the SQL Server on this machine, browse databases, tables and columns, run read-only checks.",
+      },
+      {
         to: "/settings/data-sync",
         label: "Data sync & audit",
         icon: RefreshCw,
