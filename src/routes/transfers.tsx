@@ -265,17 +265,30 @@ function Transfers() {
     const fromStoreId = kind === "transfer" ? currentStore.id : otherStoreId;
     const toStoreId = kind === "transfer" ? otherStoreId : currentStore.id;
     if (kind === "transfer") {
-      const short = clean.find((i) => {
+      // With sub-warehouse levels the check — and the pick — spans every level.
+      for (const i of clean) {
         const p = productOf(i.productId);
-        return !p || stockAt(p, currentStore.id) < i.qty;
-      });
-      if (short) {
-        const p = productOf(short.productId);
-        toast.error(
-          `Only ${p ? stockAt(p, currentStore.id) : 0} × ${p?.name ?? "item"} on hand at ${currentStore.name}`,
-        );
-        return;
+        const plan = p ? planDeduction(p, allStores, currentStore.id, i.qty) : null;
+        if (!p || !plan || plan.shortBy > 0) {
+          toast.error(
+            `Short by ${plan?.shortBy ?? i.qty} × ${p?.name ?? "item"} at ${currentStore.name}`,
+            { description: "Nothing has been moved. Reduce the quantity or restock first." },
+          );
+          return;
+        }
       }
+      // Consolidate the picked levels into the sending location so the
+      // dispatch deduction below leaves the right shelf empty.
+      if (sourceLevels.length)
+        for (const i of clean) {
+          const p = productOf(i.productId);
+          if (!p) continue;
+          for (const pick of planDeduction(p, allStores, currentStore.id, i.qty).picks) {
+            if (pick.storeId === currentStore.id) continue;
+            adjustStock(i.productId, -pick.qty, pick.storeId);
+            adjustStock(i.productId, pick.qty, currentStore.id);
+          }
+        }
     }
     const t = createTransfer({
       kind,
