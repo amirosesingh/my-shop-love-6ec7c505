@@ -6888,6 +6888,10 @@ UNION ALL
 SELECT 'table without policies', c.relname
   FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
  WHERE n.nspname = 'public' AND c.relkind = 'r'
+   -- cashiers (legacy) and pin_attempts (login throttle) are deliberately
+   -- policy-free: RLS is on, no role may read them, and the only access is
+   -- through SECURITY DEFINER routines.
+   AND c.relname NOT IN ('cashiers', 'pin_attempts')
    AND NOT EXISTS (SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid)
 UNION ALL
 SELECT 'table without grants', c.relname
