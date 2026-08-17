@@ -242,55 +242,20 @@ async function applySchema() {
 
 async function test(config) {
   let probe = null;
+  const started = Date.now();
   try {
     const driverConfig = toDriverConfig(config);
     probe = await new (loadDriver().ConnectionPool)(driverConfig).connect();
     const res = await probe
       .request()
-      .query("SELECT @@VERSION AS version, @@SERVERNAME AS name");
-    const row = res.recordset[0] ?? {};
-    return { ok: true, version: row.version, serverName: row.name };
-  } catch (err) {
-    return { ok: false, ...describeSqlError(err) };
-  } finally {
-    if (probe) await probe.close().catch(() => {});
-  }
-}
-
-/**
- * One-shot probe used by the connection wizard. Bypasses SQL Browser when a
- * port is supplied and reports latency plus the active database.
- */
-async function testDirect(input) {
-  const config = {
-    server: input?.host ?? input?.server ?? "localhost",
-    database: input?.database ?? "master",
-    auth: input?.authType === "sql" || input?.auth === "sql" ? "sql" : "windows",
-    user: input?.username ?? input?.user ?? "",
-    password: input?.password ?? "",
-    port: Number(input?.port) || 1433,
-    encrypt: input?.encrypt,
-    trustServerCertificate: input?.trustServerCertificate,
-    arithAbort: input?.arithAbort,
-    timeout: Number(input?.timeout) || undefined,
-  };
-  const started = Date.now();
-  let probe = null;
-  try {
-    probe = await new (loadDriver().ConnectionPool)(toDriverConfig(config)).connect();
-    const res = await probe
-      .request()
-      .query(
-        "SELECT 1 AS status, @@VERSION AS version, DB_NAME() AS activeDb, @@SERVERNAME AS serverName",
-      );
+      .query("SELECT @@VERSION AS version, @@SERVERNAME AS name, DB_NAME() AS activeDb");
     const row = res.recordset[0] ?? {};
     return {
       ok: true,
-      latencyMs: Date.now() - started,
-      status: row.status ?? 1,
       version: row.version,
+      serverName: row.name,
       activeDb: row.activeDb,
-      serverName: row.serverName,
+      latencyMs: Date.now() - started,
     };
   } catch (err) {
     return { ok: false, latencyMs: Date.now() - started, ...describeSqlError(err) };
@@ -306,7 +271,6 @@ module.exports = {
   getPool,
   getConfig,
   test,
-  testDirect,
   applySchema,
   describeSqlError,
   parseServerField,
