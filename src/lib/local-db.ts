@@ -325,7 +325,7 @@ export async function scanLocalInstances(): Promise<LocalInstanceScan> {
   }
 }
 
-/** Direct connection probe with explicit TLS options; reports latency. */
+/** Single connection probe with explicit TLS options; reports latency. */
 export async function testDirectConnection(
   params: DirectConnectionParams,
 ): Promise<LocalDbTestResult> {
@@ -334,7 +334,6 @@ export async function testDirectConnection(
     return { ok: false, error: "Only the Windows desktop app can reach a local SQL Server." };
   }
   try {
-    if (bridge.testDirectConnection) return await bridge.testDirectConnection(params);
     return await bridge.test({
       server: params.host,
       database: params.database,
