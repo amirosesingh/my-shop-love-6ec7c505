@@ -579,6 +579,499 @@ CREATE TABLE dbo.shift_notifications (
 );
 GO
 
+
+/* =====================================================================
+   Added in 1.3.x — tables the newer POS features write to offline.
+   Same column names and types as the central database, so a pending
+   row is pushed up with no field mapping.
+   ===================================================================== */
+
+/* ---- catalogue support: extra barcodes, categories, units ---- */
+IF OBJECT_ID('dbo.product_barcodes', 'U') IS NULL
+CREATE TABLE dbo.product_barcodes (
+  id          UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+  product_id  UNIQUEIDENTIFIER NOT NULL,
+  barcode     NVARCHAR(120)    NOT NULL,
+  label       NVARCHAR(120)    NULL,
+  pack_size   DECIMAL(18, 4)   NOT NULL DEFAULT 1,
+  is_primary  BIT              NOT NULL DEFAULT 0,
+  is_synced   BIT              NOT NULL DEFAULT 0,
+  sync_status NVARCHAR(20)     NOT NULL DEFAULT N'pending',
+  row_version INT              NOT NULL DEFAULT 1,
+  created_at  DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at  DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+IF OBJECT_ID('dbo.product_barcodes', 'U') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'UX_product_barcodes_barcode')
+  CREATE UNIQUE INDEX UX_product_barcodes_barcode ON dbo.product_barcodes (barcode);
+GO
+
+IF OBJECT_ID('dbo.product_categories', 'U') IS NULL
+CREATE TABLE dbo.product_categories (
+  id          UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+  name        NVARCHAR(200)    NOT NULL,
+  parent_id   UNIQUEIDENTIFIER NULL,
+  kind        NVARCHAR(40)     NOT NULL DEFAULT N'product',
+  sort        INT              NOT NULL DEFAULT 0,
+  is_synced   BIT              NOT NULL DEFAULT 0,
+  sync_status NVARCHAR(20)     NOT NULL DEFAULT N'pending',
+  row_version INT              NOT NULL DEFAULT 1,
+  created_at  DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at  DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+IF OBJECT_ID('dbo.uom_units', 'U') IS NULL
+CREATE TABLE dbo.uom_units (
+  id            UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+  code          NVARCHAR(40)     NOT NULL,
+  name          NVARCHAR(120)    NOT NULL,
+  allow_decimal BIT              NOT NULL DEFAULT 0,
+  sort          INT              NOT NULL DEFAULT 0,
+  is_synced     BIT              NOT NULL DEFAULT 0,
+  sync_status   NVARCHAR(20)     NOT NULL DEFAULT N'pending',
+  row_version   INT              NOT NULL DEFAULT 1,
+  created_at    DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at    DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+/* ---- money: tender types and the split-tender ledger ---- */
+IF OBJECT_ID('dbo.payment_types', 'U') IS NULL
+CREATE TABLE dbo.payment_types (
+  id                 UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+  name               NVARCHAR(120)    NOT NULL,
+  type_code          NVARCHAR(60)     NOT NULL,
+  requires_reference BIT              NOT NULL DEFAULT 0,
+  is_active          BIT              NOT NULL DEFAULT 1,
+  icon               NVARCHAR(60)     NULL,
+  sort_order         INT              NOT NULL DEFAULT 0,
+  is_system          BIT              NOT NULL DEFAULT 0,
+  is_synced          BIT              NOT NULL DEFAULT 0,
+  sync_status        NVARCHAR(20)     NOT NULL DEFAULT N'pending',
+  row_version        INT              NOT NULL DEFAULT 1,
+  created_at         DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at         DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+IF OBJECT_ID('dbo.payment_transactions', 'U') IS NULL
+CREATE TABLE dbo.payment_transactions (
+  id                    UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+  source_type           NVARCHAR(20)     NOT NULL DEFAULT N'sale',
+  sale_id               UNIQUEIDENTIFIER NULL,
+  booking_id            UNIQUEIDENTIFIER NULL,
+  member_id             UNIQUEIDENTIFIER NULL,
+  store_id              NVARCHAR(80)     NULL,
+  shift_id              NVARCHAR(80)     NULL,
+  terminal_id           NVARCHAR(120)    NULL,
+  amount                DECIMAL(18, 4)   NOT NULL DEFAULT 0,
+  method                NVARCHAR(60)     NOT NULL DEFAULT N'cash',
+  kind                  NVARCHAR(40)     NOT NULL DEFAULT N'payment',
+  reference             NVARCHAR(200)    NULL,
+  cashier_id            NVARCHAR(120)    NULL,
+  cashier_name          NVARCHAR(200)    NULL,
+  note                  NVARCHAR(400)    NULL,
+  status                NVARCHAR(30)     NOT NULL DEFAULT N'completed',
+  metadata              NVARCHAR(MAX)    NOT NULL DEFAULT N'{}',
+  paid_at               DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  client_transaction_id NVARCHAR(120)    NULL,
+  is_synced             BIT              NOT NULL DEFAULT 0,
+  sync_status           NVARCHAR(20)     NOT NULL DEFAULT N'pending',
+  row_version           INT              NOT NULL DEFAULT 1,
+  created_at            DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at            DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+/* ---- one audit trail for every stock movement ---- */
+IF OBJECT_ID('dbo.item_activity_logs', 'U') IS NULL
+CREATE TABLE dbo.item_activity_logs (
+  id             UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+  product_id     UNIQUEIDENTIFIER NULL,
+  product_name   NVARCHAR(300)    NULL,
+  sku            NVARCHAR(120)    NULL,
+  barcode        NVARCHAR(120)    NULL,
+  store_id       NVARCHAR(80)     NULL,
+  terminal_id    NVARCHAR(120)    NULL,
+  activity_type  NVARCHAR(40)     NOT NULL,
+  reference      NVARCHAR(200)    NULL,
+  quantity_delta INT              NOT NULL DEFAULT 0,
+  stock_before   INT              NULL,
+  stock_after    INT              NULL,
+  unit_cost      DECIMAL(18, 4)   NULL,
+  staff_id       NVARCHAR(120)    NULL,
+  staff_name     NVARCHAR(200)    NULL,
+  role           NVARCHAR(60)     NULL,
+  note           NVARCHAR(400)    NULL,
+  is_synced      BIT              NOT NULL DEFAULT 0,
+  sync_status    NVARCHAR(20)     NOT NULL DEFAULT N'pending',
+  row_version    INT              NOT NULL DEFAULT 1,
+  created_at     DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at     DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+/* ---- coupons: campaigns, issued vouchers and their trail ---- */
+IF OBJECT_ID('dbo.coupon_campaigns', 'U') IS NULL
+CREATE TABLE dbo.coupon_campaigns (
+  id             UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+  name           NVARCHAR(200)    NOT NULL,
+  slug           NVARCHAR(120)    NOT NULL,
+  discount_type  NVARCHAR(20)     NOT NULL DEFAULT N'percent',
+  discount_value DECIMAL(18, 4)   NOT NULL DEFAULT 0,
+  scope          NVARCHAR(40)     NOT NULL DEFAULT N'all',
+  scope_value    NVARCHAR(200)    NULL,
+  max_claims     INT              NULL,
+  max_per_member INT              NULL,
+  claims_count   INT              NOT NULL DEFAULT 0,
+  starts_at      DATETIME2(3)     NULL,
+  expires_at     DATETIME2(3)     NULL,
+  is_active      BIT              NOT NULL DEFAULT 1,
+  is_welcome     BIT              NOT NULL DEFAULT 0,
+  is_synced      BIT              NOT NULL DEFAULT 0,
+  sync_status    NVARCHAR(20)     NOT NULL DEFAULT N'pending',
+  row_version    INT              NOT NULL DEFAULT 1,
+  created_at     DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at     DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+IF OBJECT_ID('dbo.issued_vouchers', 'U') IS NULL
+CREATE TABLE dbo.issued_vouchers (
+  id               UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+  token_slug       NVARCHAR(120)    NOT NULL,
+  campaign_id      UNIQUEIDENTIFIER NULL,
+  member_id        UNIQUEIDENTIFIER NULL,
+  status           NVARCHAR(30)     NOT NULL DEFAULT N'issued',
+  issued_at        DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  expires_at       DATETIME2(3)     NULL,
+  issued_by        NVARCHAR(200)    NULL,
+  issued_source    NVARCHAR(60)     NULL,
+  redeemed_at      DATETIME2(3)     NULL,
+  redeemed_by      NVARCHAR(200)    NULL,
+  redeemed_sale_id NVARCHAR(120)    NULL,
+  disabled_at      DATETIME2(3)     NULL,
+  disabled_by      NVARCHAR(200)    NULL,
+  disable_reason   NVARCHAR(400)    NULL,
+  store_id         NVARCHAR(80)     NULL,
+  is_synced        BIT              NOT NULL DEFAULT 0,
+  sync_status      NVARCHAR(20)     NOT NULL DEFAULT N'pending',
+  row_version      INT              NOT NULL DEFAULT 1,
+  created_at       DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at       DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+IF OBJECT_ID('dbo.coupon_events', 'U') IS NULL
+CREATE TABLE dbo.coupon_events (
+  id            UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+  event_type    NVARCHAR(40)     NOT NULL,
+  campaign_id   UNIQUEIDENTIFIER NULL,
+  campaign_name NVARCHAR(200)    NULL,
+  voucher_token NVARCHAR(120)    NULL,
+  member_id     UNIQUEIDENTIFIER NULL,
+  member_phone  NVARCHAR(40)     NULL,
+  store_id      NVARCHAR(80)     NULL,
+  terminal_id   NVARCHAR(120)    NULL,
+  staff_name    NVARCHAR(200)    NULL,
+  staff_role    NVARCHAR(60)     NULL,
+  sale_id       NVARCHAR(120)    NULL,
+  note          NVARCHAR(400)    NULL,
+  is_synced     BIT              NOT NULL DEFAULT 0,
+  sync_status   NVARCHAR(20)     NOT NULL DEFAULT N'pending',
+  created_at    DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at    DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+/* ---- cash drawer opens, including no-sale ---- */
+IF OBJECT_ID('dbo.drawer_events', 'U') IS NULL
+CREATE TABLE dbo.drawer_events (
+  id          UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+  store_id    NVARCHAR(80)     NULL,
+  terminal_id NVARCHAR(120)    NULL,
+  shift_id    NVARCHAR(80)     NULL,
+  staff_id    NVARCHAR(120)    NULL,
+  staff_name  NVARCHAR(200)    NULL,
+  role        NVARCHAR(60)     NULL,
+  reason      NVARCHAR(120)    NULL,
+  note        NVARCHAR(400)    NULL,
+  approved_by NVARCHAR(200)    NULL,
+  is_synced   BIT              NOT NULL DEFAULT 0,
+  sync_status NVARCHAR(20)     NOT NULL DEFAULT N'pending',
+  created_at  DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at  DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+/* ---- who signed in during a shift ---- */
+IF OBJECT_ID('dbo.shift_sessions', 'U') IS NULL
+CREATE TABLE dbo.shift_sessions (
+  id            UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+  shift_id      NVARCHAR(80)     NOT NULL,
+  store_id      NVARCHAR(80)     NULL,
+  terminal_id   NVARCHAR(120)    NULL,
+  terminal_name NVARCHAR(200)    NULL,
+  staff_id      NVARCHAR(120)    NULL,
+  staff_name    NVARCHAR(200)    NULL,
+  role          NVARCHAR(60)     NULL,
+  signed_in_at  DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  signed_out_at DATETIME2(3)     NULL,
+  is_synced     BIT              NOT NULL DEFAULT 0,
+  sync_status   NVARCHAR(20)     NOT NULL DEFAULT N'pending',
+  row_version   INT              NOT NULL DEFAULT 1,
+  created_at    DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at    DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+/* ---- staff accounts and roles, so PIN sign-in works with no network ---- */
+IF OBJECT_ID('dbo.staff_roles', 'U') IS NULL
+CREATE TABLE dbo.staff_roles (
+  slug        NVARCHAR(60)  NOT NULL PRIMARY KEY,
+  name        NVARCHAR(120) NOT NULL,
+  base_level  NVARCHAR(40)  NULL,
+  permissions NVARCHAR(MAX) NOT NULL DEFAULT N'{}',
+  is_core     BIT           NOT NULL DEFAULT 0,
+  created_at  DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at  DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+IF OBJECT_ID('dbo.app_users', 'U') IS NULL
+CREATE TABLE dbo.app_users (
+  id            UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+  user_id       NVARCHAR(120)    NOT NULL,
+  full_name     NVARCHAR(200)    NULL,
+  email         NVARCHAR(200)    NULL,
+  role          NVARCHAR(60)     NULL,
+  role_slug     NVARCHAR(60)     NULL,
+  store_id      NVARCHAR(80)     NULL,
+  is_active     BIT              NOT NULL DEFAULT 1,
+  permissions   NVARCHAR(MAX)    NOT NULL DEFAULT N'{}',
+  pin_hash      NVARCHAR(400)    NULL,
+  pin_length    SMALLINT         NULL,
+  last_login_at DATETIME2(3)     NULL,
+  is_synced     BIT              NOT NULL DEFAULT 1,
+  sync_status   NVARCHAR(20)     NOT NULL DEFAULT N'synced',
+  row_version   INT              NOT NULL DEFAULT 1,
+  created_at    DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at    DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+IF OBJECT_ID('dbo.cashiers', 'U') IS NULL
+CREATE TABLE dbo.cashiers (
+  id            UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+  username      NVARCHAR(120)    NOT NULL,
+  full_name     NVARCHAR(200)    NULL,
+  pin_hash      NVARCHAR(400)    NULL,
+  store_id      NVARCHAR(80)     NULL,
+  role_slug     NVARCHAR(60)     NULL,
+  permissions   NVARCHAR(MAX)    NOT NULL DEFAULT N'{}',
+  is_active     BIT              NOT NULL DEFAULT 1,
+  last_login_at DATETIME2(3)     NULL,
+  is_synced     BIT              NOT NULL DEFAULT 1,
+  sync_status   NVARCHAR(20)     NOT NULL DEFAULT N'synced',
+  created_at    DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at    DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+/* ---- member OTP verification ---- */
+IF OBJECT_ID('dbo.member_verifications', 'U') IS NULL
+CREATE TABLE dbo.member_verifications (
+  id          UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+  member_id   UNIQUEIDENTIFIER NULL,
+  phone       NVARCHAR(40)     NULL,
+  email       NVARCHAR(200)    NULL,
+  channel     NVARCHAR(30)     NOT NULL DEFAULT N'whatsapp',
+  otp_code    NVARCHAR(200)    NULL,
+  attempts    INT              NOT NULL DEFAULT 0,
+  status      NVARCHAR(30)     NOT NULL DEFAULT N'pending',
+  sent_by     NVARCHAR(200)    NULL,
+  store_id    NVARCHAR(80)     NULL,
+  expires_at  DATETIME2(3)     NULL,
+  verified_at DATETIME2(3)     NULL,
+  is_synced   BIT              NOT NULL DEFAULT 0,
+  sync_status NVARCHAR(20)     NOT NULL DEFAULT N'pending',
+  created_at  DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at  DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+/* ---- terminal health and remote commands ---- */
+IF OBJECT_ID('dbo.branch_telemetry', 'U') IS NULL
+CREATE TABLE dbo.branch_telemetry (
+  terminal_id         NVARCHAR(120) NOT NULL PRIMARY KEY,
+  store_id            NVARCHAR(80)  NULL,
+  branch_id           NVARCHAR(80)  NULL,
+  terminal_name       NVARCHAR(200) NULL,
+  staff_name          NVARCHAR(200) NULL,
+  staff_role          NVARCHAR(60)  NULL,
+  db_mode             NVARCHAR(40)  NULL,
+  connection_status   NVARCHAR(40)  NULL,
+  storage_engine      NVARCHAR(40)  NULL,
+  pending_count       INT           NOT NULL DEFAULT 0,
+  pending_queue_count INT           NOT NULL DEFAULT 0,
+  conflict_count      INT           NOT NULL DEFAULT 0,
+  status              NVARCHAR(40)  NULL,
+  app_version         NVARCHAR(40)  NULL,
+  platform            NVARCHAR(40)  NULL,
+  last_synced_at      DATETIME2(3)  NULL,
+  last_ping           DATETIME2(3)  NULL,
+  last_seen_at        DATETIME2(3)  NULL,
+  is_synced           BIT           NOT NULL DEFAULT 0,
+  sync_status         NVARCHAR(20)  NOT NULL DEFAULT N'pending',
+  created_at          DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at          DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+IF OBJECT_ID('dbo.terminal_commands', 'U') IS NULL
+CREATE TABLE dbo.terminal_commands (
+  id           UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+  terminal_id  NVARCHAR(120)    NOT NULL,
+  store_id     NVARCHAR(80)     NULL,
+  command      NVARCHAR(60)     NOT NULL,
+  status       NVARCHAR(30)     NOT NULL DEFAULT N'pending',
+  note         NVARCHAR(400)    NULL,
+  result       NVARCHAR(MAX)    NULL,
+  issued_by    NVARCHAR(200)    NULL,
+  issued_role  NVARCHAR(60)     NULL,
+  picked_up_at DATETIME2(3)     NULL,
+  finished_at  DATETIME2(3)     NULL,
+  is_synced    BIT              NOT NULL DEFAULT 0,
+  sync_status  NVARCHAR(20)     NOT NULL DEFAULT N'pending',
+  created_at   DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at   DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+/* ---- outbound WhatsApp messages waiting for a connection ---- */
+IF OBJECT_ID('dbo.whatsapp_queue', 'U') IS NULL
+CREATE TABLE dbo.whatsapp_queue (
+  id              UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+  phone_number_id NVARCHAR(120)    NULL,
+  recipient       NVARCHAR(40)     NOT NULL,
+  body            NVARCHAR(MAX)    NOT NULL,
+  reference       NVARCHAR(200)    NULL,
+  store_id        NVARCHAR(80)     NULL,
+  status          NVARCHAR(30)     NOT NULL DEFAULT N'queued',
+  error           NVARCHAR(MAX)    NULL,
+  queued_at       DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  sent_at         DATETIME2(3)     NULL,
+  is_synced       BIT              NOT NULL DEFAULT 0,
+  sync_status     NVARCHAR(20)     NOT NULL DEFAULT N'pending',
+  created_at      DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at      DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+/* ---- readable trail of what staff did on this till ---- */
+IF OBJECT_ID('dbo.activity_events', 'U') IS NULL
+CREATE TABLE dbo.activity_events (
+  id              UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+  event_type      NVARCHAR(60)     NOT NULL,
+  severity        NVARCHAR(20)     NOT NULL DEFAULT N'info',
+  title           NVARCHAR(200)    NULL,
+  message         NVARCHAR(MAX)    NULL,
+  actor_id        NVARCHAR(120)    NULL,
+  actor_name      NVARCHAR(200)    NULL,
+  actor_role      NVARCHAR(60)     NULL,
+  terminal_id     NVARCHAR(120)    NULL,
+  terminal_name   NVARCHAR(200)    NULL,
+  store_id        NVARCHAR(80)     NULL,
+  entity_type     NVARCHAR(60)     NULL,
+  entity_id       NVARCHAR(120)    NULL,
+  amount          DECIMAL(18, 4)   NULL,
+  meta            NVARCHAR(MAX)    NOT NULL DEFAULT N'{}',
+  whatsapp_status NVARCHAR(30)     NULL,
+  whatsapp_error  NVARCHAR(MAX)    NULL,
+  client_event_id NVARCHAR(120)    NULL,
+  is_synced       BIT              NOT NULL DEFAULT 0,
+  sync_status     NVARCHAR(20)     NOT NULL DEFAULT N'pending',
+  created_at      DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at      DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+/* ---- the queue the sync engine drains, and its bookkeeping ---- */
+IF OBJECT_ID('dbo.offline_sync_queue', 'U') IS NULL
+CREATE TABLE dbo.offline_sync_queue (
+  id                    UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+  table_name            NVARCHAR(80)  NOT NULL,
+  record_id             NVARCHAR(120) NULL,
+  action_type           NVARCHAR(10)  NOT NULL DEFAULT N'INSERT'
+    CONSTRAINT CK_offline_sync_queue_action
+    CHECK (action_type IN (N'INSERT', N'UPDATE', N'DELETE')),
+  payload_json          NVARCHAR(MAX) NOT NULL,
+  status                NVARCHAR(20)  NOT NULL DEFAULT N'pending'
+    CONSTRAINT CK_offline_sync_queue_status
+    CHECK (status IN (N'pending', N'failed', N'dead_letter')),
+  error_message         NVARCHAR(MAX) NULL,
+  attempts              INT           NOT NULL DEFAULT 0,
+  last_attempt_at       DATETIME2(3)  NULL,
+  client_transaction_id NVARCHAR(120) NULL,
+  created_at            DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+IF OBJECT_ID('dbo.offline_sync_queue', 'U') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_offline_sync_queue_status')
+  CREATE INDEX IX_offline_sync_queue_status
+    ON dbo.offline_sync_queue (status, created_at);
+GO
+
+/* Stock movements already applied, so a retry can never deduct twice. */
+IF OBJECT_ID('dbo.stock_delta_applied', 'U') IS NULL
+CREATE TABLE dbo.stock_delta_applied (
+  movement_id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
+  product_id  UNIQUEIDENTIFIER NULL,
+  store_id    NVARCHAR(80)     NULL,
+  delta       INT              NOT NULL DEFAULT 0,
+  applied_at  DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+/* Per-table high-water marks, scoped so one PC can serve two branches. */
+IF OBJECT_ID('dbo.sync_metadata', 'U') IS NULL
+CREATE TABLE dbo.sync_metadata (
+  table_name     NVARCHAR(80)  NOT NULL,
+  store_id       NVARCHAR(80)  NOT NULL DEFAULT N'',
+  terminal_id    NVARCHAR(120) NOT NULL DEFAULT N'',
+  last_synced_at DATETIME2(3)  NULL,
+  last_pushed_at DATETIME2(3)  NULL,
+  rows_pushed    INT           NOT NULL DEFAULT 0,
+  last_error     NVARCHAR(MAX) NULL,
+  updated_at     DATETIME2(3)  NULL,
+  CONSTRAINT PK_sync_metadata PRIMARY KEY (table_name, store_id, terminal_id)
+);
+GO
+
+/* ---- lookup indexes the till hits on every scan and search ---- */
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_item_activity_logs_product')
+  CREATE INDEX IX_item_activity_logs_product
+    ON dbo.item_activity_logs (product_id, created_at DESC);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_payment_transactions_sale')
+  CREATE INDEX IX_payment_transactions_sale ON dbo.payment_transactions (sale_id);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_payment_transactions_booking')
+  CREATE INDEX IX_payment_transactions_booking ON dbo.payment_transactions (booking_id);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_activity_events_created')
+  CREATE INDEX IX_activity_events_created ON dbo.activity_events (created_at DESC);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_terminal_commands_terminal')
+  CREATE INDEX IX_terminal_commands_terminal
+    ON dbo.terminal_commands (terminal_id, status);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_issued_vouchers_token')
+  CREATE INDEX IX_issued_vouchers_token ON dbo.issued_vouchers (token_slug);
+GO
+
 /* ------------------------------------------------------------------
    Confirmation stamp — when the central database accepted this row.
    Lets a supervisor see how far behind a till is, per record.
