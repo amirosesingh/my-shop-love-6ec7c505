@@ -430,3 +430,330 @@ CREATE TABLE IF NOT EXISTS sync_metadata (
   updated_at     TEXT,
   PRIMARY KEY (table_name, store_id, terminal_id)
 );
+
+-- ============================================================================
+--  Added in 1.3.x — mirrors for the newer POS features.
+--  Column names match the central database exactly, so a queued row is pushed
+--  up with no field mapping, and a branch running SQL Server instead of this
+--  file ends up with the same shape.
+-- ============================================================================
+
+-- ---------------------------------------------------------------- catalogue
+CREATE TABLE IF NOT EXISTS payment_types (
+  id                 TEXT PRIMARY KEY,
+  name               TEXT NOT NULL,
+  type_code          TEXT NOT NULL,
+  requires_reference INTEGER NOT NULL DEFAULT 0,
+  is_active          INTEGER NOT NULL DEFAULT 1,
+  icon               TEXT,
+  sort_order         INTEGER NOT NULL DEFAULT 0,
+  is_system          INTEGER NOT NULL DEFAULT 0,
+  is_synced          INTEGER NOT NULL DEFAULT 0,
+  sync_status        TEXT NOT NULL DEFAULT 'pending',
+  row_version        INTEGER NOT NULL DEFAULT 1,
+  created_at         TEXT,
+  updated_at         TEXT
+);
+
+CREATE TABLE IF NOT EXISTS stores (
+  id          TEXT PRIMARY KEY,
+  code        TEXT,
+  name        TEXT NOT NULL,
+  address     TEXT,
+  phone       TEXT,
+  group_id    TEXT,
+  is_synced   INTEGER NOT NULL DEFAULT 1,
+  sync_status TEXT NOT NULL DEFAULT 'synced',
+  row_version INTEGER NOT NULL DEFAULT 1,
+  created_at  TEXT,
+  updated_at  TEXT
+);
+
+-- ---------------------------------------------------------------- coupons
+CREATE TABLE IF NOT EXISTS coupon_campaigns (
+  id             TEXT PRIMARY KEY,
+  name           TEXT NOT NULL,
+  slug           TEXT NOT NULL,
+  discount_type  TEXT NOT NULL DEFAULT 'percent',
+  discount_value REAL NOT NULL DEFAULT 0,
+  scope          TEXT NOT NULL DEFAULT 'all',
+  scope_value    TEXT,
+  max_claims     INTEGER,
+  max_per_member INTEGER,
+  claims_count   INTEGER NOT NULL DEFAULT 0,
+  starts_at      TEXT,
+  expires_at     TEXT,
+  is_active      INTEGER NOT NULL DEFAULT 1,
+  is_welcome     INTEGER NOT NULL DEFAULT 0,
+  is_synced      INTEGER NOT NULL DEFAULT 0,
+  sync_status    TEXT NOT NULL DEFAULT 'pending',
+  row_version    INTEGER NOT NULL DEFAULT 1,
+  created_at     TEXT,
+  updated_at     TEXT
+);
+
+CREATE TABLE IF NOT EXISTS issued_vouchers (
+  id               TEXT PRIMARY KEY,
+  token_slug       TEXT NOT NULL,
+  campaign_id      TEXT,
+  member_id        TEXT,
+  status           TEXT NOT NULL DEFAULT 'issued',
+  issued_at        TEXT,
+  expires_at       TEXT,
+  issued_by        TEXT,
+  issued_source    TEXT,
+  redeemed_at      TEXT,
+  redeemed_by      TEXT,
+  redeemed_sale_id TEXT,
+  disabled_at      TEXT,
+  disabled_by      TEXT,
+  disable_reason   TEXT,
+  store_id         TEXT,
+  is_synced        INTEGER NOT NULL DEFAULT 0,
+  sync_status      TEXT NOT NULL DEFAULT 'pending',
+  row_version      INTEGER NOT NULL DEFAULT 1,
+  created_at       TEXT,
+  updated_at       TEXT
+);
+CREATE INDEX IF NOT EXISTS issued_vouchers_token_idx ON issued_vouchers (token_slug);
+
+CREATE TABLE IF NOT EXISTS coupon_events (
+  id            TEXT PRIMARY KEY,
+  event_type    TEXT NOT NULL,
+  campaign_id   TEXT,
+  campaign_name TEXT,
+  voucher_token TEXT,
+  member_id     TEXT,
+  member_phone  TEXT,
+  store_id      TEXT,
+  terminal_id   TEXT,
+  staff_name    TEXT,
+  staff_role    TEXT,
+  sale_id       TEXT,
+  note          TEXT,
+  is_synced     INTEGER NOT NULL DEFAULT 0,
+  sync_status   TEXT NOT NULL DEFAULT 'pending',
+  created_at    TEXT,
+  updated_at    TEXT
+);
+
+-- ---------------------------------------------------------------- till floor
+CREATE TABLE IF NOT EXISTS drawer_events (
+  id          TEXT PRIMARY KEY,
+  store_id    TEXT,
+  terminal_id TEXT,
+  shift_id    TEXT,
+  staff_id    TEXT,
+  staff_name  TEXT,
+  role        TEXT,
+  reason      TEXT,
+  note        TEXT,
+  approved_by TEXT,
+  is_synced   INTEGER NOT NULL DEFAULT 0,
+  sync_status TEXT NOT NULL DEFAULT 'pending',
+  created_at  TEXT,
+  updated_at  TEXT
+);
+
+CREATE TABLE IF NOT EXISTS shift_sessions (
+  id            TEXT PRIMARY KEY,
+  shift_id      TEXT NOT NULL,
+  store_id      TEXT,
+  terminal_id   TEXT,
+  terminal_name TEXT,
+  staff_id      TEXT,
+  staff_name    TEXT,
+  role          TEXT,
+  signed_in_at  TEXT,
+  signed_out_at TEXT,
+  is_synced     INTEGER NOT NULL DEFAULT 0,
+  sync_status   TEXT NOT NULL DEFAULT 'pending',
+  row_version   INTEGER NOT NULL DEFAULT 1,
+  created_at    TEXT,
+  updated_at    TEXT
+);
+CREATE INDEX IF NOT EXISTS shift_sessions_shift_idx ON shift_sessions (shift_id);
+
+-- ------------------------------------------------------- staff (offline PIN)
+CREATE TABLE IF NOT EXISTS staff_roles (
+  slug        TEXT PRIMARY KEY,
+  name        TEXT NOT NULL,
+  base_level  TEXT,
+  permissions TEXT NOT NULL DEFAULT '{}',
+  is_core     INTEGER NOT NULL DEFAULT 0,
+  created_at  TEXT,
+  updated_at  TEXT
+);
+
+CREATE TABLE IF NOT EXISTS app_users (
+  id            TEXT PRIMARY KEY,
+  user_id       TEXT NOT NULL,
+  full_name     TEXT,
+  email         TEXT,
+  role          TEXT,
+  role_slug     TEXT,
+  store_id      TEXT,
+  is_active     INTEGER NOT NULL DEFAULT 1,
+  permissions   TEXT NOT NULL DEFAULT '{}',
+  pin_hash      TEXT,
+  pin_length    INTEGER,
+  last_login_at TEXT,
+  is_synced     INTEGER NOT NULL DEFAULT 1,
+  sync_status   TEXT NOT NULL DEFAULT 'synced',
+  row_version   INTEGER NOT NULL DEFAULT 1,
+  created_at    TEXT,
+  updated_at    TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS app_users_user_id_idx ON app_users (user_id);
+
+CREATE TABLE IF NOT EXISTS cashiers (
+  id            TEXT PRIMARY KEY,
+  username      TEXT NOT NULL,
+  full_name     TEXT,
+  pin_hash      TEXT,
+  store_id      TEXT,
+  role_slug     TEXT,
+  permissions   TEXT NOT NULL DEFAULT '{}',
+  is_active     INTEGER NOT NULL DEFAULT 1,
+  last_login_at TEXT,
+  is_synced     INTEGER NOT NULL DEFAULT 1,
+  sync_status   TEXT NOT NULL DEFAULT 'synced',
+  created_at    TEXT,
+  updated_at    TEXT
+);
+
+-- ---------------------------------------------------------------- members OTP
+CREATE TABLE IF NOT EXISTS member_verifications (
+  id          TEXT PRIMARY KEY,
+  member_id   TEXT,
+  phone       TEXT,
+  email       TEXT,
+  channel     TEXT NOT NULL DEFAULT 'whatsapp',
+  otp_code    TEXT,
+  attempts    INTEGER NOT NULL DEFAULT 0,
+  status      TEXT NOT NULL DEFAULT 'pending',
+  sent_by     TEXT,
+  store_id    TEXT,
+  expires_at  TEXT,
+  verified_at TEXT,
+  is_synced   INTEGER NOT NULL DEFAULT 0,
+  sync_status TEXT NOT NULL DEFAULT 'pending',
+  created_at  TEXT,
+  updated_at  TEXT
+);
+
+-- ------------------------------------------------------ terminal supervision
+CREATE TABLE IF NOT EXISTS branch_telemetry (
+  terminal_id         TEXT PRIMARY KEY,
+  store_id            TEXT,
+  branch_id           TEXT,
+  terminal_name       TEXT,
+  staff_name          TEXT,
+  staff_role          TEXT,
+  db_mode             TEXT,
+  connection_status   TEXT,
+  storage_engine      TEXT,
+  pending_count       INTEGER NOT NULL DEFAULT 0,
+  pending_queue_count INTEGER NOT NULL DEFAULT 0,
+  conflict_count      INTEGER NOT NULL DEFAULT 0,
+  status              TEXT,
+  app_version         TEXT,
+  platform            TEXT,
+  last_synced_at      TEXT,
+  last_ping           TEXT,
+  last_seen_at        TEXT,
+  is_synced           INTEGER NOT NULL DEFAULT 0,
+  sync_status         TEXT NOT NULL DEFAULT 'pending',
+  created_at          TEXT,
+  updated_at          TEXT
+);
+
+CREATE TABLE IF NOT EXISTS terminal_commands (
+  id           TEXT PRIMARY KEY,
+  terminal_id  TEXT NOT NULL,
+  store_id     TEXT,
+  command      TEXT NOT NULL,
+  status       TEXT NOT NULL DEFAULT 'pending',
+  note         TEXT,
+  result       TEXT,
+  issued_by    TEXT,
+  issued_role  TEXT,
+  picked_up_at TEXT,
+  finished_at  TEXT,
+  is_synced    INTEGER NOT NULL DEFAULT 0,
+  sync_status  TEXT NOT NULL DEFAULT 'pending',
+  created_at   TEXT,
+  updated_at   TEXT
+);
+CREATE INDEX IF NOT EXISTS terminal_commands_terminal_idx
+  ON terminal_commands (terminal_id, status);
+
+CREATE TABLE IF NOT EXISTS whatsapp_queue (
+  id              TEXT PRIMARY KEY,
+  phone_number_id TEXT,
+  recipient       TEXT NOT NULL,
+  body            TEXT NOT NULL,
+  reference       TEXT,
+  store_id        TEXT,
+  status          TEXT NOT NULL DEFAULT 'queued',
+  error           TEXT,
+  queued_at       TEXT,
+  sent_at         TEXT,
+  is_synced       INTEGER NOT NULL DEFAULT 0,
+  sync_status     TEXT NOT NULL DEFAULT 'pending',
+  created_at      TEXT,
+  updated_at      TEXT
+);
+CREATE INDEX IF NOT EXISTS whatsapp_queue_status_idx ON whatsapp_queue (status, queued_at);
+
+-- ---------------------------------------------------------------- audit trail
+CREATE TABLE IF NOT EXISTS activity_events (
+  id              TEXT PRIMARY KEY,
+  event_type      TEXT NOT NULL,
+  severity        TEXT NOT NULL DEFAULT 'info',
+  title           TEXT,
+  message         TEXT,
+  actor_id        TEXT,
+  actor_name      TEXT,
+  actor_role      TEXT,
+  terminal_id     TEXT,
+  terminal_name   TEXT,
+  store_id        TEXT,
+  entity_type     TEXT,
+  entity_id       TEXT,
+  amount          REAL,
+  meta            TEXT NOT NULL DEFAULT '{}',
+  whatsapp_status TEXT,
+  whatsapp_error  TEXT,
+  client_event_id TEXT,
+  is_synced       INTEGER NOT NULL DEFAULT 0,
+  sync_status     TEXT NOT NULL DEFAULT 'pending',
+  created_at      TEXT,
+  updated_at      TEXT
+);
+CREATE INDEX IF NOT EXISTS activity_events_created_idx ON activity_events (created_at DESC);
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id              TEXT PRIMARY KEY,
+  user_id         TEXT,
+  user_name       TEXT,
+  action          TEXT,
+  action_category TEXT,
+  action_name     TEXT,
+  target_module   TEXT,
+  entity          TEXT,
+  before_state    TEXT,
+  after_state     TEXT,
+  details         TEXT NOT NULL DEFAULT '{}',
+  is_synced       INTEGER NOT NULL DEFAULT 0,
+  sync_status     TEXT NOT NULL DEFAULT 'pending',
+  created_at      TEXT,
+  updated_at      TEXT
+);
+CREATE INDEX IF NOT EXISTS audit_logs_created_idx ON audit_logs (created_at DESC);
+
+-- ------------------------------------------------- lookup paths used offline
+CREATE INDEX IF NOT EXISTS products_barcode_idx ON products (barcode);
+CREATE INDEX IF NOT EXISTS products_sku_idx ON products (sku);
+CREATE INDEX IF NOT EXISTS members_phone_idx ON members (phone);
+CREATE INDEX IF NOT EXISTS sales_created_idx ON sales (created_at DESC);
