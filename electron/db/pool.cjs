@@ -5,6 +5,7 @@
  */
 const fs = require("node:fs");
 const path = require("node:path");
+const { execFileSync } = require("node:child_process");
 
 const DRIVER_HINT =
   "Local database driver not installed. Run: npm install mssql";
@@ -14,6 +15,7 @@ const WINDOWS_AUTH_HINT =
 const CONNECT_TIMEOUT_MS = 15_000;
 
 let driver = null;
+let nativeDriver = null;
 
 /** Loads the mssql driver on first use so a missing module never kills boot. */
 function loadDriver() {
@@ -26,6 +28,54 @@ function loadDriver() {
     throw e;
   }
   return driver;
+}
+
+/**
+ * Windows integrated auth needs the NATIVE build of mssql. Setting
+ * `config.driver = "msnodesqlv8"` on the default (tedious) build is silently
+ * ignored, which is what produced sign-in failures with no user/password.
+ */
+function loadNativeDriver() {
+  if (nativeDriver) return nativeDriver;
+  try {
+    nativeDriver = require("mssql/msnodesqlv8");
+  } catch (err) {
+    const e = new Error(WINDOWS_AUTH_HINT);
+    e.code = "EDRIVER";
+    e.cause = err;
+    throw e;
+  }
+  return nativeDriver;
+}
+
+const KNOWN_ODBC_DRIVERS = [
+  "ODBC Driver 18 for SQL Server",
+  "ODBC Driver 17 for SQL Server",
+  "ODBC Driver 13 for SQL Server",
+  "SQL Server Native Client 11.0",
+  "SQL Server",
+];
+
+let odbcCache = null;
+
+/** ODBC drivers actually installed on this PC, best first. */
+function installedOdbcDrivers() {
+  if (odbcCache) return odbcCache;
+  let found = [];
+  if (process.platform === "win32") {
+    try {
+      const out = execFileSync(
+        "reg",
+        ["query", "HKLM\\SOFTWARE\\ODBC\\ODBCINST.INI\\ODBC Drivers"],
+        { timeout: 4000, windowsHide: true, encoding: "utf8" },
+      ).toLowerCase();
+      found = KNOWN_ODBC_DRIVERS.filter((name) => out.includes(name.toLowerCase()));
+    } catch {
+      found = [];
+    }
+  }
+  odbcCache = found.length ? found : KNOWN_ODBC_DRIVERS;
+  return odbcCache;
 }
 
 function requireWindowsDriver() {
