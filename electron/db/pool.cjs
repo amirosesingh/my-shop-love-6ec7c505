@@ -5,6 +5,7 @@
  */
 const fs = require("node:fs");
 const path = require("node:path");
+const { execFileSync } = require("node:child_process");
 
 const DRIVER_HINT =
   "Local database driver not installed. Run: npm install mssql";
@@ -14,6 +15,7 @@ const WINDOWS_AUTH_HINT =
 const CONNECT_TIMEOUT_MS = 15_000;
 
 let driver = null;
+let nativeDriver = null;
 
 /** Loads the mssql driver on first use so a missing module never kills boot. */
 function loadDriver() {
@@ -26,6 +28,54 @@ function loadDriver() {
     throw e;
   }
   return driver;
+}
+
+/**
+ * Windows integrated auth needs the NATIVE build of mssql. Setting
+ * `config.driver = "msnodesqlv8"` on the default (tedious) build is silently
+ * ignored, which is what produced sign-in failures with no user/password.
+ */
+function loadNativeDriver() {
+  if (nativeDriver) return nativeDriver;
+  try {
+    nativeDriver = require("mssql/msnodesqlv8");
+  } catch (err) {
+    const e = new Error(WINDOWS_AUTH_HINT);
+    e.code = "EDRIVER";
+    e.cause = err;
+    throw e;
+  }
+  return nativeDriver;
+}
+
+const KNOWN_ODBC_DRIVERS = [
+  "ODBC Driver 18 for SQL Server",
+  "ODBC Driver 17 for SQL Server",
+  "ODBC Driver 13 for SQL Server",
+  "SQL Server Native Client 11.0",
+  "SQL Server",
+];
+
+let odbcCache = null;
+
+/** ODBC drivers actually installed on this PC, best first. */
+function installedOdbcDrivers() {
+  if (odbcCache) return odbcCache;
+  let found = [];
+  if (process.platform === "win32") {
+    try {
+      const out = execFileSync(
+        "reg",
+        ["query", "HKLM\\SOFTWARE\\ODBC\\ODBCINST.INI\\ODBC Drivers"],
+        { timeout: 4000, windowsHide: true, encoding: "utf8" },
+      ).toLowerCase();
+      found = KNOWN_ODBC_DRIVERS.filter((name) => out.includes(name.toLowerCase()));
+    } catch {
+      found = [];
+    }
+  }
+  odbcCache = found.length ? found : KNOWN_ODBC_DRIVERS;
+  return odbcCache;
 }
 
 function requireWindowsDriver() {
@@ -120,71 +170,85 @@ const sql = new Proxy(
 let pool = null;
 let activeConfig = null;
 
-function toDriverConfig(config) {
-  loadDriver();
-  const { host, instanceName, port, explicitPort } = parseServerField(
-    config.server,
-    config.port,
-  );
+/**
+ * Works out where the instance actually listens.
+ *
+ * A named instance normally needs SQL Browser (UDP 1434). When Browser is
+ * stopped the driver's own lookup times out, so the port is asked for once
+ * here and, if known, the connection is made straight to `host,port` — which
+ * is exactly what the wizard's TCP step already proved reachable.
+ */
+async function resolveTarget(config) {
+  const parsed = parseServerField(config.server, config.port);
+  let port = parsed.port;
+  let portKnown = !parsed.instanceName || parsed.explicitPort;
+  let browserAnswered = false;
+  if (parsed.instanceName && !parsed.explicitPort) {
+    let discovered = null;
+    try {
+      discovered = await require("./discover.cjs").instancePort(parsed.host, parsed.instanceName);
+    } catch {
+      discovered = null;
+    }
+    if (discovered) {
+      port = discovered;
+      portKnown = true;
+      browserAnswered = true;
+    }
+  }
+  return { ...parsed, port, portKnown, browserAnswered };
+}
+
+/** Encryption combinations tried in order until one completes the handshake. */
+function securityLadder(config, host) {
   const local = isLocalHost(host) || isPrivateLan(host);
+  const wanted = {
+    encrypt: config.encrypt === undefined ? !local : !!config.encrypt,
+    trust:
+      config.trustServerCertificate === undefined ? true : !!config.trustServerCertificate,
+  };
+  const ladder = [wanted, { encrypt: true, trust: true }, { encrypt: false, trust: true }];
+  const seen = new Set();
+  return ladder.filter((s) => {
+    const key = `${s.encrypt}|${s.trust}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function timeoutOf(config) {
+  const value = Number(config.timeout);
+  return value > 0 ? value : CONNECT_TIMEOUT_MS;
+}
+
+/** tedious config (SQL login, or NTLM when the native driver is missing). */
+function tediousConfig(config, target, security, byPort) {
+  const ms = timeoutOf(config);
   const base = {
-    server: host,
+    server: target.host,
     database: config.database,
-    connectionTimeout: CONNECT_TIMEOUT_MS,
-    requestTimeout: CONNECT_TIMEOUT_MS,
+    connectionTimeout: ms,
+    requestTimeout: ms,
     options: {
-      // Local instances usually have no certificate; forcing encryption there
-      // is what produces the "self signed certificate" handshake failures.
-      encrypt: config.encrypt === undefined ? !local : !!config.encrypt,
-      trustServerCertificate:
-        config.trustServerCertificate === undefined ? true : !!config.trustServerCertificate,
+      encrypt: security.encrypt,
+      trustServerCertificate: security.trust,
       enableArithAbort: config.arithAbort === undefined ? true : !!config.arithAbort,
-      connectTimeout: CONNECT_TIMEOUT_MS,
+      connectTimeout: ms,
     },
     pool: { max: 10, min: 0, idleTimeoutMillis: 30000 },
   };
-  if (Number(config.timeout) > 0) {
-    base.connectionTimeout = Number(config.timeout);
-    base.requestTimeout = Number(config.timeout);
-    base.options.connectTimeout = Number(config.timeout);
-  }
-  if (instanceName) {
-    // With a named instance SQL Browser (UDP 1434) resolves the dynamic port,
-    // so a fixed port must only be sent when the operator typed one.
-    base.options.instanceName = instanceName;
-    if (explicitPort) base.port = port;
-  } else {
-    base.port = port;
-  }
+  if (byPort) base.port = target.port;
+  else base.options.instanceName = target.instanceName;
   if (config.auth === "windows") {
-    if (requireWindowsDriver()) {
-      // Native driver: integrated auth straight through ODBC.
-      base.driver = "msnodesqlv8";
-      base.options.trustedConnection = true;
-      base.connectionString = [
-        "Driver={ODBC Driver 17 for SQL Server}",
-        `Server=${instanceName ? `${host}\\${instanceName}` : `${host},${port}`}`,
-        `Database=${config.database}`,
-        "Trusted_Connection=yes",
-        `TrustServerCertificate=${base.options.trustServerCertificate ? "yes" : "no"}`,
-      ].join(";");
-    } else if (config.user) {
-      // Fallback: tedious can do NTLM when a domain account is supplied.
-      delete base.user;
-      delete base.password;
-      base.authentication = {
-        type: "ntlm",
-        options: {
-          userName: config.user,
-          password: config.password,
-          domain: config.domain || process.env["USERDOMAIN"] || host,
-        },
-      };
-    } else {
-      const e = new Error(WINDOWS_AUTH_HINT);
-      e.code = "EDRIVER";
-      throw e;
-    }
+    base.authentication = {
+      type: "ntlm",
+      options: {
+        userName: config.user,
+        password: config.password,
+        domain: config.domain || process.env["USERDOMAIN"] || target.host,
+      },
+    };
   } else {
     base.user = config.user;
     base.password = config.password;
@@ -192,11 +256,140 @@ function toDriverConfig(config) {
   return base;
 }
 
+/** msnodesqlv8 config — a pure connection string, no tedious-shaped fields. */
+function nativeConfig(config, target, security, byPort, odbcDriver) {
+  const ms = timeoutOf(config);
+  const server = byPort
+    ? `${target.host},${target.port}`
+    : `${target.host}\\${target.instanceName}`;
+  return {
+    connectionString: [
+      `Driver={${odbcDriver}}`,
+      `Server=${server}`,
+      `Database=${config.database || "master"}`,
+      "Trusted_Connection=yes",
+      `Encrypt=${security.encrypt ? "yes" : "no"}`,
+      `TrustServerCertificate=${security.trust ? "yes" : "no"}`,
+      `Connection Timeout=${Math.round(ms / 1000)}`,
+    ].join(";"),
+    connectionTimeout: ms,
+    requestTimeout: ms,
+    pool: { max: 10, min: 0, idleTimeoutMillis: 30000 },
+  };
+}
+
+const isLoginFailure = (err) =>
+  err?.code === "ELOGIN" ||
+  /login failed|password did not match|not associated with a trusted/i.test(
+    `${err?.message ?? ""} ${err?.originalError?.message ?? ""}`,
+  );
+
+const isOdbcDriverMissing = (err) =>
+  /IM002|data source name not found|driver.*not found|no default driver/i.test(
+    `${err?.message ?? ""} ${err?.originalError?.message ?? ""}`,
+  );
+
+/**
+ * Every combination worth trying, best first: known port before instance
+ * lookup, the operator's encryption choice before the relaxed local defaults,
+ * newest installed ODBC driver first for Windows auth.
+ */
+async function planAttempts(config) {
+  const target = await resolveTarget(config);
+  const security = securityLadder(config, target.host);
+  const routes = [];
+  if (target.portKnown) routes.push(true);
+  if (target.instanceName) routes.push(false);
+  if (!routes.length) routes.push(true);
+
+  const native = config.auth === "windows" && requireWindowsDriver();
+  const drivers = native ? installedOdbcDrivers() : [null];
+  if (config.auth === "windows" && !native && !config.user) {
+    const e = new Error(WINDOWS_AUTH_HINT);
+    e.code = "EDRIVER";
+    throw e;
+  }
+
+  const attempts = [];
+  for (const odbcDriver of drivers) {
+    for (const byPort of routes) {
+      for (const sec of security) {
+        attempts.push({
+          target,
+          byPort,
+          security: sec,
+          native,
+          odbcDriver,
+          driverConfig: native
+            ? nativeConfig(config, target, sec, byPort, odbcDriver)
+            : tediousConfig(config, target, sec, byPort),
+          label: `${
+            byPort
+              ? `${target.host},${target.port}`
+              : `${target.host}\\${target.instanceName}`
+          } · ${config.auth === "windows" ? "Windows" : `SQL login ${config.user ?? ""}`} · ${
+            native ? odbcDriver : "tedious"
+          } · encrypt ${sec.encrypt ? "on" : "off"}${sec.trust ? " (trusted cert)" : ""}`,
+        });
+      }
+    }
+  }
+  return { target, attempts, native };
+}
+
+/**
+ * Opens a pool, walking the attempt ladder. The winning combination and every
+ * failed attempt come back with the result so the UI can explain itself.
+ */
+async function openConnection(config) {
+  const { attempts, target, native } = await planAttempts(config);
+  const tried = [];
+  let lastError = null;
+  for (const attempt of attempts) {
+    try {
+      const mssql = native ? loadNativeDriver() : loadDriver();
+      const opened = await new mssql.ConnectionPool(attempt.driverConfig).connect();
+      return {
+        pool: opened,
+        attempt: {
+          label: attempt.label,
+          host: target.host,
+          port: attempt.byPort ? target.port : null,
+          instanceName: target.instanceName || null,
+          usedPort: attempt.byPort,
+          driver: native ? attempt.odbcDriver : "tedious",
+          auth: config.auth === "windows" ? "windows" : "sql",
+          encrypt: attempt.security.encrypt,
+          trustServerCertificate: attempt.security.trust,
+          browserAnswered: target.browserAnswered,
+        },
+        tried,
+      };
+    } catch (err) {
+      lastError = err;
+      tried.push({ label: attempt.label, code: err?.code ?? null, error: err?.message ?? String(err) });
+      // A rejected sign-in is final: no other port, driver or TLS setting fixes it.
+      if (isLoginFailure(err)) break;
+      // Only walk to the next ODBC driver when this one is genuinely absent.
+      if (native && !isOdbcDriverMissing(err) && attempt.odbcDriver !== attempts.at(-1)?.odbcDriver) {
+        const sameDriverLeft = attempts.some(
+          (a) => a.odbcDriver === attempt.odbcDriver && !tried.some((t) => t.label === a.label),
+        );
+        if (!sameDriverLeft) break;
+      }
+    }
+  }
+  const error = lastError ?? new Error("Could not reach SQL Server");
+  error.attempts = tried;
+  error.target = target;
+  throw error;
+}
+
 async function connect(config) {
   await close();
-  const driverConfig = toDriverConfig(config);
-  pool = await new (loadDriver().ConnectionPool)(driverConfig).connect();
-  activeConfig = config;
+  const opened = await openConnection(config);
+  pool = opened.pool;
+  activeConfig = { ...config, resolved: opened.attempt };
   // Passive startup: connecting NEVER creates or alters tables. The operator
   // applies database/schema.sql explicitly from Local Database settings.
   return pool;
@@ -252,8 +445,8 @@ async function test(config) {
   let probe = null;
   const started = Date.now();
   try {
-    const driverConfig = toDriverConfig(config);
-    probe = await new (loadDriver().ConnectionPool)(driverConfig).connect();
+    const opened = await openConnection(config);
+    probe = opened.pool;
     const res = await probe
       .request()
       .query("SELECT @@VERSION AS version, @@SERVERNAME AS name, DB_NAME() AS activeDb");
@@ -264,9 +457,15 @@ async function test(config) {
       serverName: row.name,
       activeDb: row.activeDb,
       latencyMs: Date.now() - started,
+      attempt: opened.attempt,
     };
   } catch (err) {
-    return { ok: false, latencyMs: Date.now() - started, ...describeSqlError(err) };
+    return {
+      ok: false,
+      latencyMs: Date.now() - started,
+      ...describeSqlError(err),
+      attempts: err?.attempts ?? [],
+    };
   } finally {
     if (probe) await probe.close().catch(() => {});
   }
@@ -315,4 +514,7 @@ module.exports = {
   schemaFile,
   describeSqlError,
   parseServerField,
+  openConnection,
+  resolveTarget,
+  installedOdbcDrivers,
 };
