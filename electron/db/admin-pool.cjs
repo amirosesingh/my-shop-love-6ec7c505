@@ -6,144 +6,59 @@
  * disturb sales or the sync worker. One pool is held open for the whole
  * session until the operator disconnects or the app exits.
  */
-const { parseServerField, describeSqlError } = require("./pool.cjs");
+const { parseServerField, describeSqlError, openConnection, resolveTarget } = require("./pool.cjs");
 const net = require("node:net");
 
 const CONNECT_TIMEOUT_MS = 15_000;
 const MAX_ROWS = 1000;
 const SOCKET_TIMEOUT_MS = 2_000;
 
-let driver = null;
 let pool = null;
 /** { server, database, auth, trustFallback } for the status badge. */
 let session = null;
 /** Names of databases the instance reported ONLINE — the only allowed context. */
 let databases = [];
 
-function loadDriver() {
-  if (driver) return driver;
-  try {
-    driver = require("mssql");
-  } catch (err) {
-    const e = new Error("Local database driver not installed. Run: npm install mssql");
-    e.code = "EDRIVER";
-    e.cause = err;
-    throw e;
-  }
-  return driver;
-}
-
-function hasWindowsDriver() {
-  try {
-    require.resolve("msnodesqlv8");
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 /** Translates driver failures into something an operator can act on. */
 function diagnose(err) {
   const base = describeSqlError(err);
   const text = `${base.code ?? ""} ${base.error ?? ""} ${base.originalMessage ?? ""}`.toLowerCase();
   let hint = base.hint;
-  if (text.includes("certificate")) {
+  if (/im002|data source name not found|no default driver/.test(text)) {
+    hint =
+      "No suitable ODBC driver is installed for Windows authentication. Install 'ODBC Driver 18 for SQL Server' from Microsoft, or use a SQL Server login.";
+  } else if (text.includes("certificate")) {
     hint =
       "The server presented a self-signed certificate. Turn 'Trust server certificate' on, or turn encryption off for a local instance.";
   } else if (text.includes("instance") && text.includes("not")) {
     hint =
       "The named instance could not be resolved. Start the 'SQL Server Browser' service in SQL Server Configuration Manager, or enter the instance's fixed TCP port.";
-  } else if (text.includes("login failed")) {
+  } else if (text.includes("login failed for user")) {
     hint =
-      "The server was reached but rejected the sign-in. Check the login name and password, and that SQL Server authentication (mixed mode) is enabled.";
+      "The server was reached but rejected the sign-in. For a SQL login, check the name/password and that mixed-mode authentication is enabled (Server Properties > Security > SQL Server and Windows Authentication mode), then restart the service. For Windows authentication, the signed-in Windows account needs a login on the instance.";
   } else if (!hint && (text.includes("esocket") || text.includes("econnrefused"))) {
     hint =
       "Nothing answered on that port. Enable TCP/IP for the instance in SQL Server Configuration Manager and restart the SQL Server service.";
   }
-  return { ...base, hint };
+  return { ...base, hint, attempts: err?.attempts ?? [] };
 }
 
-/** Builds the mssql config for one attempt. */
-function buildConfig(input, { trustServerCertificate }) {
-  loadDriver();
-  const { host, instanceName, port, explicitPort } = parseServerField(
-    input?.server,
-    input?.port,
-  );
-  const database = String(input?.database || "master");
-  const config = {
-    server: host,
-    database,
-    connectionTimeout: CONNECT_TIMEOUT_MS,
-    requestTimeout: CONNECT_TIMEOUT_MS,
-    options: {
-      encrypt: !!input?.encrypt,
-      trustServerCertificate: !!trustServerCertificate,
-      enableArithAbort: true,
-      connectTimeout: CONNECT_TIMEOUT_MS,
-    },
-    pool: { max: 5, min: 0, idleTimeoutMillis: 60_000 },
-  };
-  if (instanceName) {
-    config.options.instanceName = instanceName;
-    if (explicitPort) config.port = port;
-  } else {
-    config.port = port;
-  }
-  if (input?.auth === "sql") {
-    config.user = input.user;
-    config.password = input.password;
-  } else if (hasWindowsDriver()) {
-    config.driver = "msnodesqlv8";
-    config.options.trustedConnection = true;
-    config.connectionString = [
-      "Driver={ODBC Driver 17 for SQL Server}",
-      `Server=${instanceName ? `${host}\\${instanceName}` : `${host},${port}`}`,
-      `Database=${database}`,
-      "Trusted_Connection=yes",
-      `TrustServerCertificate=${trustServerCertificate ? "yes" : "no"}`,
-    ].join(";");
-  } else if (input?.user) {
-    config.authentication = {
-      type: "ntlm",
-      options: {
-        userName: input.user,
-        password: input.password,
-        domain: input.domain || process.env["USERDOMAIN"] || host,
-      },
-    };
-  } else {
-    const e = new Error(
-      "Windows authentication needs the msnodesqlv8 driver on this machine. Install it, or use a SQL Server login.",
-    );
-    e.code = "EDRIVER";
-    throw e;
-  }
-  return config;
-}
-
-const isCertificateError = (err) =>
-  /certificate|ssl|self.signed/i.test(
-    `${err?.message ?? ""} ${err?.originalError?.message ?? ""}`,
-  );
-
+/**
+ * One shared engine with the operational pool: resolved instance port, ODBC
+ * driver selection for Windows auth, and the encryption retry ladder.
+ */
 async function openPool(input) {
-  const wanted = input?.trustServerCertificate !== false;
-  try {
-    const p = await new (loadDriver().ConnectionPool)(
-      buildConfig(input, { trustServerCertificate: wanted }),
-    ).connect();
-    return { pool: p, trustFallback: false };
-  } catch (err) {
-    // Auto-fallback: local instances almost never have a trusted certificate.
-    if (!wanted && isCertificateError(err)) {
-      const p = await new (loadDriver().ConnectionPool)(
-        buildConfig(input, { trustServerCertificate: true }),
-      ).connect();
-      return { pool: p, trustFallback: true };
-    }
-    throw err;
-  }
+  const opened = await openConnection({
+    ...input,
+    database: String(input?.database || "master"),
+    timeout: CONNECT_TIMEOUT_MS,
+  });
+  return {
+    pool: opened.pool,
+    trustFallback:
+      input?.trustServerCertificate === false && opened.attempt.trustServerCertificate,
+    attempt: opened.attempt,
+  };
 }
 
 async function disconnect() {
