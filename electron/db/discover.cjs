@@ -270,3 +270,53 @@ async function scanLocalInstances() {
 }
 
 module.exports.scanLocalInstances = scanLocalInstances;
+
+/**
+ * Ask the SQL Browser service on ONE machine which TCP port a named instance
+ * listens on (CLNT_UCAST_INST, 0x04 + instance name). Unicast, so it works
+ * where a broadcast is blocked. Resolves to `null` when Browser is stopped.
+ */
+function instancePort(host, instanceName, timeoutMs = 1500) {
+  const target = String(host || "localhost").trim() || "localhost";
+  const name = String(instanceName || "").trim();
+  if (!name) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    let socket;
+    try {
+      socket = dgram.createSocket("udp4");
+    } catch {
+      resolve(null);
+      return;
+    }
+    let settled = false;
+    const finish = (port) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try {
+        socket.close();
+      } catch {
+        /* already closed */
+      }
+      resolve(port);
+    };
+    const timer = setTimeout(() => finish(null), timeoutMs);
+    socket.on("error", () => finish(null));
+    socket.on("message", (msg) => {
+      try {
+        const found = parseReply(msg, target).find(
+          (s) => String(s.instance).toLowerCase() === name.toLowerCase(),
+        );
+        finish(found?.port ?? null);
+      } catch {
+        finish(null);
+      }
+    });
+    const payload = Buffer.concat([Buffer.from([0x04]), Buffer.from(name, "ascii")]);
+    socket.send(payload, 0, payload.length, BROWSER_PORT, target, (err) => {
+      if (err) finish(null);
+    });
+  });
+}
+
+module.exports.instancePort = instancePort;
