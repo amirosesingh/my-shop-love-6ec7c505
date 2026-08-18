@@ -445,8 +445,8 @@ async function test(config) {
   let probe = null;
   const started = Date.now();
   try {
-    const driverConfig = toDriverConfig(config);
-    probe = await new (loadDriver().ConnectionPool)(driverConfig).connect();
+    const opened = await openConnection(config);
+    probe = opened.pool;
     const res = await probe
       .request()
       .query("SELECT @@VERSION AS version, @@SERVERNAME AS name, DB_NAME() AS activeDb");
@@ -457,9 +457,15 @@ async function test(config) {
       serverName: row.name,
       activeDb: row.activeDb,
       latencyMs: Date.now() - started,
+      attempt: opened.attempt,
     };
   } catch (err) {
-    return { ok: false, latencyMs: Date.now() - started, ...describeSqlError(err) };
+    return {
+      ok: false,
+      latencyMs: Date.now() - started,
+      ...describeSqlError(err),
+      attempts: err?.attempts ?? [],
+    };
   } finally {
     if (probe) await probe.close().catch(() => {});
   }
@@ -508,4 +514,7 @@ module.exports = {
   schemaFile,
   describeSqlError,
   parseServerField,
+  openConnection,
+  resolveTarget,
+  installedOdbcDrivers,
 };
