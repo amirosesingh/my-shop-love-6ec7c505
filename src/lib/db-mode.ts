@@ -10,6 +10,7 @@
  * the till returns to online working the moment the internet is back.
  */
 import { isLiveOnly } from "./live-mode";
+import { isElectron } from "./native";
 
 export type DatabaseMode = "online" | "local";
 
@@ -37,8 +38,12 @@ export function subscribeDatabaseMode(listener: Listener) {
   };
 }
 
-/** Every platform is online-first; local SQL is an automatic fallback. */
-export const defaultDatabaseMode = (): DatabaseMode => "online";
+/**
+ * A till keeps trading when the line drops, so the Windows shell is
+ * local-first and reconciles in the background. The browser console has no
+ * local database engine, so it stays online-first with local failover.
+ */
+export const defaultDatabaseMode = (): DatabaseMode => (isElectron() ? "local" : "online");
 
 /** The mode the operator picked (ignoring any temporary failover). */
 export function preferredDatabaseMode(): DatabaseMode {
