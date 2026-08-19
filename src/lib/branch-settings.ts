@@ -86,7 +86,8 @@ export async function saveSectionOverride(
   patch: SectionPatch,
   updatedBy: string,
 ): Promise<void> {
-  if (!scopeId) throw new Error(`No ${TIER_LABELS[tier].toLowerCase()} is selected for this terminal`);
+  if (!scopeId)
+    throw new Error(`No ${TIER_LABELS[tier].toLowerCase()} is selected for this terminal`);
   await dbRouter.upsert(
     "settings_overrides",
     {

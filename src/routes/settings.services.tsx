@@ -61,8 +61,8 @@ function ServicesForm() {
         <div>
           <p className="text-sm">Ask what the racket job is for</p>
           <p className="text-xs text-muted-foreground">
-            Shows the service picker and labour charge box on a racket service job. General
-            bookings never carry a service fee — they are priced from the cart alone.
+            Shows the service picker and labour charge box on a racket service job. General bookings
+            never carry a service fee — they are priced from the cart alone.
           </p>
         </div>
         <Switch
@@ -91,7 +91,10 @@ function ServicesForm() {
       </div>
 
       {services.map((s) => (
-        <div key={s.id} className="grid gap-3 rounded-md border border-border p-3 sm:grid-cols-[1fr_140px_auto_auto_auto]">
+        <div
+          key={s.id}
+          className="grid gap-3 rounded-md border border-border p-3 sm:grid-cols-[1fr_140px_auto_auto_auto]"
+        >
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Service</Label>
             <Input

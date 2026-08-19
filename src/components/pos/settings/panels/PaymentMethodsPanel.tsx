@@ -30,8 +30,7 @@ export function PaymentMethodsPanel() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
-  const message = (e: unknown) =>
-    e instanceof Error ? e.message : "Could not reach the database";
+  const message = (e: unknown) => (e instanceof Error ? e.message : "Could not reach the database");
 
   /** Pull the list again after a change. A failed refresh must not wipe or
    *  silently stale the rows on screen — say so instead. */
@@ -193,9 +192,7 @@ export function PaymentMethodsPanel() {
                 onCheckedChange={(v) => patch(row.id, { requiresReference: v })}
                 aria-label="Requires a serial or reference number"
               />
-              <span className="text-xs text-muted-foreground">
-                Needs a serial / voucher number
-              </span>
+              <span className="text-xs text-muted-foreground">Needs a serial / voucher number</span>
             </div>
           </div>
 

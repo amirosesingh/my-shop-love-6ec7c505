@@ -1,13 +1,19 @@
-import { Loader2, Lock, LogOut, Menu, MapPin, ReceiptText, Settings as SettingsIcon, Store } from "lucide-react";
+import {
+  Loader2,
+  Lock,
+  LogOut,
+  Menu,
+  MapPin,
+  ReceiptText,
+  Settings as SettingsIcon,
+  Store,
+} from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { usePos } from "@/lib/pos-store";
 import { useAuth, type PermissionFlag } from "@/lib/pos-auth";
 import { Link, useLocation } from "@tanstack/react-router";
 import { TerminalLogin } from "@/components/pos/TerminalLogin";
-import {
-  TerminalActivation,
-  TerminalRevokedScreen,
-} from "@/components/pos/TerminalActivation";
+import { TerminalActivation, TerminalRevokedScreen } from "@/components/pos/TerminalActivation";
 import { clearRevocation, useRevocationCheck } from "@/lib/use-revocation-check";
 import { useAutoLock } from "@/lib/auto-lock";
 import { SidebarNav, useSidebarCollapsed } from "@/components/pos/SidebarNav";
@@ -166,7 +172,12 @@ export function AppShell({ children }: { children: ReactNode }) {
         branchId: terminal.config?.locationId ?? currentStore?.id,
       }),
     );
-  }, [terminal.config?.supabaseUrl, terminal.config?.supabaseKey, terminal.config?.locationId, user?.staffId]);
+  }, [
+    terminal.config?.supabaseUrl,
+    terminal.config?.supabaseKey,
+    terminal.config?.locationId,
+    user?.staffId,
+  ]);
   // Keeps the database-mode pill and the automatic local failover honest.
   useEffect(() => startDatabaseModeWatch(), []);
 
@@ -198,9 +209,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   // The liability wording lives with the booking rules but is printed by the
   // receipt layer, so push it across whenever the rules change.
   useEffect(() => {
-    setServiceTerms(
-      bookingRulesOf(state.settings.integrations.bookingRules).serviceTerms,
-    );
+    setServiceTerms(bookingRulesOf(state.settings.integrations.bookingRules).serviceTerms);
   }, [state.settings]);
 
   // A registered till fixes the branch for everyone signed in on it; otherwise
@@ -209,8 +218,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   // look at any branch, so the terminal pin does not apply to them there.
   useEffect(() => {
     if (isNative() && isAdmin) return;
-    const pinned =
-      terminalStoreId ?? (canSwitchStores ? null : (user?.storeId ?? soleBranchId()));
+    const pinned = terminalStoreId ?? (canSwitchStores ? null : (user?.storeId ?? soleBranchId()));
     if (user && pinned && currentStore.id !== pinned) setCurrentStore(pinned);
   }, [user, isAdmin, canSwitchStores, terminalStoreId, currentStore.id, setCurrentStore]);
 
@@ -232,8 +240,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   if (!dataReady && !offlineBypass)
     return <TillLoader onContinueOffline={() => setOfflineBypass(true)} />;
   // Nothing can be sold, received or moved without somewhere to book it to.
-  if (!stores.length && !location.pathname.startsWith("/stores"))
-    return <LocationBootGuard />;
+  if (!stores.length && !location.pathname.startsWith("/stores")) return <LocationBootGuard />;
 
   const inbound = (state.transfers ?? []).filter(
     (t) =>
@@ -242,8 +249,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   ).length;
 
   // Receipt identity wins; the locally captured install name is the fallback.
-  const companyName =
-    state.settings.receipt.companyName?.trim() || branding.company;
+  const companyName = state.settings.receipt.companyName?.trim() || branding.company;
 
   const canSee = (item: NavItem) => {
     if (item.desktopHidden && isDesktop()) return false;
@@ -351,162 +357,181 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       )}
       <ShiftGuard>
-      <div className="flex min-h-0 min-w-0 flex-1">
-      {/* Desktop / tablet sidebar */}
-      <aside
-        className={cn(
-          "hidden shrink-0 flex-col border-r border-border bg-sidebar md:flex",
-          collapsed ? "w-16" : "w-60",
-        )}
-      >
-        <SidebarNav
-          collapsed={collapsed}
-          onToggleCollapse={() => setCollapsed(!collapsed)}
-          canSee={canSee}
-          inbound={inbound}
-          header={
-            <>
-              <Brand mini={collapsed} />
-              {!collapsed && <div className="px-3 pb-3">{<StorePicker />}</div>}
-            </>
-          }
-          footer={<div className="mt-auto">{<Footer mini={collapsed} />}</div>}
-        />
-      </aside>
-
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        {/* Mobile top bar + slide-out drawer */}
-        <header className="pt-safe sticky top-0 z-30 flex shrink-0 items-center gap-2 border-b border-border bg-sidebar px-3 pb-2 md:hidden">
-          <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="Open menu" className="touch-target">
-                <Menu className="size-5" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="pt-safe pb-safe z-50 w-72 bg-sidebar p-0">
-              <SheetTitle className="sr-only">Navigation</SheetTitle>
-              <SidebarNav
-                canSee={canSee}
-                inbound={inbound}
-                onNavigate={() => setDrawerOpen(false)}
-                header={
-                  <>
-                    <Brand />
-                    <div className="px-3 pb-3">
-                      <StorePicker />
-                    </div>
-                  </>
-                }
-                footer={<div className="mt-auto">{<Footer />}</div>}
-              />
-            </SheetContent>
-          </Sheet>
-          <div className="flex min-w-0 items-center gap-2">
-            <ReceiptText className="size-4 shrink-0 text-primary" />
-            <span className="truncate text-sm font-semibold">{companyName}</span>
-          </div>
-          {mayPickStore ? (
-            <div className="ml-auto w-32 shrink-0">
-              <StorePicker />
-            </div>
-          ) : (
-            <Badge
-            variant="outline"
+        <div className="flex min-h-0 min-w-0 flex-1">
+          {/* Desktop / tablet sidebar */}
+          <aside
             className={cn(
-              "ml-auto shrink-0 text-[10px]",
-              activeShift
-                ? "border-success/40 bg-success/10 text-success"
-                : "border-destructive/40 bg-destructive/10 text-destructive",
+              "hidden shrink-0 flex-col border-r border-border bg-sidebar md:flex",
+              collapsed ? "w-16" : "w-60",
             )}
           >
-            {currentStore.code}
-            </Badge>
-          )}
-          {/* Narrow phones only get the essentials; the rest lives in the sheet. */}
-          <span className="hidden sm:inline-flex">
-            <LiveClock compact />
-          </span>
-          <MobileStatusSheet />
-          <Button asChild variant="ghost" size="icon" className="shrink-0" aria-label="Settings">
-            <Link to="/settings">
-              <SettingsIcon className="size-4" />
-            </Link>
-          </Button>
-          <ThemeToggle />
-          <Button
-            variant="outline"
-            size="sm"
-            className="touch-target shrink-0 px-2 text-[11px]"
-            onClick={() => void lock()}
-          >
-            <Lock className="size-3.5" /> Lock
-          </Button>
-        </header>
+            <SidebarNav
+              collapsed={collapsed}
+              onToggleCollapse={() => setCollapsed(!collapsed)}
+              canSee={canSee}
+              inbound={inbound}
+              header={
+                <>
+                  <Brand mini={collapsed} />
+                  {!collapsed && <div className="px-3 pb-3">{<StorePicker />}</div>}
+                </>
+              }
+              footer={<div className="mt-auto">{<Footer mini={collapsed} />}</div>}
+            />
+          </aside>
 
-        {/* Desktop header: signed-in cashier + quick lock / switch user */}
-        <header className="sticky top-0 z-30 hidden shrink-0 items-center gap-3 border-b border-border bg-sidebar px-4 py-2 md:flex">
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium">{user.name}</p>
-            <p className="text-[11px] capitalize text-muted-foreground">
-              {user.staffId} · {user.role}
-            </p>
-          </div>
-          <SyncBadge className="ml-auto" />
-          <LiveClock />
-          <SystemStatusPill />
-          <SqlAdminBadge />
-          <SecurityAlertBell />
-          <ActivityBell />
-          {terminal.config && (
-            <Badge
-              variant="outline"
-              className="shrink-0 gap-1 border-primary/40 bg-primary/10 text-[11px] text-primary"
-            >
-              <MapPin className="size-3" />
-              {terminal.config.locationName || currentStore.name}
-            </Badge>
-          )}
-          <Button asChild variant="ghost" size="icon" className="shrink-0" aria-label="Settings">
-            <Link to="/settings">
-              <SettingsIcon className="size-4" />
-            </Link>
-          </Button>
-          <ThemeToggle />
-          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => void lock()}>
-            <Lock className="size-3.5" /> Lock / Switch user
-          </Button>
-        </header>
-
-        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
-          {(() => {
-            // Decided before the page body renders: no flash of protected data.
-            if (isDesktop() && isDesktopBlocked(location.pathname))
-              return (
-                <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 p-8 text-center">
-                  <Lock className="size-8 text-muted-foreground" />
-                  <h1 className="text-lg font-semibold">Managed in the web console</h1>
-                  <p className="max-w-sm text-sm text-muted-foreground">
-                    Accounts, branches, messaging credentials and device activation are handled
-                    centrally, not from a till. Open the web admin console to change them.
-                  </p>
-                  <Button asChild variant="outline" size="sm">
-                    <Link to="/">Back to the register</Link>
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            {/* Mobile top bar + slide-out drawer */}
+            <header className="pt-safe sticky top-0 z-30 flex shrink-0 items-center gap-2 border-b border-border bg-sidebar px-3 pb-2 md:hidden">
+              <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
+                <SheetTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Open menu"
+                    className="touch-target"
+                  >
+                    <Menu className="size-5" />
                   </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="pt-safe pb-safe z-50 w-72 bg-sidebar p-0">
+                  <SheetTitle className="sr-only">Navigation</SheetTitle>
+                  <SidebarNav
+                    canSee={canSee}
+                    inbound={inbound}
+                    onNavigate={() => setDrawerOpen(false)}
+                    header={
+                      <>
+                        <Brand />
+                        <div className="px-3 pb-3">
+                          <StorePicker />
+                        </div>
+                      </>
+                    }
+                    footer={<div className="mt-auto">{<Footer />}</div>}
+                  />
+                </SheetContent>
+              </Sheet>
+              <div className="flex min-w-0 items-center gap-2">
+                <ReceiptText className="size-4 shrink-0 text-primary" />
+                <span className="truncate text-sm font-semibold">{companyName}</span>
+              </div>
+              {mayPickStore ? (
+                <div className="ml-auto w-32 shrink-0">
+                  <StorePicker />
                 </div>
-              );
-            const required = requiredPermission(location.pathname);
-            const allowed =
-              required === null ? true : required === "unknown" ? isAdmin : can(required);
-            if (allowed && visibleRoute(location.pathname)) return children;
-            if (allowed)
-              return (
-                <PermissionDenied title="Hidden for your role" flag={null} />
-              );
-            return <PermissionDenied flag={required === "unknown" ? null : required} />;
-          })()}
-        </main>
-      </div>
-      </div>
+              ) : (
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "ml-auto shrink-0 text-[10px]",
+                    activeShift
+                      ? "border-success/40 bg-success/10 text-success"
+                      : "border-destructive/40 bg-destructive/10 text-destructive",
+                  )}
+                >
+                  {currentStore.code}
+                </Badge>
+              )}
+              {/* Narrow phones only get the essentials; the rest lives in the sheet. */}
+              <span className="hidden sm:inline-flex">
+                <LiveClock compact />
+              </span>
+              <MobileStatusSheet />
+              <Button
+                asChild
+                variant="ghost"
+                size="icon"
+                className="shrink-0"
+                aria-label="Settings"
+              >
+                <Link to="/settings">
+                  <SettingsIcon className="size-4" />
+                </Link>
+              </Button>
+              <ThemeToggle />
+              <Button
+                variant="outline"
+                size="sm"
+                className="touch-target shrink-0 px-2 text-[11px]"
+                onClick={() => void lock()}
+              >
+                <Lock className="size-3.5" /> Lock
+              </Button>
+            </header>
+
+            {/* Desktop header: signed-in cashier + quick lock / switch user */}
+            <header className="sticky top-0 z-30 hidden shrink-0 items-center gap-3 border-b border-border bg-sidebar px-4 py-2 md:flex">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">{user.name}</p>
+                <p className="text-[11px] capitalize text-muted-foreground">
+                  {user.staffId} · {user.role}
+                </p>
+              </div>
+              <SyncBadge className="ml-auto" />
+              <LiveClock />
+              <SystemStatusPill />
+              <SqlAdminBadge />
+              <SecurityAlertBell />
+              <ActivityBell />
+              {terminal.config && (
+                <Badge
+                  variant="outline"
+                  className="shrink-0 gap-1 border-primary/40 bg-primary/10 text-[11px] text-primary"
+                >
+                  <MapPin className="size-3" />
+                  {terminal.config.locationName || currentStore.name}
+                </Badge>
+              )}
+              <Button
+                asChild
+                variant="ghost"
+                size="icon"
+                className="shrink-0"
+                aria-label="Settings"
+              >
+                <Link to="/settings">
+                  <SettingsIcon className="size-4" />
+                </Link>
+              </Button>
+              <ThemeToggle />
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs"
+                onClick={() => void lock()}
+              >
+                <Lock className="size-3.5" /> Lock / Switch user
+              </Button>
+            </header>
+
+            <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+              {(() => {
+                // Decided before the page body renders: no flash of protected data.
+                if (isDesktop() && isDesktopBlocked(location.pathname))
+                  return (
+                    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 p-8 text-center">
+                      <Lock className="size-8 text-muted-foreground" />
+                      <h1 className="text-lg font-semibold">Managed in the web console</h1>
+                      <p className="max-w-sm text-sm text-muted-foreground">
+                        Accounts, branches, messaging credentials and device activation are handled
+                        centrally, not from a till. Open the web admin console to change them.
+                      </p>
+                      <Button asChild variant="outline" size="sm">
+                        <Link to="/">Back to the register</Link>
+                      </Button>
+                    </div>
+                  );
+                const required = requiredPermission(location.pathname);
+                const allowed =
+                  required === null ? true : required === "unknown" ? isAdmin : can(required);
+                if (allowed && visibleRoute(location.pathname)) return children;
+                if (allowed) return <PermissionDenied title="Hidden for your role" flag={null} />;
+                return <PermissionDenied flag={required === "unknown" ? null : required} />;
+              })()}
+            </main>
+          </div>
+        </div>
       </ShiftGuard>
     </div>
   );

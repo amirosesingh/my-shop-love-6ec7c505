@@ -6,9 +6,7 @@ const ROUTES_DIR = join(process.cwd(), "src/routes");
 const APP_SHELL = readFileSync(join(process.cwd(), "src/components/pos/AppShell.tsx"), "utf8");
 const NAV = readFileSync(join(process.cwd(), "src/components/pos/nav-config.ts"), "utf8");
 
-const routeFiles = readdirSync(ROUTES_DIR).filter(
-  (f) => f.endsWith(".tsx") && !f.startsWith("__"),
-);
+const routeFiles = readdirSync(ROUTES_DIR).filter((f) => f.endsWith(".tsx") && !f.startsWith("__"));
 
 /** Screens that must never render outside the permission-gated shell. */
 /** Customer-facing screens: the display pole plus the member signup and
@@ -41,9 +39,7 @@ describe("route guards", () => {
       const src = readFileSync(join(ROUTES_DIR, f), "utf8");
       // SectionHub and SettingsFrame both render inside AppShell.
       return (
-        !src.includes("AppShell") &&
-        !src.includes("SettingsFrame") &&
-        !src.includes("SectionHub")
+        !src.includes("AppShell") && !src.includes("SettingsFrame") && !src.includes("SectionHub")
       );
     });
     expect(unguarded).toEqual([]);
@@ -78,7 +74,7 @@ describe("route guards", () => {
   /** A missing map entry must fail closed, and access must be decided before
    *  the page body renders — a post-render redirect leaks protected data. */
   it("denies unmapped routes instead of falling through to open access", () => {
-    expect(APP_SHELL).toContain("const PUBLIC_ROUTES = new Set([\"/\", \"/display\"])");
+    expect(APP_SHELL).toContain('const PUBLIC_ROUTES = new Set(["/", "/display"])');
     expect(APP_SHELL).toContain('return ROUTE_PERMISSIONS[key] ?? "unknown"');
     // The denial screen (which names the missing permission) renders instead
     // of the page body.
