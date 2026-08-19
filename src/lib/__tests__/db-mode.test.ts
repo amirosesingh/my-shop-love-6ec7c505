@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 // No browser here: a tiny stand-in for the two globals the module reads.
 const store = new Map<string, string>();
-(globalThis as unknown as { window: unknown }).window = {
+const fakeWindow: Record<string, unknown> = {
   localStorage: {
     getItem: (k: string) => store.get(k) ?? null,
     setItem: (k: string, v: string) => void store.set(k, v),
@@ -13,6 +13,12 @@ const store = new Map<string, string>();
   addEventListener: () => {},
   removeEventListener: () => {},
 };
+(globalThis as unknown as { window: unknown }).window = fakeWindow;
+
+/** The desktop preload exposes `window.pos`; that is how the app knows it is
+ *  running on a till rather than in a back-office browser tab. */
+const asDesktop = () => void (fakeWindow.pos = {});
+const asBrowser = () => void delete fakeWindow.pos;
 import {
   effectiveDatabaseMode,
   noteConnectionLost,
@@ -24,11 +30,18 @@ import {
 describe("database mode", () => {
   beforeEach(() => {
     store.clear();
+    asBrowser();
     noteConnectionRestored();
   });
 
   it("defaults to local-first on a till", () => {
+    asDesktop();
     expect(preferredDatabaseMode()).toBe("local");
+    expect(effectiveDatabaseMode()).toBe("local");
+  });
+
+  it("defaults to online in a back-office browser, which has no local engine", () => {
+    expect(preferredDatabaseMode()).toBe("online");
   });
 
   it("writes online when online mode is chosen and the connection is up", () => {

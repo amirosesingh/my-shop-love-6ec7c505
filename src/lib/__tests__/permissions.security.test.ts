@@ -31,6 +31,10 @@ const CASHIER_ALLOWED: PermissionKey[] = [
   "can_hold_cart",
   "can_reprint_bill",
   "can_manage_bookings",
+  // Bookings are taken at the till: a cashier raises the booking and takes
+  // the deposit / part payment. Cancelling one still needs a supervisor.
+  "can_create_booking",
+  "can_collect_booking",
   "can_view_inventory",
   "can_add_member",
   "can_apply_member_discount",

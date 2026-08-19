@@ -7,8 +7,8 @@
  * for a while, or delete it outright. Historical bills keep the method code
  * they were taken on, so reports stay intact after a tender is retired.
  */
-import { useEffect, useState } from "react";
-import { GripVertical, Loader2, Plus, Save, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { GripVertical, Loader2, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,46 +27,83 @@ import {
 export function PaymentMethodsPanel() {
   const [rows, setRows] = useState<PaymentType[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
-  useEffect(() => {
-    let alive = true;
-    void loadPaymentTypes().then((list) => {
-      if (!alive) return;
-      setRows(list);
-      setLoading(false);
-    });
-    return () => {
-      alive = false;
-    };
+  const message = (e: unknown) => (e instanceof Error ? e.message : "Could not reach the database");
+
+  /** Pull the list again after a change. A failed refresh must not wipe or
+   *  silently stale the rows on screen — say so instead. */
+  const refresh = useCallback(async () => {
+    try {
+      setRows(await loadPaymentTypes());
+      return true;
+    } catch (e) {
+      toast.error(`Saved, but the list could not be reloaded: ${message(e)}`);
+      return false;
+    }
   }, []);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      setRows(await loadPaymentTypes());
+    } catch (e) {
+      setLoadError(message(e));
+      toast.error(`Could not load the payment methods: ${message(e)}`);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const patch = (id: string, p: Partial<PaymentType>) =>
     setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...p } : r)));
 
   const save = async (row: PaymentType) => {
+    if (busy) return;
     setBusy(row.id);
-    const res = await savePaymentType(row);
+    let res: Awaited<ReturnType<typeof savePaymentType>>;
+    try {
+      res = await savePaymentType(row);
+    } catch (e) {
+      setBusy(null);
+      toast.error(`Could not save the payment method: ${message(e)}`);
+      return;
+    }
     setBusy(null);
     if (!res.success) {
       toast.error(res.error ?? "Could not save the payment method");
       return;
     }
     toast.success(`${row.name || "Payment method"} saved`);
-    setRows(await loadPaymentTypes());
+    await refresh();
   };
 
   const remove = async (row: PaymentType) => {
+    if (busy) return;
     if (!window.confirm(`Delete "${row.name}"? Past bills taken on it keep their record.`)) return;
     setBusy(row.id);
-    const res = await deletePaymentType(row.id);
+    let res: Awaited<ReturnType<typeof deletePaymentType>>;
+    try {
+      res = await deletePaymentType(row.id);
+    } catch (e) {
+      setBusy(null);
+      // The row stays on screen: nothing was removed in the database.
+      toast.error(`Could not delete the payment method: ${message(e)}`);
+      return;
+    }
     setBusy(null);
     if (!res.success) {
       toast.error(res.error ?? "Could not delete the payment method");
       return;
     }
     toast.success("Payment method deleted");
-    setRows(await loadPaymentTypes());
+    await refresh();
   };
 
   if (loading) {
@@ -74,6 +111,18 @@ export function PaymentMethodsPanel() {
       <p className="flex items-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="size-4 animate-spin" /> Loading payment methods…
       </p>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="space-y-3 rounded-lg border border-destructive/40 p-4">
+        <p className="text-sm font-medium">The payment methods could not be loaded.</p>
+        <p className="text-xs text-muted-foreground">{loadError}</p>
+        <Button size="sm" variant="outline" onClick={() => void load()}>
+          <RefreshCw className="mr-1 size-3.5" /> Try again
+        </Button>
+      </div>
     );
   }
 
@@ -143,9 +192,7 @@ export function PaymentMethodsPanel() {
                 onCheckedChange={(v) => patch(row.id, { requiresReference: v })}
                 aria-label="Requires a serial or reference number"
               />
-              <span className="text-xs text-muted-foreground">
-                Needs a serial / voucher number
-              </span>
+              <span className="text-xs text-muted-foreground">Needs a serial / voucher number</span>
             </div>
           </div>
 

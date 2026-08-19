@@ -1,39 +1,12 @@
 {
-  "generatedAt": "2026-08-17T13:58:59.714Z",
+  "generatedAt": "2026-08-19T02:02:07.530Z",
   "filesScanned": 396,
   "counts": {
-    "critical": 3,
+    "critical": 0,
     "warning": 2,
     "info": 220
   },
   "findings": [
-    {
-      "id": "src/components/pos/settings/panels/PaymentMethodsPanel.tsx:27:No failure handling",
-      "file": "src/components/pos/settings/panels/PaymentMethodsPanel.tsx",
-      "line": 27,
-      "rule": "No failure handling",
-      "severity": "critical",
-      "detail": "PaymentMethodsPanel() awaits work without a try/catch.",
-      "hint": "A dropped connection here can lose money or stock movements."
-    },
-    {
-      "id": "src/components/pos/settings/panels/PaymentMethodsPanel.tsx:47:No failure handling",
-      "file": "src/components/pos/settings/panels/PaymentMethodsPanel.tsx",
-      "line": 47,
-      "rule": "No failure handling",
-      "severity": "critical",
-      "detail": "save() awaits work without a try/catch.",
-      "hint": "A dropped connection here can lose money or stock movements."
-    },
-    {
-      "id": "src/components/pos/settings/panels/PaymentMethodsPanel.tsx:59:No failure handling",
-      "file": "src/components/pos/settings/panels/PaymentMethodsPanel.tsx",
-      "line": 59,
-      "rule": "No failure handling",
-      "severity": "critical",
-      "detail": "remove() awaits work without a try/catch.",
-      "hint": "A dropped connection here can lose money or stock movements."
-    },
     {
       "id": "src/lib/native-http.ts:174:Placeholder logic",
       "file": "src/lib/native-http.ts",
@@ -116,54 +89,54 @@
       "hint": "Consider reporting the failure to the user."
     },
     {
-      "id": "src/components/database/SqlConnectionModal.tsx:228:No failure handling",
+      "id": "src/components/database/SqlConnectionModal.tsx:237:No failure handling",
       "file": "src/components/database/SqlConnectionModal.tsx",
-      "line": 228,
+      "line": 237,
       "rule": "No failure handling",
       "severity": "info",
       "detail": "runSocket() awaits work without a try/catch.",
       "hint": "Consider reporting the failure to the user."
     },
     {
-      "id": "src/components/database/SqlConnectionModal.tsx:242:No failure handling",
+      "id": "src/components/database/SqlConnectionModal.tsx:253:No failure handling",
       "file": "src/components/database/SqlConnectionModal.tsx",
-      "line": 242,
+      "line": 253,
       "rule": "No failure handling",
       "severity": "info",
       "detail": "runHandshake() awaits work without a try/catch.",
       "hint": "Consider reporting the failure to the user."
     },
     {
-      "id": "src/components/database/SqlConnectionModal.tsx:261:No failure handling",
+      "id": "src/components/database/SqlConnectionModal.tsx:272:No failure handling",
       "file": "src/components/database/SqlConnectionModal.tsx",
-      "line": 261,
+      "line": 272,
       "rule": "No failure handling",
       "severity": "info",
       "detail": "runCatalog() awaits work without a try/catch.",
       "hint": "Consider reporting the failure to the user."
     },
     {
-      "id": "src/components/database/SqlConnectionModal.tsx:292:No failure handling",
+      "id": "src/components/database/SqlConnectionModal.tsx:303:No failure handling",
       "file": "src/components/database/SqlConnectionModal.tsx",
-      "line": 292,
+      "line": 303,
       "rule": "No failure handling",
       "severity": "info",
       "detail": "runLock() awaits work without a try/catch.",
       "hint": "Consider reporting the failure to the user."
     },
     {
-      "id": "src/components/database/SqlConnectionModal.tsx:342:No failure handling",
+      "id": "src/components/database/SqlConnectionModal.tsx:353:No failure handling",
       "file": "src/components/database/SqlConnectionModal.tsx",
-      "line": 342,
+      "line": 353,
       "rule": "No failure handling",
       "severity": "info",
       "detail": "finish() awaits work without a try/catch.",
       "hint": "Consider reporting the failure to the user."
     },
     {
-      "id": "src/components/database/SqlConnectionModal.tsx:428:Unvalidated number input",
+      "id": "src/components/database/SqlConnectionModal.tsx:439:Unvalidated number input",
       "file": "src/components/database/SqlConnectionModal.tsx",
-      "line": 428,
+      "line": 439,
       "rule": "Unvalidated number input",
       "severity": "info",
       "detail": "onChange={(e) => set(\"port\", Number(e.target.value) || 1433)}",
@@ -521,9 +494,9 @@
       "hint": "Consider reporting the failure to the user."
     },
     {
-      "id": "src/lib/branch-settings.ts:83:No failure handling",
+      "id": "src/lib/branch-settings.ts:82:No failure handling",
       "file": "src/lib/branch-settings.ts",
-      "line": 83,
+      "line": 82,
       "rule": "No failure handling",
       "severity": "info",
       "detail": "saveSectionOverride() awaits work without a try/catch.",
