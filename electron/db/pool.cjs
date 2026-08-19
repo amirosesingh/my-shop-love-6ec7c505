@@ -79,10 +79,14 @@ function installedOdbcDrivers() {
 }
 
 function requireWindowsDriver() {
+  // Both halves are needed: the native ODBC binding AND the mssql wrapper that
+  // actually speaks to it. Without the wrapper, `driver: "msnodesqlv8"` is
+  // silently ignored and the sign-in is attempted with no credentials.
   try {
     require.resolve("msnodesqlv8");
+    require.resolve("mssql/msnodesqlv8");
     return true;
-  } catch (err) {
+  } catch {
     return false;
   }
 }
