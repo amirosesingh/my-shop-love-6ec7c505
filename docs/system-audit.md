@@ -45,12 +45,10 @@ All five test failures and the three critical logic-scan findings are closed.
 
 ## 3. Should fix
 
-- **Redirect-only routes.** `/pos/general-booking` and `/pos/racket-service` only
-  `throw redirect({ to: "/" })`. They are dead weight unless something external links to
-  them; either give them real pages or drop them and update any docs/plans referencing them.
-- **`useServiceTypes` setting.** With the fee removed from general bookings, the
-  "use service types" switch in Settings → Services now only affects the racket flow.
-  The copy on that settings page still implies it applies to all bookings.
+- **Redirect-only routes.** Kept deliberately so old bookmarks and deep links keep
+  working; they forward to the destination that carries the permission.
+- **`useServiceTypes` setting.** Copy on Settings → Services now says the switch
+  applies to racket service jobs only. Behaviour unchanged.
 - **`serviceFee` / `serviceName` on `Booking`.** Still written by the racket flow and read
   by `chargesBlock()`; for general bookings they are now always undefined. Historical rows
   keep printing correctly, so no migration is needed, but the columns are effectively
