@@ -82,8 +82,14 @@ async function disconnect() {
  * seconds, long before the SQL driver would give up with a generic timeout, so
  * a blocked firewall or a disabled TCP/IP protocol is named for what it is.
  */
-function probePort(input) {
-  const { host, port } = parseServerField(input?.server ?? input?.host, input?.port);
+async function probePort(input) {
+  // A named instance rarely listens on 1433 — ask SQL Browser first so the
+  // probe (and the handshake after it) target the port really in use.
+  const target = await resolveTarget({
+    server: input?.server ?? input?.host,
+    port: input?.port,
+  });
+  const { host, port, instanceName, browserAnswered } = target;
   const started = Date.now();
   return new Promise((resolve) => {
     const socket = new net.Socket();
@@ -92,14 +98,25 @@ function probePort(input) {
       if (settled) return;
       settled = true;
       socket.destroy();
-      resolve({ host, port, elapsedMs: Date.now() - started, ...result });
+      resolve({
+        host,
+        port,
+        instanceName: instanceName || null,
+        browserAnswered,
+        elapsedMs: Date.now() - started,
+        ...result,
+      });
     };
     const blocked = () =>
       finish({
         ok: false,
         code: "EPORTCLOSED",
-        error: `Firewall/Port Error: TCP Port ${port} on ${host} is closed or blocked. Ensure SQL Server TCP/IP protocol is enabled in SQL Server Configuration Manager.`,
-        hint: "Also allow the port through Windows Defender Firewall and restart the SQL Server service after enabling TCP/IP.",
+        error: `Firewall/Port Error: TCP Port ${port} on ${host}${
+          instanceName ? ` (instance ${instanceName})` : ""
+        } is closed or blocked. Ensure SQL Server TCP/IP protocol is enabled in SQL Server Configuration Manager.`,
+        hint: instanceName && !browserAnswered
+          ? "The SQL Server Browser service did not answer on UDP 1434, so the instance's port could not be discovered. Start that service, or type the instance's fixed TCP port as SERVER\\INSTANCE,PORT."
+          : "Also allow the port through Windows Defender Firewall and restart the SQL Server service after enabling TCP/IP.",
       });
     socket.setTimeout(SOCKET_TIMEOUT_MS);
     socket.once("connect", () => finish({ ok: true }));
@@ -172,6 +189,7 @@ async function connectInstance(input) {
       serverName: row.serverName ?? null,
       version: row.version ?? null,
       trustFallback: opened.trustFallback,
+      resolved: opened.attempt,
     };
     return {
       ok: true,
@@ -179,6 +197,7 @@ async function connectInstance(input) {
       version: row.version ?? null,
       activeDb: session.database,
       usedTrustFallback: opened.trustFallback,
+      resolved: opened.attempt,
       databases: list.recordset.map((r) => ({
         name: String(r.name),
         state: String(r.state_desc),

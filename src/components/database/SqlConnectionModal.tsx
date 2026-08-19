@@ -62,7 +62,15 @@ const STEPS = [
 
 type StepKey = (typeof STEPS)[number]["key"];
 type StepStatus = "pending" | "running" | "passed" | "failed";
-type StepState = { status: StepStatus; detail?: string; error?: string; hint?: string | null; ms?: number };
+type StepState = {
+  status: StepStatus;
+  detail?: string;
+  error?: string;
+  hint?: string | null;
+  ms?: number;
+  /** Combinations the shell tried before giving up (port, driver, encryption). */
+  attempts?: { label: string; code?: string | null; error?: string }[];
+};
 
 const blankSteps = (): Record<StepKey, StepState> =>
   Object.fromEntries(STEPS.map((s) => [s.key, { status: "pending" as StepStatus }])) as Record<
@@ -200,6 +208,7 @@ export function SqlConnectionModal({
       ms,
       error: `${res.code ? `${res.code}: ` : ""}${res.error ?? "Step failed"}`,
       hint: tipFor(res) ?? res.hint ?? null,
+      attempts: "attempts" in res ? (res.attempts ?? []) : [],
     });
     return false;
   };
@@ -234,7 +243,9 @@ export function SqlConnectionModal({
     mark("socket", {
       status: "passed",
       ms: res.elapsedMs,
-      detail: `Port ${res.port} on ${res.host} is open`,
+      detail: `Port ${res.port} on ${res.host} is open${
+        res.instanceName ? ` (instance ${res.instanceName}${res.browserAnswered ? ", resolved via SQL Browser" : ""})` : ""
+      }`,
     });
     return true;
   };
@@ -251,8 +262,8 @@ export function SqlConnectionModal({
       status: "passed",
       ms,
       detail: `${res.serverName ?? "Signed in"} · ${describeVersion(res.version)}${
-        res.usedTrustFallback ? " · certificate trusted automatically" : ""
-      }`,
+        res.resolved ? ` · ${res.resolved.driver}, ${res.resolved.usedPort ? `port ${res.resolved.port}` : "instance lookup"}, encryption ${res.resolved.encrypt ? "on" : "off"}` : ""
+      }${res.usedTrustFallback ? " · certificate trusted automatically" : ""}`,
     });
     setDatabases(res.databases ?? []);
     return true;
@@ -523,6 +534,23 @@ export function SqlConnectionModal({
                     </p>
                     {state.status === "failed" && state.hint && (
                       <p className="text-xs text-muted-foreground">{state.hint}</p>
+                    )}
+                    {state.status === "failed" && !!state.attempts?.length && (
+                      <details className="mt-1">
+                        <summary className="cursor-pointer text-xs text-muted-foreground">
+                          {state.attempts.length} connection attempt(s) tried
+                        </summary>
+                        <ul className="mt-1 space-y-1">
+                          {state.attempts.map((a) => (
+                            <li key={a.label} className="text-xs text-muted-foreground">
+                              <span className="font-medium">{a.label}</span>
+                              {" — "}
+                              {a.code ? `${a.code}: ` : ""}
+                              {a.error}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
                     )}
                   </div>
                   {state.status === "failed" && (

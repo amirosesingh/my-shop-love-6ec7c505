@@ -21,6 +21,25 @@ export type SqlAdminFailure = {
   code?: string | null;
   originalMessage?: string | null;
   hint?: string | null;
+  /** Every combination tried before giving up, newest last. */
+  attempts?: SqlAttemptLog[];
+};
+
+/** One rejected combination from the connection ladder. */
+export type SqlAttemptLog = { label: string; code?: string | null; error?: string };
+
+/** The combination that finally completed the handshake. */
+export type SqlResolvedTarget = {
+  label: string;
+  host: string;
+  port: number | null;
+  instanceName: string | null;
+  usedPort: boolean;
+  driver: string;
+  auth: "windows" | "sql";
+  encrypt: boolean;
+  trustServerCertificate: boolean;
+  browserAnswered: boolean;
 };
 
 export type SqlDatabase = { name: string; state: string };
@@ -40,6 +59,7 @@ export type SqlAdminConnectResult =
       version: string | null;
       activeDb: string;
       usedTrustFallback: boolean;
+      resolved?: SqlResolvedTarget;
       databases: SqlDatabase[];
     }
   | SqlAdminFailure;
@@ -65,8 +85,21 @@ export type SqlQueryResult =
   | (SqlAdminFailure & { elapsedMs?: number });
 
 export type SqlPortProbe =
-  | { ok: true; host: string; port: number; elapsedMs: number }
-  | (SqlAdminFailure & { host?: string; port?: number; elapsedMs?: number });
+  | {
+      ok: true;
+      host: string;
+      port: number;
+      instanceName?: string | null;
+      browserAnswered?: boolean;
+      elapsedMs: number;
+    }
+  | (SqlAdminFailure & {
+      host?: string;
+      port?: number;
+      instanceName?: string | null;
+      browserAnswered?: boolean;
+      elapsedMs?: number;
+    });
 
 export type SqlLockResult =
   | { ok: true; activeDb: string; usedTrustFallback: boolean }
