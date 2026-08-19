@@ -84,6 +84,8 @@ const ROUTE_PERMISSIONS: Record<string, PermissionFlag> = {
   "/transfers": "can_create_transfer",
   "/bookings": "can_manage_bookings",
   "/members": "can_add_member",
+  "/stock-operations": "can_adjust_stock",
+  "/verifications": "can_view_member_history",
 };
 
 /** The only screens any signed-in account may open. Everything else must have

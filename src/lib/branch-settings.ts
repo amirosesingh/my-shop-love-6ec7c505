@@ -6,7 +6,7 @@
  * order is Private > Branch > Cluster > Global > hardcoded default. Locks are
  * global and stop any scope from overriding a block at all.
  */
-import { supabase } from "@/integrations/supabase/client";
+import { dbRouter } from "./db-router";
 import type { SettingsSectionId } from "./settings-sections";
 
 export type SectionPatch = Record<string, unknown>;
@@ -55,12 +55,11 @@ export async function loadBranchSettings(ids: ScopeIds): Promise<BranchSettingsS
       ...SETTING_TIERS.map(async (tier) => {
         const scopeId = ids[tier];
         if (!scopeId) return { tier, rows: [] as OverrideRow[] };
-        const { data } = await supabase
-          .from("settings_overrides")
-          .select("section,patch")
-          .eq("scope", tier)
-          .eq("scope_id", scopeId);
-        return { tier, rows: (data ?? []) as OverrideRow[] };
+        const rows = await dbRouter.query("settings_overrides", {
+          columns: "section,patch",
+          match: { scope: tier, scope_id: scopeId },
+        });
+        return { tier, rows: rows as unknown as OverrideRow[] };
       }),
     ]);
     for (const { tier, rows } of reads) {
@@ -70,8 +69,8 @@ export async function loadBranchSettings(ids: ScopeIds): Promise<BranchSettingsS
         }
       }
     }
-    const locks = await supabase.from("settings_locks").select("section,locked");
-    for (const row of (locks.data ?? []) as LockRow[]) {
+    const locks = await dbRouter.query("settings_locks", { columns: "section,locked" });
+    for (const row of locks as unknown as LockRow[]) {
       state.locks[row.section as SettingsSectionId] = !!row.locked;
     }
   } catch {
@@ -88,7 +87,8 @@ export async function saveSectionOverride(
   updatedBy: string,
 ): Promise<void> {
   if (!scopeId) throw new Error(`No ${TIER_LABELS[tier].toLowerCase()} is selected for this terminal`);
-  const { error } = await supabase.from("settings_overrides").upsert(
+  await dbRouter.upsert(
+    "settings_overrides",
     {
       scope: tier,
       scope_id: scopeId,
@@ -96,9 +96,9 @@ export async function saveSectionOverride(
       patch: patch as never,
       updated_by: updatedBy,
     },
-    { onConflict: "scope,scope_id,section" },
+    "scope,scope_id,section",
+    "Saving a settings override",
   );
-  if (error) throw new Error(error.message);
 }
 
 export async function clearSectionOverride(
@@ -107,13 +107,13 @@ export async function clearSectionOverride(
   section: SettingsSectionId,
 ): Promise<void> {
   if (!scopeId) return;
-  const { error } = await supabase
-    .from("settings_overrides")
-    .delete()
-    .eq("scope", tier)
-    .eq("scope_id", scopeId)
-    .eq("section", section);
-  if (error) throw new Error(error.message);
+  await dbRouter.write("Clearing a settings override", [
+    {
+      kind: "delete",
+      table: "settings_overrides",
+      match: { scope: tier, scope_id: scopeId, section },
+    },
+  ]);
 }
 
 export async function setSectionLock(
@@ -121,8 +121,10 @@ export async function setSectionLock(
   locked: boolean,
   updatedBy: string,
 ): Promise<void> {
-  const { error } = await supabase
-    .from("settings_locks")
-    .upsert({ section, locked, updated_by: updatedBy }, { onConflict: "section" });
-  if (error) throw new Error(error.message);
+  await dbRouter.upsert(
+    "settings_locks",
+    { section, locked, updated_by: updatedBy },
+    "section",
+    "Locking a settings section",
+  );
 }

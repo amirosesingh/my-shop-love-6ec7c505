@@ -59,13 +59,14 @@ function ServicesForm() {
     <div className="space-y-3">
       <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
         <div>
-          <p className="text-sm">Ask what the booking is for</p>
+          <p className="text-sm">Ask what the racket job is for</p>
           <p className="text-xs text-muted-foreground">
-            Shows a service picker and fee box when a booking is raised.
+            Shows the service picker and labour charge box on a racket service job. General
+            bookings never carry a service fee — they are priced from the cart alone.
           </p>
         </div>
         <Switch
-          aria-label="Ask what the booking is for"
+          aria-label="Ask what the racket job is for"
           checked={!!integrations.useServiceTypes}
           onCheckedChange={(v) =>
             updateSettings({ integrations: { ...integrations, useServiceTypes: v } })
