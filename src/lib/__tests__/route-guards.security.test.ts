@@ -20,10 +20,24 @@ const PUBLIC_ROUTES = new Set([
   "c.$tokenSlug.tsx",
 ]);
 
+/**
+ * A redirect-only stub keeps an old bookmark working: it declares no
+ * `component`, throws `redirect(...)` in `beforeLoad`, and so never renders a
+ * page body. There is nothing to guard and nothing to leak — the destination
+ * it forwards to carries the permission.
+ */
+const isRedirectOnly = (src: string) =>
+  !/\bcomponent\s*:/.test(src) && /\bredirect\(/.test(src) && /beforeLoad/.test(src);
+
+const redirectOnly = new Set(
+  routeFiles.filter((f) => isRedirectOnly(readFileSync(join(ROUTES_DIR, f), "utf8"))),
+);
+
 describe("route guards", () => {
   it("every screen renders inside AppShell, which enforces login + permissions", () => {
     const unguarded = routeFiles.filter((f) => {
       if (PUBLIC_ROUTES.has(f)) return false;
+      if (redirectOnly.has(f)) return false;
       const src = readFileSync(join(ROUTES_DIR, f), "utf8");
       // SectionHub and SettingsFrame both render inside AppShell.
       return (
@@ -47,11 +61,18 @@ describe("route guards", () => {
   it("every screen has a permission entry in the route guard map", () => {
     const OPEN_ROUTES = new Set(["index.tsx", ...PUBLIC_ROUTES]);
     const missing = routeFiles
-      .filter((f) => !OPEN_ROUTES.has(f))
+      .filter((f) => !OPEN_ROUTES.has(f) && !redirectOnly.has(f))
       .map((f) => `/${f.replace(/\.tsx$/, "").split(".")[0]}`)
       .filter((path, i, all) => all.indexOf(path) === i)
       .filter((path) => !APP_SHELL.includes(`"${path}"`));
     expect(missing).toEqual([]);
+  });
+
+  /** The two screens that change stock by hand and expose member contact
+   *  history must never be reachable on the fail-closed default alone. */
+  it("stock operations and the verification log declare their permission", () => {
+    expect(APP_SHELL).toContain('"/stock-operations": "can_adjust_stock"');
+    expect(APP_SHELL).toContain('"/verifications": "can_view_member_history"');
   });
 
   /** A missing map entry must fail closed, and access must be decided before
