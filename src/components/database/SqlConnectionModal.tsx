@@ -82,16 +82,23 @@ const blankSteps = (): Record<StepKey, StepState> =>
   >;
 
 /** Extra guidance on top of the driver's own hint. */
-function tipFor(result: { code?: string | null; error?: string; originalMessage?: string | null }) {
+function tipFor(
+  step: StepKey,
+  result: { code?: string | null; error?: string; originalMessage?: string | null; stage?: string },
+) {
   const text = `${result.code ?? ""} ${result.error ?? ""} ${result.originalMessage ?? ""}`.toLowerCase();
   if (text.includes("certificate"))
     return "Certificate error — switch 'Trust server certificate' ON, or turn 'Encrypt connection' OFF for a local instance.";
-  if (text.includes("instance"))
+  if (result.stage === "driver" || text.includes("im002") || text.includes("driver"))
+    return "Windows authentication needs a Microsoft ODBC SQL Server driver and the msnodesqlv8 desktop driver.";
+  if (result.stage === "instance_lookup" || text.includes("instance"))
     return "Named instance not found — start the SQL Server Browser service, or type the instance's fixed TCP port.";
-  if (text.includes("login") || text.includes("elogin"))
+  if (result.stage === "login" || text.includes("login") || text.includes("elogin"))
     return "The server answered but rejected the sign-in — check the login, password, or that this Windows account has access.";
-  if (text.includes("timeout") || text.includes("socket") || text.includes("refused"))
+  if (step === "socket" && (result.stage === "port" || text.includes("socket") || text.includes("refused")))
     return "No answer on that port — enable TCP/IP in SQL Server Configuration Manager and allow the port through the firewall.";
+  if (step === "handshake" && text.includes("timeout"))
+    return "The SQL driver reached its sign-in deadline. Check authentication, the ODBC driver and encryption settings; the TCP check is not the cause.";
   return null;
 }
 
@@ -242,7 +249,7 @@ export function SqlConnectionModal({
       status: "failed",
       ms,
       error: `${res.code ? `${res.code}: ` : ""}${res.error ?? "Step failed"}`,
-      hint: tipFor(res) ?? res.hint ?? null,
+      hint: tipFor(key, res) ?? res.hint ?? null,
       attempts: "attempts" in res ? (res.attempts ?? []) : [],
     });
     return false;
@@ -278,9 +285,11 @@ export function SqlConnectionModal({
     mark("socket", {
       status: "passed",
       ms: res.elapsedMs,
-      detail: `Port ${res.port} on ${res.host} is open${
-        res.instanceName ? ` (instance ${res.instanceName}${res.browserAnswered ? ", resolved via SQL Browser" : ""})` : ""
-      }`,
+      detail: res.skipped
+        ? `${res.host}\\${res.instanceName} uses a dynamic port; continuing with the SQL driver`
+        : `Port ${res.port} on ${res.host} is open${
+            res.instanceName ? ` (instance ${res.instanceName}${res.browserAnswered ? ", resolved via SQL Browser" : ""})` : ""
+          }`,
     });
     return true;
   };
@@ -387,6 +396,7 @@ export function SqlConnectionModal({
       ms,
       detail: `Wrote and rolled back a probe row in ${res.activeDb ?? config.database}`,
     });
+    await sqlAdmin()?.disconnect();
     return true;
   };
 

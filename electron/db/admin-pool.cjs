@@ -114,6 +114,21 @@ async function probePort(input) {
   });
   const { host, port, instanceName, browserAnswered } = target;
   const started = Date.now();
+  // Named instances commonly use dynamic ports. If Browser is stopped and no
+  // fixed port was supplied, guessing 1433 is misleading; let the SQL driver
+  // resolve HOST\INSTANCE directly during the authoritative handshake.
+  if (instanceName && !target.portKnown) {
+    return {
+      ok: true,
+      skipped: true,
+      host,
+      port: null,
+      instanceName,
+      browserAnswered: false,
+      elapsedMs: Date.now() - started,
+      hint: "Dynamic port not advertised; the SQL driver will connect to the named instance directly.",
+    };
+  }
   return new Promise((resolve) => {
     const socket = new net.Socket();
     let settled = false;
@@ -134,6 +149,7 @@ async function probePort(input) {
       finish({
         ok: false,
         code: "EPORTCLOSED",
+        stage: "port",
         error: `Firewall/Port Error: TCP Port ${port} on ${host}${
           instanceName ? ` (instance ${instanceName})` : ""
         } is closed or blocked. Ensure SQL Server TCP/IP protocol is enabled in SQL Server Configuration Manager.`,
@@ -211,7 +227,7 @@ async function connectInstance(input) {
     });
     if (run.cancelled) {
       await opened.pool.close().catch(() => {});
-      return { ok: false, code: "ECANCELLED", error: "The connection attempt was cancelled." };
+      return { ok: false, code: "ECANCELLED", stage: "driver", error: "The connection attempt was cancelled." };
     }
     pool = opened.pool;
     const meta = await pool

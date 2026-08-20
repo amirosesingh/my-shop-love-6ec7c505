@@ -7,7 +7,6 @@
  * localStorage outbox, so the web build behaves exactly as before.
  */
 import type { SyncOp } from "./sync-outbox";
-import { getDeviceSecret, setDeviceSecret } from "./device-secrets";
 
 export type LocalDbConfig = {
   server: string;
@@ -230,6 +229,8 @@ export type LocalSyncStatus = {
   queue?: SyncQueueRow[];
   lastPushAt: string | null;
   lastPullAt: string | null;
+  server?: string | null;
+  database?: string | null;
 };
 
 export type PosBridge = {
@@ -241,6 +242,7 @@ export type PosBridge = {
   ) => Promise<LocalDbTestResult & { cloudError?: string }>;
   configureCloud: (cloud: CloudBridgeConfig) => Promise<{ ok: boolean; error?: string }>;
   test: (config: LocalDbConfig) => Promise<LocalDbTestResult>;
+  getDatabaseConfig?: () => Promise<Partial<LocalDbConfig> | null>;
   /** Read the single master schema file — passive, never executes anything. */
   readSchema?: () => Promise<{
     ok: boolean;
@@ -503,8 +505,6 @@ export async function testDirectConnection(
   }
 }
 
-const SECRET_NAME = "localdb.config";
-
 let cachedConfig: LocalDbConfig | null = null;
 
 export function readLocalDbConfig(): LocalDbConfig {
@@ -512,45 +512,25 @@ export function readLocalDbConfig(): LocalDbConfig {
 }
 
 /**
- * Load the connection details from the sealed device store. Any legacy
- * plain-text copy is migrated into the encrypted store and removed, so nothing
- * readable is left behind on the machine.
+ * Load the canonical connection details from Electron's OS-encrypted store.
+ * Browser storage is deliberately not a connection authority.
  */
 export async function loadLocalDbConfig(): Promise<LocalDbConfig> {
   if (typeof window === "undefined") return defaultLocalDbConfig;
-  const sealed = await getDeviceSecret<Partial<LocalDbConfig>>(SECRET_NAME);
+  const sealed = await localDb()?.getDatabaseConfig?.();
   if (sealed) {
     cachedConfig = { ...defaultLocalDbConfig, ...sealed };
     return cachedConfig;
-  }
-  try {
-    const raw = window.localStorage.getItem(CONFIG_KEY);
-    if (raw) {
-      const legacy = { ...defaultLocalDbConfig, ...(JSON.parse(raw) as Partial<LocalDbConfig>) };
-      window.localStorage.removeItem(CONFIG_KEY);
-      await setDeviceSecret(SECRET_NAME, legacy);
-      cachedConfig = legacy;
-      return legacy;
-    }
-  } catch {
-    /* unreadable legacy copy — start fresh */
   }
   cachedConfig = defaultLocalDbConfig;
   return cachedConfig;
 }
 
 /**
- * Credentials never leave the machine, and on the machine they are sealed with
- * AES-256-GCM, so nobody can read or edit them from browser storage.
+ * Keep current wizard values in memory. The main process persists them only
+ * after the operational connection has been verified.
  */
 export async function writeLocalDbConfig(config: LocalDbConfig) {
   if (typeof window === "undefined") return;
   cachedConfig = config;
-  await setDeviceSecret(SECRET_NAME, config);
-  // Mirror the connection details into the branch database so a rebuilt or
-  // cleared browser profile does not lose them.
-  await writeLocalSetting(
-    "local_db_config",
-    JSON.stringify({ ...config, password: config.password ? "__stored__" : "" }),
-  );
 }
