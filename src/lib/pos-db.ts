@@ -1303,48 +1303,17 @@ function withRelativeStock(ops: SyncOp[]): { ops: SyncOp[]; deltas: StockDelta[]
 }
 
 /**
- * Ask the central database to apply each movement once. Failures are logged,
- * not thrown: the movement row is already stored, so the figure can be
- * reconciled without failing a completed sale.
+ * Ask the central database to apply every movement of this basket in one
+ * round trip. Failures are logged and parked, not thrown: the movement rows
+ * are already stored, so the figure can be reconciled and retried without
+ * failing a completed sale.
  */
 async function applyStockDeltas(deltas: StockDelta[]) {
-  for (const d of deltas) {
-    try {
-      const { error } = await (
-        supabase as unknown as {
-          rpc: (fn: string, args: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
-        }
-      ).rpc("stock_apply_delta", {
-        _movement_id: d.movementId,
-        _product_id: d.productId,
-        _store_id: d.storeId,
-        _delta: d.delta,
-      });
-      if (error) {
-        logSync("push", "products", false, `Stock delta: ${error.message}`);
-        recordUnappliedStock({ ...d, reason: error.message });
-        recordDiagnostic({
-          kind: "stock_delta_failed",
-          entity: "products",
-          code: reasonCode(error),
-          recordId: d.movementId,
-          storeId: d.storeId,
-        });
-      } else {
-        // A retry that finally landed must not stay on the recovery list.
-        clearUnappliedStock(d.movementId);
-      }
-    } catch (e) {
-      logSync("push", "products", false, `Stock delta: ${(e as Error)?.message ?? String(e)}`);
-      recordUnappliedStock({ ...d, reason: (e as Error)?.message ?? String(e) });
-      recordDiagnostic({
-        kind: "stock_delta_failed",
-        entity: "products",
-        code: reasonCode(e),
-        recordId: d.movementId,
-        storeId: d.storeId,
-      });
-    }
+  if (!deltas.length) return;
+  const outcomes = await applyStockDeltaBatch(deltas);
+  for (const outcome of outcomes) {
+    if (outcome.status !== "refused") continue;
+    logSync("push", "products", false, `Stock delta: ${outcome.reason ?? outcome.code ?? "failed"}`);
   }
 }
 
