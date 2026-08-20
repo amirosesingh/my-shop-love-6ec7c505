@@ -367,10 +367,10 @@ export function SyncHub() {
                   disabled={retrying}
                   onClick={async () => {
                     setRetrying(true);
-                    const res = await retryAllUnappliedStock();
+                    const res = await retryAllUnappliedStock({ force: true });
                     setRetrying(false);
                     toast[res.remaining ? "warning" : "success"](
-                      `${res.applied} applied, ${res.remaining} still waiting`,
+                      `${res.applied} applied, ${res.remaining} still waiting${res.blocked ? `, ${res.blocked} need attention` : ""}`,
                     );
                     await refresh();
                   }}
@@ -393,12 +393,15 @@ export function SyncHub() {
                     </span>
                     <span className="text-muted-foreground">{m.storeId ?? "—"}</span>
                     <span className="text-destructive">{m.reason}</span>
+                    <span className="text-muted-foreground">
+                      {m.retryable ? `retryable · attempt ${m.attempts}` : "needs attention"}
+                    </span>
                     <span className="text-muted-foreground">{when(m.at)}</span>
                     <Button
                       size="sm"
                       variant="outline"
                       className="ml-auto"
-                      disabled={retrying}
+                      disabled={retrying || !m.retryable}
                       onClick={async () => {
                         const ok = await retryUnappliedStock(m.movementId);
                         toast[ok ? "success" : "error"](
