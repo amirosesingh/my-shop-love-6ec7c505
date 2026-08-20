@@ -3541,6 +3541,19 @@ export type Database = {
         }
         Returns: number
       }
+      stock_apply_deltas: {
+        Args: { _movements: Json }
+        Returns: {
+          balance: number
+          movement_id: string
+          reason: string
+          status: string
+        }[]
+      }
+      stock_reconcile: {
+        Args: { _since?: string; _store_id: string }
+        Returns: Json
+      }
       stock_transfer_receive: {
         Args: {
           p_deduct_source?: boolean

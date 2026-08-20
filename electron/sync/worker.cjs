@@ -89,17 +89,39 @@ function stripAbsoluteStock(table, rows) {
 }
 
 async function applyStockDeltas(rows) {
-  let failure = null;
+  const movements = [];
+  const seen = new Set();
   for (const row of rows) {
     const delta = Number(row.quantity_delta ?? 0);
-    if (!row.id || !row.product_id || !delta) continue;
-    const { error } = await supabase.rpc("stock_apply_delta", {
-      _movement_id: row.id,
-      _product_id: row.product_id,
-      _store_id: row.store_id ?? credentials.branchId ?? null,
-      _delta: Math.trunc(delta),
+    if (!row.id || !row.product_id || !delta || seen.has(row.id)) continue;
+    seen.add(row.id);
+    movements.push({
+      movement_id: row.id,
+      product_id: row.product_id,
+      store_id: row.store_id ?? credentials.branchId ?? null,
+      delta: Math.trunc(delta),
     });
-    if (error) failure = error.message;
+  }
+  if (!movements.length) return null;
+
+  // One round trip for the whole push batch; each movement is still applied
+  // once, keyed on its own id.
+  const { data, error } = await supabase.rpc("stock_apply_deltas", { _movements: movements });
+  if (!error) {
+    const refused = (data ?? []).filter((r) => r.status === "refused");
+    return refused.length ? `${refused.length} stock movement(s) refused: ${refused[0].reason}` : null;
+  }
+  // Older central database without the batch routine: fall back per movement.
+  if (!/does not exist|not find|schema cache|PGRST202/i.test(error.message || "")) return error.message;
+  let failure = null;
+  for (const m of movements) {
+    const res = await supabase.rpc("stock_apply_delta", {
+      _movement_id: m.movement_id,
+      _product_id: m.product_id,
+      _store_id: m.store_id,
+      _delta: m.delta,
+    });
+    if (res.error) failure = res.error.message;
   }
   return failure;
 }

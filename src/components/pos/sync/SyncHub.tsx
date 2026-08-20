@@ -49,6 +49,7 @@ import {
   retryAllUnappliedStock,
   retryUnappliedStock,
   subscribeUnappliedStock,
+  reconcileStock,
   type UnappliedMovement,
 } from "@/lib/stock-recovery";
 import {
@@ -80,6 +81,7 @@ export function SyncHub() {
   const [unapplied, setUnapplied] = useState<UnappliedMovement[]>([]);
   const [diagnostics, setDiagnostics] = useState<DiagnosticEvent[]>([]);
   const [retrying, setRetrying] = useState(false);
+  const [reconciling, setReconciling] = useState(false);
   const [busy, setBusy] = useState<"push" | "pull" | "cycle" | null>(null);
   const [progress, setProgress] = useState(0);
   const [direction, setDirection] = useState("all");
@@ -346,7 +348,7 @@ export function SyncHub() {
         </Card>
       )}
 
-      {(unapplied.length > 0 || diagnostics.length > 0) && (
+      {
         <Card className="border-warning/40">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
@@ -354,6 +356,46 @@ export function SyncHub() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={reconciling}
+                onClick={async () => {
+                  const { activeBranchId } = await import("@/lib/active-branch");
+                  const branch = activeBranchId();
+                  if (!branch) {
+                    toast.error("Pick a branch before reconciling stock");
+                    return;
+                  }
+                  setReconciling(true);
+                  try {
+                    const report = await reconcileStock(branch);
+                    const total =
+                      report.notApplied.length +
+                      report.amountMismatch.length +
+                      report.stockMismatch.length;
+                    toast[total ? "warning" : "success"](
+                      total
+                        ? `${report.notApplied.length} not applied, ${report.amountMismatch.length} amount differences, ${report.stockMismatch.length} stock differences`
+                        : "Stock matches the movement ledger",
+                    );
+                  } catch (e) {
+                    toast.error((e as Error)?.message ?? "Could not reconcile stock");
+                  } finally {
+                    setReconciling(false);
+                    await refresh();
+                  }
+                }}
+              >
+                {reconciling ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <RotateCcw className="size-3.5" />
+                )}
+                Reconcile stock
+              </Button>
+            </div>
             {unapplied.length > 0 ? (
               <>
                 <p className="text-xs text-muted-foreground">
@@ -366,10 +408,10 @@ export function SyncHub() {
                   disabled={retrying}
                   onClick={async () => {
                     setRetrying(true);
-                    const res = await retryAllUnappliedStock();
+                    const res = await retryAllUnappliedStock({ force: true });
                     setRetrying(false);
                     toast[res.remaining ? "warning" : "success"](
-                      `${res.applied} applied, ${res.remaining} still waiting`,
+                      `${res.applied} applied, ${res.remaining} still waiting${res.blocked ? `, ${res.blocked} need attention` : ""}`,
                     );
                     await refresh();
                   }}
@@ -392,12 +434,15 @@ export function SyncHub() {
                     </span>
                     <span className="text-muted-foreground">{m.storeId ?? "—"}</span>
                     <span className="text-destructive">{m.reason}</span>
+                    <span className="text-muted-foreground">
+                      {m.retryable ? `retryable · attempt ${m.attempts}` : "needs attention"}
+                    </span>
                     <span className="text-muted-foreground">{when(m.at)}</span>
                     <Button
                       size="sm"
                       variant="outline"
                       className="ml-auto"
-                      disabled={retrying}
+                      disabled={retrying || !m.retryable}
                       onClick={async () => {
                         const ok = await retryUnappliedStock(m.movementId);
                         toast[ok ? "success" : "error"](
@@ -425,7 +470,7 @@ export function SyncHub() {
             ))}
           </CardContent>
         </Card>
-      )}
+      }
 
       {(failedQueue.length > 0 || localQueue.length > 0) && (
         <Card>
