@@ -97,7 +97,7 @@ import { parseAmount, parsePositiveAmount } from "@/lib/amount";
 import { getPosCallerAuth } from "@/lib/pos-caller-auth";
 import { evaluatePromotions, focLine } from "@/lib/pos-promotions";
 import { clearCartDraft, loadCartDraft, saveCartDraft } from "@/lib/cart-draft";
-import { openCashDrawer, printBookingSlip, printJobTag, printSaleReceipt, printShiftReport, saleReceiptPreview } from "@/lib/pos-print";
+import { openCashDrawer, printSaleReceipt, printShiftReport, saleReceiptPreview } from "@/lib/pos-print";
 import { closeScreenView, derivedCashSales, varianceNeedsPin } from "@/lib/shift-close";
 import { logSystemAction } from "@/lib/system-audit";
 import { openCustomerDisplay, publishDisplay, toDisplayLine, type DisplaySnapshot } from "@/lib/customer-display";
