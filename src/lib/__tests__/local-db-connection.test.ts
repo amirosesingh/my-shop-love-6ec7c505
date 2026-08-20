@@ -21,8 +21,10 @@ import {
   connectLocalDatabase,
   defaultLocalDbConfig,
   deriveLocalDbState,
+  verifyLocalWrite,
   withIpcTimeout,
 } from "../local-db";
+import { createRunGuard } from "../run-token";
 
 const stubShell = (connect: (...a: unknown[]) => Promise<unknown>) => {
   fakeWindow.pos = { connect, setSetting: async () => ({ ok: true }) };
@@ -115,5 +117,70 @@ describe("local database connection state", () => {
   it("does nothing when there is no desktop shell", async () => {
     const res = await connectLocalDatabase(defaultLocalDbConfig);
     expect(res.ok).toBe(false);
+  });
+});
+
+describe("write verification", () => {
+  beforeEach(() => {
+    store.clear();
+    delete fakeWindow.pos;
+  });
+
+  it("explains itself instead of throwing when there is no desktop shell", async () => {
+    const res = await verifyLocalWrite();
+    expect(res.ok).toBe(false);
+    expect(res.error).toContain("Windows desktop app");
+  });
+
+  it("passes when the shell writes and rolls back", async () => {
+    fakeWindow.pos = {
+      verifyWrite: async () => ({ ok: true, activeDb: "POS_Master_2025", rolledBack: true }),
+    };
+    const res = await verifyLocalWrite();
+    expect(res.ok).toBe(true);
+    expect(res.activeDb).toBe("POS_Master_2025");
+  });
+
+  it("fails as a timeout rather than hanging when the shell never answers", async () => {
+    fakeWindow.pos = { verifyWrite: () => new Promise(() => {}) };
+    const res = await verifyLocalWrite(10);
+    expect(res.ok).toBe(false);
+    expect(res.code).toBe("ETIMEOUT");
+  });
+
+  it("reports a read-only login as a failed write, not a success", async () => {
+    fakeWindow.pos = {
+      verifyWrite: async () => ({
+        ok: false,
+        code: "EPERM",
+        error: "INSERT permission was denied on object 'pos_connection_health'",
+      }),
+    };
+    const res = await verifyLocalWrite();
+    expect(res.ok).toBe(false);
+    expect(res.error).toContain("INSERT permission");
+  });
+});
+
+describe("stale run guard", () => {
+  it("keeps the current run live", () => {
+    const guard = createRunGuard();
+    const token = guard.start();
+    expect(guard.isLive(token)).toBe(true);
+  });
+
+  it("drops a result that arrives after the dialog closed", () => {
+    const guard = createRunGuard();
+    const token = guard.start();
+    guard.abandon(); // dialog closed mid-handshake
+    expect(guard.isLive(token)).toBe(false);
+  });
+
+  it("drops the earlier run when a new one starts", () => {
+    const guard = createRunGuard();
+    const first = guard.start();
+    const second = guard.start();
+    expect(guard.isLive(first)).toBe(false);
+    expect(guard.isLive(second)).toBe(true);
   });
 });
