@@ -20,7 +20,7 @@ import { SidebarNav, useSidebarCollapsed } from "@/components/pos/SidebarNav";
 import { SyncBadge } from "@/components/pos/sync/SyncBadge";
 import { WindowControls } from "@/components/pos/WindowControls";
 import { SystemStatusPill } from "@/components/pos/SystemStatusPill";
-import { SqlAdminBadge } from "@/components/database/SqlAdminBadge";
+import { OperationalDatabaseBadge } from "@/components/database/SqlAdminBadge";
 import { SecurityAlertBell } from "@/components/pos/SecurityAlertBell";
 import { ActivityBell } from "@/components/pos/ActivityBell";
 import { MobileStatusSheet } from "@/components/pos/MobileStatusSheet";
@@ -471,7 +471,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <SyncBadge className="ml-auto" />
               <LiveClock />
               <SystemStatusPill />
-              <SqlAdminBadge />
+              <OperationalDatabaseBadge />
               <SecurityAlertBell />
               <ActivityBell />
               {terminal.config && (

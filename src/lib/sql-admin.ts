@@ -21,6 +21,7 @@ export type SqlAdminFailure = {
   code?: string | null;
   originalMessage?: string | null;
   hint?: string | null;
+  stage?: "port" | "instance_lookup" | "driver" | "tls" | "login" | "database" | "write";
   /** Every combination tried before giving up, newest last. */
   attempts?: SqlAttemptLog[];
 };
@@ -90,7 +91,9 @@ export type SqlPortProbe =
   | {
       ok: true;
       host: string;
-      port: number;
+      port: number | null;
+      skipped?: boolean;
+      hint?: string | null;
       instanceName?: string | null;
       browserAnswered?: boolean;
       elapsedMs: number;

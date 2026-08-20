@@ -140,3 +140,25 @@ hang), a read-only login, and the three stale-run-guard behaviours.
 
 Windows Integrated and SQL login, the SQL Server Browser service stopped, and
 a read-only login failing cleanly at the write step.
+
+---
+
+# Named-instance and connection-status consolidation (1.3.12)
+
+The repeated “No answer on that port” message was not reliable: renderer code
+replaced any authentication timeout with firewall advice, even after the TCP
+step had passed. Named instances added a second false negative because a stopped
+SQL Browser service caused the probe to guess port 1433 although the native SQL
+driver could still connect directly to `HOST\\INSTANCE`.
+
+The TCP step is now advisory when a named instance has no advertised fixed
+port, and the SQL driver handshake is authoritative. Failures retain their real
+stage (port, instance lookup, driver, TLS, login, database or write), so login
+and ODBC problems are no longer shown as firewall errors.
+
+The green header badge now reads the operational POS pool—the same status used
+by Local Database settings—instead of the temporary Database Explorer pool.
+The Explorer pool remains isolated for safe schema browsing, but it cannot make
+the till appear connected. SQL connection details now have one canonical
+OS-encrypted main-process store; the old general-config copy is migrated once
+and removed.

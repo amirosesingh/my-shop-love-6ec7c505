@@ -82,16 +82,25 @@ const blankSteps = (): Record<StepKey, StepState> =>
   >;
 
 /** Extra guidance on top of the driver's own hint. */
-function tipFor(result: { code?: string | null; error?: string; originalMessage?: string | null }) {
+function tipFor(
+  step: StepKey,
+  result: { code?: string | null; error?: string; originalMessage?: string | null; stage?: string },
+) {
   const text = `${result.code ?? ""} ${result.error ?? ""} ${result.originalMessage ?? ""}`.toLowerCase();
   if (text.includes("certificate"))
     return "Certificate error — switch 'Trust server certificate' ON, or turn 'Encrypt connection' OFF for a local instance.";
-  if (text.includes("instance"))
+  if (result.code === "EDRIVER" || text.includes("im002") || text.includes("driver not"))
+    return "Windows authentication needs a Microsoft ODBC SQL Server driver and the msnodesqlv8 desktop driver.";
+  if (result.stage === "instance_lookup" || text.includes("instance"))
     return "Named instance not found — start the SQL Server Browser service, or type the instance's fixed TCP port.";
-  if (text.includes("login") || text.includes("elogin"))
+  if (result.stage === "login" || text.includes("login") || text.includes("elogin"))
     return "The server answered but rejected the sign-in — check the login, password, or that this Windows account has access.";
-  if (text.includes("timeout") || text.includes("socket") || text.includes("refused"))
+  if (step === "socket" && (result.stage === "port" || text.includes("socket") || text.includes("refused")))
     return "No answer on that port — enable TCP/IP in SQL Server Configuration Manager and allow the port through the firewall.";
+  if (step === "handshake" && text.includes("timeout"))
+    return "The SQL driver reached its sign-in deadline. Check authentication, the ODBC driver and encryption settings; the TCP check is not the cause.";
+  if (step === "handshake" && text.includes("ebudget"))
+    return "Earlier sign-in combinations used the connection deadline. Review the attempts below; the port check has already been handled separately.";
   return null;
 }
 
@@ -115,7 +124,7 @@ export function SqlConnectionModal({
   const [config, setConfig] = useState<LocalDbConfig>({
     ...defaultLocalDbConfig,
     database: DEFAULT_DATABASE,
-    port: 1433,
+    port: 0,
     encrypt: true,
     trustServerCertificate: true,
     arithAbort: true,
@@ -200,7 +209,7 @@ export function SqlConnectionModal({
         ...current,
         ...saved,
         database: saved.database || DEFAULT_DATABASE,
-        port: saved.port || 1433,
+        port: saved.port ?? 0,
         trustServerCertificate: saved.trustServerCertificate ?? true,
         arithAbort: saved.arithAbort ?? true,
       }));
@@ -214,9 +223,17 @@ export function SqlConnectionModal({
     };
   }, [open, scan, abandonRun, guard]);
 
+  const resolvedPort = () => {
+    // Older builds pre-filled 1433 even for SQLEXPRESS. Treat that legacy
+    // combination as automatic; HOST\INSTANCE,1433 remains the explicit form.
+    const named = config.server.includes("\\");
+    const inlinePort = /,\s*\d+\s*$/.test(config.server);
+    return named && !inlinePort && config.port === 1433 ? undefined : config.port || undefined;
+  };
+
   const credentials = () => ({
     server: config.server,
-    port: config.port,
+    port: resolvedPort(),
     auth: config.auth,
     user: config.user,
     password: config.password,
@@ -226,7 +243,7 @@ export function SqlConnectionModal({
 
   const params = (database: string) => ({
     host: config.server,
-    port: config.port,
+    port: resolvedPort() ?? 0,
     database,
     authType: config.auth,
     username: config.user,
@@ -242,7 +259,7 @@ export function SqlConnectionModal({
       status: "failed",
       ms,
       error: `${res.code ? `${res.code}: ` : ""}${res.error ?? "Step failed"}`,
-      hint: tipFor(res) ?? res.hint ?? null,
+      hint: tipFor(key, res) ?? res.hint ?? null,
       attempts: "attempts" in res ? (res.attempts ?? []) : [],
     });
     return false;
@@ -262,7 +279,7 @@ export function SqlConnectionModal({
       });
     mark("credentials", {
       status: "passed",
-      detail: `${config.server}${config.port ? `:${config.port}` : ""} · ${
+      detail: `${config.server}${resolvedPort() ? `:${resolvedPort()}` : " · automatic port"} · ${
         config.auth === "sql" ? `SQL login ${config.user}` : "Windows Integrated"
       }`,
     });
@@ -278,9 +295,11 @@ export function SqlConnectionModal({
     mark("socket", {
       status: "passed",
       ms: res.elapsedMs,
-      detail: `Port ${res.port} on ${res.host} is open${
-        res.instanceName ? ` (instance ${res.instanceName}${res.browserAnswered ? ", resolved via SQL Browser" : ""})` : ""
-      }`,
+      detail: res.skipped
+        ? `${res.host}\\${res.instanceName} uses a dynamic port; continuing with the SQL driver`
+        : `Port ${res.port} on ${res.host} is open${
+            res.instanceName ? ` (instance ${res.instanceName}${res.browserAnswered ? ", resolved via SQL Browser" : ""})` : ""
+          }`,
     });
     return true;
   };
@@ -387,6 +406,7 @@ export function SqlConnectionModal({
       ms,
       detail: `Wrote and rolled back a probe row in ${res.activeDb ?? config.database}`,
     });
+    await sqlAdmin()?.disconnect();
     return true;
   };
 
@@ -506,8 +526,9 @@ export function SqlConnectionModal({
               <Input
                 id="sql-port"
                 type="number"
-                value={config.port}
-                onChange={(e) => set("port", Number(e.target.value) || 1433)}
+                value={config.port || ""}
+                placeholder="Automatic"
+                onChange={(e) => set("port", Number(e.target.value) || 0)}
               />
             </div>
 

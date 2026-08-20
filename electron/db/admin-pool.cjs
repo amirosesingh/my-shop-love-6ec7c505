@@ -35,9 +35,12 @@ function diagnose(err) {
   let hint = base.hint;
   if (base.code === "ECANCELLED") {
     hint = "The attempt was stopped before it finished.";
+  } else if (base.code === "EBUDGET") {
+    hint =
+      "Earlier driver or encryption combinations used the connection deadline. Review the attempted combinations below; this is not a failed port probe.";
   } else if (base.code === "ETIMEOUT" || /did not complete|timed out/.test(text)) {
     hint =
-      "The port answered but the sign-in never completed. A firewall that swallows the reply, TLS/encryption mismatch, or a stopped SQL Server Browser service are the usual causes — try turning 'Encrypt connection' off for a local instance.";
+      "The SQL driver did not finish this sign-in combination. Check the ODBC driver and TLS/encryption settings; the separate TCP step determines whether the port is reachable.";
   } else if (/im002|data source name not found|no default driver/.test(text)) {
     hint =
       "No suitable ODBC driver is installed for Windows authentication. Install 'ODBC Driver 18 for SQL Server' from Microsoft, or use a SQL Server login.";
@@ -114,6 +117,21 @@ async function probePort(input) {
   });
   const { host, port, instanceName, browserAnswered } = target;
   const started = Date.now();
+  // Named instances commonly use dynamic ports. If Browser is stopped and no
+  // fixed port was supplied, guessing 1433 is misleading; let the SQL driver
+  // resolve HOST\INSTANCE directly during the authoritative handshake.
+  if (instanceName && !target.portKnown) {
+    return {
+      ok: true,
+      skipped: true,
+      host,
+      port: null,
+      instanceName,
+      browserAnswered: false,
+      elapsedMs: Date.now() - started,
+      hint: "Dynamic port not advertised; the SQL driver will connect to the named instance directly.",
+    };
+  }
   return new Promise((resolve) => {
     const socket = new net.Socket();
     let settled = false;
@@ -134,6 +152,7 @@ async function probePort(input) {
       finish({
         ok: false,
         code: "EPORTCLOSED",
+        stage: "port",
         error: `Firewall/Port Error: TCP Port ${port} on ${host}${
           instanceName ? ` (instance ${instanceName})` : ""
         } is closed or blocked. Ensure SQL Server TCP/IP protocol is enabled in SQL Server Configuration Manager.`,
@@ -211,7 +230,7 @@ async function connectInstance(input) {
     });
     if (run.cancelled) {
       await opened.pool.close().catch(() => {});
-      return { ok: false, code: "ECANCELLED", error: "The connection attempt was cancelled." };
+      return { ok: false, code: "ECANCELLED", stage: "driver", error: "The connection attempt was cancelled." };
     }
     pool = opened.pool;
     const meta = await pool

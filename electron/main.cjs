@@ -218,7 +218,14 @@ function broadcastStatus(payload) {
 
 async function statusPayload() {
   const status = await worker.status();
-  return { ...status, cloudConfigured: !!cloudConfig };
+  const config = pool.getConfig();
+  return {
+    ...status,
+    cloudConfigured: !!cloudConfig,
+    server: config?.server ?? null,
+    database: config?.database ?? null,
+    resolved: config?.resolved ?? null,
+  };
 }
 
 async function connectLocal(config) {
@@ -626,9 +633,6 @@ function registerIpc() {
       );
       const saved = dbConfigStore.write(config);
       if (!saved.ok) console.warn("[pos] could not seal SQL config:", saved.error);
-      // Permanent copy: survives a missing OS keyring, so the till never
-      // forgets its database after a restart.
-      configStore.set("localDb", config);
     } catch (err) {
       return { ok: false, ...pool.describeSqlError(err) };
     }
@@ -666,6 +670,7 @@ function registerIpc() {
       return { ok: false, ...pool.describeSqlError(err) };
     }
   });
+  ipcMain.handle("pos:database-config", () => dbConfigStore.read());
 
   /*
     Schema lifecycle. Reading the master file is always safe; applying it only
@@ -707,14 +712,20 @@ function registerIpc() {
     try {
       return await withTimeout(Promise.resolve().then(work), ms, message);
     } catch (err) {
-      return { ok: false, code: err?.code ?? "ETIMEOUT", error: fail(err).error, attempts: [] };
+      return {
+        ok: false,
+        code: err?.code ?? "ETIMEOUT",
+        stage: "driver",
+        error: fail(err).error,
+        attempts: [],
+      };
     }
   };
 
   ipcMain.handle("sqladmin:connect", (_e, credentials) =>
     bounded(
       30_000,
-      "SQL Server did not answer the sign-in in time. The port is open but no authentication response came back.",
+      "The SQL driver did not finish the authentication handshake in time.",
       () => sqlAdmin.connectInstance(credentials),
     ),
   );
@@ -757,7 +768,7 @@ function registerIpc() {
     }
   });
 
-  ipcMain.handle("pos:status", () => worker.status());
+  ipcMain.handle("pos:status", () => statusPayload());
   ipcMain.handle("pos:housekeep", async (_e, options) => {
     try {
       const retentionDays = Number(options?.retentionDays);
@@ -1062,8 +1073,19 @@ app.whenReady().then(async () => {
     return;
   }
   createWindows();
-  // The sealed store first, then the permanent JSON copy: whichever survived.
-  const savedDbConfig = dbConfigStore.read() ?? configStore.get("localDb");
+  // One-time migration from the legacy general config into the dedicated,
+  // OS-encrypted SQL store. Afterwards there is one canonical copy only.
+  let savedDbConfig = dbConfigStore.read();
+  const legacyDbConfig = configStore.get("localDb");
+  if (!savedDbConfig && legacyDbConfig) {
+    const migrated = dbConfigStore.write(legacyDbConfig);
+    if (migrated.ok) {
+      savedDbConfig = legacyDbConfig;
+      configStore.set("localDb", null);
+    }
+  } else if (savedDbConfig && legacyDbConfig) {
+    configStore.set("localDb", null);
+  }
   if (savedDbConfig) {
     try {
       await connectLocal(savedDbConfig);

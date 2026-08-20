@@ -118,6 +118,13 @@ describe("local database connection state", () => {
     const res = await connectLocalDatabase(defaultLocalDbConfig);
     expect(res.ok).toBe(false);
   });
+
+  it("does not require browser storage to connect", async () => {
+    stubShell(async (config) => ({ ok: !!config, verified: true }));
+    const res = await connectLocalDatabase(defaultLocalDbConfig);
+    expect(res.ok).toBe(true);
+    expect([...store.keys()].some((key) => key.includes("localdb"))).toBe(false);
+  });
 });
 
 describe("write verification", () => {

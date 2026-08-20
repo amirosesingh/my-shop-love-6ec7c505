@@ -103,7 +103,8 @@ function parseServerField(raw, fallbackPort) {
   let text = String(raw ?? "").trim();
   text = text.replace(/^tcp:/i, "");
   let port = Number(fallbackPort) || 1433;
-  let explicitPort = false;
+  // A separately supplied port is as explicit as HOST,PORT.
+  let explicitPort = Number(fallbackPort) > 0;
   const comma = text.lastIndexOf(",");
   if (comma > -1) {
     const maybePort = Number(text.slice(comma + 1).trim());
@@ -155,11 +156,27 @@ function describeSqlError(err) {
     ENOTFOUND: "The server name could not be resolved on the network.",
     EDRIVER: "The database driver is missing on this machine.",
   };
+  const text = `${code ?? ""} ${message} ${originalMessage ?? ""}`.toLowerCase();
+  const stage =
+    code === "EDRIVER" || code === "EBUDGET" || /im002|driver.*not found|data source name not found/.test(text)
+      ? "driver"
+      : code === "ELOGIN" || /login failed|password did not match/.test(text)
+        ? "login"
+        : /certificate|tls|ssl|encrypt/.test(text)
+          ? "tls"
+          : code === "ETIMEOUT_INSTANCE_LOOKUP" || code === "EINSTLOOKUP"
+            ? "instance_lookup"
+            : code === "EPORTCLOSED" || code === "ECONNREFUSED" || code === "ENOTFOUND"
+              ? "port"
+              : code === "ETIMEOUT" || code === "ETIMEDOUT"
+                ? "driver"
+                : "database";
   return {
     error: message,
     code,
     originalMessage,
     hint: (code && hints[code]) || null,
+    stage,
   };
 }
 
@@ -399,9 +416,9 @@ async function openConnection(config) {
     const remaining = deadline - Date.now();
     if (remaining <= 1_000) {
       const e = new Error(
-        "SQL Server did not complete the sign-in in time. The port answers but no authentication response came back.",
+        `The connection budget ended before the next sign-in combination could be tried${attempt?.label ? ` (${attempt.label})` : ""}.`,
       );
-      e.code = "ETIMEOUT";
+      e.code = "EBUDGET";
       e.attempts = tried;
       e.target = target;
       throw e;
