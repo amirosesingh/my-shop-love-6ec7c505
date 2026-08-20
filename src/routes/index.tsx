@@ -77,11 +77,8 @@ import { useUiScale } from "@/lib/use-ui-scale";
 import {
   discountLabel,
   loadMemberVouchers,
-  loadVoucherByToken,
   scopeLabel,
-  voucherValue,
 } from "@/lib/coupons";
-import type { Campaign, VoucherView } from "@/lib/coupons";
 import type { Booking, CartLine, DiscountType, IntakeCharge, PaymentMethod, Sale } from "@/lib/pos-types";
 import { applyCombo, intakeTotals, newJobTag } from "@/lib/booking-charges";
 import type { Payment } from "@/lib/pos-types";
