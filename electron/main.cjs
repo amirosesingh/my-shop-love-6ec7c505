@@ -746,7 +746,8 @@ function registerIpc() {
     never settles leaves the renderer spinning for ever with no way back, so a
     slow driver must always come back as a timeout result instead.
   */
-  const bounded = async (ms, message, work) => {
+  const bounded = async (ms, message, work, attemptId) => {
+    const started = Date.now();
     try {
       return await withTimeout(Promise.resolve().then(work), ms, message);
     } catch (err) {
@@ -754,6 +755,9 @@ function registerIpc() {
         ok: false,
         code: err?.code ?? "ETIMEOUT",
         stage: "driver",
+        status: "timed_out",
+        attemptId: attemptId ?? null,
+        elapsedMs: Date.now() - started,
         error: fail(err).error,
         attempts: [],
       };
@@ -765,9 +769,12 @@ function registerIpc() {
       30_000,
       "The SQL driver did not finish the authentication handshake in time.",
       () => sqlAdmin.connectInstance(credentials),
+      credentials?.attemptId ?? null,
     ),
   );
-  ipcMain.handle("sqladmin:cancel", () => sqlAdmin.cancel());
+  ipcMain.handle("sqladmin:cancel", (_e, attemptId) =>
+    bounded(5_000, "The cancel request did not finish in time.", () => sqlAdmin.cancel(attemptId)),
+  );
   ipcMain.handle("sqladmin:probe-port", (_e, credentials) =>
     bounded(15_000, "The port probe did not finish in time.", () =>
       sqlAdmin.probePort(credentials),
@@ -786,15 +793,25 @@ function registerIpc() {
   ipcMain.handle("pos:verify-write", () =>
     bounded(20_000, "The write check did not finish in time.", () => pool.verifyWrite()),
   );
-  ipcMain.handle("sqladmin:tables", (_e, dbName) => sqlAdmin.getTables(dbName));
+  ipcMain.handle("sqladmin:tables", (_e, dbName) =>
+    bounded(15_000, "The table list did not arrive in time.", () => sqlAdmin.getTables(dbName)),
+  );
   ipcMain.handle("sqladmin:columns", (_e, dbName, tableName, schemaName) =>
-    sqlAdmin.getTableColumns(dbName, tableName, schemaName),
+    bounded(15_000, "The column list did not arrive in time.", () =>
+      sqlAdmin.getTableColumns(dbName, tableName, schemaName),
+    ),
   );
   ipcMain.handle("sqladmin:query", (_e, dbName, queryText) =>
-    sqlAdmin.executeQuery(dbName, queryText),
+    bounded(30_000, "The query did not finish in time.", () =>
+      sqlAdmin.executeQuery(dbName, queryText),
+    ),
   );
-  ipcMain.handle("sqladmin:disconnect", () => sqlAdmin.disconnect());
-  ipcMain.handle("sqladmin:status", () => sqlAdmin.status());
+  ipcMain.handle("sqladmin:disconnect", () =>
+    bounded(10_000, "The disconnect did not finish in time.", () => sqlAdmin.disconnect()),
+  );
+  ipcMain.handle("sqladmin:status", () =>
+    bounded(5_000, "The connection status did not arrive in time.", () => sqlAdmin.status()),
+  );
 
   ipcMain.handle("pos:write", async (_e, _context, op) => {
     try {

@@ -122,7 +122,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
  */
 contextBridge.exposeInMainWorld("sqlAdmin", {
   connectInstance: (credentials) => invoke("sqladmin:connect", credentials),
-  cancel: () => invoke("sqladmin:cancel"),
+  cancel: (attemptId) => invoke("sqladmin:cancel", attemptId),
   probePort: (credentials) => invoke("sqladmin:probe-port", credentials),
   lockDatabase: (credentials) => invoke("sqladmin:lock", credentials),
   listDatabases: () => invoke("sqladmin:databases"),

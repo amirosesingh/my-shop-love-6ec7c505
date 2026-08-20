@@ -45,6 +45,12 @@ import {
 } from "@/lib/local-db";
 import { DESKTOP_ONLY, sqlAdmin, type SqlAdminFailure, type SqlDatabase } from "@/lib/sql-admin";
 import { createRunGuard } from "@/lib/run-token";
+import {
+  STEP_DEADLINE_MS,
+  newAttemptId,
+  traceAttempt,
+  withClientDeadline,
+} from "@/lib/connection-attempt";
 import { supabaseConfig } from "@/lib/external-supabase-config";
 
 const DEFAULT_DATABASE = "POS_Master_2025";
@@ -66,13 +72,16 @@ const STEPS = [
 ] as const;
 
 type StepKey = (typeof STEPS)[number]["key"];
-type StepStatus = "pending" | "running" | "passed" | "failed" | "stopped";
+type StepStatus = "pending" | "running" | "passed" | "failed" | "cancelled" | "timed_out";
 type StepState = {
   status: StepStatus;
   detail?: string;
   error?: string;
   hint?: string | null;
   ms?: number;
+  /** Identity of the run that produced this state. */
+  attemptId?: string;
+  code?: string | null;
   /** Combinations the shell tried before giving up (port, driver, encryption). */
   attempts?: { label: string; code?: string | null; error?: string }[];
 };
@@ -144,6 +153,10 @@ export function SqlConnectionModal({
    * handshake can never leave a spinner behind.
    */
   const guard = useRef(createRunGuard()).current;
+  /** Identity of the current run; shared with the shell so it can be cancelled. */
+  const attemptRef = useRef<string | null>(null);
+  /** Synchronous lock — protects against a double click within one render. */
+  const startingRef = useRef(false);
 
   const set = <K extends keyof LocalDbConfig>(key: K, value: LocalDbConfig[K]) => {
     setConfig((c) => ({ ...c, [key]: value }));
@@ -158,8 +171,14 @@ export function SqlConnectionModal({
   /** Abandon whatever is running and tell the shell to drop its half-open pool. */
   const abandonRun = useCallback(() => {
     guard.abandon();
+    startingRef.current = false;
     setRunning(false);
-    void sqlAdmin()?.cancel?.();
+    const id = attemptRef.current;
+    attemptRef.current = null;
+    if (id) traceAttempt(id, "driver", "cancelled");
+    void sqlAdmin()
+      ?.cancel?.(id ?? undefined)
+      .catch(() => {});
   }, [guard]);
 
   /** Operator pressed Stop: the running step is stopped, not failed. */
@@ -169,7 +188,7 @@ export function SqlConnectionModal({
       const next = { ...s };
       for (const key of Object.keys(next) as StepKey[]) {
         if (next[key].status === "running")
-          next[key] = { status: "stopped", detail: "Stopped before it finished." };
+          next[key] = { status: "cancelled", detail: "Cancelled before it finished." };
       }
       return next;
     });
@@ -220,6 +239,8 @@ export function SqlConnectionModal({
     }
     let alive = true;
     guard.abandon();
+    startingRef.current = false;
+    attemptRef.current = null;
     setRunning(false);
     setSteps(blankSteps());
     setDatabases([]);
@@ -278,13 +299,46 @@ export function SqlConnectionModal({
 
   const failure = (key: StepKey, res: SqlAdminFailure | LocalDbTestResult, ms?: number) => {
     mark(key, {
-      status: "failed",
+      status: res.code === "ECANCELLED" ? "cancelled" : res.code === "ETIMEOUT" ? "timed_out" : "failed",
       ms,
+      code: res.code ?? null,
+      attemptId: attemptRef.current ?? undefined,
       error: `${res.code ? `${res.code}: ` : ""}${res.error ?? "Step failed"}`,
       hint: tipFor(key, res) ?? res.hint ?? null,
       attempts: "attempts" in res ? (res.attempts ?? []) : [],
     });
+    traceAttempt(attemptRef.current ?? "-", key, res.code === "ECANCELLED" ? "cancelled" : "failed", ms);
     return false;
+  };
+
+  /**
+   * Runs one bridge call under a hard client deadline. A call that never
+   * answers becomes a `timed_out` step instead of an endless spinner, and the
+   * abandoned request is cancelled in the shell.
+   */
+  const bounded = async <T,>(
+    key: StepKey,
+    work: Promise<T>,
+  ): Promise<{ ok: true; value: T; ms: number } | { ok: false; ms: number }> => {
+    const res = await withClientDeadline(work, STEP_DEADLINE_MS[key] ?? 30_000);
+    if (res.timedOut) {
+      const id = attemptRef.current;
+      void sqlAdmin()
+        ?.cancel?.(id ?? undefined)
+        .catch(() => {});
+      mark(key, {
+        status: "timed_out",
+        ms: res.elapsedMs,
+        code: "ETIMEOUT",
+        attemptId: id ?? undefined,
+        error: "ETIMEOUT: this step did not finish within its deadline.",
+        hint: "The attempt was stopped and released. Check the SQL Server service, then run the checks again.",
+        attempts: [],
+      });
+      traceAttempt(id ?? "-", key, "timed_out", res.elapsedMs);
+      return { ok: false, ms: res.elapsedMs };
+    }
+    return { ok: true, value: res.value, ms: res.elapsedMs };
   };
 
   /* ---------------- individual phases ---------------- */
@@ -311,8 +365,10 @@ export function SqlConnectionModal({
   const runSocket = async () => {
     const bridge = sqlAdmin();
     if (!bridge?.probePort) return failure("socket", DESKTOP_ONLY);
-    mark("socket", { status: "running" });
-    const res = await bridge.probePort(credentials());
+    mark("socket", { status: "running", attemptId: attemptRef.current ?? undefined });
+    const call = await bounded("socket", bridge.probePort(credentials()));
+    if (!call.ok) return false;
+    const res = call.value;
     if (!res.ok) return failure("socket", res, res.elapsedMs);
     mark("socket", {
       status: "passed",
@@ -329,10 +385,19 @@ export function SqlConnectionModal({
   const runHandshake = async () => {
     const bridge = sqlAdmin();
     if (!bridge) return failure("handshake", DESKTOP_ONLY);
-    mark("handshake", { status: "running" });
-    const started = Date.now();
-    const res = await bridge.connectInstance({ ...credentials(), database: "master" });
-    const ms = Date.now() - started;
+    mark("handshake", { status: "running", attemptId: attemptRef.current ?? undefined });
+    traceAttempt(attemptRef.current ?? "-", "login", "running");
+    const call = await bounded(
+      "handshake",
+      bridge.connectInstance({
+        ...credentials(),
+        database: "master",
+        attemptId: attemptRef.current ?? undefined,
+      }),
+    );
+    if (!call.ok) return false;
+    const res = call.value;
+    const ms = call.ms;
     if (!res.ok) return failure("handshake", res, ms);
     mark("handshake", {
       status: "passed",
@@ -348,10 +413,11 @@ export function SqlConnectionModal({
   const runCatalog = async () => {
     const bridge = sqlAdmin();
     if (!bridge) return failure("catalog", DESKTOP_ONLY);
-    mark("catalog", { status: "running" });
-    const started = Date.now();
-    const res = await bridge.listDatabases();
-    const ms = Date.now() - started;
+    mark("catalog", { status: "running", attemptId: attemptRef.current ?? undefined });
+    const call = await bounded("catalog", bridge.listDatabases());
+    if (!call.ok) return false;
+    const res = call.value;
+    const ms = call.ms;
     if (!res.ok) return failure("catalog", res, ms);
     setDatabases(res.databases);
     if (!res.databases.length)
@@ -381,11 +447,15 @@ export function SqlConnectionModal({
     if (!bridge) return failure("lock", DESKTOP_ONLY);
     if (!config.database.trim())
       return failure("lock", { ok: false, error: "Choose the database to use." });
-    mark("lock", { status: "running" });
+    mark("lock", { status: "running", attemptId: attemptRef.current ?? undefined });
     const started = Date.now();
     if (bridge.lockDatabase) {
-      const locked = await bridge.lockDatabase({ ...credentials(), database: config.database });
-      if (!locked.ok) return failure("lock", locked, Date.now() - started);
+      const call = await bounded(
+        "lock",
+        bridge.lockDatabase({ ...credentials(), database: config.database }),
+      );
+      if (!call.ok) return false;
+      if (!call.value.ok) return failure("lock", call.value, Date.now() - started);
     }
     // Prove the operational pool — not just the admin pool — can use it.
     const probe = await testDirectConnection(params(config.database));
@@ -408,10 +478,11 @@ export function SqlConnectionModal({
    * write, so this stage is separate and never inferred from the one before.
    */
   const runWrite = async () => {
-    mark("write", { status: "running" });
-    const started = Date.now();
-    const res = await verifyLocalWrite();
-    const ms = Date.now() - started;
+    mark("write", { status: "running", attemptId: attemptRef.current ?? undefined });
+    const call = await bounded("write", verifyLocalWrite());
+    if (!call.ok) return false;
+    const res = call.value;
+    const ms = call.ms;
     if (!res.ok)
       return failure(
         "write",
@@ -428,7 +499,9 @@ export function SqlConnectionModal({
       ms,
       detail: `Wrote and rolled back a probe row in ${res.activeDb ?? config.database}`,
     });
-    await sqlAdmin()?.disconnect();
+    await sqlAdmin()
+      ?.disconnect()
+      .catch(() => {});
     return true;
   };
 
@@ -443,9 +516,14 @@ export function SqlConnectionModal({
 
   /** Runs `key` and, unless retrying a single step, everything after it. */
   const advance = async (from: StepKey, only = false) => {
-    if (running) return false;
+    // Synchronous lock: two clicks in one render must not start two runs.
+    if (running || startingRef.current) return false;
+    startingRef.current = true;
     const token = guard.start();
     const live = () => guard.isLive(token);
+    const attemptId = newAttemptId();
+    attemptRef.current = attemptId;
+    traceAttempt(attemptId, from, "running");
     setRunning(true);
     try {
       const order = STEPS.map((s) => s.key);
@@ -458,7 +536,11 @@ export function SqlConnectionModal({
       }
       return true;
     } finally {
-      if (live()) setRunning(false);
+      startingRef.current = false;
+      if (live()) {
+        setRunning(false);
+        if (attemptRef.current === attemptId) attemptRef.current = null;
+      }
     }
   };
 
@@ -639,17 +721,17 @@ export function SqlConnectionModal({
                     </p>
                     <p
                       className={
-                        state.status === "failed"
+                        state.status === "failed" || state.status === "timed_out"
                           ? "text-xs text-destructive"
                           : "text-xs text-muted-foreground"
                       }
                     >
                       {state.error ?? state.detail ?? step.hint}
                     </p>
-                    {state.status === "failed" && state.hint && (
+                    {(state.status === "failed" || state.status === "timed_out") && state.hint && (
                       <p className="text-xs text-muted-foreground">{state.hint}</p>
                     )}
-                    {state.status === "failed" && !!state.attempts?.length && (
+                    {(state.status === "failed" || state.status === "timed_out") && !!state.attempts?.length && (
                       <details className="mt-1">
                         <summary className="cursor-pointer text-xs text-muted-foreground">
                           {state.attempts.length} connection attempt(s) tried
@@ -667,7 +749,7 @@ export function SqlConnectionModal({
                       </details>
                     )}
                   </div>
-                  {state.status === "failed" && (
+                  {(state.status === "failed" || state.status === "timed_out") && (
                     <Button
                       type="button"
                       size="sm"
@@ -747,8 +829,9 @@ export function SqlConnectionModal({
 function StepIcon({ status }: { status: StepStatus }) {
   if (status === "running") return <Loader2 className="mt-0.5 h-4 w-4 animate-spin text-primary" />;
   if (status === "passed") return <CheckCircle2 className="mt-0.5 h-4 w-4 text-emerald-600" />;
-  if (status === "failed") return <TriangleAlert className="mt-0.5 h-4 w-4 text-destructive" />;
-  if (status === "stopped") return <CircleSlash className="mt-0.5 h-4 w-4 text-muted-foreground" />;
+  if (status === "failed" || status === "timed_out")
+    return <TriangleAlert className="mt-0.5 h-4 w-4 text-destructive" />;
+  if (status === "cancelled") return <CircleSlash className="mt-0.5 h-4 w-4 text-muted-foreground" />;
   return <Circle className="mt-0.5 h-4 w-4 text-muted-foreground" />;
 }
 
