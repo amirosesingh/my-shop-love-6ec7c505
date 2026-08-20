@@ -208,15 +208,15 @@ export function LocalDatabaseSettings() {
           value={status?.lastPullAt ? new Date(status.lastPullAt).toLocaleString() : "Never"}
         />
         <Stat
-          label="Status"
+          label="Sync activity"
           value={
             status?.connected
               ? status.phase && status.phase !== "idle"
                 ? status.phase === "pushing"
                   ? "Sending changes…"
                   : "Pulling catalogue…"
-                : "Connected"
-              : (status?.error ?? "Offline")
+                : "Idle"
+              : "Paused"
           }
         />
       </div>
