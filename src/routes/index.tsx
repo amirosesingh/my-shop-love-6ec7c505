@@ -81,9 +81,9 @@ import {
 } from "@/lib/coupons";
 import type { Campaign, VoucherView } from "@/lib/coupons";
 import type { Booking, CartLine, DiscountType, IntakeCharge, PaymentMethod, Sale } from "@/lib/pos-types";
-import { applyCombo, intakeTotals, newJobTag } from "@/lib/booking-charges";
+import { applyCombo, intakeTotals } from "@/lib/booking-charges";
 import type { Payment } from "@/lib/pos-types";
-import { TenderSplit, rememberBanks } from "@/components/pos/TenderSplit";
+import { TenderSplit } from "@/components/pos/TenderSplit";
 import { lineUnitDiscount, methodLabel, paymentsLabel, paymentsTotal, PAYMENT_LABELS, r2, validateTenders } from "@/lib/pos-types";
 import { activePaymentTypes, tenderIcon, usePaymentTypes } from "@/lib/payment-types";
 import { NO_SALE_REASON_MAX, NO_SALE_REASON_MIN, recordNoSale } from "@/lib/drawer-events";
