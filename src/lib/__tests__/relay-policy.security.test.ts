@@ -163,4 +163,67 @@ describe("relay authorisation", () => {
     expect(out.ok).toBe(false);
     if (!out.ok) expect(out.code).toBe("SCOPE_STALE");
   });
+
+  it("never lets a till write telemetry through the relay", async () => {
+    const out = await safeAuthorizeRelayOp(
+      { kind: "insert", table: "branch_telemetry", rows: [{ store_id: "STORE-B" }] },
+      cashier,
+    );
+    expect(out.ok).toBe(false);
+    if (!out.ok) expect(out.code).toBe("TABLE_FORBIDDEN");
+  });
+
+  it("keeps PIN tables out of the relay entirely", async () => {
+    for (const table of ["cashiers", "pin_attempts", "user_roles", "terminal_tokens"]) {
+      const out = await safeAuthorizeRelayOp(
+        { kind: "insert", table, rows: [{ id: "x" }] },
+        admin,
+      );
+      expect(out.ok).toBe(false);
+      if (!out.ok) expect(out.code).toBe("TABLE_FORBIDDEN");
+    }
+  });
+
+  it("writes the audit actor from the proven caller, not the payload", async () => {
+    const out = await safeAuthorizeRelayOp(
+      {
+        kind: "insert",
+        table: "audit_logs",
+        rows: [{ id: "a1", user_name: "Someone else", user_id: "u-9" }],
+      },
+      cashier,
+    );
+    expect(out.ok).toBe(true);
+    if (out.ok && out.op.kind === "insert") {
+      expect(out.op.rows[0]!["user_name"]).toBe("Amy");
+      expect(out.op.rows[0]!["user_id"]).toBe("u-1");
+    }
+  });
+
+  it("refuses a cross-branch operational write from an ordinary cashier", async () => {
+    const out = await safeAuthorizeRelayOp(
+      { kind: "update", table: "drawer_events", values: { note: "x" }, match: { store_id: "STORE-B" } },
+      cashier,
+    );
+    expect(out.ok).toBe(false);
+    if (!out.ok) expect(out.code).toBe("STORE_FORBIDDEN");
+  });
+
+  it("refuses a caller with no branch at all", async () => {
+    const out = await safeAuthorizeRelayOp(
+      { kind: "insert", table: "sales", rows: [{ id: "1" }] },
+      { ...cashier, storeId: null },
+    );
+    expect(out.ok).toBe(false);
+    if (!out.ok) expect(out.code).toBe("SCOPE_MISSING");
+  });
+
+  it("lets a supervisor read-write across branches without spoofing", async () => {
+    const out = await safeAuthorizeRelayOp(
+      { kind: "insert", table: "sales", rows: [{ id: "1", store_id: "STORE-C" }] },
+      admin,
+    );
+    expect(out.ok).toBe(true);
+    if (out.ok && out.op.kind === "insert") expect(out.op.rows[0]!["store_id"]).toBe("STORE-C");
+  });
 });

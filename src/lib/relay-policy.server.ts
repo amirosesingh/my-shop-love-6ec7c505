@@ -94,6 +94,9 @@ const ACTOR_COLUMNS: Record<string, ActorColumns> = {
   bookings: { name: "cashier" },
   held_orders: { name: "held_by" },
   purchase_orders: { name: "operator_name" },
+  // The audit trail carries no branch column, so the only thing worth
+  // pinning is who acted — never the name the till chose to send.
+  audit_logs: { id: "user_id", name: "user_name" },
 };
 
 /** Shift rows record who opened and, later, who closed. */
