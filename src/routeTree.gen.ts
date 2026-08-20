@@ -77,6 +77,7 @@ import { Route as SettingsPaymentRouteImport } from './routes/settings.payment'
 import { Route as SettingsPaymentMethodsRouteImport } from './routes/settings.payment-methods'
 import { Route as SettingsPrinterRouteImport } from './routes/settings.printer'
 import { Route as SettingsQrRouteImport } from './routes/settings.qr'
+import { Route as SettingsReceiptDesignerRouteImport } from './routes/settings.receipt-designer'
 import { Route as SettingsRegionRouteImport } from './routes/settings.region'
 import { Route as SettingsRulesRouteImport } from './routes/settings.rules'
 import { Route as SettingsSecurityAlertsRouteImport } from './routes/settings.security-alerts'
@@ -443,6 +444,11 @@ const SettingsQrRoute = SettingsQrRouteImport.update({
   path: '/settings/qr',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsReceiptDesignerRoute = SettingsReceiptDesignerRouteImport.update({
+  id: '/settings/receipt-designer',
+  path: '/settings/receipt-designer',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsRegionRoute = SettingsRegionRouteImport.update({
   id: '/settings/region',
   path: '/settings/region',
@@ -631,6 +637,7 @@ export interface FileRoutesByFullPath {
   '/settings/payment-methods': typeof SettingsPaymentMethodsRoute
   '/settings/printer': typeof SettingsPrinterRoute
   '/settings/qr': typeof SettingsQrRoute
+  '/settings/receipt-designer': typeof SettingsReceiptDesignerRoute
   '/settings/region': typeof SettingsRegionRoute
   '/settings/rules': typeof SettingsRulesRoute
   '/settings/security-alerts': typeof SettingsSecurityAlertsRoute
@@ -725,6 +732,7 @@ export interface FileRoutesByTo {
   '/settings/payment-methods': typeof SettingsPaymentMethodsRoute
   '/settings/printer': typeof SettingsPrinterRoute
   '/settings/qr': typeof SettingsQrRoute
+  '/settings/receipt-designer': typeof SettingsReceiptDesignerRoute
   '/settings/region': typeof SettingsRegionRoute
   '/settings/rules': typeof SettingsRulesRoute
   '/settings/security-alerts': typeof SettingsSecurityAlertsRoute
@@ -820,6 +828,7 @@ export interface FileRoutesById {
   '/settings/payment-methods': typeof SettingsPaymentMethodsRoute
   '/settings/printer': typeof SettingsPrinterRoute
   '/settings/qr': typeof SettingsQrRoute
+  '/settings/receipt-designer': typeof SettingsReceiptDesignerRoute
   '/settings/region': typeof SettingsRegionRoute
   '/settings/rules': typeof SettingsRulesRoute
   '/settings/security-alerts': typeof SettingsSecurityAlertsRoute
@@ -916,6 +925,7 @@ export interface FileRouteTypes {
     | '/settings/payment-methods'
     | '/settings/printer'
     | '/settings/qr'
+    | '/settings/receipt-designer'
     | '/settings/region'
     | '/settings/rules'
     | '/settings/security-alerts'
@@ -1010,6 +1020,7 @@ export interface FileRouteTypes {
     | '/settings/payment-methods'
     | '/settings/printer'
     | '/settings/qr'
+    | '/settings/receipt-designer'
     | '/settings/region'
     | '/settings/rules'
     | '/settings/security-alerts'
@@ -1104,6 +1115,7 @@ export interface FileRouteTypes {
     | '/settings/payment-methods'
     | '/settings/printer'
     | '/settings/qr'
+    | '/settings/receipt-designer'
     | '/settings/region'
     | '/settings/rules'
     | '/settings/security-alerts'
@@ -1199,6 +1211,7 @@ export interface RootRouteChildren {
   SettingsPaymentMethodsRoute: typeof SettingsPaymentMethodsRoute
   SettingsPrinterRoute: typeof SettingsPrinterRoute
   SettingsQrRoute: typeof SettingsQrRoute
+  SettingsReceiptDesignerRoute: typeof SettingsReceiptDesignerRoute
   SettingsRegionRoute: typeof SettingsRegionRoute
   SettingsRulesRoute: typeof SettingsRulesRoute
   SettingsSecurityAlertsRoute: typeof SettingsSecurityAlertsRoute
@@ -1703,6 +1716,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsQrRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/receipt-designer': {
+      id: '/settings/receipt-designer'
+      path: '/settings/receipt-designer'
+      fullPath: '/settings/receipt-designer'
+      preLoaderRoute: typeof SettingsReceiptDesignerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/region': {
       id: '/settings/region'
       path: '/settings/region'
@@ -1955,6 +1975,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsPaymentMethodsRoute: SettingsPaymentMethodsRoute,
   SettingsPrinterRoute: SettingsPrinterRoute,
   SettingsQrRoute: SettingsQrRoute,
+  SettingsReceiptDesignerRoute: SettingsReceiptDesignerRoute,
   SettingsRegionRoute: SettingsRegionRoute,
   SettingsRulesRoute: SettingsRulesRoute,
   SettingsSecurityAlertsRoute: SettingsSecurityAlertsRoute,
