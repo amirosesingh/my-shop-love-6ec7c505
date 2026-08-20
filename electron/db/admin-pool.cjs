@@ -12,6 +12,13 @@ const net = require("node:net");
 const CONNECT_TIMEOUT_MS = 15_000;
 const MAX_ROWS = 1000;
 const SOCKET_TIMEOUT_MS = 2_000;
+/**
+ * Hard ceiling for one wizard handshake. Whatever the driver does, the slot is
+ * released after this so a stuck attempt can never lock out the next one.
+ */
+const HANDSHAKE_DEADLINE_MS = 30_000;
+/** How long a fresh attempt waits for a cancelled predecessor to let go. */
+const RELEASE_WAIT_MS = 1_500;
 
 let pool = null;
 /** { server, database, auth, trustFallback } for the status badge. */
@@ -94,12 +101,25 @@ async function disconnect() {
   return { ok: true };
 }
 
-/** Aborts the running handshake (dialog closed, or operator pressed cancel). */
+/**
+ * Aborts the running handshake (dialog closed, or operator pressed cancel).
+ *
+ * Releasing `inFlight` here — not only in the original attempt's `finally` — is
+ * what makes the next attempt possible immediately. The abandoned run is
+ * flagged, so whatever it returns later is discarded instead of adopted.
+ */
 async function cancel() {
-  if (inFlight) inFlight.cancelled = true;
+  const run = inFlight;
+  if (run) {
+    run.cancelled = true;
+    if (run.timer) clearTimeout(run.timer);
+    inFlight = null;
+  }
   await disconnect();
   return { ok: true, cancelled: true };
 }
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Wizard step 1 — raw TCP reachability.
