@@ -1339,12 +1339,6 @@ function Register() {
 
   /* ── Operation deck helpers ─────────────────────────────────────── */
 
-  function openPayment(preset?: PaymentMethod) {
-    if (!lines.length) return;
-    if (preset) setMethod(preset);
-    setTendered(Math.max(0, totals.total).toFixed(2));
-    setPayOpen(true);
-  }
 
   /** Park the open ticket with everything on it, so reopening is lossless. */
   function holdOrder(silent = false) {
