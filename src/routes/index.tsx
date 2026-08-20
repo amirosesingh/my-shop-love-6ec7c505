@@ -33,7 +33,6 @@ import {
   Wrench,
   ChefHat,
 } from "lucide-react";
-import { toast } from "sonner";
 import { notifyError } from "@/lib/notify";
 import { commitLabel } from "@/lib/pos-db";
 import { AppShell } from "@/components/pos/AppShell";
