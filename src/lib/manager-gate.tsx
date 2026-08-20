@@ -60,7 +60,12 @@ export function ManagerGateProvider({ children }: { children: ReactNode }) {
                 ...(request.detail ? { detail: request.detail } : {}),
               },
             });
-            if (res.ok) return { ok: true, grantToken: res.grantToken };
+            if (res.ok) {
+              // An approval that could not be recorded is still allowed, but
+              // it is never allowed to pass unnoticed.
+              if (res.warning) toast.warning(res.warning);
+              return { ok: true, grantToken: res.grantToken };
+            }
           }
         } catch {
           /* fall through — an admin is still allowed through */
