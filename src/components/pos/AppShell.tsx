@@ -34,6 +34,7 @@ import { startSyncEngine } from "@/lib/sync-engine";
 import { hydrateBillSequence } from "@/lib/bill-number";
 import { startDatabaseModeWatch } from "@/lib/db-mode";
 import { DbConnectionModal } from "@/components/pos/DbConnectionModal";
+import { UpdateHeaderButton } from "@/components/pos/UpdateHeaderButton";
 import type { NavItem } from "@/components/pos/nav-config";
 import { setPrintStore, setPrintSettings, setServiceTerms } from "@/lib/pos-print";
 import { bookingRulesOf } from "@/lib/pos-types";
@@ -438,6 +439,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <LiveClock compact />
               </span>
               <MobileStatusSheet />
+              <UpdateHeaderButton />
               <Button
                 asChild
                 variant="ghost"
@@ -483,6 +485,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   {terminal.config.locationName || currentStore.name}
                 </Badge>
               )}
+              <UpdateHeaderButton />
               <Button
                 asChild
                 variant="ghost"

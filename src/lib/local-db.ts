@@ -245,6 +245,8 @@ export type PosBridge = {
   configureCloud: (cloud: CloudBridgeConfig) => Promise<{ ok: boolean; error?: string }>;
   test: (config: LocalDbConfig) => Promise<LocalDbTestResult>;
   getDatabaseConfig?: () => Promise<Partial<LocalDbConfig> | null>;
+  /** Forget the saved connection and drop every pool (escape hatch). */
+  resetConnection?: () => Promise<{ ok: boolean; error?: string | null }>;
   /** Read the single master schema file — passive, never executes anything. */
   readSchema?: () => Promise<{
     ok: boolean;
@@ -533,4 +535,27 @@ export async function loadLocalDbConfig(): Promise<LocalDbConfig> {
 export async function writeLocalDbConfig(config: LocalDbConfig) {
   if (typeof window === "undefined") return;
   cachedConfig = config;
+}
+
+/**
+ * Escape hatch for a stuck or unwanted connection: cancels anything in flight,
+ * closes both pools and forgets the sealed credentials. Safe to call at any
+ * time, including while the wizard is mid-run.
+ */
+export async function resetLocalDatabase(): Promise<{ ok: boolean; error?: string | null }> {
+  const bridge = localDb();
+  if (!bridge?.resetConnection) {
+    return { ok: false, error: "Only the Windows desktop app holds a local database connection." };
+  }
+  try {
+    const res = await withIpcTimeout(
+      bridge.resetConnection(),
+      15_000,
+      "The reset did not finish in time. Restart the till if the connection stays stuck.",
+    );
+    cachedConfig = defaultLocalDbConfig;
+    return res;
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
 }

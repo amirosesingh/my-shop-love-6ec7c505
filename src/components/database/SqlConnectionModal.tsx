@@ -9,6 +9,7 @@ import {
   CircleSlash,
   Plug,
   RotateCw,
+  Eraser,
   TriangleAlert,
   Zap,
 } from "lucide-react";
@@ -38,6 +39,7 @@ import {
   scanLocalInstances,
   testDirectConnection,
   verifyLocalWrite,
+  resetLocalDatabase,
   type LocalDbConfig,
   type LocalDbTestResult,
 } from "@/lib/local-db";
@@ -133,6 +135,7 @@ export function SqlConnectionModal({
   const [hostname, setHostname] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [running, setRunning] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [steps, setSteps] = useState<Record<StepKey, StepState>>(blankSteps);
   const [databases, setDatabases] = useState<SqlDatabase[]>([]);
   /**
@@ -170,6 +173,25 @@ export function SqlConnectionModal({
       }
       return next;
     });
+  };
+
+  /**
+   * Full clean slate: cancels anything still running in the shell, closes both
+   * pools and forgets the saved credentials. This is the way out of a
+   * connection that refuses to finish or a machine that was set up wrongly.
+   */
+  const resetConnection = async () => {
+    setResetting(true);
+    abandonRun();
+    try {
+      const res = await resetLocalDatabase();
+      setSteps(blankSteps());
+      setDatabases([]);
+      if (res.ok) toast.success("Connection reset. Enter the server details and run the checks again.");
+      else toast.error(res.error ?? "Could not reset the connection.");
+    } finally {
+      setResetting(false);
+    }
   };
 
   const scan = useCallback(async (silent = false) => {
@@ -686,16 +708,32 @@ export function SqlConnectionModal({
         </div>
 
         <DialogFooter className="gap-2 sm:justify-between">
-          {running ? (
-            <Button type="button" variant="outline" onClick={stopRun}>
-              <CircleSlash className="mr-2 h-4 w-4" />
-              Stop
+          <div className="flex flex-wrap gap-2">
+            {running ? (
+              <Button type="button" variant="outline" onClick={stopRun}>
+                <CircleSlash className="mr-2 h-4 w-4" />
+                Stop
+              </Button>
+            ) : (
+              <Button type="button" variant="outline" onClick={() => void advance("credentials")}>
+                Run checks
+              </Button>
+            )}
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={resetting}
+              onClick={() => void resetConnection()}
+              title="Cancel anything running, close the pools and forget the saved connection."
+            >
+              {resetting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Eraser className="mr-2 h-4 w-4" />
+              )}
+              Reset connection
             </Button>
-          ) : (
-            <Button type="button" variant="outline" onClick={() => void advance("credentials")}>
-              Run checks
-            </Button>
-          )}
+          </div>
           <Button type="button" disabled={running || !catalogReady} onClick={() => void finish()}>
             {catalogReady ? <Lock className="mr-2 h-4 w-4" /> : <Plug className="mr-2 h-4 w-4" />}
             Lock &amp; save
