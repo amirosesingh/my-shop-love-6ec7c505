@@ -19,7 +19,7 @@ import { isoDaysFromNow, useBookingIntake } from "@/lib/register/use-booking-int
 import { cartTotals, money, usePos } from "@/lib/pos-store";
 import { applyCombo, intakeTotals, newJobTag } from "@/lib/booking-charges";
 import { bookingRulesOf, lineUnitDiscount, paymentsLabel, r2, validateTenders } from "@/lib/pos-types";
-import type { Store, CartLine, Payment, PaymentMethod, Sale, Booking, Member, BookingPaymentTiming } from "@/lib/pos-types";
+import type { Store, CartLine, Payment, PaymentMethod, Sale, Booking, Member } from "@/lib/pos-types";
 import type { CartCoupon } from "@/lib/register/use-cart";
 import type { NewBooking } from "@/lib/pos-store";
 
