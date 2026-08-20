@@ -9,6 +9,7 @@ import {
   CircleSlash,
   Plug,
   RotateCw,
+  Eraser,
   TriangleAlert,
   Zap,
 } from "lucide-react";
@@ -38,6 +39,7 @@ import {
   scanLocalInstances,
   testDirectConnection,
   verifyLocalWrite,
+  resetLocalDatabase,
   type LocalDbConfig,
   type LocalDbTestResult,
 } from "@/lib/local-db";
