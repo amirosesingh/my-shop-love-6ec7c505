@@ -400,8 +400,8 @@ export function SqlConnectionModal({
   /** Runs `key` and, unless retrying a single step, everything after it. */
   const advance = async (from: StepKey, only = false) => {
     if (running) return false;
-    const token = ++runToken.current;
-    const live = () => runToken.current === token;
+    const token = guard.start();
+    const live = () => guard.isLive(token);
     setRunning(true);
     try {
       const order = STEPS.map((s) => s.key);
