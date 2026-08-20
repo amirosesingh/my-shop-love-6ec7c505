@@ -470,7 +470,7 @@ export function SyncHub() {
             ))}
           </CardContent>
         </Card>
-      )}
+      }
 
       {(failedQueue.length > 0 || localQueue.length > 0) && (
         <Card>
