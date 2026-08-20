@@ -681,23 +681,6 @@ function Register() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [payOpen, method, transferRef, displayKey]);
 
-  const wa = state.settings.whatsapp;
-
-  /** Sends the finished bill to the customer's WhatsApp. */
-  async function sendSaleOnWhatsApp(sale: Sale, to: string) {
-    setWaSending(true);
-    const buyer = state.members.find((m) => m.id === sale.memberId) ?? null;
-    const res = await sendBillOnWhatsApp({
-      cfg: wa,
-      to,
-      body: buildSaleMessage(sale, displayBase.companyName, wa),
-      reference: sale.receiptNo,
-      member: buyer,
-    });
-    setWaSending(false);
-    if (res.ok) toast.success(`Bill ${sale.receiptNo} sent on WhatsApp`);
-    else toast.error("WhatsApp send failed", { description: res.error });
-  }
 
   const serviceTypes = (state.settings.integrations.serviceTypes ?? []).filter((s2) => s2.active && s2.name.trim());
   const pickedService = serviceTypes.find((s2) => s2.id === serviceId) ?? null;
