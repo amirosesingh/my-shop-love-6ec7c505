@@ -193,22 +193,17 @@ function Register() {
   /** Code that failed to resolve, shown in the search dialog. */
   const [unknownCode, setUnknownCode] = useState<string | null>(null);
   /** Bill number reserved the moment this ticket started. */
-  const [billNo, setBillNo] = useState<string | null>(null);
   /** Cashier-adjustable column widths, remembered on this device. */
   const [billWidth, setBillWidth] = usePanelWidth("pos.register.billWidth", 420);
   const [deckWidth, setDeckWidth] = usePanelWidth("pos.register.deckWidth", 288);
   const [category, setCategory] = useState("All");
-  const [lines, setLines] = useState<CartLine[]>([]);
-  const [cartDiscount, setCartDiscount] = useState(0);
-  const [cartDiscountType, setCartDiscountType] = useState<DiscountType>("amount");
   /** Calculator-style discount pad: index of the cart line, or "bill". */
   const [padTarget, setPadTarget] = useState<number | "bill" | null>(null);
   const [exchangeOpen, setExchangeOpen] = useState(false);
   const [billQuery, setBillQuery] = useState("");
   const [billHit, setBillHit] = useState<Sale | null>(null);
   const [picks, setPicks] = useState<Record<number, number>>({});
-  const [exchangeRef, setExchangeRef] = useState<string | null>(null);
-  const [memberId, setMemberId] = useState<string | null>(null);
+
   const [payOpen, setPayOpen] = useState(false);
   /** True while a sale / booking is being stored — blocks a second click. */
   const [saving, setSaving] = useState(false);
