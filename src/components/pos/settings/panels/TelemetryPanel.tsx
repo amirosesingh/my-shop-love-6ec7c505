@@ -20,6 +20,9 @@ import { useAuth } from "@/lib/pos-auth";
 import {
   CONNECTION_LABEL,
   ENGINE_LABEL,
+  HEALTH_LABEL,
+  deviceLabel,
+  health,
   isStale,
   listTelemetry,
   type TelemetryRow,
@@ -35,11 +38,13 @@ import {
 const when = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "—";
 
+/** Colour follows the heartbeat, not the last status a till managed to write. */
 function statusTone(row: TelemetryRow) {
-  if (isStale(row)) return "bg-muted text-muted-foreground";
-  if (row.connection_status === "online") return "bg-emerald-500/15 text-emerald-600";
-  if (row.connection_status === "local") return "bg-amber-500/15 text-amber-600";
-  return "bg-destructive/15 text-destructive";
+  const state = health(row);
+  if (state === "unknown") return "bg-muted text-muted-foreground";
+  if (state === "offline") return "bg-destructive/15 text-destructive";
+  if (state === "stale") return "bg-amber-500/15 text-amber-600";
+  return "bg-emerald-500/15 text-emerald-600";
 }
 
 export function TelemetryPanel() {
@@ -102,8 +107,8 @@ export function TelemetryPanel() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Terminal</TableHead>
-                <TableHead>Branch</TableHead>
+                <TableHead>Device</TableHead>
+                <TableHead>Location</TableHead>
                 <TableHead>Signed in</TableHead>
                 <TableHead>Connection</TableHead>
                 <TableHead>Storage</TableHead>
@@ -130,12 +135,18 @@ export function TelemetryPanel() {
                 rows.map((r) => (
                   <TableRow key={r.terminal_id}>
                     <TableCell className="font-medium">
-                      {r.terminal_name || r.terminal_id.slice(0, 8)}
+                      {deviceLabel(r)}
                       <div className="text-[11px] text-muted-foreground">
-                        {r.app_version ? `v${r.app_version}` : ""} {r.platform ?? ""}
+                        {r.device_type === "mobile" ? "Phone / tablet" : "Windows till"}
+                        {r.app_version ? ` · v${r.app_version}` : ""}
                       </div>
                     </TableCell>
-                    <TableCell>{r.store_id ?? "—"}</TableCell>
+                    <TableCell>
+                      {r.location_name || r.store_id || "—"}
+                      {r.location_name && r.store_id ? (
+                        <div className="text-[11px] text-muted-foreground">{r.store_id}</div>
+                      ) : null}
+                    </TableCell>
                     <TableCell>
                       {r.staff_name ?? "—"}
                       {r.staff_role ? (
@@ -144,9 +155,13 @@ export function TelemetryPanel() {
                     </TableCell>
                     <TableCell>
                       <Badge className={statusTone(r)} variant="secondary">
-                        {isStale(r) ? "Not reporting" : CONNECTION_LABEL[r.connection_status] ?? r.connection_status}
+                        {HEALTH_LABEL[health(r)]}
                       </Badge>
-                      <div className="text-[11px] text-muted-foreground">{r.db_mode}</div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {isStale(r)
+                          ? `last said ${CONNECTION_LABEL[r.connection_status] ?? r.connection_status}`
+                          : `${CONNECTION_LABEL[r.connection_status] ?? r.connection_status} · ${r.db_mode}`}
+                      </div>
                     </TableCell>
                     <TableCell>{ENGINE_LABEL[r.storage_engine] ?? r.storage_engine}</TableCell>
                     <TableCell className="text-right">
