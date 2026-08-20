@@ -1420,6 +1420,141 @@ export type Database = {
         }
         Relationships: []
       }
+      pos_store_settings: {
+        Row: {
+          allow_discount_stacking: boolean | null
+          allow_multiple_shifts_per_terminal: boolean | null
+          allow_tax_exemption: boolean | null
+          auto_lock_timeout_seconds: number | null
+          block_shift_close_on_hold: boolean | null
+          enable_blind_cash_count: boolean | null
+          enable_cashier_x_report: boolean | null
+          enable_manager_pin_audit_log: boolean | null
+          max_cart_discount_amount: number | null
+          max_cashier_discount_percent: number | null
+          max_drawer_cash_limit: number | null
+          max_refund_days_limit: number | null
+          prevent_below_cost_sale: boolean | null
+          prevent_negative_stock_sale: boolean | null
+          require_counted_cash_on_close: boolean | null
+          require_daily_sales_for_shift_close: boolean | null
+          require_manager_pin_for_cash_drawer_open: boolean | null
+          require_manager_pin_for_refund: boolean | null
+          require_manager_pin_on_variance: boolean | null
+          require_opening_float_count: boolean | null
+          require_pin_edit_tenders: boolean | null
+          require_pin_manual_discount: boolean | null
+          require_pin_price_override: boolean | null
+          require_pin_reduce_qty: boolean | null
+          require_pin_shift_close: boolean | null
+          require_pin_stock_adjustment: boolean | null
+          require_pin_terminal_reset: boolean | null
+          require_pin_void_cart: boolean | null
+          require_pin_void_line: boolean | null
+          require_reason_for_payout: boolean | null
+          require_reason_for_price_override: boolean | null
+          require_receipt_for_refund: boolean | null
+          row_version: number
+          show_expected_totals_at_close: boolean | null
+          show_itemized_tender_breakdown: boolean | null
+          show_live_variance_at_close: boolean | null
+          show_opening_float_at_close: boolean | null
+          store_id: string
+          track_item_voids: boolean | null
+          updated_at: string
+          updated_by: string | null
+          variance_pin_threshold: number | null
+        }
+        Insert: {
+          allow_discount_stacking?: boolean | null
+          allow_multiple_shifts_per_terminal?: boolean | null
+          allow_tax_exemption?: boolean | null
+          auto_lock_timeout_seconds?: number | null
+          block_shift_close_on_hold?: boolean | null
+          enable_blind_cash_count?: boolean | null
+          enable_cashier_x_report?: boolean | null
+          enable_manager_pin_audit_log?: boolean | null
+          max_cart_discount_amount?: number | null
+          max_cashier_discount_percent?: number | null
+          max_drawer_cash_limit?: number | null
+          max_refund_days_limit?: number | null
+          prevent_below_cost_sale?: boolean | null
+          prevent_negative_stock_sale?: boolean | null
+          require_counted_cash_on_close?: boolean | null
+          require_daily_sales_for_shift_close?: boolean | null
+          require_manager_pin_for_cash_drawer_open?: boolean | null
+          require_manager_pin_for_refund?: boolean | null
+          require_manager_pin_on_variance?: boolean | null
+          require_opening_float_count?: boolean | null
+          require_pin_edit_tenders?: boolean | null
+          require_pin_manual_discount?: boolean | null
+          require_pin_price_override?: boolean | null
+          require_pin_reduce_qty?: boolean | null
+          require_pin_shift_close?: boolean | null
+          require_pin_stock_adjustment?: boolean | null
+          require_pin_terminal_reset?: boolean | null
+          require_pin_void_cart?: boolean | null
+          require_pin_void_line?: boolean | null
+          require_reason_for_payout?: boolean | null
+          require_reason_for_price_override?: boolean | null
+          require_receipt_for_refund?: boolean | null
+          row_version?: number
+          show_expected_totals_at_close?: boolean | null
+          show_itemized_tender_breakdown?: boolean | null
+          show_live_variance_at_close?: boolean | null
+          show_opening_float_at_close?: boolean | null
+          store_id: string
+          track_item_voids?: boolean | null
+          updated_at?: string
+          updated_by?: string | null
+          variance_pin_threshold?: number | null
+        }
+        Update: {
+          allow_discount_stacking?: boolean | null
+          allow_multiple_shifts_per_terminal?: boolean | null
+          allow_tax_exemption?: boolean | null
+          auto_lock_timeout_seconds?: number | null
+          block_shift_close_on_hold?: boolean | null
+          enable_blind_cash_count?: boolean | null
+          enable_cashier_x_report?: boolean | null
+          enable_manager_pin_audit_log?: boolean | null
+          max_cart_discount_amount?: number | null
+          max_cashier_discount_percent?: number | null
+          max_drawer_cash_limit?: number | null
+          max_refund_days_limit?: number | null
+          prevent_below_cost_sale?: boolean | null
+          prevent_negative_stock_sale?: boolean | null
+          require_counted_cash_on_close?: boolean | null
+          require_daily_sales_for_shift_close?: boolean | null
+          require_manager_pin_for_cash_drawer_open?: boolean | null
+          require_manager_pin_for_refund?: boolean | null
+          require_manager_pin_on_variance?: boolean | null
+          require_opening_float_count?: boolean | null
+          require_pin_edit_tenders?: boolean | null
+          require_pin_manual_discount?: boolean | null
+          require_pin_price_override?: boolean | null
+          require_pin_reduce_qty?: boolean | null
+          require_pin_shift_close?: boolean | null
+          require_pin_stock_adjustment?: boolean | null
+          require_pin_terminal_reset?: boolean | null
+          require_pin_void_cart?: boolean | null
+          require_pin_void_line?: boolean | null
+          require_reason_for_payout?: boolean | null
+          require_reason_for_price_override?: boolean | null
+          require_receipt_for_refund?: boolean | null
+          row_version?: number
+          show_expected_totals_at_close?: boolean | null
+          show_itemized_tender_breakdown?: boolean | null
+          show_live_variance_at_close?: boolean | null
+          show_opening_float_at_close?: boolean | null
+          store_id?: string
+          track_item_voids?: boolean | null
+          updated_at?: string
+          updated_by?: string | null
+          variance_pin_threshold?: number | null
+        }
+        Relationships: []
+      }
       product_barcodes: {
         Row: {
           barcode: string
@@ -3137,6 +3272,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      held_orders_open_count: { Args: { _store_id?: string }; Returns: number }
       is_app_supervisor: { Args: never; Returns: boolean }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
       is_staff_now: { Args: never; Returns: boolean }
@@ -3184,6 +3320,20 @@ export type Database = {
           username: string
         }[]
       }
+      log_manager_override: {
+        Args: {
+          _action: string
+          _approved_by?: string
+          _approved_role?: string
+          _detail?: string
+          _outcome?: string
+          _requested_by?: string
+          _rule_key?: string
+          _store_id?: string
+          _terminal_id?: string
+        }
+        Returns: string
+      }
       member_join: {
         Args: { _email?: string; _full_name: string; _phone: string }
         Returns: string
@@ -3205,6 +3355,13 @@ export type Database = {
       }
       pin_throttle_reset: { Args: { _key: string }; Returns: undefined }
       pin_throttle_status: { Args: { _key: string }; Returns: Json }
+      pos_rules_defaults: { Args: never; Returns: Json }
+      pos_rules_get: { Args: { _store_id?: string }; Returns: Json }
+      pos_rules_row: { Args: { _store_id: string }; Returns: Json }
+      pos_rules_save: {
+        Args: { _expected_version?: number; _patch: Json; _store_id: string }
+        Returns: Json
+      }
       schema_inventory: { Args: never; Returns: Json }
       security_report_findings: {
         Args: { _deployment_ref: string; _findings: Json; _source: string }
@@ -3453,6 +3610,23 @@ export type Database = {
           permissions: Json
           store_id: string
           username: string
+        }[]
+      }
+      verify_manager_pin: {
+        Args: {
+          p_action?: string
+          p_detail?: string
+          p_pin: string
+          p_requested_by?: string
+          p_rule_key?: string
+          p_store_id?: string
+          p_terminal_id?: string
+          p_user_id: string
+        }
+        Returns: {
+          full_name: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
         }[]
       }
       verify_terminal_pin: {

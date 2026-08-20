@@ -80,14 +80,32 @@ export async function rpc<T>(name: string, body: unknown, accessToken?: string):
   return (await res.json()) as T;
 }
 
-/** Effective rule set for a branch (store row layered over the global row). */
-export async function loadRules(storeId: string): Promise<PosRules> {
+/** Where an answer came from, so the UI can say when rules are not live. */
+export type RulesSource = "database" | "defaults";
+
+export type RulesResult = { rules: PosRules; source: RulesSource; error?: string };
+
+/**
+ * Effective rule set for a branch (store row layered over the global row).
+ *
+ * A failure still returns the strict built-in defaults so the till keeps
+ * working, but it is reported rather than hidden.
+ */
+export async function loadRulesResult(storeId: string): Promise<RulesResult> {
   try {
     const json = await rpc<unknown>("pos_rules_get", { _store_id: storeId || "" });
-    return normalizeRules(json);
-  } catch {
-    return { ...DEFAULT_POS_RULES };
+    return { rules: normalizeRules(json), source: "database" };
+  } catch (e) {
+    return {
+      rules: { ...DEFAULT_POS_RULES },
+      source: "defaults",
+      error: (e as Error).message.slice(0, 300),
+    };
   }
+}
+
+export async function loadRules(storeId: string): Promise<PosRules> {
+  return (await loadRulesResult(storeId)).rules;
 }
 
 export async function saveRules(
@@ -163,7 +181,7 @@ export async function logOverride(input: {
   storeId?: string | null;
   terminalId?: string | null;
   detail?: string | null;
-}) {
+}): Promise<{ ok: boolean; error?: string }> {
   try {
     await rpc("log_manager_override", {
       _action: input.action,
@@ -175,16 +193,29 @@ export async function logOverride(input: {
       _terminal_id: input.terminalId ?? null,
       _detail: input.detail ?? null,
     });
-  } catch {
-    /* never block the till on an audit write */
+    return { ok: true };
+  } catch (e) {
+    // The till is never blocked on an audit write, but the caller is told so
+    // the approval can be shown as unrecorded instead of silently lost.
+    return { ok: false, error: (e as Error).message.slice(0, 300) };
+  }
+}
+
+/**
+ * Open held tickets for a branch. A failure is reported, never counted as
+ * zero — closing a shift must not slip through because the count was lost.
+ */
+export async function heldOrderCountResult(
+  storeId: string,
+): Promise<{ ok: boolean; count: number; error?: string }> {
+  try {
+    const n = await rpc<unknown>("held_orders_open_count", { _store_id: storeId || "" });
+    return { ok: true, count: Number(n) || 0 };
+  } catch (e) {
+    return { ok: false, count: 0, error: (e as Error).message.slice(0, 300) };
   }
 }
 
 export async function heldOrderCount(storeId: string): Promise<number> {
-  try {
-    const n = await rpc<unknown>("held_orders_open_count", { _store_id: storeId || "" });
-    return Number(n) || 0;
-  } catch {
-    return 0;
-  }
+  return (await heldOrderCountResult(storeId)).count;
 }
