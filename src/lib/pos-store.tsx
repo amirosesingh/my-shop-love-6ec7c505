@@ -793,10 +793,20 @@ export function PosProvider({ children }: { children: ReactNode }) {
       } else {
         // Offline, local SQL or queued: nothing opens until it is stored.
         target = await db.commitShift(shift);
-        if (target === "cloud" && (await db.shiftExists(shift.id)) === "no") {
-          throw new Error(
-            "The shift was not found in the database after saving. Nothing was opened — try again, or check this account's branch and role.",
-          );
+        if (target === "cloud") {
+          const seen = await db.shiftExists(shift.id);
+          if (seen === "no") {
+            throw new Error(
+              "The shift was not found in the database after saving. Nothing was opened — try again, or check this account's branch and role.",
+            );
+          }
+          // "unknown" means the check itself failed — never read that as "no
+          // shift". The shift opens, and the failed check is recorded.
+          if (seen === "unknown") {
+            toast.warning(
+              "The shift opened, but it could not be confirmed centrally. Check Data Sync & Audit if it looks wrong.",
+            );
+          }
         }
       }
       logger.log("sale_event", "Shift opened", "shifts", {

@@ -16,6 +16,8 @@ import {
 } from "./db-mode";
 import { notifyError, showNotification } from "./notify";
 import { logSync } from "./sync-log";
+import { recordDiagnostic, reasonCode } from "./diagnostics";
+import { recordUnappliedStock, clearUnappliedStock } from "./stock-recovery";
 import { canRelay, relayStores } from "./sync-relay";
 import { isOperationalTable } from "./pos-auth-route";
 import { keyset, nextCursor, PAGE_SIZE, type Cursor, type Page } from "./keyset";
@@ -62,36 +64,48 @@ export function dbError(context: string, error: unknown) {
 
 const num = (v: unknown, fallback = 0) => (v == null ? fallback : Number(v));
 
+/** Guard verdict: blocked with a reason, clear to delete, or not verifiable. */
+export type DeleteGuardVerdict =
+  | { state: "blocked"; code: string; reason: string }
+  | { state: "clear" }
+  | { state: "unknown" };
+
 /**
- * Which records still point at a product. Uses the database guard routine and
- * falls back to direct counts when that routine has not been installed yet.
+ * Which records still point at a product.
+ *
+ * The database routine is the guard. When it cannot be reached the answer is
+ * "unknown" and the caller must refuse the delete — guessing from constraint
+ * messages is only ever used to word a refusal, never to allow one.
  */
-async function productDeleteBlock(id: string): Promise<{ code: string; reason: string } | null> {
+export async function productDeleteBlock(id: string): Promise<DeleteGuardVerdict> {
   try {
     const rpc = (await (
       supabase as unknown as {
-        rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
+        rpc: (
+          fn: string,
+          args: Record<string, unknown>,
+        ) => Promise<{ data: unknown; error: unknown }>;
       }
     ).rpc("product_delete_guard", { _product_id: id })) as { data: unknown; error: unknown };
-    if (!rpc.error && rpc.data) return usageBlock(rpc.data as ProductUsage);
-  } catch {
-    /* fall through to the direct counts below */
-  }
-  try {
-    const probe = async (table: string, column: string) => {
-      const res = await supabase.from(table as never).select("id").eq(column, id).limit(1);
-      return !res.error && Array.isArray(res.data) && res.data.length > 0;
-    };
-    const [sales, purchases, transfers, adjustments, promotions] = await Promise.all([
-      probe("sale_items", "product_id"),
-      probe("purchase_order_items", "product_id"),
-      probe("stock_transfer_items", "product_id"),
-      probe("stock_adjustments", "product_id"),
-      probe("promotions", "foc_product_id"),
-    ]);
-    return usageBlock({ sales, purchases, transfers, adjustments, promotions });
-  } catch {
-    return null;
+    if (rpc.error || !rpc.data) {
+      recordDiagnostic({
+        kind: "backend_object_missing",
+        entity: "products",
+        code: reasonCode(rpc.error ?? "no answer"),
+        recordId: id,
+      });
+      return { state: "unknown" };
+    }
+    const block = usageBlock(rpc.data as ProductUsage);
+    return block ? { state: "blocked", ...block } : { state: "clear" };
+  } catch (e) {
+    recordDiagnostic({
+      kind: "backend_object_missing",
+      entity: "products",
+      code: reasonCode(e),
+      recordId: id,
+    });
+    return { state: "unknown" };
   }
 }
 
@@ -1238,9 +1252,17 @@ export async function mirrorToLocal(context: string, ops: SyncOp[]) {
   for (const op of ops) {
     try {
       const res = await bridge.write(context, op);
-      if (!res.ok) logSync("push", op.table, false, res.error ?? `${context}: local copy failed`);
+      if (!res.ok) {
+        logSync("push", op.table, false, res.error ?? `${context}: local copy failed`);
+        recordDiagnostic({
+          kind: "local_mirror_failed",
+          entity: op.table,
+          code: reasonCode(res.error ?? "local copy failed"),
+        });
+      }
     } catch (e) {
       logSync("push", op.table, false, `${context}: ${(e as Error)?.message ?? String(e)}`);
+      recordDiagnostic({ kind: "local_mirror_failed", entity: op.table, code: reasonCode(e) });
     }
   }
 }
@@ -1298,9 +1320,30 @@ async function applyStockDeltas(deltas: StockDelta[]) {
         _store_id: d.storeId,
         _delta: d.delta,
       });
-      if (error) logSync("push", "products", false, `Stock delta: ${error.message}`);
+      if (error) {
+        logSync("push", "products", false, `Stock delta: ${error.message}`);
+        recordUnappliedStock({ ...d, reason: error.message });
+        recordDiagnostic({
+          kind: "stock_delta_failed",
+          entity: "products",
+          code: reasonCode(error),
+          recordId: d.movementId,
+          storeId: d.storeId,
+        });
+      } else {
+        // A retry that finally landed must not stay on the recovery list.
+        clearUnappliedStock(d.movementId);
+      }
     } catch (e) {
       logSync("push", "products", false, `Stock delta: ${(e as Error)?.message ?? String(e)}`);
+      recordUnappliedStock({ ...d, reason: (e as Error)?.message ?? String(e) });
+      recordDiagnostic({
+        kind: "stock_delta_failed",
+        entity: "products",
+        code: reasonCode(e),
+        recordId: d.movementId,
+        storeId: d.storeId,
+      });
     }
   }
 }
@@ -1429,8 +1472,12 @@ export const db = {
       return;
     }
     try {
-      const block = await productDeleteBlock(id);
-      if (block) throw new Error(`${block.code}: ${block.reason}`);
+      const guard = await productDeleteBlock(id);
+      if (guard.state === "blocked") throw new Error(`${guard.code}: ${guard.reason}`);
+      if (guard.state === "unknown")
+        throw new Error(
+          "PRODUCT_DELETE_UNVERIFIED: we could not confirm this product is safe to remove — try again",
+        );
       await runOpLive("Deleting product", op);
     } catch (e) {
       const message = (e as { message?: string })?.message ?? String(e);
@@ -1749,9 +1796,23 @@ export const db = {
         .select("id")
         .eq("client_transaction_id", clientTxnId)
         .limit(1);
-      if (res.error) return "unknown";
+      if (res.error) {
+        recordDiagnostic({
+          kind: "sale_idempotency_unavailable",
+          entity: "sales",
+          code: reasonCode(res.error),
+          recordId: clientTxnId,
+        });
+        return "unknown";
+      }
       return Array.isArray(res.data) && res.data.length > 0 ? "yes" : "no";
-    } catch {
+    } catch (e) {
+      recordDiagnostic({
+        kind: "sale_idempotency_unavailable",
+        entity: "sales",
+        code: reasonCode(e),
+        recordId: clientTxnId,
+      });
       return "unknown";
     }
   },
@@ -1775,9 +1836,23 @@ export const db = {
         .eq("id", id)
         .limit(1);
       // A refused or failed read tells us nothing about the write itself.
-      if (res.error) return "unknown";
+      if (res.error) {
+        recordDiagnostic({
+          kind: "shift_lookup_unavailable",
+          entity: "shifts",
+          code: reasonCode(res.error),
+          recordId: id,
+        });
+        return "unknown";
+      }
       return Array.isArray(res.data) && res.data.length > 0 ? "yes" : "no";
-    } catch {
+    } catch (e) {
+      recordDiagnostic({
+        kind: "shift_lookup_unavailable",
+        entity: "shifts",
+        code: reasonCode(e),
+        recordId: id,
+      });
       return "unknown";
     }
   },

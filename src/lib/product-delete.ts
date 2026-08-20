@@ -12,6 +12,9 @@ export type BlockedDelete = { id: string; name: string; reason: string };
 /** Conflict code returned when an item is on a past bill. */
 export const PRODUCT_HAS_SALES_HISTORY = "PRODUCT_HAS_SALES_HISTORY";
 
+/** Returned when the safety check itself could not be completed. */
+export const PRODUCT_DELETE_UNVERIFIED = "PRODUCT_DELETE_UNVERIFIED";
+
 /** Which records still point at a product, as reported by the database guard. */
 export type ProductUsage = {
   sales?: boolean;
@@ -64,6 +67,8 @@ export function isSalesHistoryBlock(message: string): boolean {
 
 /** Plain-language reason for a failed delete. */
 export function describeDeleteBlock(message: string): string {
+  if (message.includes(PRODUCT_DELETE_UNVERIFIED))
+    return "we could not confirm this product is safe to remove — try again";
   if (!isLinkedRecordError(message)) return message;
   const hit = REASONS.find((r) => r.match.test(message));
   return hit ? hit.reason : "other records still point at it";
