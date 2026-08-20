@@ -103,7 +103,7 @@ import { logSystemAction } from "@/lib/system-audit";
 import { openCustomerDisplay, publishDisplay, toDisplayLine, type DisplaySnapshot } from "@/lib/customer-display";
 import { MemberHistoryDialog } from "@/components/pos/MemberHistoryDialog";
 
-const isoDaysFromNow = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+
 
 export const Route = createFileRoute("/")({
   validateSearch: (
