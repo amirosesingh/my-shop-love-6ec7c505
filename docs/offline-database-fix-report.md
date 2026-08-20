@@ -94,3 +94,49 @@ The Electron main process cannot be launched in this environment, so
 `pos:connect`, the boot reconnect and `BACKUP DATABASE` were verified by unit
 tests against a stubbed bridge plus code tracing. The one step to run on a real
 Windows till: connect, restart the app, confirm it reconnects without the wizard.
+
+---
+
+# Connection handshake and write verification (1.3.11)
+
+## Why the wizard hung on "Auth handshake"
+
+`sqladmin:connect` was the only administration channel without a deadline,
+while behind it the connection ladder could walk up to 30 driver / route /
+encryption combinations at 15 s each. The renderer awaited that with no
+timeout and no cancellation, so the step could spin for many minutes. Closing
+and reopening the dialog reset the step list but not the in-flight promise,
+which then wrote its result into the fresh state.
+
+## What changed
+
+- Every attempt is bounded by our own clock (drivers do not reliably honour
+  their own timeout): 8 s per attempt, 25 s for the whole ladder.
+- Half-open pools are closed after every failed attempt, and the instance-name
+  route is skipped once a port has been proven, which cuts the ladder down
+  sharply in the common case.
+- New `sqladmin:cancel` channel. The dialog cancels on close, and a **Stop**
+  button cancels on demand — the running step is marked stopped, not failed.
+- Every `sqladmin:*` handler is wrapped in a deadline, so a stuck driver comes
+  back as a timeout result the operator can read.
+- Results are guarded by a run token (`src/lib/run-token.ts`), so a promise
+  from an abandoned run can never revive a spinner.
+
+## Write verification
+
+Signing in is not the same as being able to write, so a sixth step proves it
+on the till's own pool: `BEGIN TRAN` → insert a probe row into
+`dbo.pos_connection_health` → read it back → `ROLLBACK`. No real data is
+touched and nothing is left behind. A login with read-but-not-write rights now
+fails here instead of reporting a healthy connection.
+
+## Tests
+
+`src/lib/__tests__/local-db-connection.test.ts` gained cases for the missing
+bridge, a successful write probe, a probe that never answers (timeout, not a
+hang), a read-only login, and the three stale-run-guard behaviours.
+
+## Still to confirm on a real till
+
+Windows Integrated and SQL login, the SQL Server Browser service stopped, and
+a read-only login failing cleanly at the write step.

@@ -6,6 +6,7 @@ import {
   Database,
   Loader2,
   Lock,
+  CircleSlash,
   Plug,
   RotateCw,
   TriangleAlert,
@@ -41,6 +42,7 @@ import {
   type LocalDbTestResult,
 } from "@/lib/local-db";
 import { DESKTOP_ONLY, sqlAdmin, type SqlAdminFailure, type SqlDatabase } from "@/lib/sql-admin";
+import { createRunGuard } from "@/lib/run-token";
 import { supabaseConfig } from "@/lib/external-supabase-config";
 
 const DEFAULT_DATABASE = "POS_Master_2025";
@@ -62,7 +64,7 @@ const STEPS = [
 ] as const;
 
 type StepKey = (typeof STEPS)[number]["key"];
-type StepStatus = "pending" | "running" | "passed" | "failed";
+type StepStatus = "pending" | "running" | "passed" | "failed" | "stopped";
 type StepState = {
   status: StepStatus;
   detail?: string;
@@ -129,7 +131,7 @@ export function SqlConnectionModal({
    * dropped instead of writing into fresh state, so closing the dialog mid-
    * handshake can never leave a spinner behind.
    */
-  const runToken = useRef(0);
+  const guard = useRef(createRunGuard()).current;
 
   const set = <K extends keyof LocalDbConfig>(key: K, value: LocalDbConfig[K]) => {
     setConfig((c) => ({ ...c, [key]: value }));
@@ -143,10 +145,23 @@ export function SqlConnectionModal({
 
   /** Abandon whatever is running and tell the shell to drop its half-open pool. */
   const abandonRun = useCallback(() => {
-    runToken.current += 1;
+    guard.abandon();
     setRunning(false);
     void sqlAdmin()?.cancel?.();
-  }, []);
+  }, [guard]);
+
+  /** Operator pressed Stop: the running step is stopped, not failed. */
+  const stopRun = () => {
+    abandonRun();
+    setSteps((s) => {
+      const next = { ...s };
+      for (const key of Object.keys(next) as StepKey[]) {
+        if (next[key].status === "running")
+          next[key] = { status: "stopped", detail: "Stopped before it finished." };
+      }
+      return next;
+    });
+  };
 
   const scan = useCallback(async (silent = false) => {
     setScanning(true);
@@ -173,7 +188,7 @@ export function SqlConnectionModal({
       return;
     }
     let alive = true;
-    runToken.current += 1;
+    guard.abandon();
     setRunning(false);
     setSteps(blankSteps());
     setDatabases([]);
@@ -197,7 +212,7 @@ export function SqlConnectionModal({
     return () => {
       alive = false;
     };
-  }, [open, scan, abandonRun]);
+  }, [open, scan, abandonRun, guard]);
 
   const credentials = () => ({
     server: config.server,
@@ -387,8 +402,8 @@ export function SqlConnectionModal({
   /** Runs `key` and, unless retrying a single step, everything after it. */
   const advance = async (from: StepKey, only = false) => {
     if (running) return false;
-    const token = ++runToken.current;
-    const live = () => runToken.current === token;
+    const token = guard.start();
+    const live = () => guard.isLive(token);
     setRunning(true);
     try {
       const order = STEPS.map((s) => s.key);
@@ -650,15 +665,16 @@ export function SqlConnectionModal({
         </div>
 
         <DialogFooter className="gap-2 sm:justify-between">
-          <Button
-            type="button"
-            variant="outline"
-            disabled={running}
-            onClick={() => void advance("credentials")}
-          >
-            {running ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Run checks
-          </Button>
+          {running ? (
+            <Button type="button" variant="outline" onClick={stopRun}>
+              <CircleSlash className="mr-2 h-4 w-4" />
+              Stop
+            </Button>
+          ) : (
+            <Button type="button" variant="outline" onClick={() => void advance("credentials")}>
+              Run checks
+            </Button>
+          )}
           <Button type="button" disabled={running || !catalogReady} onClick={() => void finish()}>
             {catalogReady ? <Lock className="mr-2 h-4 w-4" /> : <Plug className="mr-2 h-4 w-4" />}
             Lock &amp; save
@@ -673,6 +689,7 @@ function StepIcon({ status }: { status: StepStatus }) {
   if (status === "running") return <Loader2 className="mt-0.5 h-4 w-4 animate-spin text-primary" />;
   if (status === "passed") return <CheckCircle2 className="mt-0.5 h-4 w-4 text-emerald-600" />;
   if (status === "failed") return <TriangleAlert className="mt-0.5 h-4 w-4 text-destructive" />;
+  if (status === "stopped") return <CircleSlash className="mt-0.5 h-4 w-4 text-muted-foreground" />;
   return <Circle className="mt-0.5 h-4 w-4 text-muted-foreground" />;
 }
 

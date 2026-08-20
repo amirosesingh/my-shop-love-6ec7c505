@@ -458,12 +458,11 @@ export async function scanLocalInstances(): Promise<LocalInstanceScan> {
   }
 }
 
-/** Single connection probe with explicit TLS options; reports latency. */
 /**
  * Proves the till's own pool can write: one transaction that inserts, reads
  * back, then rolls back. Nothing customer-facing is touched.
  */
-export async function verifyLocalWrite(): Promise<LocalWriteCheck> {
+export async function verifyLocalWrite(timeoutMs = 30_000): Promise<LocalWriteCheck> {
   const bridge = localDb();
   if (!bridge?.verifyWrite) {
     return { ok: false, error: "Only the Windows desktop app can write to a local database." };
@@ -471,7 +470,7 @@ export async function verifyLocalWrite(): Promise<LocalWriteCheck> {
   try {
     return await withIpcTimeout(
       bridge.verifyWrite(),
-      30_000,
+      timeoutMs,
       "The write check did not finish. The database accepted the sign-in but never answered the write.",
     );
   } catch (err) {
@@ -479,6 +478,7 @@ export async function verifyLocalWrite(): Promise<LocalWriteCheck> {
   }
 }
 
+/** Single connection probe with explicit TLS options; reports latency. */
 export async function testDirectConnection(
   params: DirectConnectionParams,
 ): Promise<LocalDbTestResult> {
