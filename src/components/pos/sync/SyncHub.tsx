@@ -146,6 +146,13 @@ export function SyncHub() {
 
   const failedQueue = queue.filter((q) => q.state === "refused" || q.reason);
   const engineState = syncState();
+  // Two different stores, named for what they are: the branch SQL Server is the
+  // operational database, the file below is only a mirror plus the audit ledger.
+  const operational = localDb()
+    ? localQueueConnected
+      ? "Branch SQL Server — connected"
+      : "Branch SQL Server — unavailable"
+    : "Browser storage (no local SQL Server)";
 
   return (
     <div className="space-y-4">
@@ -163,13 +170,17 @@ export function SyncHub() {
             </Badge>
           </Field>
           <Field label="Database mode">{databaseModeLabel()}</Field>
-          <Field label="Local engine">{engine?.engine ?? "Browser storage"}</Field>
+          <Field label="Operational database">{operational}</Field>
+          <Field label="Mirror engine">{engine?.engine ?? "Browser storage"}</Field>
           <Field label="Last successful pull">{when(lastSuccessfulPull())}</Field>
           <Field label="Last sync">{when(engineState.lastSyncAt)}</Field>
           <Field label="Pending changes">{badge.pending}</Field>
           <Field label="Needs attention">{badge.conflicts}</Field>
-          <Field label="Local database file" className="sm:col-span-2 lg:col-span-1">
+          <Field label="Offline mirror & audit file" className="sm:col-span-2 lg:col-span-1">
             <span className="break-all text-xs text-muted-foreground">{engine?.path ?? "—"}</span>
+            <span className="block text-xs text-muted-foreground">
+              Holds the catalogue copy and the sync ledger — not the till&apos;s sales database.
+            </span>
           </Field>
           {engineState.lastError && (
             <p className="sm:col-span-2 lg:col-span-4 flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
