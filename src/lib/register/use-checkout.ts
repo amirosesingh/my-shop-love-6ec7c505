@@ -85,6 +85,7 @@ export function useCheckout(deps: CheckoutDeps) {
 
   /** Sends the finished bill to the customer's WhatsApp. */
   async function sendSaleOnWhatsApp(sale: Sale, to: string) {
+    deps.setWaSending(true);
     const wa = state.settings.whatsapp;
     const buyer = state.members.find((m) => m.id === sale.memberId) ?? null;
     const res = await sendBillOnWhatsApp({
@@ -94,6 +95,7 @@ export function useCheckout(deps: CheckoutDeps) {
       reference: sale.receiptNo,
       member: buyer,
     });
+    deps.setWaSending(false);
     if (res.ok) toast.success(`Bill ${sale.receiptNo} sent on WhatsApp`);
     else toast.error("WhatsApp send failed", { description: res.error });
   }
