@@ -223,8 +223,23 @@ async function statusPayload() {
 
 async function connectLocal(config) {
   await pool.connect(config);
+  // A pool object is not proof of a usable database: prove it with a real
+  // round-trip before anything is told the till is connected.
+  const verified = await pool.verify();
   reconnectDelay = 5_000;
   broadcastStatus(await statusPayload());
+  return verified;
+}
+
+/** Rejects instead of hanging for ever when a driver never answers. */
+function withTimeout(promise, ms, message) {
+  let timer;
+  return Promise.race([
+    promise.finally(() => clearTimeout(timer)),
+    new Promise((_r, reject) => {
+      timer = setTimeout(() => reject(new Error(message)), ms);
+    }),
+  ]);
 }
 
 function scheduleReconnect() {
@@ -602,9 +617,13 @@ function registerIpc() {
   });
 
   ipcMain.handle("pos:connect", async (_e, config, cloud) => {
-    let cloudError;
+    let verified;
     try {
-      await connectLocal(config);
+      verified = await withTimeout(
+        connectLocal(config),
+        45_000,
+        "The local database did not answer in time. Check the server name, instance and firewall.",
+      );
       const saved = dbConfigStore.write(config);
       if (!saved.ok) console.warn("[pos] could not seal SQL config:", saved.error);
       // Permanent copy: survives a missing OS keyring, so the till never
@@ -613,12 +632,22 @@ function registerIpc() {
     } catch (err) {
       return { ok: false, ...pool.describeSqlError(err) };
     }
-    try {
-      await initializeWorker(cloud);
-    } catch (error) {
-      cloudError = fail(error).error;
-    }
-    return { ok: true, ...(cloudError ? { cloudError } : {}) };
+    // Cloud sync is started but never awaited: a slow or unreachable cloud must
+    // not hold the setup wizard open. Its outcome arrives on pos:status-changed.
+    Promise.resolve()
+      .then(() => initializeWorker(cloud))
+      .catch(async (error) => {
+        const message = fail(error).error;
+        console.warn("[pos] cloud sync could not start:", message);
+        broadcastStatus({ ...(await statusPayload()), cloudError: message });
+      });
+    return {
+      ok: true,
+      verified: true,
+      activeDb: verified?.activeDb ?? config?.database ?? null,
+      serverName: verified?.serverName ?? null,
+      latencyMs: verified?.latencyMs ?? null,
+    };
   });
 
   ipcMain.handle("pos:configure-cloud", async (_e, cloud) => {

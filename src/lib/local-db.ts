@@ -63,6 +63,116 @@ export type LocalDbTestResult = {
   hint?: string | null;
 };
 
+/**
+ * The one state every panel reads. Derived in a single place so a spinner can
+ * never outlive the work it belongs to, and nothing reports "connected" before
+ * the shell has proved the database answers.
+ */
+export type LocalDbConnectionState =
+  | "unavailable"
+  | "not_configured"
+  | "testing"
+  | "saving"
+  | "initializing"
+  | "connected"
+  | "failed";
+
+export type LocalDbConnectionView = {
+  state: LocalDbConnectionState;
+  /** One plain line an operator can act on. */
+  message: string;
+  detail?: string | null;
+  busy: boolean;
+};
+
+const STATE_MESSAGE: Record<LocalDbConnectionState, string> = {
+  unavailable: "Local database unavailable",
+  not_configured: "Local database requires setup",
+  testing: "Checking the local database…",
+  saving: "Saving the connection…",
+  initializing: "Reconnecting…",
+  connected: "Local database connected",
+  failed: "Local database unavailable",
+};
+
+export function describeLocalDbState(
+  state: LocalDbConnectionState,
+  detail?: string | null,
+): LocalDbConnectionView {
+  return {
+    state,
+    message: STATE_MESSAGE[state],
+    detail: detail ?? null,
+    busy: state === "testing" || state === "saving" || state === "initializing",
+  };
+}
+
+/**
+ * Turns the shell's raw status into the single state above.
+ *
+ * `pending` is whatever the UI is doing right now (a wizard run, a save); it
+ * always wins, because that is the only work the spinner belongs to.
+ */
+export function deriveLocalDbState(input: {
+  available: boolean;
+  configured: boolean;
+  status: Pick<LocalSyncStatus, "connected" | "error"> | null;
+  pending?: "testing" | "saving" | null;
+}): LocalDbConnectionView {
+  if (!input.available) return describeLocalDbState("unavailable");
+  if (input.pending) return describeLocalDbState(input.pending);
+  if (input.status?.connected) return describeLocalDbState("connected");
+  if (input.status?.error) return describeLocalDbState("failed", input.status.error);
+  if (!input.configured) return describeLocalDbState("not_configured");
+  return describeLocalDbState("initializing", "Trying to reach the saved database.");
+}
+
+/** No IPC call may hang the UI: everything gets an outer deadline. */
+export async function withIpcTimeout<T>(
+  work: Promise<T>,
+  ms: number,
+  message: string,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  return (await Promise.race([
+    work.finally(() => clearTimeout(timer)),
+    new Promise<never>((_r, reject) => {
+      timer = setTimeout(() => reject(new Error(message)), ms);
+    }),
+  ])) as T;
+}
+
+/**
+ * Save the details and point the till at the database. Resolves as soon as the
+ * shell has proved the local database is usable; cloud sync starts behind it.
+ */
+export async function connectLocalDatabase(
+  config: LocalDbConfig,
+  cloud?: CloudBridgeConfig,
+): Promise<LocalDbTestResult> {
+  const bridge = localDb();
+  if (!bridge) return { ok: false, error: "Only the Windows desktop app has a local database." };
+  try {
+    await writeLocalDbConfig(config);
+  } catch (err) {
+    return {
+      ok: false,
+      error: `The connection details could not be saved: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    };
+  }
+  try {
+    return await withIpcTimeout(
+      bridge.connect(config, cloud),
+      60_000,
+      "The desktop shell did not answer. The local database may be unreachable — check the server name and firewall.",
+    );
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 /** One SQL Server instance found on this machine or the local network. */
 export type DiscoveredDbServer = {
   address: string;

@@ -31,12 +31,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  connectLocalDatabase,
   defaultLocalDbConfig,
   loadLocalDbConfig,
-  localDb,
   scanLocalInstances,
   testDirectConnection,
-  writeLocalDbConfig,
   type LocalDbConfig,
   type LocalDbTestResult,
 } from "@/lib/local-db";
@@ -314,13 +313,14 @@ export function SqlConnectionModal({
     // Prove the operational pool — not just the admin pool — can use it.
     const probe = await testDirectConnection(params(config.database));
     if (!probe.ok) return failure("lock", probe, Date.now() - started);
-    await writeLocalDbConfig(config);
-    const opened = await localDb()?.connect(config, supabaseConfig());
-    if (opened && !opened.ok) return failure("lock", opened, Date.now() - started);
+    // Saves the details and returns as soon as the local database is proved;
+    // cloud sync starts behind it, so this can never sit here spinning.
+    const opened = await connectLocalDatabase(config, supabaseConfig());
+    if (!opened.ok) return failure("lock", opened, Date.now() - started);
     mark("lock", {
       status: "passed",
       ms: Date.now() - started,
-      detail: `Locked to ${probe.activeDb ?? config.database}`,
+      detail: `Locked to ${opened.activeDb ?? probe.activeDb ?? config.database}`,
     });
     return true;
   };
