@@ -1,0 +1,520 @@
+/**
+ * Checkout orchestration.
+ *
+ * The two commit operations that finish a ticket: a normal sale (`completeSale`)
+ * and a pay-later booking / racket stringing job (`bookAndPayLater`). Both are
+ * lifted out of the register screen unchanged, so the till behaves exactly as
+ * before.
+ */
+import { useState } from "react";
+import { toast } from "sonner";
+import { notifyError } from "@/lib/notify";
+import { openCashDrawer, printBookingSlip, printJobTag, printSaleReceipt } from "@/lib/pos-print";
+import { buildBookingMessage, buildSaleMessage, sendBillOnWhatsApp } from "@/lib/whatsapp";
+import { logger } from "@/lib/audit-log";
+import { redeemVoucher } from "@/lib/coupons";
+import { publishDisplay, type DisplaySnapshot } from "@/lib/customer-display";
+import { rememberBanks } from "@/components/pos/TenderSplit";
+import { isoDaysFromNow, useBookingIntake } from "@/lib/register/use-booking-intake";
+import { cartTotals, usePos, type Store } from "@/lib/pos-store";
+import { useAuth } from "@/lib/pos-auth";
+import { useUserPermissions } from "@/lib/pos-permissions";
+import { bookingRulesOf, lineUnitDiscount, methodLabel, paymentsLabel, r2, validateTenders } from "@/lib/pos-types";
+import type { CartLine, Payment, PaymentMethod, Sale, Booking, BookingPaymentTiming, Member, IntakeCharge } from "@/lib/pos-types";
+import type { CartCoupon } from "@/lib/register/use-cart";
+import type { NewBooking } from "@/lib/pos-store";
+
+export type CheckoutDeps = {
+  /** Active shift (required before any commit). */
+  getActiveShift: () => ReturnType<typeof usePos>["activeShift"];
+  /** Branch this sale/booking is being raised at. */
+  getCurrentStore: () => Store;
+  /** Cashier name stamped on the receipt. */
+  getActiveCashier: () => string;
+  /** Manager-gated permission check. */
+  requirePermission: (perm: string) => Promise<boolean>;
+
+  // Cart / ticket
+  getLines: () => CartLine[];
+  getTotals: () => ReturnType<typeof cartTotals>;
+  getMember: () => Member | null;
+  getMemberId: () => string | null;
+  getCoupon: () => CartCoupon | null;
+  getVoucherToken: () => string | null;
+  getExchangeRef: () => string | null;
+  getPointsEarned: () => number;
+  getBillNo: () => string | null;
+  resetCart: () => void;
+  setLines: (lines: CartLine[]) => void;
+  setMemberId: (id: string | null) => void;
+  setVoucherToken: (token: string | null) => void;
+
+  // Tender
+  getMethod: () => PaymentMethod;
+  getTendered: () => string;
+  getTransferRef: () => string;
+  getTenderRef: () => string;
+  getTenderRefNote: () => string;
+  getBankName: () => string;
+  getTenders: () => Payment[];
+  getActiveMethodName: () => string;
+  getNeedsTenderRef: () => boolean;
+  resetTender: () => void;
+
+  // Booking intake state
+  bookingIntake: ReturnType<typeof useBookingIntake>;
+
+  // UI / display
+  getWaNumber: () => string;
+  setWaNumber: (v: string) => void;
+  cartSnapshot: () => DisplaySnapshot;
+  getDisplayBase: () => DisplaySnapshotBase;
+};
+
+export type DisplaySnapshotBase = {
+  companyName: string;
+  storeName: string;
+  cashier: string;
+  payment: DisplaySnapshot["payment"];
+};
+
+export function useCheckout(deps: CheckoutDeps) {
+  const { state, recordSale, createBooking } = usePos();
+  const { user, can } = useAuth();
+  const { getWaSettings } = useWhatsAppSettings();
+  const [saving, setSaving] = useState(false);
+  const [lastSale, setLastSale] = useState<Sale | null>(null);
+
+  /** Sends the finished bill to the customer's WhatsApp. */
+  async function sendSaleOnWhatsApp(sale: Sale, to: string) {
+    const wa = getWaSettings();
+    const buyer = state.members.find((m) => m.id === sale.memberId) ?? null;
+    const res = await sendBillOnWhatsApp({
+      cfg: wa,
+      to,
+      body: buildSaleMessage(sale, deps.getDisplayBase().companyName, wa),
+      reference: sale.receiptNo,
+      member: buyer,
+    });
+    if (res.ok) toast.success(`Bill ${sale.receiptNo} sent on WhatsApp`);
+    else toast.error("WhatsApp send failed", { description: res.error });
+  }
+
+  async function bookAndPayLater() {
+    const activeShift = deps.getActiveShift();
+    const currentStore = deps.getCurrentStore();
+    const activeCashier = deps.getActiveCashier();
+    const lines = deps.getLines();
+    const totals = deps.getTotals();
+    const member = deps.getMember();
+    const memberId = deps.getMemberId();
+    const bi = deps.bookingIntake;
+    const wa = getWaSettings();
+    const displayBase = deps.getDisplayBase();
+
+    if (!activeShift) {
+      toast.error("Open a shift before taking a booking");
+      return;
+    }
+    if (!bi.racketMode && !lines.length) {
+      toast.error("Please add at least one item to the cart before saving a pay-later booking.", {
+        description: "Only racket / stringing jobs can be booked with an empty cart.",
+      });
+      return;
+    }
+    if (!(await deps.requirePermission("can_create_booking"))) return;
+    const paidNow =
+      bi.payTiming === "collection" ? 0 : bi.payTiming === "now" ? bi.bookingTotal : r2(Math.max(0, Number(bi.deposit || 0)));
+    if (paidNow > bi.bookingTotal) {
+      toast.error("Deposit cannot exceed the booking total");
+      return;
+    }
+    const minDeposit = Math.min(minDepositFor(bi.bookingTotal), bi.bookingTotal);
+    if (minDeposit > 0 && paidNow + 0.001 < minDeposit) {
+      toast.error(`This branch needs a deposit of at least ${money(minDeposit)}`);
+      return;
+    }
+    const bookingRules = bookingRulesOf(state.settings.integrations.bookingRules);
+    if (!bi.racketMode && bookingRules.serviceTerms.trim() && !bi.liabilityOk) {
+      toast.error("The customer must accept the booking terms & conditions", {
+        description: "Tick the agreement box at the bottom of the booking form.",
+      });
+      return;
+    }
+    if (bi.racketMode) {
+      if (bi.labourUnlocked && !bi.labourReason.trim()) {
+        toast.error("Enter a reason for the labour override");
+        return;
+      }
+      if (bookingRules.requireRacketModel && !bi.racketModel.trim()) {
+        toast.error("Enter the racket brand / model");
+        return;
+      }
+      if (bookingRules.requireStringType && !bi.stringType.trim()) {
+        toast.error("Enter the string type / brand");
+        return;
+      }
+      if (bookingRules.requirePromisedAt && !bi.promisedAt) {
+        toast.error("Choose a ready-by date and time");
+        return;
+      }
+      if (bookingRules.requireLiabilityAccept && bookingRules.serviceTerms.trim() && !bi.liabilityOk) {
+        toast.error("The customer must accept the service & liability terms", {
+          description: bi.highTension
+            ? "This job is flagged high tension — acceptance is required."
+            : "Tick the agreement box on the intake form.",
+        });
+        return;
+      }
+      if (bookingRules.warnOutsideTradingHours && bi.promisedAt) {
+        const hhmm = bi.promisedAt.slice(11, 16);
+        const { dayStart, dayEnd } = state.settings.hours;
+        if (dayStart && dayEnd && (hhmm < dayStart || hhmm > dayEnd))
+          toast.warning(`Ready-by time is outside trading hours (${dayStart}–${dayEnd})`);
+      }
+    }
+    if (!bi.dueDate) {
+      toast.error("Choose a collect-by date");
+      return;
+    }
+    let booking: Booking;
+    try {
+      setSaving(true);
+      const serviceTypes = (state.settings.integrations.serviceTypes ?? []).filter((s) => s.active && s.name.trim());
+      const pickedService = serviceTypes.find((s) => s.id === bi.serviceId) ?? null;
+      const serviceCharge = 0; // booked separately via charges
+      const newBooking: NewBooking = {
+        storeId: currentStore.id,
+        shiftId: activeShift.id,
+        lines,
+        subtotal: r2(totals.subtotal + serviceCharge),
+        discount: totals.discount,
+        tax: totals.tax,
+        total: bi.bookingTotal,
+        serviceTypeId: bi.racketMode ? pickedService?.id : undefined,
+        serviceName: bi.racketMode ? (serviceLabel(pickedService, bi.customService) || undefined) : undefined,
+        serviceFee: serviceCharge || undefined,
+        charges:
+          bi.racketMode && bi.intakeCharges.length
+            ? bi.intakeCharges.map((c) =>
+                c.kind === "labor" && bi.labourUnlocked && bi.labourReason.trim()
+                  ? { ...c, overrideReason: bi.labourReason.trim() }
+                  : c,
+              )
+            : undefined,
+        paymentTiming: bi.payTiming,
+        deposit: paidNow,
+        depositMethod: bi.depositMethod,
+        dueDate: bi.dueDate,
+        memberId,
+        customerName: bi.bookName.trim() || member?.name || "Walk-in",
+        customerPhone: bi.bookPhone.trim() || member?.phone || "",
+        note: bi.bookNote.trim(),
+        cashier: activeCashier,
+        tagId: bi.racketMode ? bi.jobTag || (bookingRules.autoJobTag ? newJobTag() : undefined) : undefined,
+        stringOrigin: bi.racketMode ? (bi.stringCustomerOwned ? "customer" : "store") : undefined,
+        liabilityAccepted: bi.liabilityOk,
+        stringProductId: bi.racketMode && !bi.stringCustomerOwned ? bi.stringProductId || undefined : undefined,
+        intakeNote: bi.racketMode ? bi.grommetNotes.trim() || undefined : undefined,
+        job: bi.racketMode
+          ? {
+              racketModel: bi.racketModel.trim() || undefined,
+              stringType: bi.stringType.trim() || undefined,
+              tensionMain: bi.tensionMain ? Number(bi.tensionMain) : undefined,
+              tensionCross: bi.tensionCross ? Number(bi.tensionCross) : undefined,
+              tensionUnit: bi.tensionUnit,
+              grommetNotes: bi.grommetNotes.trim() || undefined,
+              jobNotes: bi.jobNotes.trim() || undefined,
+              stencil: bi.stencil,
+              overgrip: bi.overgrip,
+              droppedOffAt: new Date().toISOString(),
+              promisedAt: bi.promisedAt ? new Date(bi.promisedAt).toISOString() : undefined,
+              notifyWhatsApp: bi.notifyWhatsApp,
+            }
+          : undefined,
+      };
+      booking = await createBooking(newBooking);
+    } catch (e) {
+      toast.error("Booking was not saved", {
+        description: (e as { message?: string })?.message ?? "Nothing was stored — try again.",
+      });
+      return;
+    } finally {
+      setSaving(false);
+    }
+    if (paidNow > 0 && bi.depositMethod === "cash") openCashDrawer();
+    printBookingSlip(booking, member, state.settings.payment);
+    if (booking.job) printJobTag(booking);
+    if (wa.enabled && wa.autoSendOnBooking) {
+      void sendBillOnWhatsApp({
+        cfg: wa,
+        to: bi.bookPhone.trim() || member?.phone || "",
+        body: buildBookingMessage(booking, displayBase.companyName, wa),
+        reference: booking.ref,
+        member,
+      });
+    }
+    publishDisplay({
+      ...deps.cartSnapshot(),
+      mode: "booking",
+      paid: booking.paid,
+      balance: r2(booking.total - booking.paid),
+      reference: booking.ref,
+      dueDate: booking.dueDate,
+      method: bi.depositMethod,
+    });
+    deps.resetCart();
+    deps.setMemberId(null);
+    deps.setLines([
+      {
+        productId: `booking:${booking.id}`,
+        name: `${booking.job ? "Racket job" : "Booking"} ${booking.ref}`,
+        price: 0,
+        qty: 1,
+        taxRate: 0,
+        discount: 0,
+        bookingId: booking.id,
+        bookingRef: booking.ref,
+        ...(booking.job ? { job: booking.job } : {}),
+      },
+    ]);
+    bi.setBookOpen(false);
+    bi.setDeposit("");
+    bi.setBookName("");
+    bi.setBookPhone("");
+    bi.setBookNote("");
+    bi.setServiceId("");
+    bi.setCustomService("");
+    bi.resetJobCard();
+    bi.setBookMode("cart");
+    bi.setPayTiming("deposit");
+    bi.setDueDate(isoDaysFromNow(14));
+    toast.success(`Booking ${booking.ref} reserved until ${new Date(booking.dueDate).toDateString()}`);
+  }
+
+  async function completeSale() {
+    const activeShift = deps.getActiveShift();
+    const currentStore = deps.getCurrentStore();
+    const activeCashier = deps.getActiveCashier();
+    const lines = deps.getLines();
+    const totals = deps.getTotals();
+    const member = deps.getMember();
+    const memberId = deps.getMemberId();
+    const coupon = deps.getCoupon();
+    const voucherToken = deps.getVoucherToken();
+    const exchangeRef = deps.getExchangeRef();
+    const pointsEarned = deps.getPointsEarned();
+    const billNo = deps.getBillNo();
+    const method = deps.getMethod();
+    const tendered = deps.getTendered();
+    const transferRef = deps.getTransferRef();
+    const tenderRef = deps.getTenderRef();
+    const tenderRefNote = deps.getTenderRefNote();
+    const bankName = deps.getBankName();
+    const tenders = deps.getTenders();
+    const activeMethodName = deps.getActiveMethodName();
+    const needsTenderRef = deps.getNeedsTenderRef();
+    const wa = getWaSettings();
+    const displayBase = deps.getDisplayBase();
+
+    if (!activeShift) {
+      toast.error("Open a shift before taking payment");
+      return;
+    }
+    const isRefund = totals.total < 0;
+    if (!(await deps.requirePermission("can_process_sale"))) return;
+    if (isRefund && !(await deps.requirePermission("can_process_refund"))) return;
+    const splitting = tenders.length > 0;
+    const split = validateTenders(totals.total, tenders);
+    const splitPaid = split.paid;
+    if (!isRefund && splitting && split.error) {
+      toast.error(
+        split.balance > 0
+          ? `Split tenders cover ${money(splitPaid)} of ${money(totals.total)} — ${split.error}`
+          : split.error,
+      );
+      return;
+    }
+    const paid = isRefund
+      ? totals.total
+      : splitting
+        ? splitPaid
+        : method === "cash"
+          ? Number(tendered || 0)
+          : totals.total;
+    if (!isRefund && !splitting && method === "cash" && paid < totals.total) {
+      toast.error("Tendered amount is less than the total");
+      return;
+    }
+    if (!isRefund && !splitting && method === "card" && !bankName.trim()) {
+      toast.error("Enter which bank card machine was used");
+      return;
+    }
+    if (!isRefund && !splitting && method === "bank_transfer" && !transferRef.trim()) {
+      toast.error("Enter the transfer reference shown on the customer's slip");
+      return;
+    }
+    if (!isRefund && !splitting && needsTenderRef && !tenderRef.trim()) {
+      toast.error(`Enter the serial / reference number for ${activeMethodName}`);
+      return;
+    }
+    if (!isRefund && !splitting && method === "points" && (member?.points ?? 0) < totals.total * 100) {
+      toast.error("Not enough points on this member");
+      return;
+    }
+    const payments: Payment[] = splitting
+      ? tenders
+      : [
+          {
+            id: crypto.randomUUID(),
+            method,
+            amount: r2(Math.abs(totals.total)),
+            ...(method === "card" && bankName.trim() ? { bankName: bankName.trim() } : {}),
+            ...(method === "bank_transfer" && transferRef.trim() ? { ref: transferRef.trim() } : {}),
+            ...(needsTenderRef
+              ? {
+                  requiresReference: true,
+                  reference: tenderRef.trim(),
+                  ...(tenderRefNote.trim() ? { referenceNote: tenderRefNote.trim() } : {}),
+                }
+              : {}),
+          },
+        ];
+    const headline = payments.reduce((a, p) => (p.amount > a.amount ? p : a), payments[0]!).method;
+    rememberBanks(payments.map((p) => p.bankName ?? ""));
+    let sale: Sale;
+    try {
+      setSaving(true);
+      sale = await recordSale({
+        storeId: currentStore.id,
+        ...(billNo ? { receiptNo: billNo } : {}),
+        shiftId: activeShift.id,
+        lines,
+        subtotal: totals.subtotal,
+        discount: totals.discount,
+        tax: totals.tax,
+        total: totals.total,
+        paid,
+        change: r2(Math.max(0, paid - totals.total)),
+        method: splitting ? headline : method,
+        payments,
+        memberId,
+        pointsEarned,
+        cashier: activeCashier,
+        ...(method === "bank_transfer" ? { transferRef: transferRef.trim() } : {}),
+        ...(exchangeRef ? { exchangeOfReceiptNo: exchangeRef, exchangeCredit: totals.credit } : {}),
+        ...(coupon
+          ? {
+              couponCode: coupon.code,
+              couponPromoId: coupon.promoId,
+              couponScope: coupon.scope,
+              couponDiscount: coupon.discount,
+              couponName: coupon.name,
+              couponRemaining: coupon.remaining,
+            }
+          : {}),
+      });
+    } catch (e) {
+      toast.error("Payment was not saved", {
+        description:
+          (e as { message?: string })?.message ?? "Nothing was stored, so the ticket is untouched — try again.",
+      });
+      return;
+    } finally {
+      setSaving(false);
+    }
+    if (coupon) {
+      logger.log("promotion", "Coupon redeemed on a bill", "register", {
+        receiptNo: sale.receiptNo,
+        coupon: coupon.code,
+        promotionId: coupon.promoId,
+        scope: coupon.scope,
+        product: coupon.productName ?? null,
+        discountValue: coupon.discount,
+        billTotal: sale.total,
+        storeId: sale.storeId,
+      });
+    }
+    if (payments.some((p) => p.method === "cash")) openCashDrawer();
+    if (voucherToken) {
+      void redeemVoucher({
+        token: voucherToken,
+        saleId: sale.receiptNo,
+        storeId: sale.storeId,
+        staff: activeCashier,
+      }).catch((e: unknown) => notifyError(e, "Could not lock the voucher"));
+      deps.setVoucherToken(null);
+    }
+    if (splitting || payments.some((p) => p.bankName)) {
+      logger.log("sale", "Split payment recorded", "register", {
+        receiptNo: sale.receiptNo,
+        total: sale.total,
+        tenders: paymentsLabel(payments),
+        storeId: sale.storeId,
+      });
+    }
+    if (method === "bank_transfer") {
+      logger.log("sale", "Bank transfer payment recorded", "register", {
+        receiptNo: sale.receiptNo,
+        total: sale.total,
+        transferRef: sale.transferRef,
+        bank: state.settings.payment.bankName,
+      });
+    }
+    printSaleReceipt(sale, member, "sale");
+    setLastSale(sale);
+    const customerNumber = member?.phone ?? "";
+    deps.setWaNumber(customerNumber);
+    if (wa.enabled && wa.autoSendOnSale && customerNumber) {
+      void sendSaleOnWhatsApp(sale, customerNumber);
+    }
+    publishDisplay({
+      ...deps.cartSnapshot(),
+      mode: "paid",
+      paid: sale.paid,
+      change: sale.change,
+      reference: sale.receiptNo,
+      method: sale.method,
+      transferRef: sale.transferRef ?? "",
+    });
+    deps.resetCart();
+    deps.setMemberId(null);
+    deps.resetTender();
+    toast.success(
+      exchangeRef ? `Exchange ${sale.receiptNo} completed against ${exchangeRef}` : `Sale ${sale.receiptNo} completed`,
+    );
+  }
+
+  return {
+    saving,
+    lastSale,
+    setLastSale,
+    completeSale,
+    bookAndPayLater,
+    sendSaleOnWhatsApp,
+  };
+}
+
+/** Local helper to read WhatsApp settings from the central POS store. */
+function useWhatsAppSettings() {
+  const { state } = usePos();
+  return {
+    getWaSettings: () => state.settings.whatsapp,
+  };
+}
+
+function money(n: number) {
+  return new Intl.NumberFormat("en-MY", { style: "currency", currency: "MYR" }).format(n);
+}
+
+function minDepositFor(total: number) {
+  return 0;
+}
+
+function serviceLabel(pickedService: { name: string } | null, customService: string) {
+  return pickedService?.name || customService || "";
+}
+
+function newJobTag() {
+  return `J${Date.now().toString(36).toUpperCase()}`;
+}
