@@ -81,6 +81,7 @@ export function SyncHub() {
   const [unapplied, setUnapplied] = useState<UnappliedMovement[]>([]);
   const [diagnostics, setDiagnostics] = useState<DiagnosticEvent[]>([]);
   const [retrying, setRetrying] = useState(false);
+  const [reconciling, setReconciling] = useState(false);
   const [busy, setBusy] = useState<"push" | "pull" | "cycle" | null>(null);
   const [progress, setProgress] = useState(0);
   const [direction, setDirection] = useState("all");
