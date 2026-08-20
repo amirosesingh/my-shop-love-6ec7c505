@@ -438,6 +438,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <LiveClock compact />
               </span>
               <MobileStatusSheet />
+              <UpdateHeaderButton />
               <Button
                 asChild
                 variant="ghost"
@@ -483,6 +484,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   {terminal.config.locationName || currentStore.name}
                 </Badge>
               )}
+              <UpdateHeaderButton />
               <Button
                 asChild
                 variant="ghost"
