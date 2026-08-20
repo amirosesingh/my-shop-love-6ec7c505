@@ -733,6 +733,8 @@ export type ReceiptSettings = {
   };
   customLines: ReceiptCustomLine[];
   qr: ReceiptQrSettings;
+  /** operator stylesheet, scoped to the receipt body before printing */
+  css?: string;
   /** wording printed on booking / racket job slips */
   bookingSlip: BookingSlipSettings;
 };
@@ -751,6 +753,7 @@ export type ReceiptOverride = Partial<
     | "footerText"
     | "customLines"
     | "qr"
+    | "css"
     | "bookingSlip"
   >
 >;

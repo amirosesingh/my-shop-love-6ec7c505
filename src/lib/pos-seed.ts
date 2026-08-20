@@ -42,6 +42,7 @@ export const defaultReceiptSettings: ReceiptSettings = {
   },
   customLines: [],
   qr: { enabled: false, value: "", size: 96, placement: "footer" },
+  css: "",
   bookingSlip: {
     terms:
       "1. Rackets left over 30 days after the ready date may be disposed of.\n2. Old or damaged frames and grommets may break during stringing; we string at the owner's risk.\n3. Tension is set as agreed above; a 5% variance is normal.\n4. Please check the racket before leaving the counter — no claims after collection.",

@@ -330,6 +330,7 @@ const rowToSettings = (r: Row | null): AppSettings =>
           },
           customLines: Array.isArray(r.custom_lines) ? r.custom_lines : [],
           qr: { ...defaultSettings.receipt.qr, ...((r.qr ?? {}) as object) },
+          css: (r as { receipt_css?: string | null }).receipt_css ?? "",
           bookingSlip: {
             ...defaultSettings.receipt.bookingSlip,
             ...((r.booking_slip ?? {}) as object),
@@ -403,6 +404,7 @@ const buildSettingsRow = (s: AppSettings): Row => ({
   fonts: s.receipt.fonts,
   custom_lines: s.receipt.customLines,
   qr: s.receipt.qr,
+  receipt_css: s.receipt.css ?? "",
   booking_slip: s.receipt.bookingSlip,
   payment_details: s.payment,
   whatsapp_settings: s.whatsapp,

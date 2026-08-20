@@ -25,6 +25,12 @@ import {
   silentPrint,
 } from "./receipt-printer";
 import { columnsForPaper, htmlToEscPos } from "./escpos";
+import { RECEIPT_SCOPE, scopeReceiptCss } from "./receipt-css";
+import {
+  renderReceiptText,
+  SAMPLE_RECEIPT_CONTEXT,
+  type ReceiptTokenContext,
+} from "./receipt-template";
 
 export const STORE = {
   name: "NORTHWIND & CO.",
@@ -60,6 +66,43 @@ export function setPrintSettings(receipt: ReceiptSettings, tax: TaxSettings) {
   globalReceiptCfg = receipt;
   receiptCfg = resolveReceiptCfg(receipt, activeBranch);
   taxCfg = tax;
+}
+
+/**
+ * Values the dynamic receipt fields resolve against for the slip being built.
+ * Each body function fills this in before the header or footer is rendered, so
+ * a template line can never carry data from the previous print.
+ */
+let tokenCtx: ReceiptTokenContext = {};
+const setTokens = (ctx: ReceiptTokenContext) => {
+  tokenCtx = ctx;
+};
+
+/** Device identity shown on slips; pushed in by the terminal layer. */
+let deviceIdentity: { deviceName?: string; terminalName?: string } = {};
+export function setPrintDevice(identity: { deviceName?: string; terminalName?: string }) {
+  deviceIdentity = identity ?? {};
+}
+
+const placeTokens = (): ReceiptTokenContext => ({
+  device_name: deviceIdentity.deviceName ?? "",
+  terminal_name: deviceIdentity.terminalName ?? deviceIdentity.deviceName ?? "",
+  branch_name: activeBranch?.name ?? "",
+  branch_code: activeBranch?.code ?? "",
+});
+
+const dateTokens = (iso?: string): ReceiptTokenContext => {
+  const d = iso ? new Date(iso) : new Date();
+  if (Number.isNaN(d.getTime())) return { date: "", time: "" };
+  return {
+    date: d.toLocaleDateString(),
+    time: d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+  };
+};
+
+/** Preview helper: render templates with clearly-marked sample values. */
+export function usePreviewTokens() {
+  tokenCtx = { ...SAMPLE_RECEIPT_CONTEXT, ...placeTokens() };
 }
 
 /** Service & high-tension liability wording, pushed in from the booking rules. */
@@ -148,7 +191,9 @@ export function qrSvg(value: string, size: number) {
 const customLines = (placement: "header" | "footer") =>
   (receiptCfg.customLines ?? [])
     .filter((l) => l.placement === placement && l.text.trim())
-    .map((l) => `<div class="c muted">${esc(l.text)}</div>`)
+    .map((l) => renderReceiptText(l.text, tokenCtx).trim())
+    .filter(Boolean)
+    .map((text) => `<div class="c muted">${esc(text)}</div>`)
     .join("");
 
 /** QR block if it belongs at the given placement. */
@@ -291,7 +336,8 @@ const shell = (title: string, body: string, autoPrint = true) => {
     html, body { width: ${bodyWidth}; margin: ${bodyMargin}; }
     .no-print { display: none !important; }
   }
-</style></head><body>${body}
+  ${scopeReceiptCss(receiptCfg.css)}
+</style></head><body><div class="${RECEIPT_SCOPE.slice(1)}">${body}</div>
 ${
   autoPrint
     ? `<script>window.onload=function(){window.focus();window.print();setTimeout(function(){window.close()},400)}<\/script>`
@@ -327,7 +373,7 @@ const header = (subtitle?: string) => {
   <div class="c muted">${esc(
     activeBranch ? `${activeBranch.name} (${activeBranch.code})` : STORE.line1,
   )}</div>
-  ${(receiptCfg.headerText || "")
+  ${renderReceiptText(receiptCfg.headerText || "", tokenCtx)
     .split("\n")
     .filter(Boolean)
     .map((l) => `<div class="c muted">${esc(l)}</div>`)
@@ -340,6 +386,23 @@ const header = (subtitle?: string) => {
 };
 
 function saleBody(sale: Sale, member: Member | null, kind: ReceiptKind) {
+  setTokens({
+    ...placeTokens(),
+    ...dateTokens(sale.createdAt),
+    receipt_number: sale.receiptNo,
+    cashier: sale.cashier ?? "",
+    customer_name: member?.name ?? "",
+    customer_code: member?.code ?? "",
+    item_count: String(sale.lines.reduce((a, l) => a + l.qty, 0)),
+    subtotal: fmt(sale.subtotal),
+    discount: fmt(sale.discount),
+    tax: fmt(sale.tax),
+    total: fmt(sale.total),
+    payment_method: sale.method ?? "",
+    received: fmt(sale.paid),
+    change: fmt(sale.change),
+    booking_ref: sale.bookingRef ?? "",
+  });
   const hidePrices = kind === "gift" || kind === "kitchen";
   const subtitle =
     kind === "gift"
@@ -436,7 +499,7 @@ function saleBody(sale: Sale, member: Member | null, kind: ReceiptKind) {
     <div class="c muted rcpt-foot">${
       kind === "gift"
         ? "Exchangeable within 30 days with this slip"
-        : esc(receiptCfg.footerText || "")
+        : esc(renderReceiptText(receiptCfg.footerText || "", tokenCtx))
     }</div>
     ${customLines("footer")}
     ${qrBlock("footer")}
@@ -661,7 +724,26 @@ function signatureBlock(customerName: string) {
     <div class="muted">Date</div>`;
 }
 
+const bookingTokens = (booking: Booking, member: Member | null): ReceiptTokenContext => ({
+  ...placeTokens(),
+  ...dateTokens(booking.createdAt),
+  receipt_number: booking.ref,
+  booking_ref: booking.ref,
+  cashier: booking.cashier ?? "",
+  customer_name: member?.name ?? booking.customerName ?? "",
+  customer_code: member?.code ?? "",
+  item_count: String(booking.lines.reduce((a, l) => a + l.qty, 0)),
+  subtotal: fmt(booking.subtotal),
+  discount: fmt(booking.discount),
+  tax: fmt(booking.tax),
+  total: fmt(booking.total),
+  deposit: fmt(booking.paid),
+  balance: fmt(bookingBalance(booking)),
+  collection_date: booking.dueDate ?? "",
+});
+
 function bookingBody(booking: Booking, member: Member | null, pay: PaymentDetails | null) {
+  setTokens(bookingTokens(booking, member));
   const rows = booking.lines
     .map(
       (l) =>
@@ -708,12 +790,18 @@ function bookingBody(booking: Booking, member: Member | null, pay: PaymentDetail
     ${transferBlock(pay)}
     ${member ? `<hr><div>Member ${esc(member.code)} · ${esc(member.name)}</div>` : ""}
     <hr>${receiptCfg.showBarcode ? barcodeSvg(booking.ref) : ""}
-    <div class="c muted rcpt-foot">${esc(receiptCfg.footerText || "")}</div>
+    <div class="c muted rcpt-foot">${esc(renderReceiptText(receiptCfg.footerText || "", tokenCtx))}</div>
     ${customLines("footer")}
     <div class="c muted">${esc(booking.ref)}</div>`;
 }
 
 function bookingPaymentBody(booking: Booking, payment: BookingPayment) {
+  setTokens({
+    ...bookingTokens(booking, null),
+    ...dateTokens(payment.at),
+    payment_method: payment.method ?? "",
+    received: fmt(payment.amount),
+  });
   return `${header("PART PAYMENT RECEIPT")}
     <table>
       <tr><td>Booking</td><td class="r b">${esc(booking.ref)}</td></tr>
@@ -730,7 +818,7 @@ function bookingPaymentBody(booking: Booking, payment: BookingPayment) {
     <hr><div class="c">Collect &amp; settle by ${esc(new Date(booking.dueDate).toDateString())}</div>
     ${receiptCfg.bookingSlip?.termsOnPayment ? termsBlock() : ""}
     ${booking.job ? serviceTermsBlock() : ""}
-    <hr><div class="c muted rcpt-foot">${esc(receiptCfg.footerText || "")}</div>
+    <hr><div class="c muted rcpt-foot">${esc(renderReceiptText(receiptCfg.footerText || "", tokenCtx))}</div>
     <div class="c muted">${esc(booking.ref)}</div>`;
 }
 

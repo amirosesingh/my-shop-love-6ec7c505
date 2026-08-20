@@ -392,12 +392,17 @@ export type Database = {
           connection_status: string
           created_at: string
           db_mode: string
+          device_name: string | null
+          device_type: string | null
+          last_heartbeat_at: string | null
           last_ping: string | null
           last_seen_at: string
           last_synced_at: string | null
+          location_name: string | null
           pending_count: number
           pending_queue_count: number | null
           platform: string | null
+          session_status: string | null
           staff_name: string | null
           staff_role: string | null
           status: string | null
@@ -414,12 +419,17 @@ export type Database = {
           connection_status?: string
           created_at?: string
           db_mode?: string
+          device_name?: string | null
+          device_type?: string | null
+          last_heartbeat_at?: string | null
           last_ping?: string | null
           last_seen_at?: string
           last_synced_at?: string | null
+          location_name?: string | null
           pending_count?: number
           pending_queue_count?: number | null
           platform?: string | null
+          session_status?: string | null
           staff_name?: string | null
           staff_role?: string | null
           status?: string | null
@@ -436,12 +446,17 @@ export type Database = {
           connection_status?: string
           created_at?: string
           db_mode?: string
+          device_name?: string | null
+          device_type?: string | null
+          last_heartbeat_at?: string | null
           last_ping?: string | null
           last_seen_at?: string
           last_synced_at?: string | null
+          location_name?: string | null
           pending_count?: number
           pending_queue_count?: number | null
           platform?: string | null
+          session_status?: string | null
           staff_name?: string | null
           staff_role?: string | null
           status?: string | null
@@ -1293,6 +1308,7 @@ export type Database = {
           paper_size: string
           phone: string | null
           qr: Json
+          receipt_css: string
           receipt_design: Json
           reg_number: string | null
           region_country: string
@@ -1335,6 +1351,7 @@ export type Database = {
           paper_size?: string
           phone?: string | null
           qr?: Json
+          receipt_css?: string
           receipt_design?: Json
           reg_number?: string | null
           region_country?: string
@@ -1377,6 +1394,7 @@ export type Database = {
           paper_size?: string
           phone?: string | null
           qr?: Json
+          receipt_css?: string
           receipt_design?: Json
           reg_number?: string | null
           region_country?: string

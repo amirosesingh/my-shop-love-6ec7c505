@@ -48,6 +48,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
       { to: "/settings/type", label: "Typography", blurb: "Fonts, sizes and spacing." },
       { to: "/settings/lines", label: "Extra lines", blurb: "Policy notes, promotions, opening hours." },
       { to: "/settings/qr", label: "QR code", blurb: "Payload, size and placement." },
+      { to: "/settings/receipt-designer", label: "Designer", blurb: "Dynamic fields, logo and receipt CSS." },
       { to: "/settings/booking-slip", label: "Booking slip", blurb: "Terms and the signature line.", shared: true },
     ],
   },
