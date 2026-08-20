@@ -17,7 +17,7 @@ import {
 import { notifyError, showNotification } from "./notify";
 import { logSync } from "./sync-log";
 import { recordDiagnostic, reasonCode } from "./diagnostics";
-import { recordUnappliedStock, clearUnappliedStock } from "./stock-recovery";
+import { applyStockDeltaBatch } from "./stock-recovery";
 import { canRelay, relayStores } from "./sync-relay";
 import { isOperationalTable } from "./pos-auth-route";
 import { keyset, nextCursor, PAGE_SIZE, type Cursor, type Page } from "./keyset";
