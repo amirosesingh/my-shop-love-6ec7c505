@@ -36,6 +36,7 @@ import {
   loadLocalDbConfig,
   scanLocalInstances,
   testDirectConnection,
+  verifyLocalWrite,
   type LocalDbConfig,
   type LocalDbTestResult,
 } from "@/lib/local-db";
@@ -57,6 +58,7 @@ const STEPS = [
   { key: "handshake", label: "Auth handshake", hint: "Sign in against master." },
   { key: "catalog", label: "Catalog discovery", hint: "List the databases you can open." },
   { key: "lock", label: "Lock & save", hint: "Point the till at the chosen database." },
+  { key: "write", label: "Write verification", hint: "Insert and roll back a probe row." },
 ] as const;
 
 type StepKey = (typeof STEPS)[number]["key"];
@@ -122,6 +124,12 @@ export function SqlConnectionModal({
   const [running, setRunning] = useState(false);
   const [steps, setSteps] = useState<Record<StepKey, StepState>>(blankSteps);
   const [databases, setDatabases] = useState<SqlDatabase[]>([]);
+  /**
+   * Every run owns a token. A result from a cancelled or superseded run is
+   * dropped instead of writing into fresh state, so closing the dialog mid-
+   * handshake can never leave a spinner behind.
+   */
+  const runToken = useRef(0);
 
   const set = <K extends keyof LocalDbConfig>(key: K, value: LocalDbConfig[K]) => {
     setConfig((c) => ({ ...c, [key]: value }));
@@ -132,6 +140,13 @@ export function SqlConnectionModal({
 
   const mark = (key: StepKey, patch: StepState) =>
     setSteps((s) => ({ ...s, [key]: { ...s[key], ...patch } }));
+
+  /** Abandon whatever is running and tell the shell to drop its half-open pool. */
+  const abandonRun = useCallback(() => {
+    runToken.current += 1;
+    setRunning(false);
+    void sqlAdmin()?.cancel?.();
+  }, []);
 
   const scan = useCallback(async (silent = false) => {
     setScanning(true);
@@ -152,8 +167,14 @@ export function SqlConnectionModal({
 
   /* Pre-fill from the sealed config, then scan this PC. */
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      abandonRun();
+      setSteps(blankSteps());
+      return;
+    }
     let alive = true;
+    runToken.current += 1;
+    setRunning(false);
     setSteps(blankSteps());
     setDatabases([]);
     void (async () => {
@@ -176,7 +197,7 @@ export function SqlConnectionModal({
     return () => {
       alive = false;
     };
-  }, [open, scan]);
+  }, [open, scan, abandonRun]);
 
   const credentials = () => ({
     server: config.server,
