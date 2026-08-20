@@ -2,16 +2,14 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
+  deriveLocalDbState,
   defaultLocalDbConfig,
   hasLocalDb,
   localDb,
   loadLocalDbConfig,
-  writeLocalDbConfig,
   type LocalDbConfig,
-  type LocalDbTestResult,
   type LocalSyncStatus,
 } from "@/lib/local-db";
-import { supabaseConfig } from "@/lib/external-supabase-config";
 import { SqlConnectionModal } from "@/components/database/SqlConnectionModal";
 import { SchemaPanel } from "@/components/database/SchemaPanel";
 
@@ -24,11 +22,15 @@ export function LocalDatabaseSettings() {
   const [config, setConfig] = useState<LocalDbConfig>(defaultLocalDbConfig);
   const [status, setStatus] = useState<LocalSyncStatus | null>(null);
   const [busy, setBusy] = useState(false);
-  const [diagnostic, setDiagnostic] = useState<LocalDbTestResult | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
+  const [configured, setConfigured] = useState(false);
 
   useEffect(() => {
-    void loadLocalDbConfig().then(setConfig);
+    void loadLocalDbConfig().then((saved) => {
+      setConfig(saved);
+      setConfigured(!!saved.server && !!saved.database);
+    });
   }, []);
 
   const refresh = useCallback(async () => {
@@ -62,21 +64,6 @@ export function LocalDatabaseSettings() {
       const res = await fn();
       if (res.ok) toast.success(label);
       else toast.error(res.error ?? `${label} failed`);
-      await refresh();
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  /** Test connection keeps the full driver diagnostic on screen. */
-  const testConnection = async () => {
-    setBusy(true);
-    setDiagnostic(null);
-    try {
-      const res = await localDb()!.test(config);
-      setDiagnostic(res);
-      if (res.ok) toast.success("Connection works");
-      else toast.error(res.error ?? "Could not connect");
       await refresh();
     } finally {
       setBusy(false);
