@@ -386,23 +386,28 @@ export function SqlConnectionModal({
 
   /** Runs `key` and, unless retrying a single step, everything after it. */
   const advance = async (from: StepKey, only = false) => {
+    if (running) return false;
+    const token = ++runToken.current;
+    const live = () => runToken.current === token;
     setRunning(true);
     try {
       const order = STEPS.map((s) => s.key);
       for (const key of order.slice(order.indexOf(from))) {
+        if (!live()) return false;
         const ok = await RUNNERS[key]();
-        if (!ok) return false;
+        if (!live() || !ok) return false;
         // The catalogue step hands control back so a database can be picked.
         if (only || key === "catalog") return true;
       }
       return true;
     } finally {
-      setRunning(false);
+      if (live()) setRunning(false);
     }
   };
 
   const finish = async () => {
-    const ok = await advance("lock", true);
+    // Lock, then prove the very same connection can actually write.
+    const ok = await advance("lock");
     if (!ok) return;
     toast.success("Connected to the local database");
     onConnected?.(config);
