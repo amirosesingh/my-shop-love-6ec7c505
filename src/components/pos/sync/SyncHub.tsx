@@ -44,6 +44,19 @@ import {
   subscribeConflicts,
   type SyncConflict,
 } from "@/lib/sync-conflicts";
+import {
+  listUnappliedStock,
+  retryAllUnappliedStock,
+  retryUnappliedStock,
+  subscribeUnappliedStock,
+  type UnappliedMovement,
+} from "@/lib/stock-recovery";
+import {
+  describeDiagnostic,
+  listDiagnostics,
+  subscribeDiagnostics,
+  type DiagnosticEvent,
+} from "@/lib/diagnostics";
 
 const when = (iso?: string | null) => (iso ? new Date(iso).toLocaleString() : "—");
 
@@ -64,6 +77,9 @@ export function SyncHub() {
   const [localQueue, setLocalQueue] = useState<SyncQueueRow[]>([]);
   const [localConnected, setLocalConnected] = useState(false);
   const [conflicts, setConflicts] = useState<SyncConflict[]>([]);
+  const [unapplied, setUnapplied] = useState<UnappliedMovement[]>([]);
+  const [diagnostics, setDiagnostics] = useState<DiagnosticEvent[]>([]);
+  const [retrying, setRetrying] = useState(false);
   const [busy, setBusy] = useState<"push" | "pull" | "cycle" | null>(null);
   const [progress, setProgress] = useState(0);
   const [direction, setDirection] = useState("all");
@@ -92,16 +108,22 @@ export function SyncHub() {
       setLocalQueue([]);
     }
     setConflicts(listConflicts());
+    setUnapplied(listUnappliedStock());
+    setDiagnostics(listDiagnostics(50));
   }, []);
 
   useEffect(() => {
     void refresh();
     const off = subscribeSyncAudit(() => void refresh());
     const offConflicts = subscribeConflicts(() => setConflicts(listConflicts()));
+    const offStock = subscribeUnappliedStock(() => setUnapplied(listUnappliedStock()));
+    const offDiag = subscribeDiagnostics(() => setDiagnostics(listDiagnostics(50)));
     const timer = window.setInterval(() => void refresh(), 8000);
     return () => {
       off();
       offConflicts();
+      offStock();
+      offDiag();
       window.clearInterval(timer);
     };
   }, [refresh]);
@@ -318,6 +340,87 @@ export function SyncHub() {
                 >
                   Got it
                 </Button>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {(unapplied.length > 0 || diagnostics.length > 0) && (
+        <Card className="border-warning/40">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <TriangleAlert className="size-4 text-warning" /> Unapplied stock movements
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {unapplied.length > 0 ? (
+              <>
+                <p className="text-xs text-muted-foreground">
+                  These stock changes were recorded on the bill but never reached the central stock
+                  figure. Retrying is safe — each movement can only ever be applied once.
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={retrying}
+                  onClick={async () => {
+                    setRetrying(true);
+                    const res = await retryAllUnappliedStock();
+                    setRetrying(false);
+                    toast[res.remaining ? "warning" : "success"](
+                      `${res.applied} applied, ${res.remaining} still waiting`,
+                    );
+                    await refresh();
+                  }}
+                >
+                  {retrying ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <RotateCcw className="size-3.5" />
+                  )}
+                  Retry all
+                </Button>
+                {unapplied.map((m) => (
+                  <div
+                    key={m.movementId}
+                    className="flex flex-wrap items-center gap-2 rounded-md border border-border p-2 text-xs"
+                  >
+                    <span className="font-mono">{m.productId.slice(0, 8)}</span>
+                    <span className="tabular-nums">
+                      {m.delta > 0 ? `+${m.delta}` : m.delta}
+                    </span>
+                    <span className="text-muted-foreground">{m.storeId ?? "—"}</span>
+                    <span className="text-destructive">{m.reason}</span>
+                    <span className="text-muted-foreground">{when(m.at)}</span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="ml-auto"
+                      disabled={retrying}
+                      onClick={async () => {
+                        const ok = await retryUnappliedStock(m.movementId);
+                        toast[ok ? "success" : "error"](
+                          ok ? "Stock movement applied" : "Still could not apply it",
+                        );
+                        await refresh();
+                      }}
+                    >
+                      <RotateCcw className="size-3.5" /> Retry
+                    </Button>
+                  </div>
+                ))}
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                No stock movement is waiting. Recent background checks that could not be completed
+                are listed below.
+              </p>
+            )}
+            {diagnostics.slice(0, 10).map((d) => (
+              <div key={d.id} className="rounded-md border border-border p-2 text-xs">
+                <span className="text-muted-foreground">{when(d.at)} — </span>
+                {describeDiagnostic(d)}
               </div>
             ))}
           </CardContent>

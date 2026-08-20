@@ -3362,6 +3362,7 @@ export type Database = {
         Args: { _expected_version?: number; _patch: Json; _store_id: string }
         Returns: Json
       }
+      product_delete_guard: { Args: { _product_id: string }; Returns: Json }
       schema_inventory: { Args: never; Returns: Json }
       security_report_findings: {
         Args: { _deployment_ref: string; _findings: Json; _source: string }

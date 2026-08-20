@@ -1260,3 +1260,10 @@ For any future change (add/remove/modify a feature, fix a bug, alter a table, ch
 **Highest-priority tests to add:** sale idempotency under retry; stock delta double-apply; `cartTotals` tax-mode matrix; manager-gate accept/deny; settings inheritance and locks.
 
 **Recommended improvements (post-audit):** create the missing database objects and surface their absence in diagnostics; batch stock deltas into one RPC with a retry queue; drop the permissive duplicate policies; split `src/routes/index.tsx`; consolidate the overlapping audit/sync-log modules; add an end-to-end checkout test against a seeded database.
+
+## Part 3 — Delete protection, silent failures, stock recovery (v1.3.16)
+
+- `product_delete_guard(_product_id uuid)` installed; signed-in staff only. It is the deterministic delete guard; an unreachable guard now blocks the delete instead of allowing it. Lookup indexes added on the five referencing columns.
+- Swallowed failures now emit structured diagnostics (`src/lib/diagnostics.ts`): missing backend object, stock delta failed, local mirror failed, duplicate-checkout lookup unavailable, shift lookup unavailable. Codes and ids only — no PINs, tokens, prices or customer data.
+- Failed stock movements are parked in `src/lib/stock-recovery.ts` and retried from Data Sync & Audit. Retry is idempotent via `stock_delta_applied.movement_id`.
+- Shift open treats an "unknown" existence check as unverified, not as "no shift"; it warns instead of failing.
