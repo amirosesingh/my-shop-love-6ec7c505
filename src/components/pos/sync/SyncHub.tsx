@@ -49,6 +49,7 @@ import {
   retryAllUnappliedStock,
   retryUnappliedStock,
   subscribeUnappliedStock,
+  reconcileStock,
   type UnappliedMovement,
 } from "@/lib/stock-recovery";
 import {
