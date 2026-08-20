@@ -664,15 +664,16 @@ export function SqlConnectionModal({
         </div>
 
         <DialogFooter className="gap-2 sm:justify-between">
-          <Button
-            type="button"
-            variant="outline"
-            disabled={running}
-            onClick={() => void advance("credentials")}
-          >
-            {running ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Run checks
-          </Button>
+          {running ? (
+            <Button type="button" variant="outline" onClick={stopRun}>
+              <CircleSlash className="mr-2 h-4 w-4" />
+              Stop
+            </Button>
+          ) : (
+            <Button type="button" variant="outline" onClick={() => void advance("credentials")}>
+              Run checks
+            </Button>
+          )}
           <Button type="button" disabled={running || !catalogReady} onClick={() => void finish()}>
             {catalogReady ? <Lock className="mr-2 h-4 w-4" /> : <Plug className="mr-2 h-4 w-4" />}
             Lock &amp; save
@@ -687,6 +688,7 @@ function StepIcon({ status }: { status: StepStatus }) {
   if (status === "running") return <Loader2 className="mt-0.5 h-4 w-4 animate-spin text-primary" />;
   if (status === "passed") return <CheckCircle2 className="mt-0.5 h-4 w-4 text-emerald-600" />;
   if (status === "failed") return <TriangleAlert className="mt-0.5 h-4 w-4 text-destructive" />;
+  if (status === "stopped") return <CircleSlash className="mt-0.5 h-4 w-4 text-muted-foreground" />;
   return <Circle className="mt-0.5 h-4 w-4 text-muted-foreground" />;
 }
 
