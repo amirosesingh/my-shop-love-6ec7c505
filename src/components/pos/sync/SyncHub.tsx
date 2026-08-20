@@ -348,7 +348,7 @@ export function SyncHub() {
         </Card>
       )}
 
-      {(unapplied.length > 0 || diagnostics.length > 0) && (
+      {
         <Card className="border-warning/40">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
@@ -356,6 +356,46 @@ export function SyncHub() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={reconciling}
+                onClick={async () => {
+                  const { activeBranchId } = await import("@/lib/active-branch");
+                  const branch = activeBranchId();
+                  if (!branch) {
+                    toast.error("Pick a branch before reconciling stock");
+                    return;
+                  }
+                  setReconciling(true);
+                  try {
+                    const report = await reconcileStock(branch);
+                    const total =
+                      report.notApplied.length +
+                      report.amountMismatch.length +
+                      report.stockMismatch.length;
+                    toast[total ? "warning" : "success"](
+                      total
+                        ? `${report.notApplied.length} not applied, ${report.amountMismatch.length} amount differences, ${report.stockMismatch.length} stock differences`
+                        : "Stock matches the movement ledger",
+                    );
+                  } catch (e) {
+                    toast.error((e as Error)?.message ?? "Could not reconcile stock");
+                  } finally {
+                    setReconciling(false);
+                    await refresh();
+                  }
+                }}
+              >
+                {reconciling ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <RotateCcw className="size-3.5" />
+                )}
+                Reconcile stock
+              </Button>
+            </div>
             {unapplied.length > 0 ? (
               <>
                 <p className="text-xs text-muted-foreground">
