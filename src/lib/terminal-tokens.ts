@@ -349,6 +349,10 @@ export async function deleteTerminalToken(id: string): Promise<void> {
 
 export type TerminalConfig = {
   tokenId: string;
+  /** human-readable name of this physical machine, shown everywhere */
+  deviceName?: string;
+  /** pc or mobile, as recorded when the code was issued */
+  deviceType?: "pc" | "mobile";
   locationId: string;
   locationName: string;
   supabaseUrl: string;
