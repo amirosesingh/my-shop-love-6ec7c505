@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS public.sales_client_transaction_id_uidx;

@@ -65,7 +65,9 @@ import {
   emptyBranchSettings,
   emptyScopeIds,
   loadBranchSettings,
+  resolveScopedSettings,
   saveSectionOverride,
+
   setSectionLock,
   SETTING_TIERS,
   type BranchSettingsState,
@@ -2028,18 +2030,11 @@ export function PosProvider({ children }: { children: ReactNode }) {
   // Every consumer sees the resolved record:
   // Private > Branch > Cluster > Global > shipped default.
   const effectiveState = useMemo(() => {
-    let settings = state.settings;
-    let touched = false;
-    for (const tier of SETTING_TIERS) {
-      for (const key of Object.keys(scope.overrides[tier]) as SettingsSectionId[]) {
-        if (scope.locks[key]) continue;
-        settings = mergePatch(settings, scope.overrides[tier][key]);
-        touched = true;
-      }
-    }
+    const { settings, touched } = resolveScopedSettings(state.settings, scope, mergePatch);
     if (!touched) return state;
     return { ...state, settings };
   }, [state, scope]);
+
 
   /** Which tier is supplying the value at a dotted settings path right now. */
   const sourceOfPath = useCallback(
