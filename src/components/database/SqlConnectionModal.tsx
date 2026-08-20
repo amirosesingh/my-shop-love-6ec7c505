@@ -6,6 +6,7 @@ import {
   Database,
   Loader2,
   Lock,
+  CircleSlash,
   Plug,
   RotateCw,
   TriangleAlert,
