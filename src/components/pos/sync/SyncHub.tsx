@@ -62,6 +62,7 @@ export function SyncHub() {
   const [engine, setEngine] = useState<LocalEngineInfo | null>(null);
   const [queue, setQueue] = useState<QueueView[]>([]);
   const [localQueue, setLocalQueue] = useState<SyncQueueRow[]>([]);
+  const [localConnected, setLocalConnected] = useState(false);
   const [conflicts, setConflicts] = useState<SyncConflict[]>([]);
   const [busy, setBusy] = useState<"push" | "pull" | "cycle" | null>(null);
   const [progress, setProgress] = useState(0);
@@ -78,13 +79,16 @@ export function SyncHub() {
     if (bridge?.status) {
       try {
         const st = await bridge.status();
+        setLocalConnected(!!st.connected);
         setLocalQueue(
           (st.queue ?? []).filter((r) => r.status === "error" || r.status === "quarantined"),
         );
       } catch {
+        setLocalConnected(false);
         setLocalQueue([]);
       }
     } else {
+      setLocalConnected(false);
       setLocalQueue([]);
     }
     setConflicts(listConflicts());
@@ -149,7 +153,7 @@ export function SyncHub() {
   // Two different stores, named for what they are: the branch SQL Server is the
   // operational database, the file below is only a mirror plus the audit ledger.
   const operational = localDb()
-    ? localQueueConnected
+    ? localConnected
       ? "Branch SQL Server — connected"
       : "Branch SQL Server — unavailable"
     : "Browser storage (no local SQL Server)";
