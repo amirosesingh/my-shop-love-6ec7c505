@@ -76,7 +76,6 @@ import {
   discountLabel,
   loadMemberVouchers,
   loadVoucherByToken,
-  redeemVoucher,
   scopeLabel,
   voucherValue,
 } from "@/lib/coupons";
