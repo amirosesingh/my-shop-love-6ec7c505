@@ -1,6 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useCart } from "@/lib/register/use-cart";
+import { useTender } from "@/lib/register/use-tender";
+import { isoDaysFromNow, useBookingIntake } from "@/lib/register/use-booking-intake";
 import {
   BadgeCheck,
   Banknote,
@@ -101,7 +103,7 @@ import { logSystemAction } from "@/lib/system-audit";
 import { openCustomerDisplay, publishDisplay, toDisplayLine, type DisplaySnapshot } from "@/lib/customer-display";
 import { MemberHistoryDialog } from "@/components/pos/MemberHistoryDialog";
 
-const isoDaysFromNow = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+
 
 export const Route = createFileRoute("/")({
   validateSearch: (
@@ -236,7 +238,6 @@ function Register() {
   const [billHit, setBillHit] = useState<Sale | null>(null);
   const [picks, setPicks] = useState<Record<number, number>>({});
 
-  const [payOpen, setPayOpen] = useState(false);
   /** True while a sale / booking is being stored — blocks a second click. */
   const [saving, setSaving] = useState(false);
   const [openShiftOpen, setOpenShiftOpen] = useState(false);
@@ -249,20 +250,39 @@ function Register() {
    *  supervisors: no coupons, exchanges, drawer opens, prints or payments. */
   const tillLocked = !activeShift;
   const lockedReason = "Open a shift first";
-  const [tendered, setTendered] = useState("");
-  const [method, setMethod] = useState<PaymentMethod>("cash");
-  const [transferRef, setTransferRef] = useState("");
-  /** Serial / voucher number typed for a tender that demands one. */
-  const [tenderRef, setTenderRef] = useState("");
-  const [tenderRefNote, setTenderRefNote] = useState("");
-  // Tenders are configured centrally, so a new collection type (a government
-  // voucher scheme, say) appears at the till without a new build.
-  const { types: paymentTypes } = usePaymentTypes();
-  const tenderOptions = activePaymentTypes(paymentTypes);
-  const activeTender = tenderOptions.find((t) => t.code === method);
-  const activeMethodName = activeTender?.name ?? methodLabel(method);
-  /** Voucher / coupon tenders cannot complete without their serial number. */
-  const needsTenderRef = !!activeTender?.requiresReference && method !== "bank_transfer";
+  const {
+    payOpen,
+    setPayOpen,
+    tendered,
+    setTendered,
+    method,
+    setMethod,
+    transferRef,
+    setTransferRef,
+    tenderRef,
+    setTenderRef,
+    tenderRefNote,
+    setTenderRefNote,
+    splitOpen,
+    setSplitOpen,
+    splitWays,
+    setSplitWays,
+    tenders,
+    setTenders,
+    bankName,
+    setBankName,
+    paymentTypes,
+    tenderOptions,
+    activeTender,
+    activeMethodName,
+    needsTenderRef,
+    openPayment,
+    resetTender,
+  } = useTender({
+    hasLines: () => lines.length > 0,
+    getTotal: () => totals.total,
+  });
+
   const [waNumber, setWaNumber] = useState("");
   const [waSending, setWaSending] = useState(false);
   const [lastSale, setLastSale] = useState<Sale | null>(null);
@@ -271,51 +291,78 @@ function Register() {
   const memberInputRef = useRef<HTMLInputElement>(null);
   const [historyMemberId, setHistoryMemberId] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
-  const [bookOpen, setBookOpen] = useState(false);
-  const [deposit, setDeposit] = useState("");
-  const [depositMethod, setDepositMethod] = useState<PaymentMethod>("cash");
-  const [dueDate, setDueDate] = useState(isoDaysFromNow(14));
-  const [bookName, setBookName] = useState("");
-  const [bookPhone, setBookPhone] = useState("");
-  const [bookNote, setBookNote] = useState("");
-  // What the booking is for (re-stringing, repair …) and when it gets paid.
-  const [serviceId, setServiceId] = useState("");
-  const [customService, setCustomService] = useState("");
-  const [payTiming, setPayTiming] = useState<BookingPaymentTiming>("deposit");
-  /* Racket stringing job card */
-  /** Which flow opened the booking dialog: goods booking vs racket job. */
-  const [bookMode, setBookMode] = useState<"cart" | "racket">("cart");
-  const [racketModel, setRacketModel] = useState("");
-  const [stringType, setStringType] = useState("");
-  const [tensionMain, setTensionMain] = useState("");
-  const [tensionCross, setTensionCross] = useState("");
-  const [tensionUnit, setTensionUnit] = useState<"lb" | "kg">("lb");
-  const [grommetNotes, setGrommetNotes] = useState("");
-  const [jobNotes, setJobNotes] = useState("");
-  const [promisedAt, setPromisedAt] = useState("");
-  const [stencil, setStencil] = useState(false);
-  const [overgrip, setOvergrip] = useState(false);
-  /** Job tag / barcode printed on the racket and carried onto the ticket. */
-  const [jobTag, setJobTag] = useState("");
-  /** Booking hub chooser: racket service vs standard reservation. */
-  const [bookingHubOpen, setBookingHubOpen] = useState(false);
-  /** Set when the racket dialog is re-opened to edit an existing job. */
-  const [editBookingId, setEditBookingId] = useState<string | null>(null);
-  const [notifyWhatsApp, setNotifyWhatsApp] = useState(false);
-  /** Itemised racket intake charges: labour, string, grip, add-ons. */
-  const [intakeCharges, setIntakeCharges] = useState<IntakeCharge[]>([]);
-  /** Customer accepted the service & high-tension liability terms at intake. */
-  const [liabilityOk, setLiabilityOk] = useState(false);
-  /** Customer lookup inside the booking dialog (name or phone). */
-  const [bookMemberQuery, setBookMemberQuery] = useState("");
-  /** Racket / string sourced from stock, or brought in by the customer. */
-  const [racketProductId, setRacketProductId] = useState("");
-  const [racketCustomerOwned, setRacketCustomerOwned] = useState(true);
-  const [stringProductId, setStringProductId] = useState("");
-  const [stringCustomerOwned, setStringCustomerOwned] = useState(false);
-  /** Labour is locked to the configured fee until a cashier overrides it. */
-  const [labourUnlocked, setLabourUnlocked] = useState(false);
-  const [labourReason, setLabourReason] = useState("");
+  const {
+    bookOpen,
+    setBookOpen,
+    deposit,
+    setDeposit,
+    depositMethod,
+    setDepositMethod,
+    dueDate,
+    setDueDate,
+    bookName,
+    setBookName,
+    bookPhone,
+    setBookPhone,
+    bookNote,
+    setBookNote,
+    serviceId,
+    setServiceId,
+    customService,
+    setCustomService,
+    payTiming,
+    setPayTiming,
+    bookMode,
+    setBookMode,
+    racketModel,
+    setRacketModel,
+    stringType,
+    setStringType,
+    tensionMain,
+    setTensionMain,
+    tensionCross,
+    setTensionCross,
+    tensionUnit,
+    setTensionUnit,
+    grommetNotes,
+    setGrommetNotes,
+    jobNotes,
+    setJobNotes,
+    promisedAt,
+    setPromisedAt,
+    stencil,
+    setStencil,
+    overgrip,
+    setOvergrip,
+    jobTag,
+    setJobTag,
+    bookingHubOpen,
+    setBookingHubOpen,
+    editBookingId,
+    setEditBookingId,
+    notifyWhatsApp,
+    setNotifyWhatsApp,
+    intakeCharges,
+    setIntakeCharges,
+    liabilityOk,
+    setLiabilityOk,
+    bookMemberQuery,
+    setBookMemberQuery,
+    racketProductId,
+    setRacketProductId,
+    racketCustomerOwned,
+    setRacketCustomerOwned,
+    stringProductId,
+    setStringProductId,
+    stringCustomerOwned,
+    setStringCustomerOwned,
+    labourUnlocked,
+    setLabourUnlocked,
+    labourReason,
+    setLabourReason,
+    resetJobCard,
+  } = useBookingIntake();
+
   /** Narrow windows: the action deck collapses so it can't cover the totals. */
   const [deckOpen, setDeckOpen] = useState(false);
   /* Operation deck state */
@@ -330,11 +377,6 @@ function Register() {
   /** Live vouchers held by the attached member, for the picker. */
   const [memberVouchers, setMemberVouchers] = useState<VoucherView[]>([]);
   const [voucherPickerOpen, setVoucherPickerOpen] = useState(false);
-  const [splitOpen, setSplitOpen] = useState(false);
-  const [splitWays, setSplitWays] = useState(2);
-  /* Split tenders + card machine capture */
-  const [tenders, setTenders] = useState<Payment[]>([]);
-  const [bankName, setBankName] = useState("");
   /* No-sale drawer open */
   const [noSaleOpen, setNoSaleOpen] = useState(false);
   const [noSaleReason, setNoSaleReason] = useState("");
@@ -662,29 +704,6 @@ function Register() {
   const stringingService = serviceTypes.find((s2) => s2.isStringingJob) ?? null;
   const racketMode = bookMode === "racket";
 
-  function resetJobCard() {
-    setRacketModel("");
-    setStringType("");
-    setTensionMain("");
-    setTensionCross("");
-    setTensionUnit("lb");
-    setGrommetNotes("");
-    setJobNotes("");
-    setPromisedAt("");
-    setNotifyWhatsApp(false);
-    setIntakeCharges([]);
-    setStencil(false);
-    setOvergrip(false);
-    setJobTag("");
-    setEditBookingId(null);
-    setBookMemberQuery("");
-    setRacketProductId("");
-    setRacketCustomerOwned(true);
-    setStringProductId("");
-    setStringCustomerOwned(false);
-    setLabourUnlocked(false);
-    setLabourReason("");
-  }
 
   /** Master lists an admin curates in booking settings. */
   const racketModelList = state.settings.integrations.racketModels ?? [];
@@ -1307,13 +1326,7 @@ function Register() {
     });
     resetCart();
     setMemberId(null);
-    setTendered("");
-    setTransferRef("");
-    setTenderRef("");
-    setTenderRefNote("");
-    setTenders([]);
-    setBankName("");
-    setPayOpen(false);
+    resetTender();
     toast.success(
       exchangeRef ? `Exchange ${sale.receiptNo} completed against ${exchangeRef}` : `Sale ${sale.receiptNo} completed`,
     );
@@ -1321,12 +1334,6 @@ function Register() {
 
   /* ── Operation deck helpers ─────────────────────────────────────── */
 
-  function openPayment(preset?: PaymentMethod) {
-    if (!lines.length) return;
-    if (preset) setMethod(preset);
-    setTendered(Math.max(0, totals.total).toFixed(2));
-    setPayOpen(true);
-  }
 
   /** Park the open ticket with everything on it, so reopening is lossless. */
   function holdOrder(silent = false) {
