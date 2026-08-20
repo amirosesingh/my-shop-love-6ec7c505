@@ -44,6 +44,19 @@ import {
   subscribeConflicts,
   type SyncConflict,
 } from "@/lib/sync-conflicts";
+import {
+  listUnappliedStock,
+  retryAllUnappliedStock,
+  retryUnappliedStock,
+  subscribeUnappliedStock,
+  type UnappliedMovement,
+} from "@/lib/stock-recovery";
+import {
+  describeDiagnostic,
+  listDiagnostics,
+  subscribeDiagnostics,
+  type DiagnosticEvent,
+} from "@/lib/diagnostics";
 
 const when = (iso?: string | null) => (iso ? new Date(iso).toLocaleString() : "—");
 
@@ -64,6 +77,9 @@ export function SyncHub() {
   const [localQueue, setLocalQueue] = useState<SyncQueueRow[]>([]);
   const [localConnected, setLocalConnected] = useState(false);
   const [conflicts, setConflicts] = useState<SyncConflict[]>([]);
+  const [unapplied, setUnapplied] = useState<UnappliedMovement[]>([]);
+  const [diagnostics, setDiagnostics] = useState<DiagnosticEvent[]>([]);
+  const [retrying, setRetrying] = useState(false);
   const [busy, setBusy] = useState<"push" | "pull" | "cycle" | null>(null);
   const [progress, setProgress] = useState(0);
   const [direction, setDirection] = useState("all");
@@ -92,16 +108,22 @@ export function SyncHub() {
       setLocalQueue([]);
     }
     setConflicts(listConflicts());
+    setUnapplied(listUnappliedStock());
+    setDiagnostics(listDiagnostics(50));
   }, []);
 
   useEffect(() => {
     void refresh();
     const off = subscribeSyncAudit(() => void refresh());
     const offConflicts = subscribeConflicts(() => setConflicts(listConflicts()));
+    const offStock = subscribeUnappliedStock(() => setUnapplied(listUnappliedStock()));
+    const offDiag = subscribeDiagnostics(() => setDiagnostics(listDiagnostics(50)));
     const timer = window.setInterval(() => void refresh(), 8000);
     return () => {
       off();
       offConflicts();
+      offStock();
+      offDiag();
       window.clearInterval(timer);
     };
   }, [refresh]);
