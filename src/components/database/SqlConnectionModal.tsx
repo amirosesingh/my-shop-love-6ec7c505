@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   CheckCircle2,
@@ -346,12 +346,37 @@ export function SqlConnectionModal({
     return true;
   };
 
+  /**
+   * Final proof: the till's own pool inserts a probe row, reads it back and
+   * rolls the transaction back. Signing in is not the same as being able to
+   * write, so this stage is separate and never inferred from the one before.
+   */
+  const runWrite = async () => {
+    mark("write", { status: "running" });
+    const started = Date.now();
+    const res = await verifyLocalWrite();
+    const ms = Date.now() - started;
+    if (!res.ok)
+      return failure(
+        "write",
+        { ...res, error: `Database write verification failed — ${res.error ?? "unknown reason"}` },
+        ms,
+      );
+    mark("write", {
+      status: "passed",
+      ms,
+      detail: `Wrote and rolled back a probe row in ${res.activeDb ?? config.database}`,
+    });
+    return true;
+  };
+
   const RUNNERS: Record<StepKey, () => Promise<boolean>> = {
     credentials: runCredentials,
     socket: runSocket,
     handshake: runHandshake,
     catalog: runCatalog,
     lock: runLock,
+    write: runWrite,
   };
 
   /** Runs `key` and, unless retrying a single step, everything after it. */
