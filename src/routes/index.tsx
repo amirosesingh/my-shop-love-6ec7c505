@@ -284,7 +284,6 @@ function Register() {
 
   const [waNumber, setWaNumber] = useState("");
   const [waSending, setWaSending] = useState(false);
-  const [lastSale, setLastSale] = useState<Sale | null>(null);
   const [memberQuery, setMemberQuery] = useState("");
   const [quickMemberOpen, setQuickMemberOpen] = useState(false);
   const memberInputRef = useRef<HTMLInputElement>(null);
