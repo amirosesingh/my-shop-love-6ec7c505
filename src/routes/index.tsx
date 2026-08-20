@@ -7,6 +7,7 @@ import { useCheckout } from "@/lib/register/use-checkout";
 import { usePromotions } from "@/lib/register/use-promotions";
 import { useExchange } from "@/lib/register/use-exchange";
 import { useRegisterHeldOrders } from "@/lib/register/use-held-orders";
+import { TICKET_ACTIONS, logTicketEvent } from "@/lib/ticket-audit";
 import {
   BadgeCheck,
   Banknote,
