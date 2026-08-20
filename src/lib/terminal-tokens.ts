@@ -702,8 +702,20 @@ export async function activateTerminal(code: string): Promise<TerminalConfig> {
     throw new ActivationError("This activation token has already been used or expired.");
   }
 
+  // Best effort: carry the name management gave this machine onto the device
+  // itself, so logs and telemetry read "Front counter" rather than a UUID.
+  const named = await (tenant as any)
+    .from("terminal_tokens")
+    .select("device_name, platform")
+    .eq("id", payload.token_id)
+    .maybeSingle()
+    .then((r: any) => r?.data ?? null)
+    .catch(() => null);
+
   const config: TerminalConfig = {
     tokenId: payload.token_id,
+    deviceName: (named?.device_name as string | undefined)?.trim() || remote.locationName || "",
+    deviceType: named?.platform === "mobile" ? "mobile" : "pc",
     locationId: payload.location_id || remote.locationId,
     locationName: remote.locationName || payload.location_name,
     supabaseUrl: payload.supabase_url,
