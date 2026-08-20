@@ -359,7 +359,12 @@ export function SqlConnectionModal({
     if (!res.ok)
       return failure(
         "write",
-        { ...res, error: `Database write verification failed — ${res.error ?? "unknown reason"}` },
+        {
+          ok: false,
+          code: res.code ?? null,
+          hint: res.hint ?? null,
+          error: `Database write verification failed — ${res.error ?? "unknown reason"}`,
+        },
         ms,
       );
     mark("write", {
