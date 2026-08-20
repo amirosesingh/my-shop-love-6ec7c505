@@ -230,16 +230,27 @@ async function lockDatabase(input) {
  * Phase 2: discover every ONLINE database so the UI can populate itself.
  */
 async function connectInstance(input) {
+  // A previous attempt that is still walking its ladder must never block a
+  // deliberate retry: cancel it, give it a moment to let go, then take over.
   if (inFlight) {
-    return {
-      ok: false,
-      code: "EBUSY",
-      error: "A connection attempt is already running.",
-      hint: "Wait for the current attempt to finish, or close the dialog to cancel it.",
-      attempts: [],
-    };
+    await cancel();
+    for (let waited = 0; inFlight && waited < RELEASE_WAIT_MS; waited += 100) await sleep(100);
+    if (inFlight) {
+      return {
+        ok: false,
+        code: "EBUSY",
+        error: "A connection attempt is still shutting down.",
+        hint: "Press “Reset connection” to clear it, then run the checks again.",
+        attempts: [],
+      };
+    }
   }
-  const run = { cancelled: false };
+  const run = { cancelled: false, timer: null };
+  // Hard release: however the driver behaves, the slot frees itself.
+  run.timer = setTimeout(() => {
+    run.cancelled = true;
+    if (inFlight === run) inFlight = null;
+  }, HANDSHAKE_DEADLINE_MS);
   inFlight = run;
   await disconnect();
   try {
@@ -288,6 +299,7 @@ async function connectInstance(input) {
     await disconnect();
     return { ok: false, ...diagnose(err) };
   } finally {
+    if (run.timer) clearTimeout(run.timer);
     if (inFlight === run) inFlight = null;
   }
 }
