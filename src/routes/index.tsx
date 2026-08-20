@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useCart } from "@/lib/register/use-cart";
 import { useTender } from "@/lib/register/use-tender";
 import { isoDaysFromNow, useBookingIntake } from "@/lib/register/use-booking-intake";
+import { useCheckout } from "@/lib/register/use-checkout";
 import {
   BadgeCheck,
   Banknote,
@@ -75,7 +76,6 @@ import {
   discountLabel,
   loadMemberVouchers,
   loadVoucherByToken,
-  redeemVoucher,
   scopeLabel,
   voucherValue,
 } from "@/lib/coupons";
@@ -83,11 +83,11 @@ import type { Campaign, VoucherView } from "@/lib/coupons";
 import type { Booking, CartLine, DiscountType, IntakeCharge, PaymentMethod, Sale } from "@/lib/pos-types";
 import { applyCombo, intakeTotals, newJobTag } from "@/lib/booking-charges";
 import type { Payment } from "@/lib/pos-types";
-import { TenderSplit, rememberBanks } from "@/components/pos/TenderSplit";
+import { TenderSplit } from "@/components/pos/TenderSplit";
 import { lineUnitDiscount, methodLabel, paymentsLabel, paymentsTotal, PAYMENT_LABELS, r2, validateTenders } from "@/lib/pos-types";
 import { activePaymentTypes, tenderIcon, usePaymentTypes } from "@/lib/payment-types";
 import { NO_SALE_REASON_MAX, NO_SALE_REASON_MIN, recordNoSale } from "@/lib/drawer-events";
-import { buildBookingMessage, buildSaleMessage, sendBillOnWhatsApp } from "@/lib/whatsapp";
+
 import { logger } from "@/lib/audit-log";
 import { DiscountPad } from "@/components/pos/DiscountPad";
 import { useManagerGate, type GateRequest } from "@/lib/manager-gate";
@@ -97,7 +97,7 @@ import { parseAmount, parsePositiveAmount } from "@/lib/amount";
 import { getPosCallerAuth } from "@/lib/pos-caller-auth";
 import { evaluatePromotions, focLine } from "@/lib/pos-promotions";
 import { clearCartDraft, loadCartDraft, saveCartDraft } from "@/lib/cart-draft";
-import { openCashDrawer, printBookingSlip, printJobTag, printSaleReceipt, printShiftReport, saleReceiptPreview } from "@/lib/pos-print";
+import { openCashDrawer, printSaleReceipt, printShiftReport, saleReceiptPreview } from "@/lib/pos-print";
 import { closeScreenView, derivedCashSales, varianceNeedsPin } from "@/lib/shift-close";
 import { logSystemAction } from "@/lib/system-audit";
 import { openCustomerDisplay, publishDisplay, toDisplayLine, type DisplaySnapshot } from "@/lib/customer-display";
@@ -239,7 +239,6 @@ function Register() {
   const [picks, setPicks] = useState<Record<number, number>>({});
 
   /** True while a sale / booking is being stored — blocks a second click. */
-  const [saving, setSaving] = useState(false);
   const [openShiftOpen, setOpenShiftOpen] = useState(false);
   const [float, setFloat] = useState("150");
   const [cashier, setCashier] = useState(user?.name ?? "Cashier");
@@ -285,7 +284,6 @@ function Register() {
 
   const [waNumber, setWaNumber] = useState("");
   const [waSending, setWaSending] = useState(false);
-  const [lastSale, setLastSale] = useState<Sale | null>(null);
   const [memberQuery, setMemberQuery] = useState("");
   const [quickMemberOpen, setQuickMemberOpen] = useState(false);
   const memberInputRef = useRef<HTMLInputElement>(null);
@@ -483,6 +481,7 @@ function Register() {
   const totals = cartTotals(lines, r2(manualBillDiscount + promo.promoDiscount), "amount", taxSettings);
   const pointsEarned = member ? Math.max(0, Math.round(totals.total * promo.pointsRate)) : 0;
 
+
   // Keep the qualifying FOC freebie in sync with the open ticket.
   const focId = promo.foc ? `${promo.foc.promo.id}:${promo.foc.product.id}:${promo.foc.qty}` : "";
   const hasFoc = lines.some((l) => l.foc);
@@ -653,7 +652,112 @@ function Register() {
     transferRef: "",
   });
 
-  // Mirror the live ticket onto the customer-facing second screen.
+  const { saving, lastSale, setLastSale, completeSale, bookAndPayLater, sendSaleOnWhatsApp } = useCheckout({
+    getActiveShift: () => activeShift,
+    getCurrentStore: () => currentStore,
+    getActiveCashier: () => activeCashier,
+    requirePermission,
+    getLines: () => lines,
+    getTotals: () => totals,
+    getMember: () => member,
+    getMemberId: () => memberId,
+    getCoupon: () => coupon,
+    getVoucherToken: () => voucherToken,
+    getExchangeRef: () => exchangeRef,
+    getPointsEarned: () => pointsEarned,
+    getBillNo: () => billNo,
+    resetCart,
+    setLines,
+    setMemberId,
+    setVoucherToken,
+    getMethod: () => method,
+    getTendered: () => tendered,
+    getTransferRef: () => transferRef,
+    getTenderRef: () => tenderRef,
+    getTenderRefNote: () => tenderRefNote,
+    getBankName: () => bankName,
+    getTenders: () => tenders,
+    getActiveMethodName: () => activeMethodName,
+    getNeedsTenderRef: () => needsTenderRef,
+    resetTender,
+    bookingIntake: {
+      bookOpen,
+      setBookOpen,
+      deposit,
+      setDeposit,
+      depositMethod,
+      setDepositMethod,
+      dueDate,
+      setDueDate,
+      bookName,
+      setBookName,
+      bookPhone,
+      setBookPhone,
+      bookNote,
+      setBookNote,
+      serviceId,
+      setServiceId,
+      customService,
+      setCustomService,
+      payTiming,
+      setPayTiming,
+      bookMode,
+      setBookMode,
+      racketModel,
+      setRacketModel,
+      stringType,
+      setStringType,
+      tensionMain,
+      setTensionMain,
+      tensionCross,
+      setTensionCross,
+      tensionUnit,
+      setTensionUnit,
+      grommetNotes,
+      setGrommetNotes,
+      jobNotes,
+      setJobNotes,
+      promisedAt,
+      setPromisedAt,
+      stencil,
+      setStencil,
+      overgrip,
+      setOvergrip,
+      jobTag,
+      setJobTag,
+      bookingHubOpen,
+      setBookingHubOpen,
+      editBookingId,
+      setEditBookingId,
+      notifyWhatsApp,
+      setNotifyWhatsApp,
+      intakeCharges,
+      setIntakeCharges,
+      liabilityOk,
+      setLiabilityOk,
+      bookMemberQuery,
+      setBookMemberQuery,
+      racketProductId,
+      setRacketProductId,
+      racketCustomerOwned,
+      setRacketCustomerOwned,
+      stringProductId,
+      setStringProductId,
+      stringCustomerOwned,
+      setStringCustomerOwned,
+      labourUnlocked,
+      setLabourUnlocked,
+      labourReason,
+      setLabourReason,
+      resetJobCard,
+    },
+    getWaNumber: () => waNumber,
+    setWaNumber,
+    setWaSending,
+    cartSnapshot,
+    getDisplayBase: () => displayBase,
+  });
+
   const displayKey = JSON.stringify({
     l: lines.map((l) => [l.productId, l.qty, l.discount, l.discountType, l.foc, l.credit]),
     t: totals.total,
@@ -681,23 +785,6 @@ function Register() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [payOpen, method, transferRef, displayKey]);
 
-  const wa = state.settings.whatsapp;
-
-  /** Sends the finished bill to the customer's WhatsApp. */
-  async function sendSaleOnWhatsApp(sale: Sale, to: string) {
-    setWaSending(true);
-    const buyer = state.members.find((m) => m.id === sale.memberId) ?? null;
-    const res = await sendBillOnWhatsApp({
-      cfg: wa,
-      to,
-      body: buildSaleMessage(sale, displayBase.companyName, wa),
-      reference: sale.receiptNo,
-      member: buyer,
-    });
-    setWaSending(false);
-    if (res.ok) toast.success(`Bill ${sale.receiptNo} sent on WhatsApp`);
-    else toast.error("WhatsApp send failed", { description: res.error });
-  }
 
   const serviceTypes = (state.settings.integrations.serviceTypes ?? []).filter((s2) => s2.active && s2.name.trim());
   const pickedService = serviceTypes.find((s2) => s2.id === serviceId) ?? null;
@@ -979,358 +1066,6 @@ function Register() {
   const bookingBalance = r2(Math.max(0, bookingTotal - bookingPaidNow));
   const bookingDepositShort = bookingMinDeposit > 0 && bookingPaidNow + 0.001 < bookingMinDeposit;
 
-  async function bookAndPayLater() {
-    if (!activeShift) {
-      toast.error("Open a shift before taking a booking");
-      return;
-    }
-    if (!racketMode && !lines.length) {
-      toast.error("Please add at least one item to the cart before saving a pay-later booking.", {
-        description: "Only racket / stringing jobs can be booked with an empty cart.",
-      });
-      return;
-    }
-    if (!(await requirePermission("can_create_booking"))) return;
-    const paidNow =
-      payTiming === "collection" ? 0 : payTiming === "now" ? bookingTotal : r2(Math.max(0, Number(deposit || 0)));
-    if (paidNow > bookingTotal) {
-      toast.error("Deposit cannot exceed the booking total");
-      return;
-    }
-    const minDeposit = Math.min(minDepositFor(bookingTotal), bookingTotal);
-    if (minDeposit > 0 && paidNow + 0.001 < minDeposit) {
-      toast.error(`This branch needs a deposit of at least ${money(minDeposit)}`);
-      return;
-    }
-    if (!racketMode && bookingRules.serviceTerms.trim() && !liabilityOk) {
-      toast.error("The customer must accept the booking terms & conditions", {
-        description: "Tick the agreement box at the bottom of the booking form.",
-      });
-      return;
-    }
-    if (racketMode) {
-      if (labourUnlocked && !labourReason.trim()) {
-        toast.error("Enter a reason for the labour override");
-        return;
-      }
-      if (bookingRules.requireRacketModel && !racketModel.trim()) {
-        toast.error("Enter the racket brand / model");
-        return;
-      }
-      if (bookingRules.requireStringType && !stringType.trim()) {
-        toast.error("Enter the string type / brand");
-        return;
-      }
-      if (bookingRules.requirePromisedAt && !promisedAt) {
-        toast.error("Choose a ready-by date and time");
-        return;
-      }
-      if (
-        bookingRules.requireLiabilityAccept &&
-        bookingRules.serviceTerms.trim() &&
-        !liabilityOk
-      ) {
-        toast.error("The customer must accept the service & liability terms", {
-          description: highTension
-            ? "This job is flagged high tension — acceptance is required."
-            : "Tick the agreement box on the intake form.",
-        });
-        return;
-      }
-      if (bookingRules.warnOutsideTradingHours && promisedAt) {
-        const hhmm = promisedAt.slice(11, 16);
-        const { dayStart, dayEnd } = state.settings.hours;
-        if (dayStart && dayEnd && (hhmm < dayStart || hhmm > dayEnd))
-          toast.warning(`Ready-by time is outside trading hours (${dayStart}–${dayEnd})`);
-      }
-    }
-    if (!dueDate) {
-      toast.error("Choose a collect-by date");
-      return;
-    }
-    let booking: Booking;
-    try {
-      setSaving(true);
-      booking = await createBooking({
-        storeId: currentStore.id,
-        shiftId: activeShift.id,
-        lines,
-        subtotal: r2(totals.subtotal + serviceCharge),
-        discount: totals.discount,
-        tax: totals.tax,
-        total: bookingTotal,
-        serviceTypeId: racketMode ? pickedService?.id : undefined,
-        serviceName: racketMode ? serviceLabel || undefined : undefined,
-        serviceFee: serviceCharge || undefined,
-        charges: racketMode && intake.charges.length
-          ? intake.charges.map((c) =>
-              c.kind === "labor" && labourUnlocked && labourReason.trim()
-                ? { ...c, overrideReason: labourReason.trim() }
-                : c,
-            )
-          : undefined,
-        paymentTiming: payTiming,
-        deposit: paidNow,
-        depositMethod,
-        dueDate,
-        memberId,
-        customerName: bookName.trim() || member?.name || "Walk-in",
-        customerPhone: bookPhone.trim() || member?.phone || "",
-        note: bookNote.trim(),
-        cashier: activeCashier,
-        tagId: racketMode ? jobTag || (bookingRules.autoJobTag ? newJobTag() : undefined) : undefined,
-        stringOrigin: racketMode ? (stringCustomerOwned ? "customer" : "store") : undefined,
-        liabilityAccepted: liabilityOk,
-        stringProductId: racketMode && !stringCustomerOwned ? stringProductId || undefined : undefined,
-        intakeNote: racketMode ? grommetNotes.trim() || undefined : undefined,
-        job: racketMode
-          ? {
-              racketModel: racketModel.trim() || undefined,
-              stringType: stringType.trim() || undefined,
-              tensionMain: tensionMain ? Number(tensionMain) : undefined,
-              tensionCross: tensionCross ? Number(tensionCross) : undefined,
-              tensionUnit,
-              grommetNotes: grommetNotes.trim() || undefined,
-              jobNotes: jobNotes.trim() || undefined,
-              stencil,
-              overgrip,
-              droppedOffAt: new Date().toISOString(),
-              promisedAt: promisedAt ? new Date(promisedAt).toISOString() : undefined,
-              notifyWhatsApp,
-            }
-          : undefined,
-      });
-    } catch (e) {
-      toast.error("Booking was not saved", {
-        description: (e as { message?: string })?.message ?? "Nothing was stored — try again.",
-      });
-      return;
-    } finally {
-      setSaving(false);
-    }
-    if (paidNow > 0 && depositMethod === "cash") openCashDrawer();
-    printBookingSlip(booking, member, state.settings.payment);
-    if (booking.job) printJobTag(booking);
-    if (wa.enabled && wa.autoSendOnBooking) {
-      void sendBillOnWhatsApp({
-        cfg: wa,
-        to: bookPhone.trim() || member?.phone || "",
-        body: buildBookingMessage(booking, displayBase.companyName, wa),
-        reference: booking.ref,
-        member,
-      });
-    }
-    publishDisplay({
-      ...cartSnapshot(),
-      mode: "booking",
-      paid: booking.paid,
-      balance: r2(booking.total - booking.paid),
-      reference: booking.ref,
-      dueDate: booking.dueDate,
-      method: depositMethod,
-    });
-    resetCart();
-    setMemberId(null);
-    /* The job stays visible on the ticket so the counter can edit its specs
-       and see what is on the bench. It is priced at 0 — the money already sits
-       on the booking as a deposit or an on-collection balance. */
-    setLines([
-      {
-        productId: `booking:${booking.id}`,
-        name: `${booking.job ? "Racket job" : "Booking"} ${booking.ref}`,
-        price: 0,
-        qty: 1,
-        taxRate: 0,
-        discount: 0,
-        bookingId: booking.id,
-        bookingRef: booking.ref,
-        ...(booking.job ? { job: booking.job } : {}),
-      },
-    ]);
-    setBookOpen(false);
-    setDeposit("");
-    setBookName("");
-    setBookPhone("");
-    setBookNote("");
-    setServiceId("");
-    setCustomService("");
-    resetJobCard();
-    setBookMode("cart");
-    setPayTiming("deposit");
-    setDueDate(isoDaysFromNow(14));
-    toast.success(`Booking ${booking.ref} reserved until ${new Date(booking.dueDate).toDateString()}`);
-  }
-
-  async function completeSale() {
-    if (!activeShift) {
-      toast.error("Open a shift before taking payment");
-      return;
-    }
-    const isRefund = totals.total < 0;
-    if (!(await requirePermission("can_process_sale"))) return;
-    if (isRefund && !(await requirePermission("can_process_refund"))) return;
-    const splitting = tenders.length > 0;
-    const split = validateTenders(totals.total, tenders);
-    const splitPaid = split.paid;
-    if (!isRefund && splitting && split.error) {
-      toast.error(
-        split.balance > 0
-          ? `Split tenders cover ${money(splitPaid)} of ${money(totals.total)} — ${split.error}`
-          : split.error,
-      );
-      return;
-    }
-    const paid = isRefund
-      ? totals.total
-      : splitting
-        ? splitPaid
-        : method === "cash"
-          ? Number(tendered || 0)
-          : totals.total;
-    if (!isRefund && !splitting && method === "cash" && paid < totals.total) {
-      toast.error("Tendered amount is less than the total");
-      return;
-    }
-    if (!isRefund && !splitting && method === "card" && !bankName.trim()) {
-      toast.error("Enter which bank card machine was used");
-      return;
-    }
-    if (!isRefund && !splitting && method === "bank_transfer" && !transferRef.trim()) {
-      toast.error("Enter the transfer reference shown on the customer's slip");
-      return;
-    }
-    if (!isRefund && !splitting && needsTenderRef && !tenderRef.trim()) {
-      toast.error(`Enter the serial / reference number for ${activeMethodName}`);
-      return;
-    }
-    if (!isRefund && !splitting && method === "points" && (member?.points ?? 0) < totals.total * 100) {
-      toast.error("Not enough points on this member");
-      return;
-    }
-    const payments: Payment[] = splitting
-      ? tenders
-      : [
-          {
-            id: crypto.randomUUID(),
-            method,
-            amount: r2(Math.abs(totals.total)),
-            ...(method === "card" && bankName.trim() ? { bankName: bankName.trim() } : {}),
-            ...(method === "bank_transfer" && transferRef.trim() ? { ref: transferRef.trim() } : {}),
-            ...(needsTenderRef
-              ? {
-                  requiresReference: true,
-                  reference: tenderRef.trim(),
-                  ...(tenderRefNote.trim() ? { referenceNote: tenderRefNote.trim() } : {}),
-                }
-              : {}),
-          },
-        ];
-    // The headline method stays the largest tender so reports keep working.
-    const headline = payments.reduce((a, p) => (p.amount > a.amount ? p : a), payments[0]!).method;
-    rememberBanks(payments.map((p) => p.bankName ?? ""));
-    let sale: Sale;
-    try {
-      setSaving(true);
-      sale = await recordSale({
-        storeId: currentStore.id,
-        ...(billNo ? { receiptNo: billNo } : {}),
-        shiftId: activeShift.id,
-        lines,
-        subtotal: totals.subtotal,
-        discount: totals.discount,
-        tax: totals.tax,
-        total: totals.total,
-        paid,
-        change: r2(Math.max(0, paid - totals.total)),
-        method: splitting ? headline : method,
-        payments,
-        memberId,
-        pointsEarned,
-        cashier: activeCashier,
-        ...(method === "bank_transfer" ? { transferRef: transferRef.trim() } : {}),
-        ...(exchangeRef ? { exchangeOfReceiptNo: exchangeRef, exchangeCredit: totals.credit } : {}),
-        ...(coupon
-          ? {
-              couponCode: coupon.code,
-              couponPromoId: coupon.promoId,
-              couponScope: coupon.scope,
-              couponDiscount: coupon.discount,
-              couponName: coupon.name,
-              couponRemaining: coupon.remaining,
-            }
-          : {}),
-      });
-    } catch (e) {
-      toast.error("Payment was not saved", {
-        description:
-          (e as { message?: string })?.message ?? "Nothing was stored, so the ticket is untouched — try again.",
-      });
-      return;
-    } finally {
-      setSaving(false);
-    }
-    if (coupon) {
-      logger.log("promotion", "Coupon redeemed on a bill", "register", {
-        receiptNo: sale.receiptNo,
-        coupon: coupon.code,
-        promotionId: coupon.promoId,
-        scope: coupon.scope,
-        product: coupon.productName ?? null,
-        discountValue: coupon.discount,
-        billTotal: sale.total,
-        storeId: sale.storeId,
-      });
-    }
-    if (payments.some((p) => p.method === "cash")) openCashDrawer();
-    if (voucherToken) {
-      // Single-use lock lives in the database, so a second scan cannot reuse it.
-      void redeemVoucher({
-        token: voucherToken,
-        saleId: sale.receiptNo,
-        storeId: sale.storeId,
-        staff: activeCashier,
-      }).catch((e: unknown) => notifyError(e, "Could not lock the voucher"));
-      setVoucherToken(null);
-    }
-    if (splitting || payments.some((p) => p.bankName)) {
-      logger.log("sale", "Split payment recorded", "register", {
-        receiptNo: sale.receiptNo,
-        total: sale.total,
-        tenders: paymentsLabel(payments),
-        storeId: sale.storeId,
-      });
-    }
-    if (method === "bank_transfer") {
-      logger.log("sale", "Bank transfer payment recorded", "register", {
-        receiptNo: sale.receiptNo,
-        total: sale.total,
-        transferRef: sale.transferRef,
-        bank: state.settings.payment.bankName,
-      });
-    }
-    printSaleReceipt(sale, member, "sale");
-    setLastSale(sale);
-    const customerNumber = member?.phone ?? "";
-    setWaNumber(customerNumber);
-    if (wa.enabled && wa.autoSendOnSale && customerNumber) {
-      void sendSaleOnWhatsApp(sale, customerNumber);
-    }
-    publishDisplay({
-      ...cartSnapshot(),
-      mode: "paid",
-      paid: sale.paid,
-      change: sale.change,
-      reference: sale.receiptNo,
-      method: sale.method,
-      transferRef: sale.transferRef ?? "",
-    });
-    resetCart();
-    setMemberId(null);
-    resetTender();
-    toast.success(
-      exchangeRef ? `Exchange ${sale.receiptNo} completed against ${exchangeRef}` : `Sale ${sale.receiptNo} completed`,
-    );
-  }
 
   /* ── Operation deck helpers ─────────────────────────────────────── */
 
@@ -2235,7 +1970,7 @@ function Register() {
           });
         }}
       />
-      {wa.enabled && can("can_send_whatsapp_bill") && (
+      {state.settings.whatsapp.enabled && can("can_send_whatsapp_bill") && (
         <div className="flex flex-wrap items-center gap-2">
           <Input
             value={waNumber}
