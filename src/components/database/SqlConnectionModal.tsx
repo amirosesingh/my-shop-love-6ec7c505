@@ -708,16 +708,32 @@ export function SqlConnectionModal({
         </div>
 
         <DialogFooter className="gap-2 sm:justify-between">
-          {running ? (
-            <Button type="button" variant="outline" onClick={stopRun}>
-              <CircleSlash className="mr-2 h-4 w-4" />
-              Stop
+          <div className="flex flex-wrap gap-2">
+            {running ? (
+              <Button type="button" variant="outline" onClick={stopRun}>
+                <CircleSlash className="mr-2 h-4 w-4" />
+                Stop
+              </Button>
+            ) : (
+              <Button type="button" variant="outline" onClick={() => void advance("credentials")}>
+                Run checks
+              </Button>
+            )}
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={resetting}
+              onClick={() => void resetConnection()}
+              title="Cancel anything running, close the pools and forget the saved connection."
+            >
+              {resetting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Eraser className="mr-2 h-4 w-4" />
+              )}
+              Reset connection
             </Button>
-          ) : (
-            <Button type="button" variant="outline" onClick={() => void advance("credentials")}>
-              Run checks
-            </Button>
-          )}
+          </div>
           <Button type="button" disabled={running || !catalogReady} onClick={() => void finish()}>
             {catalogReady ? <Lock className="mr-2 h-4 w-4" /> : <Plug className="mr-2 h-4 w-4" />}
             Lock &amp; save
