@@ -1,4 +1,15 @@
 import { beforeEach, describe, expect, it } from "vitest";
+
+// The library only touches storage when a window exists; give it a small one.
+const store = new Map<string, string>();
+(globalThis as unknown as { window: unknown }).window = {
+  localStorage: {
+    getItem: (k: string) => store.get(k) ?? null,
+    setItem: (k: string, v: string) => void store.set(k, v),
+    removeItem: (k: string) => void store.delete(k),
+    clear: () => store.clear(),
+  },
+};
 import {
   clearUnappliedStock,
   listUnappliedStock,
