@@ -158,7 +158,7 @@ function describeSqlError(err) {
   };
   const text = `${code ?? ""} ${message} ${originalMessage ?? ""}`.toLowerCase();
   const stage =
-    code === "EDRIVER" || /im002|driver.*not found|data source name not found/.test(text)
+    code === "EDRIVER" || code === "EBUDGET" || /im002|driver.*not found|data source name not found/.test(text)
       ? "driver"
       : code === "ELOGIN" || /login failed|password did not match/.test(text)
         ? "login"
@@ -416,9 +416,9 @@ async function openConnection(config) {
     const remaining = deadline - Date.now();
     if (remaining <= 1_000) {
       const e = new Error(
-        "SQL Server did not complete the sign-in in time. The port answers but no authentication response came back.",
+        `The connection budget ended before the next sign-in combination could be tried${attempt?.label ? ` (${attempt.label})` : ""}.`,
       );
-      e.code = "ETIMEOUT";
+      e.code = "EBUDGET";
       e.attempts = tried;
       e.target = target;
       throw e;

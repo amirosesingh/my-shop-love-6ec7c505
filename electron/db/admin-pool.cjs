@@ -35,9 +35,12 @@ function diagnose(err) {
   let hint = base.hint;
   if (base.code === "ECANCELLED") {
     hint = "The attempt was stopped before it finished.";
+  } else if (base.code === "EBUDGET") {
+    hint =
+      "Earlier driver or encryption combinations used the connection deadline. Review the attempted combinations below; this is not a failed port probe.";
   } else if (base.code === "ETIMEOUT" || /did not complete|timed out/.test(text)) {
     hint =
-      "The port answered but the sign-in never completed. A firewall that swallows the reply, TLS/encryption mismatch, or a stopped SQL Server Browser service are the usual causes — try turning 'Encrypt connection' off for a local instance.";
+      "The SQL driver did not finish this sign-in combination. Check the ODBC driver and TLS/encryption settings; the separate TCP step determines whether the port is reachable.";
   } else if (/im002|data source name not found|no default driver/.test(text)) {
     hint =
       "No suitable ODBC driver is installed for Windows authentication. Install 'ODBC Driver 18 for SQL Server' from Microsoft, or use a SQL Server login.";

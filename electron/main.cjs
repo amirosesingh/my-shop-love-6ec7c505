@@ -712,14 +712,20 @@ function registerIpc() {
     try {
       return await withTimeout(Promise.resolve().then(work), ms, message);
     } catch (err) {
-      return { ok: false, code: err?.code ?? "ETIMEOUT", error: fail(err).error, attempts: [] };
+      return {
+        ok: false,
+        code: err?.code ?? "ETIMEOUT",
+        stage: "driver",
+        error: fail(err).error,
+        attempts: [],
+      };
     }
   };
 
   ipcMain.handle("sqladmin:connect", (_e, credentials) =>
     bounded(
       30_000,
-      "SQL Server did not answer the sign-in in time. The port is open but no authentication response came back.",
+      "The SQL driver did not finish the authentication handshake in time.",
       () => sqlAdmin.connectInstance(credentials),
     ),
   );

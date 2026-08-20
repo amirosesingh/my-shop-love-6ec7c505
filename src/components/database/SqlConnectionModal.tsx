@@ -99,6 +99,8 @@ function tipFor(
     return "No answer on that port — enable TCP/IP in SQL Server Configuration Manager and allow the port through the firewall.";
   if (step === "handshake" && text.includes("timeout"))
     return "The SQL driver reached its sign-in deadline. Check authentication, the ODBC driver and encryption settings; the TCP check is not the cause.";
+  if (step === "handshake" && text.includes("ebudget"))
+    return "Earlier sign-in combinations used the connection deadline. Review the attempts below; the port check has already been handled separately.";
   return null;
 }
 
