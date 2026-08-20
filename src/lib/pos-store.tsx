@@ -83,6 +83,8 @@ import {
   setPath,
   type SettingsSectionId,
 } from "./settings-sections";
+import { schedulePersist } from "./pos-persist";
+
 
 const KEY = "pos-state-v2";
 
