@@ -346,6 +346,87 @@ export function SyncHub() {
         </Card>
       )}
 
+      {(unapplied.length > 0 || diagnostics.length > 0) && (
+        <Card className="border-warning/40">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <TriangleAlert className="size-4 text-warning" /> Unapplied stock movements
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {unapplied.length > 0 ? (
+              <>
+                <p className="text-xs text-muted-foreground">
+                  These stock changes were recorded on the bill but never reached the central stock
+                  figure. Retrying is safe — each movement can only ever be applied once.
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={retrying}
+                  onClick={async () => {
+                    setRetrying(true);
+                    const res = await retryAllUnappliedStock();
+                    setRetrying(false);
+                    toast[res.remaining ? "warning" : "success"](
+                      `${res.applied} applied, ${res.remaining} still waiting`,
+                    );
+                    await refresh();
+                  }}
+                >
+                  {retrying ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <RotateCcw className="size-3.5" />
+                  )}
+                  Retry all
+                </Button>
+                {unapplied.map((m) => (
+                  <div
+                    key={m.movementId}
+                    className="flex flex-wrap items-center gap-2 rounded-md border border-border p-2 text-xs"
+                  >
+                    <span className="font-mono">{m.productId.slice(0, 8)}</span>
+                    <span className="tabular-nums">
+                      {m.delta > 0 ? `+${m.delta}` : m.delta}
+                    </span>
+                    <span className="text-muted-foreground">{m.storeId ?? "—"}</span>
+                    <span className="text-destructive">{m.reason}</span>
+                    <span className="text-muted-foreground">{when(m.at)}</span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="ml-auto"
+                      disabled={retrying}
+                      onClick={async () => {
+                        const ok = await retryUnappliedStock(m.movementId);
+                        toast[ok ? "success" : "error"](
+                          ok ? "Stock movement applied" : "Still could not apply it",
+                        );
+                        await refresh();
+                      }}
+                    >
+                      <RotateCcw className="size-3.5" /> Retry
+                    </Button>
+                  </div>
+                ))}
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                No stock movement is waiting. Recent background checks that could not be completed
+                are listed below.
+              </p>
+            )}
+            {diagnostics.slice(0, 10).map((d) => (
+              <div key={d.id} className="rounded-md border border-border p-2 text-xs">
+                <span className="text-muted-foreground">{when(d.at)} — </span>
+                {describeDiagnostic(d)}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       {(failedQueue.length > 0 || localQueue.length > 0) && (
         <Card>
           <CardHeader className="pb-2">
