@@ -324,19 +324,6 @@ function Register() {
   const [couponCode, setCouponCode] = useState("");
   const [couponScope, setCouponScope] = useState<"bill" | "item">("bill");
   const [couponLine, setCouponLine] = useState<string>("");
-  const [coupon, setCoupon] = useState<{
-    code: string;
-    promoId: string;
-    scope: "bill" | "item";
-    discount: number;
-    productId?: string;
-    productName?: string;
-    appliedAt: string;
-    /** campaign title, printed on the slip */
-    name?: string;
-    /** unused value left on a fixed-amount voucher */
-    remaining?: number;
-  } | null>(null);
   /** Digital voucher token locked at the end of the sale, when one is on the bill. */
   const [voucherToken, setVoucherToken] = useState<string | null>(null);
   /** Live vouchers held by the attached member, for the picker. */
@@ -486,101 +473,6 @@ function Register() {
         })
         .slice(0, 5)
     : [];
-
-  function addLine(productId: string) {
-    if (!activeShift) {
-      toast.error("Open a shift before ringing up a sale");
-      setOpenShiftOpen(true);
-      return;
-    }
-    const product = state.products.find((p) => p.id === productId);
-    if (!product) return;
-    const onHand = availableAt(product, currentStore.id, state.bookings);
-    if (onHand <= 0) {
-      const reserved = stockAt(product, currentStore.id) > 0;
-      toast.error(
-        reserved
-          ? `${product.name} is fully reserved by open bookings at ${currentStore.name}`
-          : `${product.name} is out of stock at ${currentStore.name}`,
-      );
-      return;
-    }
-    setLines((ls) => {
-      const found = ls.find((l) => l.productId === productId && !l.credit);
-      if (found) return ls.map((l) => (l.productId === productId && !l.credit ? { ...l, qty: l.qty + 1 } : l));
-      return [
-        ...ls,
-        {
-          productId,
-          name: product.name,
-          price: product.price,
-          qty: 1,
-          taxRate: product.taxRate,
-          discount: 0,
-          discountType: "amount",
-        },
-      ];
-    });
-  }
-
-  async function setQty(index: number, delta: number) {
-    const line = lines[index];
-    const removes = line && !line.credit && line.qty + delta <= 0;
-    // Removing a line, or reducing a quantity, needs manager approval unless
-    // the cashier holds the right themselves.
-    if (removes) {
-      if (!(await requirePermission("can_delete_line"))) return;
-      logger.log("refund", "Line deleted from the cart", "register", {
-        product: line?.name,
-        productId: line?.productId,
-        qty: line?.qty,
-        price: line?.price,
-        storeId: currentStore.id,
-      });
-    } else if (delta < 0 && line && !line.credit) {
-      if (!(await requirePermission("can_reduce_qty"))) return;
-      logger.log("sale", "Item quantity reduced", "register", {
-        product: line.name,
-        productId: line.productId,
-        from: line.qty,
-        to: line.qty - 1,
-        storeId: currentStore.id,
-      });
-    }
-    setLines((ls) =>
-      ls
-        .map((l, i) => (i === index ? { ...l, qty: l.credit ? l.qty - delta : l.qty + delta } : l))
-        .filter((l) => (l.credit ? l.qty < 0 : l.qty > 0)),
-    );
-  }
-
-  function patchLine(index: number, patch: Partial<CartLine>) {
-    setLines((ls) => ls.map((l, i) => (i === index ? { ...l, ...patch } : l)));
-  }
-
-  function resetCart() {
-    setLines([]);
-    setCartDiscount(0);
-    setExchangeRef(null);
-    setCoupon(null);
-    setBillNo(null);
-    clearCartDraft(currentStore.id);
-  }
-
-  async function clearCart(source: "clear" | "void" = "void") {
-    if (lines.length && !(await requirePermission("can_void_cart"))) return;
-    if (lines.length) {
-      logTicketEvent(source === "clear" ? TICKET_ACTIONS.cleared : TICKET_ACTIONS.voided, {
-        lines: lines.length,
-        value: totals.total,
-        coupon: coupon?.code ?? null,
-        storeId: currentStore.id,
-        member: member?.name ?? null,
-        items: lines.map((l) => ({ name: l.name, qty: l.qty, price: l.price })),
-      });
-    }
-    resetCart();
-  }
 
   function lookupBill() {
     const ref = billQuery.trim().toLowerCase();
