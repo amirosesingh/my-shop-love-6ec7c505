@@ -68,6 +68,17 @@ export type LocalDbTestResult = {
  * never outlive the work it belongs to, and nothing reports "connected" before
  * the shell has proved the database answers.
  */
+export type LocalWriteCheck = {
+  ok: boolean;
+  activeDb?: string | null;
+  createdProbeTable?: boolean;
+  rolledBack?: boolean;
+  latencyMs?: number;
+  error?: string;
+  code?: string | null;
+  hint?: string | null;
+};
+
 export type LocalDbConnectionState =
   | "unavailable"
   | "not_configured"
@@ -246,6 +257,8 @@ export type PosBridge = {
   /** Registry + loopback discovery of instances installed on this PC. */
   scanLocalInstances?: () => Promise<LocalInstanceScan>;
   status: () => Promise<LocalSyncStatus>;
+  /** Transactional write probe on the operational pool (always rolled back). */
+  verifyWrite?: () => Promise<LocalWriteCheck>;
   push: () => Promise<{ ok: boolean; pushed: number; failed: number; error?: string }>;
   pull: () => Promise<{ ok: boolean; merged: number; error?: string }>;
   setSyncEnabled: (on: boolean) => Promise<void>;
@@ -446,6 +459,26 @@ export async function scanLocalInstances(): Promise<LocalInstanceScan> {
 }
 
 /** Single connection probe with explicit TLS options; reports latency. */
+/**
+ * Proves the till's own pool can write: one transaction that inserts, reads
+ * back, then rolls back. Nothing customer-facing is touched.
+ */
+export async function verifyLocalWrite(): Promise<LocalWriteCheck> {
+  const bridge = localDb();
+  if (!bridge?.verifyWrite) {
+    return { ok: false, error: "Only the Windows desktop app can write to a local database." };
+  }
+  try {
+    return await withIpcTimeout(
+      bridge.verifyWrite(),
+      30_000,
+      "The write check did not finish. The database accepted the sign-in but never answered the write.",
+    );
+  } catch (err) {
+    return { ok: false, code: "ETIMEOUT", error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 export async function testDirectConnection(
   params: DirectConnectionParams,
 ): Promise<LocalDbTestResult> {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   CheckCircle2,
@@ -36,6 +36,7 @@ import {
   loadLocalDbConfig,
   scanLocalInstances,
   testDirectConnection,
+  verifyLocalWrite,
   type LocalDbConfig,
   type LocalDbTestResult,
 } from "@/lib/local-db";
@@ -57,6 +58,7 @@ const STEPS = [
   { key: "handshake", label: "Auth handshake", hint: "Sign in against master." },
   { key: "catalog", label: "Catalog discovery", hint: "List the databases you can open." },
   { key: "lock", label: "Lock & save", hint: "Point the till at the chosen database." },
+  { key: "write", label: "Write verification", hint: "Insert and roll back a probe row." },
 ] as const;
 
 type StepKey = (typeof STEPS)[number]["key"];
@@ -122,6 +124,12 @@ export function SqlConnectionModal({
   const [running, setRunning] = useState(false);
   const [steps, setSteps] = useState<Record<StepKey, StepState>>(blankSteps);
   const [databases, setDatabases] = useState<SqlDatabase[]>([]);
+  /**
+   * Every run owns a token. A result from a cancelled or superseded run is
+   * dropped instead of writing into fresh state, so closing the dialog mid-
+   * handshake can never leave a spinner behind.
+   */
+  const runToken = useRef(0);
 
   const set = <K extends keyof LocalDbConfig>(key: K, value: LocalDbConfig[K]) => {
     setConfig((c) => ({ ...c, [key]: value }));
@@ -132,6 +140,13 @@ export function SqlConnectionModal({
 
   const mark = (key: StepKey, patch: StepState) =>
     setSteps((s) => ({ ...s, [key]: { ...s[key], ...patch } }));
+
+  /** Abandon whatever is running and tell the shell to drop its half-open pool. */
+  const abandonRun = useCallback(() => {
+    runToken.current += 1;
+    setRunning(false);
+    void sqlAdmin()?.cancel?.();
+  }, []);
 
   const scan = useCallback(async (silent = false) => {
     setScanning(true);
@@ -152,8 +167,14 @@ export function SqlConnectionModal({
 
   /* Pre-fill from the sealed config, then scan this PC. */
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      abandonRun();
+      setSteps(blankSteps());
+      return;
+    }
     let alive = true;
+    runToken.current += 1;
+    setRunning(false);
     setSteps(blankSteps());
     setDatabases([]);
     void (async () => {
@@ -176,7 +197,7 @@ export function SqlConnectionModal({
     return () => {
       alive = false;
     };
-  }, [open, scan]);
+  }, [open, scan, abandonRun]);
 
   const credentials = () => ({
     server: config.server,
@@ -325,33 +346,68 @@ export function SqlConnectionModal({
     return true;
   };
 
+  /**
+   * Final proof: the till's own pool inserts a probe row, reads it back and
+   * rolls the transaction back. Signing in is not the same as being able to
+   * write, so this stage is separate and never inferred from the one before.
+   */
+  const runWrite = async () => {
+    mark("write", { status: "running" });
+    const started = Date.now();
+    const res = await verifyLocalWrite();
+    const ms = Date.now() - started;
+    if (!res.ok)
+      return failure(
+        "write",
+        {
+          ok: false,
+          code: res.code ?? null,
+          hint: res.hint ?? null,
+          error: `Database write verification failed — ${res.error ?? "unknown reason"}`,
+        },
+        ms,
+      );
+    mark("write", {
+      status: "passed",
+      ms,
+      detail: `Wrote and rolled back a probe row in ${res.activeDb ?? config.database}`,
+    });
+    return true;
+  };
+
   const RUNNERS: Record<StepKey, () => Promise<boolean>> = {
     credentials: runCredentials,
     socket: runSocket,
     handshake: runHandshake,
     catalog: runCatalog,
     lock: runLock,
+    write: runWrite,
   };
 
   /** Runs `key` and, unless retrying a single step, everything after it. */
   const advance = async (from: StepKey, only = false) => {
+    if (running) return false;
+    const token = ++runToken.current;
+    const live = () => runToken.current === token;
     setRunning(true);
     try {
       const order = STEPS.map((s) => s.key);
       for (const key of order.slice(order.indexOf(from))) {
+        if (!live()) return false;
         const ok = await RUNNERS[key]();
-        if (!ok) return false;
+        if (!live() || !ok) return false;
         // The catalogue step hands control back so a database can be picked.
         if (only || key === "catalog") return true;
       }
       return true;
     } finally {
-      setRunning(false);
+      if (live()) setRunning(false);
     }
   };
 
   const finish = async () => {
-    const ok = await advance("lock", true);
+    // Lock, then prove the very same connection can actually write.
+    const ok = await advance("lock");
     if (!ok) return;
     toast.success("Connected to the local database");
     onConnected?.(config);

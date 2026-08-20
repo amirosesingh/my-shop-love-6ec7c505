@@ -698,10 +698,45 @@ function registerIpc() {
 
   /* ---------------- SSMS-style administration connection ---------------- */
 
-  ipcMain.handle("sqladmin:connect", (_e, credentials) => sqlAdmin.connectInstance(credentials));
-  ipcMain.handle("sqladmin:probe-port", (_e, credentials) => sqlAdmin.probePort(credentials));
-  ipcMain.handle("sqladmin:lock", (_e, credentials) => sqlAdmin.lockDatabase(credentials));
-  ipcMain.handle("sqladmin:databases", () => sqlAdmin.listDatabases());
+  /*
+    Every administration channel carries its own deadline. An IPC handler that
+    never settles leaves the renderer spinning for ever with no way back, so a
+    slow driver must always come back as a timeout result instead.
+  */
+  const bounded = async (ms, message, work) => {
+    try {
+      return await withTimeout(Promise.resolve().then(work), ms, message);
+    } catch (err) {
+      return { ok: false, code: err?.code ?? "ETIMEOUT", error: fail(err).error, attempts: [] };
+    }
+  };
+
+  ipcMain.handle("sqladmin:connect", (_e, credentials) =>
+    bounded(
+      30_000,
+      "SQL Server did not answer the sign-in in time. The port is open but no authentication response came back.",
+      () => sqlAdmin.connectInstance(credentials),
+    ),
+  );
+  ipcMain.handle("sqladmin:cancel", () => sqlAdmin.cancel());
+  ipcMain.handle("sqladmin:probe-port", (_e, credentials) =>
+    bounded(15_000, "The port probe did not finish in time.", () =>
+      sqlAdmin.probePort(credentials),
+    ),
+  );
+  ipcMain.handle("sqladmin:lock", (_e, credentials) =>
+    bounded(30_000, "The database could not be opened in time.", () =>
+      sqlAdmin.lockDatabase(credentials),
+    ),
+  );
+  ipcMain.handle("sqladmin:databases", () =>
+    bounded(15_000, "The database list did not arrive in time.", () => sqlAdmin.listDatabases()),
+  );
+
+  /* Write verification runs on the OPERATIONAL pool the till itself uses. */
+  ipcMain.handle("pos:verify-write", () =>
+    bounded(20_000, "The write check did not finish in time.", () => pool.verifyWrite()),
+  );
   ipcMain.handle("sqladmin:tables", (_e, dbName) => sqlAdmin.getTables(dbName));
   ipcMain.handle("sqladmin:columns", (_e, dbName, tableName, schemaName) =>
     sqlAdmin.getTableColumns(dbName, tableName, schemaName),

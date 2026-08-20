@@ -66,6 +66,8 @@ export type SqlAdminConnectResult =
 
 export type SqlAdminStatus = {
   connected: boolean;
+  /** True while a handshake is still walking the attempt ladder. */
+  busy?: boolean;
   server: string | null;
   serverName: string | null;
   database: string | null;
@@ -107,6 +109,8 @@ export type SqlLockResult =
 
 export type SqlAdminBridge = {
   connectInstance: (credentials: SqlAdminCredentials) => Promise<SqlAdminConnectResult>;
+  /** Abort the running handshake and drop the half-open pool. */
+  cancel?: () => Promise<{ ok: boolean; cancelled?: boolean }>;
   /** Raw 2-second TCP reachability probe — names firewall/port problems. */
   probePort?: (credentials: SqlAdminCredentials) => Promise<SqlPortProbe>;
   /** Re-point the administration pool at the operator's chosen database. */
