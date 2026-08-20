@@ -41,6 +41,7 @@ import {
   type LocalDbTestResult,
 } from "@/lib/local-db";
 import { DESKTOP_ONLY, sqlAdmin, type SqlAdminFailure, type SqlDatabase } from "@/lib/sql-admin";
+import { createRunGuard } from "@/lib/run-token";
 import { supabaseConfig } from "@/lib/external-supabase-config";
 
 const DEFAULT_DATABASE = "POS_Master_2025";
