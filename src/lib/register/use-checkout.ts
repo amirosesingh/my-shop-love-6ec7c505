@@ -66,6 +66,7 @@ export type CheckoutDeps = {
   // UI / display
   getWaNumber: () => string;
   setWaNumber: (v: string) => void;
+  setWaSending: (v: boolean) => void;
   cartSnapshot: () => DisplaySnapshot;
   getDisplayBase: () => DisplaySnapshotBase;
 };
