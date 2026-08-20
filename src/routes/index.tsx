@@ -236,7 +236,6 @@ function Register() {
   const [billHit, setBillHit] = useState<Sale | null>(null);
   const [picks, setPicks] = useState<Record<number, number>>({});
 
-  const [payOpen, setPayOpen] = useState(false);
   /** True while a sale / booking is being stored — blocks a second click. */
   const [saving, setSaving] = useState(false);
   const [openShiftOpen, setOpenShiftOpen] = useState(false);
@@ -249,20 +248,39 @@ function Register() {
    *  supervisors: no coupons, exchanges, drawer opens, prints or payments. */
   const tillLocked = !activeShift;
   const lockedReason = "Open a shift first";
-  const [tendered, setTendered] = useState("");
-  const [method, setMethod] = useState<PaymentMethod>("cash");
-  const [transferRef, setTransferRef] = useState("");
-  /** Serial / voucher number typed for a tender that demands one. */
-  const [tenderRef, setTenderRef] = useState("");
-  const [tenderRefNote, setTenderRefNote] = useState("");
-  // Tenders are configured centrally, so a new collection type (a government
-  // voucher scheme, say) appears at the till without a new build.
-  const { types: paymentTypes } = usePaymentTypes();
-  const tenderOptions = activePaymentTypes(paymentTypes);
-  const activeTender = tenderOptions.find((t) => t.code === method);
-  const activeMethodName = activeTender?.name ?? methodLabel(method);
-  /** Voucher / coupon tenders cannot complete without their serial number. */
-  const needsTenderRef = !!activeTender?.requiresReference && method !== "bank_transfer";
+  const {
+    payOpen,
+    setPayOpen,
+    tendered,
+    setTendered,
+    method,
+    setMethod,
+    transferRef,
+    setTransferRef,
+    tenderRef,
+    setTenderRef,
+    tenderRefNote,
+    setTenderRefNote,
+    splitOpen,
+    setSplitOpen,
+    splitWays,
+    setSplitWays,
+    tenders,
+    setTenders,
+    bankName,
+    setBankName,
+    paymentTypes,
+    tenderOptions,
+    activeTender,
+    activeMethodName,
+    needsTenderRef,
+    openPayment,
+    resetTender,
+  } = useTender({
+    hasLines: () => lines.length > 0,
+    getTotal: () => totals.total,
+  });
+
   const [waNumber, setWaNumber] = useState("");
   const [waSending, setWaSending] = useState(false);
   const [lastSale, setLastSale] = useState<Sale | null>(null);
