@@ -14,6 +14,7 @@ import { recordSync } from "./sync-audit";
 export type DiagnosticKind =
   | "backend_object_missing"
   | "stock_delta_failed"
+  | "stock_reconcile_drift"
   | "local_mirror_failed"
   | "sale_idempotency_unavailable"
   | "shift_lookup_unavailable";
@@ -126,6 +127,10 @@ export const describeDiagnostic = (e: DiagnosticEvent): string => {
       return `A required backend routine for ${e.entity} is not installed.`;
     case "stock_delta_failed":
       return `A stock movement for ${e.entity} could not be applied centrally (${e.code}).`;
+    case "stock_reconcile_drift":
+      return e.code === "stock_mismatch"
+        ? `A product's branch stock does not match the movements applied to it (${e.recordId ?? "unknown"}).`
+        : `A stock movement was recorded centrally for a different amount than the till's ledger (${e.recordId ?? "unknown"}).`;
     case "local_mirror_failed":
       return `The terminal copy of ${e.entity} could not be updated (${e.code}).`;
     case "sale_idempotency_unavailable":
