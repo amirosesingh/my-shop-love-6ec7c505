@@ -1,0 +1,1 @@
+ALTER FUNCTION public.pos_rules_defaults() SET search_path TO 'public', 'pg_temp';

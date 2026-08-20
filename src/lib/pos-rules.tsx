@@ -13,7 +13,14 @@ import { getPosRules } from "./pos-rules.functions";
 import { getPosCallerAuth } from "./pos-caller-auth";
 import { DEFAULT_POS_RULES, type PosRules } from "./pos-rules";
 
-type Ctx = { rules: PosRules; loading: boolean; refresh: () => void };
+type Ctx = {
+  rules: PosRules;
+  loading: boolean;
+  /** True when the rules shown are the built-in defaults, not the saved ones. */
+  usingDefaults: boolean;
+  backendError: string;
+  refresh: () => void;
+};
 
 const RulesContext = createContext<Ctx | null>(null);
 
@@ -39,17 +46,27 @@ export function PosRulesProvider({
       // the global defaults rather than an error.
       try {
         const res = await getPosRules({ data: { ...auth, storeId: storeId ?? "" } });
-        return res.rules as PosRules;
-      } catch {
-        return DEFAULT_POS_RULES;
+        return {
+          rules: res.rules as PosRules,
+          usingDefaults: res.backend !== "database",
+          backendError: res.backendError ?? "",
+        };
+      } catch (e) {
+        return {
+          rules: DEFAULT_POS_RULES,
+          usingDefaults: true,
+          backendError: (e as Error).message,
+        };
       }
     },
   });
 
   const value = useMemo<Ctx>(
     () => ({
-      rules: query.data ?? DEFAULT_POS_RULES,
+      rules: query.data?.rules ?? DEFAULT_POS_RULES,
       loading: query.isPending,
+      usingDefaults: query.data?.usingDefaults ?? false,
+      backendError: query.data?.backendError ?? "",
       refresh: () => void queryClient.invalidateQueries({ queryKey: ["pos-rules"] }),
     }),
     [query.data, query.isPending, queryClient],
@@ -60,6 +77,12 @@ export function PosRulesProvider({
 
 export function usePosRules(): Ctx {
   return (
-    useContext(RulesContext) ?? { rules: DEFAULT_POS_RULES, loading: false, refresh: () => {} }
+    useContext(RulesContext) ?? {
+      rules: DEFAULT_POS_RULES,
+      loading: false,
+      usingDefaults: false,
+      backendError: "",
+      refresh: () => {},
+    }
   );
 }

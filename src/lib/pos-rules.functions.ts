@@ -65,27 +65,40 @@ async function assertCaller(data: { accessToken?: string; terminalToken?: string
 export const getPosRules = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => callerInput.parse(data))
   .handler(async ({ data }) => {
-    const { loadRules } = await import("./pos-rules.server");
+    const { loadRulesResult } = await import("./pos-rules.server");
     // Reading rules must never fail before sign-in: an unauthenticated caller
     // gets the global defaults chain (global row, then built-in defaults).
     if (!data.accessToken && !data.terminalToken) {
-      return { ok: true as const, anonymous: true as const, rules: await loadRules("") };
+      const base = await loadRulesResult("");
+      return {
+        ok: true as const,
+        anonymous: true as const,
+        backend: base.source,
+        backendError: base.error ?? "",
+        rules: base.rules,
+      };
     }
     try {
       await assertCaller(data);
+      const loaded = await loadRulesResult(data.storeId ?? "");
       return {
         ok: true as const,
         anonymous: false as const,
-        rules: await loadRules(data.storeId ?? ""),
+        backend: loaded.source,
+        backendError: loaded.error ?? "",
+        rules: loaded.rules,
       };
     } catch (e) {
       // A partially initialised session falls back to the branch/global chain
       // instead of raising into the UI.
+      const base = await loadRulesResult("");
       return {
         ok: false as const,
         anonymous: true as const,
         error: (e as Error).message,
-        rules: await loadRules(""),
+        backend: base.source,
+        backendError: base.error ?? "",
+        rules: base.rules,
       };
     }
   });
@@ -187,7 +200,7 @@ export const authorizeAsAdmin = createServerFn({ method: "POST" })
       if (caller.role !== "admin") {
         return { ok: false as const, error: "Administrators only" };
       }
-      await logOverride({
+      const logged = await logOverride({
         action: data.action,
         ruleKey: data.ruleKey ?? null,
         requestedBy: caller.userId,
@@ -199,6 +212,9 @@ export const authorizeAsAdmin = createServerFn({ method: "POST" })
       });
       return {
         ok: true as const,
+        warning: logged.ok
+          ? ""
+          : "Approved, but the override could not be written to the audit log.",
         manager: { id: caller.userId, name: caller.userId, role: "admin" },
         grantToken: signOverrideGrant({
           action: data.action,
@@ -214,13 +230,28 @@ export const authorizeAsAdmin = createServerFn({ method: "POST" })
 export const assertShiftClosable = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => closeInput.parse(data))
   .handler(async ({ data }) => {
-    const { loadRules, heldOrderCount, verifyOverrideGrant } = await import("./pos-rules.server");
+    const { loadRulesResult, heldOrderCountResult, verifyOverrideGrant } = await import(
+      "./pos-rules.server"
+    );
     try {
       await assertCaller(data);
-      const rules = await loadRules(data.storeId ?? "");
+      const loaded = await loadRulesResult(data.storeId ?? "");
+      const rules = loaded.rules;
       const override = verifyOverrideGrant(data.grantToken, "shift_close");
       if (rules.block_shift_close_on_hold && !override) {
-        const held = await heldOrderCount(data.storeId ?? "");
+        const heldRes = await heldOrderCountResult(data.storeId ?? "");
+        // If the count itself could not be read, the shift stays open rather
+        // than closing over bills nobody could see.
+        if (!heldRes.ok) {
+          return {
+            ok: false as const,
+            code: "ERROR" as const,
+            held: 0,
+            error:
+              "Held bills could not be checked right now, so the shift was not closed. Try again, or ask a manager to approve the closure.",
+          };
+        }
+        const held = heldRes.count;
         if (held > 0) {
           return {
             ok: false as const,

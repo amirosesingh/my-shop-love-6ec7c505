@@ -42,7 +42,7 @@ export const Route = createFileRoute("/settings/rules")({
 });
 
 function RulesSettings() {
-  const { rules, loading, refresh } = usePosRules();
+  const { rules, loading, usingDefaults, backendError, refresh } = usePosRules();
   const { currentStore } = usePos();
   const { isAdmin, can } = useAuth();
   const mayEdit = isAdmin || can("can_access_pos_settings");
@@ -142,6 +142,15 @@ function RulesSettings() {
           <p className="rounded-md border border-border bg-card p-4 text-sm text-muted-foreground">
             These rules are managed by an administrator. You can see what is enforced, but not
             change it.
+          </p>
+        )}
+
+        {usingDefaults && !loading && (
+          <p className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+            The saved rules could not be read, so the strictest built-in settings are being
+            enforced right now. Anything you save here may not take effect until the connection is
+            back.
+            {backendError ? <span className="mt-1 block text-xs opacity-80">{backendError}</span> : null}
           </p>
         )}
 
