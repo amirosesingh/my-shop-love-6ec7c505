@@ -1267,3 +1267,91 @@ For any future change (add/remove/modify a feature, fix a bug, alter a table, ch
 - Swallowed failures now emit structured diagnostics (`src/lib/diagnostics.ts`): missing backend object, stock delta failed, local mirror failed, duplicate-checkout lookup unavailable, shift lookup unavailable. Codes and ids only — no PINs, tokens, prices or customer data.
 - Failed stock movements are parked in `src/lib/stock-recovery.ts` and retried from Data Sync & Audit. Retry is idempotent via `stock_delta_applied.movement_id`.
 - Shift open treats an "unknown" existence check as unverified, not as "no shift"; it warns instead of failing.
+
+## Part 7 — Regression audit and production hardening (v1.3.20)
+
+Final end-to-end audit after Parts 1–6. No new features were added.
+
+### Bugs fixed
+
+- **Junk rule values silently disabled a manager gate.** `normalizeRules()`
+  treated any unrecognised value (e.g. `"yes"`) as `false`, so a malformed
+  rules row could switch off a PIN requirement. Unrecognised values now keep
+  the shipped rule; only `true/false/1/0/"true"/"false"/"1"/"0"` change a gate.
+
+### Database migrations
+
+- Dropped the redundant duplicate unique index
+  `sales_client_transaction_id_uidx`; `sales_client_transaction_id_key` still
+  enforces one bill per checkout attempt. Every sale insert now maintains one
+  index fewer.
+
+### Security review (no exploitable gaps found)
+
+- Every table in `public` has RLS enabled (0 tables without it).
+- No role in `public` is granted to `anon`. Public pages reach data only
+  through six SECURITY DEFINER routines (`coupon_claim`,
+  `member_welcome_claim`, `voucher_by_token`, `terminal_token_claim`,
+  `terminal_token_heartbeat`, `terminal_token_status`), each of which validates
+  its own input. Policies whose role list still reads `public` are therefore
+  unreachable anonymously.
+- `cashiers` and `pin_attempts` remain deny-all by design, reachable only
+  through `verify_cashier_pin` / `pin_throttle_*`.
+- Branch isolation verified on both read and write: `sales`, `sale_items`,
+  `shifts`, `bookings`, `held_orders`, `stock_adjustments`,
+  `payment_transactions` and `branch_telemetry` all carry
+  `store_visible(store_id)` / `user_has_store_access(...)` in USING **and**
+  WITH CHECK, so a till cannot read or insert another branch's rows.
+- Manager overrides are proved by an HMAC grant bound to a single action with a
+  5-minute expiry; forged, replayed-for-another-action and expired grants are
+  all rejected (now covered by tests).
+
+### Connection and sync
+
+- Sale idempotency confirmed end to end: `commitSale()` short-circuits when the
+  attempt id already exists centrally, and still saves when the duplicate check
+  itself cannot run, with the unique index as the final guard.
+- Stock movements stay idempotent through `stock_delta_applied.movement_id`.
+- Bill numbers embed branch + platform + terminal + day, so the global unique
+  index on `sales.bill_number` cannot collide across branches or offline tills.
+
+### Refactor
+
+- Settings inheritance (Private > Branch > Cluster > Global, with global locks)
+  was extracted from the store memo into the pure
+  `resolveScopedSettings()` in `src/lib/branch-settings.ts` so the precedence
+  rules can be tested directly. Behaviour unchanged.
+
+### Files changed
+
+- `src/lib/pos-rules.ts` — stricter boolean coercion.
+- `src/lib/branch-settings.ts` — new `resolveScopedSettings()`.
+- `src/lib/pos-store.tsx` — uses the extracted resolver.
+- `src/lib/__tests__/tax-matrix.test.ts`, `manager-gate.test.ts`,
+  `settings-inheritance.test.ts`, `checkout-e2e.test.ts` — new.
+- Migration: drop duplicate sales index.
+
+### Tests
+
+24 files, **177 tests passing** (was 148). New coverage: tax modes and discount
+spreading, exchange/refund totals, manager gate mapping and override grants,
+settings inheritance and locks, checkout commit composition, split tenders and
+retry idempotency.
+
+### Known limitations
+
+- Electron SQL Server handshake and printer/drawer behaviour still need a real
+  Windows till; they cannot be exercised in CI.
+- No seeded-database integration test; checkout coverage stops at the database
+  boundary (the ops actually sent).
+- `settings_effective` and friends cannot be called from the maintenance shell
+  role, so their SQL is verified by review, not by an automated round trip.
+
+### Recommended next actions
+
+1. Run one full manual pass on a Windows till: connect, open shift, sell, print,
+   open drawer, close shift with X/Z.
+2. Add a seeded integration environment so cross-branch RLS can be asserted with
+   two real signed-in users instead of by policy inspection.
+3. Keep the audit/sync-log modules consolidation on the backlog; it is the last
+   sizeable duplication left.
