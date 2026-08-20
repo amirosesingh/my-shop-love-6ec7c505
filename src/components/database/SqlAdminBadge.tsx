@@ -4,8 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { hasLocalDb, localDb, type LocalSyncStatus } from "@/lib/local-db";
 
 /**
- * Live state of the administration connection: server, selected database and
- * whether the pool is open. Renders nothing in the browser build.
+ * Live state of the operational branch SQL Server—the same pool used by sales,
+ * sync and Local Database settings. Renders nothing in the browser build.
  */
 export function OperationalDatabaseBadge({ className = "" }: { className?: string }) {
   const [status, setStatus] = useState<LocalSyncStatus | null>(null);

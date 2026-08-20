@@ -89,7 +89,7 @@ function tipFor(
   const text = `${result.code ?? ""} ${result.error ?? ""} ${result.originalMessage ?? ""}`.toLowerCase();
   if (text.includes("certificate"))
     return "Certificate error — switch 'Trust server certificate' ON, or turn 'Encrypt connection' OFF for a local instance.";
-  if (result.stage === "driver" || text.includes("im002") || text.includes("driver"))
+  if (result.code === "EDRIVER" || text.includes("im002") || text.includes("driver not"))
     return "Windows authentication needs a Microsoft ODBC SQL Server driver and the msnodesqlv8 desktop driver.";
   if (result.stage === "instance_lookup" || text.includes("instance"))
     return "Named instance not found — start the SQL Server Browser service, or type the instance's fixed TCP port.";
@@ -122,7 +122,7 @@ export function SqlConnectionModal({
   const [config, setConfig] = useState<LocalDbConfig>({
     ...defaultLocalDbConfig,
     database: DEFAULT_DATABASE,
-    port: 1433,
+    port: 0,
     encrypt: true,
     trustServerCertificate: true,
     arithAbort: true,
@@ -207,7 +207,7 @@ export function SqlConnectionModal({
         ...current,
         ...saved,
         database: saved.database || DEFAULT_DATABASE,
-        port: saved.port || 1433,
+        port: saved.port ?? 0,
         trustServerCertificate: saved.trustServerCertificate ?? true,
         arithAbort: saved.arithAbort ?? true,
       }));
@@ -221,9 +221,17 @@ export function SqlConnectionModal({
     };
   }, [open, scan, abandonRun, guard]);
 
+  const resolvedPort = () => {
+    // Older builds pre-filled 1433 even for SQLEXPRESS. Treat that legacy
+    // combination as automatic; HOST\INSTANCE,1433 remains the explicit form.
+    const named = config.server.includes("\\");
+    const inlinePort = /,\s*\d+\s*$/.test(config.server);
+    return named && !inlinePort && config.port === 1433 ? undefined : config.port || undefined;
+  };
+
   const credentials = () => ({
     server: config.server,
-    port: config.port,
+    port: resolvedPort(),
     auth: config.auth,
     user: config.user,
     password: config.password,
@@ -233,7 +241,7 @@ export function SqlConnectionModal({
 
   const params = (database: string) => ({
     host: config.server,
-    port: config.port,
+    port: resolvedPort() ?? 0,
     database,
     authType: config.auth,
     username: config.user,
@@ -269,7 +277,7 @@ export function SqlConnectionModal({
       });
     mark("credentials", {
       status: "passed",
-      detail: `${config.server}${config.port ? `:${config.port}` : ""} · ${
+      detail: `${config.server}${resolvedPort() ? `:${resolvedPort()}` : " · automatic port"} · ${
         config.auth === "sql" ? `SQL login ${config.user}` : "Windows Integrated"
       }`,
     });
@@ -516,8 +524,9 @@ export function SqlConnectionModal({
               <Input
                 id="sql-port"
                 type="number"
-                value={config.port}
-                onChange={(e) => set("port", Number(e.target.value) || 1433)}
+                value={config.port || ""}
+                placeholder="Automatic"
+                onChange={(e) => set("port", Number(e.target.value) || 0)}
               />
             </div>
 

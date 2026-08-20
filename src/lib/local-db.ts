@@ -29,7 +29,9 @@ export const defaultLocalDbConfig: LocalDbConfig = {
   auth: "windows",
   user: "",
   password: "",
-  port: 1433,
+  // 0 means automatic: default instances use 1433, named instances let the
+  // SQL driver/Browser resolve their dynamic port.
+  port: 0,
   encrypt: false,
   trustServerCertificate: true,
   arithAbort: true,
@@ -421,8 +423,6 @@ export async function scanLocalDatabases(): Promise<ScanNetworkResult> {
     return { ok: false, servers: [], error: err instanceof Error ? err.message : String(err) };
   }
 }
-
-const CONFIG_KEY = "pos.localdb.config";
 
 /**
  * Registry + loopback discovery of SQL Server instances installed on this PC.

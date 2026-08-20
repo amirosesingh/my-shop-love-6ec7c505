@@ -762,7 +762,7 @@ function registerIpc() {
     }
   });
 
-  ipcMain.handle("pos:status", () => worker.status());
+  ipcMain.handle("pos:status", () => statusPayload());
   ipcMain.handle("pos:housekeep", async (_e, options) => {
     try {
       const retentionDays = Number(options?.retentionDays);
