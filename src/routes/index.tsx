@@ -192,8 +192,39 @@ function Register() {
   const [catalogOpen, setCatalogOpen] = useState(false);
   /** Code that failed to resolve, shown in the search dialog. */
   const [unknownCode, setUnknownCode] = useState<string | null>(null);
-  /** Bill number reserved the moment this ticket started. */
+  /** The open ticket: lines, discount, member, coupon and bill number. */
+  const {
+    lines,
+    setLines,
+    cartDiscount,
+    setCartDiscount,
+    cartDiscountType,
+    setCartDiscountType,
+    exchangeRef,
+    setExchangeRef,
+    memberId,
+    setMemberId,
+    billNo,
+    setBillNo,
+    coupon,
+    setCoupon,
+    addLine,
+    setQty,
+    patchLine,
+    resetCart,
+    clearCart,
+  } = useCart({
+    hasShift: !!activeShift,
+    onNeedShift: () => setOpenShiftOpen(true),
+    products: state.products,
+    bookings: state.bookings,
+    currentStore,
+    requirePermission,
+    getTotal: () => totals.total,
+    getMemberName: () => member?.name ?? null,
+  });
   /** Cashier-adjustable column widths, remembered on this device. */
+
   const [billWidth, setBillWidth] = usePanelWidth("pos.register.billWidth", 420);
   const [deckWidth, setDeckWidth] = usePanelWidth("pos.register.deckWidth", 288);
   const [category, setCategory] = useState("All");
