@@ -13,6 +13,10 @@ const WINDOWS_AUTH_HINT =
   "Windows authentication needs the msnodesqlv8 driver. Run: npm install msnodesqlv8 (requires Visual Studio Build Tools), or switch to a SQL Server login.";
 
 const CONNECT_TIMEOUT_MS = 15_000;
+/** Hard ceiling for the whole attempt ladder — the UI must always get an answer. */
+const LADDER_BUDGET_MS = 25_000;
+/** No single attempt may eat the whole budget. */
+const ATTEMPT_TIMEOUT_MS = 8_000;
 
 let driver = null;
 let nativeDriver = null;
@@ -226,6 +230,33 @@ function timeoutOf(config) {
   return value > 0 ? value : CONNECT_TIMEOUT_MS;
 }
 
+/** Per-attempt deadline: never longer than what is left of the overall budget. */
+function attemptTimeoutOf(config, remainingMs) {
+  const wanted = Math.min(timeoutOf(config), ATTEMPT_TIMEOUT_MS);
+  return Math.max(1_000, Math.min(wanted, remainingMs));
+}
+
+/**
+ * Races a driver connect against our own clock.
+ *
+ * The drivers do not always honour their own connect timeout (msnodesqlv8 in
+ * particular can sit on a half-open socket), which is exactly how the wizard
+ * ended up spinning for ever. Whatever the driver does, this settles.
+ */
+function withDeadline(work, ms, code, message) {
+  let timer = null;
+  return Promise.race([
+    Promise.resolve(work).finally(() => clearTimeout(timer)),
+    new Promise((_resolve, reject) => {
+      timer = setTimeout(() => {
+        const e = new Error(message);
+        e.code = code;
+        reject(e);
+      }, ms);
+    }),
+  ]);
+}
+
 /** tedious config (SQL login, or NTLM when the native driver is missing). */
 function tediousConfig(config, target, security, byPort) {
   const ms = timeoutOf(config);
@@ -303,7 +334,10 @@ async function planAttempts(config) {
   const security = securityLadder(config, target.host);
   const routes = [];
   if (target.portKnown) routes.push(true);
-  if (target.instanceName) routes.push(false);
+  // Instance-name resolution is only a fallback: when the port is already
+  // known (typed, or answered by SQL Browser) it is the proven route and
+  // asking the driver to resolve the instance again only wastes the budget.
+  if (target.instanceName && !target.portKnown) routes.push(false);
   if (!routes.length) routes.push(true);
 
   const native = config.auth === "windows" && requireWindowsDriver();
@@ -349,10 +383,44 @@ async function openConnection(config) {
   const { attempts, target, native } = await planAttempts(config);
   const tried = [];
   let lastError = null;
+  const budget = Number(config.budgetMs) > 0 ? Number(config.budgetMs) : LADDER_BUDGET_MS;
+  const deadline = Date.now() + budget;
+  const cancelled = () => typeof config.isCancelled === "function" && config.isCancelled();
+  /** ODBC drivers proved absent, and the one that actually answered. */
+  const deadDrivers = new Set();
+  let usableDriver = null;
   for (const attempt of attempts) {
+    if (cancelled()) {
+      const e = new Error("The connection attempt was cancelled.");
+      e.code = "ECANCELLED";
+      e.attempts = tried;
+      throw e;
+    }
+    const remaining = deadline - Date.now();
+    if (remaining <= 1_000) {
+      const e = new Error(
+        "SQL Server did not complete the sign-in in time. The port answers but no authentication response came back.",
+      );
+      e.code = "ETIMEOUT";
+      e.attempts = tried;
+      e.target = target;
+      throw e;
+    }
+    let opening = null;
+    if (deadDrivers.has(attempt.odbcDriver)) continue;
+    if (usableDriver && attempt.odbcDriver !== usableDriver) continue;
     try {
       const mssql = native ? loadNativeDriver() : loadDriver();
-      const opened = await new mssql.ConnectionPool(attempt.driverConfig).connect();
+      opening = new mssql.ConnectionPool(attempt.driverConfig);
+      // Unhandled 'error' events on a pool we are about to drop must not crash
+      // the main process.
+      opening.on("error", () => {});
+      const opened = await withDeadline(
+        opening.connect(),
+        attemptTimeoutOf(config, remaining),
+        "ETIMEOUT",
+        "The sign-in did not complete before the deadline.",
+      );
       return {
         pool: opened,
         attempt: {
@@ -371,17 +439,30 @@ async function openConnection(config) {
       };
     } catch (err) {
       lastError = err;
+      // The driver may still settle later; make sure the socket is dropped.
+      if (opening) {
+        try {
+          await opening.close();
+        } catch {
+          /* never opened */
+        }
+      }
       tried.push({ label: attempt.label, code: err?.code ?? null, error: err?.message ?? String(err) });
       // A rejected sign-in is final: no other port, driver or TLS setting fixes it.
       if (isLoginFailure(err)) break;
-      // Only walk to the next ODBC driver when this one is genuinely absent.
-      if (native && !isOdbcDriverMissing(err) && attempt.odbcDriver !== attempts.at(-1)?.odbcDriver) {
-        const sameDriverLeft = attempts.some(
-          (a) => a.odbcDriver === attempt.odbcDriver && !tried.some((t) => t.label === a.label),
-        );
-        if (!sameDriverLeft) break;
+      if (native) {
+        // A driver that is simply not installed is skipped entirely; a driver
+        // that answered is the right one, so no other driver is worth trying.
+        if (isOdbcDriverMissing(err)) deadDrivers.add(attempt.odbcDriver);
+        else usableDriver = attempt.odbcDriver;
       }
     }
+  }
+  if (cancelled()) {
+    const e = new Error("The connection attempt was cancelled.");
+    e.code = "ECANCELLED";
+    e.attempts = tried;
+    throw e;
   }
   const error = lastError ?? new Error("Could not reach SQL Server");
   error.attempts = tried;
@@ -511,6 +592,75 @@ function readSchemaFile() {
   }
 }
 
+const HEALTH_TABLE = "dbo.pos_connection_health";
+
+/**
+ * Proves the till's OWN pool — the same connection sales use — can write.
+ *
+ * A row is inserted inside an explicit transaction, read back, and the whole
+ * thing is rolled back, so no customer or sales data is touched and nothing is
+ * left behind. When the health table is absent it is created inside the same
+ * transaction (and rolled back with it), which additionally proves the login
+ * is not read-only.
+ */
+async function verifyWrite() {
+  if (!pool) {
+    return { ok: false, code: "ENOTCONNECTED", error: "Local database is not connected." };
+  }
+  const started = Date.now();
+  const marker = `pos-write-check-${Date.now()}`;
+  try {
+    const existing = await pool
+      .request()
+      .query(`SELECT OBJECT_ID('${HEALTH_TABLE}', 'U') AS id`);
+    const hasTable = existing.recordset[0]?.id != null;
+    const create = hasTable
+      ? ""
+      : `CREATE TABLE ${HEALTH_TABLE} (
+           id uniqueidentifier NOT NULL DEFAULT NEWID(),
+           note nvarchar(128) NULL,
+           checked_at datetime2 NOT NULL DEFAULT SYSUTCDATETIME()
+         );\n`;
+    const res = await pool.request().batch(
+      `SET NOCOUNT ON;
+       SET XACT_ABORT ON;
+       BEGIN TRAN;
+       ${create}INSERT INTO ${HEALTH_TABLE} (note) VALUES ('${marker}');
+       SELECT COUNT(*) AS written, DB_NAME() AS activeDb
+         FROM ${HEALTH_TABLE} WHERE note = '${marker}';
+       ROLLBACK;`,
+    );
+    const row = res.recordset?.[0] ?? {};
+    if (!Number(row.written)) {
+      return {
+        ok: false,
+        code: "EWRITEBACK",
+        error: "The probe row was written but could not be read back.",
+        hint: "The login can insert but not select in this database. Check its role membership.",
+        latencyMs: Date.now() - started,
+      };
+    }
+    return {
+      ok: true,
+      activeDb: row.activeDb ?? activeConfig?.database ?? null,
+      createdProbeTable: !hasTable,
+      rolledBack: true,
+      latencyMs: Date.now() - started,
+    };
+  } catch (err) {
+    const described = describeSqlError(err);
+    const text = `${described.code ?? ""} ${described.error ?? ""}`.toLowerCase();
+    return {
+      ok: false,
+      ...described,
+      latencyMs: Date.now() - started,
+      hint: /permission|denied|read.only/.test(text)
+        ? "The sign-in works but this login cannot write to that database. Grant it db_datawriter (and db_ddladmin to create the schema), or apply the master schema from Local database settings."
+        : described.hint,
+    };
+  }
+}
+
 /**
  * Explicit, operator-initiated schema apply. Never called on boot.
  */
@@ -537,6 +687,7 @@ module.exports = {
   getConfig,
   test,
   verify,
+  verifyWrite,
   applySchema,
   applySchemaNow,
   readSchema,

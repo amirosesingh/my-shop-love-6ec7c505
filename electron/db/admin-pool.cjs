@@ -18,13 +18,27 @@ let pool = null;
 let session = null;
 /** Names of databases the instance reported ONLINE — the only allowed context. */
 let databases = [];
+/**
+ * Exactly one handshake may be in flight.
+ *
+ * Without this, a second "Run checks" started another attempt ladder while the
+ * first was still walking one, and `connectInstance`'s opening `disconnect()`
+ * tore down the pool the first run was about to return — which is how the
+ * wizard could sit on "Loading…" for ever.
+ */
+let inFlight = null;
 
 /** Translates driver failures into something an operator can act on. */
 function diagnose(err) {
   const base = describeSqlError(err);
   const text = `${base.code ?? ""} ${base.error ?? ""} ${base.originalMessage ?? ""}`.toLowerCase();
   let hint = base.hint;
-  if (/im002|data source name not found|no default driver/.test(text)) {
+  if (base.code === "ECANCELLED") {
+    hint = "The attempt was stopped before it finished.";
+  } else if (base.code === "ETIMEOUT" || /did not complete|timed out/.test(text)) {
+    hint =
+      "The port answered but the sign-in never completed. A firewall that swallows the reply, TLS/encryption mismatch, or a stopped SQL Server Browser service are the usual causes — try turning 'Encrypt connection' off for a local instance.";
+  } else if (/im002|data source name not found|no default driver/.test(text)) {
     hint =
       "No suitable ODBC driver is installed for Windows authentication. Install 'ODBC Driver 18 for SQL Server' from Microsoft, or use a SQL Server login.";
   } else if (text.includes("certificate")) {
@@ -52,6 +66,8 @@ async function openPool(input) {
     ...input,
     database: String(input?.database || "master"),
     timeout: CONNECT_TIMEOUT_MS,
+    budgetMs: Number(input?.budgetMs) > 0 ? Number(input.budgetMs) : undefined,
+    isCancelled: typeof input?.isCancelled === "function" ? input.isCancelled : undefined,
   });
   return {
     pool: opened.pool,
@@ -73,6 +89,13 @@ async function disconnect() {
   session = null;
   databases = [];
   return { ok: true };
+}
+
+/** Aborts the running handshake (dialog closed, or operator pressed cancel). */
+async function cancel() {
+  if (inFlight) inFlight.cancelled = true;
+  await disconnect();
+  return { ok: true, cancelled: true };
 }
 
 /**
@@ -168,9 +191,28 @@ async function lockDatabase(input) {
  * Phase 2: discover every ONLINE database so the UI can populate itself.
  */
 async function connectInstance(input) {
+  if (inFlight) {
+    return {
+      ok: false,
+      code: "EBUSY",
+      error: "A connection attempt is already running.",
+      hint: "Wait for the current attempt to finish, or close the dialog to cancel it.",
+      attempts: [],
+    };
+  }
+  const run = { cancelled: false };
+  inFlight = run;
   await disconnect();
   try {
-    const opened = await openPool({ ...input, database: input?.database || "master" });
+    const opened = await openPool({
+      ...input,
+      database: input?.database || "master",
+      isCancelled: () => run.cancelled,
+    });
+    if (run.cancelled) {
+      await opened.pool.close().catch(() => {});
+      return { ok: false, code: "ECANCELLED", error: "The connection attempt was cancelled." };
+    }
     pool = opened.pool;
     const meta = await pool
       .request()
@@ -206,6 +248,8 @@ async function connectInstance(input) {
   } catch (err) {
     await disconnect();
     return { ok: false, ...diagnose(err) };
+  } finally {
+    if (inFlight === run) inFlight = null;
   }
 }
 
@@ -372,6 +416,7 @@ async function executeQuery(dbName, queryText) {
 function status() {
   return {
     connected: !!pool,
+    busy: !!inFlight,
     server: session?.server ?? null,
     serverName: session?.serverName ?? null,
     database: session?.database ?? null,
@@ -382,6 +427,7 @@ function status() {
 
 module.exports = {
   connectInstance,
+  cancel,
   probePort,
   lockDatabase,
   listDatabases,

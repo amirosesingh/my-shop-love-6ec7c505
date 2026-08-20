@@ -20,6 +20,8 @@ contextBridge.exposeInMainWorld("pos", {
   /** Registry + loopback discovery of instances installed on this PC. */
   scanLocalInstances: () => invoke("db:scan-local-instances"),
   status: () => invoke("pos:status"),
+  /** Transactional write probe on the operational pool (always rolled back). */
+  verifyWrite: () => invoke("pos:verify-write"),
   /** Silent receipt printing — no Windows print dialog. */
   print: (html, options) => invoke("print:silent", html, options),
   /** Raw ESC/POS bytes (cash drawer kick) straight to the printer. */
@@ -117,6 +119,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
  */
 contextBridge.exposeInMainWorld("sqlAdmin", {
   connectInstance: (credentials) => invoke("sqladmin:connect", credentials),
+  cancel: () => invoke("sqladmin:cancel"),
   probePort: (credentials) => invoke("sqladmin:probe-port", credentials),
   lockDatabase: (credentials) => invoke("sqladmin:lock", credentials),
   listDatabases: () => invoke("sqladmin:databases"),
