@@ -673,6 +673,44 @@ function registerIpc() {
   ipcMain.handle("pos:database-config", () => dbConfigStore.read());
 
   /*
+    Escape hatch. Cancels any handshake still walking its ladder, closes both
+    the administration and the operational pool, and forgets the sealed
+    credentials so the wizard starts from a clean slate.
+  */
+  ipcMain.handle("pos:reset-connection", async () => {
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+    try {
+      await sqlAdmin.cancel();
+    } catch {
+      /* nothing was running */
+    }
+    try {
+      await sqlAdmin.disconnect();
+    } catch {
+      /* already gone */
+    }
+    try {
+      await pool.close();
+    } catch {
+      /* already gone */
+    }
+    const cleared = dbConfigStore.write(null);
+    broadcastStatus({
+      connected: false,
+      tables: [],
+      queue: [],
+      server: null,
+      database: null,
+      resolved: null,
+      cloudConfigured: !!cloudConfig,
+    });
+    return { ok: cleared.ok !== false, error: cleared.error ?? null };
+  });
+
+  /*
     Schema lifecycle. Reading the master file is always safe; applying it only
     ever happens because an operator pressed the button in settings.
   */
