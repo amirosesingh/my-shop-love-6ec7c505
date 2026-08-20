@@ -106,8 +106,13 @@ export function normalizeRules(input: unknown): PosRules {
     const raw = row[key];
     if (raw === undefined || raw === null) return;
     if (typeof DEFAULT_POS_RULES[key] === "boolean") {
-      (out as Record<string, unknown>)[key] = raw === true || raw === "true";
+      // Only a recognisable yes/no changes a gate. Anything else is junk and
+      // must keep the shipped rule, so a bad row can never silently open one.
+      const on = raw === true || raw === "true" || raw === 1 || raw === "1";
+      const off = raw === false || raw === "false" || raw === 0 || raw === "0";
+      if (on || off) (out as Record<string, unknown>)[key] = on;
     } else {
+
       const n = Number(raw);
       if (Number.isFinite(n)) (out as Record<string, unknown>)[key] = n;
     }

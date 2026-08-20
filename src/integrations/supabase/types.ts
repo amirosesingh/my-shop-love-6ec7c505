@@ -2261,6 +2261,39 @@ export type Database = {
         }
         Relationships: []
       }
+      settings_scoped: {
+        Row: {
+          created_at: string
+          is_overridden: boolean
+          key: string
+          scope: string
+          scope_id: string
+          updated_at: string
+          updated_by: string | null
+          value: Json | null
+        }
+        Insert: {
+          created_at?: string
+          is_overridden?: boolean
+          key: string
+          scope?: string
+          scope_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json | null
+        }
+        Update: {
+          created_at?: string
+          is_overridden?: boolean
+          key?: string
+          scope?: string
+          scope_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json | null
+        }
+        Relationships: []
+      }
       shift_sessions: {
         Row: {
           created_at: string
@@ -3395,7 +3428,35 @@ export type Database = {
         Args: { p_active: boolean; p_user_id: string }
         Returns: undefined
       }
+      settings_cluster_of: {
+        Args: { _scope: string; _scope_id: string }
+        Returns: string
+      }
+      settings_effective: {
+        Args: { _scope: string; _scope_id: string }
+        Returns: {
+          effective_value: Json
+          is_overridden: boolean
+          parent_inherited_value: Json
+          setting_key: string
+          source: string
+        }[]
+      }
       settings_private_key: { Args: never; Returns: string }
+      settings_sync_batch: {
+        Args: { _keys: string[]; _scope: string; _scope_id: string }
+        Returns: Json
+      }
+      settings_upsert: {
+        Args: { _patch: Json; _scope: string; _scope_id: string }
+        Returns: {
+          effective_value: Json
+          is_overridden: boolean
+          parent_inherited_value: Json
+          setting_key: string
+          source: string
+        }[]
+      }
       shift_active_for_branch: {
         Args: { p_store_id: string }
         Returns: {

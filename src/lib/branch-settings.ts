@@ -129,3 +129,27 @@ export async function setSectionLock(
     "Locking a settings section",
   );
 }
+
+/**
+ * Resolve a settings record through the override chain.
+ *
+ * Weakest tier first, so a stronger tier always wins on the same path, and a
+ * globally locked section is skipped entirely: nobody can override it.
+ * Kept pure so the precedence rules can be tested on their own.
+ */
+export function resolveScopedSettings<T>(
+  base: T,
+  scope: BranchSettingsState,
+  merge: (target: T, patch: unknown) => T,
+): { settings: T; touched: boolean } {
+  let settings = base;
+  let touched = false;
+  for (const tier of SETTING_TIERS) {
+    for (const key of Object.keys(scope.overrides[tier]) as SettingsSectionId[]) {
+      if (scope.locks[key]) continue;
+      settings = merge(settings, scope.overrides[tier][key]);
+      touched = true;
+    }
+  }
+  return { settings, touched };
+}
