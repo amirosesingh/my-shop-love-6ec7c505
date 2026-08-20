@@ -19,6 +19,8 @@ const SOCKET_TIMEOUT_MS = 2_000;
 const HANDSHAKE_DEADLINE_MS = 30_000;
 /** How long a fresh attempt waits for a cancelled predecessor to let go. */
 const RELEASE_WAIT_MS = 1_500;
+/** Ceiling for the metadata/catalogue queries that follow a successful login. */
+const QUERY_DEADLINE_MS = 10_000;
 
 let pool = null;
 /** { server, database, auth, trustFallback } for the status badge. */
@@ -34,6 +36,35 @@ let databases = [];
  * wizard could sit on "Loading…" for ever.
  */
 let inFlight = null;
+
+let attemptSeq = 0;
+const newAttemptId = () => `att_${Date.now().toString(36)}_${(++attemptSeq).toString(36)}`;
+
+/** Console diagnostics — identity and timing only, never credentials. */
+function trace(run, event, extra) {
+  const detail = extra ? ` ${JSON.stringify(extra)}` : "";
+  // eslint-disable-next-line no-console
+  console.log(
+    `[sqladmin] attempt=${run.attemptId} stage=${run.stage} event=${event} elapsed=${
+      Date.now() - run.startedAt
+    }ms${detail}`,
+  );
+}
+
+/** Rejects instead of hanging when a request never answers. */
+function withDeadline(promise, ms, code, message) {
+  let timer;
+  return Promise.race([
+    Promise.resolve(promise).finally(() => clearTimeout(timer)),
+    new Promise((_r, reject) => {
+      timer = setTimeout(() => {
+        const err = new Error(message);
+        err.code = code;
+        reject(err);
+      }, ms);
+    }),
+  ]);
+}
 
 /** Translates driver failures into something an operator can act on. */
 function diagnose(err) {
@@ -108,15 +139,16 @@ async function disconnect() {
  * what makes the next attempt possible immediately. The abandoned run is
  * flagged, so whatever it returns later is discarded instead of adopted.
  */
-async function cancel() {
+async function cancel(attemptId) {
   const run = inFlight;
-  if (run) {
+  if (run && (!attemptId || run.attemptId === attemptId)) {
     run.cancelled = true;
     if (run.timer) clearTimeout(run.timer);
     inFlight = null;
+    trace(run, "cancelled");
   }
   await disconnect();
-  return { ok: true, cancelled: true };
+  return { ok: true, cancelled: true, attemptId: run?.attemptId ?? attemptId ?? null };
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -231,48 +263,87 @@ async function lockDatabase(input) {
  */
 async function connectInstance(input) {
   // A previous attempt that is still walking its ladder must never block a
-  // deliberate retry: cancel it, give it a moment to let go, then take over.
+  // deliberate retry: it is cancelled and superseded, never a reason to refuse.
   if (inFlight) {
     await cancel();
     for (let waited = 0; inFlight && waited < RELEASE_WAIT_MS; waited += 100) await sleep(100);
-    if (inFlight) {
-      return {
-        ok: false,
-        code: "EBUSY",
-        error: "A connection attempt is still shutting down.",
-        hint: "Press “Reset connection” to clear it, then run the checks again.",
-        attempts: [],
-      };
-    }
+    inFlight = null;
   }
-  const run = { cancelled: false, timer: null };
+  const run = {
+    attemptId: String(input?.attemptId || newAttemptId()),
+    startedAt: Date.now(),
+    stage: "driver",
+    cancelled: false,
+    timer: null,
+  };
   // Hard release: however the driver behaves, the slot frees itself.
   run.timer = setTimeout(() => {
     run.cancelled = true;
     if (inFlight === run) inFlight = null;
+    trace(run, "deadline");
   }, HANDSHAKE_DEADLINE_MS);
   inFlight = run;
+  trace(run, "start");
   await disconnect();
+  const finalise = (result) => ({
+    ...result,
+    attemptId: run.attemptId,
+    stage: result.stage ?? run.stage,
+    status: result.ok ? "success" : run.cancelled ? "cancelled" : (result.status ?? "failed"),
+    elapsedMs: Date.now() - run.startedAt,
+  });
   try {
-    const opened = await openPool({
+    const openPromise = openPool({
       ...input,
       database: input?.database || "master",
       isCancelled: () => run.cancelled,
     });
+    // A late pool from an abandoned attempt must not stay open.
+    openPromise
+      .then((o) => {
+        if (run.cancelled && o?.pool) void o.pool.close().catch(() => {});
+      })
+      .catch(() => {});
+    const opened = await openPromise;
     if (run.cancelled) {
       await opened.pool.close().catch(() => {});
-      return { ok: false, code: "ECANCELLED", stage: "driver", error: "The connection attempt was cancelled." };
+      return finalise({
+        ok: false,
+        code: "ECANCELLED",
+        stage: "driver",
+        status: "cancelled",
+        error: "The connection attempt was cancelled.",
+      });
     }
+    run.stage = "database";
     pool = opened.pool;
-    const meta = await pool
-      .request()
-      .query("SELECT @@SERVERNAME AS serverName, @@VERSION AS version, DB_NAME() AS activeDb");
+    const meta = await withDeadline(
+      pool.request().query("SELECT @@SERVERNAME AS serverName, @@VERSION AS version, DB_NAME() AS activeDb"),
+      QUERY_DEADLINE_MS,
+      "ETIMEOUT",
+      "The server signed in but did not answer the identification query in time.",
+    );
     const row = meta.recordset[0] ?? {};
-    const list = await pool
-      .request()
-      .query(
-        "SELECT name, state_desc FROM sys.databases WHERE state_desc = 'ONLINE' AND HAS_DBACCESS(name) = 1 ORDER BY name ASC",
-      );
+    const list = await withDeadline(
+      pool
+        .request()
+        .query(
+          "SELECT name, state_desc FROM sys.databases WHERE state_desc = 'ONLINE' AND HAS_DBACCESS(name) = 1 ORDER BY name ASC",
+        ),
+      QUERY_DEADLINE_MS,
+      "ETIMEOUT",
+      "The database list did not arrive in time.",
+    );
+    if (run.cancelled) {
+      await disconnect();
+      return finalise({
+        ok: false,
+        code: "ECANCELLED",
+        stage: "database",
+        status: "cancelled",
+        error: "The connection attempt was cancelled.",
+      });
+    }
     databases = list.recordset.map((r) => String(r.name));
     session = {
       server: String(input?.server ?? ""),
@@ -283,8 +354,10 @@ async function connectInstance(input) {
       trustFallback: opened.trustFallback,
       resolved: opened.attempt,
     };
-    return {
+    trace(run, "success");
+    return finalise({
       ok: true,
+      stage: "write",
       serverName: row.serverName ?? null,
       version: row.version ?? null,
       activeDb: session.database,
@@ -294,10 +367,11 @@ async function connectInstance(input) {
         name: String(r.name),
         state: String(r.state_desc),
       })),
-    };
+    });
   } catch (err) {
     await disconnect();
-    return { ok: false, ...diagnose(err) };
+    trace(run, run.cancelled ? "cancelled" : "failed", { code: err?.code ?? null });
+    return finalise({ ok: false, ...diagnose(err) });
   } finally {
     if (run.timer) clearTimeout(run.timer);
     if (inFlight === run) inFlight = null;
@@ -468,6 +542,8 @@ function status() {
   return {
     connected: !!pool,
     busy: !!inFlight,
+    attemptId: inFlight?.attemptId ?? null,
+    stage: inFlight?.stage ?? null,
     server: session?.server ?? null,
     serverName: session?.serverName ?? null,
     database: session?.database ?? null,

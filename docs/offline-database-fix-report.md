@@ -162,3 +162,11 @@ The Explorer pool remains isolated for safe schema browsing, but it cannot make
 the till appear connected. SQL connection details now have one canonical
 OS-encrypted main-process store; the old general-config copy is migrated once
 and removed.
+## 1.3.14 — connection wizard is a finite-state machine
+
+- Every wizard run now carries an `attemptId` that crosses the IPC boundary, so the shell can cancel that exact attempt and a late result from a superseded run is discarded.
+- Each step races the bridge call against a client deadline (`src/lib/connection-attempt.ts`); a lost reply becomes `timed_out`, never an endless spinner.
+- Every `sqladmin:*` channel is bounded in `electron/main.cjs`, including `cancel`, `disconnect` and `status`.
+- `connectInstance` bounds the post-login identification and catalogue queries, closes the pool of an abandoned attempt, and no longer answers `EBUSY` — a new attempt always supersedes the old one.
+- Step states are explicit: `pending | running | passed | failed | cancelled | timed_out`, with a synchronous double-click lock on Run checks.
+- Diagnostics log attempt id, stage, elapsed time and outcome only — never credentials.

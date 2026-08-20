@@ -13,7 +13,21 @@ export type SqlAdminCredentials = {
   domain?: string;
   encrypt?: boolean;
   trustServerCertificate?: boolean;
+  /** Identity of the wizard run, so a stale result can be recognised. */
+  attemptId?: string;
 };
+
+/** Terminal outcomes an attempt can reach — never an open-ended "loading". */
+export type SqlAttemptStatus = "success" | "failed" | "cancelled" | "timed_out";
+
+export type SqlAttemptStage =
+  | "port"
+  | "instance_lookup"
+  | "driver"
+  | "tls"
+  | "login"
+  | "database"
+  | "write";
 
 export type SqlAdminFailure = {
   ok: false;
@@ -21,7 +35,10 @@ export type SqlAdminFailure = {
   code?: string | null;
   originalMessage?: string | null;
   hint?: string | null;
-  stage?: "port" | "instance_lookup" | "driver" | "tls" | "login" | "database" | "write";
+  stage?: SqlAttemptStage;
+  status?: SqlAttemptStatus;
+  attemptId?: string | null;
+  elapsedMs?: number;
   /** Every combination tried before giving up, newest last. */
   attempts?: SqlAttemptLog[];
 };
@@ -56,6 +73,10 @@ export type SqlColumn = {
 export type SqlAdminConnectResult =
   | {
       ok: true;
+      attemptId?: string | null;
+      status?: "success";
+      stage?: SqlAttemptStage;
+      elapsedMs?: number;
       serverName: string | null;
       version: string | null;
       activeDb: string;
@@ -69,6 +90,8 @@ export type SqlAdminStatus = {
   connected: boolean;
   /** True while a handshake is still walking the attempt ladder. */
   busy?: boolean;
+  attemptId?: string | null;
+  stage?: SqlAttemptStage | null;
   server: string | null;
   serverName: string | null;
   database: string | null;
@@ -113,7 +136,7 @@ export type SqlLockResult =
 export type SqlAdminBridge = {
   connectInstance: (credentials: SqlAdminCredentials) => Promise<SqlAdminConnectResult>;
   /** Abort the running handshake and drop the half-open pool. */
-  cancel?: () => Promise<{ ok: boolean; cancelled?: boolean }>;
+  cancel?: (attemptId?: string) => Promise<{ ok: boolean; cancelled?: boolean }>;
   /** Raw 2-second TCP reachability probe — names firewall/port problems. */
   probePort?: (credentials: SqlAdminCredentials) => Promise<SqlPortProbe>;
   /** Re-point the administration pool at the operator's chosen database. */
