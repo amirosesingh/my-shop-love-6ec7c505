@@ -1321,13 +1321,7 @@ function Register() {
     });
     resetCart();
     setMemberId(null);
-    setTendered("");
-    setTransferRef("");
-    setTenderRef("");
-    setTenderRefNote("");
-    setTenders([]);
-    setBankName("");
-    setPayOpen(false);
+    resetTender();
     toast.success(
       exchangeRef ? `Exchange ${sale.receiptNo} completed against ${exchangeRef}` : `Sale ${sale.receiptNo} completed`,
     );
