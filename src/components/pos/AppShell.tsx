@@ -34,6 +34,7 @@ import { startSyncEngine } from "@/lib/sync-engine";
 import { hydrateBillSequence } from "@/lib/bill-number";
 import { startDatabaseModeWatch } from "@/lib/db-mode";
 import { DbConnectionModal } from "@/components/pos/DbConnectionModal";
+import { UpdateHeaderButton } from "@/components/pos/UpdateHeaderButton";
 import type { NavItem } from "@/components/pos/nav-config";
 import { setPrintStore, setPrintSettings, setServiceTerms } from "@/lib/pos-print";
 import { bookingRulesOf } from "@/lib/pos-types";
