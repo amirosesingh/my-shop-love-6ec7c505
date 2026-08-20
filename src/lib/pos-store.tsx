@@ -461,12 +461,9 @@ export function PosProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!ready) return;
     if (isLiveOnly()) return;
-    try {
-      window.localStorage.setItem(KEY, JSON.stringify(state));
-    } catch {
-      /* storage full */
-    }
+    schedulePersist(KEY, () => JSON.stringify(state));
   }, [state, ready]);
+
 
   // Overrides follow the cluster, branch and person in context.
   useEffect(() => {
