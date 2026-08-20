@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useCart } from "@/lib/register/use-cart";
+import { useTender } from "@/lib/register/use-tender";
 import {
   BadgeCheck,
   Banknote,
