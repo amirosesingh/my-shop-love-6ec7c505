@@ -25,6 +25,12 @@ import {
   silentPrint,
 } from "./receipt-printer";
 import { columnsForPaper, htmlToEscPos } from "./escpos";
+import { RECEIPT_SCOPE, scopeReceiptCss } from "./receipt-css";
+import {
+  renderReceiptText,
+  SAMPLE_RECEIPT_CONTEXT,
+  type ReceiptTokenContext,
+} from "./receipt-template";
 
 export const STORE = {
   name: "NORTHWIND & CO.",
@@ -60,6 +66,43 @@ export function setPrintSettings(receipt: ReceiptSettings, tax: TaxSettings) {
   globalReceiptCfg = receipt;
   receiptCfg = resolveReceiptCfg(receipt, activeBranch);
   taxCfg = tax;
+}
+
+/**
+ * Values the dynamic receipt fields resolve against for the slip being built.
+ * Each body function fills this in before the header or footer is rendered, so
+ * a template line can never carry data from the previous print.
+ */
+let tokenCtx: ReceiptTokenContext = {};
+const setTokens = (ctx: ReceiptTokenContext) => {
+  tokenCtx = ctx;
+};
+
+/** Device identity shown on slips; pushed in by the terminal layer. */
+let deviceIdentity: { deviceName?: string; terminalName?: string } = {};
+export function setPrintDevice(identity: { deviceName?: string; terminalName?: string }) {
+  deviceIdentity = identity ?? {};
+}
+
+const placeTokens = (): ReceiptTokenContext => ({
+  device_name: deviceIdentity.deviceName ?? "",
+  terminal_name: deviceIdentity.terminalName ?? deviceIdentity.deviceName ?? "",
+  branch_name: activeBranch?.name ?? "",
+  branch_code: activeBranch?.code ?? "",
+});
+
+const dateTokens = (iso?: string): ReceiptTokenContext => {
+  const d = iso ? new Date(iso) : new Date();
+  if (Number.isNaN(d.getTime())) return { date: "", time: "" };
+  return {
+    date: d.toLocaleDateString(),
+    time: d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+  };
+};
+
+/** Preview helper: render templates with clearly-marked sample values. */
+export function usePreviewTokens() {
+  tokenCtx = { ...SAMPLE_RECEIPT_CONTEXT, ...placeTokens() };
 }
 
 /** Service & high-tension liability wording, pushed in from the booking rules. */
@@ -148,7 +191,9 @@ export function qrSvg(value: string, size: number) {
 const customLines = (placement: "header" | "footer") =>
   (receiptCfg.customLines ?? [])
     .filter((l) => l.placement === placement && l.text.trim())
-    .map((l) => `<div class="c muted">${esc(l.text)}</div>`)
+    .map((l) => renderReceiptText(l.text, tokenCtx).trim())
+    .filter(Boolean)
+    .map((text) => `<div class="c muted">${esc(text)}</div>`)
     .join("");
 
 /** QR block if it belongs at the given placement. */
@@ -291,7 +336,8 @@ const shell = (title: string, body: string, autoPrint = true) => {
     html, body { width: ${bodyWidth}; margin: ${bodyMargin}; }
     .no-print { display: none !important; }
   }
-</style></head><body>${body}
+  ${scopeReceiptCss(receiptCfg.css)}
+</style></head><body><div class="${RECEIPT_SCOPE.slice(1)}">${body}</div>
 ${
   autoPrint
     ? `<script>window.onload=function(){window.focus();window.print();setTimeout(function(){window.close()},400)}<\/script>`
@@ -327,7 +373,7 @@ const header = (subtitle?: string) => {
   <div class="c muted">${esc(
     activeBranch ? `${activeBranch.name} (${activeBranch.code})` : STORE.line1,
   )}</div>
-  ${(receiptCfg.headerText || "")
+  ${renderReceiptText(receiptCfg.headerText || "", tokenCtx)
     .split("\n")
     .filter(Boolean)
     .map((l) => `<div class="c muted">${esc(l)}</div>`)
