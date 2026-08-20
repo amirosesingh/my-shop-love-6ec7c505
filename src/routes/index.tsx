@@ -4,6 +4,9 @@ import { useCart } from "@/lib/register/use-cart";
 import { useTender } from "@/lib/register/use-tender";
 import { isoDaysFromNow, useBookingIntake } from "@/lib/register/use-booking-intake";
 import { useCheckout } from "@/lib/register/use-checkout";
+import { usePromotions } from "@/lib/register/use-promotions";
+import { useExchange } from "@/lib/register/use-exchange";
+import { useRegisterHeldOrders } from "@/lib/register/use-held-orders";
 import {
   BadgeCheck,
   Banknote,
@@ -70,8 +73,6 @@ import { BOOKING_TIMING_LABELS, bookingRulesOf, type BookingPaymentTiming } from
 import { useUserPermissions } from "@/lib/pos-permissions";
 import { useVisibility } from "@/lib/ui-visibility";
 import { useUiScale } from "@/lib/use-ui-scale";
-import { addHeldOrder, removeHeldOrder, useHeldOrders, type HeldOrder } from "@/lib/held-orders";
-import { TICKET_ACTIONS, logTicketEvent } from "@/lib/ticket-audit";
 import {
   discountLabel,
   loadMemberVouchers,
@@ -233,10 +234,6 @@ function Register() {
   const [category, setCategory] = useState("All");
   /** Calculator-style discount pad: index of the cart line, or "bill". */
   const [padTarget, setPadTarget] = useState<number | "bill" | null>(null);
-  const [exchangeOpen, setExchangeOpen] = useState(false);
-  const [billQuery, setBillQuery] = useState("");
-  const [billHit, setBillHit] = useState<Sale | null>(null);
-  const [picks, setPicks] = useState<Record<number, number>>({});
 
   /** True while a sale / booking is being stored — blocks a second click. */
   const [openShiftOpen, setOpenShiftOpen] = useState(false);
@@ -364,17 +361,7 @@ function Register() {
   /** Narrow windows: the action deck collapses so it can't cover the totals. */
   const [deckOpen, setDeckOpen] = useState(false);
   /* Operation deck state */
-  const held = useHeldOrders();
   const [receiptPreview, setReceiptPreview] = useState(false);
-  const [couponOpen, setCouponOpen] = useState(false);
-  const [couponCode, setCouponCode] = useState("");
-  const [couponScope, setCouponScope] = useState<"bill" | "item">("bill");
-  const [couponLine, setCouponLine] = useState<string>("");
-  /** Digital voucher token locked at the end of the sale, when one is on the bill. */
-  const [voucherToken, setVoucherToken] = useState<string | null>(null);
-  /** Live vouchers held by the attached member, for the picker. */
-  const [memberVouchers, setMemberVouchers] = useState<VoucherView[]>([]);
-  const [voucherPickerOpen, setVoucherPickerOpen] = useState(false);
   /* No-sale drawer open */
   const [noSaleOpen, setNoSaleOpen] = useState(false);
   const [noSaleReason, setNoSaleReason] = useState("");
@@ -450,20 +437,6 @@ function Register() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lines.length, billNo, currentStore.id]);
 
-  // Keep the attached member's live vouchers loaded for the picker.
-  useEffect(() => {
-    if (!memberId) {
-      setMemberVouchers([]);
-      return;
-    }
-    let live = true;
-    void loadMemberVouchers(memberId)
-      .then((vs) => live && setMemberVouchers(vs))
-      .catch(() => live && setMemberVouchers([]));
-    return () => {
-      live = false;
-    };
-  }, [memberId]);
 
   const taxSettings = state.settings.tax;
   // Promotions run against the subtotal after line-level discounts.
@@ -501,6 +474,81 @@ function Register() {
   }, [focId, hasFoc, state.promotions, state.products]);
   const balanceDue = totals.total >= 0 ? totals.total : 0;
   const refundDue = totals.total < 0 ? r2(-totals.total) : 0;
+
+  const {
+    couponOpen,
+    setCouponOpen,
+    couponCode,
+    setCouponCode,
+    couponScope,
+    setCouponScope,
+    couponLine,
+    setCouponLine,
+    voucherToken,
+    setVoucherToken,
+    memberVouchers,
+    voucherPickerOpen,
+    setVoucherPickerOpen,
+    applyCoupon,
+    applyVoucher,
+    voucherPreview,
+    removeCoupon,
+  } = usePromotions({
+    products: state.products,
+    promotions: state.promotions,
+    members: state.members,
+    storeId: currentStore.id,
+    lines,
+    promoBase,
+    coupon,
+    setCoupon,
+    memberId,
+    setMemberId,
+    patchLine,
+    setCartDiscount,
+    setCartDiscountType,
+    unlockDiscounts,
+  });
+
+  const {
+    exchangeOpen,
+    setExchangeOpen,
+    billQuery,
+    setBillQuery,
+    billHit,
+    setBillHit,
+    picks,
+    setPicks,
+    lookupBill,
+    addExchangeCredits,
+  } = useExchange({
+    sales: state.sales,
+    hasShift: () => !!activeShift,
+    setLines,
+    setExchangeRef,
+  });
+
+  const { held, holdOrder, resumeHeld } = useRegisterHeldOrders({
+    lines,
+    total: totals.total,
+    cartDiscount,
+    cartDiscountType,
+    exchangeRef,
+    memberId,
+    memberName: member?.name ?? null,
+    coupon,
+    billNo,
+    storeId: currentStore.id,
+    cashier: activeCashier,
+    setLines,
+    setCartDiscount,
+    setCartDiscountType,
+    setExchangeRef,
+    setMemberId,
+    setCoupon,
+    setBillNo,
+    resetCart,
+  });
   const detail = state.products.find((p) => p.id === detailId) ?? null;
 
   const memberMatches = memberQuery.trim()
@@ -516,50 +564,6 @@ function Register() {
         .slice(0, 5)
     : [];
 
-  function lookupBill() {
-    const ref = billQuery.trim().toLowerCase();
-    const hit =
-      state.sales.find((s) => s.receiptNo.toLowerCase() === ref) ??
-      state.sales.find((s) => s.receiptNo.toLowerCase().includes(ref) && !!ref) ??
-      null;
-    setBillHit(hit);
-    setPicks({});
-    if (!hit) toast.error(`No bill found for “${billQuery}”`);
-  }
-
-  function addExchangeCredits() {
-    if (!billHit) return;
-    if (!activeShift) {
-      toast.error("Open a shift before processing an exchange");
-      return;
-    }
-    const credits: CartLine[] = Object.entries(picks)
-      .filter(([, qty]) => qty > 0)
-      .map(([idx, qty]) => {
-        const src = billHit.lines[Number(idx)];
-        return {
-          productId: src.productId,
-          name: src.name,
-          price: r2(src.price - lineUnitDiscount(src)),
-          qty: -qty,
-          taxRate: src.taxRate,
-          discount: 0,
-          discountType: "amount" as DiscountType,
-          credit: true,
-        };
-      });
-    if (!credits.length) {
-      toast.error("Select at least one item to exchange");
-      return;
-    }
-    setLines((ls) => [...credits, ...ls]);
-    setExchangeRef(billHit.receiptNo);
-    setExchangeOpen(false);
-    setBillQuery("");
-    setBillHit(null);
-    setPicks({});
-    toast.success(`Credits from ${billHit.receiptNo} added to the ticket`);
-  }
 
   /** Adds the product matching a scanned/typed code to the ticket. */
   function scanCode(raw: string) {
@@ -1070,68 +1074,6 @@ function Register() {
   /* ── Operation deck helpers ─────────────────────────────────────── */
 
 
-  /** Park the open ticket with everything on it, so reopening is lossless. */
-  function holdOrder(silent = false) {
-    if (!lines.length) return null;
-    const snapshot = lines;
-    const id = `H${Date.now()}`;
-    const order: HeldOrder = {
-      id,
-      label: `${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · ${snapshot.length} item(s)`,
-      total: totals.total,
-      lines: snapshot,
-      heldAt: new Date().toISOString(),
-      storeId: currentStore.id,
-      heldBy: activeCashier,
-      cartDiscount,
-      ...(billNo ? { billNo } : {}),
-      cartDiscountType,
-      exchangeRef,
-      memberId,
-      memberName: member?.name ?? null,
-      coupon,
-    };
-    addHeldOrder(order);
-    logTicketEvent(TICKET_ACTIONS.held, {
-      holdRef: id,
-      lines: snapshot.length,
-      value: totals.total,
-      storeId: currentStore.id,
-      memberId,
-      member: member?.name ?? null,
-      items: snapshot.map((l) => ({ name: l.name, qty: l.qty, price: l.price })),
-    });
-    resetCart();
-    if (!silent) toast.success("Order held — reopen it from Hold tickets");
-    return order;
-  }
-
-  /** Reopen a parked ticket. An open ticket is parked first, so the cashier
-   *  can switch between drafts without losing either one. */
-  function resumeHeld(id: string) {
-    const order = held.find((h) => h.id === id);
-    if (!order) return;
-    const parked = lines.length ? holdOrder(true) : null;
-    setLines(order.lines);
-    setCartDiscount(order.cartDiscount ?? 0);
-    setCartDiscountType(order.cartDiscountType ?? "amount");
-    setExchangeRef(order.exchangeRef ?? null);
-    setMemberId(order.memberId ?? null);
-    setCoupon((order.coupon as typeof coupon) ?? null);
-    setBillNo(order.billNo ?? null);
-    removeHeldOrder(id);
-    logTicketEvent(parked ? TICKET_ACTIONS.switched : TICKET_ACTIONS.resumed, {
-      holdRef: order.id,
-      parkedRef: parked?.id ?? null,
-      lines: order.lines.length,
-      value: order.total,
-      heldAt: order.heldAt,
-      heldBy: order.heldBy ?? null,
-      heldForSeconds: Math.round((Date.now() - new Date(order.heldAt).getTime()) / 1000),
-      storeId: currentStore.id,
-    });
-    toast.success(parked ? "Switched ticket — the previous one is on hold" : "Held order resumed");
-  }
 
   /** Arriving from the Hold tickets screen with ?resume=<id>. */
   const { resume, booking: bookingFlow } = Route.useSearch();
@@ -1152,222 +1094,6 @@ function Register() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookingFlow]);
 
-  async function applyCoupon() {
-    const code = couponCode.trim();
-    if (!code) return;
-    const rule = state.promotions.find((p) => p.active && p.name.toLowerCase() === code.toLowerCase() && p.value);
-    if (!rule) {
-      toast.error(`No active promotion matches “${code}”`);
-      return;
-    }
-    const targetIndex = lines.findIndex((l) => l.productId === couponLine);
-    if (couponScope === "item" && targetIndex < 0) {
-      toast.error("Pick the item the coupon applies to");
-      return;
-    }
-    if (!(await unlockDiscounts())) return;
-    const at = new Date().toISOString();
-    if (couponScope === "item") {
-      const line = lines[targetIndex]!;
-      const unit = rule.valueType === "percent" ? r2((line.price * (rule.value ?? 0)) / 100) : r2(rule.value ?? 0);
-      const value = r2(unit * line.qty);
-      patchLine(targetIndex, {
-        discount: rule.value ?? 0,
-        discountType: rule.valueType ?? "amount",
-        couponCode: rule.name,
-        couponDiscount: value,
-      });
-      setCoupon({
-        code: rule.name,
-        promoId: rule.id,
-        scope: "item",
-        discount: value,
-        productId: line.productId,
-        productName: line.name,
-        appliedAt: at,
-      });
-      logger.log("promotion", "Coupon applied to an item", "register", {
-        coupon: rule.name,
-        promotionId: rule.id,
-        scope: "item",
-        product: line.name,
-        productId: line.productId,
-        qty: line.qty,
-        discountValue: value,
-        storeId: currentStore.id,
-        memberId,
-        appliedAt: at,
-      });
-    } else {
-      setCartDiscountType(rule.valueType ?? "amount");
-      setCartDiscount(rule.value ?? 0);
-      const value = rule.valueType === "percent" ? r2((promoBase * (rule.value ?? 0)) / 100) : r2(rule.value ?? 0);
-      setCoupon({
-        code: rule.name,
-        promoId: rule.id,
-        scope: "bill",
-        discount: value,
-        appliedAt: at,
-      });
-      logger.log("promotion", "Coupon applied to the bill", "register", {
-        coupon: rule.name,
-        promotionId: rule.id,
-        scope: "bill",
-        discountValue: value,
-        billBase: promoBase,
-        storeId: currentStore.id,
-        memberId,
-        appliedAt: at,
-      });
-    }
-    setCouponCode("");
-    setCouponOpen(false);
-    toast.success(`Coupon ${rule.name} applied`);
-  }
-
-  /**
-   * Apply a digital voucher (scanned QR or typed token). The voucher is only
-   * locked in the database once the sale actually completes.
-   */
-  async function applyVoucher(rawToken: string) {
-    const token = rawToken.trim().split("/").pop() ?? "";
-    if (!token) return;
-    if (!lines.length) {
-      toast.error("Ring the items up before applying a voucher");
-      return;
-    }
-    try {
-      const view = await loadVoucherByToken(token);
-      if (!view) {
-        toast.error("That voucher code is not recognised");
-        return;
-      }
-      if (view.voucher.status === "REDEEMED") {
-        toast.error("This voucher has already been used");
-        return;
-      }
-      const campaign = view.campaign;
-      if (campaign.expiresAt && new Date() > new Date(campaign.expiresAt)) {
-        toast.error("This voucher has expired");
-        return;
-      }
-      if (view.voucher.memberId && state.members.some((m) => m.id === view.voucher.memberId)) {
-        setMemberId(view.voucher.memberId);
-      }
-
-      const at = new Date().toISOString();
-      if (campaign.scope === "PRODUCT") {
-        const index = lines.findIndex((l) => l.productId === campaign.scopeValue);
-        if (index < 0) {
-          toast.error("The product this voucher covers is not on this bill");
-          return;
-        }
-        const line = lines[index]!;
-        const value = voucherValue(campaign, r2(line.price * line.qty));
-        patchLine(index, {
-          discount: r2(value / Math.max(1, line.qty)),
-          discountType: "amount",
-          couponCode: token,
-          couponDiscount: value,
-        });
-        setCoupon({
-          code: token,
-          promoId: campaign.id,
-          scope: "item",
-          discount: value,
-          productId: line.productId,
-          productName: line.name,
-          appliedAt: at,
-          name: campaign.name,
-          remaining: campaign.discountType === "FIXED_AMOUNT" ? Math.max(0, r2(campaign.discountValue - value)) : 0,
-        });
-      } else {
-        const base =
-          campaign.scope === "CATEGORY"
-            ? r2(
-                lines
-                  .filter((l) => state.products.find((p) => p.id === l.productId)?.category === campaign.scopeValue)
-                  .reduce((a, l) => a + l.price * l.qty, 0),
-              )
-            : promoBase;
-        if (base <= 0) {
-          toast.error("Nothing on this bill qualifies for that voucher");
-          return;
-        }
-        const value = voucherValue(campaign, base);
-        setCartDiscountType("amount");
-        setCartDiscount(value);
-        setCoupon({
-          code: token,
-          promoId: campaign.id,
-          scope: "bill",
-          discount: value,
-          appliedAt: at,
-          name: campaign.name,
-          remaining: campaign.discountType === "FIXED_AMOUNT" ? Math.max(0, r2(campaign.discountValue - value)) : 0,
-        });
-      }
-
-      setVoucherToken(token);
-      logger.log("promotion", "Digital voucher applied", "register", {
-        voucher: token,
-        campaign: campaign.name,
-        campaignId: campaign.id,
-        scope: campaign.scope,
-        memberId: view.voucher.memberId,
-        storeId: currentStore.id,
-        appliedAt: at,
-      });
-      toast.success(`${campaign.name} applied`);
-    } catch (e) {
-      notifyError(e, "Could not read that voucher");
-    }
-  }
-
-  /**
-   * What a voucher would take off the ticket as it stands, so the cashier can
-   * compare before committing. Returns 0 with a reason when it doesn't apply.
-   */
-  function voucherPreview(campaign: Campaign): { value: number; reason: string } {
-    if (!lines.length) return { value: 0, reason: "Ring up items first" };
-    if (campaign.scope === "PRODUCT") {
-      const line = lines.find((l) => l.productId === campaign.scopeValue);
-      if (!line) return { value: 0, reason: "That product is not on this bill" };
-      return { value: voucherValue(campaign, r2(line.price * line.qty)), reason: "" };
-    }
-    const base =
-      campaign.scope === "CATEGORY"
-        ? r2(
-            lines
-              .filter((l) => state.products.find((p) => p.id === l.productId)?.category === campaign.scopeValue)
-              .reduce((a, l) => a + l.price * l.qty, 0),
-          )
-        : promoBase;
-    if (base <= 0) return { value: 0, reason: "Nothing on this bill qualifies" };
-    return { value: voucherValue(campaign, base), reason: "" };
-  }
-
-  /** Take the coupon off the ticket and record who removed it. */
-  function removeCoupon() {
-    if (!coupon) return;
-    if (coupon.scope === "item") {
-      const i = lines.findIndex((l) => l.couponCode === coupon.code);
-      if (i >= 0) patchLine(i, { discount: 0, couponCode: undefined, couponDiscount: undefined });
-    } else {
-      setCartDiscount(0);
-    }
-    logger.log("promotion", "Coupon removed", "register", {
-      coupon: coupon.code,
-      promotionId: coupon.promoId,
-      scope: coupon.scope,
-      product: coupon.productName ?? null,
-      discountValue: coupon.discount,
-      appliedAt: coupon.appliedAt,
-      storeId: currentStore.id,
-    });
-    setCoupon(null);
-    setVoucherToken(null);
-  }
 
   const splitShares = useMemo(() => {
     const cents = Math.round(balanceDue * 100);
