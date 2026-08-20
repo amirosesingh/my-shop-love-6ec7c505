@@ -7,7 +7,7 @@
  * keys each movement on its id and applies it once, so a repeat can never
  * deduct twice.
  */
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
 
 export type UnappliedMovement = {
   movementId: string;
