@@ -62,7 +62,7 @@ const STEPS = [
 ] as const;
 
 type StepKey = (typeof STEPS)[number]["key"];
-type StepStatus = "pending" | "running" | "passed" | "failed";
+type StepStatus = "pending" | "running" | "passed" | "failed" | "stopped";
 type StepState = {
   status: StepStatus;
   detail?: string;
@@ -129,7 +129,7 @@ export function SqlConnectionModal({
    * dropped instead of writing into fresh state, so closing the dialog mid-
    * handshake can never leave a spinner behind.
    */
-  const runToken = useRef(0);
+  const guard = useRef(createRunGuard()).current;
 
   const set = <K extends keyof LocalDbConfig>(key: K, value: LocalDbConfig[K]) => {
     setConfig((c) => ({ ...c, [key]: value }));
@@ -143,10 +143,23 @@ export function SqlConnectionModal({
 
   /** Abandon whatever is running and tell the shell to drop its half-open pool. */
   const abandonRun = useCallback(() => {
-    runToken.current += 1;
+    guard.abandon();
     setRunning(false);
     void sqlAdmin()?.cancel?.();
-  }, []);
+  }, [guard]);
+
+  /** Operator pressed Stop: the running step is stopped, not failed. */
+  const stopRun = () => {
+    abandonRun();
+    setSteps((s) => {
+      const next = { ...s };
+      for (const key of Object.keys(next) as StepKey[]) {
+        if (next[key].status === "running")
+          next[key] = { status: "stopped", detail: "Stopped before it finished." };
+      }
+      return next;
+    });
+  };
 
   const scan = useCallback(async (silent = false) => {
     setScanning(true);
@@ -173,7 +186,7 @@ export function SqlConnectionModal({
       return;
     }
     let alive = true;
-    runToken.current += 1;
+    guard.abandon();
     setRunning(false);
     setSteps(blankSteps());
     setDatabases([]);
@@ -197,7 +210,7 @@ export function SqlConnectionModal({
     return () => {
       alive = false;
     };
-  }, [open, scan, abandonRun]);
+  }, [open, scan, abandonRun, guard]);
 
   const credentials = () => ({
     server: config.server,
