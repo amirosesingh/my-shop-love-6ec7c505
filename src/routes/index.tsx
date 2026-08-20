@@ -81,7 +81,7 @@ import {
 } from "@/lib/coupons";
 import type { Campaign, VoucherView } from "@/lib/coupons";
 import type { Booking, CartLine, DiscountType, IntakeCharge, PaymentMethod, Sale } from "@/lib/pos-types";
-import { applyCombo, intakeTotals } from "@/lib/booking-charges";
+import { applyCombo, intakeTotals, newJobTag } from "@/lib/booking-charges";
 import type { Payment } from "@/lib/pos-types";
 import { TenderSplit } from "@/components/pos/TenderSplit";
 import { lineUnitDiscount, methodLabel, paymentsLabel, paymentsTotal, PAYMENT_LABELS, r2, validateTenders } from "@/lib/pos-types";
