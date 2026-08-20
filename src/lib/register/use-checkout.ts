@@ -16,11 +16,10 @@ import { redeemVoucher } from "@/lib/coupons";
 import { publishDisplay, type DisplaySnapshot } from "@/lib/customer-display";
 import { rememberBanks } from "@/components/pos/TenderSplit";
 import { isoDaysFromNow, useBookingIntake } from "@/lib/register/use-booking-intake";
-import { cartTotals, usePos, type Store } from "@/lib/pos-store";
-import { useAuth } from "@/lib/pos-auth";
-import { useUserPermissions } from "@/lib/pos-permissions";
-import { bookingRulesOf, lineUnitDiscount, methodLabel, paymentsLabel, r2, validateTenders } from "@/lib/pos-types";
-import type { CartLine, Payment, PaymentMethod, Sale, Booking, BookingPaymentTiming, Member, IntakeCharge } from "@/lib/pos-types";
+import { cartTotals, money, usePos } from "@/lib/pos-store";
+import { applyCombo, intakeTotals, newJobTag } from "@/lib/booking-charges";
+import { bookingRulesOf, lineUnitDiscount, paymentsLabel, r2, validateTenders } from "@/lib/pos-types";
+import type { Store, CartLine, Payment, PaymentMethod, Sale, Booking, Member, BookingPaymentTiming } from "@/lib/pos-types";
 import type { CartCoupon } from "@/lib/register/use-cart";
 import type { NewBooking } from "@/lib/pos-store";
 
@@ -80,14 +79,12 @@ export type DisplaySnapshotBase = {
 
 export function useCheckout(deps: CheckoutDeps) {
   const { state, recordSale, createBooking } = usePos();
-  const { user, can } = useAuth();
-  const { getWaSettings } = useWhatsAppSettings();
   const [saving, setSaving] = useState(false);
   const [lastSale, setLastSale] = useState<Sale | null>(null);
 
   /** Sends the finished bill to the customer's WhatsApp. */
   async function sendSaleOnWhatsApp(sale: Sale, to: string) {
-    const wa = getWaSettings();
+    const wa = state.settings.whatsapp;
     const buyer = state.members.find((m) => m.id === sale.memberId) ?? null;
     const res = await sendBillOnWhatsApp({
       cfg: wa,
@@ -109,14 +106,24 @@ export function useCheckout(deps: CheckoutDeps) {
     const member = deps.getMember();
     const memberId = deps.getMemberId();
     const bi = deps.bookingIntake;
-    const wa = getWaSettings();
+    const wa = state.settings.whatsapp;
     const displayBase = deps.getDisplayBase();
+    const bookingRules = bookingRulesOf(state.settings.integrations.bookingRules);
+    const racketMode = bi.bookMode === "racket";
+    const combo = applyCombo(bi.intakeCharges, bookingRules);
+    const intake = intakeTotals(combo.charges, state.settings.tax, 0, state.settings.integrations.categoryMap);
+    const serviceCharge = racketMode ? intake.subtotal : 0;
+    const bookingTotal = r2(totals.total + serviceCharge);
+    const highTension =
+      Number(bi.tensionMain || 0) > bookingRules.highTensionThreshold ||
+      Number(bi.tensionCross || 0) > bookingRules.highTensionThreshold ||
+      bi.stringCustomerOwned;
 
     if (!activeShift) {
       toast.error("Open a shift before taking a booking");
       return;
     }
-    if (!bi.racketMode && !lines.length) {
+    if (!racketMode && !lines.length) {
       toast.error("Please add at least one item to the cart before saving a pay-later booking.", {
         description: "Only racket / stringing jobs can be booked with an empty cart.",
       });
@@ -124,24 +131,23 @@ export function useCheckout(deps: CheckoutDeps) {
     }
     if (!(await deps.requirePermission("can_create_booking"))) return;
     const paidNow =
-      bi.payTiming === "collection" ? 0 : bi.payTiming === "now" ? bi.bookingTotal : r2(Math.max(0, Number(bi.deposit || 0)));
-    if (paidNow > bi.bookingTotal) {
+      bi.payTiming === "collection" ? 0 : bi.payTiming === "now" ? bookingTotal : r2(Math.max(0, Number(bi.deposit || 0)));
+    if (paidNow > bookingTotal) {
       toast.error("Deposit cannot exceed the booking total");
       return;
     }
-    const minDeposit = Math.min(minDepositFor(bi.bookingTotal), bi.bookingTotal);
+    const minDeposit = Math.min(minDepositFor(bookingTotal, bookingRules), bookingTotal);
     if (minDeposit > 0 && paidNow + 0.001 < minDeposit) {
       toast.error(`This branch needs a deposit of at least ${money(minDeposit)}`);
       return;
     }
-    const bookingRules = bookingRulesOf(state.settings.integrations.bookingRules);
-    if (!bi.racketMode && bookingRules.serviceTerms.trim() && !bi.liabilityOk) {
+    if (!racketMode && bookingRules.serviceTerms.trim() && !bi.liabilityOk) {
       toast.error("The customer must accept the booking terms & conditions", {
         description: "Tick the agreement box at the bottom of the booking form.",
       });
       return;
     }
-    if (bi.racketMode) {
+    if (racketMode) {
       if (bi.labourUnlocked && !bi.labourReason.trim()) {
         toast.error("Enter a reason for the labour override");
         return;
@@ -160,7 +166,7 @@ export function useCheckout(deps: CheckoutDeps) {
       }
       if (bookingRules.requireLiabilityAccept && bookingRules.serviceTerms.trim() && !bi.liabilityOk) {
         toast.error("The customer must accept the service & liability terms", {
-          description: bi.highTension
+          description: highTension
             ? "This job is flagged high tension — acceptance is required."
             : "Tick the agreement box on the intake form.",
         });
@@ -182,7 +188,6 @@ export function useCheckout(deps: CheckoutDeps) {
       setSaving(true);
       const serviceTypes = (state.settings.integrations.serviceTypes ?? []).filter((s) => s.active && s.name.trim());
       const pickedService = serviceTypes.find((s) => s.id === bi.serviceId) ?? null;
-      const serviceCharge = 0; // booked separately via charges
       const newBooking: NewBooking = {
         storeId: currentStore.id,
         shiftId: activeShift.id,
@@ -190,12 +195,12 @@ export function useCheckout(deps: CheckoutDeps) {
         subtotal: r2(totals.subtotal + serviceCharge),
         discount: totals.discount,
         tax: totals.tax,
-        total: bi.bookingTotal,
-        serviceTypeId: bi.racketMode ? pickedService?.id : undefined,
-        serviceName: bi.racketMode ? (serviceLabel(pickedService, bi.customService) || undefined) : undefined,
+        total: bookingTotal,
+        serviceTypeId: racketMode ? pickedService?.id : undefined,
+        serviceName: racketMode ? (serviceLabel(pickedService, bi.customService) || undefined) : undefined,
         serviceFee: serviceCharge || undefined,
         charges:
-          bi.racketMode && bi.intakeCharges.length
+          racketMode && bi.intakeCharges.length
             ? bi.intakeCharges.map((c) =>
                 c.kind === "labor" && bi.labourUnlocked && bi.labourReason.trim()
                   ? { ...c, overrideReason: bi.labourReason.trim() }
@@ -211,12 +216,12 @@ export function useCheckout(deps: CheckoutDeps) {
         customerPhone: bi.bookPhone.trim() || member?.phone || "",
         note: bi.bookNote.trim(),
         cashier: activeCashier,
-        tagId: bi.racketMode ? bi.jobTag || (bookingRules.autoJobTag ? newJobTag() : undefined) : undefined,
-        stringOrigin: bi.racketMode ? (bi.stringCustomerOwned ? "customer" : "store") : undefined,
+        tagId: racketMode ? bi.jobTag || (bookingRules.autoJobTag ? newJobTag() : undefined) : undefined,
+        stringOrigin: racketMode ? (bi.stringCustomerOwned ? "customer" : "store") : undefined,
         liabilityAccepted: bi.liabilityOk,
-        stringProductId: bi.racketMode && !bi.stringCustomerOwned ? bi.stringProductId || undefined : undefined,
-        intakeNote: bi.racketMode ? bi.grommetNotes.trim() || undefined : undefined,
-        job: bi.racketMode
+        stringProductId: racketMode && !bi.stringCustomerOwned ? bi.stringProductId || undefined : undefined,
+        intakeNote: racketMode ? bi.grommetNotes.trim() || undefined : undefined,
+        job: racketMode
           ? {
               racketModel: bi.racketModel.trim() || undefined,
               stringType: bi.stringType.trim() || undefined,
@@ -314,7 +319,7 @@ export function useCheckout(deps: CheckoutDeps) {
     const tenders = deps.getTenders();
     const activeMethodName = deps.getActiveMethodName();
     const needsTenderRef = deps.getNeedsTenderRef();
-    const wa = getWaSettings();
+    const wa = state.settings.whatsapp;
     const displayBase = deps.getDisplayBase();
 
     if (!activeShift) {
@@ -495,26 +500,13 @@ export function useCheckout(deps: CheckoutDeps) {
   };
 }
 
-/** Local helper to read WhatsApp settings from the central POS store. */
-function useWhatsAppSettings() {
-  const { state } = usePos();
-  return {
-    getWaSettings: () => state.settings.whatsapp,
-  };
-}
-
-function money(n: number) {
-  return new Intl.NumberFormat("en-MY", { style: "currency", currency: "MYR" }).format(n);
-}
-
-function minDepositFor(total: number) {
-  return 0;
+function minDepositFor(total: number, rules: ReturnType<typeof bookingRulesOf>) {
+  if (!rules.requireDeposit) return 0;
+  return rules.depositMode === "percent"
+    ? r2((total * Math.max(0, rules.depositMin)) / 100)
+    : r2(Math.max(0, rules.depositMin));
 }
 
 function serviceLabel(pickedService: { name: string } | null, customService: string) {
   return pickedService?.name || customService || "";
-}
-
-function newJobTag() {
-  return `J${Date.now().toString(36).toUpperCase()}`;
 }
