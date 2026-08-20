@@ -1970,7 +1970,7 @@ function Register() {
           });
         }}
       />
-      {wa.enabled && can("can_send_whatsapp_bill") && (
+      {state.settings.whatsapp.enabled && can("can_send_whatsapp_bill") && (
         <div className="flex flex-wrap items-center gap-2">
           <Input
             value={waNumber}
