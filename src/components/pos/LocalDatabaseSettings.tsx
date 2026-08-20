@@ -87,6 +87,21 @@ export function LocalDatabaseSettings() {
     { pending: 0, synced: 0, errored: 0 },
   );
 
+  const view = deriveLocalDbState({
+    available,
+    configured,
+    status,
+    pending: busy ? "saving" : null,
+  });
+  const tone =
+    view.state === "connected"
+      ? "bg-emerald-500"
+      : view.state === "failed" || view.state === "unavailable"
+        ? "bg-destructive"
+        : view.busy
+          ? "bg-amber-500 animate-pulse"
+          : "bg-muted-foreground";
+
   return (
     <div className="space-y-3 rounded-md border border-border px-3 py-3">
       <div>
@@ -97,9 +112,17 @@ export function LocalDatabaseSettings() {
         </p>
       </div>
 
-      <div>
-        <Button size="sm" onClick={() => setWizardOpen(true)}>
-          Set up connection
+      {/* -------------------------- status -------------------------- */}
+      <div className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
+        <div className="flex items-start gap-2">
+          <span className={`mt-1.5 size-2 shrink-0 rounded-full ${tone}`} />
+          <div>
+            <p className="text-sm">{view.message}</p>
+            {view.detail && <p className="text-xs text-muted-foreground">{view.detail}</p>}
+          </div>
+        </div>
+        <Button size="sm" disabled={view.busy} onClick={() => setWizardOpen(true)}>
+          {view.state === "connected" ? "Change connection" : "Set up connection"}
         </Button>
       </div>
       <SqlConnectionModal
@@ -107,46 +130,12 @@ export function LocalDatabaseSettings() {
         onOpenChange={setWizardOpen}
         onConnected={(next) => {
           setConfig(next);
+          setConfigured(!!next.server && !!next.database);
           void refresh();
         }}
       />
 
-      <div className="rounded-md border border-border px-3 py-2 text-xs">
-        <p>
-          <span className="text-muted-foreground">Server</span> {config.server || "not set"}
-          {" · "}
-          <span className="text-muted-foreground">Database</span> {config.database || "not set"}
-        </p>
-        <p className="text-muted-foreground">
-          {config.auth === "windows"
-            ? "Signs in with this Windows account."
-            : `SQL Server login${config.user ? ` (${config.user})` : ""}`}
-        </p>
-      </div>
-
-      <SchemaPanel />
-
       <div className="flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={busy}
-          onClick={testConnection}
-        >
-          Test connection
-        </Button>
-        <Button
-          size="sm"
-          disabled={busy}
-          onClick={() =>
-            run("Connected to local database", async () => {
-              await writeLocalDbConfig(config);
-              return localDb()!.connect(config, supabaseConfig());
-            })
-          }
-        >
-          Save &amp; connect
-        </Button>
         <Button
           size="sm"
           variant="outline"
@@ -161,7 +150,7 @@ export function LocalDatabaseSettings() {
           disabled={busy}
           onClick={() => run("Backup written", () => localDb()!.backup())}
         >
-          Back up local database
+          Back up branch database
         </Button>
         {totals.errored > 0 && (
           <Button
@@ -174,34 +163,37 @@ export function LocalDatabaseSettings() {
           </Button>
         )}
       </div>
+      <p className="text-xs text-muted-foreground">
+        The backup writes a full copy of this branch&apos;s SQL Server database to a file you
+        choose.
+      </p>
 
-      {diagnostic && (
-        <div
-          className={`rounded-md border px-3 py-2 text-xs ${
-            diagnostic.ok
-              ? "border-emerald-500/40 bg-emerald-500/10"
-              : "border-destructive/40 bg-destructive/10"
-          }`}
+      {/* -------------------------- details -------------------------- */}
+      <div className="rounded-md border border-border px-3 py-2">
+        <button
+          type="button"
+          className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+          onClick={() => setShowDetails((s) => !s)}
         >
-          {diagnostic.ok ? (
+          {showDetails ? "Hide technical details" : "Show technical details"}
+        </button>
+        {showDetails && (
+          <div className="mt-2 space-y-2 text-xs">
             <p>
-              Connected{diagnostic.serverName ? ` to ${diagnostic.serverName}` : ""}.{" "}
-              <span className="text-muted-foreground">{diagnostic.version}</span>
+              <span className="text-muted-foreground">Server</span> {config.server || "not set"}
+              {" · "}
+              <span className="text-muted-foreground">Database</span>{" "}
+              {config.database || "not set"}
             </p>
-          ) : (
-            <div className="space-y-1">
-              <p className="font-medium">
-                {diagnostic.code ? `${diagnostic.code}: ` : ""}
-                {diagnostic.error}
-              </p>
-              {diagnostic.originalMessage && (
-                <p className="text-muted-foreground">{diagnostic.originalMessage}</p>
-              )}
-              {diagnostic.hint && <p className="text-muted-foreground">{diagnostic.hint}</p>}
-            </div>
-          )}
-        </div>
-      )}
+            <p className="text-muted-foreground">
+              {config.auth === "windows"
+                ? "Signs in with this Windows account."
+                : `SQL Server login${config.user ? ` (${config.user})` : ""}`}
+            </p>
+            <SchemaPanel />
+          </div>
+        )}
+      </div>
 
       <div className="grid gap-2 text-sm sm:grid-cols-3">
         <Stat label="Waiting to sync" value={String(totals.pending)} />
