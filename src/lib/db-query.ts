@@ -74,11 +74,17 @@ export function localQuery(table: string, options: QueryOptions = {}): Row[] | n
 }
 
 /**
- * Read a table without choosing a database, and say which one answered.
+ * Reads already on the wire, so two screens asking for the same rows in the
+ * same moment share one round trip instead of racing each other. Entries are
+ * dropped the instant the read settles: nothing is cached, only shared.
  */
-export async function routedQueryWithSource(
+const inFlight = new Map<string, Promise<{ rows: Row[]; source: ReadSource }>>();
+
+const readKey = (table: string, options: QueryOptions) => `${table}|${JSON.stringify(options)}`;
+
+async function runQuery(
   table: string,
-  options: QueryOptions = {},
+  options: QueryOptions,
 ): Promise<{ rows: Row[]; source: ReadSource }> {
   const cached = () => localQuery(table, options);
   const health = lastHealth();
@@ -110,7 +116,25 @@ export async function routedQueryWithSource(
   }
 }
 
+/**
+ * Read a table without choosing a database, and say which one answered.
+ */
+export function routedQueryWithSource(
+  table: string,
+  options: QueryOptions = {},
+): Promise<{ rows: Row[]; source: ReadSource }> {
+  const key = readKey(table, options);
+  const existing = inFlight.get(key);
+  if (existing) return existing;
+  const run = runQuery(table, options).finally(() => {
+    inFlight.delete(key);
+  });
+  inFlight.set(key, run);
+  return run;
+}
+
 /** Same read when the caller does not care where the rows came from. */
 export async function routedQuery(table: string, options: QueryOptions = {}): Promise<Row[]> {
   return (await routedQueryWithSource(table, options)).rows;
 }
+

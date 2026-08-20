@@ -1,0 +1,173 @@
+/**
+ * The open ticket.
+ *
+ * Everything that makes up what the cashier has rung up — the lines, the bill
+ * discount, an exchange reference, the attached member, a coupon and the
+ * reserved bill number — plus the handlers that change it. Lifted out of the
+ * register screen unchanged so the till behaves exactly as before; the screen
+ * now reads this instead of holding it all itself.
+ */
+import { useState } from "react";
+import { toast } from "sonner";
+import { availableAt, stockAt } from "@/lib/pos-store";
+import { clearCartDraft } from "@/lib/cart-draft";
+import { logger } from "@/lib/audit-log";
+import { TICKET_ACTIONS, logTicketEvent } from "@/lib/ticket-audit";
+import type { Booking, CartLine, DiscountType, Product, Store } from "@/lib/pos-types";
+
+/** A coupon or voucher applied to the open ticket. */
+export type CartCoupon = {
+  code: string;
+  promoId: string;
+  scope: "bill" | "item";
+  discount: number;
+  productId?: string;
+  productName?: string;
+  appliedAt: string;
+  /** campaign title, printed on the slip */
+  name?: string;
+  /** unused value left on a fixed-amount voucher */
+  remaining?: number;
+};
+
+type CartDeps = {
+  /** Selling is blocked until a shift is open. */
+  hasShift: boolean;
+  /** Prompt the cashier to open a shift. */
+  onNeedShift: () => void;
+  products: Product[];
+  bookings: Booking[];
+  currentStore: Store;
+  requirePermission: (flag: string) => Promise<boolean>;
+  /** Read at the moment of clearing, for the audit line. */
+  getTotal: () => number;
+  getMemberName: () => string | null;
+};
+
+export function useCart(deps: CartDeps) {
+  const [lines, setLines] = useState<CartLine[]>([]);
+  const [cartDiscount, setCartDiscount] = useState(0);
+  const [cartDiscountType, setCartDiscountType] = useState<DiscountType>("amount");
+  const [exchangeRef, setExchangeRef] = useState<string | null>(null);
+  const [memberId, setMemberId] = useState<string | null>(null);
+  const [billNo, setBillNo] = useState<string | null>(null);
+  const [coupon, setCoupon] = useState<CartCoupon | null>(null);
+
+  function addLine(productId: string) {
+    if (!deps.hasShift) {
+      toast.error("Open a shift before ringing up a sale");
+      deps.onNeedShift();
+      return;
+    }
+    const product = deps.products.find((p) => p.id === productId);
+    if (!product) return;
+    const onHand = availableAt(product, deps.currentStore.id, deps.bookings);
+    if (onHand <= 0) {
+      const reserved = stockAt(product, deps.currentStore.id) > 0;
+      toast.error(
+        reserved
+          ? `${product.name} is fully reserved by open bookings at ${deps.currentStore.name}`
+          : `${product.name} is out of stock at ${deps.currentStore.name}`,
+      );
+      return;
+    }
+    setLines((ls) => {
+      const found = ls.find((l) => l.productId === productId && !l.credit);
+      if (found)
+        return ls.map((l) => (l.productId === productId && !l.credit ? { ...l, qty: l.qty + 1 } : l));
+      return [
+        ...ls,
+        {
+          productId,
+          name: product.name,
+          price: product.price,
+          qty: 1,
+          taxRate: product.taxRate,
+          discount: 0,
+          discountType: "amount",
+        },
+      ];
+    });
+  }
+
+  async function setQty(index: number, delta: number) {
+    const line = lines[index];
+    const removes = line && !line.credit && line.qty + delta <= 0;
+    // Removing a line, or reducing a quantity, needs manager approval unless
+    // the cashier holds the right themselves.
+    if (removes) {
+      if (!(await deps.requirePermission("can_delete_line"))) return;
+      logger.log("refund", "Line deleted from the cart", "register", {
+        product: line?.name,
+        productId: line?.productId,
+        qty: line?.qty,
+        price: line?.price,
+        storeId: deps.currentStore.id,
+      });
+    } else if (delta < 0 && line && !line.credit) {
+      if (!(await deps.requirePermission("can_reduce_qty"))) return;
+      logger.log("sale", "Item quantity reduced", "register", {
+        product: line.name,
+        productId: line.productId,
+        from: line.qty,
+        to: line.qty - 1,
+        storeId: deps.currentStore.id,
+      });
+    }
+    setLines((ls) =>
+      ls
+        .map((l, i) => (i === index ? { ...l, qty: l.credit ? l.qty - delta : l.qty + delta } : l))
+        .filter((l) => (l.credit ? l.qty < 0 : l.qty > 0)),
+    );
+  }
+
+  function patchLine(index: number, patch: Partial<CartLine>) {
+    setLines((ls) => ls.map((l, i) => (i === index ? { ...l, ...patch } : l)));
+  }
+
+  function resetCart() {
+    setLines([]);
+    setCartDiscount(0);
+    setExchangeRef(null);
+    setCoupon(null);
+    setBillNo(null);
+    clearCartDraft(deps.currentStore.id);
+  }
+
+  async function clearCart(source: "clear" | "void" = "void") {
+    if (lines.length && !(await deps.requirePermission("can_void_cart"))) return;
+    if (lines.length) {
+      logTicketEvent(source === "clear" ? TICKET_ACTIONS.cleared : TICKET_ACTIONS.voided, {
+        lines: lines.length,
+        value: deps.getTotal(),
+        coupon: coupon?.code ?? null,
+        storeId: deps.currentStore.id,
+        member: deps.getMemberName(),
+        items: lines.map((l) => ({ name: l.name, qty: l.qty, price: l.price })),
+      });
+    }
+    resetCart();
+  }
+
+  return {
+    lines,
+    setLines,
+    cartDiscount,
+    setCartDiscount,
+    cartDiscountType,
+    setCartDiscountType,
+    exchangeRef,
+    setExchangeRef,
+    memberId,
+    setMemberId,
+    billNo,
+    setBillNo,
+    coupon,
+    setCoupon,
+    addLine,
+    setQty,
+    patchLine,
+    resetCart,
+    clearCart,
+  };
+}
