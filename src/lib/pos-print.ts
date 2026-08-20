@@ -386,6 +386,23 @@ const header = (subtitle?: string) => {
 };
 
 function saleBody(sale: Sale, member: Member | null, kind: ReceiptKind) {
+  setTokens({
+    ...placeTokens(),
+    ...dateTokens(sale.createdAt),
+    receipt_number: sale.receiptNo,
+    cashier: sale.cashier ?? "",
+    customer_name: member?.name ?? "",
+    customer_code: member?.code ?? "",
+    item_count: String(sale.lines.reduce((a, l) => a + l.qty, 0)),
+    subtotal: fmt(sale.subtotal),
+    discount: fmt(sale.discount),
+    tax: fmt(sale.tax),
+    total: fmt(sale.total),
+    payment_method: sale.method ?? "",
+    received: fmt(sale.paid),
+    change: fmt(sale.change),
+    booking_ref: sale.bookingRef ?? "",
+  });
   const hidePrices = kind === "gift" || kind === "kitchen";
   const subtitle =
     kind === "gift"
@@ -482,7 +499,7 @@ function saleBody(sale: Sale, member: Member | null, kind: ReceiptKind) {
     <div class="c muted rcpt-foot">${
       kind === "gift"
         ? "Exchangeable within 30 days with this slip"
-        : esc(receiptCfg.footerText || "")
+        : esc(renderReceiptText(receiptCfg.footerText || "", tokenCtx))
     }</div>
     ${customLines("footer")}
     ${qrBlock("footer")}
@@ -707,7 +724,26 @@ function signatureBlock(customerName: string) {
     <div class="muted">Date</div>`;
 }
 
+const bookingTokens = (booking: Booking, member: Member | null): ReceiptTokenContext => ({
+  ...placeTokens(),
+  ...dateTokens(booking.createdAt),
+  receipt_number: booking.ref,
+  booking_ref: booking.ref,
+  cashier: booking.cashier ?? "",
+  customer_name: member?.name ?? booking.customerName ?? "",
+  customer_code: member?.code ?? "",
+  item_count: String(booking.lines.reduce((a, l) => a + l.qty, 0)),
+  subtotal: fmt(booking.subtotal),
+  discount: fmt(booking.discount),
+  tax: fmt(booking.tax),
+  total: fmt(booking.total),
+  deposit: fmt(booking.paid),
+  balance: fmt(bookingBalance(booking)),
+  collection_date: booking.dueDate ?? "",
+});
+
 function bookingBody(booking: Booking, member: Member | null, pay: PaymentDetails | null) {
+  setTokens(bookingTokens(booking, member));
   const rows = booking.lines
     .map(
       (l) =>
@@ -754,12 +790,18 @@ function bookingBody(booking: Booking, member: Member | null, pay: PaymentDetail
     ${transferBlock(pay)}
     ${member ? `<hr><div>Member ${esc(member.code)} · ${esc(member.name)}</div>` : ""}
     <hr>${receiptCfg.showBarcode ? barcodeSvg(booking.ref) : ""}
-    <div class="c muted rcpt-foot">${esc(receiptCfg.footerText || "")}</div>
+    <div class="c muted rcpt-foot">${esc(renderReceiptText(receiptCfg.footerText || "", tokenCtx))}</div>
     ${customLines("footer")}
     <div class="c muted">${esc(booking.ref)}</div>`;
 }
 
 function bookingPaymentBody(booking: Booking, payment: BookingPayment) {
+  setTokens({
+    ...bookingTokens(booking, null),
+    ...dateTokens(payment.at),
+    payment_method: payment.method ?? "",
+    received: fmt(payment.amount),
+  });
   return `${header("PART PAYMENT RECEIPT")}
     <table>
       <tr><td>Booking</td><td class="r b">${esc(booking.ref)}</td></tr>
@@ -776,7 +818,7 @@ function bookingPaymentBody(booking: Booking, payment: BookingPayment) {
     <hr><div class="c">Collect &amp; settle by ${esc(new Date(booking.dueDate).toDateString())}</div>
     ${receiptCfg.bookingSlip?.termsOnPayment ? termsBlock() : ""}
     ${booking.job ? serviceTermsBlock() : ""}
-    <hr><div class="c muted rcpt-foot">${esc(receiptCfg.footerText || "")}</div>
+    <hr><div class="c muted rcpt-foot">${esc(renderReceiptText(receiptCfg.footerText || "", tokenCtx))}</div>
     <div class="c muted">${esc(booking.ref)}</div>`;
 }
 
