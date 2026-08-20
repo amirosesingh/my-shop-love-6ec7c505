@@ -477,6 +477,30 @@ async function test(config) {
 
 /** Reads the master schema file so the UI can show it before anything runs. */
 function readSchema() {
+  return readSchemaFile();
+}
+
+/**
+ * Proves the open pool is actually usable: one round-trip that names the
+ * database it landed in. A pool object alone is not evidence of a working
+ * database, so nothing reports "connected" until this succeeds.
+ */
+async function verify() {
+  if (!pool) throw new Error("Local database is not connected");
+  const started = Date.now();
+  const res = await pool
+    .request()
+    .query("SELECT 1 AS ok, DB_NAME() AS activeDb, @@SERVERNAME AS serverName");
+  const row = res.recordset[0] ?? {};
+  return {
+    ok: true,
+    activeDb: row.activeDb ?? activeConfig?.database ?? null,
+    serverName: row.serverName ?? null,
+    latencyMs: Date.now() - started,
+  };
+}
+
+function readSchemaFile() {
   try {
     const file = schemaFile();
     const text = fs.readFileSync(file, "utf8");
@@ -512,6 +536,7 @@ module.exports = {
   getPool,
   getConfig,
   test,
+  verify,
   applySchema,
   applySchemaNow,
   readSchema,
