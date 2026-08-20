@@ -186,6 +186,16 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     panel: page(() => import("@/routes/settings.lines")),
   },
   {
+    id: "receipt-designer",
+    label: "Receipt designer",
+    blurb: "Dynamic fields, logo upload and scoped receipt CSS.",
+    icon: ListPlus,
+    category: "printing",
+    to: "/settings/receipt-designer",
+    panel: page(() => import("@/routes/settings.receipt-designer")),
+    keywords: "template css logo fields variables",
+  },
+  {
     id: "qr",
     label: "Receipt QR code",
     blurb: "QR payload, size and placement on the slip.",
