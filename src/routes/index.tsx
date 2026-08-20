@@ -239,7 +239,6 @@ function Register() {
   const [picks, setPicks] = useState<Record<number, number>>({});
 
   /** True while a sale / booking is being stored — blocks a second click. */
-  const [saving, setSaving] = useState(false);
   const [openShiftOpen, setOpenShiftOpen] = useState(false);
   const [float, setFloat] = useState("150");
   const [cashier, setCashier] = useState(user?.name ?? "Cashier");
