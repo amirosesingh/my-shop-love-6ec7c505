@@ -703,29 +703,6 @@ function Register() {
   const stringingService = serviceTypes.find((s2) => s2.isStringingJob) ?? null;
   const racketMode = bookMode === "racket";
 
-  function resetJobCard() {
-    setRacketModel("");
-    setStringType("");
-    setTensionMain("");
-    setTensionCross("");
-    setTensionUnit("lb");
-    setGrommetNotes("");
-    setJobNotes("");
-    setPromisedAt("");
-    setNotifyWhatsApp(false);
-    setIntakeCharges([]);
-    setStencil(false);
-    setOvergrip(false);
-    setJobTag("");
-    setEditBookingId(null);
-    setBookMemberQuery("");
-    setRacketProductId("");
-    setRacketCustomerOwned(true);
-    setStringProductId("");
-    setStringCustomerOwned(false);
-    setLabourUnlocked(false);
-    setLabourReason("");
-  }
 
   /** Master lists an admin curates in booking settings. */
   const racketModelList = state.settings.integrations.racketModels ?? [];
