@@ -348,11 +348,6 @@ function Register() {
   /** Live vouchers held by the attached member, for the picker. */
   const [memberVouchers, setMemberVouchers] = useState<VoucherView[]>([]);
   const [voucherPickerOpen, setVoucherPickerOpen] = useState(false);
-  const [splitOpen, setSplitOpen] = useState(false);
-  const [splitWays, setSplitWays] = useState(2);
-  /* Split tenders + card machine capture */
-  const [tenders, setTenders] = useState<Payment[]>([]);
-  const [bankName, setBankName] = useState("");
   /* No-sale drawer open */
   const [noSaleOpen, setNoSaleOpen] = useState(false);
   const [noSaleReason, setNoSaleReason] = useState("");
