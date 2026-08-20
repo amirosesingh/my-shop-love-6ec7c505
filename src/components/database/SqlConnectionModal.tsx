@@ -135,6 +135,7 @@ export function SqlConnectionModal({
   const [hostname, setHostname] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [running, setRunning] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [steps, setSteps] = useState<Record<StepKey, StepState>>(blankSteps);
   const [databases, setDatabases] = useState<SqlDatabase[]>([]);
   /**
@@ -172,6 +173,25 @@ export function SqlConnectionModal({
       }
       return next;
     });
+  };
+
+  /**
+   * Full clean slate: cancels anything still running in the shell, closes both
+   * pools and forgets the saved credentials. This is the way out of a
+   * connection that refuses to finish or a machine that was set up wrongly.
+   */
+  const resetConnection = async () => {
+    setResetting(true);
+    abandonRun();
+    try {
+      const res = await resetLocalDatabase();
+      setSteps(blankSteps());
+      setDatabases([]);
+      if (res.ok) toast.success("Connection reset. Enter the server details and run the checks again.");
+      else toast.error(res.error ?? "Could not reset the connection.");
+    } finally {
+      setResetting(false);
+    }
   };
 
   const scan = useCallback(async (silent = false) => {
