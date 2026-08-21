@@ -106,24 +106,70 @@ const KNOWN_ODBC_DRIVERS = [
 
 let odbcCache = null;
 
-/** ODBC drivers actually installed on this PC, best first. */
-function installedOdbcDrivers() {
+/**
+ * Names of the registry values under the ODBC Drivers key.
+ *
+ * Each installed driver is one value line: `    <name>    REG_SZ    Installed`.
+ * Matching the whole dump as one string made "SQL Server" match any line, so
+ * uninstalled drivers were tried and burned the connection budget.
+ */
+function parseOdbcRegistry(dump) {
+  const names = [];
+  for (const raw of String(dump ?? "").split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith("HKEY_")) continue;
+    const match = /^(.+?)\s{2,}REG_SZ\s{2,}(.*)$/.exec(line);
+    if (!match) continue;
+    const name = match[1].trim();
+    if (!/installed/i.test(match[2])) continue;
+    if (name && !names.includes(name)) names.push(name);
+  }
+  return names;
+}
+
+/**
+ * ODBC drivers actually installed on this PC, best first.
+ *
+ * Returns `{ drivers, detected }`. `detected` is false when the registry could
+ * not be read at all — the caller then falls back to the two most likely
+ * drivers rather than walking every name ever shipped.
+ */
+function detectOdbcDrivers() {
   if (odbcCache) return odbcCache;
-  let found = [];
+  let installed = [];
+  let detected = false;
   if (process.platform === "win32") {
     try {
       const out = execFileSync(
         "reg",
         ["query", "HKLM\\SOFTWARE\\ODBC\\ODBCINST.INI\\ODBC Drivers"],
         { timeout: 4000, windowsHide: true, encoding: "utf8" },
-      ).toLowerCase();
-      found = KNOWN_ODBC_DRIVERS.filter((name) => out.includes(name.toLowerCase()));
-    } catch {
-      found = [];
+      );
+      installed = parseOdbcRegistry(out);
+      detected = true;
+    } catch (err) {
+      logConnection("odbc.registry-unreadable", { error: err?.message ?? String(err) });
+      installed = [];
+      detected = false;
     }
   }
-  odbcCache = found.length ? found : KNOWN_ODBC_DRIVERS;
+  const lower = installed.map((n) => n.toLowerCase());
+  const ranked = KNOWN_ODBC_DRIVERS.filter((name) => lower.includes(name.toLowerCase()));
+  // A driver we do not rank but that IS installed still beats guessing.
+  const extras = installed.filter(
+    (name) => /sql server/i.test(name) && !ranked.some((r) => r.toLowerCase() === name.toLowerCase()),
+  );
+  const drivers = detected
+    ? [...ranked, ...extras]
+    : KNOWN_ODBC_DRIVERS.slice(0, 2);
+  odbcCache = { drivers, detected, installed };
+  logConnection("odbc.detected", { detected, drivers });
   return odbcCache;
+}
+
+/** Backwards-compatible list form used by the diagnostics UI. */
+function installedOdbcDrivers() {
+  return detectOdbcDrivers().drivers;
 }
 
 function requireWindowsDriver() {
