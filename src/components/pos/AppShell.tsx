@@ -17,11 +17,13 @@ import { TerminalActivation, TerminalRevokedScreen } from "@/components/pos/Term
 import { clearRevocation, useRevocationCheck } from "@/lib/use-revocation-check";
 import { useAutoLock } from "@/lib/auto-lock";
 import { SidebarNav, useSidebarCollapsed } from "@/components/pos/SidebarNav";
-import { SyncBadge } from "@/components/pos/sync/SyncBadge";
+import {
+  ConnectionStatusButton,
+  SystemAlertsButton,
+} from "@/components/pos/StatusCluster";
 import { WindowControls } from "@/components/pos/WindowControls";
-import { SystemStatusPill } from "@/components/pos/SystemStatusPill";
-import { OperationalDatabaseBadge } from "@/components/database/SqlAdminBadge";
 import { SecurityAlertBell } from "@/components/pos/SecurityAlertBell";
+
 import { ActivityBell } from "@/components/pos/ActivityBell";
 import { MobileStatusSheet } from "@/components/pos/MobileStatusSheet";
 import { ShiftGuard } from "@/components/pos/ShiftGuard";
