@@ -25,8 +25,10 @@ import {
   health,
   isStale,
   listTelemetry,
+  missingTelemetryColumns,
   type TelemetryRow,
 } from "@/lib/telemetry";
+
 import {
   COMMAND_LABEL,
   issueCommand,
@@ -53,11 +55,14 @@ export function TelemetryPanel() {
   const [commands, setCommands] = useState<TerminalCommand[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [missingColumns, setMissingColumns] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     try {
       const [t, c] = await Promise.all([listTelemetry(), listCommands()]);
       setRows(t);
+      setMissingColumns(missingTelemetryColumns());
+
       setCommands(c);
     } catch (e) {
       toast.error("Could not load terminal health", { description: (e as Error).message });
@@ -95,7 +100,15 @@ export function TelemetryPanel() {
 
   return (
     <>
+      {missingColumns.length > 0 && (
+        <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-700 dark:text-amber-400">
+          Some device details are unavailable — this database is missing recent telemetry
+          columns ({missingColumns.join(", ")}). Terminals still report their core status.
+          Apply the latest database update to restore the full view.
+        </div>
+      )}
       <section className="rounded-lg border border-border bg-card p-5">
+
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
           <h2 className="truncate text-lg font-semibold">Terminals</h2>
           <Button variant="outline" size="sm" onClick={() => void load()}>
