@@ -600,14 +600,16 @@ export type LocalDbReconnectResult = {
  * pools down, cancels anything wedged and opens the saved connection again,
  * without asking the operator to restart or to type the server details afresh.
  */
-export async function reconnectLocalDatabase(): Promise<LocalDbReconnectResult> {
+export async function reconnectLocalDatabase(
+  override?: Partial<LocalDbConfig>,
+): Promise<LocalDbReconnectResult> {
   const bridge = localDb();
   if (!bridge?.reconnect) {
     return { ok: false, error: "Only the Windows desktop app holds a local database connection." };
   }
   try {
     return await withIpcTimeout(
-      bridge.reconnect(),
+      bridge.reconnect(override),
       70_000,
       "The reconnect did not finish in time.",
     );
@@ -615,6 +617,7 @@ export async function reconnectLocalDatabase(): Promise<LocalDbReconnectResult> 
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
+
 
 /** Nudge the background retry loop to attempt right now. */
 export async function retryLocalDatabaseNow(): Promise<{ ok: boolean }> {
