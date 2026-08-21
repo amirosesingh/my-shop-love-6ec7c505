@@ -576,10 +576,31 @@ export const isMissingTxnColumn = (message: string | undefined | null) =>
   /client_transaction_id|store_name_snapshot|store_address_snapshot/.test(message) &&
   /does not exist|schema cache/i.test(message);
 
-const forgetTxnColumn = (message?: string | null) => {
-  if (!message || /client_transaction_id/.test(message)) hasClientTxnColumn = false;
-  if (!message || /store_(name|address)_snapshot/.test(message)) hasStoreSnapshotColumns = false;
+/**
+ * Schema drift used to be invisible: the read simply got quieter. Each column
+ * we stop asking for is announced once, so a database left behind by an
+ * upgrade shows up in the console instead of silently dropping fields.
+ */
+const announcedDrift = new Set<string>();
+const announceDrift = (column: string) => {
+  if (announcedDrift.has(column)) return;
+  announcedDrift.add(column);
+  console.warn(
+    `[schema] this database has no "${column}" column on sales — reads continue without it. Apply the latest schema file to restore the field.`,
+  );
 };
+
+const forgetTxnColumn = (message?: string | null) => {
+  if (!message || /client_transaction_id/.test(message)) {
+    if (hasClientTxnColumn) announceDrift("client_transaction_id");
+    hasClientTxnColumn = false;
+  }
+  if (!message || /store_(name|address)_snapshot/.test(message)) {
+    if (hasStoreSnapshotColumns) announceDrift("store_name_snapshot/store_address_snapshot");
+    hasStoreSnapshotColumns = false;
+  }
+};
+
 
 const rowToSale = (r: Row): Sale => ({
   id: r.id,
