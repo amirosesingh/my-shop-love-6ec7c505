@@ -101,19 +101,29 @@ function beginRecovery(reason) {
 /** The renderer mounted — this build works. */
 function markHealthy() {
   const version = app.getVersion();
+  countedThisLaunch = false;
   return save({
     ...read(),
     version,
     pending: false,
     failures: 0,
+    reason: null,
     lastGoodVersion: version,
     lastGoodAt: new Date().toISOString(),
   });
 }
 
+/** At most one failure is ever counted per launch. */
+let countedThisLaunch = false;
+
 /** The watchdog fired, or the app server refused to start. */
 function markFailed(reason) {
   const prev = read();
+  if (countedThisLaunch) {
+    return save({ ...prev, pending: false, reason: reason ? String(reason) : prev.reason ?? null });
+  }
+  countedThisLaunch = true;
+  console.error(`[health] launch of ${prev.version ?? "?"} failed: ${reason ?? "unknown reason"}`);
   return save({
     ...prev,
     pending: false,
@@ -125,9 +135,19 @@ function markFailed(reason) {
 
 /** Operator asked to try the current build again. */
 function reset() {
-  return save({ ...read(), pending: false, failures: 0 });
+  countedThisLaunch = false;
+  return save({ ...read(), pending: false, failures: 0, reason: null });
 }
 
 const shouldEnterSafeMode = (state) => (state?.failures ?? 0) >= FAILURE_LIMIT;
 
-module.exports = { read, beginBoot, markHealthy, markFailed, reset, shouldEnterSafeMode, FAILURE_LIMIT };
+module.exports = {
+  read,
+  beginBoot,
+  beginRecovery,
+  markHealthy,
+  markFailed,
+  reset,
+  shouldEnterSafeMode,
+  FAILURE_LIMIT,
+};
