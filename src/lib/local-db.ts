@@ -677,5 +677,3 @@ export async function removeStoredConnection(): Promise<{
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
-
-}
