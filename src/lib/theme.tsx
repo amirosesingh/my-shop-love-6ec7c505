@@ -54,8 +54,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [prefersDark, setPrefersDark] = useState(true);
 
   useEffect(() => {
-    const stored = localStorage.getItem(KEY) as ThemeChoice | null;
-    if (stored === "light" || stored === "dark" || stored === "system") setThemeState(stored);
+    const stored = readStoredTheme();
+
     setPrefersDark(systemDark());
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = (e: MediaQueryListEvent) => setPrefersDark(e.matches);
