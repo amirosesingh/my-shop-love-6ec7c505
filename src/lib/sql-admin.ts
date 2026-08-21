@@ -7,6 +7,8 @@ export type SqlAdminCredentials = {
   server: string;
   database?: string;
   port?: number;
+  /** Port the TCP step proved open; skips re-resolving the named instance. */
+  resolvedPort?: number;
   auth: "windows" | "sql";
   user?: string;
   password?: string;
