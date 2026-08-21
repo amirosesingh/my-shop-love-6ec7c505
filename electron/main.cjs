@@ -1009,6 +1009,30 @@ function registerIpc() {
   ipcMain.handle("net:head", (_e, url) => netHttp.head(String(url)));
   ipcMain.handle("net:get-binary", (_e, url) => netHttp.getBinary(String(url)));
 
+  /* ------------------- missing SQL Server driver install --------------- */
+
+  ipcMain.handle("driver:list", () => {
+    try {
+      return driverInstall.listDrivers();
+    } catch (error) {
+      return { ok: false, error: fail(error).error };
+    }
+  });
+  ipcMain.handle("driver:install", async (_e, id) => {
+    try {
+      return await driverInstall.installDriver(String(id), {
+        onProgress: (progress) => {
+          for (const win of BrowserWindow.getAllWindows()) {
+            win.webContents.send("driver:progress", progress);
+          }
+        },
+      });
+    } catch (error) {
+      // The installer already reports its own failures; this is the last net.
+      return { ok: false, code: "EFAILED", error: fail(error).error };
+    }
+  });
+
   /**
    * The branch database is the home for the activation token and the branch it
    * binds this machine to. The sealed file store stays as the fallback for a
