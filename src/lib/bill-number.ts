@@ -236,13 +236,14 @@ export async function reserveBillNumber(
   config: BillNumberConfig = {},
 ): Promise<string> {
   const { prefix, seq, pad, store } = computeNext(branchCode, existing, config);
-  writeSeq(store);
+  const onDevice = writeSeq(store);
   const durable = await writeSeqDurable(store);
-  if (!durable && typeof window === "undefined") {
+  if (!onDevice && !durable) {
     throw new BillNumberReservationError(
       "The bill counter could not be reserved anywhere, so this bill number may already be in use.",
     );
   }
+
   return `${prefix}-${String(seq).padStart(pad, "0")}`;
 }
 
