@@ -470,12 +470,12 @@ export function AppShell({ children }: { children: ReactNode }) {
                   {user.staffId} · {user.role}
                 </p>
               </div>
-              <SyncBadge className="ml-auto" />
+              <div className="ml-auto" />
               <LiveClock />
-              <SystemStatusPill />
-              <OperationalDatabaseBadge />
-              <SecurityAlertBell />
+              <ConnectionStatusButton />
+              <SystemAlertsButton />
               <ActivityBell />
+
               {terminal.config && (
                 <Badge
                   variant="outline"
