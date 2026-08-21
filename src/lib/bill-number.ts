@@ -103,17 +103,42 @@ const readSeq = (): SeqStore | null => {
   }
 };
 
+/** Thrown when a number could not be reserved durably — never hand it out. */
+export class BillNumberReservationError extends Error {
+  constructor(message: string, readonly cause?: unknown) {
+    super(message);
+    this.name = "BillNumberReservationError";
+  }
+}
+
+/**
+ * Records the counter on the device. A failure here means the next sale would
+ * reuse this number, so it is raised rather than swallowed.
+ */
 const writeSeq = (value: SeqStore) => {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(SEQ_KEY, JSON.stringify(value));
-  } catch {
-    /* storage unavailable — the number still comes out, just unseeded */
+  } catch (err) {
+    throw new BillNumberReservationError(
+      "This device could not store the bill counter, so the next sale could reuse the same bill number. Free up browser storage and try again.",
+      err,
+    );
   }
-  // The branch database is the durable home for the counter: browser storage
-  // can be cleared, the till database cannot.
-  void writeLocalSetting(SEQ_KEY, JSON.stringify(value));
 };
+
+/**
+ * The branch database is the durable home for the counter: browser storage can
+ * be cleared, the till database cannot. Resolves false when it did not land.
+ */
+const writeSeqDurable = async (value: SeqStore): Promise<boolean> => {
+  try {
+    return await writeLocalSetting(SEQ_KEY, JSON.stringify(value));
+  } catch {
+    return false;
+  }
+};
+
 
 /**
  * Restores the running counter from the branch database at start-up, so a
