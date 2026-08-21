@@ -171,6 +171,39 @@ function parseJsonColumns(table, row) {
   return copy;
 }
 
+/**
+ * Builds the `UPDATE SET` list for a MERGE, guaranteeing each column appears
+ * exactly once. SQL Server rejects the whole statement if a column is assigned
+ * twice, which is what happened when a cloud row carried its own `updated_at`
+ * next to the automatic `SYSUTCDATETIME()` stamp.
+ */
+function buildSetList(columns, { markPending, hasRowVersion }) {
+  const assigned = new Map();
+  const put = (column, expression) => assigned.set(column, `t.[${column}] = ${expression}`);
+
+  for (const c of columns) {
+    if (c === "id") continue;
+    if (markPending && c === "row_version") continue;
+    put(c, `s.[${c}]`);
+  }
+
+  // A local edit is stamped with the local clock; a cloud row keeps the
+  // timestamp it arrived with so watermarks and last-write-wins stay honest.
+  if (markPending || !columns.includes("updated_at")) {
+    put("updated_at", "SYSUTCDATETIME()");
+  }
+
+  if (markPending) {
+    put("is_synced", "0");
+    put("sync_status", "N'pending'");
+    // A local edit always advances the version so the cloud copy cannot
+    // silently win the next pull.
+    if (hasRowVersion) put("row_version", "ISNULL(t.[row_version], 0) + 1");
+  }
+
+  return [...assigned.values()].join(", ");
+}
+
 async function upsertRow(tx, table, row, { markPending = true } = {}) {
   assertTable(table);
   const record = normaliseRow(table, row);
@@ -183,19 +216,10 @@ async function upsertRow(tx, table, row, { markPending = true } = {}) {
   const request = new sql.Request(tx);
   for (const col of columns) bind(request, col, record[col] ?? null);
 
-  const setList = columns
-    .filter((c) => c !== "id" && !(markPending && c === "row_version"))
-    .map((c) => `t.[${c}] = s.[${c}]`)
-    .concat("t.[updated_at] = SYSUTCDATETIME()")
-    .concat(markPending ? ["t.[is_synced] = 0", "t.[sync_status] = N'pending'"] : [])
-    .concat(
-      // A local edit always advances the version so the cloud copy cannot
-      // silently win the next pull.
-      markPending && known.has("row_version")
-        ? ["t.[row_version] = ISNULL(t.[row_version], 0) + 1"]
-        : [],
-    )
-    .join(", ");
+  const setList = buildSetList(columns, {
+    markPending,
+    hasRowVersion: known.has("row_version"),
+  });
 
   const insertCols = columns.map((c) => `[${c}]`).join(", ");
   const insertVals = columns.map((c) => `s.[${c}]`).join(", ");
@@ -224,13 +248,15 @@ async function updateRows(tx, table, values, match) {
   assertTable(table);
   const known = await tableColumns(table);
   const request = new sql.Request(tx);
-  const sets = [];
+  const sets = new Map();
   for (const [key, value] of Object.entries(values)) {
     if (!known.has(key.toLowerCase())) continue;
+    // Sync bookkeeping is owned by this function, never by the caller.
+    if (key === "updated_at" || SYNC_COLUMNS.has(key)) continue;
     bind(request, `set_${key}`, value);
-    sets.push(`[${key}] = @set_${key}`);
+    sets.set(key, `[${key}] = @set_${key}`);
   }
-  if (!sets.length) return;
+  if (!sets.size) return;
   const wheres = [];
   for (const [key, value] of Object.entries(match)) {
     bind(request, `w_${key}`, value);
@@ -238,11 +264,12 @@ async function updateRows(tx, table, values, match) {
   }
   await request.query(`
     UPDATE dbo.[${table}]
-       SET ${sets.join(", ")}, [updated_at] = SYSUTCDATETIME(),
+       SET ${[...sets.values()].join(", ")}, [updated_at] = SYSUTCDATETIME(),
            [is_synced] = 0, [sync_status] = N'pending'
      WHERE ${wheres.join(" AND ")};
   `);
 }
+
 
 async function deleteRows(tx, table, match) {
   assertTable(table);
@@ -707,6 +734,7 @@ function toCloudRow(table, row) {
 
 module.exports = {
   TABLES,
+  buildSetList,
   CATALOGUE_TABLES,
   SCOPED_PULL_TABLES,
   PRUNABLE_TABLES,
