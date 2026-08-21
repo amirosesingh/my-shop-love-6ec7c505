@@ -103,7 +103,8 @@ export function MobileStatusSheet({ className }: { className?: string }) {
             <RefreshCw className={cn("mr-1.5 size-3.5", busy && "animate-spin")} /> Sync now
           </Button>
 
-          <Row label="Connection">
+          <Row label="Sync &amp; local database">
+
             <ConnectionStatusButton />
           </Row>
           <Row label="Sync detail">
