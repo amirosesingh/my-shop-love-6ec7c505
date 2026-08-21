@@ -259,6 +259,24 @@ function withTimeout(promise, ms, message) {
 const RECONNECT_ATTEMPT_MS = 60_000;
 
 /**
+ * Set while the operator removes the saved connection: the backoff loop must
+ * not re-arm itself between the cancel and the file being unlinked.
+ */
+let reconnectSuppressed = false;
+/** Structured reason for the last failure — shown verbatim in the UI banner. */
+let lastConnectionDetail = null;
+
+/** Stops the backoff loop dead. */
+function stopReconnectLoop() {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  reconnectAttempt = 0;
+  reconnectDelay = 5_000;
+}
+
+/**
  * Tells the renderer the loop is alive: which attempt is running, when the
  * next one starts, and why the last one failed. A bare spinner with no reason
  * is what left the till reading "Reconnecting…" for ever.
@@ -271,6 +289,9 @@ function broadcastReconnecting(nextRetryAt) {
     nextRetryAt: nextRetryAt ?? null,
     error: lastConnectionError,
     lastError: lastConnectionError,
+    errorCode: lastConnectionDetail?.code ?? null,
+    errorHint: lastConnectionDetail?.hint ?? null,
+    errorStage: lastConnectionDetail?.stage ?? null,
     tables: [],
     queue: [],
     server: null,
@@ -285,6 +306,7 @@ function broadcastReconnecting(nextRetryAt) {
  * connection is saved. `immediate` is the operator pressing "Retry now".
  */
 function scheduleReconnect(immediate = false) {
+  if (reconnectSuppressed) return;
   if (!dbConfigStore.read()) return;
   if (reconnectTimer) {
     if (!immediate) return;
@@ -299,6 +321,7 @@ function scheduleReconnect(immediate = false) {
   broadcastReconnecting(new Date(Date.now() + delay).toISOString());
   reconnectTimer = setTimeout(async () => {
     reconnectTimer = null;
+    if (reconnectSuppressed) return;
     const config = dbConfigStore.read();
     if (!config) return;
     reconnectAttempt += 1;
@@ -310,7 +333,8 @@ function scheduleReconnect(immediate = false) {
       );
       console.log(`[pos] local database reconnected on attempt ${reconnectAttempt}`);
     } catch (error) {
-      lastConnectionError = fail(error).error;
+      lastConnectionDetail = pool.describeSqlError(error);
+      lastConnectionError = lastConnectionDetail.error ?? fail(error).error;
       console.warn(`[pos] reconnect attempt ${reconnectAttempt} failed: ${lastConnectionError}`);
       reconnectDelay = Math.min(reconnectDelay * 2, 60_000);
       scheduleReconnect();
@@ -318,16 +342,21 @@ function scheduleReconnect(immediate = false) {
   }, delay);
 }
 
+
 /**
  * Escape hatch that keeps the credentials: drop everything that might be
- * wedged and open the saved connection again, right now.
+ * wedged and open the connection again, right now.
+ *
+ * `override` carries the values currently typed into the wizard. Retrying the
+ * sealed file when the operator has just corrected the port is how "Reconnect
+ * now" used to repeat the very failure they were fixing. The override is used
+ * for the attempt only and is sealed just once it actually works.
  */
-async function reconnectNow() {
-  const config = dbConfigStore.read();
-  if (reconnectTimer) {
-    clearTimeout(reconnectTimer);
-    reconnectTimer = null;
-  }
+async function reconnectNow(override) {
+  const saved = dbConfigStore.read();
+  const usingOverride = !!(override && override.server && override.database);
+  const config = usingOverride ? { ...saved, ...override } : saved;
+  stopReconnectLoop();
   try {
     await sqlAdmin.cancel();
   } catch {
@@ -345,6 +374,7 @@ async function reconnectNow() {
   }
   if (!config) {
     lastConnectionError = null;
+    lastConnectionDetail = null;
     reconnectAttempt = 0;
     broadcastStatus({
       connected: false,
@@ -371,9 +401,12 @@ async function reconnectNow() {
       RECONNECT_ATTEMPT_MS,
       "The local database did not answer in time.",
     );
+    // Only a proven-good override replaces the sealed credentials.
+    if (usingOverride) dbConfigStore.write(config);
     return {
       ok: true,
       stage: "connected",
+      usedFormValues: usingOverride,
       activeDb: verified?.activeDb ?? config.database ?? null,
       serverName: verified?.serverName ?? null,
       latencyMs: verified?.latencyMs ?? null,
@@ -381,8 +414,10 @@ async function reconnectNow() {
   } catch (error) {
     const described = pool.describeSqlError(error);
     lastConnectionError = described.error;
+    lastConnectionDetail = described;
     // Keep trying in the background: the service may simply still be starting.
     scheduleReconnect();
+
     return { ok: false, stage: described.stage ?? "database", ...described };
   }
 }
@@ -811,9 +846,9 @@ function registerIpc() {
     the administration and the operational pool, and forgets the sealed
     credentials so the wizard starts from a clean slate.
   */
-  ipcMain.handle("pos:reconnect", async () => {
+  ipcMain.handle("pos:reconnect", async (_e, override) => {
     try {
-      return await reconnectNow();
+      return await reconnectNow(override);
     } catch (error) {
       return { ok: false, stage: "database", ...pool.describeSqlError(error) };
     }
@@ -825,14 +860,16 @@ function registerIpc() {
     return { ok: true };
   });
 
-  ipcMain.handle("pos:forget-connection", async () => {
-    if (reconnectTimer) {
-      clearTimeout(reconnectTimer);
-      reconnectTimer = null;
-    }
-    reconnectAttempt = 0;
-    reconnectDelay = 5_000;
+  /**
+   * Deletes the sealed credentials for good: cancels anything in flight, stops
+   * the backoff loop (and keeps it stopped while the file is unlinked), then
+   * reports a clean, unconfigured till.
+   */
+  async function removeStoredConnection() {
+    reconnectSuppressed = true;
+    stopReconnectLoop();
     lastConnectionError = null;
+    lastConnectionDetail = null;
     try {
       await sqlAdmin.cancel();
     } catch {
@@ -848,10 +885,12 @@ function registerIpc() {
     } catch {
       /* already gone */
     }
-    const cleared = dbConfigStore.write(null);
+    const cleared = dbConfigStore.remove();
+    reconnectSuppressed = false;
     broadcastStatus({
       connected: false,
       reconnecting: false,
+      configured: false,
       tables: [],
       queue: [],
       server: null,
@@ -859,8 +898,17 @@ function registerIpc() {
       resolved: null,
       cloudConfigured: !!cloudConfig,
     });
-    return { ok: cleared.ok !== false, stage: "forgotten", error: cleared.error ?? null };
-  });
+    return {
+      ok: cleared.ok !== false,
+      stage: "forgotten",
+      removed: cleared.removed === true,
+      error: cleared.error ?? null,
+    };
+  }
+
+  ipcMain.handle("pos:forget-connection", removeStoredConnection);
+  ipcMain.handle("pos:remove-connection", removeStoredConnection);
+
 
   /*
     Schema lifecycle. Reading the master file is always safe; applying it only

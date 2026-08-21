@@ -162,10 +162,12 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  */
 async function probePort(input) {
   // A named instance rarely listens on 1433 — ask SQL Browser first so the
-  // probe (and the handshake after it) target the port really in use.
+  // probe (and the handshake after it) target the port really in use. In
+  // direct mode the operator supplied the port, so no lookup happens at all.
   const target = await resolveTarget({
     server: input?.server ?? input?.host,
     port: input?.port,
+    directConnect: input?.directConnect === true,
   });
   const { host, port, instanceName, browserAnswered } = target;
   const started = Date.now();
@@ -184,6 +186,7 @@ async function probePort(input) {
       hint: "Dynamic port not advertised; the SQL driver will connect to the named instance directly.",
     };
   }
+
   return new Promise((resolve) => {
     const socket = new net.Socket();
     let settled = false;

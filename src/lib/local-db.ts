@@ -21,6 +21,11 @@ export type LocalDbConfig = {
   trustServerCertificate?: boolean;
   /** SET ARITHABORT ON for the session (default on). */
   arithAbort?: boolean;
+  /**
+   * Connect straight to `server,port` and never ask SQL Server Browser to
+   * resolve a named instance. The reliable choice whenever the port is known.
+   */
+  directConnect?: boolean;
 };
 
 export const defaultLocalDbConfig: LocalDbConfig = {
@@ -35,7 +40,9 @@ export const defaultLocalDbConfig: LocalDbConfig = {
   encrypt: false,
   trustServerCertificate: true,
   arithAbort: true,
+  directConnect: false,
 };
+
 
 export type TableSyncStat = {
   table: string;
@@ -128,16 +135,35 @@ export function describeLocalDbState(
 export function deriveLocalDbState(input: {
   available: boolean;
   configured: boolean;
-  status: Pick<LocalSyncStatus, "connected" | "error"> | null;
+  status:
+    | (Pick<LocalSyncStatus, "connected" | "error"> & {
+        errorHint?: string | null;
+        errorCode?: string | null;
+      })
+    | null;
   pending?: "testing" | "saving" | null;
 }): LocalDbConnectionView {
   if (!input.available) return describeLocalDbState("unavailable");
   if (input.pending) return describeLocalDbState(input.pending);
   if (input.status?.connected) return describeLocalDbState("connected");
-  if (input.status?.error) return describeLocalDbState("failed", input.status.error);
+  if (input.status?.error) return describeLocalDbState("failed", reconnectReason(input.status));
   if (!input.configured) return describeLocalDbState("not_configured");
   return describeLocalDbState("initializing", "Trying to reach the saved database.");
 }
+
+/**
+ * The banner shows the driver's actual reason, not a generic line: a stopped
+ * SQL Browser or a wrong port is a fixable misconfiguration and the operator
+ * should be told which one it is.
+ */
+export function reconnectReason(status: {
+  error?: string | null;
+  errorHint?: string | null;
+}): string {
+  const parts = [status.error?.trim(), status.errorHint?.trim()].filter(Boolean);
+  return parts.length ? parts.join(" ") : "Trying to reach the saved database.";
+}
+
 
 /** No IPC call may hang the UI: everything gets an outer deadline. */
 export async function withIpcTimeout<T>(
@@ -225,6 +251,12 @@ export type DirectConnectionParams = {
 export type LocalSyncStatus = {
   connected: boolean;
   error?: string;
+  /** Structured reason from the shell, so the banner can be specific. */
+  errorCode?: string | null;
+  errorHint?: string | null;
+  errorStage?: string | null;
+  reconnecting?: boolean;
+  configured?: boolean;
   phase?: "idle" | "pushing" | "pulling";
   enabled?: boolean;
   tables: TableSyncStat[];
@@ -249,10 +281,20 @@ export type PosBridge = {
   resetConnection?: () => Promise<{ ok: boolean; error?: string | null }>;
   /** Forget the saved connection (same as resetConnection, explicit name). */
   forgetConnection?: () => Promise<{ ok: boolean; error?: string | null }>;
-  /** Rebuild the connection from the SAVED credentials — no restart, no setup. */
-  reconnect?: () => Promise<LocalDbReconnectResult>;
+  /** Delete the sealed credentials file and stop the background retry loop. */
+  removeConnection?: () => Promise<{
+    ok: boolean;
+    removed?: boolean;
+    error?: string | null;
+  }>;
+  /**
+   * Rebuild the connection. With no argument the saved credentials are used;
+   * pass the values on screen to retry those instead.
+   */
+  reconnect?: (override?: Partial<LocalDbConfig>) => Promise<LocalDbReconnectResult>;
   /** Ask the background loop for an immediate attempt. */
   retryConnection?: () => Promise<{ ok: boolean }>;
+
   /** Read the single master schema file — passive, never executes anything. */
   readSchema?: () => Promise<{
     ok: boolean;
@@ -565,14 +607,16 @@ export type LocalDbReconnectResult = {
  * pools down, cancels anything wedged and opens the saved connection again,
  * without asking the operator to restart or to type the server details afresh.
  */
-export async function reconnectLocalDatabase(): Promise<LocalDbReconnectResult> {
+export async function reconnectLocalDatabase(
+  override?: Partial<LocalDbConfig>,
+): Promise<LocalDbReconnectResult> {
   const bridge = localDb();
   if (!bridge?.reconnect) {
     return { ok: false, error: "Only the Windows desktop app holds a local database connection." };
   }
   try {
     return await withIpcTimeout(
-      bridge.reconnect(),
+      bridge.reconnect(override),
       70_000,
       "The reconnect did not finish in time.",
     );
@@ -580,6 +624,7 @@ export async function reconnectLocalDatabase(): Promise<LocalDbReconnectResult> 
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
+
 
 /** Nudge the background retry loop to attempt right now. */
 export async function retryLocalDatabaseNow(): Promise<{ ok: boolean }> {
@@ -603,6 +648,35 @@ export async function resetLocalDatabase(): Promise<{ ok: boolean; error?: strin
       forget(),
       15_000,
       "The reset did not finish in time. Restart the till if the connection stays stuck.",
+    );
+    cachedConfig = defaultLocalDbConfig;
+    return res;
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+
+/**
+ * Delete the stored credentials for good. The shell unlinks the sealed file,
+ * cancels anything in flight and stops the background retry loop, so the till
+ * lands back on a clean "requires setup" state.
+ */
+export async function removeStoredConnection(): Promise<{
+  ok: boolean;
+  removed?: boolean;
+  error?: string | null;
+}> {
+  const bridge = localDb();
+  const remove = bridge?.removeConnection ?? bridge?.forgetConnection ?? bridge?.resetConnection;
+  if (!remove) {
+    return { ok: false, error: "Only the Windows desktop app holds a local database connection." };
+  }
+  try {
+    const res = await withIpcTimeout(
+      remove(),
+      15_000,
+      "Removing the saved connection did not finish in time.",
     );
     cachedConfig = defaultLocalDbConfig;
     return res;

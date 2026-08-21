@@ -37,4 +37,23 @@ function write(config) {
   }
 }
 
-module.exports = { read, write };
+/**
+ * Deletes the sealed file outright — the operator asked for the stored
+ * credentials to be gone, so blanking fields would not be honest.
+ */
+function remove() {
+  const file = sealed();
+  try {
+    const existed = fs.existsSync(file);
+    fs.rmSync(file, { force: true });
+    return { ok: !fs.existsSync(file), removed: existed };
+  } catch (error) {
+    return {
+      ok: false,
+      removed: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+module.exports = { read, write, remove };

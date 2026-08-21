@@ -2,17 +2,29 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   deriveLocalDbState,
   defaultLocalDbConfig,
   hasLocalDb,
   localDb,
   loadLocalDbConfig,
   reconnectLocalDatabase,
+  removeStoredConnection,
   type LocalDbConfig,
   type LocalSyncStatus,
 } from "@/lib/local-db";
 import { SqlConnectionModal } from "@/components/database/SqlConnectionModal";
 import { SchemaPanel } from "@/components/database/SchemaPanel";
+
 
 /**
  * Local Microsoft SQL Server controls. Only meaningful inside the Windows
@@ -27,6 +39,33 @@ export function LocalDatabaseSettings() {
   const [showDetails, setShowDetails] = useState(false);
   const [configured, setConfigured] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+
+  /**
+   * Deletes the sealed credentials file, cancels anything still connecting and
+   * stops the background retry loop, so the panel returns to "not configured"
+   * instead of retrying a connection nobody wants any more.
+   */
+  const removeConnection = async () => {
+    setRemoving(true);
+    try {
+      const res = await removeStoredConnection();
+      if (res.ok) {
+        setConfig(defaultLocalDbConfig);
+        setConfigured(false);
+        setStatus(null);
+        setConfirmRemove(false);
+        toast.success("Saved connection removed from this machine.");
+      } else {
+        toast.error(res.error ?? "Could not remove the saved connection.");
+      }
+      await refresh();
+    } finally {
+      setRemoving(false);
+    }
+  };
+
 
   /**
    * Rebuilds the connection from the credentials already saved here. This is
@@ -160,11 +199,43 @@ export function LocalDatabaseSettings() {
               {reconnecting ? "Reconnecting…" : "Reconnect now"}
             </Button>
           )}
+          {configured && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={removing}
+              onClick={() => setConfirmRemove(true)}
+              title="Delete the stored server details and credentials from this machine."
+            >
+              {removing ? "Removing…" : "Remove saved connection"}
+            </Button>
+          )}
           <Button size="sm" disabled={view.busy} onClick={() => setWizardOpen(true)}>
             {view.state === "connected" ? "Change connection" : "Set up connection"}
           </Button>
         </div>
       </div>
+
+      <AlertDialog open={confirmRemove} onOpenChange={setConfirmRemove}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove the saved connection?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The stored server, database and sign-in credentials are deleted from this machine, any
+              connection attempt still running is cancelled and the till stops retrying in the
+              background. Selling continues against the online database until a new connection is
+              set up.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={removing}>Keep it</AlertDialogCancel>
+            <AlertDialogAction disabled={removing} onClick={() => void removeConnection()}>
+              Remove connection
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <SqlConnectionModal
         open={wizardOpen}
         onOpenChange={setWizardOpen}
