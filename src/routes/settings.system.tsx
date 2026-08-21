@@ -3,6 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
 import { SettingsTabs } from "@/components/pos/settings/SettingsTabs";
 import { SystemStatusPanel } from "@/components/pos/settings/panels/SystemStatusPanel";
+import { ServerKeysPanel } from "@/components/pos/settings/panels/ServerKeysPanel";
 import { DatabaseHealthPanel } from "@/components/pos/settings/panels/DatabaseHealthPanel";
 import { LogicHealthPanel } from "@/components/pos/settings/panels/LogicHealthPanel";
 import { SecurityAlertsPanel } from "@/components/pos/settings/panels/SecurityAlertsPanel";
