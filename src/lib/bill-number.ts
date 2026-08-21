@@ -180,24 +180,58 @@ export function seedFromExisting(prefix: string, existing: Iterable<string>): nu
   return highest;
 }
 
-/**
- * Next bill number for this branch/device/day. `existing` is any list of
- * receipt numbers the till already knows about, used to recover the counter.
- */
-export function nextBillNumber(
+const computeNext = (
   branchCode: string,
-  existing: Iterable<string> = [],
-  config: BillNumberConfig = {},
-): string {
+  existing: Iterable<string>,
+  config: BillNumberConfig,
+) => {
   const prefix = billPrefix(branchCode, new Date(), config);
   const pad = Math.min(6, Math.max(3, Math.round(config.padding ?? 4)));
   const saved = readSeq();
   const base =
     saved && saved.prefix === prefix ? saved.next : seedFromExisting(prefix, existing) + 1;
   const seq = Math.max(1, base, seedFromExisting(prefix, existing) + 1);
-  writeSeq({ prefix, next: seq + 1 });
+  return { prefix, seq, pad, store: { prefix, next: seq + 1 } as SeqStore };
+};
+
+/**
+ * Next bill number for this branch/device/day. `existing` is any list of
+ * receipt numbers the till already knows about, used to recover the counter.
+ * Throws when the counter cannot be recorded on the device — a number that was
+ * not reserved must never reach a receipt.
+ */
+export function nextBillNumber(
+  branchCode: string,
+  existing: Iterable<string> = [],
+  config: BillNumberConfig = {},
+): string {
+  const { prefix, seq, pad, store } = computeNext(branchCode, existing, config);
+  writeSeq(store);
+  void writeSeqDurable(store);
   return `${prefix}-${String(seq).padStart(pad, "0")}`;
 }
+
+/**
+ * Same number, but the durable reservation in the branch database is awaited.
+ * Use this on the checkout path: if neither the device nor the branch database
+ * could hold the counter, it rejects instead of risking a duplicate bill.
+ */
+export async function reserveBillNumber(
+  branchCode: string,
+  existing: Iterable<string> = [],
+  config: BillNumberConfig = {},
+): Promise<string> {
+  const { prefix, seq, pad, store } = computeNext(branchCode, existing, config);
+  writeSeq(store);
+  const durable = await writeSeqDurable(store);
+  if (!durable && typeof window === "undefined") {
+    throw new BillNumberReservationError(
+      "The bill counter could not be reserved anywhere, so this bill number may already be in use.",
+    );
+  }
+  return `${prefix}-${String(seq).padStart(pad, "0")}`;
+}
+
 
 /** A checkout attempt id: retries of the same attempt reuse it, so no double bill. */
 export const newClientTransactionId = (): string => crypto.randomUUID();
