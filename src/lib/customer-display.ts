@@ -99,10 +99,64 @@ export function readDisplaySnapshot(): DisplaySnapshot | null {
   }
 }
 
+/** Key written when the till shuts down, so popups opened before a refresh
+ *  still hear about it through the `storage` event. */
+export const DISPLAY_SHUTDOWN_KEY = "pos.display.shutdown";
+
+type ShutdownMessage = { __posDisplay: "shutdown"; at: number };
+
+const isShutdown = (v: unknown): v is ShutdownMessage =>
+  !!v && typeof v === "object" && (v as ShutdownMessage).__posDisplay === "shutdown";
+
+/** Popup handle for the display opened from this till window. */
+let popup: Window | null = null;
+
 export function openCustomerDisplay() {
-  window.open(
+  popup = window.open(
     "/display",
     "pos-customer-display",
     "width=1024,height=768,menubar=no,toolbar=no,location=no,status=no",
   );
+  return popup;
+}
+
+/** Close the customer screen: the popup we own plus any other window
+ *  listening on the channel (second monitor, another tab). */
+export function closeCustomerDisplay() {
+  if (typeof window === "undefined") return;
+  const message: ShutdownMessage = { __posDisplay: "shutdown", at: Date.now() };
+  try {
+    chan()?.postMessage(message);
+  } catch {
+    /* channel already closed */
+  }
+  try {
+    window.localStorage.setItem(DISPLAY_SHUTDOWN_KEY, String(message.at));
+  } catch {
+    /* storage blocked */
+  }
+  try {
+    if (popup && !popup.closed) popup.close();
+  } catch {
+    /* cross-origin or already gone */
+  }
+  popup = null;
+}
+
+/** Subscribe on the customer screen to till shutdown. Returns unsubscribe. */
+export function subscribeDisplayShutdown(cb: () => void) {
+  if (typeof window === "undefined") return () => {};
+  const c = chan();
+  const onMessage = (e: MessageEvent<unknown>) => {
+    if (isShutdown(e.data)) cb();
+  };
+  c?.addEventListener("message", onMessage);
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === DISPLAY_SHUTDOWN_KEY && e.newValue) cb();
+  };
+  window.addEventListener("storage", onStorage);
+  return () => {
+    c?.removeEventListener("message", onMessage);
+    window.removeEventListener("storage", onStorage);
+  };
 }
