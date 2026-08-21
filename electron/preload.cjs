@@ -12,13 +12,19 @@ contextBridge.exposeInMainWorld("pos", {
   configureCloud: (cloud) => invoke("pos:configure-cloud", cloud),
   test: (config) => invoke("pos:test", config),
   getDatabaseConfig: () => invoke("pos:database-config"),
-  /** Tear both pools down and open the SAVED connection again — no restart. */
-  reconnect: () => invoke("pos:reconnect"),
+  /**
+   * Tear both pools down and open the connection again — no restart. Pass the
+   * values currently on screen to retry those instead of the sealed file.
+   */
+  reconnect: (override) => invoke("pos:reconnect", override),
   /** Ask the background loop for an immediate attempt. */
   retryConnection: () => invoke("pos:retry-connection"),
   /** Forget the saved SQL Server connection and drop every pool. */
   forgetConnection: () => invoke("pos:forget-connection"),
   resetConnection: () => invoke("pos:forget-connection"),
+  /** Delete the sealed credentials file and stop the background retry loop. */
+  removeConnection: () => invoke("pos:remove-connection"),
+
   /* schema lifecycle — read is passive, apply needs an operator click */
   readSchema: () => invoke("pos:read-schema"),
   applySchema: () => invoke("pos:apply-schema"),
