@@ -50,6 +50,7 @@
         <button id="retry">Try starting again</button>
         <button id="resume">Resume automatic updates</button>
         <button id="logs">Open log folder</button>
+        <button id="report">Save diagnostic report</button>
         <button id="quit">Close</button>
       </div>
       <div id="msg"></div>
@@ -95,6 +96,12 @@
         msg.textContent = "Automatic updates switched back on. Start the till again to pick one up.";
       };
       document.getElementById("logs").onclick = () => api.openLogs();
+      document.getElementById("report").onclick = async () => {
+        const r = await api.collectDiagnostics();
+        msg.textContent = r && r.ok
+          ? "Saved diagnostic-report.txt in the log folder. Send that file to support."
+          : "Could not write the report. Use Open log folder instead.";
+      };
       document.getElementById("quit").onclick = () => api.quit();
     </script>
   </body>

@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld("recovery", {
   retry: () => ipcRenderer.invoke("health:retry"),
   resumeUpdates: () => ipcRenderer.invoke("health:resume-updates"),
   openLogs: () => ipcRenderer.invoke("health:open-logs"),
+  collectDiagnostics: () => ipcRenderer.invoke("health:collect-diagnostics"),
   quit: () => ipcRenderer.invoke("health:quit"),
   onProgress: (cb) => {
     const handler = (_e, payload) => cb(payload);

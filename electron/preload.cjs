@@ -117,6 +117,8 @@ contextBridge.exposeInMainWorld("pos", {
   reportReady: () => invoke("app:ready"),
   healthState: () => invoke("health:state"),
   rollbackNow: () => invoke("health:rollback"),
+  openLogFolder: () => invoke("health:open-logs"),
+  collectDiagnostics: () => invoke("health:collect-diagnostics"),
   onStatus: (cb) => {
     const handler = (_e, payload) => cb(payload);
     ipcRenderer.on("pos:status-changed", handler);
