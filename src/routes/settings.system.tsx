@@ -51,7 +51,12 @@ function SystemSettingsPage() {
       />
 
       <div className="w-full min-w-0 max-w-full">
-        {tab === "system" && <SystemStatusPanel />}
+        {tab === "system" && (
+          <div className="space-y-4">
+            <ServerKeysPanel />
+            <SystemStatusPanel />
+          </div>
+        )}
         {tab === "database-health" && <DatabaseHealthPanel />}
         {tab === "logic-health" && <LogicHealthPanel />}
         {tab === "security-alerts" && <SecurityAlertsPanel />}
