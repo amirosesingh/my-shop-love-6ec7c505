@@ -94,6 +94,22 @@ const blankSteps = (): Record<StepKey, StepState> =>
     StepState
   >;
 
+/** True when the failure is "no Microsoft ODBC driver on this PC". */
+export function isDriverMissing(state: {
+  code?: string | null;
+  error?: string;
+  hint?: string | null;
+}): boolean {
+  const text = `${state.code ?? ""} ${state.error ?? ""} ${state.hint ?? ""}`.toLowerCase();
+  return (
+    state.code === "EDRIVER" ||
+    text.includes("im002") ||
+    text.includes("odbc driver") ||
+    text.includes("driver not found") ||
+    text.includes("data source name not found")
+  );
+}
+
 /** Extra guidance on top of the driver's own hint. */
 function tipFor(
   step: StepKey,
