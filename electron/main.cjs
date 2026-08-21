@@ -345,14 +345,18 @@ function scheduleReconnect(immediate = false) {
 
 /**
  * Escape hatch that keeps the credentials: drop everything that might be
- * wedged and open the saved connection again, right now.
+ * wedged and open the connection again, right now.
+ *
+ * `override` carries the values currently typed into the wizard. Retrying the
+ * sealed file when the operator has just corrected the port is how "Reconnect
+ * now" used to repeat the very failure they were fixing. The override is used
+ * for the attempt only and is sealed just once it actually works.
  */
-async function reconnectNow() {
-  const config = dbConfigStore.read();
-  if (reconnectTimer) {
-    clearTimeout(reconnectTimer);
-    reconnectTimer = null;
-  }
+async function reconnectNow(override) {
+  const saved = dbConfigStore.read();
+  const usingOverride = !!(override && override.server && override.database);
+  const config = usingOverride ? { ...saved, ...override } : saved;
+  stopReconnectLoop();
   try {
     await sqlAdmin.cancel();
   } catch {
@@ -370,6 +374,7 @@ async function reconnectNow() {
   }
   if (!config) {
     lastConnectionError = null;
+    lastConnectionDetail = null;
     reconnectAttempt = 0;
     broadcastStatus({
       connected: false,
@@ -396,9 +401,12 @@ async function reconnectNow() {
       RECONNECT_ATTEMPT_MS,
       "The local database did not answer in time.",
     );
+    // Only a proven-good override replaces the sealed credentials.
+    if (usingOverride) dbConfigStore.write(config);
     return {
       ok: true,
       stage: "connected",
+      usedFormValues: usingOverride,
       activeDb: verified?.activeDb ?? config.database ?? null,
       serverName: verified?.serverName ?? null,
       latencyMs: verified?.latencyMs ?? null,
@@ -406,8 +414,10 @@ async function reconnectNow() {
   } catch (error) {
     const described = pool.describeSqlError(error);
     lastConnectionError = described.error;
+    lastConnectionDetail = described;
     // Keep trying in the background: the service may simply still be starting.
     scheduleReconnect();
+
     return { ok: false, stage: described.stage ?? "database", ...described };
   }
 }
