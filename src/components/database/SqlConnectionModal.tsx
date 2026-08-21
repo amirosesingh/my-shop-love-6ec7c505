@@ -46,6 +46,7 @@ import {
 } from "@/lib/local-db";
 import { DESKTOP_ONLY, sqlAdmin, type SqlAdminFailure, type SqlDatabase } from "@/lib/sql-admin";
 import { createRunGuard } from "@/lib/run-token";
+import { DriverInstallPanel } from "@/components/database/DriverInstallPanel";
 import {
   STEP_DEADLINE_MS,
   newAttemptId,
@@ -92,6 +93,22 @@ const blankSteps = (): Record<StepKey, StepState> =>
     StepKey,
     StepState
   >;
+
+/** True when the failure is "no Microsoft ODBC driver on this PC". */
+export function isDriverMissing(state: {
+  code?: string | null;
+  error?: string;
+  hint?: string | null;
+}): boolean {
+  const text = `${state.code ?? ""} ${state.error ?? ""} ${state.hint ?? ""}`.toLowerCase();
+  return (
+    state.code === "EDRIVER" ||
+    text.includes("im002") ||
+    text.includes("odbc driver") ||
+    text.includes("driver not found") ||
+    text.includes("data source name not found")
+  );
+}
 
 /** Extra guidance on top of the driver's own hint. */
 function tipFor(
@@ -774,8 +791,12 @@ export function SqlConnectionModal({
                           ))}
                         </ul>
                       </details>
-                    )}
-                  </div>
+                     )}
+                     {(state.status === "failed" || state.status === "timed_out") &&
+                       isDriverMissing(state) && (
+                         <DriverInstallPanel onInstalled={() => void advance(step.key, true)} />
+                       )}
+                   </div>
                   {(state.status === "failed" || state.status === "timed_out") && (
                     <Button
                       type="button"
