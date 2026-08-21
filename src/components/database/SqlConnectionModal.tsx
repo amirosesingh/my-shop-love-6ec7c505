@@ -293,7 +293,9 @@ export function SqlConnectionModal({
         port: saved.port ?? 0,
         trustServerCertificate: saved.trustServerCertificate ?? true,
         arithAbort: saved.arithAbort ?? true,
+        directConnect: saved.directConnect ?? (saved.port ?? 0) > 0,
       }));
+      dirtyRef.current = false;
       const list = await scan(true);
       if (!alive || hasSaved) return;
       const preferred = list.find((t) => t.includes("\\")) ?? list[0];
@@ -304,13 +306,23 @@ export function SqlConnectionModal({
     };
   }, [open, scan, abandonRun, guard]);
 
+  /**
+   * The port the operator actually asked for.
+   *
+   * A named instance and an explicit port are not mutually exclusive: an
+   * earlier build discarded 1433 whenever the server text held a backslash,
+   * which forced a SQL Browser lookup — and a stalled handshake — even though
+   * the port was right there. Whatever is typed is now honoured; "automatic"
+   * is expressed by leaving the port empty, or by turning direct mode off.
+   */
   const resolvedPort = () => {
-    // Older builds pre-filled 1433 even for SQLEXPRESS. Treat that legacy
-    // combination as automatic; HOST\INSTANCE,1433 remains the explicit form.
-    const named = config.server.includes("\\");
-    const inlinePort = /,\s*\d+\s*$/.test(config.server);
-    return named && !inlinePort && config.port === 1433 ? undefined : config.port || undefined;
+    const inline = /,\s*(\d+)\s*$/.exec(config.server);
+    if (inline) return Number(inline[1]);
+    return config.port || undefined;
   };
+
+  /** Direct mode needs a real port; without one there is nothing to aim at. */
+  const directConnect = () => config.directConnect === true && !!resolvedPort();
 
   const credentials = () => ({
     server: config.server,
@@ -319,6 +331,7 @@ export function SqlConnectionModal({
     // driver resolving the instance again over SQL Browser — the sub-step that
     // used to hang the handshake when that service is stopped.
     resolvedPort: provenPortRef.current ?? undefined,
+    directConnect: directConnect(),
     auth: config.auth,
     user: config.user,
     password: config.password,
@@ -329,10 +342,12 @@ export function SqlConnectionModal({
   const params = (database: string) => ({
     host: config.server,
     port: resolvedPort() ?? 0,
+    directConnect: directConnect(),
     database,
     authType: config.auth,
     username: config.user,
     password: config.password,
+
     encrypt: !!config.encrypt,
     trustServerCertificate: config.trustServerCertificate !== false,
     arithAbort: config.arithAbort !== false,
