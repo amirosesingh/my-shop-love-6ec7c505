@@ -15,7 +15,7 @@ import {
 type Bridge = Record<string, unknown>;
 
 function installBridge(bridge: Bridge) {
-  (globalThis as unknown as { window: unknown }).window = { posLocalDb: bridge };
+  (globalThis as unknown as { window: unknown }).window = { pos: bridge };
 }
 
 beforeEach(() => {
