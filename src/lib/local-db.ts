@@ -21,6 +21,11 @@ export type LocalDbConfig = {
   trustServerCertificate?: boolean;
   /** SET ARITHABORT ON for the session (default on). */
   arithAbort?: boolean;
+  /**
+   * Connect straight to `server,port` and never ask SQL Server Browser to
+   * resolve a named instance. The reliable choice whenever the port is known.
+   */
+  directConnect?: boolean;
 };
 
 export const defaultLocalDbConfig: LocalDbConfig = {
@@ -35,7 +40,9 @@ export const defaultLocalDbConfig: LocalDbConfig = {
   encrypt: false,
   trustServerCertificate: true,
   arithAbort: true,
+  directConnect: false,
 };
+
 
 export type TableSyncStat = {
   table: string;
