@@ -856,5 +856,5 @@ module.exports = {
   parseServerField,
   openConnection,
   resolveTarget,
-  installedOdbcDrivers,
+  parseOdbcRegistry,
 };
