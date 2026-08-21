@@ -717,6 +717,31 @@ export function SqlConnectionModal({
               />
             </div>
 
+            <div className="space-y-1.5 sm:col-span-2">
+              <div className="flex items-center justify-between gap-3 rounded-md border p-3">
+                <div className="space-y-0.5">
+                  <Label htmlFor="sql-direct" className="text-sm">
+                    Direct connection (server, port)
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Connects straight to the port above and never asks the SQL Server Browser
+                    service to look up the instance. Recommended whenever the port is known.
+                  </p>
+                </div>
+                <Switch
+                  id="sql-direct"
+                  checked={config.directConnect === true}
+                  onCheckedChange={(v) => set("directConnect", v)}
+                />
+              </div>
+              {config.directConnect && !resolvedPort() && (
+                <p className="text-xs text-destructive">
+                  Direct connection needs a port — enter one above (usually 1433).
+                </p>
+              )}
+            </div>
+
+
             <div className="space-y-1.5">
               <Label>Authentication</Label>
               <Select
