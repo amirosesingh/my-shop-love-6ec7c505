@@ -219,7 +219,14 @@ async function rollback(version, onProgress) {
   return { ok: true, version };
 }
 
-module.exports = { start, stop, pause, check, install, rollback, status: () => state
+module.exports = {
+  start,
+  stop,
+  pause,
   resume,
   isPaused,
+  check,
+  install,
+  rollback,
+  status: () => state,
 };
