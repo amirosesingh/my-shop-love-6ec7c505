@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld("recovery", {
   state: () => ipcRenderer.invoke("health:state"),
   rollback: () => ipcRenderer.invoke("health:rollback"),
   retry: () => ipcRenderer.invoke("health:retry"),
+  resumeUpdates: () => ipcRenderer.invoke("health:resume-updates"),
   openLogs: () => ipcRenderer.invoke("health:open-logs"),
   quit: () => ipcRenderer.invoke("health:quit"),
   onProgress: (cb) => {
