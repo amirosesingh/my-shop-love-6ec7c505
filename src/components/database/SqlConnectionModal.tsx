@@ -177,13 +177,21 @@ export function SqlConnectionModal({
   const provenPortRef = useRef<number | null>(null);
   /** Synchronous lock — protects against a double click within one render. */
   const startingRef = useRef(false);
+  /**
+   * True once the operator edits the form. "Reconnect now" then retries what
+   * is on screen instead of the sealed file, which is how a corrected port
+   * used to be ignored.
+   */
+  const dirtyRef = useRef(false);
 
   const set = <K extends keyof LocalDbConfig>(key: K, value: LocalDbConfig[K]) => {
     setConfig((c) => ({ ...c, [key]: value }));
+    dirtyRef.current = true;
     // Any credential edit invalidates everything proved so far.
     setSteps(blankSteps());
     setDatabases([]);
   };
+
 
   const mark = (key: StepKey, patch: StepState) =>
     setSteps((s) => ({ ...s, [key]: { ...s[key], ...patch } }));
