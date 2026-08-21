@@ -14,9 +14,53 @@ const WINDOWS_AUTH_HINT =
 
 const CONNECT_TIMEOUT_MS = 15_000;
 /** Hard ceiling for the whole attempt ladder — the UI must always get an answer. */
-const LADDER_BUDGET_MS = 25_000;
+const LADDER_BUDGET_MS = 40_000;
 /** No single attempt may eat the whole budget. */
-const ATTEMPT_TIMEOUT_MS = 8_000;
+const ATTEMPT_TIMEOUT_MS = 10_000;
+/** The ladder stays short on purpose: four tries fit inside the budget. */
+const MAX_ATTEMPTS_PER_DRIVER = 4;
+
+/* ------------------------- connection diagnostics ------------------------- */
+
+let logFile = null;
+let logResolved = false;
+
+/** `<userData>/connection.log`, resolved lazily so tests can load this module. */
+function connectionLogFile() {
+  if (logResolved) return logFile;
+  logResolved = true;
+  try {
+    const { app } = require("electron");
+    logFile = path.join(app.getPath("userData"), "connection.log");
+  } catch {
+    logFile = null;
+  }
+  return logFile;
+}
+
+/**
+ * One structured line per sub-step (driver load, target resolution, Browser
+ * lookup, every ladder attempt, verification). Never any credential value.
+ */
+function logConnection(event, detail) {
+  const line = `${new Date().toISOString()} [sqlconn] ${event}${
+    detail ? ` ${JSON.stringify(detail)}` : ""
+  }`;
+  // eslint-disable-next-line no-console
+  console.log(line);
+  const file = connectionLogFile();
+  if (!file) return;
+  try {
+    // Rotate before the log can grow without bound on a long-running till.
+    if (fs.existsSync(file) && fs.statSync(file).size > 512 * 1024) {
+      fs.renameSync(file, `${file}.1`);
+    }
+    fs.appendFileSync(file, `${line}\n`, "utf8");
+  } catch {
+    /* diagnostics must never break a connection */
+  }
+}
+
 
 let driver = null;
 let nativeDriver = null;
