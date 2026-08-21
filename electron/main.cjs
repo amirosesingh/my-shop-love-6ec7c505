@@ -54,12 +54,15 @@ let readyWatchdog = null;
 let safeMode = false;
 let reconnectTimer = null;
 let reconnectDelay = 5_000;
+let reconnectAttempt = 0;
+let lastConnectionError = null;
 let cloudConfig = null;
 
 function enterSafeMode(reason) {
   if (safeMode) return;
   safeMode = true;
   if (reason) health.markFailed(reason);
+  else health.beginRecovery("Repeated failed launches");
   updater.pause();
   for (const win of BrowserWindow.getAllWindows()) win.destroy();
   mainWindow = null;
@@ -662,7 +665,12 @@ function registerIpc() {
   ipcMain.handle("app:ready", () => {
     if (readyWatchdog) clearTimeout(readyWatchdog);
     readyWatchdog = null;
-    return { ok: true, health: health.markHealthy() };
+    const state = health.markHealthy();
+    // This build reached the till, so a previous bad start may no longer keep
+    // automatic updates switched off.
+    const resumed = updater.resume();
+    if (resumed.resumed) console.log("[pos] automatic updates resumed after a healthy launch");
+    return { ok: true, health: state, updatesResumed: resumed.resumed };
   });
 
   ipcMain.handle("health:state", () => {
@@ -687,6 +695,11 @@ function registerIpc() {
     const { lastGoodVersion } = health.read();
     updater.pause();
     return updater.rollback(lastGoodVersion, (percent) => recovery.progress({ percent }));
+  });
+
+  ipcMain.handle("health:resume-updates", () => {
+    health.reset();
+    return updater.resume();
   });
 
   ipcMain.handle("health:retry", () => {
@@ -797,11 +810,28 @@ function registerIpc() {
     the administration and the operational pool, and forgets the sealed
     credentials so the wizard starts from a clean slate.
   */
-  ipcMain.handle("pos:reset-connection", async () => {
+  ipcMain.handle("pos:reconnect", async () => {
+    try {
+      return await reconnectNow();
+    } catch (error) {
+      return { ok: false, stage: "database", ...pool.describeSqlError(error) };
+    }
+  });
+
+  /** Operator asked for an immediate background retry (non-blocking). */
+  ipcMain.handle("pos:retry-connection", () => {
+    scheduleReconnect(true);
+    return { ok: true };
+  });
+
+  ipcMain.handle("pos:forget-connection", async () => {
     if (reconnectTimer) {
       clearTimeout(reconnectTimer);
       reconnectTimer = null;
     }
+    reconnectAttempt = 0;
+    reconnectDelay = 5_000;
+    lastConnectionError = null;
     try {
       await sqlAdmin.cancel();
     } catch {
@@ -820,6 +850,7 @@ function registerIpc() {
     const cleared = dbConfigStore.write(null);
     broadcastStatus({
       connected: false,
+      reconnecting: false,
       tables: [],
       queue: [],
       server: null,
@@ -827,7 +858,7 @@ function registerIpc() {
       resolved: null,
       cloudConfigured: !!cloudConfig,
     });
-    return { ok: cleared.ok !== false, error: cleared.error ?? null };
+    return { ok: cleared.ok !== false, stage: "forgotten", error: cleared.error ?? null };
   });
 
   /*
@@ -1235,6 +1266,9 @@ app.whenReady().then(async () => {
   const boot = health.beginBoot();
   if (health.shouldEnterSafeMode(boot)) {
     safeMode = true;
+    // Clear the pending marker at once: time spent in recovery must never be
+    // counted as further failed launches, or the till can never leave it.
+    health.beginRecovery(boot.reason ?? "Repeated failed launches");
     updater.pause();
     recovery.open();
     return;
