@@ -57,6 +57,7 @@ import { isNative } from "@/lib/native";
 import { setBranchId } from "@/lib/activity-journal";
 import { soleBranchId } from "@/lib/active-branch";
 import { flushWhatsAppQueue } from "@/lib/whatsapp";
+import { closeCustomerDisplay } from "@/lib/customer-display";
 import { reportAppReady } from "@/lib/app-health";
 import { localDb } from "@/lib/local-db";
 import { supabaseConfig } from "@/lib/external-supabase-config";
