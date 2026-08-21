@@ -121,6 +121,8 @@ class Worker {
     this.spid = null;
     this.target = null;
     this.connected = false;
+    /** True while an OPEN is in flight: a session may already exist server-side. */
+    this.openInFlight = false;
     this.idleTimer = null;
 
     this.child.on("message", (msg) => this.#onMessage(msg));
@@ -216,9 +218,11 @@ class Worker {
   kill(reason) {
     if (this.dead) return;
     log("driver.kill", { pid: this.pid, reason: reason ?? null, spid: this.spid ?? null });
-    if (this.connected && this.spid) {
+    // A handshake killed mid-flight may already have a session on the server
+    // even though no SPID came back, so it is recorded either way.
+    if (this.connected || this.openInFlight) {
       orphanedSessions.push({
-        spid: this.spid,
+        spid: this.spid ?? null,
         target: this.target,
         at: new Date().toISOString(),
         reason: reason ?? null,
@@ -505,7 +509,18 @@ const isNativePool = (value) => value instanceof NativePool;
  * `target` is the canonical direct target string, and it is what the crash
  * counter is keyed on, so a bad connection string cannot loop for ever.
  */
-async function openNative({ driverConfig, target, attemptId, timeoutMs, isCancelled }) {
+async function openNative({
+  driverConfig,
+  target,
+  attemptId,
+  timeoutMs,
+  isCancelled,
+  // Test-only fault injection: the supervisor's own behaviour (deadline, kill,
+  // crash counting) can only be proven against a worker that really hangs or
+  // really dies, and neither can be provoked from outside the process.
+  simulateHang,
+  simulateCrash,
+}) {
   if (isCrashBlocked(target)) {
     const err = new Error(
       `The database driver stopped unexpectedly ${crashCount(target)} times in a row while connecting to ${target}. Automatic retrying has been stopped. Check the ODBC driver version and the server name, then retry manually.`,
@@ -515,14 +530,16 @@ async function openNative({ driverConfig, target, attemptId, timeoutMs, isCancel
   }
   const worker = await acquireWorker();
   worker.target = target;
+  worker.openInFlight = true;
   const started = Date.now();
   log("driver.open", { attemptId, target, pid: worker.pid });
   try {
     const result = await worker.send(
       OPS.OPEN,
-      { driverConfig },
-      { attemptId, timeoutMs: Math.max(2_000, Number(timeoutMs) || 15_000) },
+      { driverConfig, simulateHang, simulateCrash },
+      { attemptId, timeoutMs: Math.max(1_000, Number(timeoutMs) || 15_000) },
     );
+    worker.openInFlight = false;
     if (typeof isCancelled === "function" && isCancelled()) {
       worker.connected = true;
       worker.spid = result?.spid ?? null;
@@ -538,6 +555,7 @@ async function openNative({ driverConfig, target, attemptId, timeoutMs, isCancel
     log("driver.open-ok", { attemptId, target, elapsedMs: Date.now() - started });
     return new NativePool(worker, { target, driverConfig });
   } catch (err) {
+    worker.openInFlight = err?.code === ETIMEOUT || err?.code === "ECANCELLED";
     if (err?.code === ETIMEOUT || err?.code === "ECANCELLED") {
       // The native connect is still running. Terminating the process is the
       // only way to stop it, and it is safe: nothing else lives in there.
@@ -568,7 +586,11 @@ function diagnostics() {
     maxWorkers: MAX_WORKERS,
     warm: !!warm,
     sessions: sessionReport(),
-    crashTargets: [...crashState.entries()].map(([target, state]) => ({ target, ...state })),
+    crashTargets: [...crashState.entries()].map(([target, state]) => ({
+      target,
+      consecutive: state.crashes,
+      blocked: state.blocked === true,
+    })),
   };
 }
 
