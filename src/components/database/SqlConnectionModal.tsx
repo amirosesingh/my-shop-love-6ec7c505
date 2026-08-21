@@ -39,6 +39,7 @@ import {
   scanLocalInstances,
   testDirectConnection,
   verifyLocalWrite,
+  reconnectLocalDatabase,
   resetLocalDatabase,
   type LocalDbConfig,
   type LocalDbTestResult,
