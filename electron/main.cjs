@@ -1297,6 +1297,43 @@ function registerIpc() {
     return { ok: true };
   });
   ipcMain.handle("local:rollback", (_e, op) => localDb.rollbackOp(op ?? {}));
+
+  /* ---------------------- offline staff sign-in ---------------------- */
+  ipcMain.handle("staff:roster", (_e, storeId) => ({
+    ok: true,
+    rows: localDb.listStaffRoster(storeId ? String(storeId) : ""),
+  }));
+  ipcMain.handle("staff:cache-roster", (_e, rows) => ({
+    ok: true,
+    written: localDb.upsertStaffRoster(Array.isArray(rows) ? rows : []),
+  }));
+  ipcMain.handle("staff:verify-pin", (_e, username, pin) =>
+    staffAuth.verifyPin(String(username ?? ""), String(pin ?? "")),
+  );
+  ipcMain.handle("staff:remember-pin", (_e, username, pin) =>
+    staffAuth.rememberPin(String(username ?? ""), String(pin ?? "")),
+  );
+  ipcMain.handle("staff:forget-pin", (_e, username) => ({
+    ok: localDb.forgetStaffVerifier(String(username ?? "")),
+  }));
+
+  /* ---------------------- app server keys ---------------------- */
+  ipcMain.handle("server-keys:status", () => ({ ok: true, ...serverKeys.status() }));
+  ipcMain.handle("server-keys:set", async (_e, value) => {
+    const saved = serverKeys.setServiceKey(value);
+    if (saved.ok === false) return saved;
+    // The running server captured the old environment, so it is restarted to
+    // pick the new key up. The windows keep their origin because the port is
+    // reserved for this app.
+    try {
+      stopAppServer();
+      baseUrl = DEV_URL || (await startAppServer());
+      for (const win of BrowserWindow.getAllWindows()) win.webContents.reload();
+    } catch (err) {
+      return fail(err);
+    }
+    return { ok: true, ...serverKeys.status() };
+  });
   /** Offline relationship check straight from the local mirror's catalogue. */
   ipcMain.handle("local:relational-health", () => {
     try {
