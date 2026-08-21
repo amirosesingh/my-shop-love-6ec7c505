@@ -646,7 +646,9 @@ export async function resetLocalDatabase(): Promise<{ ok: boolean; error?: strin
     return res;
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
 }
+
 
 /**
  * Delete the stored credentials for good. The shell unlinks the sealed file,
