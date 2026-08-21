@@ -259,6 +259,24 @@ function withTimeout(promise, ms, message) {
 const RECONNECT_ATTEMPT_MS = 60_000;
 
 /**
+ * Set while the operator removes the saved connection: the backoff loop must
+ * not re-arm itself between the cancel and the file being unlinked.
+ */
+let reconnectSuppressed = false;
+/** Structured reason for the last failure — shown verbatim in the UI banner. */
+let lastConnectionDetail = null;
+
+/** Stops the backoff loop dead. */
+function stopReconnectLoop() {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  reconnectAttempt = 0;
+  reconnectDelay = 5_000;
+}
+
+/**
  * Tells the renderer the loop is alive: which attempt is running, when the
  * next one starts, and why the last one failed. A bare spinner with no reason
  * is what left the till reading "Reconnecting…" for ever.
@@ -271,6 +289,9 @@ function broadcastReconnecting(nextRetryAt) {
     nextRetryAt: nextRetryAt ?? null,
     error: lastConnectionError,
     lastError: lastConnectionError,
+    errorCode: lastConnectionDetail?.code ?? null,
+    errorHint: lastConnectionDetail?.hint ?? null,
+    errorStage: lastConnectionDetail?.stage ?? null,
     tables: [],
     queue: [],
     server: null,
@@ -285,6 +306,7 @@ function broadcastReconnecting(nextRetryAt) {
  * connection is saved. `immediate` is the operator pressing "Retry now".
  */
 function scheduleReconnect(immediate = false) {
+  if (reconnectSuppressed) return;
   if (!dbConfigStore.read()) return;
   if (reconnectTimer) {
     if (!immediate) return;
@@ -299,6 +321,7 @@ function scheduleReconnect(immediate = false) {
   broadcastReconnecting(new Date(Date.now() + delay).toISOString());
   reconnectTimer = setTimeout(async () => {
     reconnectTimer = null;
+    if (reconnectSuppressed) return;
     const config = dbConfigStore.read();
     if (!config) return;
     reconnectAttempt += 1;
@@ -310,13 +333,15 @@ function scheduleReconnect(immediate = false) {
       );
       console.log(`[pos] local database reconnected on attempt ${reconnectAttempt}`);
     } catch (error) {
-      lastConnectionError = fail(error).error;
+      lastConnectionDetail = pool.describeSqlError(error);
+      lastConnectionError = lastConnectionDetail.error ?? fail(error).error;
       console.warn(`[pos] reconnect attempt ${reconnectAttempt} failed: ${lastConnectionError}`);
       reconnectDelay = Math.min(reconnectDelay * 2, 60_000);
       scheduleReconnect();
     }
   }, delay);
 }
+
 
 /**
  * Escape hatch that keeps the credentials: drop everything that might be
