@@ -422,18 +422,31 @@ function Register() {
    *  held record and the printed receipt all carry the same number. */
   useEffect(() => {
     if (!lines.length || billNo) return;
-    setBillNo(
-      nextBillNumber(
-        currentStore.receiptPrefix?.trim() || currentStore.code || "R",
-        state.sales.map((s) => s.receiptNo),
-        {
-          ...(state.settings.integrations.billNumbering ?? {}),
-          timeZone: state.settings.integrations.timeZone || undefined,
-        },
-      ),
-    );
+    let cancelled = false;
+    void reserveBillNumber(
+      currentStore.receiptPrefix?.trim() || currentStore.code || "R",
+      state.sales.map((s) => s.receiptNo),
+      {
+        ...(state.settings.integrations.billNumbering ?? {}),
+        timeZone: state.settings.integrations.timeZone || undefined,
+      },
+    )
+      .then((no) => {
+        if (!cancelled) setBillNo(no);
+      })
+      .catch((err) => {
+        // Leave the header blank: checkout reserves the number again and will
+        // stop the sale if the counter still cannot be stored.
+        toast.error(
+          err instanceof Error ? err.message : "Could not reserve a bill number.",
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lines.length, billNo, currentStore.id]);
+
 
 
   const taxSettings = state.settings.tax;
