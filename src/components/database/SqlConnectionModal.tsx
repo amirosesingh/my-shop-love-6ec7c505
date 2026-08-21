@@ -775,8 +775,12 @@ export function SqlConnectionModal({
                           ))}
                         </ul>
                       </details>
-                    )}
-                  </div>
+                     )}
+                     {(state.status === "failed" || state.status === "timed_out") &&
+                       isDriverMissing(state) && (
+                         <DriverInstallPanel onInstalled={() => void advance(step.key, true)} />
+                       )}
+                   </div>
                   {(state.status === "failed" || state.status === "timed_out") && (
                     <Button
                       type="button"
