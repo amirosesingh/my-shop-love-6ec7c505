@@ -1299,7 +1299,8 @@ app.whenReady().then(async () => {
     try {
       await connectLocal(savedDbConfig);
     } catch (error) {
-      console.error("[pos] automatic SQL reconnect failed:", fail(error).error);
+      lastConnectionError = fail(error).error;
+      console.error("[pos] automatic SQL reconnect failed:", lastConnectionError);
       scheduleReconnect();
     }
   }
