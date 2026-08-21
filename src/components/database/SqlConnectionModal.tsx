@@ -201,6 +201,24 @@ export function SqlConnectionModal({
    * pools and forgets the saved credentials. This is the way out of a
    * connection that refuses to finish or a machine that was set up wrongly.
    */
+  /**
+   * Keeps the saved credentials: closes everything and opens the connection
+   * again. The operator's first move when the till says "Reconnecting…".
+   */
+  const reconnectNow = async () => {
+    setResetting(true);
+    abandonRun();
+    try {
+      const res = await reconnectLocalDatabase();
+      if (res.ok)
+        toast.success(`Reconnected${res.activeDb ? ` to ${res.activeDb}` : ""}.`);
+      else
+        toast.error(res.error ?? "Could not reconnect.", { description: res.hint ?? undefined });
+    } finally {
+      setResetting(false);
+    }
+  };
+
   const resetConnection = async () => {
     setResetting(true);
     abandonRun();
@@ -811,6 +829,20 @@ export function SqlConnectionModal({
             )}
             <Button
               type="button"
+              variant="outline"
+              disabled={resetting}
+              onClick={() => void reconnectNow()}
+              title="Close both pools and open the saved connection again — credentials are kept."
+            >
+              {resetting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Plug className="mr-2 h-4 w-4" />
+              )}
+              Reconnect now
+            </Button>
+            <Button
+              type="button"
               variant="ghost"
               disabled={resetting}
               onClick={() => void resetConnection()}
@@ -821,7 +853,7 @@ export function SqlConnectionModal({
               ) : (
                 <Eraser className="mr-2 h-4 w-4" />
               )}
-              Reset connection
+              Forget connection
             </Button>
           </div>
           <Button type="button" disabled={running || !catalogReady} onClick={() => void finish()}>

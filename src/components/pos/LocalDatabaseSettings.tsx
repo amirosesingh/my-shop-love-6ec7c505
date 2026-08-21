@@ -7,6 +7,7 @@ import {
   hasLocalDb,
   localDb,
   loadLocalDbConfig,
+  reconnectLocalDatabase,
   type LocalDbConfig,
   type LocalSyncStatus,
 } from "@/lib/local-db";
@@ -25,6 +26,32 @@ export function LocalDatabaseSettings() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [configured, setConfigured] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false);
+
+  /**
+   * Rebuilds the connection from the credentials already saved here. This is
+   * the recovery path that used to need a full restart of the till.
+   */
+  const reconnectNow = async () => {
+    setReconnecting(true);
+    try {
+      const res = await reconnectLocalDatabase();
+      if (res.ok) {
+        toast.success(
+          `Local database reconnected${res.activeDb ? ` · ${res.activeDb}` : ""}${
+            res.latencyMs != null ? ` · ${res.latencyMs}ms` : ""
+          }`,
+        );
+      } else {
+        toast.error(res.error ?? "Could not reconnect to the local database.", {
+          description: res.hint ?? undefined,
+        });
+      }
+      await refresh();
+    } finally {
+      setReconnecting(false);
+    }
+  };
 
   useEffect(() => {
     void loadLocalDbConfig().then((saved) => {
@@ -121,9 +148,22 @@ export function LocalDatabaseSettings() {
             {view.detail && <p className="text-xs text-muted-foreground">{view.detail}</p>}
           </div>
         </div>
-        <Button size="sm" disabled={view.busy} onClick={() => setWizardOpen(true)}>
-          {view.state === "connected" ? "Change connection" : "Set up connection"}
-        </Button>
+        <div className="flex shrink-0 flex-wrap justify-end gap-2">
+          {configured && view.state !== "connected" && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={reconnecting}
+              onClick={() => void reconnectNow()}
+              title="Close both pools and open the saved connection again, without restarting the till."
+            >
+              {reconnecting ? "Reconnecting…" : "Reconnect now"}
+            </Button>
+          )}
+          <Button size="sm" disabled={view.busy} onClick={() => setWizardOpen(true)}>
+            {view.state === "connected" ? "Change connection" : "Set up connection"}
+          </Button>
+        </div>
       </div>
       <SqlConnectionModal
         open={wizardOpen}
