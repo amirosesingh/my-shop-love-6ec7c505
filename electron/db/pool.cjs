@@ -15,10 +15,20 @@ const WINDOWS_AUTH_HINT =
 const CONNECT_TIMEOUT_MS = 15_000;
 /** Hard ceiling for the whole attempt ladder — the UI must always get an answer. */
 const LADDER_BUDGET_MS = 40_000;
+/**
+ * Direct mode has a single route (host,port) and no discovery, so a dead port
+ * or a rejected login must surface in seconds rather than after the budget
+ * reserved for SQL Browser based discovery.
+ */
+const DIRECT_BUDGET_MS = 12_000;
 /** No single attempt may eat the whole budget. */
 const ATTEMPT_TIMEOUT_MS = 10_000;
 /** The ladder stays short on purpose: four tries fit inside the budget. */
 const MAX_ATTEMPTS_PER_DRIVER = 4;
+
+/** True when the operator asked for a plain `host,port` connection. */
+const isDirectConnect = (config) => config?.directConnect === true;
+
 
 /* ------------------------- connection diagnostics ------------------------- */
 
