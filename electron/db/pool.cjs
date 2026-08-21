@@ -309,6 +309,22 @@ async function resolveTarget(config) {
   let port = parsed.port;
   let portKnown = !parsed.instanceName || parsed.explicitPort;
   let browserAnswered = false;
+  // Direct mode: the operator gave a real port, so the instance name is only
+  // decoration. Go straight to host,port and never touch UDP 1434.
+  if (isDirectConnect(config)) {
+    const proven = Number(config.resolvedPort);
+    if (Number.isFinite(proven) && proven > 0) port = proven;
+    logConnection("target.direct", { host: parsed.host, port });
+    return {
+      ...parsed,
+      instanceName: "",
+      port,
+      portKnown: true,
+      browserAnswered: false,
+      provenPort: true,
+      direct: true,
+    };
+  }
   // A port the TCP step already proved open outranks any further lookup.
   const proven = Number(config.resolvedPort);
   if (Number.isFinite(proven) && proven > 0) {
@@ -318,6 +334,7 @@ async function resolveTarget(config) {
     return { ...parsed, port, portKnown, browserAnswered, provenPort: true };
   }
   if (parsed.instanceName && !parsed.explicitPort) {
+
     let discovered = null;
     const started = Date.now();
     try {
