@@ -22,7 +22,7 @@ import {
   SystemAlertsButton,
 } from "@/components/pos/StatusCluster";
 import { WindowControls } from "@/components/pos/WindowControls";
-import { SecurityAlertBell } from "@/components/pos/SecurityAlertBell";
+
 
 import { ActivityBell } from "@/components/pos/ActivityBell";
 import { MobileStatusSheet } from "@/components/pos/MobileStatusSheet";
