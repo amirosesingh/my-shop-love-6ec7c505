@@ -51,6 +51,14 @@ contextBridge.exposeInMainWorld("pos", {
   netGetJson: (url) => invoke("net:get-json", url),
   netHead: (url) => invoke("net:head", url),
   netGetBinary: (url) => invoke("net:get-binary", url),
+  /* one-click install of a missing Microsoft SQL Server driver */
+  listDrivers: () => invoke("driver:list"),
+  installDriver: (id) => invoke("driver:install", id),
+  onDriverProgress: (cb) => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on("driver:progress", handler);
+    return () => ipcRenderer.removeListener("driver:progress", handler);
+  },
   updateStatus: () => invoke("update:status"),
   checkForUpdates: () => invoke("update:check"),
   installUpdate: () => invoke("update:install"),
