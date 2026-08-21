@@ -217,6 +217,22 @@ export async function readConnectionAudit(): Promise<LocalConnectionAudit | null
   }
 }
 
+/**
+ * Writes one diagnostic report file and reveals it. Used when a shop needs to
+ * send evidence of a crash to support without hunting through a log folder.
+ */
+export async function saveDiagnosticReport(): Promise<{ ok: boolean; file?: string }> {
+  const bridge = localDb() as (LocalDbBridge & {
+    collectDiagnostics?: () => Promise<{ ok: boolean; file?: string }>;
+  }) | null;
+  if (!bridge?.collectDiagnostics) return { ok: false };
+  try {
+    return await withIpcTimeout(bridge.collectDiagnostics(), 10_000, "The report timed out.");
+  } catch {
+    return { ok: false };
+  }
+}
+
 /** No IPC call may hang the UI: everything gets an outer deadline. */
 export async function withIpcTimeout<T>(
   work: Promise<T>,
