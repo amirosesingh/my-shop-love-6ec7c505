@@ -3,6 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
 import { SettingsTabs } from "@/components/pos/settings/SettingsTabs";
 import { SystemStatusPanel } from "@/components/pos/settings/panels/SystemStatusPanel";
+import { ServerKeysPanel } from "@/components/pos/settings/panels/ServerKeysPanel";
 import { DatabaseHealthPanel } from "@/components/pos/settings/panels/DatabaseHealthPanel";
 import { LogicHealthPanel } from "@/components/pos/settings/panels/LogicHealthPanel";
 import { SecurityAlertsPanel } from "@/components/pos/settings/panels/SecurityAlertsPanel";
@@ -51,7 +52,12 @@ function SystemSettingsPage() {
       />
 
       <div className="w-full min-w-0 max-w-full">
-        {tab === "system" && <SystemStatusPanel />}
+        {tab === "system" && (
+          <div className="space-y-4">
+            <ServerKeysPanel />
+            <SystemStatusPanel />
+          </div>
+        )}
         {tab === "database-health" && <DatabaseHealthPanel />}
         {tab === "logic-health" && <LogicHealthPanel />}
         {tab === "security-alerts" && <SecurityAlertsPanel />}

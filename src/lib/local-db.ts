@@ -416,6 +416,55 @@ export type PosBridge = {
   getSetting?: (key: string) => Promise<{ ok: boolean; value?: string | null; error?: string }>;
   setSetting?: (key: string, value: string | null) => Promise<{ ok: boolean; error?: string }>;
   onStatus: (cb: (s: LocalSyncStatus) => void) => () => void;
+
+  /* ---- offline cashier sign-in, backed by the local SQL database ---- */
+  staffRoster?: (storeId?: string | null) => Promise<{ ok: boolean; rows: LocalStaffRow[] }>;
+  cacheStaffRoster?: (
+    rows: Record<string, unknown>[],
+  ) => Promise<{ ok: boolean; written: number }>;
+  verifyStaffPin?: (
+    username: string,
+    pin: string,
+  ) => Promise<{
+    ok: boolean;
+    reason?: string;
+    error?: string;
+    staff?: {
+      id: string;
+      username: string;
+      full_name: string;
+      store_id: string | null;
+      permissions: Record<string, boolean>;
+      role_slug?: string;
+    };
+  }>;
+  rememberStaffPin?: (username: string, pin: string) => Promise<{ ok: boolean }>;
+  forgetStaffPin?: (username: string) => Promise<{ ok: boolean }>;
+
+  /* ---- keys the bundled app server needs ---- */
+  serverKeyStatus?: () => Promise<{
+    ok: boolean;
+    hasServiceKey: boolean;
+    serviceKeyHint: string;
+    hasSigningKey: boolean;
+    fromEnvironment: boolean;
+  }>;
+  setServerServiceKey?: (
+    value: string,
+  ) => Promise<{ ok: boolean; error?: string; hasServiceKey?: boolean; serviceKeyHint?: string }>;
+};
+
+/** A staff row mirrored into the till's local database. */
+export type LocalStaffRow = {
+  id: string;
+  username: string;
+  fullName: string;
+  email: string;
+  roleSlug: string;
+  storeId: string | null;
+  isActive: boolean;
+  pinLength: number;
+  permissions: Record<string, boolean>;
 };
 
 export type CloudBridgeConfig = {

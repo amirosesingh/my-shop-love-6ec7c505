@@ -21,6 +21,8 @@ const health = require("./health.cjs");
 const recovery = require("./recovery.cjs");
 const netHttp = require("./net.cjs");
 const diagnostics = require("./diagnostics.cjs");
+const serverKeys = require("./server-keys.cjs");
+const staffAuth = require("./staff-auth.cjs");
 
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
 const DEBUG = process.env.POS_DEBUG === "1";
@@ -172,6 +174,9 @@ async function startAppServer() {
   serverProcess = spawn(process.execPath, [serverEntry], {
     env: {
       ...process.env,
+      // Without these the bundled server cannot reach the central database and
+      // every cashier sign-in fails with "no key configured".
+      ...serverKeys.serverEnv(),
       ELECTRON_RUN_AS_NODE: "1",
       NODE_ENV: "production",
       HOST: "127.0.0.1",
@@ -179,6 +184,7 @@ async function startAppServer() {
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
+
   // Piped to a file as well as the console: on a shop PC nobody is watching a
   // console, and a server that refuses to start is exactly what the recovery
   // screen needs evidence for.
@@ -1291,6 +1297,43 @@ function registerIpc() {
     return { ok: true };
   });
   ipcMain.handle("local:rollback", (_e, op) => localDb.rollbackOp(op ?? {}));
+
+  /* ---------------------- offline staff sign-in ---------------------- */
+  ipcMain.handle("staff:roster", (_e, storeId) => ({
+    ok: true,
+    rows: localDb.listStaffRoster(storeId ? String(storeId) : ""),
+  }));
+  ipcMain.handle("staff:cache-roster", (_e, rows) => ({
+    ok: true,
+    written: localDb.upsertStaffRoster(Array.isArray(rows) ? rows : []),
+  }));
+  ipcMain.handle("staff:verify-pin", (_e, username, pin) =>
+    staffAuth.verifyPin(String(username ?? ""), String(pin ?? "")),
+  );
+  ipcMain.handle("staff:remember-pin", (_e, username, pin) =>
+    staffAuth.rememberPin(String(username ?? ""), String(pin ?? "")),
+  );
+  ipcMain.handle("staff:forget-pin", (_e, username) => ({
+    ok: localDb.forgetStaffVerifier(String(username ?? "")),
+  }));
+
+  /* ---------------------- app server keys ---------------------- */
+  ipcMain.handle("server-keys:status", () => ({ ok: true, ...serverKeys.status() }));
+  ipcMain.handle("server-keys:set", async (_e, value) => {
+    const saved = serverKeys.setServiceKey(value);
+    if (saved.ok === false) return saved;
+    // The running server captured the old environment, so it is restarted to
+    // pick the new key up. The windows keep their origin because the port is
+    // reserved for this app.
+    try {
+      stopAppServer();
+      baseUrl = DEV_URL || (await startAppServer());
+      for (const win of BrowserWindow.getAllWindows()) win.webContents.reload();
+    } catch (err) {
+      return fail(err);
+    }
+    return { ok: true, ...serverKeys.status() };
+  });
   /** Offline relationship check straight from the local mirror's catalogue. */
   ipcMain.handle("local:relational-health", () => {
     try {

@@ -468,44 +468,81 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     let verified: ServerLogin | null = null;
     let failure = "";
+    /** True when the server never got to judge the credential itself. */
+    let unreachable = offline;
     if (!offline) {
       try {
         const { serverUrl } = await import("@/lib/server-origin");
+        // A till on a flaky line must not hang on the keypad: after six
+        // seconds the local database answers instead.
+        const abort = new AbortController();
+        const timer = window.setTimeout(() => abort.abort(), 6_000);
         const res = await fetch(serverUrl("/api/public/cashier-login"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: abort.signal,
           body: JSON.stringify({
             username: code,
             pin,
             platform: typeof navigator === "undefined" ? "web" : navigator.platform || "web",
           }),
-        });
-        const payload = (await res.json()) as ServerLogin;
+        }).finally(() => window.clearTimeout(timer));
+        const payload = (await res.json().catch(() => null)) as ServerLogin | null;
         if (payload?.ok) verified = payload;
-        else failure = payload?.error ?? "";
+        else {
+          failure = payload?.error ?? "";
+          // A server that cannot reach the central database (missing key,
+          // 5xx, gateway) has not rejected anyone — fall through to the local
+          // database. A 401 is a real rejection and must stay one.
+          const code503 = (payload as { code?: string } | null)?.code;
+          if (res.status >= 500 || code503 === "no_service_key") unreachable = true;
+        }
       } catch {
-        offline = true;
+        unreachable = true;
       }
     }
 
     let next: TerminalUser;
-    if (offline) {
-      const cached = await verifyCachedPin(code, pin);
-      if (!cached)
-        return {
-          ok: false,
-          error:
-            "No connection and this account has not signed in on this terminal before. Connect to the internet once, then you can sign in offline.",
+    let signedInOffline = false;
+    if (!verified && unreachable) {
+      // Tier 1: the till's own local SQL database.
+      const { verifyLocalPin } = await import("@/lib/local-staff");
+      const local = await verifyLocalPin(code, pin);
+      if (local.ok) {
+        signedInOffline = true;
+        next = {
+          userCode: local.staff.username,
+          name: local.staff.full_name,
+          role: "staff",
+          storeId: activeBranchId(null) ?? (local.staff.store_id?.trim() || null),
+          email: "",
+          cashierId: local.staff.id,
+          permissions: local.staff.permissions as unknown as TerminalUser["permissions"],
         };
-      next = {
-        userCode: cached.username,
-        name: cached.fullName,
-        role: "staff",
-        storeId: activeBranchId(null) ?? (cached.storeId?.trim() || null),
-        email: "",
-        cashierId: cached.cashierId,
-        permissions: cached.permissions as unknown as TerminalUser["permissions"],
-      };
+      } else if (local.reason === "inactive") {
+        return { ok: false, error: "Account deactivated" };
+      } else {
+        // Tier 2: the browser-storage verifier kept by earlier builds.
+        const cached = await verifyCachedPin(code, pin);
+        if (!cached)
+          return {
+            ok: false,
+            error:
+              local.reason === "bad-pin"
+                ? "Invalid username or PIN"
+                : "No connection and this account has not signed in on this terminal before. Connect once, then you can sign in offline.",
+          };
+        signedInOffline = true;
+        next = {
+          userCode: cached.username,
+          name: cached.fullName,
+          role: "staff",
+          storeId: activeBranchId(null) ?? (cached.storeId?.trim() || null),
+          email: "",
+          cashierId: cached.cashierId,
+          permissions: cached.permissions as unknown as TerminalUser["permissions"],
+        };
+      }
     } else if (verified?.cashier) {
       const account = verified.cashier;
       next = {
@@ -517,9 +554,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         cashierId: account.id,
         permissions: account.permissions as unknown as TerminalUser["permissions"],
       };
+      // The PIN is only in hand at this moment: keep a verifier and the
+      // profile in the local database so the next outage is survivable.
+      try {
+        const { cacheStaffRoster, rememberLocalPin } = await import("@/lib/local-staff");
+        await cacheStaffRoster([
+          {
+            id: account.id,
+            user_id: account.username,
+            full_name: account.full_name,
+            store_id: account.store_id,
+            permissions: account.permissions,
+            is_active: true,
+            pin_length: pin.length,
+          },
+        ]);
+        await rememberLocalPin(account.username, pin);
+      } catch {
+        /* offline sign-in stays on the browser-storage tier */
+      }
     } else {
       return { ok: false, error: failure || "Invalid username or PIN" };
     }
+    if (signedInOffline) {
+      // Queue the sign-in so head office sees it once the line is back. The id
+      // is derived from terminal + person + minute, so a replay is an upsert.
+      try {
+        const { queueOfflineSignIn } = await import("@/lib/offline-sign-ins");
+        await queueOfflineSignIn({
+          username: next.userCode,
+          fullName: next.name,
+          storeId: next.storeId,
+        });
+      } catch {
+        /* the sign-in itself still stands */
+      }
+    }
+
     setTerminalUser(next);
     // The branch is in place before the register mounts, so nothing renders
     // against an unresolved branch.

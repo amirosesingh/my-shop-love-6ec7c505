@@ -60,12 +60,34 @@ export function CashierPinLogin({
 
   useEffect(() => {
     let live = true;
-    void listTerminalStaff(activeBranchId(null))
-      // A malformed or missing answer must never blank the till: the typed
-      // username path below keeps sign-in possible.
-      .then((rows) => live && setStaff(Array.isArray(rows) ? rows : []))
-      .catch(() => live && setStaff([]))
-      .finally(() => live && setLoading(false));
+    const branch = activeBranchId(null);
+    void (async () => {
+      let rows: TerminalStaff[] = [];
+      try {
+        rows = await listTerminalStaff(branch);
+      } catch {
+        rows = [];
+      }
+      // No answer from the server: offer the roster mirrored into this till's
+      // own database, so a cut-off branch still sees who can sign in.
+      if (!rows.length) {
+        try {
+          const { localStaffRoster } = await import("@/lib/local-staff");
+          rows = (await localStaffRoster(branch)).map((r) => ({
+            username: r.username,
+            fullName: r.fullName,
+            pinLength: r.pinLength,
+            roleSlug: r.roleSlug,
+            storeId: r.storeId,
+          })) as unknown as TerminalStaff[];
+        } catch {
+          rows = [];
+        }
+      }
+      if (!live) return;
+      setStaff(Array.isArray(rows) ? rows : []);
+      setLoading(false);
+    })();
     return () => {
       live = false;
     };

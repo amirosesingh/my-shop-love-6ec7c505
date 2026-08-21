@@ -124,6 +124,27 @@ export async function listTerminalStaff(storeId: string | null): Promise<Termina
     const staff = (value as { staff?: unknown } | null)?.staff;
     return Array.isArray(staff) ? (staff as TerminalStaff[]) : [];
   };
+  /** Keep the roster in the till's own database for the next outage. */
+  const mirror = async (staff: TerminalStaff[]) => {
+    if (!staff.length) return staff;
+    try {
+      const { cacheStaffRoster } = await import("./local-staff");
+      await cacheStaffRoster(
+        staff.map((s) => ({
+          id: s.username,
+          user_id: s.username,
+          full_name: s.fullName,
+          store_id: s.storeId,
+          role_slug: s.roleSlug,
+          pin_length: s.pinLength,
+          is_active: true,
+        })),
+      );
+    } catch {
+      /* mirroring is best-effort */
+    }
+    return staff;
+  };
   try {
     // Android talks to the hosted POS directly; a server function would be
     // answered by the phone's own static file server.
@@ -134,9 +155,9 @@ export async function listTerminalStaff(storeId: string | null): Promise<Termina
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ storeId }),
       });
-      return rows(await res.json().catch(() => null));
+      return mirror(rows(await res.json().catch(() => null)));
     }
-    return rows(await listTerminalStaffAccounts({ data: { storeId } }));
+    return mirror(rows(await listTerminalStaffAccounts({ data: { storeId } })));
   } catch {
     // A till must still be able to sign in by typing a username.
     return [];

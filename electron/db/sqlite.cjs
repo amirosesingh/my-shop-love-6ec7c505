@@ -470,7 +470,143 @@ function clearAudit() {
   tx(() => db.exec(`DELETE FROM sync_audit`));
 }
 
+/* ------------------------- staff (offline login) ------------------------- */
+
+/**
+ * The roster mirrored from the central database, so a till with no connection
+ * can still show who works at this branch and check a PIN.
+ *
+ * The central database hashes PINs with bcrypt inside Postgres, which cannot
+ * be recomputed here, so the mirrored row carries no usable hash. Instead the
+ * till writes a PBKDF2 verifier of the PIN the first time that person signs in
+ * successfully online (`setStaffVerifier`), and that verifier is what an
+ * offline sign-in is checked against.
+ */
+function upsertStaffRoster(rows) {
+  if (!ready() || !Array.isArray(rows) || !rows.length) return 0;
+  const at = nowIso();
+  return tx(() => {
+    const stmt = db.prepare(
+      `INSERT INTO app_users
+         (id, user_id, full_name, email, role, role_slug, store_id, is_active,
+          permissions, pin_length, is_synced, sync_status, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'synced', ?)
+       ON CONFLICT(user_id) DO UPDATE SET
+         full_name = excluded.full_name,
+         email = excluded.email,
+         role = excluded.role,
+         role_slug = excluded.role_slug,
+         store_id = excluded.store_id,
+         is_active = excluded.is_active,
+         permissions = excluded.permissions,
+         pin_length = COALESCE(excluded.pin_length, app_users.pin_length),
+         updated_at = excluded.updated_at`,
+    );
+    let n = 0;
+    for (const row of rows) {
+      const userId = String(row?.user_id ?? row?.username ?? "").trim().toLowerCase();
+      if (!userId) continue;
+      stmt.run(
+        String(row?.id ?? uuid()),
+        userId,
+        row?.full_name ?? row?.fullName ?? userId,
+        row?.email ?? null,
+        row?.role ?? null,
+        row?.role_slug ?? row?.roleSlug ?? null,
+        row?.store_id ?? row?.storeId ?? null,
+        row?.is_active === false ? 0 : 1,
+        JSON.stringify(row?.permissions ?? {}),
+        Number(row?.pin_length ?? row?.pinLength) || null,
+        at,
+      );
+      n += 1;
+    }
+    return n;
+  });
+}
+
+const parseStaff = (row) =>
+  row
+    ? {
+        id: row.id,
+        username: row.user_id,
+        fullName: row.full_name || row.user_id,
+        email: row.email ?? "",
+        roleSlug: row.role_slug ?? row.role ?? "cashier",
+        storeId: row.store_id ?? null,
+        isActive: row.is_active !== 0,
+        pinLength: row.pin_length ?? 0,
+        verifier: row.pin_hash ?? "",
+        permissions: (() => {
+          try {
+            return JSON.parse(row.permissions ?? "{}");
+          } catch {
+            return {};
+          }
+        })(),
+      }
+    : null;
+
+/** Everyone this till can offer at sign-in; optionally limited to one branch. */
+function listStaffRoster(storeId) {
+  if (!ready()) return [];
+  const rows = storeId
+    ? db
+        .prepare(
+          `SELECT * FROM app_users WHERE is_active = 1 AND (store_id = ? OR store_id IS NULL)
+             ORDER BY full_name`,
+        )
+        .all(String(storeId))
+    : db.prepare(`SELECT * FROM app_users WHERE is_active = 1 ORDER BY full_name`).all();
+  return rows.map(parseStaff);
+}
+
+function getStaff(username) {
+  if (!ready()) return null;
+  const key = String(username ?? "").trim().toLowerCase();
+  if (!key) return null;
+  return parseStaff(
+    db
+      .prepare(`SELECT * FROM app_users WHERE lower(user_id) = ? OR lower(email) = ? LIMIT 1`)
+      .get(key, key),
+  );
+}
+
+/** Remember a PBKDF2 verifier for a person who just signed in online. */
+function setStaffVerifier(username, verifier, pinLength) {
+  if (!ready()) return false;
+  const key = String(username ?? "").trim().toLowerCase();
+  if (!key || !verifier) return false;
+  return tx(() => {
+    const existing = db.prepare(`SELECT id FROM app_users WHERE lower(user_id) = ?`).get(key);
+    if (existing) {
+      db.prepare(
+        `UPDATE app_users SET pin_hash = ?, pin_length = COALESCE(?, pin_length),
+           last_login_at = ?, updated_at = ? WHERE id = ?`,
+      ).run(verifier, Number(pinLength) || null, nowIso(), nowIso(), existing.id);
+    } else {
+      db.prepare(
+        `INSERT INTO app_users (id, user_id, full_name, is_active, permissions, pin_hash,
+           pin_length, last_login_at, updated_at)
+         VALUES (?, ?, ?, 1, '{}', ?, ?, ?, ?)`,
+      ).run(uuid(), key, key, verifier, Number(pinLength) || null, nowIso(), nowIso());
+    }
+    return true;
+  });
+}
+
+/** Wipe on demand — an admin removing a person must remove their offline key. */
+function forgetStaffVerifier(username) {
+  if (!ready()) return false;
+  const key = String(username ?? "").trim().toLowerCase();
+  return tx(() => {
+    db.prepare(`UPDATE app_users SET pin_hash = NULL WHERE lower(user_id) = ?`).run(key);
+    return true;
+  });
+}
+
 /* -------------------------------- misc -------------------------------- */
+
 
 function getState(key) {
   if (!ready()) return null;
@@ -600,6 +736,11 @@ function relationalHealth() {
 }
 
 module.exports = {
+  upsertStaffRoster,
+  listStaffRoster,
+  getStaff,
+  setStaffVerifier,
+  forgetStaffVerifier,
   MIRROR_ENTITIES,
   MAX_ATTEMPTS,
   init,

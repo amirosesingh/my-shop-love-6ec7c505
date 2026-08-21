@@ -20,8 +20,14 @@ export async function handleCashierLogin(request: Request): Promise<Response> {
 
   const { hasServiceKey } = await import("@/lib/pos-relay.server");
   if (!hasServiceKey())
+    // `code` lets the till tell "the server cannot check anything" apart from
+    // "this PIN is wrong", so it can fall back to its local database.
     return Response.json(
-      { ok: false, error: "Central database key missing on this server" },
+      {
+        ok: false,
+        code: "no_service_key",
+        error: "Central database key missing on this server",
+      },
       { status: 503 },
     );
 

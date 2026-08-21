@@ -100,6 +100,15 @@ contextBridge.exposeInMainWorld("pos", {
   localRollback: (op) => invoke("local:rollback", op),
   /** Read-only relationship check against the local mirror (offline). */
   localRelationalHealth: () => invoke("local:relational-health"),
+  /* offline cashier sign-in against the local database */
+  staffRoster: (storeId) => invoke("staff:roster", storeId),
+  cacheStaffRoster: (rows) => invoke("staff:cache-roster", rows),
+  verifyStaffPin: (username, pin) => invoke("staff:verify-pin", username, pin),
+  rememberStaffPin: (username, pin) => invoke("staff:remember-pin", username, pin),
+  forgetStaffPin: (username) => invoke("staff:forget-pin", username),
+  /* keys the bundled app server needs to reach the central database */
+  serverKeyStatus: () => invoke("server-keys:status"),
+  setServerServiceKey: (value) => invoke("server-keys:set", value),
   /* branding mirror — survives updates and cleared browser storage */
   readBranding: () => invoke("branding:read"),
   writeBranding: (branding) => invoke("branding:write", branding),
