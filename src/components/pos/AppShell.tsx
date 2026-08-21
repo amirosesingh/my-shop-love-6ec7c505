@@ -196,6 +196,19 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("online", flush);
   }, []);
 
+  // The customer screen must never outlive the till: when this window goes
+  // away, shut the second screen down with it.
+  useEffect(() => {
+    if (window.location.pathname.startsWith("/display")) return;
+    const shutdown = () => closeCustomerDisplay();
+    window.addEventListener("pagehide", shutdown);
+    window.addEventListener("beforeunload", shutdown);
+    return () => {
+      window.removeEventListener("pagehide", shutdown);
+      window.removeEventListener("beforeunload", shutdown);
+    };
+  }, []);
+
   useEffect(() => {
     setPrintStore(currentStore ?? null);
   }, [currentStore]);
