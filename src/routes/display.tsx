@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import {
   readDisplaySnapshot,
   subscribeDisplay,
+  subscribeDisplayShutdown,
   type DisplaySnapshot,
 } from "@/lib/customer-display";
 import { qrSvg } from "@/lib/pos-print";
