@@ -97,18 +97,57 @@ export function snapshot(staff?: { name?: string | null; role?: string | null })
   };
 }
 
+/**
+ * Columns this database has refused so far. A till pointed at a database that
+ * is a version behind keeps reporting its core status instead of failing every
+ * heartbeat; the dropped names are remembered for the rest of the session.
+ */
+const droppedColumns = new Set<string>();
+
+/** Columns the heartbeat must never drop — without them the row is meaningless. */
+const ESSENTIAL = new Set(["terminal_id", "store_id", "last_seen_at"]);
+
+/** Which telemetry columns this database could not accept, if any. */
+export const missingTelemetryColumns = (): string[] => [...droppedColumns];
+
+/** Pull the offending column name out of a PostgREST / Postgres error. */
+function missingColumn(error: { code?: string; message?: string } | null): string | null {
+  if (!error) return null;
+  if (error.code !== "PGRST204" && error.code !== "42703") return null;
+  const m = /'([^']+)'|"([^"]+)"/.exec(error.message ?? "");
+  return m?.[1] ?? m?.[2] ?? null;
+}
+
+function withoutDropped(row: TelemetryRow): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...row };
+  for (const key of droppedColumns) delete out[key];
+  return out;
+}
+
 /** Send this terminal's status up. Failures are silent — it is only telemetry. */
 export async function publishTelemetry(staff?: { name?: string | null; role?: string | null }) {
   if (typeof window === "undefined") return;
   if (!isOnline()) return;
-  try {
-    await supabase.from("branch_telemetry").upsert(snapshot(staff) as never, {
-      onConflict: "terminal_id",
-    });
-  } catch {
-    /* telemetry never interrupts trading */
+  const row = snapshot(staff);
+  for (let attempt = 0; attempt < 8; attempt++) {
+    try {
+      const { error } = await supabase
+        .from("branch_telemetry")
+        .upsert(withoutDropped(row) as never, { onConflict: "terminal_id" });
+      if (!error) return;
+      const column = missingColumn(error as { code?: string; message?: string });
+      if (!column || ESSENTIAL.has(column) || droppedColumns.has(column)) return;
+      droppedColumns.add(column);
+      console.warn(
+        `[telemetry] this database has no "${column}" column on branch_telemetry — reporting without it`,
+      );
+    } catch {
+      /* telemetry never interrupts trading */
+      return;
+    }
   }
 }
+
 
 /** Every terminal's latest status, newest heartbeat first. */
 export async function listTelemetry(): Promise<TelemetryRow[]> {
