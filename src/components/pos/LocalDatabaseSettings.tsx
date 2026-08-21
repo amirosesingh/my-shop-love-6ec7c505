@@ -2,17 +2,29 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   deriveLocalDbState,
   defaultLocalDbConfig,
   hasLocalDb,
   localDb,
   loadLocalDbConfig,
   reconnectLocalDatabase,
+  removeStoredConnection,
   type LocalDbConfig,
   type LocalSyncStatus,
 } from "@/lib/local-db";
 import { SqlConnectionModal } from "@/components/database/SqlConnectionModal";
 import { SchemaPanel } from "@/components/database/SchemaPanel";
+
 
 /**
  * Local Microsoft SQL Server controls. Only meaningful inside the Windows
