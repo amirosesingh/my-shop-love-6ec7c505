@@ -254,6 +254,13 @@ function createWindows() {
   mainWindow.on("maximize", sendWindowState);
   mainWindow.on("unmaximize", sendWindowState);
 
+  // The customer screen is a companion of the till, never the other way
+  // round: closing the till takes the second screen with it.
+  mainWindow.on("closed", () => {
+    mainWindow = null;
+    closeCustomerDisplay();
+  });
+
   // A second monitor becomes the customer-facing display automatically.
   const external = screen.getAllDisplays().find((d) => d.bounds.x !== 0 || d.bounds.y !== 0);
   if (external) {
@@ -268,9 +275,20 @@ function createWindows() {
         nodeIntegration: false,
       },
     });
+    // Closing only the customer screen leaves the till running.
+    displayWindow.on("closed", () => {
+      displayWindow = null;
+    });
     instrument(displayWindow, "/display");
     void load(displayWindow, "/display");
   }
+}
+
+/** Destroy the customer-facing window if one is open. Safe to call twice. */
+function closeCustomerDisplay() {
+  const win = displayWindow;
+  displayWindow = null;
+  if (win && !win.isDestroyed()) win.destroy();
 }
 
 function broadcastStatus(payload) {
@@ -1553,6 +1571,10 @@ app.whenReady().then(async () => {
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindows();
   });
+});
+
+app.on("before-quit", () => {
+  closeCustomerDisplay();
 });
 
 app.on("window-all-closed", async () => {

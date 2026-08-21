@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import {
   readDisplaySnapshot,
   subscribeDisplay,
+  subscribeDisplayShutdown,
   type DisplaySnapshot,
 } from "@/lib/customer-display";
 import { qrSvg } from "@/lib/pos-print";
@@ -34,8 +35,13 @@ export const Route = createFileRoute("/display")({
 
 const money = (n: number) => n.toLocaleString(undefined, { style: "currency", currency: "USD" });
 
+/** A basket left on screen this long without an update is stale: fall back to
+ *  the idle screen rather than showing customers an abandoned order. */
+const STALE_MS = 5 * 60 * 1000;
+
 function CustomerDisplay() {
   const [snap, setSnap] = useState<DisplaySnapshot | null>(null);
+  const [tillClosed, setTillClosed] = useState(false);
   const router = useRouter();
 
   // The display is often launched from the sidebar in the same window, so it
@@ -54,8 +60,34 @@ function CustomerDisplay() {
 
   useEffect(() => {
     setSnap(readDisplaySnapshot());
-    return subscribeDisplay(setSnap);
+    return subscribeDisplay((s) => {
+      setTillClosed(false);
+      setSnap(s);
+    });
   }, []);
+
+  // The till went away: close with it, or say so if the browser refuses.
+  useEffect(
+    () =>
+      subscribeDisplayShutdown(() => {
+        setSnap(null);
+        setTillClosed(true);
+        try {
+          window.close();
+        } catch {
+          /* closing is only allowed for script-opened windows */
+        }
+      }),
+    [],
+  );
+
+  // Drop back to idle when the counter stops publishing.
+  useEffect(() => {
+    if (!snap) return;
+    const age = Date.now() - (snap.at || 0);
+    const timer = setTimeout(() => setSnap(null), Math.max(1000, STALE_MS - age));
+    return () => clearTimeout(timer);
+  }, [snap]);
 
   const pay = snap?.payment ?? null;
   const transferMode = snap?.mode === "transfer";
@@ -63,6 +95,16 @@ function CustomerDisplay() {
   const payQr = resolvePaymentQr(pay?.paymentQr, snap?.total ?? 0, snap?.reference ?? "");
   const showTransfer =
     !!pay && (!!pay.accountNumber || !!pay.whatsapp || !!pay.accountName || !!payQr);
+
+  if (tillClosed)
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center bg-background p-8 text-center text-foreground">
+        <h1 className="text-4xl font-bold tracking-tight">Till closed</h1>
+        <p className="mt-2 text-muted-foreground">
+          This counter has shut down. You may close this window.
+        </p>
+      </main>
+    );
 
   return (
     <main className="flex min-h-screen flex-col bg-background text-foreground">

@@ -57,6 +57,7 @@ import { isNative } from "@/lib/native";
 import { setBranchId } from "@/lib/activity-journal";
 import { soleBranchId } from "@/lib/active-branch";
 import { flushWhatsAppQueue } from "@/lib/whatsapp";
+import { closeCustomerDisplay } from "@/lib/customer-display";
 import { reportAppReady } from "@/lib/app-health";
 import { localDb } from "@/lib/local-db";
 import { supabaseConfig } from "@/lib/external-supabase-config";
@@ -194,6 +195,19 @@ export function AppShell({ children }: { children: ReactNode }) {
     flush();
     window.addEventListener("online", flush);
     return () => window.removeEventListener("online", flush);
+  }, []);
+
+  // The customer screen must never outlive the till: when this window goes
+  // away, shut the second screen down with it.
+  useEffect(() => {
+    if (window.location.pathname.startsWith("/display")) return;
+    const shutdown = () => closeCustomerDisplay();
+    window.addEventListener("pagehide", shutdown);
+    window.addEventListener("beforeunload", shutdown);
+    return () => {
+      window.removeEventListener("pagehide", shutdown);
+      window.removeEventListener("beforeunload", shutdown);
+    };
   }, []);
 
   useEffect(() => {
