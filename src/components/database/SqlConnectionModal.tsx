@@ -277,6 +277,10 @@ export function SqlConnectionModal({
   const credentials = () => ({
     server: config.server,
     port: resolvedPort(),
+    // The port the TCP step actually proved open. Passing it forward stops the
+    // driver resolving the instance again over SQL Browser — the sub-step that
+    // used to hang the handshake when that service is stopped.
+    resolvedPort: provenPortRef.current ?? undefined,
     auth: config.auth,
     user: config.user,
     password: config.password,
@@ -366,10 +370,12 @@ export function SqlConnectionModal({
     const bridge = sqlAdmin();
     if (!bridge?.probePort) return failure("socket", DESKTOP_ONLY);
     mark("socket", { status: "running", attemptId: attemptRef.current ?? undefined });
+    provenPortRef.current = null;
     const call = await bounded("socket", bridge.probePort(credentials()));
     if (!call.ok) return false;
     const res = call.value;
     if (!res.ok) return failure("socket", res, res.elapsedMs);
+    provenPortRef.current = res.skipped ? null : (res.port ?? null);
     mark("socket", {
       status: "passed",
       ms: res.elapsedMs,

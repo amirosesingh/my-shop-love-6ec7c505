@@ -917,7 +917,7 @@ function registerIpc() {
 
   ipcMain.handle("sqladmin:connect", (_e, credentials) =>
     bounded(
-      30_000,
+      45_000,
       "The SQL driver did not finish the authentication handshake in time.",
       () => sqlAdmin.connectInstance(credentials),
       credentials?.attemptId ?? null,
@@ -932,7 +932,7 @@ function registerIpc() {
     ),
   );
   ipcMain.handle("sqladmin:lock", (_e, credentials) =>
-    bounded(30_000, "The database could not be opened in time.", () =>
+    bounded(45_000, "The database could not be opened in time.", () =>
       sqlAdmin.lockDatabase(credentials),
     ),
   );
