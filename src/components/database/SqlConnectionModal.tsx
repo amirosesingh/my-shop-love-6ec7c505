@@ -41,6 +41,7 @@ import {
   verifyLocalWrite,
   reconnectLocalDatabase,
   resetLocalDatabase,
+  removeStoredConnection,
   type LocalDbConfig,
   type LocalDbTestResult,
 } from "@/lib/local-db";
@@ -183,6 +184,8 @@ export function SqlConnectionModal({
    * used to be ignored.
    */
   const dirtyRef = useRef(false);
+  /** Server · database already sealed on this machine, "" when there is none. */
+  const [savedLabel, setSavedLabel] = useState("");
 
   const set = <K extends keyof LocalDbConfig>(key: K, value: LocalDbConfig[K]) => {
     setConfig((c) => ({ ...c, [key]: value }));
@@ -259,15 +262,24 @@ export function SqlConnectionModal({
   };
 
 
+  /**
+   * Deletes the sealed file outright, stops the background retry loop and
+   * clears the driver crash counter, so the wizard starts from nothing instead
+   * of fighting a connection that was saved earlier.
+   */
   const resetConnection = async () => {
     setResetting(true);
     abandonRun();
     try {
-      const res = await resetLocalDatabase();
+      const res = savedLabel ? await removeStoredConnection() : await resetLocalDatabase();
       setSteps(blankSteps());
       setDatabases([]);
-      if (res.ok) toast.success("Connection reset. Enter the server details and run the checks again.");
-      else toast.error(res.error ?? "Could not reset the connection.");
+      if (res.ok) {
+        setSavedLabel("");
+        setConfig((c) => ({ ...c, ...defaultLocalDbConfig, database: DEFAULT_DATABASE }));
+        dirtyRef.current = false;
+        toast.success("Saved connection removed. Enter the server details and run the checks again.");
+      } else toast.error(res.error ?? "Could not remove the saved connection.");
     } finally {
       setResetting(false);
     }
@@ -308,6 +320,9 @@ export function SqlConnectionModal({
       const saved = await loadLocalDbConfig();
       if (!alive) return;
       const hasSaved = saved.server && saved.server !== defaultLocalDbConfig.server;
+      setSavedLabel(
+        hasSaved ? [saved.server, saved.database].filter(Boolean).join(" · ") : "",
+      );
       setConfig((current) => ({
         ...current,
         ...saved,
@@ -899,6 +914,25 @@ export function SqlConnectionModal({
           )}
         </div>
 
+        {savedLabel && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2">
+            <p className="text-xs text-muted-foreground">
+              This machine already has a saved connection:{" "}
+              <span className="font-medium text-foreground">{savedLabel}</span>. It is reused on
+              every start until it is removed.
+            </p>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={resetting}
+              onClick={() => void resetConnection()}
+            >
+              Remove saved connection
+            </Button>
+          </div>
+        )}
+
         <DialogFooter className="gap-2 sm:justify-between">
           <div className="flex flex-wrap gap-2">
             {running ? (
@@ -930,14 +964,18 @@ export function SqlConnectionModal({
               variant="ghost"
               disabled={resetting}
               onClick={() => void resetConnection()}
-              title="Cancel anything running, close the pools and forget the saved connection."
+              title={
+                savedLabel
+                  ? `Cancel anything running and delete the saved details for ${savedLabel}.`
+                  : "Cancel anything running and clear the connection."
+              }
             >
               {resetting ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <Eraser className="mr-2 h-4 w-4" />
               )}
-              Forget connection
+              {savedLabel ? `Remove saved connection (${savedLabel})` : "Forget connection"}
             </Button>
           </div>
           <Button type="button" disabled={running || !catalogReady} onClick={() => void finish()}>

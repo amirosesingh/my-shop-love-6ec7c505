@@ -87,6 +87,33 @@ export type LocalWriteCheck = {
   hint?: string | null;
 };
 
+/**
+ * Migration guard for the saved connection plus isolated-driver health.
+ *
+ * A named instance without a pinned port cannot work once connections stop
+ * asking the SQL Server Browser service for a dynamic port, so it is reported
+ * up front instead of failing at the first sale.
+ */
+export type LocalConnectionAudit = {
+  ok: boolean;
+  configured: boolean;
+  direct: boolean;
+  needsPort: boolean;
+  host: string | null;
+  instanceName: string | null;
+  port: number | null;
+  target: string | null;
+  issues: Array<{ code: string; severity: "error" | "warning"; message: string; hint?: string }>;
+  driver?: {
+    workers: number;
+    maxWorkers: number;
+    orphanedSessions: number;
+    sessionWarning: boolean;
+    crashTargets: Array<{ target: string; consecutive: number; blocked: boolean }>;
+    crashBlocked: boolean;
+  };
+};
+
 export type LocalDbConnectionState =
   | "unavailable"
   | "not_configured"
@@ -94,7 +121,8 @@ export type LocalDbConnectionState =
   | "saving"
   | "initializing"
   | "connected"
-  | "failed";
+  | "failed"
+  | "driver_blocked";
 
 export type LocalDbConnectionView = {
   state: LocalDbConnectionState;
@@ -112,6 +140,7 @@ const STATE_MESSAGE: Record<LocalDbConnectionState, string> = {
   initializing: "Reconnecting…",
   connected: "Local database connected",
   failed: "Local database unavailable",
+  driver_blocked: "Local database driver stopped",
 };
 
 export function describeLocalDbState(
@@ -146,6 +175,11 @@ export function deriveLocalDbState(input: {
   if (!input.available) return describeLocalDbState("unavailable");
   if (input.pending) return describeLocalDbState(input.pending);
   if (input.status?.connected) return describeLocalDbState("connected");
+  // A repeated driver crash is deterministic: the banner says so and the till
+  // stops pretending a retry is imminent.
+  if (input.status?.errorCode === "EDRIVER_CRASH_LOOP") {
+    return describeLocalDbState("driver_blocked", reconnectReason(input.status));
+  }
   if (input.status?.error) return describeLocalDbState("failed", reconnectReason(input.status));
   if (!input.configured) return describeLocalDbState("not_configured");
   return describeLocalDbState("initializing", "Trying to reach the saved database.");
@@ -164,6 +198,24 @@ export function reconnectReason(status: {
   return parts.length ? parts.join(" ") : "Trying to reach the saved database.";
 }
 
+
+/**
+ * Reads the saved-connection audit. Never throws: diagnostics failing must not
+ * take the settings screen down with them.
+ */
+export async function readConnectionAudit(): Promise<LocalConnectionAudit | null> {
+  const bridge = localDb();
+  if (!bridge?.getConnectionAudit) return null;
+  try {
+    return await withIpcTimeout(
+      bridge.getConnectionAudit(),
+      5_000,
+      "The connection check did not answer.",
+    );
+  } catch {
+    return null;
+  }
+}
 
 /** No IPC call may hang the UI: everything gets an outer deadline. */
 export async function withIpcTimeout<T>(
@@ -277,6 +329,7 @@ export type PosBridge = {
   configureCloud: (cloud: CloudBridgeConfig) => Promise<{ ok: boolean; error?: string }>;
   test: (config: LocalDbConfig) => Promise<LocalDbTestResult>;
   getDatabaseConfig?: () => Promise<Partial<LocalDbConfig> | null>;
+  getConnectionAudit?: () => Promise<LocalConnectionAudit>;
   /** Forget the saved connection and drop every pool (escape hatch). */
   resetConnection?: () => Promise<{ ok: boolean; error?: string | null }>;
   /** Forget the saved connection (same as resetConnection, explicit name). */

@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld("pos", {
   configureCloud: (cloud) => invoke("pos:configure-cloud", cloud),
   test: (config) => invoke("pos:test", config),
   getDatabaseConfig: () => invoke("pos:database-config"),
+  getConnectionAudit: () => invoke("pos:connection-audit"),
   /**
    * Tear both pools down and open the connection again — no restart. Pass the
    * values currently on screen to retry those instead of the sealed file.

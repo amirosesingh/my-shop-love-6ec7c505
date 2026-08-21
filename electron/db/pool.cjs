@@ -73,7 +73,6 @@ function logConnection(event, detail) {
 
 
 let driver = null;
-let nativeDriver = null;
 
 /** Loads the mssql driver on first use so a missing module never kills boot. */
 function loadDriver() {
@@ -89,22 +88,16 @@ function loadDriver() {
 }
 
 /**
- * Windows integrated auth needs the NATIVE build of mssql. Setting
- * `config.driver = "msnodesqlv8"` on the default (tedious) build is silently
- * ignored, which is what produced sign-in failures with no user/password.
+ * Windows integrated authentication runs in an isolated driver process.
+ *
+ * `mssql/msnodesqlv8` is a native ODBC binding: a stuck or faulting connect
+ * cannot be interrupted from JavaScript, and closing the pool underneath it
+ * used to take the whole till down. It is therefore never loaded here — the
+ * supervisor below owns a separate process, and cancellation means killing it.
  */
-function loadNativeDriver() {
-  if (nativeDriver) return nativeDriver;
-  try {
-    nativeDriver = require("mssql/msnodesqlv8");
-  } catch (err) {
-    const e = new Error(WINDOWS_AUTH_HINT);
-    e.code = "EDRIVER";
-    e.cause = err;
-    throw e;
-  }
-  return nativeDriver;
-}
+const native = require("./native-client.cjs");
+native.setLogger((event, detail) => logConnection(event, detail));
+
 
 const KNOWN_ODBC_DRIVERS = [
   "ODBC Driver 18 for SQL Server",
@@ -197,32 +190,15 @@ function requireWindowsDriver() {
 }
 
 /**
- * `localhost\SQLEXPRESS`, `HOST\INST,1435`, `tcp:host,1433` and plain hosts all
- * arrive in the same field. Tedious needs them split apart.
+ * Target parsing lives in `sql-target.cjs` so the probe, the handshake, the
+ * lock step and the operational pool cannot disagree about where to connect.
  */
-function parseServerField(raw, fallbackPort) {
-  let text = String(raw ?? "").trim();
-  text = text.replace(/^tcp:/i, "");
-  let port = Number(fallbackPort) || 1433;
-  // A separately supplied port is as explicit as HOST,PORT.
-  let explicitPort = Number(fallbackPort) > 0;
-  const comma = text.lastIndexOf(",");
-  if (comma > -1) {
-    const maybePort = Number(text.slice(comma + 1).trim());
-    if (Number.isFinite(maybePort) && maybePort > 0) {
-      port = maybePort;
-      explicitPort = true;
-      text = text.slice(0, comma).trim();
-    }
-  }
-  let instanceName = "";
-  const slash = text.indexOf("\\");
-  if (slash > -1) {
-    instanceName = text.slice(slash + 1).trim();
-    text = text.slice(0, slash).trim();
-  }
-  return { host: text || "localhost", instanceName, port, explicitPort };
-}
+const {
+  parseServerField,
+  normalizeDirectTarget,
+  auditConnectionConfig,
+} = require("./sql-target.cjs");
+
 
 const isLocalHost = (host) =>
   /^(localhost|127\.0\.0\.1|\.|\(local\))$/i.test(String(host || "")) ||
@@ -256,10 +232,16 @@ function describeSqlError(err) {
     ECONNREFUSED: "The machine answered but nothing is listening on that port.",
     ENOTFOUND: "The server name could not be resolved on the network.",
     EDRIVER: "The database driver is missing on this machine.",
+    EDRIVER_CRASH:
+      "The isolated database driver process stopped unexpectedly. The till itself was not affected — retry the connection.",
+    EDRIVER_CRASH_LOOP:
+      "The database driver crashed repeatedly against this server, so automatic retrying was stopped. Check the ODBC driver version and the server name, then retry manually.",
   };
   const text = `${code ?? ""} ${message} ${originalMessage ?? ""}`.toLowerCase();
   const stage =
-    code === "EDRIVER" || code === "EBUDGET" || /im002|driver.*not found|data source name not found/.test(text)
+    code === "EDRIVER_CRASH" || code === "EDRIVER_CRASH_LOOP"
+      ? "driver"
+      : code === "EDRIVER" || code === "EBUDGET" || /im002|driver.*not found|data source name not found/.test(text)
       ? "driver"
       : code === "ELOGIN" || /login failed|password did not match/.test(text)
         ? "login"
@@ -282,13 +264,48 @@ function describeSqlError(err) {
 }
 
 /**
+ * `Transaction` and `Request` must follow the pool they are given.
+ *
+ * A Windows-auth pool is a facade over another process, so `new
+ * sql.Transaction(pool)` has to produce the facade transaction; a SQL-login
+ * pool is a real tedious object and keeps the real class. Returning an object
+ * from the constructor lets every existing call site stay exactly as it is.
+ */
+function dispatchingClass(makeNative, name) {
+  return class {
+    constructor(owner) {
+      if (native.isNativePool(owner) || owner instanceof native.NativeTransaction) {
+        return makeNative(owner);
+      }
+      const Real = Reflect.get(loadDriver(), name);
+      return new Real(owner);
+    }
+  };
+}
+
+const NativeRequestFor = (owner) =>
+  owner instanceof native.NativeTransaction
+    ? new native.NativeRequest(owner.pool, owner.handle)
+    : new native.NativeRequest(owner, "pool");
+
+
+/**
  * Lazy stand-in for the mssql namespace: `sql.Int`, `new sql.Transaction(...)`
  * etc. keep working, but the module is only required when actually touched.
+ * The type constructors come from the pure-JavaScript build in every case —
+ * they are metadata, never a live driver connection.
  */
 const sql = new Proxy(
   {},
   {
-    get: (_t, prop) => Reflect.get(loadDriver(), prop),
+    get: (_t, prop) => {
+      if (prop === "Transaction") {
+        return dispatchingClass((owner) => new native.NativeTransaction(owner), "Transaction");
+      }
+      if (prop === "Request") return dispatchingClass(NativeRequestFor, "Request");
+
+      return Reflect.get(loadDriver(), prop);
+    },
     has: (_t, prop) => Reflect.has(loadDriver(), prop),
   },
 );
@@ -310,21 +327,18 @@ async function resolveTarget(config) {
   let portKnown = !parsed.instanceName || parsed.explicitPort;
   let browserAnswered = false;
   // Direct mode: the operator gave a real port, so the instance name is only
-  // decoration. Go straight to host,port and never touch UDP 1434.
+  // decoration. One canonical `host,port` target, and never UDP 1434.
   if (isDirectConnect(config)) {
-    const proven = Number(config.resolvedPort);
-    if (Number.isFinite(proven) && proven > 0) port = proven;
-    logConnection("target.direct", { host: parsed.host, port });
-    return {
-      ...parsed,
-      instanceName: "",
-      port,
-      portKnown: true,
-      browserAnswered: false,
-      provenPort: true,
-      direct: true,
-    };
+    const target = normalizeDirectTarget(config);
+    logConnection("target.direct", {
+      host: target.host,
+      port: target.port,
+      droppedInstanceName: target.droppedInstanceName,
+      browserUsed: false,
+    });
+    return target;
   }
+
   // A port the TCP step already proved open outranks any further lookup.
   const proven = Number(config.resolvedPort);
   if (Number.isFinite(proven) && proven > 0) {
@@ -499,15 +513,15 @@ async function planAttempts(config) {
   if (target.instanceName && !target.provenPort) routes.push(false);
   if (!routes.length) routes.push(true);
 
-  const native = config.auth === "windows" && requireWindowsDriver();
-  const odbc = native ? detectOdbcDrivers() : { drivers: [null], detected: true };
+  const useNative = config.auth === "windows" && requireWindowsDriver();
+  const odbc = useNative ? detectOdbcDrivers() : { drivers: [null], detected: true };
   const drivers = odbc.drivers;
-  if (config.auth === "windows" && !native && !config.user) {
+  if (config.auth === "windows" && !useNative && !config.user) {
     const e = new Error(WINDOWS_AUTH_HINT);
     e.code = "EDRIVER";
     throw e;
   }
-  if (native && !drivers.length) {
+  if (useNative && !drivers.length) {
     const e = new Error(
       "No ODBC driver for SQL Server is installed on this PC, so Windows authentication cannot be used. Install 'ODBC Driver 18 for SQL Server' from Microsoft, or switch to a SQL Server login.",
     );
@@ -524,9 +538,9 @@ async function planAttempts(config) {
           target,
           byPort,
           security: sec,
-          native,
+          native: useNative,
           odbcDriver,
-          driverConfig: native
+          driverConfig: useNative
             ? nativeConfig(config, target, sec, byPort, odbcDriver)
             : tediousConfig(config, target, sec, byPort),
           label: `${
@@ -534,7 +548,7 @@ async function planAttempts(config) {
               ? `${target.host},${target.port}`
               : `${target.host}\\${target.instanceName}`
           } · ${config.auth === "windows" ? "Windows" : `SQL login ${config.user ?? ""}`} · ${
-            native ? odbcDriver : "tedious"
+            useNative ? odbcDriver : "tedious"
           } · encrypt ${sec.encrypt ? "on" : "off"}${sec.trust ? " (trusted cert)" : ""}`,
         });
       }
@@ -545,11 +559,12 @@ async function planAttempts(config) {
   }
   logConnection("ladder.planned", {
     attempts: attempts.length,
-    drivers: native ? drivers : ["tedious"],
+    drivers: useNative ? drivers : ["tedious"],
     odbcDetected: odbc.detected,
     routes: routes.map((byPort) => (byPort ? "port" : "instance")),
+    browserUsed: target.browserAnswered === true,
   });
-  return { target, attempts, native };
+  return { target, attempts, useNative };
 }
 
 /**
@@ -557,7 +572,9 @@ async function planAttempts(config) {
  * failed attempt come back with the result so the UI can explain itself.
  */
 async function openConnection(config) {
-  const { attempts, target, native } = await planAttempts(config);
+  const { attempts, target, useNative } = await planAttempts(config);
+  // One canonical string, shared by the crash counter and every log line.
+  const targetKey = `${target.host},${target.port}`;
   const tried = [];
   let lastError = null;
   const defaultBudget = isDirectConnect(config) ? DIRECT_BUDGET_MS : LADDER_BUDGET_MS;
@@ -589,19 +606,37 @@ async function openConnection(config) {
     if (deadDrivers.has(attempt.odbcDriver)) continue;
     if (usableDriver && attempt.odbcDriver !== usableDriver) continue;
     const startedAt = Date.now();
-    logConnection("attempt.start", { label: attempt.label, remainingMs: remaining });
+    logConnection("attempt.start", {
+      label: attempt.label,
+      remainingMs: remaining,
+      isolated: attempt.native === true,
+    });
     try {
-      const mssql = native ? loadNativeDriver() : loadDriver();
-      opening = new mssql.ConnectionPool(attempt.driverConfig);
-      // Unhandled 'error' events on a pool we are about to drop must not crash
-      // the main process.
-      opening.on("error", () => {});
-      const opened = await withDeadline(
-        opening.connect(),
-        attemptTimeoutOf(config, remaining),
-        "ETIMEOUT",
-        "The sign-in did not complete before the deadline.",
-      );
+      let opened;
+      if (attempt.native) {
+        // Windows authentication never runs in this process. The supervisor
+        // owns the deadline AND the cancellation, because the only way to stop
+        // a wedged native connect is to terminate the process running it.
+        opened = await native.openNative({
+          driverConfig: attempt.driverConfig,
+          target: targetKey,
+          attemptId: config.attemptId ?? targetKey,
+          timeoutMs: attemptTimeoutOf(config, remaining),
+          isCancelled: config.isCancelled,
+        });
+      } else {
+        const mssql = loadDriver();
+        opening = new mssql.ConnectionPool(attempt.driverConfig);
+        // Unhandled 'error' events on a pool we are about to drop must not
+        // crash the main process.
+        opening.on("error", () => {});
+        opened = await withDeadline(
+          opening.connect(),
+          attemptTimeoutOf(config, remaining),
+          "ETIMEOUT",
+          "The sign-in did not complete before the deadline.",
+        );
+      }
       logConnection("attempt.ok", { label: attempt.label, elapsedMs: Date.now() - startedAt });
       return {
         pool: opened,
@@ -611,7 +646,9 @@ async function openConnection(config) {
           port: attempt.byPort ? target.port : null,
           instanceName: target.instanceName || null,
           usedPort: attempt.byPort,
-          driver: native ? attempt.odbcDriver : "tedious",
+          driver: attempt.native ? attempt.odbcDriver : "tedious",
+          isolated: attempt.native === true,
+          browserUsed: target.browserAnswered === true,
           auth: config.auth === "windows" ? "windows" : "sql",
           encrypt: attempt.security.encrypt,
           trustServerCertificate: attempt.security.trust,
@@ -638,7 +675,10 @@ async function openConnection(config) {
       });
       // A rejected sign-in is final: no other port, driver or TLS setting fixes it.
       if (isLoginFailure(err)) break;
-      if (native) {
+      // A deterministic driver crash must not be walked around the ladder:
+      // every remaining combination would crash the same way.
+      if (err?.code === "EDRIVER_CRASH_LOOP") break;
+      if (attempt.native) {
         // A driver that is simply not installed is skipped entirely; a driver
         // that answered is the right one, so no other driver is worth trying.
         if (isOdbcDriverMissing(err)) deadDrivers.add(attempt.odbcDriver);
@@ -889,4 +929,8 @@ module.exports = {
   isDirectConnect,
   DIRECT_BUDGET_MS,
   parseOdbcRegistry,
+  auditConnectionConfig,
+  driverDiagnostics: () => native.diagnostics(),
+  shutdownDrivers: (reason) => native.shutdown(reason),
+  resetDriverCrashState: (target) => native.resetCrashState(target),
 };

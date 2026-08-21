@@ -19,6 +19,8 @@ import {
   loadLocalDbConfig,
   reconnectLocalDatabase,
   removeStoredConnection,
+  readConnectionAudit,
+  type LocalConnectionAudit,
   type LocalDbConfig,
   type LocalSyncStatus,
 } from "@/lib/local-db";
@@ -41,6 +43,7 @@ export function LocalDatabaseSettings() {
   const [reconnecting, setReconnecting] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [audit, setAudit] = useState<LocalConnectionAudit | null>(null);
 
   /**
    * Deletes the sealed credentials file, cancels anything still connecting and
@@ -55,6 +58,7 @@ export function LocalDatabaseSettings() {
         setConfig(defaultLocalDbConfig);
         setConfigured(false);
         setStatus(null);
+        setAudit(null);
         setConfirmRemove(false);
         toast.success("Saved connection removed from this machine.");
       } else {
@@ -103,6 +107,7 @@ export function LocalDatabaseSettings() {
     const bridge = localDb();
     if (!bridge) return;
     setStatus(await bridge.status());
+    setAudit(await readConnectionAudit());
   }, []);
 
   useEffect(() => {
@@ -168,6 +173,16 @@ export function LocalDatabaseSettings() {
           ? "bg-amber-500 animate-pulse"
           : "bg-muted-foreground";
 
+  /**
+   * A saved connection is never anonymous: every path that offers to remove it
+   * also says exactly which server and database will be forgotten.
+   */
+  const savedLabel = configured
+    ? [config.server?.trim(), config.database?.trim()].filter(Boolean).join(" · ")
+    : "";
+  const blockingIssues = (audit?.issues ?? []).filter((i) => i.severity === "error");
+  const driverInfo = audit?.driver;
+
   return (
     <div className="space-y-3 rounded-md border border-border px-3 py-3">
       <div>
@@ -185,6 +200,9 @@ export function LocalDatabaseSettings() {
           <div>
             <p className="text-sm">{view.message}</p>
             {view.detail && <p className="text-xs text-muted-foreground">{view.detail}</p>}
+            {savedLabel && (
+              <p className="text-xs text-muted-foreground">Saved connection: {savedLabel}</p>
+            )}
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap justify-end gap-2">
@@ -205,9 +223,13 @@ export function LocalDatabaseSettings() {
               variant="outline"
               disabled={removing}
               onClick={() => setConfirmRemove(true)}
-              title="Delete the stored server details and credentials from this machine."
+              title={`Delete the stored details for ${savedLabel || "this machine"}.`}
             >
-              {removing ? "Removing…" : "Remove saved connection"}
+              {removing
+                ? "Removing…"
+                : savedLabel
+                  ? `Remove saved connection (${savedLabel})`
+                  : "Remove saved connection"}
             </Button>
           )}
           <Button size="sm" disabled={view.busy} onClick={() => setWizardOpen(true)}>
@@ -216,10 +238,45 @@ export function LocalDatabaseSettings() {
         </div>
       </div>
 
+      {blockingIssues.map((issue) => (
+        <div
+          key={issue.code}
+          className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2"
+        >
+          <p className="text-xs font-medium text-destructive">{issue.message}</p>
+          {issue.hint && <p className="text-xs text-muted-foreground">{issue.hint}</p>}
+        </div>
+      ))}
+
+      {driverInfo?.crashBlocked && (
+        <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2">
+          <p className="text-xs font-medium text-destructive">
+            The isolated database driver stopped three times in a row, so automatic retrying is
+            paused.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            The till kept running. Check the ODBC driver and the server name, then use “Reconnect
+            now” to try again.
+          </p>
+        </div>
+      )}
+
+      {driverInfo?.sessionWarning && (
+        <div className="rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2">
+          <p className="text-xs">
+            {driverInfo.orphanedSessions} cancelled sign-in attempts may still hold a session on the
+            server. Restart SQL Server or wait for the sessions to time out if connections start
+            being refused.
+          </p>
+        </div>
+      )}
+
       <AlertDialog open={confirmRemove} onOpenChange={setConfirmRemove}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove the saved connection?</AlertDialogTitle>
+            <AlertDialogTitle>
+              Remove the saved connection{savedLabel ? ` (${savedLabel})` : ""}?
+            </AlertDialogTitle>
             <AlertDialogDescription>
               The stored server, database and sign-in credentials are deleted from this machine, any
               connection attempt still running is cancelled and the till stops retrying in the
