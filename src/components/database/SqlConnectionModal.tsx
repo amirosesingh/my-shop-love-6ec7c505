@@ -155,6 +155,8 @@ export function SqlConnectionModal({
   const guard = useRef(createRunGuard()).current;
   /** Identity of the current run; shared with the shell so it can be cancelled. */
   const attemptRef = useRef<string | null>(null);
+  /** Port the TCP step proved open; reused by the handshake and the lock. */
+  const provenPortRef = useRef<number | null>(null);
   /** Synchronous lock — protects against a double click within one render. */
   const startingRef = useRef(false);
 
