@@ -558,6 +558,8 @@ async function openConnection(config) {
     let opening = null;
     if (deadDrivers.has(attempt.odbcDriver)) continue;
     if (usableDriver && attempt.odbcDriver !== usableDriver) continue;
+    const startedAt = Date.now();
+    logConnection("attempt.start", { label: attempt.label, remainingMs: remaining });
     try {
       const mssql = native ? loadNativeDriver() : loadDriver();
       opening = new mssql.ConnectionPool(attempt.driverConfig);
@@ -570,6 +572,7 @@ async function openConnection(config) {
         "ETIMEOUT",
         "The sign-in did not complete before the deadline.",
       );
+      logConnection("attempt.ok", { label: attempt.label, elapsedMs: Date.now() - startedAt });
       return {
         pool: opened,
         attempt: {
@@ -597,6 +600,12 @@ async function openConnection(config) {
         }
       }
       tried.push({ label: attempt.label, code: err?.code ?? null, error: err?.message ?? String(err) });
+      logConnection("attempt.fail", {
+        label: attempt.label,
+        code: err?.code ?? null,
+        elapsedMs: Date.now() - startedAt,
+        error: err?.message ?? String(err),
+      });
       // A rejected sign-in is final: no other port, driver or TLS setting fixes it.
       if (isLoginFailure(err)) break;
       if (native) {
@@ -829,6 +838,8 @@ async function applySchemaNow() {
 }
 
 module.exports = {
+  installedOdbcDrivers,
+  logConnection,
   sql,
   connect,
   close,
