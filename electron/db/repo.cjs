@@ -734,6 +734,7 @@ function toCloudRow(table, row) {
 
 module.exports = {
   TABLES,
+  buildSetList,
   CATALOGUE_TABLES,
   SCOPED_PULL_TABLES,
   PRUNABLE_TABLES,
