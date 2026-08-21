@@ -482,6 +482,26 @@ The main process also installs `uncaughtException` / `unhandledRejection`
 handlers that write to `connection.log` and keep the window alive, and the saved
 connection is no longer awaited during boot — the register renders first.
 
+### 11.2 Durable crash evidence (v1.3.24)
+
+Previously a crash could leave nothing behind: native faults produced no
+minidump, the local app server's output went to a console nobody sees, and a
+dead renderer was only inferred one boot later. `electron/diagnostics.cjs` now
+writes to the user data folder that the recovery screen already reveals:
+
+| File | Written by |
+| --- | --- |
+| `crash.log` | uncaught exceptions, `render-process-gone`, `child-process-gone`, unresponsive windows, `did-fail-load`, app-server exits |
+| `server.log` | every line of the local app server's stdout/stderr |
+| `connection.log` | the SQL attempt ladder (existing) |
+| `diagnostic-report.txt` | on demand — machine facts plus the tails of the three logs above |
+| crash dumps | `crashReporter` minidumps, upload disabled — local folder only |
+
+All logs rotate once at 512 KB and every write is wrapped: logging may never be
+the reason the till stops. "Save diagnostic report" appears both in Local
+database settings and on the recovery screen, so a shop can send one file
+instead of describing a crash.
+
 **Driver auto-install** (`electron/db/driver-install.cjs`, `driver-catalog.json`,
 `src/components/database/DriverInstallPanel.tsx`). When the ladder ends in
 `EDRIVER` the wizard offers a one-click install of the missing Microsoft driver.
