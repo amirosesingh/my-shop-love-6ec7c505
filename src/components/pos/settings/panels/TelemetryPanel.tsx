@@ -55,11 +55,14 @@ export function TelemetryPanel() {
   const [commands, setCommands] = useState<TerminalCommand[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [missingColumns, setMissingColumns] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     try {
       const [t, c] = await Promise.all([listTelemetry(), listCommands()]);
       setRows(t);
+      setMissingColumns(missingTelemetryColumns());
+
       setCommands(c);
     } catch (e) {
       toast.error("Could not load terminal health", { description: (e as Error).message });
