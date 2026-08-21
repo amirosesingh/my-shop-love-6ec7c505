@@ -560,7 +560,9 @@ async function openConnection(config) {
   const { attempts, target, native } = await planAttempts(config);
   const tried = [];
   let lastError = null;
-  const budget = Number(config.budgetMs) > 0 ? Number(config.budgetMs) : LADDER_BUDGET_MS;
+  const defaultBudget = isDirectConnect(config) ? DIRECT_BUDGET_MS : LADDER_BUDGET_MS;
+  const budget = Number(config.budgetMs) > 0 ? Number(config.budgetMs) : defaultBudget;
+
   const deadline = Date.now() + budget;
   const cancelled = () => typeof config.isCancelled === "function" && config.isCancelled();
   /** ODBC drivers proved absent, and the one that actually answered. */
