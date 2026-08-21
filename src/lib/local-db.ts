@@ -222,9 +222,9 @@ export async function readConnectionAudit(): Promise<LocalConnectionAudit | null
  * send evidence of a crash to support without hunting through a log folder.
  */
 export async function saveDiagnosticReport(): Promise<{ ok: boolean; file?: string }> {
-  const bridge = localDb() as (LocalDbBridge & {
-    collectDiagnostics?: () => Promise<{ ok: boolean; file?: string }>;
-  }) | null;
+  const bridge = localDb() as
+    | (PosBridge & { collectDiagnostics?: () => Promise<{ ok: boolean; file?: string }> })
+    | null;
   if (!bridge?.collectDiagnostics) return { ok: false };
   try {
     return await withIpcTimeout(bridge.collectDiagnostics(), 10_000, "The report timed out.");
@@ -346,6 +346,9 @@ export type PosBridge = {
   test: (config: LocalDbConfig) => Promise<LocalDbTestResult>;
   getDatabaseConfig?: () => Promise<Partial<LocalDbConfig> | null>;
   getConnectionAudit?: () => Promise<LocalConnectionAudit>;
+  /** Writes one shareable diagnostic report and reveals it in the file manager. */
+  collectDiagnostics?: () => Promise<{ ok: boolean; file?: string }>;
+  openLogFolder?: () => Promise<unknown>;
   /** Forget the saved connection and drop every pool (escape hatch). */
   resetConnection?: () => Promise<{ ok: boolean; error?: string | null }>;
   /** Forget the saved connection (same as resetConnection, explicit name). */
