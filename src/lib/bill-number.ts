@@ -92,10 +92,20 @@ export function billPrefix(
 
 type SeqStore = { prefix: string; next: number };
 
-const readSeq = (): SeqStore | null => {
-  if (typeof window === "undefined") return null;
+/** Device storage when there is any — server rendering has none. */
+const localStore = (): Storage | null => {
   try {
-    const raw = window.localStorage.getItem(SEQ_KEY);
+    return (globalThis as { localStorage?: Storage }).localStorage ?? null;
+  } catch {
+    return null;
+  }
+};
+
+const readSeq = (): SeqStore | null => {
+  const store = localStore();
+  if (!store) return null;
+  try {
+    const raw = store.getItem(SEQ_KEY);
     const parsed = raw ? (JSON.parse(raw) as SeqStore) : null;
     return parsed && typeof parsed.next === "number" ? parsed : null;
   } catch {
@@ -113,12 +123,15 @@ export class BillNumberReservationError extends Error {
 
 /**
  * Records the counter on the device. A failure here means the next sale would
- * reuse this number, so it is raised rather than swallowed.
+ * reuse this number, so it is raised rather than swallowed. Returns false only
+ * when there is no device storage at all (server rendering).
  */
-const writeSeq = (value: SeqStore) => {
-  if (typeof window === "undefined") return;
+const writeSeq = (value: SeqStore): boolean => {
+  const store = localStore();
+  if (!store) return false;
   try {
-    window.localStorage.setItem(SEQ_KEY, JSON.stringify(value));
+    store.setItem(SEQ_KEY, JSON.stringify(value));
+    return true;
   } catch (err) {
     throw new BillNumberReservationError(
       "This device could not store the bill counter, so the next sale could reuse the same bill number. Free up browser storage and try again.",
@@ -126,6 +139,7 @@ const writeSeq = (value: SeqStore) => {
     );
   }
 };
+
 
 /**
  * The branch database is the durable home for the counter: browser storage can
