@@ -244,6 +244,12 @@ export type DirectConnectionParams = {
 export type LocalSyncStatus = {
   connected: boolean;
   error?: string;
+  /** Structured reason from the shell, so the banner can be specific. */
+  errorCode?: string | null;
+  errorHint?: string | null;
+  errorStage?: string | null;
+  reconnecting?: boolean;
+  configured?: boolean;
   phase?: "idle" | "pushing" | "pulling";
   enabled?: boolean;
   tables: TableSyncStat[];
@@ -268,10 +274,20 @@ export type PosBridge = {
   resetConnection?: () => Promise<{ ok: boolean; error?: string | null }>;
   /** Forget the saved connection (same as resetConnection, explicit name). */
   forgetConnection?: () => Promise<{ ok: boolean; error?: string | null }>;
-  /** Rebuild the connection from the SAVED credentials — no restart, no setup. */
-  reconnect?: () => Promise<LocalDbReconnectResult>;
+  /** Delete the sealed credentials file and stop the background retry loop. */
+  removeConnection?: () => Promise<{
+    ok: boolean;
+    removed?: boolean;
+    error?: string | null;
+  }>;
+  /**
+   * Rebuild the connection. With no argument the saved credentials are used;
+   * pass the values on screen to retry those instead.
+   */
+  reconnect?: (override?: Partial<LocalDbConfig>) => Promise<LocalDbReconnectResult>;
   /** Ask the background loop for an immediate attempt. */
   retryConnection?: () => Promise<{ ok: boolean }>;
+
   /** Read the single master schema file — passive, never executes anything. */
   readSchema?: () => Promise<{
     ok: boolean;
