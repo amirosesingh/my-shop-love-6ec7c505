@@ -119,7 +119,7 @@
     "vitest": "^4.1.10",
     "wrangler": "^4.119.0"
   },
-  "version": "1.3.23",
+  "version": "1.3.24",
   "build": {
     "appId": "app.lovable.pos",
     "productName": "LovablePOS",
@@ -132,7 +132,8 @@
     ],
     "asarUnpack": [
       "node_modules/msnodesqlv8/**",
-      "node_modules/mssql/**"
+      "node_modules/mssql/**",
+      "electron/db/**"
     ],
     "win": {
       "target": [

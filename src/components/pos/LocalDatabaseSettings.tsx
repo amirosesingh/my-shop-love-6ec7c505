@@ -20,6 +20,7 @@ import {
   reconnectLocalDatabase,
   removeStoredConnection,
   readConnectionAudit,
+  saveDiagnosticReport,
   type LocalConnectionAudit,
   type LocalDbConfig,
   type LocalSyncStatus,
@@ -180,6 +181,7 @@ export function LocalDatabaseSettings() {
   const savedLabel = configured
     ? [config.server?.trim(), config.database?.trim()].filter(Boolean).join(" · ")
     : "";
+  const [savingReport, setSavingReport] = useState(false);
   const blockingIssues = (audit?.issues ?? []).filter((i) => i.severity === "error");
   const driverInfo = audit?.driver;
 
@@ -232,6 +234,26 @@ export function LocalDatabaseSettings() {
                   : "Remove saved connection"}
             </Button>
           )}
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={savingReport}
+            onClick={() => {
+              setSavingReport(true);
+              void saveDiagnosticReport()
+                .then((r) =>
+                  toast[r.ok ? "success" : "error"](
+                    r.ok
+                      ? "Saved diagnostic-report.txt in the log folder."
+                      : "Could not write the report on this machine.",
+                  ),
+                )
+                .finally(() => setSavingReport(false));
+            }}
+            title="Write one file with the crash, connection and server logs so support can read what happened."
+          >
+            {savingReport ? "Saving…" : "Save diagnostic report"}
+          </Button>
           <Button size="sm" disabled={view.busy} onClick={() => setWizardOpen(true)}>
             {view.state === "connected" ? "Change connection" : "Set up connection"}
           </Button>

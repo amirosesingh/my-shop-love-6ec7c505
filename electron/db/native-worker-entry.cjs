@@ -110,22 +110,23 @@ async function readSpid() {
 }
 
 async function handle(message) {
+  // Fault injection, used only by the supervisor's own tests: a hang and a
+  // hard death are the two behaviours the parent must survive, and neither can
+  // be provoked from outside this process. Checked before the driver loads so
+  // the test does not need a real ODBC installation.
+  if (message.op === OPS.OPEN && message.payload?.simulateHang) {
+    return new Promise(() => {});
+  }
+  if (message.op === OPS.OPEN && message.payload?.simulateCrash) {
+    process.kill(process.pid, "SIGKILL");
+    return new Promise(() => {});
+  }
   const namespace = loadDriver();
   switch (message.op) {
     case OPS.PING:
       return { pong: true, pid: process.pid };
 
     case OPS.OPEN: {
-      // Fault injection, used only by the supervisor's own tests: a hang and a
-      // hard death are exactly the two behaviours that cannot be simulated
-      // from the parent process.
-      if (message.payload.simulateHang) {
-        await new Promise(() => {});
-      }
-      if (message.payload.simulateCrash) {
-        process.kill(process.pid, "SIGKILL");
-        await new Promise(() => {});
-      }
       if (pool) {
         try {
           await pool.close();

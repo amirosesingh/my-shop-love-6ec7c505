@@ -24,21 +24,27 @@ afterEach(() => {
 describe("direct-mode target normalisation", () => {
   it("turns a named instance with a pinned port into one host,port string", () => {
     const t = target.normalizeDirectTarget({ server: "PCNAME\\SQLEXPRESS", port: 1450 });
-    expect(t.direct).toBe("PCNAME,1450");
+    expect(t.address).toBe("PCNAME,1450");
     expect(t.host).toBe("PCNAME");
-    expect(t.instanceName).toBe("SQLEXPRESS");
-    expect(t.usesBrowser).toBe(false);
+    // The instance name is dropped on purpose: it is what sends the driver to
+    // the SQL Server Browser service.
+    expect(t.instanceName).toBe("");
+    expect(t.droppedInstanceName).toBe("SQLEXPRESS");
+    expect(t.browserAnswered).toBe(false);
   });
 
   it("honours a port typed inline after the instance name", () => {
     const t = target.normalizeDirectTarget({ server: "PCNAME\\SQLEXPRESS,1433" });
-    expect(t.direct).toBe("PCNAME,1433");
+    expect(t.address).toBe("PCNAME,1433");
   });
 
-  it("cannot build a direct target without a port", () => {
-    const t = target.normalizeDirectTarget({ server: "PCNAME\\SQLEXPRESS" });
-    expect(t.direct).toBeNull();
-    expect(t.usesBrowser).toBe(true);
+  it("prefers the port the TCP step actually proved open", () => {
+    const t = target.normalizeDirectTarget({
+      server: "PCNAME\\SQLEXPRESS",
+      port: 1433,
+      resolvedPort: 1450,
+    });
+    expect(t.address).toBe("PCNAME,1450");
   });
 });
 
@@ -90,8 +96,9 @@ describe("isolated worker supervision", () => {
       }),
     ).rejects.toMatchObject({ code: "ETIMEOUT" });
     expect(Date.now() - started).toBeLessThan(8_000);
-    // The stuck process is gone, not parked for reuse.
-    expect(native.diagnostics().workers).toBe(0);
+    // The stuck process was killed, not parked for reuse, so nothing can send
+    // another statement down a connection whose native call is still running.
+    expect(native.diagnostics().warm).toBe(false);
   }, 30_000);
 
   it("never spawns more than the configured number of driver processes", async () => {

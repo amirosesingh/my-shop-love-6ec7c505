@@ -20,9 +20,15 @@ const brandingStore = require("./branding-store.cjs");
 const health = require("./health.cjs");
 const recovery = require("./recovery.cjs");
 const netHttp = require("./net.cjs");
+const diagnostics = require("./diagnostics.cjs");
 
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
 const DEBUG = process.env.POS_DEBUG === "1";
+
+// Must run before the first window exists, otherwise a native crash in the GPU
+// or a driver leaves nothing behind to look at.
+diagnostics.startCrashReporter();
+diagnostics.watchApp(app);
 
 /* ---------------------------------------------------------------------------
    Safety net.
@@ -34,19 +40,21 @@ const DEBUG = process.env.POS_DEBUG === "1";
    --------------------------------------------------------------------------- */
 process.on("uncaughtException", (error) => {
   try {
-    pool.logConnection("main.uncaught-exception", {
+    const detail = {
       error: error?.message ?? String(error),
       stack: String(error?.stack ?? "").split("\n").slice(0, 4).join(" | "),
-    });
+    };
+    pool.logConnection("main.uncaught-exception", detail);
+    diagnostics.logCrash("main.uncaught-exception", detail);
   } catch {
     console.error("[pos] uncaught exception:", error);
   }
 });
 process.on("unhandledRejection", (reason) => {
   try {
-    pool.logConnection("main.unhandled-rejection", {
-      error: reason?.message ?? String(reason),
-    });
+    const detail = { error: reason?.message ?? String(reason) };
+    pool.logConnection("main.unhandled-rejection", detail);
+    diagnostics.logCrash("main.unhandled-rejection", detail);
   } catch {
     console.error("[pos] unhandled rejection:", reason);
   }
@@ -171,9 +179,24 @@ async function startAppServer() {
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
-  serverProcess.stdout.on("data", (d) => console.log(`[app-server] ${String(d).trimEnd()}`));
-  serverProcess.stderr.on("data", (d) => console.error(`[app-server] ${String(d).trimEnd()}`));
-  serverProcess.on("exit", (code) => console.error(`[app-server] exited with code ${code}`));
+  // Piped to a file as well as the console: on a shop PC nobody is watching a
+  // console, and a server that refuses to start is exactly what the recovery
+  // screen needs evidence for.
+  serverProcess.stdout.on("data", (d) => {
+    const line = String(d).trimEnd();
+    console.log(`[app-server] ${line}`);
+    diagnostics.logServer(line);
+  });
+  serverProcess.stderr.on("data", (d) => {
+    const line = String(d).trimEnd();
+    console.error(`[app-server] ${line}`);
+    diagnostics.logServer(`ERR ${line}`);
+  });
+  serverProcess.on("exit", (code) => {
+    console.error(`[app-server] exited with code ${code}`);
+    diagnostics.logServer(`exited with code ${code}`);
+    diagnostics.logCrash("app-server.exit", { code });
+  });
 
   await waitForPort(port);
   return `http://127.0.0.1:${port}`;
@@ -191,7 +214,9 @@ function load(win, route) {
 function instrument(win, route) {
   win.webContents.on("did-fail-load", (_e, code, description, url) => {
     console.error(`[window] failed to load ${url || route}: ${description} (${code})`);
+    diagnostics.logCrash("window.did-fail-load", { route, code, description });
   });
+  diagnostics.watchWindow(win, route);
   if (DEBUG) win.webContents.openDevTools({ mode: "detach" });
 }
 
@@ -788,6 +813,22 @@ function registerIpc() {
   });
 
   ipcMain.handle("health:open-logs", () => shell.openPath(app.getPath("userData")));
+  // One file a shop can attach to an email, instead of a folder of logs they
+  // have to understand.
+  ipcMain.handle("health:collect-diagnostics", () => {
+    const result = diagnostics.writeReport({
+      appVersion: app.getVersion(),
+      driver: (() => {
+        try {
+          return pool.driverDiagnostics?.() ?? null;
+        } catch {
+          return null;
+        }
+      })(),
+    });
+    if (result.ok) shell.showItemInFolder(result.file);
+    return result;
+  });
   ipcMain.handle("health:quit", () => app.quit());
 
   ipcMain.handle("print:silent", async (_e, html, options) => {

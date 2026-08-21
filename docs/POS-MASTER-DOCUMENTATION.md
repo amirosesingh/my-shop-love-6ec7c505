@@ -437,6 +437,71 @@ success, which is what made "Lock & Save" stop hanging.
 The read-only guard `validateReadOnly(text)` gates `sqladmin:query`, so the
 explorer cannot mutate the operational database.
 
+### 11.1 Isolated Windows Authentication driver (v1.3.24)
+
+Windows Integrated Authentication uses `mssql/msnodesqlv8`, a native ODBC
+binding. A stuck native `connect()` cannot be interrupted from JavaScript: a
+Promise timeout only stops *waiting*, and closing or replacing the pool while
+the native call is in flight used to take the whole Electron process down —
+the "POS did not start correctly" screen. It therefore no longer runs in the
+main process at all.
+
+| File | Role |
+| --- | --- |
+| `electron/db/native-worker-entry.cjs` | the ONLY module that loads `mssql/msnodesqlv8`; holds no policy |
+| `electron/db/native-client.cjs` | main-process supervisor: deadlines, kill-based cancellation, crash counter, worker pool, session accounting |
+| `electron/db/native-protocol.cjs` | request/response wire format, value/type/error encoding |
+| `electron/db/sql-target.cjs` | single source of truth for direct-mode targets and the migration audit |
+
+Rules enforced by the design:
+
+- **Isolation** — the main process never requires the native driver. SQL Server
+  Authentication is untouched and stays on pure-JS `tedious` in the main process.
+- **Attempt identity** — every message carries an `attemptId`; a reply for an
+  attempt that already timed out or was reaped is logged as
+  `driver.reply-discarded` and never reaches app state.
+- **Cancellation** — the only cancellation primitive is `worker.kill()`.
+  Nothing calls `.close()` on a connection whose native connect may be running.
+- **Crash loop** — three consecutive `EDRIVER_CRASH` results on one target
+  (`CRASH_LIMIT`) switch it to `EDRIVER_CRASH_LOOP`: automatic retrying stops
+  and the settings panel shows a hard error. "Reconnect now" clears the block.
+- **Worker pool** — a warm worker is reused; `MAX_WORKERS = 2` caps concurrent
+  driver processes so a retry burst cannot flood the machine.
+- **Session cleanup** — a kill skips TDS logout, so the SPID is recorded and
+  closed through a side-channel `KILL_SESSION`; unresolved orphans past
+  `ORPHAN_WARN_AT` raise a warning in Local database settings.
+- **Direct-mode determinism** — `normalizeDirectTarget` turns `PCNAME\SQLEXPRESS`
+  plus a pinned port into `PCNAME,port` once, and every path (admin handshake,
+  lock flow, operational pool) uses that same string. SQL Browser is never
+  consulted in direct mode.
+- **Migration guard** — `auditConnectionConfig`, exposed as `pos:connection-audit`,
+  flags any saved named instance with no pinned port (`EMISSINGPORT`) before it
+  fails at the first sale.
+
+The main process also installs `uncaughtException` / `unhandledRejection`
+handlers that write to `connection.log` and keep the window alive, and the saved
+connection is no longer awaited during boot — the register renders first.
+
+### 11.2 Durable crash evidence (v1.3.24)
+
+Previously a crash could leave nothing behind: native faults produced no
+minidump, the local app server's output went to a console nobody sees, and a
+dead renderer was only inferred one boot later. `electron/diagnostics.cjs` now
+writes to the user data folder that the recovery screen already reveals:
+
+| File | Written by |
+| --- | --- |
+| `crash.log` | uncaught exceptions, `render-process-gone`, `child-process-gone`, unresponsive windows, `did-fail-load`, app-server exits |
+| `server.log` | every line of the local app server's stdout/stderr |
+| `connection.log` | the SQL attempt ladder (existing) |
+| `diagnostic-report.txt` | on demand — machine facts plus the tails of the three logs above |
+| crash dumps | `crashReporter` minidumps, upload disabled — local folder only |
+
+All logs rotate once at 512 KB and every write is wrapped: logging may never be
+the reason the till stops. "Save diagnostic report" appears both in Local
+database settings and on the recovery screen, so a shop can send one file
+instead of describing a crash.
+
 **Driver auto-install** (`electron/db/driver-install.cjs`, `driver-catalog.json`,
 `src/components/database/DriverInstallPanel.tsx`). When the ladder ends in
 `EDRIVER` the wizard offers a one-click install of the missing Microsoft driver.
