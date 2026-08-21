@@ -12,9 +12,10 @@ import { CloudCheck, CloudOff, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { SyncStatus } from "@/components/pos/SyncStatus";
-import { SyncBadge } from "@/components/pos/sync/SyncBadge";
-import { SystemStatusPill } from "@/components/pos/SystemStatusPill";
-import { SecurityAlertBell } from "@/components/pos/SecurityAlertBell";
+import {
+  ConnectionStatusButton,
+  SystemAlertsButton,
+} from "@/components/pos/StatusCluster";
 import { ActivityBell } from "@/components/pos/ActivityBell";
 import { databaseModeLabel, effectiveDatabaseMode, subscribeDatabaseMode } from "@/lib/db-mode";
 import { isOnline, isOnlineSyncEnabled, pendingCount, subscribeOutbox } from "@/lib/sync-outbox";
@@ -102,17 +103,14 @@ export function MobileStatusSheet({ className }: { className?: string }) {
             <RefreshCw className={cn("mr-1.5 size-3.5", busy && "animate-spin")} /> Sync now
           </Button>
 
-          <Row label="Sync">
-            <SyncBadge />
+          <Row label="Connection">
+            <ConnectionStatusButton />
           </Row>
           <Row label="Sync detail">
             <SyncStatus />
           </Row>
-          <Row label="Services">
-            <SystemStatusPill />
-          </Row>
-          <Row label="Security">
-            <SecurityAlertBell />
+          <Row label="System &amp; security">
+            <SystemAlertsButton />
           </Row>
           <Row label="Activity">
             <ActivityBell />
