@@ -234,6 +234,8 @@ async function connectLocal(config) {
   // round-trip before anything is told the till is connected.
   const verified = await pool.verify();
   reconnectDelay = 5_000;
+  reconnectAttempt = 0;
+  lastConnectionError = null;
   broadcastStatus(await statusPayload());
   return verified;
 }
@@ -249,18 +251,136 @@ function withTimeout(promise, ms, message) {
   ]);
 }
 
-function scheduleReconnect() {
-  if (reconnectTimer || !dbConfigStore.read()) return;
+/** One reconnect attempt may never outlive its own slot. */
+const RECONNECT_ATTEMPT_MS = 60_000;
+
+/**
+ * Tells the renderer the loop is alive: which attempt is running, when the
+ * next one starts, and why the last one failed. A bare spinner with no reason
+ * is what left the till reading "Reconnecting…" for ever.
+ */
+function broadcastReconnecting(nextRetryAt) {
+  broadcastStatus({
+    connected: false,
+    reconnecting: true,
+    attempt: reconnectAttempt,
+    nextRetryAt: nextRetryAt ?? null,
+    error: lastConnectionError,
+    lastError: lastConnectionError,
+    tables: [],
+    queue: [],
+    server: null,
+    database: null,
+    resolved: null,
+    cloudConfigured: !!cloudConfig,
+  });
+}
+
+/**
+ * Backoff 5s -> 10s -> 20s -> 40s -> 60s, capped, retrying for as long as a
+ * connection is saved. `immediate` is the operator pressing "Retry now".
+ */
+function scheduleReconnect(immediate = false) {
+  if (!dbConfigStore.read()) return;
+  if (reconnectTimer) {
+    if (!immediate) return;
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  if (immediate) {
+    reconnectDelay = 5_000;
+    reconnectAttempt = 0;
+  }
+  const delay = immediate ? 0 : reconnectDelay;
+  broadcastReconnecting(new Date(Date.now() + delay).toISOString());
   reconnectTimer = setTimeout(async () => {
     reconnectTimer = null;
+    const config = dbConfigStore.read();
+    if (!config) return;
+    reconnectAttempt += 1;
     try {
-      await connectLocal(dbConfigStore.read());
+      await withTimeout(
+        connectLocal(config),
+        RECONNECT_ATTEMPT_MS,
+        "The local database did not answer in time.",
+      );
+      console.log(`[pos] local database reconnected on attempt ${reconnectAttempt}`);
     } catch (error) {
-      broadcastStatus({ connected: false, error: fail(error).error, tables: [], queue: [] });
+      lastConnectionError = fail(error).error;
+      console.warn(`[pos] reconnect attempt ${reconnectAttempt} failed: ${lastConnectionError}`);
       reconnectDelay = Math.min(reconnectDelay * 2, 60_000);
       scheduleReconnect();
     }
-  }, reconnectDelay);
+  }, delay);
+}
+
+/**
+ * Escape hatch that keeps the credentials: drop everything that might be
+ * wedged and open the saved connection again, right now.
+ */
+async function reconnectNow() {
+  const config = dbConfigStore.read();
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  try {
+    await sqlAdmin.cancel();
+  } catch {
+    /* nothing was running */
+  }
+  try {
+    await sqlAdmin.disconnect();
+  } catch {
+    /* already gone */
+  }
+  try {
+    await pool.close();
+  } catch {
+    /* already gone */
+  }
+  if (!config) {
+    lastConnectionError = null;
+    reconnectAttempt = 0;
+    broadcastStatus({
+      connected: false,
+      reconnecting: false,
+      tables: [],
+      queue: [],
+      server: null,
+      database: null,
+      resolved: null,
+      cloudConfigured: !!cloudConfig,
+    });
+    return {
+      ok: false,
+      stage: "config",
+      error: "No local database connection is saved on this till.",
+      hint: "Run Setup connection in Local database settings.",
+    };
+  }
+  reconnectAttempt = 1;
+  broadcastReconnecting(new Date().toISOString());
+  try {
+    const verified = await withTimeout(
+      connectLocal(config),
+      RECONNECT_ATTEMPT_MS,
+      "The local database did not answer in time.",
+    );
+    return {
+      ok: true,
+      stage: "connected",
+      activeDb: verified?.activeDb ?? config.database ?? null,
+      serverName: verified?.serverName ?? null,
+      latencyMs: verified?.latencyMs ?? null,
+    };
+  } catch (error) {
+    const described = pool.describeSqlError(error);
+    lastConnectionError = described.error;
+    // Keep trying in the background: the service may simply still be starting.
+    scheduleReconnect();
+    return { ok: false, stage: described.stage ?? "database", ...described };
+  }
 }
 
 /** Loose files a crashed update or print job can leave behind. */
