@@ -1,64 +1,96 @@
-# Phase 3 — Crash-proof Windows authentication and fresh connection control
+# Phase 3 — Crash-proof Windows Authentication via an isolated driver process
 
-The TCP check and authentication check prove different things. A fast open TCP port confirms that something is listening; it does not prove that Windows Integrated Authentication completed.
+## What the current code does, and where it fights these requirements
 
-The confirmed crash boundary is the native `msnodesqlv8` Windows-auth driver running inside Electron's main process. Current deadlines only stop waiting for its Promise; they cannot stop the native ODBC call. Closing or replacing that pool while the native call is still running can terminate the whole Electron process. Direct mode itself is already Browser-free: with a port present it targets `host,port`, drops the instance suffix, and does not use UDP 1434.
+| Current behaviour | Conflict |
+| --- | --- |
+| `pool.cjs` loads `mssql/msnodesqlv8` in the Electron main process and selects it for every Windows-auth attempt | The native ODBC call shares the process that owns every window, so a native fault takes the whole till down |
+| `withDeadline` races a timer against the driver promise, then closes the pool object | The abandoned native `connect()` keeps running; closing underneath it is the crash pattern |
+| The admin flow waits 1.5s for a cancelled run, then proceeds regardless | Two native calls can overlap on one target |
+| No `uncaughtException` / `unhandledRejection` handler exists | Nothing contains an async native failure |
+| Boot awaits the saved connection before the till reports healthy | A bad saved connection can end on the recovery screen |
+| The operational connection test drops `directConnect` | The Lock step re-derives the target independently, which this work forbids |
+| Direct mode already skips SQL Browser and instance lookup | Correct today — kept exactly as is |
 
-## 1. Isolate Windows ODBC from the Electron process
+`mssql` and `msnodesqlv8` are already unpacked in the packaged build, so a separate process can load them.
 
-- Add a dedicated SQL worker process for every Windows Integrated Authentication connection lifecycle.
-- Load `mssql/msnodesqlv8` only inside that worker; the Electron main process must never load the native binding.
-- Communicate over a small request/response protocol with attempt IDs, structured results, and no credentials in logs.
-- A timeout or Stop action terminates the worker process, which is the only reliable cancellation boundary for a stuck native ODBC call. It must never call `close()` on an object whose native `connect()` is still in flight.
-- Keep SQL Server Authentication on the existing pure-JavaScript `tedious` path.
-- Route the admin handshake/catalog/lock flow and the operational Windows-auth pool through the isolated worker so a later query cannot reintroduce the same whole-app crash.
-- If a worker exits unexpectedly, return a specific `EDRIVER_CRASH` result, keep the POS window alive, and allow an immediate clean retry.
+## 1. Isolated Windows-auth driver process
 
-## 2. Make direct Windows-auth attempts deterministic
+- New worker module that is the only place `mssql/msnodesqlv8` is ever loaded. It runs as a child process of the shell using the same executable in Node mode, so no extra runtime is required.
+- The worker owns the whole Windows-auth lifecycle: handshake, catalog listing, database lock, and the operational pool used for sales and sync.
+- The main process keeps a thin typed proxy exposing the same functions the app already calls, so callers do not change shape.
+- SQL Server Authentication stays on the existing in-process `tedious` path, untouched.
+- The main process must never require the native binding, directly or transitively.
 
-- Normalize `PCNAME\SQLEXPRESS` plus an explicit port into one direct target: `PCNAME,port`; do not consult SQL Browser or retry by instance name.
-- Pass `directConnect` through every typed bridge, including the direct operational test, so the Lock & Save step cannot silently fall back to automatic discovery.
-- For direct mode, try one route and a bounded TLS sequence without overlapping attempts. Kill and recreate the worker between timed-out native attempts.
-- Report the selected route and driver in the result: for example, `Windows Integrated · ODBC Driver 18 · PCNAME,port · SQL Browser not used`.
-- Distinguish `TCP open` from `ODBC authentication timed out`, driver-process exit, login denial, TLS/certificate failure, and inaccessible database.
+## 2. Request/response protocol with attempt identity
 
-## 3. Stop saved configuration from taking over startup
+- Every message carries an attempt ID, an operation name, and a payload.
+- Replies are matched to in-flight attempts. A reply for an attempt that already timed out, was stopped, or belonged to a reaped worker is discarded and never written to app state.
+- Credentials, connection strings, and passwords are stripped before anything is logged or broadcast; logs carry target, driver, stage, attempt ID, and timing only.
+- Structured failure results distinguish authentication timeout, login rejection, TLS/certificate failure, missing driver, inaccessible database, and driver-process exit.
 
-- Do not synchronously open the saved SQL connection during Electron boot.
-- Show the POS first, mark the app healthy, then start one background reconnect attempt after the renderer is ready.
-- Keep the backoff loop cancellable and single-flight; removing a connection must terminate its SQL worker, clear timers, unlink the encrypted config, and prevent a stale callback from re-arming retries.
-- A failed saved connection must leave the application usable and must never trigger the “POS did not start correctly” recovery screen.
+## 3. Cancellation by termination only
 
-## 4. Show and remove the saved connection everywhere it is edited
+- Timeout or Stop terminates the worker process. Nothing tries to close or reuse a connection whose native call may still be running.
+- After termination the attempt resolves as a terminal failure immediately, and a fresh worker serves the next attempt.
+- The existing single-flight guard is replaced by attempt ownership, so a superseded run can never race a live one.
 
-- Add a shared saved-connection summary to both Local database settings and the Setup Connection wizard.
-- When a sealed connection exists, always show its server/instance, database, authentication type, connection mode, and port.
-- Place **Remove saved connection** beside that summary in both surfaces, with the existing destructive confirmation.
-- After removal, clear the form cache, active status, retry state, and step results, then present a genuinely fresh default form.
-- Only show **Reconnect now** when a saved connection exists. In the wizard, edited values remain attempt-only until they succeed.
+## 4. Session cleanup after a kill
 
-## 5. Add durable crash and connection diagnostics
+- Terminating a worker skips TDS logout, so the server-side session can linger.
+- Each attempt records its server session identifier as soon as the sign-in reports one.
+- After a kill, a short-lived side-channel connection attempts to close that orphaned session when permissions allow.
+- When cleanup is not possible the event is counted and logged. Accumulating kill-without-logout events raise a visible warning in the local database panel, so repeated retries cannot quietly exhaust server connections.
 
-- Add a rotating desktop log in Electron user data and send main-process lifecycle, SQL worker start/exit/timeout, attempt ID, stage, driver name, target, elapsed time, and sanitized error details to it.
-- Persist admin-handshake traces to the same diagnostics stream instead of console-only output.
-- Record `uncaughtException`, `unhandledRejection`, renderer termination, and child-process termination. Native worker crashes must include exit code/signal and the last safe stage.
-- Keep credentials, connection strings, tokens, and passwords out of every log.
-- Add **Open diagnostics folder** / **Copy latest connection report** actions to the local database failure UI; retain the recovery screen’s log-folder action.
+## 5. Crash handling and crash-loop protection
 
-## 6. Regression coverage and release
+- An unexpected worker exit returns `EDRIVER_CRASH` with exit code and last safe stage. The POS window stays open and usable.
+- Consecutive `EDRIVER_CRASH` results are counted per connection target. A success or a different failure resets the count.
+- After three consecutive crashes on the same target, automatic retry stops and the UI shows a hard error naming the target and the likely cause, with manual retry only. This prevents a deterministic driver or connection-string fault from looping forever.
+- The background reconnect loop respects that stop and does not re-arm itself.
 
-- Verify direct `PCNAME\SQLEXPRESS` + explicit port never performs UDP 1434 discovery and displays the actual ODBC driver used.
-- Simulate a worker that hangs during authentication: the step times out, the worker is terminated, Electron remains alive, and retry succeeds with a new worker.
-- Simulate a worker crash: return `EDRIVER_CRASH`, write diagnostics, and keep the renderer usable.
-- Verify saved config does not block boot, is visible in both UI paths, and removal stops all retries and resets to `not_configured`.
-- Verify SQL-login connections still use `tedious` and existing sale/sync transaction behavior remains intact.
-- Run the focused connection tests and the full Vitest suite, then bump all generated/package versions together to `1.3.24`.
+## 6. Worker reuse and process caps
+
+- A healthy worker is kept warm and reused for later attempts and for operational queries; only a crash, a kill, or a target change discards it.
+- A hard cap limits concurrent worker processes. Requests beyond the cap queue rather than spawning more, so a burst of retries cannot flood the machine.
+- Workers are terminated on app shutdown, on connection removal, and when idle beyond a bounded lifetime.
+
+## 7. One canonical direct target
+
+- A single normalizer converts server text, instance name, and port into one direct target of the form `HOST,PORT`, dropping the instance suffix.
+- That resolved target — not the raw form values — flows through the port probe, handshake, catalog, lock, and operational connection. No layer re-derives it.
+- The typed bridges carry `directConnect` and the resolved target end to end, including the operational connection test that currently loses it.
+- SQL Browser and instance-name fallback remain unused in direct mode.
+- Results state the exact route used, for example `Windows Integrated · ODBC Driver 18 · PCNAME,1433 · SQL Browser not used`.
+
+## 8. Migration audit before rollout
+
+- A startup audit inspects the stored connection: a named instance without a pinned port is reported as needing attention, because dynamic-port discovery is not available on the direct path.
+- The local database panel shows a clear, actionable notice for such a configuration and offers to pin the port through the wizard, rather than failing silently at first sale.
+- The audit result is written to diagnostics so a fleet can be checked from logs.
+
+## 9. Startup, diagnostics and safety net
+
+- Boot no longer waits on SQL: the till renders and reports healthy first, then one background attempt runs.
+- Global handlers capture uncaught errors, unhandled rejections, and child-process exits, writing them to a rotating diagnostics log in application data alongside the existing connection log.
+- The failure UI gains actions to open the diagnostics folder and copy the latest sanitized connection report.
+
+## 10. Tests and release
+
+- Direct `PCNAME\SQLEXPRESS` plus a port resolves to one `PCNAME,PORT` target with no Browser lookup, identically across probe, handshake, lock, and operational paths.
+- A worker that hangs during authentication is killed; the step fails cleanly, the app stays alive, and the next attempt succeeds on a fresh worker.
+- A late reply from a reaped attempt is discarded and cannot alter state.
+- Three consecutive crashes on one target stop automatic retry and surface a hard error; a success resets the counter.
+- Worker reuse holds across sequential attempts, and the concurrency cap is never exceeded.
+- Session-kill accounting increments and warns as designed.
+- A named instance without a port is flagged by the migration audit.
+- SQL-login connections still use `tedious`, and sale/sync transaction behaviour is unchanged.
+- Full Vitest suite, then a coordinated version bump to `1.3.24`.
 
 ## Technical files
 
-- New isolated worker and main-process proxy under `electron/db/`
-- `electron/db/pool.cjs`, `electron/db/admin-pool.cjs`, `electron/main.cjs`, `electron/preload.cjs`
-- `src/lib/local-db.ts`, `src/lib/sql-admin.ts`
-- `src/components/database/SqlConnectionModal.tsx`
-- `src/components/pos/LocalDatabaseSettings.tsx`
-- Focused worker-crash, direct-route, startup, removal, and UI-state tests
+- New: isolated Windows-auth driver worker, its main-process proxy, protocol types, crash-loop tracker, session-cleanup helper, and target normalizer under `electron/db/`
+- Updated: `electron/db/pool.cjs`, `electron/db/admin-pool.cjs`, `electron/main.cjs`, `electron/preload.cjs`
+- Updated: `src/lib/local-db.ts`, `src/lib/sql-admin.ts`
+- Updated: `src/components/database/SqlConnectionModal.tsx`, `src/components/pos/LocalDatabaseSettings.tsx`
+- New tests for target normalization, attempt-ID discard, crash-loop limits, worker reuse, and the migration audit
