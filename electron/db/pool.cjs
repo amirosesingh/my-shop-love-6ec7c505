@@ -465,24 +465,34 @@ async function planAttempts(config) {
   const routes = [];
   if (target.portKnown) routes.push(true);
   // Instance-name resolution is only a fallback: when the port is already
-  // known (typed, or answered by SQL Browser) it is the proven route and
-  // asking the driver to resolve the instance again only wastes the budget.
-  if (target.instanceName && !target.portKnown) routes.push(false);
+  // known (typed, proven by the TCP step, or answered by SQL Browser) it is
+  // the proven route and asking the driver to resolve the instance again only
+  // wastes the budget.
+  if (target.instanceName && !target.provenPort) routes.push(false);
   if (!routes.length) routes.push(true);
 
   const native = config.auth === "windows" && requireWindowsDriver();
-  const drivers = native ? installedOdbcDrivers() : [null];
+  const odbc = native ? detectOdbcDrivers() : { drivers: [null], detected: true };
+  const drivers = odbc.drivers;
   if (config.auth === "windows" && !native && !config.user) {
     const e = new Error(WINDOWS_AUTH_HINT);
+    e.code = "EDRIVER";
+    throw e;
+  }
+  if (native && !drivers.length) {
+    const e = new Error(
+      "No ODBC driver for SQL Server is installed on this PC, so Windows authentication cannot be used. Install 'ODBC Driver 18 for SQL Server' from Microsoft, or switch to a SQL Server login.",
+    );
     e.code = "EDRIVER";
     throw e;
   }
 
   const attempts = [];
   for (const odbcDriver of drivers) {
+    const perDriver = [];
     for (const byPort of routes) {
       for (const sec of security) {
-        attempts.push({
+        perDriver.push({
           target,
           byPort,
           security: sec,
@@ -501,7 +511,16 @@ async function planAttempts(config) {
         });
       }
     }
+    // Best first, and short: four combinations comfortably fit the budget,
+    // while fifteen guaranteed a timeout before any of them could answer.
+    attempts.push(...perDriver.slice(0, MAX_ATTEMPTS_PER_DRIVER));
   }
+  logConnection("ladder.planned", {
+    attempts: attempts.length,
+    drivers: native ? drivers : ["tedious"],
+    odbcDetected: odbc.detected,
+    routes: routes.map((byPort) => (byPort ? "port" : "instance")),
+  });
   return { target, attempts, native };
 }
 
