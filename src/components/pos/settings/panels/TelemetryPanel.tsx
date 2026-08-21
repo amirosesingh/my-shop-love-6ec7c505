@@ -25,8 +25,10 @@ import {
   health,
   isStale,
   listTelemetry,
+  missingTelemetryColumns,
   type TelemetryRow,
 } from "@/lib/telemetry";
+
 import {
   COMMAND_LABEL,
   issueCommand,
