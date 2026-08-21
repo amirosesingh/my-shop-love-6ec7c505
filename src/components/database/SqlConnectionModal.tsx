@@ -228,22 +228,36 @@ export function SqlConnectionModal({
    * connection that refuses to finish or a machine that was set up wrongly.
    */
   /**
-   * Keeps the saved credentials: closes everything and opens the connection
-   * again. The operator's first move when the till says "Reconnecting…".
+   * Closes everything and opens the connection again. When the form has been
+   * edited the values on screen are used for the retry — repeating the sealed
+   * file is exactly what made this button look dead after a port was fixed.
    */
   const reconnectNow = async () => {
     setResetting(true);
     abandonRun();
+    setSteps(blankSteps());
     try {
-      const res = await reconnectLocalDatabase();
+      const override = dirtyRef.current
+        ? {
+            ...config,
+            port: resolvedPort() ?? 0,
+            directConnect: directConnect(),
+          }
+        : undefined;
+      const res = await reconnectLocalDatabase(override);
       if (res.ok)
-        toast.success(`Reconnected${res.activeDb ? ` to ${res.activeDb}` : ""}.`);
+        toast.success(
+          `Reconnected${res.activeDb ? ` to ${res.activeDb}` : ""}${
+            override ? " using the details on screen" : ""
+          }.`,
+        );
       else
         toast.error(res.error ?? "Could not reconnect.", { description: res.hint ?? undefined });
     } finally {
       setResetting(false);
     }
   };
+
 
   const resetConnection = async () => {
     setResetting(true);
