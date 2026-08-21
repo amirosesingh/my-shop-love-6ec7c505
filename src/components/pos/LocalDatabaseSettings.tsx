@@ -39,6 +39,33 @@ export function LocalDatabaseSettings() {
   const [showDetails, setShowDetails] = useState(false);
   const [configured, setConfigured] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+
+  /**
+   * Deletes the sealed credentials file, cancels anything still connecting and
+   * stops the background retry loop, so the panel returns to "not configured"
+   * instead of retrying a connection nobody wants any more.
+   */
+  const removeConnection = async () => {
+    setRemoving(true);
+    try {
+      const res = await removeStoredConnection();
+      if (res.ok) {
+        setConfig(defaultLocalDbConfig);
+        setConfigured(false);
+        setStatus(null);
+        setConfirmRemove(false);
+        toast.success("Saved connection removed from this machine.");
+      } else {
+        toast.error(res.error ?? "Could not remove the saved connection.");
+      }
+      await refresh();
+    } finally {
+      setRemoving(false);
+    }
+  };
+
 
   /**
    * Rebuilds the connection from the credentials already saved here. This is
