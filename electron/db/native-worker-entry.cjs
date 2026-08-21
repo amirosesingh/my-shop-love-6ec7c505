@@ -116,6 +116,16 @@ async function handle(message) {
       return { pong: true, pid: process.pid };
 
     case OPS.OPEN: {
+      // Fault injection, used only by the supervisor's own tests: a hang and a
+      // hard death are exactly the two behaviours that cannot be simulated
+      // from the parent process.
+      if (message.payload.simulateHang) {
+        await new Promise(() => {});
+      }
+      if (message.payload.simulateCrash) {
+        process.kill(process.pid, "SIGKILL");
+        await new Promise(() => {});
+      }
       if (pool) {
         try {
           await pool.close();
@@ -125,6 +135,7 @@ async function handle(message) {
         pool = null;
       }
       const opening = new namespace.ConnectionPool(message.payload.driverConfig);
+
       // A dropped pool must not turn an ordinary network blip into a crash.
       opening.on("error", () => {});
       await opening.connect();
