@@ -1,51 +1,77 @@
-# Stop the authentication handshake from crashing the till into the recovery screen
+# One-click install of the missing SQL Server ODBC driver
 
-## Which driver the till actually uses (answer first)
+## Which driver is involved (context)
 
-Two different things are often mixed up. Neither is "the SQL Browser driver" — SQL Browser is only a lookup service, not a driver.
+- SQL Server **login** connections use `mssql` on **tedious** — pure JavaScript over TCP, no driver install needed.
+- **Windows Integrated** authentication uses `mssql/msnodesqlv8`, which needs a Microsoft **ODBC** driver present on the PC. `installedOdbcDrivers()` in `electron/db/pool.cjs` reads the ODBC registry key; when nothing usable is found the ladder fails immediately with code `EDRIVER`.
+- That `EDRIVER` case is the only one this feature acts on. OLE DB is included in the catalogue but only offered when a future OLE DB path needs it.
 
-- **SQL Server login (username + password)** -> `mssql` on **tedious**, a pure JavaScript TDS client. It opens a direct TCP socket to `host,port`. No ODBC involved.
-- **Windows Integrated authentication** -> `mssql/msnodesqlv8`, a **native ODBC** binding. It builds a connection string with `Driver={ODBC Driver 18 for SQL Server}` (falling back to 17, 13, SQL Server Native Client 11.0, then the generic "SQL Server" driver, ranked by what the Windows registry reports as installed).
-- **SQL Server Browser (UDP 1434)** is used only when a named instance such as `localhost\SQLEXPRESS` is typed and no port is known. The wizard's TCP pre-flight resolves the port once and the handshake then connects by `host,port` directly, so with an explicit port the Browser service is never contacted.
+## What gets built
 
-So a direct local connection with a SQL login is fully tedious/TCP. Only Windows auth pulls in ODBC.
+### 1. Pinned driver catalogue
+A new `electron/db/driver-catalog.json` (read at runtime, so it can be refreshed by an app update or an optional signed remote override) listing, per driver id:
+`name`, `version`, official `https://download.microsoft.com/...` x64 `.msi` URL, `sha256`, size, and a `manualUrl` for the Microsoft download page.
 
-## Why it crashes into "POS did not start correctly"
+Entries: ODBC Driver 18 for SQL Server, ODBC Driver 17 for SQL Server (older-encryption fallback), OLE DB Driver 19 for SQL Server.
 
-Confirmed by reading the code:
+Only `download.microsoft.com` / `go.microsoft.com` over HTTPS is accepted; any other host in the catalogue is refused before a byte is fetched.
 
-- Windows-auth handshakes load `msnodesqlv8`, a native binary running **inside the Electron main process**. If that binary faults (missing/mismatched ODBC driver, bad VC++ runtime, driver-level abort), the whole main process dies instantly — a JavaScript `try/catch` cannot catch it.
-- `main.cjs` registers **no** `uncaughtException`, `unhandledRejection`, `render-process-gone` or `child-process-gone` handler, so nothing survives such a fault.
-- On launch, `app.whenReady()` calls `connectLocal(savedDbConfig)` — the same handshake — **before** the renderer reports `app:ready`. `health.beginBoot()` has already written `pending: true`. A crash there leaves the marker set; the next launch counts the failure, and after two, `shouldEnterSafeMode()` opens the recovery window. That is exactly the reported "handshake crashes, then POS did not start correctly".
+### 2. Main-process installer (`electron/db/driver-install.cjs`)
+Windows-only. Steps, each traced:
 
-## The fix
+```text
+resolve catalogue entry -> download to %TEMP%\pos-driver\<id>.msi (streamed, progress events)
+  -> sha256 of the file on disk vs pinned value
+  -> msiexec /i <path> /qn /norestart  (launched so Windows shows its own UAC prompt)
+  -> read exit code -> re-run installedOdbcDrivers() -> delete the temp file
+```
 
-### 1. Handshake failures can never be boot failures
-- Move the automatic reconnect on saved credentials to **after** the renderer reports `app:ready`, so the boot-health marker is already cleared before any driver work runs.
-- Boot health gains a distinction between "UI never came up" and "a background task died": only the first counts toward safe mode.
+- Download uses the existing main-process `net.cjs` HTTP (proxy-safe, no CORS), reporting `{ phase: "download", percent }` to the renderer through a new `driver:progress` broadcast. The file is written to disk rather than passed through IPC as base64.
+- Checksum is computed with `node:crypto` on the downloaded file. A mismatch deletes the file and returns `{ ok:false, code:"ECHECKSUM" }` — no install is attempted, ever.
+- Elevation is the normal Windows UAC prompt; nothing suppresses or bypasses it. Silent refers only to the MSI's own UI.
+- Exit codes are mapped: `0` success, `3010`/`1641` success but **restart required**, `1602` user cancelled the elevation/install, `1603`/other → raw code surfaced.
+- One install at a time; a second request returns "an installation is already running".
 
-### 2. The native driver runs where it cannot kill the till
-- Windows-auth (msnodesqlv8/ODBC) connect attempts move into a short-lived **child helper process** (Electron `utilityProcess`, Node fallback in dev). The parent sends target + auth mode, the child answers with the winning attempt or a structured error, and the parent enforces the same per-attempt and ladder deadlines.
-- A child that segfaults becomes a normal `EDRIVER`/`ECRASH` result with a clear message ("the ODBC driver crashed — install/repair ODBC Driver 18 for SQL Server, or use a SQL Server login"), not a dead application.
-- Tedious (SQL login) keeps running in-process; it is pure JS and cannot fault this way.
+### 3. IPC surface
+- `driver:list` — catalogue plus what is currently installed.
+- `driver:install` (id) — runs the flow above, returns `{ ok, code, exitCode, restartRequired, installed[] }`.
+- `driver:progress` — broadcast for percent and phase.
+- `driver:cancel` — abort an in-flight download (an MSI already running is left to Windows).
+All wrapped in the existing `withTimeout` helper and exposed through `electron/preload.cjs`.
 
-### 3. Last-resort process guards
-- `process.on("uncaughtException")` and `("unhandledRejection")` in main: log, record the reason, keep the window alive, broadcast a connection error to the UI.
-- `render-process-gone` / `child-process-gone`: reload the window once instead of dropping straight into recovery; only a repeated failure escalates.
+### 4. UI: the driver-missing popup gains "Install driver"
+In `SqlConnectionModal.tsx` (and the same block reused in `LocalDatabaseSettings.tsx`), the `EDRIVER` tip becomes a small panel:
 
-### 4. Honest reporting
-- The recovery screen shows the recorded reason ("database driver crashed during connection") plus the existing "Try again" / "Resume updates" actions.
-- The crash is appended to the rotating `connection.log`, with driver name, route and encryption — never credentials.
-- The wizard's handshake step shows the driver actually used (tedious vs a named ODBC driver) on both success and failure, so this question never needs asking again.
+- Which driver is missing and which one will be installed (name + version).
+- Primary button **Install driver automatically**, with the plain warning: *"Windows will ask for permission — approve the prompt to continue."*
+- Progress line: `Downloading 42%` -> `Verifying download` -> `Installing… (approve the Windows prompt)` -> result.
+- Secondary: **Download manually** (official page) and **Retry connection**, always available.
+- On success the wizard re-reads the installed drivers and **automatically re-runs the handshake step** — no restart, unless the exit code says a restart is required, in which case it says so plainly and offers a Restart now button.
 
-## Files to change
+Failure messages, each distinct and non-fatal:
+| Case | Message |
+| --- | --- |
+| Download failed | "Could not download the driver — check the internet or proxy." + retry + manual link |
+| Checksum mismatch | Security warning: the file did not match Microsoft's expected fingerprint; install refused; manual link |
+| UAC cancelled (1602) | "Installation was cancelled, the driver is still missing." + retry |
+| Other exit code | "The installer stopped with code <n>." + manual instructions link |
+| Not Windows / no catalogue entry | Button hidden, manual link only |
 
-- `electron/main.cjs` — post-ready auto-connect, process-level crash guards, renderer-gone recovery
-- `electron/health.cjs` — separate background-crash reason from failed-launch counting
-- `electron/db/pool.cjs`, `electron/db/admin-pool.cjs` — route native attempts through the helper, surface crash as a typed error, report the driver used
-- `electron/db/odbc-connect-child.cjs` (new) — isolated native connect worker
-- `electron/recovery.html` / `recovery.cjs` — show the recorded reason
-- `src/lib/sql-admin.ts`, `src/components/database/SqlConnectionModal.tsx` — driver-used field and crash message
-- Tests: boot health does not count a post-ready crash; a crashed helper yields a typed error instead of a rejection
+### 5. Logging
+Every phase writes through the existing `logConnection`/`trace` pattern into the rotating `connection.log`: `driver.download.start/progress/end`, `driver.checksum` (expected vs actual prefix), `driver.install.start/end` with exit code, and the post-install driver list. No paths outside temp, no credentials.
 
-No schema, business-logic or cloud changes. Version bumped and noted in the master documentation.
+### 6. Tests
+`driver-install.cjs` takes injectable `download`, `hash` and `runInstaller` helpers so Vitest can drive: success, restart-required (3010), download failure, checksum mismatch, UAC cancel (1602), unknown exit code, non-Windows platform, and a rejected non-Microsoft URL. No real installer is ever run in CI.
+
+## Security invariants
+
+- Downloads only from the pinned official Microsoft HTTPS URL; any other host aborts.
+- SHA256 verification is mandatory and has no override or "install anyway" path.
+- The Windows elevation prompt is always shown and never bypassed.
+
+## Files
+
+- new: `electron/db/driver-install.cjs`, `electron/db/driver-catalog.json`, `src/lib/driver-install.ts`, tests
+- changed: `electron/main.cjs` (IPC), `electron/preload.cjs` (bridge), `electron/db/pool.cjs` (cache reset after install, export refresh helper), `src/components/database/SqlConnectionModal.tsx`, `src/components/pos/LocalDatabaseSettings.tsx`
+
+Version bumped and the feature noted in the master documentation. No schema, business-logic or cloud changes.
