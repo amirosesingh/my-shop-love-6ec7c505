@@ -927,6 +927,21 @@ export function PosProvider({ children }: { children: ReactNode }) {
     const branchId = requireBranchId(input.storeId || snapshot.currentStoreId);
     input = { ...input, storeId: branchId };
     const store = snapshot.stores.find((x) => x.id === branchId);
+    // Branch + platform + terminal + day + sequence, so two registers can
+    // never mint the same bill number, online or off. A number reserved when
+    // the ticket started wins, so the header, the held record and the printed
+    // bill all agree. The reservation is awaited: if it cannot be stored the
+    // sale stops here rather than risking a duplicate bill number.
+    const receiptNo =
+      input.receiptNo ||
+      (await reserveBillNumber(
+        store?.receiptPrefix?.trim() || store?.code || "R",
+        snapshot.sales.map((s) => s.receiptNo),
+        {
+          ...(snapshot.settings.integrations.billNumbering ?? {}),
+          timeZone: snapshot.settings.integrations.timeZone || undefined,
+        },
+      ));
     const sale: Sale = {
       ...input,
       // Freeze how this branch reads right now, so a later rename never
@@ -943,23 +958,11 @@ export function PosProvider({ children }: { children: ReactNode }) {
           0,
       })),
       id: crypto.randomUUID(),
-      // Branch + platform + terminal + day + sequence, so two registers can
-      // never mint the same bill number, online or off.
-      // A number reserved when the ticket started wins, so the header, the
-      // held record and the printed bill all agree.
-      receiptNo:
-        input.receiptNo ||
-        nextBillNumber(
-          store?.receiptPrefix?.trim() || store?.code || "R",
-          snapshot.sales.map((s) => s.receiptNo),
-          {
-            ...(snapshot.settings.integrations.billNumbering ?? {}),
-            timeZone: snapshot.settings.integrations.timeZone || undefined,
-          },
-        ),
+      receiptNo,
       clientTxnId: input.clientTxnId ?? crypto.randomUUID(),
       createdAt: new Date().toISOString(),
     };
+
 
     const touchedProducts = snapshot.products
       .filter((p) => input.lines.some((l) => l.productId === p.id))
