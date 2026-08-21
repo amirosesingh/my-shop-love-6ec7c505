@@ -646,5 +646,34 @@ export async function resetLocalDatabase(): Promise<{ ok: boolean; error?: strin
     return res;
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
+}
+
+/**
+ * Delete the stored credentials for good. The shell unlinks the sealed file,
+ * cancels anything in flight and stops the background retry loop, so the till
+ * lands back on a clean "requires setup" state.
+ */
+export async function removeStoredConnection(): Promise<{
+  ok: boolean;
+  removed?: boolean;
+  error?: string | null;
+}> {
+  const bridge = localDb();
+  const remove = bridge?.removeConnection ?? bridge?.forgetConnection ?? bridge?.resetConnection;
+  if (!remove) {
+    return { ok: false, error: "Only the Windows desktop app holds a local database connection." };
   }
+  try {
+    const res = await withIpcTimeout(
+      remove(),
+      15_000,
+      "Removing the saved connection did not finish in time.",
+    );
+    cachedConfig = defaultLocalDbConfig;
+    return res;
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 }
