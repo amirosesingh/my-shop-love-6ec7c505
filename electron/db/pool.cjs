@@ -886,5 +886,7 @@ module.exports = {
   parseServerField,
   openConnection,
   resolveTarget,
+  isDirectConnect,
+  DIRECT_BUDGET_MS,
   parseOdbcRegistry,
 };
