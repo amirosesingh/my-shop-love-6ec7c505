@@ -298,20 +298,43 @@ async function resolveTarget(config) {
   let port = parsed.port;
   let portKnown = !parsed.instanceName || parsed.explicitPort;
   let browserAnswered = false;
+  // A port the TCP step already proved open outranks any further lookup.
+  const proven = Number(config.resolvedPort);
+  if (Number.isFinite(proven) && proven > 0) {
+    port = proven;
+    portKnown = true;
+    logConnection("target.proven-port", { host: parsed.host, port });
+    return { ...parsed, port, portKnown, browserAnswered, provenPort: true };
+  }
   if (parsed.instanceName && !parsed.explicitPort) {
     let discovered = null;
+    const started = Date.now();
     try {
       discovered = await require("./discover.cjs").instancePort(parsed.host, parsed.instanceName);
-    } catch {
+    } catch (err) {
+      logConnection("browser.lookup-failed", { error: err?.message ?? String(err) });
       discovered = null;
     }
+    logConnection("browser.lookup", {
+      host: parsed.host,
+      instance: parsed.instanceName,
+      port: discovered,
+      elapsedMs: Date.now() - started,
+    });
     if (discovered) {
       port = discovered;
       portKnown = true;
       browserAnswered = true;
     }
   }
-  return { ...parsed, port, portKnown, browserAnswered };
+  logConnection("target.resolved", {
+    host: parsed.host,
+    instance: parsed.instanceName || null,
+    port,
+    portKnown,
+    browserAnswered,
+  });
+  return { ...parsed, port, portKnown, browserAnswered, provenPort: false };
 }
 
 /** Encryption combinations tried in order until one completes the handshake. */
