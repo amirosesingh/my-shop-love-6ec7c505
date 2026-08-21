@@ -25,6 +25,34 @@ const DEV_URL = process.env.VITE_DEV_SERVER_URL;
 const DEBUG = process.env.POS_DEBUG === "1";
 
 /* ---------------------------------------------------------------------------
+   Safety net.
+
+   An unhandled error must never be the reason a shop cannot ring up a sale.
+   Everything is written to the connection diagnostics log and the till keeps
+   running; the native SQL driver is isolated in its own process, so the only
+   faults that can reach here are ordinary JavaScript ones.
+   --------------------------------------------------------------------------- */
+process.on("uncaughtException", (error) => {
+  try {
+    pool.logConnection("main.uncaught-exception", {
+      error: error?.message ?? String(error),
+      stack: String(error?.stack ?? "").split("\n").slice(0, 4).join(" | "),
+    });
+  } catch {
+    console.error("[pos] uncaught exception:", error);
+  }
+});
+process.on("unhandledRejection", (reason) => {
+  try {
+    pool.logConnection("main.unhandled-rejection", {
+      error: reason?.message ?? String(reason),
+    });
+  } catch {
+    console.error("[pos] unhandled rejection:", reason);
+  }
+});
+
+/* ---------------------------------------------------------------------------
    One till per PC.
 
    Two copies of the register on the same machine would each hold their own
@@ -307,7 +335,22 @@ function broadcastReconnecting(nextRetryAt) {
  */
 function scheduleReconnect(immediate = false) {
   if (reconnectSuppressed) return;
-  if (!dbConfigStore.read()) return;
+  const savedForRetry = dbConfigStore.read();
+  if (!savedForRetry) return;
+  // Three driver crashes in a row against the same server is a deterministic
+  // fault, not bad luck. Retrying it forever only hides the real problem.
+  const audit = pool.auditConnectionConfig(savedForRetry);
+  if (audit.target && pool.driverDiagnostics().crashTargets.some((t) => t.blocked)) {
+    lastConnectionDetail = {
+      code: "EDRIVER_CRASH_LOOP",
+      stage: "driver",
+      error: `The database driver stopped unexpectedly three times in a row while connecting to ${audit.target}.`,
+      hint: "Automatic retrying has been stopped. Check the ODBC driver version and the server name, then use Reconnect now.",
+    };
+    lastConnectionError = lastConnectionDetail.error;
+    broadcastReconnecting(null);
+    return;
+  }
   if (reconnectTimer) {
     if (!immediate) return;
     clearTimeout(reconnectTimer);
@@ -841,14 +884,41 @@ function registerIpc() {
   });
   ipcMain.handle("pos:database-config", () => dbConfigStore.read());
 
+  /**
+   * Migration guard plus driver health, for the local database panel.
+   *
+   * A named instance with no pinned port cannot work on the direct path, so it
+   * is reported here rather than failing silently at the first sale.
+   */
+  ipcMain.handle("pos:connection-audit", () => {
+    const saved = dbConfigStore.read();
+    const audit = pool.auditConnectionConfig(saved);
+    const driver = pool.driverDiagnostics();
+    return {
+      ...audit,
+      driver: {
+        workers: driver.workers,
+        maxWorkers: driver.maxWorkers,
+        orphanedSessions: driver.sessions.unresolved,
+        sessionWarning: driver.sessions.warn,
+        crashTargets: driver.crashTargets,
+        crashBlocked: driver.crashTargets.some((t) => t.blocked),
+      },
+    };
+  });
+
   /*
     Escape hatch. Cancels any handshake still walking its ladder, closes both
     the administration and the operational pool, and forgets the sealed
     credentials so the wizard starts from a clean slate.
   */
   ipcMain.handle("pos:reconnect", async (_e, override) => {
+    // An operator asking to reconnect is an explicit "try again": clear the
+    // crash-loop block so the attempt is actually made.
+    pool.resetDriverCrashState();
     try {
       return await reconnectNow(override);
+
     } catch (error) {
       return { ok: false, stage: "database", ...pool.describeSqlError(error) };
     }
@@ -885,6 +955,8 @@ function registerIpc() {
     } catch {
       /* already gone */
     }
+    pool.shutdownDrivers("connection-removed");
+    pool.resetDriverCrashState();
     const cleared = dbConfigStore.remove();
     reconnectSuppressed = false;
     broadcastStatus({
@@ -1369,13 +1441,19 @@ app.whenReady().then(async () => {
     configStore.set("localDb", null);
   }
   if (savedDbConfig) {
-    try {
-      await connectLocal(savedDbConfig);
-    } catch (error) {
-      lastConnectionError = fail(error).error;
+    // Never awaited: the register must be on screen and healthy before the
+    // database is reached for, so a bad saved connection can no longer end on
+    // the "POS did not start correctly" screen.
+    const audit = pool.auditConnectionConfig(savedDbConfig);
+    if (!audit.ok) {
+      pool.logConnection("config.audit", { issues: audit.issues.map((i) => i.code) });
+    }
+    void connectLocal(savedDbConfig).catch((error) => {
+      lastConnectionDetail = pool.describeSqlError(error);
+      lastConnectionError = lastConnectionDetail.error ?? fail(error).error;
       console.error("[pos] automatic SQL reconnect failed:", lastConnectionError);
       scheduleReconnect();
-    }
+    });
   }
   updater.start();
   // A few seconds after the till is usable, never before: housekeeping must
@@ -1401,5 +1479,6 @@ app.on("window-all-closed", async () => {
   stopAppServer();
   await pool.close();
   await sqlAdmin.disconnect().catch(() => {});
+  pool.shutdownDrivers("app-exit");
   if (process.platform !== "darwin") app.quit();
 });
