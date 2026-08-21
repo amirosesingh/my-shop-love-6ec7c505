@@ -26,9 +26,21 @@ const EMPTY = {
   lastFailureAt: null,
 };
 
+/** A record that cannot be parsed or is out of range must never block a launch. */
+function sanitize(raw) {
+  const state = { ...EMPTY, ...(raw && typeof raw === "object" ? raw : {}) };
+  const failures = Number(state.failures);
+  state.failures = Number.isFinite(failures) && failures > 0 ? Math.min(Math.floor(failures), 99) : 0;
+  state.pending = state.pending === true;
+  state.version = typeof state.version === "string" ? state.version : null;
+  state.lastGoodVersion =
+    typeof state.lastGoodVersion === "string" ? state.lastGoodVersion : null;
+  return state;
+}
+
 function read() {
   try {
-    return { ...EMPTY, ...JSON.parse(fs.readFileSync(file(), "utf8")) };
+    return sanitize(JSON.parse(fs.readFileSync(file(), "utf8")));
   } catch {
     return { ...EMPTY };
   }
@@ -46,19 +58,43 @@ function save(next) {
 /**
  * Called before any window opens. Returns the state for this launch, including
  * whether the previous attempt died before the UI came up.
+ *
+ * Failures are version-scoped: an update replaces the build that was failing,
+ * so its record can never keep the new build in recovery.
  */
 function beginBoot() {
   const version = app.getVersion();
   const prev = read();
+  const sameBuild = !prev.version || prev.version === version;
+  if (!sameBuild && (prev.pending || prev.failures)) {
+    console.warn(
+      `[health] discarding failure record for ${prev.version}; ${version} is installed now`,
+    );
+  }
   // A pending marker from a previous run means that run never reached the UI.
-  const failures = prev.pending ? prev.failures + 1 : 0;
-  if (prev.pending) console.error(`[health] previous launch of ${prev.version} never became ready`);
+  const carried = sameBuild && prev.pending;
+  const failures = carried ? prev.failures + 1 : 0;
+  if (carried) console.error(`[health] previous launch of ${prev.version} never became ready`);
   return save({
     ...prev,
     version,
     pending: true,
     failures,
-    lastFailureAt: prev.pending ? new Date().toISOString() : prev.lastFailureAt,
+    lastFailureAt: carried ? new Date().toISOString() : prev.lastFailureAt,
+  });
+}
+
+/**
+ * The launch went straight into recovery. The pending marker is cleared right
+ * away so sitting in safe mode cannot count as further failed launches.
+ */
+function beginRecovery(reason) {
+  const prev = read();
+  return save({
+    ...prev,
+    pending: false,
+    lastFailureAt: new Date().toISOString(),
+    reason: reason ? String(reason) : prev.reason ?? null,
   });
 }
 
