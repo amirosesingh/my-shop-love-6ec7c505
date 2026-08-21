@@ -38,12 +38,24 @@ let prefs: UiScalePrefs = DEFAULTS;
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
 
+/** Older builds wrote the same preferences here; read once, then forget it. */
+const LEGACY_KEY = "pos.ui.scale";
+
 function load(): UiScalePrefs {
   if (typeof window === "undefined") return DEFAULTS;
   try {
-    const raw = window.localStorage.getItem(KEY);
+    let raw = window.localStorage.getItem(KEY);
+    if (!raw) {
+      // Adopt an older device's value, then retire the old key.
+      raw = window.localStorage.getItem(LEGACY_KEY);
+      if (raw) {
+        window.localStorage.setItem(KEY, raw);
+        window.localStorage.removeItem(LEGACY_KEY);
+      }
+    }
     if (!raw) return DEFAULTS;
     const parsed = JSON.parse(raw) as Partial<UiScalePrefs>;
+
     return {
       mode: parsed.mode === "manual" ? "manual" : "auto",
       scale: clamp(Number(parsed.scale) || 1, 0.85, 1.5),

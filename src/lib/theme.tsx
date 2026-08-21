@@ -11,6 +11,24 @@ import {
 export type ThemeChoice = "system" | "light" | "dark";
 
 const KEY = "pos.theme";
+/** Older builds wrote the same preference here; read once, then forget it. */
+const LEGACY_KEY = "pos.ui.theme";
+
+/** Reads the choice from the current key, adopting an older device's value. */
+const readStoredTheme = (): ThemeChoice | null => {
+  try {
+    const current = localStorage.getItem(KEY);
+    if (current) return current as ThemeChoice;
+    const legacy = localStorage.getItem(LEGACY_KEY);
+    if (!legacy) return null;
+    localStorage.setItem(KEY, legacy);
+    localStorage.removeItem(LEGACY_KEY);
+    return legacy as ThemeChoice;
+  } catch {
+    return null;
+  }
+};
+
 
 type Ctx = {
   theme: ThemeChoice;
@@ -36,8 +54,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [prefersDark, setPrefersDark] = useState(true);
 
   useEffect(() => {
-    const stored = localStorage.getItem(KEY) as ThemeChoice | null;
+    const stored = readStoredTheme();
     if (stored === "light" || stored === "dark" || stored === "system") setThemeState(stored);
+
+
     setPrefersDark(systemDark());
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = (e: MediaQueryListEvent) => setPrefersDark(e.matches);

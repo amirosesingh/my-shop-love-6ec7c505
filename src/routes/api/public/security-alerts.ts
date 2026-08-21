@@ -5,7 +5,6 @@
  * closes ones that no longer appear.
  */
 import { createFileRoute } from "@tanstack/react-router";
-import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 
 const payload = z.object({
@@ -22,24 +21,18 @@ const payload = z.object({
     .max(200),
 });
 
-function signatureMatches(raw: string, header: string, secret: string): boolean {
-  const expected = createHmac("sha256", secret).update(raw).digest("hex");
-  const given = header.replace(/^sha256=/i, "").trim();
-  if (given.length !== expected.length) return false;
-  return timingSafeEqual(Buffer.from(given), Buffer.from(expected));
-}
-
 async function handle({ request }: { request: Request }) {
-  const secret = process.env["SECURITY_ALERT_INGEST_SECRET"];
-  if (!secret) {
-    return Response.json({ error: "Ingest is not configured" }, { status: 503 });
-  }
-
   const raw = await request.text();
-  const signature = request.headers.get("x-security-signature") ?? "";
-  if (!signature || !signatureMatches(raw, signature, secret)) {
-    return new Response("Invalid signature", { status: 401 });
-  }
+  // Shared caller check for every /api/public/* endpoint.
+  const { verifyHmacSignature } = await import("@/lib/public-api-guard.server");
+  const denied = verifyHmacSignature({
+    raw,
+    signature: request.headers.get("x-security-signature"),
+    secret: process.env["SECURITY_ALERT_INGEST_SECRET"],
+    label: "Security alert ingest",
+  });
+  if (denied) return denied;
+
 
   let parsed;
   try {

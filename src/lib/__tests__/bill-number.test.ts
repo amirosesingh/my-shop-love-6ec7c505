@@ -37,3 +37,32 @@ describe("bill numbers", () => {
     expect(dayStamp(at, "America/New_York")).toBe("20260811");
   });
 });
+
+describe("bill number reservation failures", () => {
+  it("refuses to hand out a number the device could not record", async () => {
+    const original = globalThis.localStorage;
+    (globalThis as { localStorage?: unknown }).localStorage = {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error("QuotaExceededError");
+      },
+      removeItem: () => {},
+      clear: () => {},
+    };
+    const { nextBillNumber: next, reserveBillNumber, BillNumberReservationError } = await import(
+      "@/lib/bill-number"
+    );
+    expect(() => next("B1", [], { branchCode: "B101" })).toThrow(BillNumberReservationError);
+    await expect(reserveBillNumber("B1", [], { branchCode: "B101" })).rejects.toBeInstanceOf(
+      BillNumberReservationError,
+    );
+    (globalThis as { localStorage?: unknown }).localStorage = original;
+  });
+
+  it("awaits the durable reservation before returning a number", async () => {
+    const { reserveBillNumber } = await import("@/lib/bill-number");
+    const a = await reserveBillNumber("B1", [], { branchCode: "B101", padding: 4 });
+    const b = await reserveBillNumber("B1", [], { branchCode: "B101", padding: 4 });
+    expect(a).not.toEqual(b);
+  });
+});
