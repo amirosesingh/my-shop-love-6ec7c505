@@ -128,16 +128,35 @@ export function describeLocalDbState(
 export function deriveLocalDbState(input: {
   available: boolean;
   configured: boolean;
-  status: Pick<LocalSyncStatus, "connected" | "error"> | null;
+  status:
+    | (Pick<LocalSyncStatus, "connected" | "error"> & {
+        errorHint?: string | null;
+        errorCode?: string | null;
+      })
+    | null;
   pending?: "testing" | "saving" | null;
 }): LocalDbConnectionView {
   if (!input.available) return describeLocalDbState("unavailable");
   if (input.pending) return describeLocalDbState(input.pending);
   if (input.status?.connected) return describeLocalDbState("connected");
-  if (input.status?.error) return describeLocalDbState("failed", input.status.error);
+  if (input.status?.error) return describeLocalDbState("failed", reconnectReason(input.status));
   if (!input.configured) return describeLocalDbState("not_configured");
   return describeLocalDbState("initializing", "Trying to reach the saved database.");
 }
+
+/**
+ * The banner shows the driver's actual reason, not a generic line: a stopped
+ * SQL Browser or a wrong port is a fixable misconfiguration and the operator
+ * should be told which one it is.
+ */
+export function reconnectReason(status: {
+  error?: string | null;
+  errorHint?: string | null;
+}): string {
+  const parts = [status.error?.trim(), status.errorHint?.trim()].filter(Boolean);
+  return parts.length ? parts.join(" ") : "Trying to reach the saved database.";
+}
+
 
 /** No IPC call may hang the UI: everything gets an outer deadline. */
 export async function withIpcTimeout<T>(
