@@ -247,6 +247,12 @@ export type PosBridge = {
   getDatabaseConfig?: () => Promise<Partial<LocalDbConfig> | null>;
   /** Forget the saved connection and drop every pool (escape hatch). */
   resetConnection?: () => Promise<{ ok: boolean; error?: string | null }>;
+  /** Forget the saved connection (same as resetConnection, explicit name). */
+  forgetConnection?: () => Promise<{ ok: boolean; error?: string | null }>;
+  /** Rebuild the connection from the SAVED credentials — no restart, no setup. */
+  reconnect?: () => Promise<LocalDbReconnectResult>;
+  /** Ask the background loop for an immediate attempt. */
+  retryConnection?: () => Promise<{ ok: boolean }>;
   /** Read the single master schema file — passive, never executes anything. */
   readSchema?: () => Promise<{
     ok: boolean;
@@ -542,14 +548,59 @@ export async function writeLocalDbConfig(config: LocalDbConfig) {
  * closes both pools and forgets the sealed credentials. Safe to call at any
  * time, including while the wizard is mid-run.
  */
+export type LocalDbReconnectResult = {
+  ok: boolean;
+  stage?: string;
+  activeDb?: string | null;
+  serverName?: string | null;
+  latencyMs?: number | null;
+  error?: string | null;
+  hint?: string | null;
+};
+
+/**
+ * Rebuild the connection from the credentials already saved on this till.
+ *
+ * This is the fix for "Reconnecting…" that never recovered: it tears both
+ * pools down, cancels anything wedged and opens the saved connection again,
+ * without asking the operator to restart or to type the server details afresh.
+ */
+export async function reconnectLocalDatabase(): Promise<LocalDbReconnectResult> {
+  const bridge = localDb();
+  if (!bridge?.reconnect) {
+    return { ok: false, error: "Only the Windows desktop app holds a local database connection." };
+  }
+  try {
+    return await withIpcTimeout(
+      bridge.reconnect(),
+      70_000,
+      "The reconnect did not finish in time.",
+    );
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/** Nudge the background retry loop to attempt right now. */
+export async function retryLocalDatabaseNow(): Promise<{ ok: boolean }> {
+  const bridge = localDb();
+  if (!bridge?.retryConnection) return { ok: false };
+  try {
+    return await withIpcTimeout(bridge.retryConnection(), 10_000, "The retry request timed out.");
+  } catch {
+    return { ok: false };
+  }
+}
+
 export async function resetLocalDatabase(): Promise<{ ok: boolean; error?: string | null }> {
   const bridge = localDb();
-  if (!bridge?.resetConnection) {
+  const forget = bridge?.forgetConnection ?? bridge?.resetConnection;
+  if (!forget) {
     return { ok: false, error: "Only the Windows desktop app holds a local database connection." };
   }
   try {
     const res = await withIpcTimeout(
-      bridge.resetConnection(),
+      forget(),
       15_000,
       "The reset did not finish in time. Restart the till if the connection stays stuck.",
     );

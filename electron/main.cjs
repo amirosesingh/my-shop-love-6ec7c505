@@ -54,12 +54,15 @@ let readyWatchdog = null;
 let safeMode = false;
 let reconnectTimer = null;
 let reconnectDelay = 5_000;
+let reconnectAttempt = 0;
+let lastConnectionError = null;
 let cloudConfig = null;
 
 function enterSafeMode(reason) {
   if (safeMode) return;
   safeMode = true;
   if (reason) health.markFailed(reason);
+  else health.beginRecovery("Repeated failed launches");
   updater.pause();
   for (const win of BrowserWindow.getAllWindows()) win.destroy();
   mainWindow = null;
@@ -234,6 +237,8 @@ async function connectLocal(config) {
   // round-trip before anything is told the till is connected.
   const verified = await pool.verify();
   reconnectDelay = 5_000;
+  reconnectAttempt = 0;
+  lastConnectionError = null;
   broadcastStatus(await statusPayload());
   return verified;
 }
@@ -249,18 +254,136 @@ function withTimeout(promise, ms, message) {
   ]);
 }
 
-function scheduleReconnect() {
-  if (reconnectTimer || !dbConfigStore.read()) return;
+/** One reconnect attempt may never outlive its own slot. */
+const RECONNECT_ATTEMPT_MS = 60_000;
+
+/**
+ * Tells the renderer the loop is alive: which attempt is running, when the
+ * next one starts, and why the last one failed. A bare spinner with no reason
+ * is what left the till reading "Reconnecting…" for ever.
+ */
+function broadcastReconnecting(nextRetryAt) {
+  broadcastStatus({
+    connected: false,
+    reconnecting: true,
+    attempt: reconnectAttempt,
+    nextRetryAt: nextRetryAt ?? null,
+    error: lastConnectionError,
+    lastError: lastConnectionError,
+    tables: [],
+    queue: [],
+    server: null,
+    database: null,
+    resolved: null,
+    cloudConfigured: !!cloudConfig,
+  });
+}
+
+/**
+ * Backoff 5s -> 10s -> 20s -> 40s -> 60s, capped, retrying for as long as a
+ * connection is saved. `immediate` is the operator pressing "Retry now".
+ */
+function scheduleReconnect(immediate = false) {
+  if (!dbConfigStore.read()) return;
+  if (reconnectTimer) {
+    if (!immediate) return;
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  if (immediate) {
+    reconnectDelay = 5_000;
+    reconnectAttempt = 0;
+  }
+  const delay = immediate ? 0 : reconnectDelay;
+  broadcastReconnecting(new Date(Date.now() + delay).toISOString());
   reconnectTimer = setTimeout(async () => {
     reconnectTimer = null;
+    const config = dbConfigStore.read();
+    if (!config) return;
+    reconnectAttempt += 1;
     try {
-      await connectLocal(dbConfigStore.read());
+      await withTimeout(
+        connectLocal(config),
+        RECONNECT_ATTEMPT_MS,
+        "The local database did not answer in time.",
+      );
+      console.log(`[pos] local database reconnected on attempt ${reconnectAttempt}`);
     } catch (error) {
-      broadcastStatus({ connected: false, error: fail(error).error, tables: [], queue: [] });
+      lastConnectionError = fail(error).error;
+      console.warn(`[pos] reconnect attempt ${reconnectAttempt} failed: ${lastConnectionError}`);
       reconnectDelay = Math.min(reconnectDelay * 2, 60_000);
       scheduleReconnect();
     }
-  }, reconnectDelay);
+  }, delay);
+}
+
+/**
+ * Escape hatch that keeps the credentials: drop everything that might be
+ * wedged and open the saved connection again, right now.
+ */
+async function reconnectNow() {
+  const config = dbConfigStore.read();
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  try {
+    await sqlAdmin.cancel();
+  } catch {
+    /* nothing was running */
+  }
+  try {
+    await sqlAdmin.disconnect();
+  } catch {
+    /* already gone */
+  }
+  try {
+    await pool.close();
+  } catch {
+    /* already gone */
+  }
+  if (!config) {
+    lastConnectionError = null;
+    reconnectAttempt = 0;
+    broadcastStatus({
+      connected: false,
+      reconnecting: false,
+      tables: [],
+      queue: [],
+      server: null,
+      database: null,
+      resolved: null,
+      cloudConfigured: !!cloudConfig,
+    });
+    return {
+      ok: false,
+      stage: "config",
+      error: "No local database connection is saved on this till.",
+      hint: "Run Setup connection in Local database settings.",
+    };
+  }
+  reconnectAttempt = 1;
+  broadcastReconnecting(new Date().toISOString());
+  try {
+    const verified = await withTimeout(
+      connectLocal(config),
+      RECONNECT_ATTEMPT_MS,
+      "The local database did not answer in time.",
+    );
+    return {
+      ok: true,
+      stage: "connected",
+      activeDb: verified?.activeDb ?? config.database ?? null,
+      serverName: verified?.serverName ?? null,
+      latencyMs: verified?.latencyMs ?? null,
+    };
+  } catch (error) {
+    const described = pool.describeSqlError(error);
+    lastConnectionError = described.error;
+    // Keep trying in the background: the service may simply still be starting.
+    scheduleReconnect();
+    return { ok: false, stage: described.stage ?? "database", ...described };
+  }
 }
 
 /** Loose files a crashed update or print job can leave behind. */
@@ -542,7 +665,12 @@ function registerIpc() {
   ipcMain.handle("app:ready", () => {
     if (readyWatchdog) clearTimeout(readyWatchdog);
     readyWatchdog = null;
-    return { ok: true, health: health.markHealthy() };
+    const state = health.markHealthy();
+    // This build reached the till, so a previous bad start may no longer keep
+    // automatic updates switched off.
+    const resumed = updater.resume();
+    if (resumed.resumed) console.log("[pos] automatic updates resumed after a healthy launch");
+    return { ok: true, health: state, updatesResumed: resumed.resumed };
   });
 
   ipcMain.handle("health:state", () => {
@@ -567,6 +695,11 @@ function registerIpc() {
     const { lastGoodVersion } = health.read();
     updater.pause();
     return updater.rollback(lastGoodVersion, (percent) => recovery.progress({ percent }));
+  });
+
+  ipcMain.handle("health:resume-updates", () => {
+    health.reset();
+    return updater.resume();
   });
 
   ipcMain.handle("health:retry", () => {
@@ -677,11 +810,28 @@ function registerIpc() {
     the administration and the operational pool, and forgets the sealed
     credentials so the wizard starts from a clean slate.
   */
-  ipcMain.handle("pos:reset-connection", async () => {
+  ipcMain.handle("pos:reconnect", async () => {
+    try {
+      return await reconnectNow();
+    } catch (error) {
+      return { ok: false, stage: "database", ...pool.describeSqlError(error) };
+    }
+  });
+
+  /** Operator asked for an immediate background retry (non-blocking). */
+  ipcMain.handle("pos:retry-connection", () => {
+    scheduleReconnect(true);
+    return { ok: true };
+  });
+
+  ipcMain.handle("pos:forget-connection", async () => {
     if (reconnectTimer) {
       clearTimeout(reconnectTimer);
       reconnectTimer = null;
     }
+    reconnectAttempt = 0;
+    reconnectDelay = 5_000;
+    lastConnectionError = null;
     try {
       await sqlAdmin.cancel();
     } catch {
@@ -700,6 +850,7 @@ function registerIpc() {
     const cleared = dbConfigStore.write(null);
     broadcastStatus({
       connected: false,
+      reconnecting: false,
       tables: [],
       queue: [],
       server: null,
@@ -707,7 +858,7 @@ function registerIpc() {
       resolved: null,
       cloudConfigured: !!cloudConfig,
     });
-    return { ok: cleared.ok !== false, error: cleared.error ?? null };
+    return { ok: cleared.ok !== false, stage: "forgotten", error: cleared.error ?? null };
   });
 
   /*
@@ -766,7 +917,7 @@ function registerIpc() {
 
   ipcMain.handle("sqladmin:connect", (_e, credentials) =>
     bounded(
-      30_000,
+      45_000,
       "The SQL driver did not finish the authentication handshake in time.",
       () => sqlAdmin.connectInstance(credentials),
       credentials?.attemptId ?? null,
@@ -781,7 +932,7 @@ function registerIpc() {
     ),
   );
   ipcMain.handle("sqladmin:lock", (_e, credentials) =>
-    bounded(30_000, "The database could not be opened in time.", () =>
+    bounded(45_000, "The database could not be opened in time.", () =>
       sqlAdmin.lockDatabase(credentials),
     ),
   );
@@ -1115,6 +1266,9 @@ app.whenReady().then(async () => {
   const boot = health.beginBoot();
   if (health.shouldEnterSafeMode(boot)) {
     safeMode = true;
+    // Clear the pending marker at once: time spent in recovery must never be
+    // counted as further failed launches, or the till can never leave it.
+    health.beginRecovery(boot.reason ?? "Repeated failed launches");
     updater.pause();
     recovery.open();
     return;
@@ -1145,7 +1299,8 @@ app.whenReady().then(async () => {
     try {
       await connectLocal(savedDbConfig);
     } catch (error) {
-      console.error("[pos] automatic SQL reconnect failed:", fail(error).error);
+      lastConnectionError = fail(error).error;
+      console.error("[pos] automatic SQL reconnect failed:", lastConnectionError);
       scheduleReconnect();
     }
   }

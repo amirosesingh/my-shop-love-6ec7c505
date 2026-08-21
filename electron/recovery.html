@@ -48,6 +48,7 @@
       <div class="actions">
         <button class="primary" id="rollback">Roll back to previous version</button>
         <button id="retry">Try starting again</button>
+        <button id="resume">Resume automatic updates</button>
         <button id="logs">Open log folder</button>
         <button id="quit">Close</button>
       </div>
@@ -89,6 +90,10 @@
       };
       api.onProgress((p) => { if (p && p.percent != null) msg.textContent = "Downloading… " + p.percent + "%"; });
       document.getElementById("retry").onclick = () => api.retry();
+      document.getElementById("resume").onclick = async () => {
+        await api.resumeUpdates();
+        msg.textContent = "Automatic updates switched back on. Start the till again to pick one up.";
+      };
       document.getElementById("logs").onclick = () => api.openLogs();
       document.getElementById("quit").onclick = () => api.quit();
     </script>

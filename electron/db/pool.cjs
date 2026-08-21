@@ -14,9 +14,53 @@ const WINDOWS_AUTH_HINT =
 
 const CONNECT_TIMEOUT_MS = 15_000;
 /** Hard ceiling for the whole attempt ladder — the UI must always get an answer. */
-const LADDER_BUDGET_MS = 25_000;
+const LADDER_BUDGET_MS = 40_000;
 /** No single attempt may eat the whole budget. */
-const ATTEMPT_TIMEOUT_MS = 8_000;
+const ATTEMPT_TIMEOUT_MS = 10_000;
+/** The ladder stays short on purpose: four tries fit inside the budget. */
+const MAX_ATTEMPTS_PER_DRIVER = 4;
+
+/* ------------------------- connection diagnostics ------------------------- */
+
+let logFile = null;
+let logResolved = false;
+
+/** `<userData>/connection.log`, resolved lazily so tests can load this module. */
+function connectionLogFile() {
+  if (logResolved) return logFile;
+  logResolved = true;
+  try {
+    const { app } = require("electron");
+    logFile = path.join(app.getPath("userData"), "connection.log");
+  } catch {
+    logFile = null;
+  }
+  return logFile;
+}
+
+/**
+ * One structured line per sub-step (driver load, target resolution, Browser
+ * lookup, every ladder attempt, verification). Never any credential value.
+ */
+function logConnection(event, detail) {
+  const line = `${new Date().toISOString()} [sqlconn] ${event}${
+    detail ? ` ${JSON.stringify(detail)}` : ""
+  }`;
+  // eslint-disable-next-line no-console
+  console.log(line);
+  const file = connectionLogFile();
+  if (!file) return;
+  try {
+    // Rotate before the log can grow without bound on a long-running till.
+    if (fs.existsSync(file) && fs.statSync(file).size > 512 * 1024) {
+      fs.renameSync(file, `${file}.1`);
+    }
+    fs.appendFileSync(file, `${line}\n`, "utf8");
+  } catch {
+    /* diagnostics must never break a connection */
+  }
+}
+
 
 let driver = null;
 let nativeDriver = null;
@@ -62,24 +106,71 @@ const KNOWN_ODBC_DRIVERS = [
 
 let odbcCache = null;
 
-/** ODBC drivers actually installed on this PC, best first. */
-function installedOdbcDrivers() {
+/**
+ * Names of the registry values under the ODBC Drivers key.
+ *
+ * Each installed driver is one value line: `    <name>    REG_SZ    Installed`.
+ * Matching the whole dump as one string made "SQL Server" match any line, so
+ * uninstalled drivers were tried and burned the connection budget.
+ */
+function parseOdbcRegistry(dump) {
+  const names = [];
+  for (const raw of String(dump ?? "").split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith("HKEY_")) continue;
+    const match = /^(.+?)\s{2,}REG_SZ\s{2,}(.*)$/.exec(line);
+    if (!match) continue;
+    const name = match[1].trim();
+    // "Not installed" must not match — only a positive Installed value counts.
+    if (!/^installed$/i.test(match[2].trim())) continue;
+    if (name && !names.includes(name)) names.push(name);
+  }
+  return names;
+}
+
+/**
+ * ODBC drivers actually installed on this PC, best first.
+ *
+ * Returns `{ drivers, detected }`. `detected` is false when the registry could
+ * not be read at all — the caller then falls back to the two most likely
+ * drivers rather than walking every name ever shipped.
+ */
+function detectOdbcDrivers() {
   if (odbcCache) return odbcCache;
-  let found = [];
+  let installed = [];
+  let detected = false;
   if (process.platform === "win32") {
     try {
       const out = execFileSync(
         "reg",
         ["query", "HKLM\\SOFTWARE\\ODBC\\ODBCINST.INI\\ODBC Drivers"],
         { timeout: 4000, windowsHide: true, encoding: "utf8" },
-      ).toLowerCase();
-      found = KNOWN_ODBC_DRIVERS.filter((name) => out.includes(name.toLowerCase()));
-    } catch {
-      found = [];
+      );
+      installed = parseOdbcRegistry(out);
+      detected = true;
+    } catch (err) {
+      logConnection("odbc.registry-unreadable", { error: err?.message ?? String(err) });
+      installed = [];
+      detected = false;
     }
   }
-  odbcCache = found.length ? found : KNOWN_ODBC_DRIVERS;
+  const lower = installed.map((n) => n.toLowerCase());
+  const ranked = KNOWN_ODBC_DRIVERS.filter((name) => lower.includes(name.toLowerCase()));
+  // A driver we do not rank but that IS installed still beats guessing.
+  const extras = installed.filter(
+    (name) => /sql server/i.test(name) && !ranked.some((r) => r.toLowerCase() === name.toLowerCase()),
+  );
+  const drivers = detected
+    ? [...ranked, ...extras]
+    : KNOWN_ODBC_DRIVERS.slice(0, 2);
+  odbcCache = { drivers, detected, installed };
+  logConnection("odbc.detected", { detected, drivers });
   return odbcCache;
+}
+
+/** Backwards-compatible list form used by the diagnostics UI. */
+function installedOdbcDrivers() {
+  return detectOdbcDrivers().drivers;
 }
 
 function requireWindowsDriver() {
@@ -208,20 +299,43 @@ async function resolveTarget(config) {
   let port = parsed.port;
   let portKnown = !parsed.instanceName || parsed.explicitPort;
   let browserAnswered = false;
+  // A port the TCP step already proved open outranks any further lookup.
+  const proven = Number(config.resolvedPort);
+  if (Number.isFinite(proven) && proven > 0) {
+    port = proven;
+    portKnown = true;
+    logConnection("target.proven-port", { host: parsed.host, port });
+    return { ...parsed, port, portKnown, browserAnswered, provenPort: true };
+  }
   if (parsed.instanceName && !parsed.explicitPort) {
     let discovered = null;
+    const started = Date.now();
     try {
       discovered = await require("./discover.cjs").instancePort(parsed.host, parsed.instanceName);
-    } catch {
+    } catch (err) {
+      logConnection("browser.lookup-failed", { error: err?.message ?? String(err) });
       discovered = null;
     }
+    logConnection("browser.lookup", {
+      host: parsed.host,
+      instance: parsed.instanceName,
+      port: discovered,
+      elapsedMs: Date.now() - started,
+    });
     if (discovered) {
       port = discovered;
       portKnown = true;
       browserAnswered = true;
     }
   }
-  return { ...parsed, port, portKnown, browserAnswered };
+  logConnection("target.resolved", {
+    host: parsed.host,
+    instance: parsed.instanceName || null,
+    port,
+    portKnown,
+    browserAnswered,
+  });
+  return { ...parsed, port, portKnown, browserAnswered, provenPort: false };
 }
 
 /** Encryption combinations tried in order until one completes the handshake. */
@@ -352,24 +466,34 @@ async function planAttempts(config) {
   const routes = [];
   if (target.portKnown) routes.push(true);
   // Instance-name resolution is only a fallback: when the port is already
-  // known (typed, or answered by SQL Browser) it is the proven route and
-  // asking the driver to resolve the instance again only wastes the budget.
-  if (target.instanceName && !target.portKnown) routes.push(false);
+  // known (typed, proven by the TCP step, or answered by SQL Browser) it is
+  // the proven route and asking the driver to resolve the instance again only
+  // wastes the budget.
+  if (target.instanceName && !target.provenPort) routes.push(false);
   if (!routes.length) routes.push(true);
 
   const native = config.auth === "windows" && requireWindowsDriver();
-  const drivers = native ? installedOdbcDrivers() : [null];
+  const odbc = native ? detectOdbcDrivers() : { drivers: [null], detected: true };
+  const drivers = odbc.drivers;
   if (config.auth === "windows" && !native && !config.user) {
     const e = new Error(WINDOWS_AUTH_HINT);
+    e.code = "EDRIVER";
+    throw e;
+  }
+  if (native && !drivers.length) {
+    const e = new Error(
+      "No ODBC driver for SQL Server is installed on this PC, so Windows authentication cannot be used. Install 'ODBC Driver 18 for SQL Server' from Microsoft, or switch to a SQL Server login.",
+    );
     e.code = "EDRIVER";
     throw e;
   }
 
   const attempts = [];
   for (const odbcDriver of drivers) {
+    const perDriver = [];
     for (const byPort of routes) {
       for (const sec of security) {
-        attempts.push({
+        perDriver.push({
           target,
           byPort,
           security: sec,
@@ -388,7 +512,16 @@ async function planAttempts(config) {
         });
       }
     }
+    // Best first, and short: four combinations comfortably fit the budget,
+    // while fifteen guaranteed a timeout before any of them could answer.
+    attempts.push(...perDriver.slice(0, MAX_ATTEMPTS_PER_DRIVER));
   }
+  logConnection("ladder.planned", {
+    attempts: attempts.length,
+    drivers: native ? drivers : ["tedious"],
+    odbcDetected: odbc.detected,
+    routes: routes.map((byPort) => (byPort ? "port" : "instance")),
+  });
   return { target, attempts, native };
 }
 
@@ -426,6 +559,8 @@ async function openConnection(config) {
     let opening = null;
     if (deadDrivers.has(attempt.odbcDriver)) continue;
     if (usableDriver && attempt.odbcDriver !== usableDriver) continue;
+    const startedAt = Date.now();
+    logConnection("attempt.start", { label: attempt.label, remainingMs: remaining });
     try {
       const mssql = native ? loadNativeDriver() : loadDriver();
       opening = new mssql.ConnectionPool(attempt.driverConfig);
@@ -438,6 +573,7 @@ async function openConnection(config) {
         "ETIMEOUT",
         "The sign-in did not complete before the deadline.",
       );
+      logConnection("attempt.ok", { label: attempt.label, elapsedMs: Date.now() - startedAt });
       return {
         pool: opened,
         attempt: {
@@ -465,6 +601,12 @@ async function openConnection(config) {
         }
       }
       tried.push({ label: attempt.label, code: err?.code ?? null, error: err?.message ?? String(err) });
+      logConnection("attempt.fail", {
+        label: attempt.label,
+        code: err?.code ?? null,
+        elapsedMs: Date.now() - startedAt,
+        error: err?.message ?? String(err),
+      });
       // A rejected sign-in is final: no other port, driver or TLS setting fixes it.
       if (isLoginFailure(err)) break;
       if (native) {
@@ -697,6 +839,8 @@ async function applySchemaNow() {
 }
 
 module.exports = {
+  installedOdbcDrivers,
+  logConnection,
   sql,
   connect,
   close,
@@ -713,5 +857,5 @@ module.exports = {
   parseServerField,
   openConnection,
   resolveTarget,
-  installedOdbcDrivers,
+  parseOdbcRegistry,
 };

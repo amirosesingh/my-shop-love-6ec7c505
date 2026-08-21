@@ -21,9 +21,9 @@ export function newAttemptId(): string {
 /** Deadlines sit just above the main-process bound for the same channel. */
 export const STEP_DEADLINE_MS: Record<string, number> = {
   socket: 18_000,
-  handshake: 33_000,
+  handshake: 48_000,
   catalog: 18_000,
-  lock: 35_000,
+  lock: 48_000,
   write: 25_000,
 };
 

@@ -12,8 +12,13 @@ contextBridge.exposeInMainWorld("pos", {
   configureCloud: (cloud) => invoke("pos:configure-cloud", cloud),
   test: (config) => invoke("pos:test", config),
   getDatabaseConfig: () => invoke("pos:database-config"),
+  /** Tear both pools down and open the SAVED connection again — no restart. */
+  reconnect: () => invoke("pos:reconnect"),
+  /** Ask the background loop for an immediate attempt. */
+  retryConnection: () => invoke("pos:retry-connection"),
   /** Forget the saved SQL Server connection and drop every pool. */
-  resetConnection: () => invoke("pos:reset-connection"),
+  forgetConnection: () => invoke("pos:forget-connection"),
+  resetConnection: () => invoke("pos:forget-connection"),
   /* schema lifecycle — read is passive, apply needs an operator click */
   readSchema: () => invoke("pos:read-schema"),
   applySchema: () => invoke("pos:apply-schema"),

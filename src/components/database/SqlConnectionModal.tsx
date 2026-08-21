@@ -39,6 +39,7 @@ import {
   scanLocalInstances,
   testDirectConnection,
   verifyLocalWrite,
+  reconnectLocalDatabase,
   resetLocalDatabase,
   type LocalDbConfig,
   type LocalDbTestResult,
@@ -155,6 +156,8 @@ export function SqlConnectionModal({
   const guard = useRef(createRunGuard()).current;
   /** Identity of the current run; shared with the shell so it can be cancelled. */
   const attemptRef = useRef<string | null>(null);
+  /** Port the TCP step proved open; reused by the handshake and the lock. */
+  const provenPortRef = useRef<number | null>(null);
   /** Synchronous lock — protects against a double click within one render. */
   const startingRef = useRef(false);
 
@@ -199,6 +202,24 @@ export function SqlConnectionModal({
    * pools and forgets the saved credentials. This is the way out of a
    * connection that refuses to finish or a machine that was set up wrongly.
    */
+  /**
+   * Keeps the saved credentials: closes everything and opens the connection
+   * again. The operator's first move when the till says "Reconnecting…".
+   */
+  const reconnectNow = async () => {
+    setResetting(true);
+    abandonRun();
+    try {
+      const res = await reconnectLocalDatabase();
+      if (res.ok)
+        toast.success(`Reconnected${res.activeDb ? ` to ${res.activeDb}` : ""}.`);
+      else
+        toast.error(res.error ?? "Could not reconnect.", { description: res.hint ?? undefined });
+    } finally {
+      setResetting(false);
+    }
+  };
+
   const resetConnection = async () => {
     setResetting(true);
     abandonRun();
@@ -277,6 +298,10 @@ export function SqlConnectionModal({
   const credentials = () => ({
     server: config.server,
     port: resolvedPort(),
+    // The port the TCP step actually proved open. Passing it forward stops the
+    // driver resolving the instance again over SQL Browser — the sub-step that
+    // used to hang the handshake when that service is stopped.
+    resolvedPort: provenPortRef.current ?? undefined,
     auth: config.auth,
     user: config.user,
     password: config.password,
@@ -366,10 +391,12 @@ export function SqlConnectionModal({
     const bridge = sqlAdmin();
     if (!bridge?.probePort) return failure("socket", DESKTOP_ONLY);
     mark("socket", { status: "running", attemptId: attemptRef.current ?? undefined });
+    provenPortRef.current = null;
     const call = await bounded("socket", bridge.probePort(credentials()));
     if (!call.ok) return false;
     const res = call.value;
     if (!res.ok) return failure("socket", res, res.elapsedMs);
+    provenPortRef.current = res.skipped ? null : (res.port ?? null);
     mark("socket", {
       status: "passed",
       ms: res.elapsedMs,
@@ -803,6 +830,20 @@ export function SqlConnectionModal({
             )}
             <Button
               type="button"
+              variant="outline"
+              disabled={resetting}
+              onClick={() => void reconnectNow()}
+              title="Close both pools and open the saved connection again — credentials are kept."
+            >
+              {resetting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Plug className="mr-2 h-4 w-4" />
+              )}
+              Reconnect now
+            </Button>
+            <Button
+              type="button"
               variant="ghost"
               disabled={resetting}
               onClick={() => void resetConnection()}
@@ -813,7 +854,7 @@ export function SqlConnectionModal({
               ) : (
                 <Eraser className="mr-2 h-4 w-4" />
               )}
-              Reset connection
+              Forget connection
             </Button>
           </div>
           <Button type="button" disabled={running || !catalogReady} onClick={() => void finish()}>

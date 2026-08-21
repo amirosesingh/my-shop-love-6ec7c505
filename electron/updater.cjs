@@ -139,6 +139,20 @@ function pause() {
   stop();
 }
 
+/**
+ * A launch that reached the till proves the build works, so automatic updates
+ * come back on their own — a single bad start can no longer pause them for ever.
+ */
+function resume() {
+  if (!paused) return { ok: true, resumed: false };
+  paused = false;
+  set({ status: "idle", error: null });
+  start();
+  return { ok: true, resumed: true };
+}
+
+const isPaused = () => paused;
+
 /* ------------------------------ rollback ------------------------------ */
 
 const artifact = (version) => `${app.getName()} Setup ${version}.exe`;
@@ -205,4 +219,14 @@ async function rollback(version, onProgress) {
   return { ok: true, version };
 }
 
-module.exports = { start, stop, pause, check, install, rollback, status: () => state };
+module.exports = {
+  start,
+  stop,
+  pause,
+  resume,
+  isPaused,
+  check,
+  install,
+  rollback,
+  status: () => state,
+};
