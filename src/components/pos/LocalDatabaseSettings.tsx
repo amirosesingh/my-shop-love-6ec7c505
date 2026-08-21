@@ -160,11 +160,43 @@ export function LocalDatabaseSettings() {
               {reconnecting ? "Reconnecting…" : "Reconnect now"}
             </Button>
           )}
+          {configured && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={removing}
+              onClick={() => setConfirmRemove(true)}
+              title="Delete the stored server details and credentials from this machine."
+            >
+              {removing ? "Removing…" : "Remove saved connection"}
+            </Button>
+          )}
           <Button size="sm" disabled={view.busy} onClick={() => setWizardOpen(true)}>
             {view.state === "connected" ? "Change connection" : "Set up connection"}
           </Button>
         </div>
       </div>
+
+      <AlertDialog open={confirmRemove} onOpenChange={setConfirmRemove}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove the saved connection?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The stored server, database and sign-in credentials are deleted from this machine, any
+              connection attempt still running is cancelled and the till stops retrying in the
+              background. Selling continues against the online database until a new connection is
+              set up.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={removing}>Keep it</AlertDialogCancel>
+            <AlertDialogAction disabled={removing} onClick={() => void removeConnection()}>
+              Remove connection
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <SqlConnectionModal
         open={wizardOpen}
         onOpenChange={setWizardOpen}
