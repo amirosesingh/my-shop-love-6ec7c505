@@ -96,6 +96,16 @@ function CustomerDisplay() {
   const showTransfer =
     !!pay && (!!pay.accountNumber || !!pay.whatsapp || !!pay.accountName || !!payQr);
 
+  if (tillClosed)
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center bg-background p-8 text-center text-foreground">
+        <h1 className="text-4xl font-bold tracking-tight">Till closed</h1>
+        <p className="mt-2 text-muted-foreground">
+          This counter has shut down. You may close this window.
+        </p>
+      </main>
+    );
+
   return (
     <main className="flex min-h-screen flex-col bg-background text-foreground">
       <header className="flex items-baseline justify-between border-b border-border px-8 py-5">
