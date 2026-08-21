@@ -121,7 +121,8 @@ function parseOdbcRegistry(dump) {
     const match = /^(.+?)\s{2,}REG_SZ\s{2,}(.*)$/.exec(line);
     if (!match) continue;
     const name = match[1].trim();
-    if (!/installed/i.test(match[2])) continue;
+    // "Not installed" must not match — only a positive Installed value counts.
+    if (!/^installed$/i.test(match[2].trim())) continue;
     if (name && !names.includes(name)) names.push(name);
   }
   return names;
