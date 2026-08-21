@@ -846,9 +846,9 @@ function registerIpc() {
     the administration and the operational pool, and forgets the sealed
     credentials so the wizard starts from a clean slate.
   */
-  ipcMain.handle("pos:reconnect", async () => {
+  ipcMain.handle("pos:reconnect", async (_e, override) => {
     try {
-      return await reconnectNow();
+      return await reconnectNow(override);
     } catch (error) {
       return { ok: false, stage: "database", ...pool.describeSqlError(error) };
     }
@@ -860,14 +860,16 @@ function registerIpc() {
     return { ok: true };
   });
 
-  ipcMain.handle("pos:forget-connection", async () => {
-    if (reconnectTimer) {
-      clearTimeout(reconnectTimer);
-      reconnectTimer = null;
-    }
-    reconnectAttempt = 0;
-    reconnectDelay = 5_000;
+  /**
+   * Deletes the sealed credentials for good: cancels anything in flight, stops
+   * the backoff loop (and keeps it stopped while the file is unlinked), then
+   * reports a clean, unconfigured till.
+   */
+  async function removeStoredConnection() {
+    reconnectSuppressed = true;
+    stopReconnectLoop();
     lastConnectionError = null;
+    lastConnectionDetail = null;
     try {
       await sqlAdmin.cancel();
     } catch {
@@ -883,10 +885,12 @@ function registerIpc() {
     } catch {
       /* already gone */
     }
-    const cleared = dbConfigStore.write(null);
+    const cleared = dbConfigStore.remove();
+    reconnectSuppressed = false;
     broadcastStatus({
       connected: false,
       reconnecting: false,
+      configured: false,
       tables: [],
       queue: [],
       server: null,
@@ -894,8 +898,17 @@ function registerIpc() {
       resolved: null,
       cloudConfigured: !!cloudConfig,
     });
-    return { ok: cleared.ok !== false, stage: "forgotten", error: cleared.error ?? null };
-  });
+    return {
+      ok: cleared.ok !== false,
+      stage: "forgotten",
+      removed: cleared.removed === true,
+      error: cleared.error ?? null,
+    };
+  }
+
+  ipcMain.handle("pos:forget-connection", removeStoredConnection);
+  ipcMain.handle("pos:remove-connection", removeStoredConnection);
+
 
   /*
     Schema lifecycle. Reading the master file is always safe; applying it only
