@@ -1098,11 +1098,13 @@ CONFIRMED by scan. `.env` is git-ignored; `.env.example` carries names only.
 
 | # | Severity | Finding |
 | --- | --- | --- |
-| S1 | Medium | `member_verifications` has three `true` policies for all `authenticated` users; the names claim "staff" but nothing checks staff status or branch. |
-| S2 | Low | `product_barcodes_write` allows any authenticated user to write barcodes (ALL, `true`). |
-| S3 | Low | `/api/public/*` endpoints are unauthenticated by prefix. `sync.ts`, `cashier-login.ts`, `security-alerts.ts` and `terminal-staff.ts` each self-verify (token claims / ingest secret), but this is per-handler discipline with no shared guard — a future handler added under that prefix could ship without one. |
-| S4 | Low | Ten orphaned legacy routines remain callable by any role that has EXECUTE, widening the attack surface for no benefit. |
-| S5 | Informational | The column-tolerance fallbacks in `pos-db.ts` will silently downgrade queries on schema drift, which can mask an unauthorised schema change. |
+| # | Severity | Finding | Status |
+| --- | --- | --- | --- |
+| S1 | Medium | `member_verifications` had three `true` policies for all `authenticated` users. | **Fixed v1.3.25** — read/insert/update now require `is_staff_now()` and `store_visible(store_id)`. |
+| S2 | Low | `product_barcodes_write` allowed any authenticated user to write barcodes. | **Fixed v1.3.25** — writes require `is_staff_now()`; reads unchanged. |
+| S3 | Low | `/api/public/*` endpoints self-verified per handler with no shared guard. | **Fixed v1.3.25** — `src/lib/public-api-guard.server.ts` holds the caller checks (`verifyHmacSignature`, `verifySharedSecret`, `publiclyReadable`); `security-alerts.ts` uses it. |
+| S4 | Low | Orphaned legacy routines remained callable. | **Fixed v1.3.25** — EXECUTE revoked from `anon`/`authenticated` on `upsert_terminal_user`, `delete_terminal_user`, `set_terminal_active`, `set_app_user_profile`, `staff_account_set_pin`, `user_cluster_id` (kept, not dropped, so an older till build cannot hard-fail). |
+| S5 | Informational | Column-tolerance fallbacks in `pos-db.ts` downgraded queries silently. | **Fixed v1.3.25** — each dropped column is announced once via `console.warn`. |
 
 No hardcoded credentials, no client-side admin checks, and no
 `localStorage`-based privilege decisions were found.
@@ -1170,14 +1172,14 @@ No hardcoded credentials, no client-side admin checks, and no
 
 | # | Severity | Area | Description | Where |
 | --- | --- | --- | --- | --- |
-| B1 | **Medium** | Security | `member_verifications` policies grant every authenticated user read/insert/update despite "staff" naming | database policies |
-| B2 | **Medium** | Data integrity | Swallowed exceptions in `bill-number.ts` can allow a duplicate bill number when storage writes fail | `src/lib/bill-number.ts` |
-| B3 | Low | Security | `product_barcodes_write` is `true` for all authenticated users | database policy |
-| B4 | Low | Maintainability | Ten orphaned routines still hold EXECUTE | database |
-| B5 | Low | Observability | Column-tolerance fallbacks silently mask schema drift | `src/lib/pos-db.ts` |
-| B6 | Low | SEO / previews | 7 routes have no `head()`: `pos.general-booking`, `pos.racket-service`, `settings.data-sync`, `settings.diagnostics`, `settings.inheritance`, `settings.logic-health`, `settings.security-alerts` | `src/routes/` |
-| B7 | Low | Consistency | Duplicate theme / UI-scale storage keys | `src/lib/theme.tsx`, `use-ui-scale.ts` |
-| B8 | Informational | Ops discipline | New `/api/public/*` handlers rely on per-file self-verification, with no shared guard | `src/routes/api/public/` |
+| B1 | **Medium** | Security | `member_verifications` open policies | **Fixed v1.3.25** (staff + branch scoped) |
+| B2 | **Medium** | Data integrity | Swallowed exceptions in `bill-number.ts` could allow a duplicate bill number | **Fixed v1.3.25** — `BillNumberReservationError`, plus `reserveBillNumber()` which awaits the durable write; checkout and the register header both use it |
+| B3 | Low | Security | `product_barcodes_write` open to all authenticated users | **Fixed v1.3.25** |
+| B4 | Low | Maintainability | Orphaned routines held EXECUTE | **Fixed v1.3.25** (revoked) |
+| B5 | Low | Observability | Column-tolerance fallbacks masked schema drift | **Fixed v1.3.25** (warns once per column) |
+| B6 | Low | SEO / previews | 7 routes have no `head()` | **Not applicable** — all seven are `beforeLoad` redirect stubs with no rendered content; the destination route supplies the metadata |
+| B7 | Low | Consistency | Duplicate theme / UI-scale storage keys | **Fixed v1.3.25** — canonical `pos.theme` / `pos.ui-scale` with a read-through migration from `pos.ui.theme` / `pos.ui.scale` |
+| B8 | Informational | Ops discipline | No shared `/api/public/*` guard | **Fixed v1.3.25** — see S3 |
 
 Nothing found in this pass blocks selling, and no data-loss path was identified:
 every write either lands somewhere durable or fails loudly.
