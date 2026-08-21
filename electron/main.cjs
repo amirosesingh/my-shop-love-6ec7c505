@@ -9,6 +9,7 @@ const pool = require("./db/pool.cjs");
 const repo = require("./db/repo.cjs");
 const discover = require("./db/discover.cjs");
 const sqlAdmin = require("./db/admin-pool.cjs");
+const driverInstall = require("./db/driver-install.cjs");
 const worker = require("./sync/worker.cjs");
 const updater = require("./updater.cjs");
 const terminalStore = require("./terminal-store.cjs");
