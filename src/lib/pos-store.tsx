@@ -43,7 +43,7 @@ import { clearSnapshot, readSnapshot, writeSnapshot } from "./offline-snapshot";
 import { isLiveOnly } from "./live-mode";
 import { useAuth } from "@/lib/pos-auth";
 import { readTerminalConfig } from "./terminal-tokens";
-import { nextBillNumber } from "./bill-number";
+import { reserveBillNumber } from "./bill-number";
 import { loadCashierToken, loadSessionToken } from "./pos-credentials";
 import {
   activeBranchId,
