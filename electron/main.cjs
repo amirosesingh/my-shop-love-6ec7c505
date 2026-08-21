@@ -1573,6 +1573,10 @@ app.whenReady().then(async () => {
   });
 });
 
+app.on("before-quit", () => {
+  closeCustomerDisplay();
+});
+
 app.on("window-all-closed", async () => {
   if (readyWatchdog) clearTimeout(readyWatchdog);
   worker.stop();
