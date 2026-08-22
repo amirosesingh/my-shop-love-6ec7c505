@@ -18,13 +18,16 @@ export type RelayOp =
       rows: Record<string, unknown>[];
       onConflict?: string;
     }
-  | { kind: "update"; table: string; values: Record<string, unknown>; match: Record<string, unknown> }
+  | {
+      kind: "update";
+      table: string;
+      values: Record<string, unknown>;
+      match: Record<string, unknown>;
+    }
   | { kind: "delete"; table: string; match: Record<string, unknown> };
 
 /** Read requests the relay may answer for a proven till. */
-export type RelayRead =
-  | { kind: "activeShift"; storeId: string }
-  | { kind: "stores" };
+export type RelayRead = { kind: "activeShift"; storeId: string } | { kind: "stores" };
 
 /**
  * Only operational tables may be written through the relay. `stores` is
@@ -52,6 +55,18 @@ export const RELAY_TABLES = new Set([
   "whatsapp_queue",
   "stores",
 ]);
+
+/** Conflict keys are owned by the server; callers cannot choose arbitrary unique columns. */
+const RELAY_CONFLICT_KEYS: Readonly<Record<string, string>> = {
+  sales: "id",
+  sale_items: "id",
+  payment_transactions: "id",
+  item_activity_logs: "id",
+};
+
+function conflictKey(table: string): string {
+  return RELAY_CONFLICT_KEYS[table] ?? "id";
+}
 
 /**
  * Names the service key may be bound under. Deployments have historically used
@@ -89,9 +104,7 @@ export function hasServiceKey(): boolean {
  * Answer a read for a proven till. This keeps offline/compatibility sessions
  * working when no live backend Auth session is available.
  */
-export async function runRelayRead(
-  read: RelayRead,
-): Promise<{
+export async function runRelayRead(read: RelayRead): Promise<{
   ok: boolean;
   row?: Record<string, unknown> | null;
   rows?: Record<string, unknown>[];
@@ -161,15 +174,23 @@ export async function runRelayOp(
 
   let res: Response;
   switch (safeOp.kind) {
-    case "insert":
-      res = await serviceRest(safeOp.table, {
-        method: "POST",
-        body: JSON.stringify(safeOp.rows),
-        prefer: "return=minimal",
-      });
+    case "insert": {
+      // Client-generated ids make retry an acknowledgement of the same row,
+      // not a second insert that fails with a duplicate-key error.
+      const keyed =
+        safeOp.rows.length > 0 && safeOp.rows.every((row) => typeof row.id === "string" && row.id);
+      res = await serviceRest(
+        keyed ? `${safeOp.table}?on_conflict=${conflictKey(safeOp.table)}` : safeOp.table,
+        {
+          method: "POST",
+          body: JSON.stringify(safeOp.rows),
+          prefer: keyed ? "return=minimal,resolution=merge-duplicates" : "return=minimal",
+        },
+      );
       break;
+    }
     case "upsert":
-      res = await serviceRest(`${safeOp.table}?on_conflict=${safeOp.onConflict ?? "id"}`, {
+      res = await serviceRest(`${safeOp.table}?on_conflict=${conflictKey(safeOp.table)}`, {
         method: "POST",
         body: JSON.stringify(safeOp.rows),
         prefer: "return=minimal,resolution=merge-duplicates",

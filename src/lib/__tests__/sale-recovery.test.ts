@@ -2,7 +2,7 @@
  * A failed-looking checkout must never lose a bill or mint a second one.
  */
 import { describe, expect, it } from "vitest";
-import { isDuplicateBillNumber } from "../pos-db";
+import { isDuplicateBillNumber, stableChildId } from "../pos-db";
 
 describe("duplicate bill detection", () => {
   it("recognises a unique-key refusal on the bill number", () => {
@@ -23,6 +23,16 @@ describe("duplicate bill detection", () => {
     expect(isDuplicateBillNumber(new Error("Failed to fetch"))).toBe(false);
     expect(isDuplicateBillNumber(new Error("permission denied for table sales"))).toBe(false);
     expect(isDuplicateBillNumber(null)).toBe(false);
+  });
+});
+
+describe("checkout row identity", () => {
+  it("derives stable, distinct UUIDs for child rows", () => {
+    const parent = "12345678-1234-4234-a234-123456789abc";
+    expect(stableChildId(parent, "2", 0)).toBe(stableChildId(parent, "2", 0));
+    expect(stableChildId(parent, "2", 0)).not.toBe(stableChildId(parent, "2", 1));
+    expect(stableChildId(parent, "1", 0)).not.toBe(stableChildId(parent, "2", 0));
+    expect(stableChildId(parent, "2", 0)).toMatch(/^[0-9a-f-]{36}$/);
   });
 });
 

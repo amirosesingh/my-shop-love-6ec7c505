@@ -21,11 +21,7 @@ import { applyStockDeltaBatch } from "./stock-recovery";
 import { canRelay, relayStores } from "./sync-relay";
 import { isOperationalTable } from "./pos-auth-route";
 import { keyset, nextCursor, PAGE_SIZE, type Cursor, type Page } from "./keyset";
-import {
-  isLinkedRecordError,
-  usageBlock,
-  type ProductUsage,
-} from "./product-delete";
+import { isLinkedRecordError, usageBlock, type ProductUsage } from "./product-delete";
 import type {
   AppSettings,
   Member,
@@ -56,7 +52,10 @@ export function dbError(context: string, error: unknown) {
   // Offline is a normal state for a till: the change is already stored here
   // and will sync later. Say so rather than failing silently.
   if (typeof navigator !== "undefined" && !navigator.onLine) {
-    showNotification(`${context} saved on this terminal — it will sync when the connection is back.`, "info");
+    showNotification(
+      `${context} saved on this terminal — it will sync when the connection is back.`,
+      "info",
+    );
     return;
   }
   notifyError(error, context);
@@ -66,9 +65,7 @@ const num = (v: unknown, fallback = 0) => (v == null ? fallback : Number(v));
 
 /** Guard verdict: blocked with a reason, clear to delete, or not verifiable. */
 export type DeleteGuardVerdict =
-  | { state: "blocked"; code: string; reason: string }
-  | { state: "clear" }
-  | { state: "unknown" };
+  { state: "blocked"; code: string; reason: string } | { state: "clear" } | { state: "unknown" };
 
 /**
  * Which records still point at a product.
@@ -162,7 +159,7 @@ const safeNumOrNull = (value: unknown): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
-const safeArray = <T,>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
+const safeArray = <T>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
 
 const safeStockMap = (value: unknown): Record<string, number> => {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
@@ -180,39 +177,39 @@ export const productToRow = (p: Product): Row => {
       ? safeStockMap(p.stockByStore)
       : null;
   return {
-  id: p.id,
-  barcode: p.barcode || p.sku || p.id,
-  name: p.name,
-  sku: p.sku ?? null,
-  category: p.category ?? null,
-  product_group: p.group ?? null,
-  sub_category: p.subCategory ?? null,
-  unit: p.unit ?? null,
-  packs: safeArray(p.packs),
-  barcode_aliases: safeArray<string>(p.barcodes)
-    .map((b) => String(b ?? "").trim())
-    .filter(Boolean),
-  barcode_variants: safeArray<{ code?: string; label?: string }>(p.variants)
-    .map((v) => ({ code: String(v?.code ?? "").trim(), label: v?.label?.trim() || undefined }))
-    .filter((v) => v.code),
-  cost_price: safeNum(p.cost),
-  selling_price: safeNum(p.price),
-  ecom_price: safeNumOrNull(p.ecomPrice),
-  ecom_visible: p.ecomVisible ?? true,
-  is_archived: p.archived === true,
-  archived_at: p.archived ? new Date().toISOString() : null,
-  // Stock is only ever written when the caller actually carries the per-branch
-  // map. A product saved without it (a price or name edit, a partial import)
-  // must never zero the quantity that is already banked in the database.
-  ...(stock
-    ? {
-        stock_quantity: safeInt(Object.values(stock).reduce((a, b) => a + b, 0)),
-        stock_by_store: stock,
-      }
-    : {}),
-  reorder_level: safeInt(p.reorderLevel),
-  tax_rate: safeNum(p.taxRate),
-  custom_points: safeNumOrNull(p.customPoints),
+    id: p.id,
+    barcode: p.barcode || p.sku || p.id,
+    name: p.name,
+    sku: p.sku ?? null,
+    category: p.category ?? null,
+    product_group: p.group ?? null,
+    sub_category: p.subCategory ?? null,
+    unit: p.unit ?? null,
+    packs: safeArray(p.packs),
+    barcode_aliases: safeArray<string>(p.barcodes)
+      .map((b) => String(b ?? "").trim())
+      .filter(Boolean),
+    barcode_variants: safeArray<{ code?: string; label?: string }>(p.variants)
+      .map((v) => ({ code: String(v?.code ?? "").trim(), label: v?.label?.trim() || undefined }))
+      .filter((v) => v.code),
+    cost_price: safeNum(p.cost),
+    selling_price: safeNum(p.price),
+    ecom_price: safeNumOrNull(p.ecomPrice),
+    ecom_visible: p.ecomVisible ?? true,
+    is_archived: p.archived === true,
+    archived_at: p.archived ? new Date().toISOString() : null,
+    // Stock is only ever written when the caller actually carries the per-branch
+    // map. A product saved without it (a price or name edit, a partial import)
+    // must never zero the quantity that is already banked in the database.
+    ...(stock
+      ? {
+          stock_quantity: safeInt(Object.values(stock).reduce((a, b) => a + b, 0)),
+          stock_by_store: stock,
+        }
+      : {}),
+    reorder_level: safeInt(p.reorderLevel),
+    tax_rate: safeNum(p.taxRate),
+    custom_points: safeNumOrNull(p.customPoints),
   };
 };
 
@@ -361,24 +358,15 @@ const rowToSettings = (r: Row | null): AppSettings =>
         review: {
           maxVoids: num(r.review_max_voids, defaultSettings.review.maxVoids),
           maxRefunds: num(r.review_max_refunds, defaultSettings.review.maxRefunds),
-          maxRefundValue: num(
-            r.review_max_refund_value,
-            defaultSettings.review.maxRefundValue,
-          ),
+          maxRefundValue: num(r.review_max_refund_value, defaultSettings.review.maxRefundValue),
           maxNoSaleOpens: num(r.review_max_nosale, defaultSettings.review.maxNoSaleOpens),
-          maxDiscountPct: num(
-            r.review_max_discount_pct,
-            defaultSettings.review.maxDiscountPct,
-          ),
+          maxDiscountPct: num(r.review_max_discount_pct, defaultSettings.review.maxDiscountPct),
         },
         hours: {
           dayStart: r.day_start_time ?? defaultSettings.hours.dayStart,
           dayEnd: r.day_end_time ?? defaultSettings.hours.dayEnd,
           maxShiftHours: num(r.max_shift_hours, defaultSettings.hours.maxShiftHours),
-          reminderMinutes: num(
-            r.shift_reminder_minutes,
-            defaultSettings.hours.reminderMinutes,
-          ),
+          reminderMinutes: num(r.shift_reminder_minutes, defaultSettings.hours.reminderMinutes),
         },
         visibility: {
           hidden: ((r.ui_visibility as { hidden?: Record<string, string[]> } | null)?.hidden ??
@@ -601,7 +589,6 @@ const forgetTxnColumn = (message?: string | null) => {
   }
 };
 
-
 const rowToSale = (r: Row): Sale => ({
   id: r.id,
   receiptNo: r.bill_number,
@@ -685,7 +672,8 @@ const saleToRow = (s: Sale): Row => ({
 });
 
 const saleItemRows = (s: Sale) =>
-  s.lines.map((l) => ({
+  s.lines.map((l, index) => ({
+    id: stableChildId(s.id, "1", index),
     sale_id: s.id,
     product_id: l.productId || null,
     product_name: l.name,
@@ -716,11 +704,19 @@ const salePaymentRows = (s: Sale) => {
           referenceNote: (p.referenceNote ?? "").trim(),
           bankName: (p.bankName ?? "").trim(),
         }))
-      : [{ method: String(s.method), amount: s.paid, reference: "", referenceNote: "", bankName: "" }];
+      : [
+          {
+            method: String(s.method),
+            amount: s.paid,
+            reference: "",
+            referenceNote: "",
+            bankName: "",
+          },
+        ];
   return tenders
     .filter((t) => t.amount !== 0)
-    .map((t) => ({
-      id: crypto.randomUUID(),
+    .map((t, index) => ({
+      id: stableChildId(s.id, "2", index),
       source_type: "sale",
       sale_id: s.id,
       member_id: s.memberId,
@@ -751,8 +747,8 @@ const salePaymentRows = (s: Sale) => {
 const saleActivityRows = (s: Sale) =>
   s.lines
     .filter((l) => l.productId)
-    .map((l) => ({
-      id: crypto.randomUUID(),
+    .map((l, index) => ({
+      id: stableChildId(s.id, "3", index),
       product_id: l.productId,
       product_name: l.name,
       store_id: s.storeId,
@@ -764,6 +760,14 @@ const saleActivityRows = (s: Sale) =>
       note: "",
       created_at: s.createdAt,
     }));
+
+/** Stable UUID children: rebuilding a checkout after a restart reuses the same keys. */
+export function stableChildId(parentId: string, group: string, index: number): string {
+  const hex = parentId.replace(/-/g, "").toLowerCase();
+  if (!/^[0-9a-f]{32}$/.test(hex)) return crypto.randomUUID();
+  const suffix = `${group}${index.toString(16).padStart(11, "0")}`.slice(-12);
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${suffix}`;
+}
 
 /* --------------------------- tier name cache --------------------------- */
 
@@ -956,9 +960,12 @@ export async function loadActiveShift(storeId: string): Promise<Shift | null> {
   if (hasStaffSession()) {
     // The server routine answers for every staff account, whatever branch is
     // written on their profile, and hands back the whole row in one call.
-    const rpc = await supabase.rpc("shift_active_for_branch" as never, {
-      p_store_id: storeId,
-    } as never);
+    const rpc = await supabase.rpc(
+      "shift_active_for_branch" as never,
+      {
+        p_store_id: storeId,
+      } as never,
+    );
     if (!rpc.error) {
       const row = (Array.isArray(rpc.data) ? rpc.data[0] : rpc.data) as Row | null;
       return row?.id ? rowToShift(row) : null;
@@ -1001,17 +1008,20 @@ export async function openShiftOnServer(s: Shift): Promise<Shift | null> {
   const { hasStaffSession } = await import("./sync-relay");
   if (!hasStaffSession()) return null;
   try {
-    const res = await supabase.rpc("shift_open" as never, {
-      p_id: s.id,
-      p_store_id: s.storeId,
-      p_opened_by_name: s.cashier,
-      p_opening_float: s.openingFloat,
-      p_terminal_id: s.terminalId ?? null,
-      p_terminal_name: s.terminalName ?? null,
-      p_opened_by_staff_id: s.openedByStaffId ?? null,
-      p_opened_by_role: s.openedByRole ?? null,
-      p_user_id: s.userId ?? null,
-    } as never);
+    const res = await supabase.rpc(
+      "shift_open" as never,
+      {
+        p_id: s.id,
+        p_store_id: s.storeId,
+        p_opened_by_name: s.cashier,
+        p_opening_float: s.openingFloat,
+        p_terminal_id: s.terminalId ?? null,
+        p_terminal_name: s.terminalName ?? null,
+        p_opened_by_staff_id: s.openedByStaffId ?? null,
+        p_opened_by_role: s.openedByRole ?? null,
+        p_user_id: s.userId ?? null,
+      } as never,
+    );
     if (res.error) return null;
     const row = (Array.isArray(res.data) ? res.data[0] : res.data) as Row | null;
     return row?.id ? rowToShift(row) : null;
@@ -1371,7 +1381,12 @@ async function applyStockDeltas(deltas: StockDelta[]) {
   const outcomes = await applyStockDeltaBatch(deltas);
   for (const outcome of outcomes) {
     if (outcome.status !== "refused") continue;
-    logSync("push", "products", false, `Stock delta: ${outcome.reason ?? outcome.code ?? "failed"}`);
+    logSync(
+      "push",
+      "products",
+      false,
+      `Stock delta: ${outcome.reason ?? outcome.code ?? "failed"}`,
+    );
   }
 }
 
@@ -1423,10 +1438,16 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
       if (!isConnectionError(cloud)) throw cloud;
       noteConnectionLost();
       try {
-        for (const op of ops) {
-          const res = await bridge.write(context, op);
-          if (!res.ok) throw new Error(res.error ?? `${context} could not be stored locally`);
-        }
+        const result = bridge.writeBatch
+          ? await bridge.writeBatch(context, ops)
+          : await (async () => {
+              for (const op of ops) {
+                const res = await bridge.write(context, op);
+                if (!res.ok) return res;
+              }
+              return { ok: true };
+            })();
+        if (!result.ok) throw new Error(result.error ?? `${context} could not be stored locally`);
         setCloudDirect(false);
         if (bridge.push) void bridge.push();
         return noteCommitTarget("local");
@@ -1785,20 +1806,20 @@ export const db = {
 
   /** Save a completed bill and wait until it is stored somewhere. */
   async commitSale(sale: Sale, products: Product[], member: Member | null): Promise<CommitTarget> {
-    // A retried checkout (double click, network drop) must never bill twice:
-    // if this attempt already reached the central database, stop here.
-    if (sale.clientTxnId && (await db.saleAttemptExists(sale.clientTxnId)) === "yes")
-      return "cloud";
+    // A retry may find the header already committed. Reuse its real id and
+    // reconcile every required child rather than mistaking a partial sale for completion.
+    const storedId = sale.clientTxnId ? await db.saleAttemptId(sale.clientTxnId) : null;
+    if (storedId) sale.id = storedId;
     const ops: SyncOp[] = [
-      { kind: "insert", table: "sales", rows: [saleToRow(sale)] },
-      { kind: "insert", table: "sale_items", rows: saleItemRows(sale) },
+      { kind: "upsert", table: "sales", rows: [saleToRow(sale)], onConflict: "id" },
+      { kind: "upsert", table: "sale_items", rows: saleItemRows(sale), onConflict: "id" },
     ];
     const tenders = salePaymentRows(sale);
     if (tenders.length)
-      ops.push({ kind: "insert", table: "payment_transactions", rows: tenders });
+      ops.push({ kind: "upsert", table: "payment_transactions", rows: tenders, onConflict: "id" });
     const movements = saleActivityRows(sale);
     if (movements.length)
-      ops.push({ kind: "insert", table: "item_activity_logs", rows: movements });
+      ops.push({ kind: "upsert", table: "item_activity_logs", rows: movements, onConflict: "id" });
     if (products.length)
       ops.push({ kind: "upsert", table: "products", rows: products.map(productToRow) });
     if (member) ops.push({ kind: "upsert", table: "members", rows: [memberToRow(member, tierId)] });
@@ -1809,31 +1830,23 @@ export const db = {
         values: { exchanged_to_bill_number: sale.receiptNo },
         match: { bill_number: sale.exchangeOfReceiptNo },
       });
+    return commitOps("Saving sale", ops);
+  },
+
+  async saleAttemptId(clientTxnId: string): Promise<string | null> {
     try {
-      return await commitOps("Saving sale", ops);
-    } catch (error) {
-      // The records are written one after another. If the bill itself landed
-      // and something later failed, the sale is real: finish the rest in the
-      // background as keyed writes (so nothing can double up) rather than
-      // telling the cashier the payment was lost.
-      if (sale.clientTxnId && (await db.saleAttemptExists(sale.clientTxnId)) === "yes") {
-        for (const op of ops.slice(1)) {
-          queueSoft(
-            "Completing sale",
-            op.kind === "insert"
-              ? { kind: "upsert", table: op.table, rows: op.rows, onConflict: "id" }
-              : op,
-          );
-        }
-        recordDiagnostic({
-          kind: "local_mirror_failed",
-          entity: "sales",
-          code: reasonCode(error),
-          recordId: sale.receiptNo,
-        });
-        return "cloud";
-      }
-      throw error;
+      const res = await supabase
+        .from("sales" as never)
+        .select("id")
+        .eq("client_transaction_id", clientTxnId)
+        .limit(1);
+      if (res.error) return null;
+      const first = Array.isArray(res.data)
+        ? (res.data[0] as { id?: string } | undefined)
+        : undefined;
+      return first?.id ?? null;
+    } catch {
+      return null;
     }
   },
 
@@ -1968,9 +1981,7 @@ export const db = {
 
   /** Save one product and wait until it is stored somewhere. */
   commitProduct: (p: Product) =>
-    commitOps("Saving product", [
-      { kind: "upsert", table: "products", rows: [productToRow(p)] },
-    ]),
+    commitOps("Saving product", [{ kind: "upsert", table: "products", rows: [productToRow(p)] }]),
 
   /** Save a promotion and wait until it is stored somewhere. */
   commitPromotion: (p: Promotion) =>

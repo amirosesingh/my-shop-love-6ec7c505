@@ -8,6 +8,7 @@ const invoke = (channel, ...args) => ipcRenderer.invoke(channel, ...args);
 
 contextBridge.exposeInMainWorld("pos", {
   write: (context, op) => invoke("pos:write", context, op),
+  writeBatch: (context, ops) => invoke("pos:write-batch", context, ops),
   connect: (config, cloud) => invoke("pos:connect", config, cloud),
   configureCloud: (cloud) => invoke("pos:configure-cloud", cloud),
   test: (config) => invoke("pos:test", config),
