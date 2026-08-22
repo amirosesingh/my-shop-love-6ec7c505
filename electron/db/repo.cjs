@@ -975,14 +975,18 @@ async function createSale({
 
 /** Full local catalogue — the register never fetches products over HTTP. */
 async function getProducts() {
-  const res = await getPool().request().query("SELECT * FROM dbo.products ORDER BY name ASC;");
-  return res.recordset.map((row) => parseJsonColumns("products", row));
+  return withHeal("products", async () => {
+    const res = await getPool().request().query("SELECT * FROM dbo.products ORDER BY name ASC;");
+    return res.recordset.map((row) => parseJsonColumns("products", row));
+  });
 }
 
 async function rows(table) {
   assertTable(table);
-  const result = await getPool().request().query(`SELECT * FROM dbo.[${table}];`);
-  return result.recordset.map((row) => parseJsonColumns(table, row));
+  return withHeal(table, async () => {
+    const result = await getPool().request().query(`SELECT * FROM dbo.[${table}];`);
+    return result.recordset.map((row) => parseJsonColumns(table, row));
+  });
 }
 
 async function snapshot() {
@@ -1009,12 +1013,18 @@ async function pendingSyncCount() {
   let total = 0;
   let sales = 0;
   for (const table of PUSH_TABLES) {
-    const res = await getPool()
-      .request()
-      .query(`SELECT COUNT(*) AS n FROM dbo.[${table}] WHERE is_synced = 0;`);
-    const n = res.recordset[0]?.n ?? 0;
-    total += n;
-    if (table === "sales") sales = n;
+    try {
+      const res = await withHeal(table, () =>
+        getPool()
+          .request()
+          .query(`SELECT COUNT(*) AS n FROM dbo.[${table}] WHERE is_synced = 0;`),
+      );
+      const n = res.recordset[0]?.n ?? 0;
+      total += n;
+      if (table === "sales") sales = n;
+    } catch {
+      // A table that could not be repaired simply has no countable backlog.
+    }
   }
   return { total, sales };
 }
