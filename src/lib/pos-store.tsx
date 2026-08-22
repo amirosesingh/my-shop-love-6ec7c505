@@ -942,7 +942,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
           timeZone: snapshot.settings.integrations.timeZone || undefined,
         },
       ));
-    const sale: Sale = {
+    let sale: Sale = {
       ...input,
       // Freeze how this branch reads right now, so a later rename never
       // rewrites a printed bill or a historical report.
