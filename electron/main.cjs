@@ -1301,7 +1301,6 @@ function registerIpc() {
     ok: true,
     ...localDb.info(),
     counts: localDb.counts(),
-    pending: localDb.pendingCounts(),
   }));
   ipcMain.handle("local:mirror", (_e, entity, rows) => ({
     ok: true,
@@ -1311,18 +1310,6 @@ function registerIpc() {
     ok: true,
     rows: localDb.listMirror(String(entity), Number(limit) || 500),
   }));
-  ipcMain.handle("local:enqueue", (_e, entity, payload) => ({
-    ok: true,
-    row: localDb.enqueue(String(entity), payload ?? {}),
-  }));
-  ipcMain.handle("local:pending", (_e, limit) => ({
-    ok: true,
-    rows: localDb.pending(Number(limit) || 200),
-  }));
-  ipcMain.handle("local:mark", (_e, id, status, error) => {
-    localDb.markOutbox(String(id), String(status), error ?? null);
-    return { ok: true };
-  });
   ipcMain.handle("local:audit-log", (_e, entry) => ({
     ok: true,
     row: localDb.logAudit(entry ?? {}),

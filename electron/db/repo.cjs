@@ -97,6 +97,72 @@ const PRUNABLE_TABLES = [
   "audit_logs",
 ];
 
+/**
+ * Columns the central database actually has, per pushed table (verified
+ * against the live schema). A till's local schema can drift ahead of or
+ * behind the cloud; pushing a column the cloud does not have makes PostgREST
+ * reject the whole batch, which is how payments used to silently never sync.
+ * Anything not listed here is dropped from the push payload (and logged
+ * once), so drift degrades to a warning instead of a sync outage.
+ */
+const CLOUD_COLUMNS = {
+  stores: "id,code,name,address,phone,created_at,updated_at,group_id,row_version,location_type,parent_id,is_central,building_name,floor_label,is_active,archived_at,is_primary_sub",
+  membership_tiers: "id,name,discount_percentage,points_multiplier,created_at,updated_at,row_version",
+  products: "id,barcode,name,category,cost_price,selling_price,ecom_price,stock_quantity,custom_points,point_multiplier,created_at,sku,reorder_level,tax_rate,ecom_visible,stock_by_store,updated_at,landing_pct,sub_category,unit,packs,barcode_aliases,is_archived,archived_at,brand,product_group,barcode_variants,row_version",
+  product_barcodes: "id,product_id,barcode,label,pack_size,is_primary,created_at,updated_at,row_version",
+  product_categories: "id,name,parent_id,sort,created_at,updated_at,kind,row_version",
+  uom_units: "id,code,name,allow_decimal,sort,created_at,updated_at,row_version",
+  members: "id,member_code,full_name,phone,email,address,date_of_birth,tier_id,loyalty_points,total_spent,created_at,updated_at,row_version,is_verified,verified_at,verified_channel",
+  promotions: "id,title,promo_type,min_spend,discount_percent,discount_amount,foc_product_id,points_per_dollar,tier_rates,is_active,start_date,end_date,created_at,updated_at,row_version",
+  suppliers: "id,name,contact_name,phone,email,address,tax_number,notes,is_active,created_at,updated_at,row_version",
+  shifts: "id,store_id,terminal_id,terminal_name,opened_by_name,opened_by_staff_id,opened_by_role,closed_by_name,closed_by_staff_id,closed_by_role,opened_at,closed_at,opening_float,counted_cash,expected_cash,note,overdue,created_at,updated_at,status,closing_float,user_id,row_version,counted_card,counted_digital,expected_card,expected_digital,variance_cash,variance_card,variance_digital,variance_total",
+  shift_sessions: "id,shift_id,store_id,terminal_id,terminal_name,staff_id,staff_name,role,signed_in_at,signed_out_at,created_at,updated_at,row_version",
+  drawer_events: "id,store_id,terminal_id,shift_id,staff_id,staff_name,role,reason,note,approved_by,created_at",
+  sales: "id,bill_number,member_id,store_id,cashier_name,subtotal_amount,total_amount,discount_amount,tax_amount,payment_type,points_earned,points_redeemed,is_exchange,original_bill_number,is_refunded,created_at,shift_id,paid_amount,change_amount,exchange_credit,exchanged_to_bill_number,coupon_code,coupon_promo_id,coupon_scope,coupon_discount,payments,client_transaction_id,cashier_id,created_by,updated_by,row_version,store_name_snapshot,store_address_snapshot",
+  sale_items: "id,sale_id,product_id,product_name,unit_price,quantity,discount_percent,discount_amount,is_return,created_at,tax_rate,is_foc,promo_id,coupon_code,coupon_discount,unit_cost,row_version",
+  payment_transactions: "id,source_type,sale_id,booking_id,member_id,store_id,shift_id,terminal_id,amount,method,kind,reference,cashier_id,cashier_name,note,paid_at,created_at,updated_at,row_version,status,metadata,client_transaction_id",
+  item_activity_logs: "id,product_id,product_name,sku,barcode,store_id,terminal_id,activity_type,reference,quantity_delta,stock_before,stock_after,unit_cost,staff_id,staff_name,role,note,created_at,row_version",
+  purchase_orders: "id,po_number,supplier_name,operator_name,total_cost,total_items_count,created_at,supplier_id,store_id,store_code,invoice_date,invoice_entry_date,updated_at,row_version",
+  purchase_order_items: "id,po_id,product_id,barcode,product_name,cost_price,selling_price,quantity_received,subtotal_cost,created_at,sku,updated_at,row_version",
+  bookings: "id,ref,store_id,shift_id,customer_name,customer_phone,member_id,service_type_id,service_name,service_fee,payment_timing,lines,subtotal,discount,tax,total,paid,due_date,note,cashier,status,sale_receipt_no,closed_at,racket_model,string_type,tension_main,tension_cross,tension_unit,grommet_notes,job_notes,dropped_off_at,promised_at,job_status,job_status_by,job_status_at,notify_whatsapp,created_at,updated_at,tag_id,intake_note,string_origin,string_source_product_id,grip_product_id,charges,technician,liability_accepted,incident_note,row_version",
+  booking_payments: "id,booking_id,amount,method,cashier,paid_at,created_at,row_version",
+  stock_transfers: "id,ref,kind,transfer_scope,from_store_id,from_store_name,from_group_id,to_store_id,to_store_name,to_group_id,status,note,created_by,approved_by,approved_at,received_by,received_at,rejected_reason,created_at,updated_at,row_version",
+  stock_transfer_items: "id,transfer_id,product_id,barcode,sku,product_name,quantity,quantity_received,unit_cost,created_at,row_version",
+  stock_adjustments: "id,product_id,product_name,sku,barcode,store_id,terminal_id,reason,note,previous_stock,updated_stock,delta,cost_impact,staff_id,staff_name,role,created_at,row_version",
+  held_orders: "id,label,store_id,shift_id,held_by,total,lines,cart_discount,cart_discount_type,exchange_ref,member_id,member_name,coupon,note,cancelled_from,held_at,created_at,updated_at,row_version",
+  audit_logs: "id,user_name,action_category,action_name,target_module,details,created_at,user_id,action,entity,before_state,after_state",
+};
+for (const key of Object.keys(CLOUD_COLUMNS)) {
+  CLOUD_COLUMNS[key] = new Set(CLOUD_COLUMNS[key].split(","));
+}
+
+/**
+ * Only tables the central database actually has are ever pushed. Legacy
+ * local-only tables (e.g. `transfers`) stay writable locally but leave the
+ * sync loop, so they can no longer fail every cycle against a 404.
+ */
+const PUSH_TABLES = TABLES.filter((t) => CLOUD_COLUMNS[t]);
+
+/** One console line per table when drift drops columns, not one per row. */
+const driftLogged = new Set();
+function filterCloudColumns(table, row) {
+  const allowed = CLOUD_COLUMNS[table];
+  if (!allowed) return row;
+  const out = {};
+  const dropped = [];
+  for (const [key, value] of Object.entries(row)) {
+    if (allowed.has(key)) out[key] = value;
+    else dropped.push(key);
+  }
+  if (dropped.length && !driftLogged.has(table)) {
+    driftLogged.add(table);
+    console.warn(
+      `[sync] ${table}: local column(s) not present centrally were dropped from the push: ${dropped.join(", ")}`,
+    );
+  }
+  return out;
+}
+
 const SYNC_COLUMNS = new Set(["is_synced", "sync_status", "synced_at", "sync_error"]);
 
 const isUuid = (v) =>
@@ -158,9 +224,9 @@ function normaliseRow(table, row) {
 }
 
 const JSON_COLUMNS = {
-  products: ["stock_by_store", "packs", "barcode_aliases"],
+  products: ["stock_by_store", "packs", "barcode_aliases", "barcode_variants"],
   promotions: ["tier_rates"],
-  bookings: ["lines"],
+  bookings: ["lines", "charges"],
   transfers: ["items"],
   audit_logs: ["details"],
   held_orders: ["lines", "coupon"],
@@ -358,18 +424,27 @@ async function markSynced(table, ids) {
   `);
 }
 
-/** Repeated failures park the row so one bad record can't block the queue. */
-async function markFailed(table, ids, message, quarantine) {
+/**
+ * Repeated failures park the row so one bad record can't block the queue.
+ * The attempt counter and the quarantine decision are both persisted here, in
+ * SQL — a till restart can no longer unpark a row that already failed five
+ * times, which the old in-memory counter allowed.
+ */
+async function markFailed(table, ids, message, maxAttempts = 5) {
   if (!ids.length) return;
   assertTable(table);
   const request = getPool()
     .request()
-    .input("status", sql.NVarChar(20), quarantine ? "quarantined" : "error")
+    .input("maxAttempts", sql.Int, Math.max(1, Number(maxAttempts) || 5))
     .input("msg", sql.NVarChar(sql.MAX), String(message).slice(0, 3000));
   ids.forEach((id, i) => bind(request, `id${i}`, id));
   await request.query(`
     UPDATE dbo.[${table}]
-       SET sync_status = @status, sync_error = @msg,
+       SET sync_status = CASE
+             WHEN ISNULL(sync_attempts, 0) + 1 >= @maxAttempts THEN N'quarantined'
+             ELSE N'error'
+           END,
+           sync_error = @msg,
            sync_attempts = ISNULL(sync_attempts, 0) + 1,
            last_error_at = SYSUTCDATETIME()
      WHERE id IN (${ids.map((_, i) => `@id${i}`).join(", ")});
@@ -381,7 +456,7 @@ async function markFailed(table, ids, message, quarantine) {
 }
 
 async function retryErrored() {
-  for (const table of TABLES) {
+  for (const table of PUSH_TABLES) {
     await getPool()
       .request()
       .query(
@@ -425,7 +500,7 @@ async function discardRow(table, id) {
 
 async function queueRows(limit = 100) {
   const rows = [];
-  for (const table of TABLES) {
+  for (const table of PUSH_TABLES) {
     let res;
     try {
       res = await getPool().request().input("limit", sql.Int, limit).query(`
@@ -566,7 +641,7 @@ async function compareRows(table, { since = null, limit = 2000 } = {}) {
 
 async function stats() {
   const out = [];
-  for (const table of TABLES) {
+  for (const table of PUSH_TABLES) {
     const res = await getPool().request().query(`
       SELECT
         SUM(CASE WHEN is_synced = 0 AND sync_status = N'pending' THEN 1 ELSE 0 END) AS pending,
@@ -748,7 +823,7 @@ async function snapshot() {
 async function pendingSyncCount() {
   let total = 0;
   let sales = 0;
-  for (const table of TABLES) {
+  for (const table of PUSH_TABLES) {
     const res = await getPool()
       .request()
       .query(`SELECT COUNT(*) AS n FROM dbo.[${table}] WHERE is_synced = 0;`);
@@ -834,11 +909,15 @@ function toCloudRow(table, row) {
   // change is skipped centrally, the next pull brings the newer copy down.
   const out = parseJsonColumns(table, rest);
   if (typeof row.row_version !== "number") delete out.row_version;
-  return out;
+  // Never send a column the central database does not have: one unknown key
+  // makes PostgREST refuse the whole batch.
+  return filterCloudColumns(table, out);
 }
 
 module.exports = {
   TABLES,
+  PUSH_TABLES,
+  CLOUD_COLUMNS,
   buildSetList,
   CATALOGUE_TABLES,
   SCOPED_PULL_TABLES,

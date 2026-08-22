@@ -90,13 +90,11 @@ contextBridge.exposeInMainWorld("pos", {
   getConfig: (key) => invoke("config:get", key),
   setConfig: (key, value) => invoke("config:set", key, value),
   resetConfig: () => invoke("config:reset"),
-  /* embedded local database (mirror + offline outbox + audit ledger) */
+  /* embedded local database (mirror + audit ledger). Offline sales live in
+     the branch SQL Server outbox — there is deliberately no second queue. */
   localInfo: () => invoke("local:info"),
   localMirror: (entity, rows) => invoke("local:mirror", entity, rows),
   localList: (entity, limit) => invoke("local:list", entity, limit),
-  localEnqueue: (entity, payload) => invoke("local:enqueue", entity, payload),
-  localPending: (limit) => invoke("local:pending", limit),
-  localMark: (id, status, error) => invoke("local:mark", id, status, error),
   localAuditLog: (entry) => invoke("local:audit-log", entry),
   localAuditList: (limit) => invoke("local:audit-list", limit),
   localAuditClear: () => invoke("local:audit-clear"),

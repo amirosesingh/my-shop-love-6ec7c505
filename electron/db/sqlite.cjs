@@ -28,7 +28,7 @@ let lastError = null;
 let scope = { storeId: "", terminalId: "" };
 
 /** Attempts a queued change gets before it is parked for an operator. */
-const MAX_ATTEMPTS = 10;
+
 
 /** Local mirror tables that carry sync bookkeeping columns. */
 const SYNCED_TABLES = [
@@ -71,7 +71,7 @@ function init(directory) {
     // so the local shape stays reviewable next to the cloud schema.
     db.exec(fs.readFileSync(path.join(__dirname, "offline_sqlite_v2.sql"), "utf8"));
     migrate();
-    drainLegacyOutbox();
+    
     lastError = null;
     return { ok: true, engine: "sqlite", path: dbPath };
   } catch (error) {
@@ -219,25 +219,6 @@ function setScope({ storeId, terminalId } = {}) {
   return scope;
 }
 
-/** Moves rows written by pre-v2 builds into the new queue, once. */
-function drainLegacyOutbox() {
-  try {
-    tx(() =>
-      db.exec(
-        `INSERT OR IGNORE INTO offline_sync_queue
-           (id, table_name, record_id, action_type, payload_json, status, error_message, attempts, created_at)
-         SELECT id, entity, record_id, 'INSERT', payload,
-                CASE WHEN status = 'failed' THEN 'failed' ELSE 'pending' END,
-                error, attempts, created_at
-         FROM outbox WHERE status IN ('pending', 'failed');
-         DELETE FROM outbox;`,
-      ),
-    );
-  } catch {
-    /* legacy table absent or already drained */
-  }
-}
-
 const ready = () => !!db;
 
 /* ------------------------------- mirror ------------------------------- */
@@ -275,131 +256,6 @@ function counts() {
       : 0;
   }
   return out;
-}
-
-/* ------------------------------- outbox ------------------------------- */
-
-/** Append-only: offline sales/jobs/payments get a client UUID and UTC stamp. */
-function enqueue(entity, payload, actionType = "INSERT") {
-  if (!ready()) return null;
-  const action = ["INSERT", "UPDATE", "DELETE"].includes(actionType) ? actionType : "INSERT";
-  const clientTxnId = payload?.client_transaction_id ?? uuid();
-  const row = {
-    id: uuid(),
-    entity,
-    record_id: String(payload?.id ?? ""),
-    payload: { ...payload, id: payload?.id ?? uuid(), created_at: payload?.created_at ?? nowIso() },
-    created_at: nowIso(),
-    status: "pending",
-    attempts: 0,
-    error: null,
-    client_transaction_id: clientTxnId,
-  };
-  tx(() =>
-    db
-      .prepare(
-        `INSERT INTO offline_sync_queue
-           (id, table_name, record_id, action_type, payload_json, status, error_message,
-            attempts, last_attempt_at, client_transaction_id, created_at)
-         VALUES (?, ?, ?, ?, ?, 'pending', NULL, 0, NULL, ?, ?)`,
-      )
-      .run(
-        row.id,
-        row.entity,
-        row.record_id,
-        action,
-        JSON.stringify(row.payload),
-        clientTxnId,
-        row.created_at,
-      ),
-  );
-  return row;
-}
-
-/** Queue rows are exposed in the legacy `{ entity, payload, error }` shape. */
-const fromQueue = (r) => ({
-  id: r.id,
-  entity: r.table_name,
-  record_id: r.record_id,
-  action_type: r.action_type,
-  payload: JSON.parse(r.payload_json),
-  status: r.status,
-  attempts: r.attempts,
-  error: r.error_message,
-  lastAttemptAt: r.last_attempt_at ?? null,
-  clientTransactionId: r.client_transaction_id ?? null,
-  quarantined: r.status === "dead_letter",
-  created_at: r.created_at,
-});
-
-function pending(limit = 200) {
-  if (!ready()) return [];
-  return db
-    .prepare(
-      `SELECT * FROM offline_sync_queue WHERE status IN ('pending','failed') ORDER BY created_at LIMIT ?`,
-    )
-    .all(limit)
-    .map(fromQueue);
-}
-
-/** Changes parked after too many refusals, for the admin retry/discard view. */
-function deadLetters(limit = 200) {
-  if (!ready()) return [];
-  return db
-    .prepare(`SELECT * FROM offline_sync_queue WHERE status = 'dead_letter' ORDER BY created_at LIMIT ?`)
-    .all(limit)
-    .map(fromQueue);
-}
-
-/** Put every parked change back in line. */
-function retryDeadLetters() {
-  if (!ready()) return 0;
-  return tx(
-    () =>
-      db
-        .prepare(
-          `UPDATE offline_sync_queue SET status = 'pending', attempts = 0, error_message = NULL
-             WHERE status = 'dead_letter'`,
-        )
-        .run().changes ?? 0,
-  );
-}
-
-function discardDeadLetters() {
-  if (!ready()) return 0;
-  return tx(
-    () => db.prepare(`DELETE FROM offline_sync_queue WHERE status = 'dead_letter'`).run().changes ?? 0,
-  );
-}
-
-function pendingCounts() {
-  const rows = pending(1000);
-  const grouped = {};
-  for (const row of rows) grouped[row.entity] = (grouped[row.entity] ?? 0) + 1;
-  const parked = ready()
-    ? db.prepare(`SELECT COUNT(*) AS n FROM offline_sync_queue WHERE status = 'dead_letter'`).get().n
-    : 0;
-  return { total: rows.length, byEntity: grouped, deadLetters: parked };
-}
-
-function markOutbox(id, status, error = null) {
-  if (!ready()) return;
-  tx(() => {
-    if (status === "synced") {
-      db.prepare(`DELETE FROM offline_sync_queue WHERE id = ?`).run(id);
-      return;
-    }
-    // Retry state lives in the table, so it survives a restart. Past the cap
-    // the change is parked rather than retried forever.
-    db.prepare(
-      `UPDATE offline_sync_queue
-         SET attempts = attempts + 1,
-             error_message = ?,
-             last_attempt_at = ?,
-             status = CASE WHEN attempts + 1 >= ? THEN 'dead_letter' ELSE ? END
-       WHERE id = ?`,
-    ).run(error, nowIso(), MAX_ATTEMPTS, status === "failed" ? "failed" : "pending", id);
-  });
 }
 
 /* ---------------------------- audit ledger ---------------------------- */
@@ -744,7 +600,6 @@ module.exports = {
   setStaffVerifier,
   forgetStaffVerifier,
   MIRROR_ENTITIES,
-  MAX_ATTEMPTS,
   init,
   info,
   relationalHealth,
@@ -752,13 +607,6 @@ module.exports = {
   mirror,
   listMirror,
   counts,
-  enqueue,
-  pending,
-  deadLetters,
-  retryDeadLetters,
-  discardDeadLetters,
-  pendingCounts,
-  markOutbox,
   logAudit,
   listAudit,
   clearAudit,

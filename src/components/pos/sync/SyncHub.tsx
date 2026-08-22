@@ -76,6 +76,7 @@ export function SyncHub() {
   const [engine, setEngine] = useState<LocalEngineInfo | null>(null);
   const [queue, setQueue] = useState<QueueView[]>([]);
   const [localQueue, setLocalQueue] = useState<SyncQueueRow[]>([]);
+  const [localStats, setLocalStats] = useState<{ table: string; pending: number; errored: number }[]>([]);
   const [localConnected, setLocalConnected] = useState(false);
   const [conflicts, setConflicts] = useState<SyncConflict[]>([]);
   const [unapplied, setUnapplied] = useState<UnappliedMovement[]>([]);
@@ -101,13 +102,18 @@ export function SyncHub() {
         setLocalQueue(
           (st.queue ?? []).filter((r) => r.status === "error" || r.status === "quarantined"),
         );
+        setLocalStats(
+          (st as { tables?: { table: string; pending: number; errored: number }[] }).tables ?? [],
+        );
       } catch {
         setLocalConnected(false);
         setLocalQueue([]);
+        setLocalStats([]);
       }
     } else {
       setLocalConnected(false);
       setLocalQueue([]);
+      setLocalStats([]);
     }
     setConflicts(listConflicts());
     setUnapplied(listUnappliedStock());
@@ -243,7 +249,7 @@ export function SyncHub() {
                     {engine ? (engine.counts[entity] ?? 0) : "—"}
                   </td>
                   <td className="py-1.5 text-right tabular-nums">
-                    {engine?.pending.byEntity[entity] ??
+                    {localStats.find((t) => t.table === entity)?.pending ??
                       queue.filter((q) => q.op.table === entity).length}
                   </td>
                 </tr>

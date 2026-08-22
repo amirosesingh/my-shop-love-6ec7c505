@@ -1131,6 +1131,7 @@ export type Database = {
           booking_id: string | null
           cashier_id: string | null
           cashier_name: string | null
+          client_transaction_id: string | null
           created_at: string
           id: string
           kind: string
@@ -1154,6 +1155,7 @@ export type Database = {
           booking_id?: string | null
           cashier_id?: string | null
           cashier_name?: string | null
+          client_transaction_id?: string | null
           created_at?: string
           id?: string
           kind?: string
@@ -1177,6 +1179,7 @@ export type Database = {
           booking_id?: string | null
           cashier_id?: string | null
           cashier_name?: string | null
+          client_transaction_id?: string | null
           created_at?: string
           id?: string
           kind?: string

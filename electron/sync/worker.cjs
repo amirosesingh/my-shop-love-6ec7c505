@@ -24,7 +24,6 @@ function setPhase(next) {
   phase = next;
   notify();
 }
-const attempts = new Map(); // `${table}:${id}` -> failed attempts
 let credentials = {};
 let relayUrl = null;
 // Which timestamp column each catalogue table actually has. Probed once so a
@@ -105,14 +104,29 @@ async function applyStockDeltas(rows) {
   if (!movements.length) return null;
 
   // One round trip for the whole push batch; each movement is still applied
-  // once, keyed on its own id.
+  // once, keyed on its own id. Refusals come back per movement so the exact
+  // rows can be parked with their reason instead of vanishing as "synced".
+  const asRefusals = (rows) =>
+    (rows ?? [])
+      .filter((r) => r?.status === "refused")
+      .map((r) => ({
+        id: String(r.movement_id ?? "").toLowerCase(),
+        reason: r.reason ?? "refused",
+      }))
+      .filter((r) => r.id);
+
   const { data, error } = await supabase.rpc("stock_apply_deltas", { _movements: movements });
   if (!error) {
-    const refused = (data ?? []).filter((r) => r.status === "refused");
-    return refused.length ? `${refused.length} stock movement(s) refused: ${refused[0].reason}` : null;
+    const refused = asRefusals(data);
+    return refused.length
+      ? { error: `${refused.length} stock movement(s) refused: ${refused[0].reason}`, refused }
+      : null;
   }
   // Older central database without the batch routine: fall back per movement.
-  if (!/does not exist|not find|schema cache|PGRST202/i.test(error.message || "")) return error.message;
+  if (!/does not exist|not find|schema cache|PGRST202/i.test(error.message || "")) {
+    return { error: error.message, refused: [] };
+  }
+  const refused = [];
   let failure = null;
   for (const m of movements) {
     const res = await supabase.rpc("stock_apply_delta", {
@@ -121,9 +135,17 @@ async function applyStockDeltas(rows) {
       _store_id: m.store_id,
       _delta: m.delta,
     });
-    if (res.error) failure = res.error.message;
+    if (res.error) {
+      failure = res.error.message;
+      continue;
+    }
+    const rows2 = Array.isArray(res.data) ? res.data : res.data ? [res.data] : [];
+    refused.push(...asRefusals(rows2));
   }
-  return failure;
+  if (refused.length) {
+    return { error: `${refused.length} stock movement(s) refused: ${refused[0].reason}`, refused };
+  }
+  return failure ? { error: failure, refused: [] } : null;
 }
 
 function init({ url, key, accessToken, sessionToken, cashierToken, terminalToken, branchId, relayUrl: relay, onChange }) {
@@ -195,7 +217,7 @@ async function push() {
   setPhase("pushing");
   let pushed = 0;
   let failed = 0;
-  for (const table of repo.TABLES) {
+  for (const table of repo.PUSH_TABLES ?? repo.TABLES) {
     let rows;
     try {
       rows = await repo.pendingRows(table, BATCH);
@@ -219,14 +241,9 @@ async function push() {
 
     if (error) {
       failed += ids.length;
-      let quarantine = false;
-      for (const id of ids) {
-        const key = `${table}:${id}`;
-        const n = (attempts.get(key) ?? 0) + 1;
-        attempts.set(key, n);
-        if (n >= MAX_ATTEMPTS) quarantine = true;
-      }
-      await repo.markFailed(table, ids, error.message, quarantine);
+      // The attempt counter lives in the database: a parked row stays parked
+      // across restarts until someone retries it from the Sync Hub.
+      await repo.markFailed(table, ids, error.message, MAX_ATTEMPTS);
       await repo
         .setWatermark(table, null, { error: error.message })
         .catch(() => {});
@@ -234,15 +251,37 @@ async function push() {
       continue;
     }
 
-    // Inventory moves only after the movement rows themselves are up.
+    // Inventory moves only after the movement rows themselves are up. A
+    // refusal (e.g. the central negative-stock guard) is not "synced": the
+    // movement row keeps its place in the queue with the reason attached, so
+    // the Sync Hub shows it and a later retry can still apply it.
     let deltaError = null;
-    if (table === "item_activity_logs") deltaError = await applyStockDeltas(payload);
+    let syncedIds = ids;
+    if (table === "item_activity_logs") {
+      const result = await applyStockDeltas(payload);
+      if (result) {
+        deltaError = result.error;
+        if (result.refused?.length) {
+          const refusedIds = new Set(result.refused.map((r) => r.id));
+          const parked = ids.filter((id) => refusedIds.has(String(id).toLowerCase()));
+          if (parked.length) {
+            await repo.markFailed(
+              table,
+              parked,
+              `Stock movement refused centrally: ${result.refused[0].reason ?? "guard"}`,
+              MAX_ATTEMPTS,
+            );
+            syncedIds = ids.filter((id) => !refusedIds.has(String(id).toLowerCase()));
+            failed += parked.length;
+          }
+        }
+      }
+    }
 
-    await repo.markSynced(table, ids);
-    for (const id of ids) attempts.delete(`${table}:${id}`);
-    pushed += ids.length;
+    await repo.markSynced(table, syncedIds);
+    pushed += syncedIds.length;
     await repo
-      .setWatermark(table, null, { rowsPushed: ids.length, pushed: true, error: deltaError })
+      .setWatermark(table, null, { rowsPushed: syncedIds.length, pushed: true, error: deltaError })
       .catch(() => {});
     notify();
   }
