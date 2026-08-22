@@ -169,6 +169,7 @@ contextBridge.exposeInMainWorld("sqlAdmin", {
   getTableColumns: (dbName, tableName, schemaName) =>
     invoke("sqladmin:columns", dbName, tableName, schemaName),
   executeQuery: (dbName, queryText) => invoke("sqladmin:query", dbName, queryText),
+  repair: (payload) => invoke("sqladmin:repair", payload),
   disconnect: () => invoke("sqladmin:disconnect"),
   status: () => invoke("sqladmin:status"),
 });

@@ -1172,6 +1172,63 @@ function registerIpc() {
     bounded(5_000, "The connection status did not arrive in time.", () => sqlAdmin.status()),
   );
 
+  /*
+    Elevated schema repair. The operational POS login may read and write rows
+    yet lack CREATE/ALTER rights; when the self-heal layer reports a
+    permission failure the operator signs in once with a database
+    administrator login and the guarded master-schema batches for the failing
+    tables replay through that session. The repair session is torn down
+    straight afterwards and the operational pool is never touched. Only
+    batches parsed from database/schema.sql may run — the renderer supplies
+    table names, never SQL.
+  */
+  ipcMain.handle("sqladmin:repair", async (_e, payload) => {
+    try {
+      const tables = Array.isArray(payload?.tables) ? payload.tables : [];
+      const database = String(payload?.database ?? "").trim();
+      if (!tables.length) return { ok: false, stage: "prepare", error: "Choose at least one table." };
+      if (!database) {
+        return { ok: false, stage: "prepare", error: "The POS database name is missing." };
+      }
+      const got = pool.schemaTableBatches(tables);
+      if (!got.batches?.length) {
+        return { ok: false, stage: "prepare", error: got.error ?? "No repair statements found." };
+      }
+      const creds = payload?.credentials ?? {};
+      const connect = await bounded(35_000, "The administrator sign-in did not finish in time.", () =>
+        sqlAdmin.connectInstance({ ...creds, database: "master" }),
+      );
+      if (!connect?.ok) return { ok: false, stage: "connect", ...(connect ?? {}) };
+      let repair;
+      try {
+        repair = await bounded(120_000, "The repair script did not finish in time.", () =>
+          sqlAdmin.runRepair(database, got.batches),
+        );
+      } finally {
+        await sqlAdmin.disconnect().catch(() => {});
+      }
+      if (!repair?.ok && !repair?.results) return { ok: false, stage: "repair", ...(repair ?? {}) };
+      // The operational pool must forget what it cached about the schema.
+      try {
+        require("./db/repo.cjs").forgetColumnCache();
+      } catch {
+        /* repo not loaded yet */
+      }
+      return {
+        ok: repair.ok,
+        stage: "repair",
+        ran: repair.ran,
+        total: repair.total,
+        repairedTables: got.tables,
+        unknownTables: got.unknownTables,
+        error: repair.error ?? null,
+        results: repair.results,
+      };
+    } catch (err) {
+      return { ok: false, stage: "repair", ...pool.describeSqlError(err) };
+    }
+  });
+
   ipcMain.handle("pos:write", async (_e, _context, op) => {
     try {
       await repo.applyOp(op);

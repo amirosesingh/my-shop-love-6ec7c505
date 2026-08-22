@@ -1066,7 +1066,11 @@ async function applySchemaTables(tableNames) {
       await pool.request().batch(batch);
       batchCount += 1;
     } catch (err) {
-      errors.push({ scope: owner.get(i) ?? "unknown", ...describeSqlError(err) });
+      errors.push({
+        scope: owner.get(i) ?? "unknown",
+        ...describeSqlError(err),
+        permission: isDdlPermissionError(err),
+      });
     }
   }
   try {
@@ -1080,6 +1084,7 @@ async function applySchemaTables(tableNames) {
     unknownTables: unknown,
     batchCount,
     errors,
+    permission: errors.some((e) => e.permission),
   };
 }
 
@@ -1119,6 +1124,46 @@ function schemaTableSql(tableNames) {
     `   Extracted from database/schema.sql. Every statement is guarded:\n` +
     `   safe to run repeatedly, never drops data. */\n\n`;
   return { ok: true, file, tables: names, text: header + body + "\nGO\n" };
+}
+
+/**
+ * The raw guarded batches for the chosen tables — the exact statements the
+ * elevated administrator-repair channel replays. Batches only ever come from
+ * the master schema file on disk, never from renderer-supplied SQL, so this
+ * channel cannot be turned into an arbitrary-DDL bridge.
+ */
+function schemaTableBatches(tableNames) {
+  const wanted = (Array.isArray(tableNames) ? tableNames : [])
+    .map((n) => String(n).toLowerCase())
+    .filter(Boolean);
+  if (!wanted.length) return { ok: false, error: "Choose at least one table to repair." };
+  const manifest = schemaManifest();
+  if (!manifest) return { ok: false, error: "Master schema file could not be read." };
+  const unknown = wanted.filter((w) => !manifest.tableBatches.has(w));
+  const known = new Set(wanted.filter((w) => manifest.tableBatches.has(w)));
+  if (!known.size) {
+    return { ok: false, error: `Not in the master schema file: ${unknown.join(", ")}` };
+  }
+  const selected = new Set(manifest.sharedIdx);
+  for (const [key, idxs] of manifest.tableBatches) {
+    if (!known.has(key)) continue;
+    for (const i of idxs) selected.add(i);
+  }
+  const batches = [...selected]
+    .sort((a, b) => a - b)
+    .map((i) => (manifest.rawBatches[i] ?? "").trim())
+    .filter(Boolean);
+  return {
+    ok: unknown.length === 0 && batches.length > 0,
+    batches,
+    tables: manifest.tables.filter((t) => known.has(t.key)).map((t) => t.name),
+    unknownTables: unknown,
+    error: batches.length
+      ? unknown.length
+        ? `Not in the master schema file: ${unknown.join(", ")}`
+        : null
+      : "Nothing to repair for the chosen tables.",
+  };
 }
 
 /* ================= on-demand schema self-heal ================= */
