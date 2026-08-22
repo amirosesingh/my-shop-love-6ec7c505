@@ -2,13 +2,20 @@
  * Admin-controlled screen visibility.
  *
  * The permission matrix decides what a person is *allowed* to do; this decides
- * what they can *see* on the busiest screens. Admins are never hidden from
- * anything, so an accidental toggle can never lock the owner out.
+ * what they can *see*. There is no third, hidden layer: whatever an
+ * administrator switches here is what the role gets, immediately.
+ *
+ * The only exception is a small set of owner-only screens (staff, terminals,
+ * sync, security, billing identity). Those can never be handed to another role
+ * by accident, and are marked `ownerOnly`.
+ *
+ * Admins are never hidden from anything, so a bad toggle cannot lock the owner
+ * out of their own install.
  */
 import { useCallback } from "react";
 import { usePos } from "./pos-store";
 import { useAuth } from "@/lib/pos-auth";
-import { roleHasTag, type PermissionTag, type StaffRole } from "./permissions";
+import type { StaffRole } from "./permissions";
 
 export type VisibilityRole = Exclude<StaffRole, "admin">;
 
@@ -25,9 +32,10 @@ export type VisibilityElement = {
   group: string;
   /** Route this element hides. Set for whole screens such as settings pages. */
   route?: string;
-  /** Which roles the screen is meant for at all. */
-  tag?: PermissionTag;
+  /** Owner-only screens can never be granted to another role. */
+  ownerOnly?: boolean;
 };
+
 
 /** Every element an administrator can hide, grouped by the screen it lives on. */
 export const VISIBILITY_ELEMENTS: VisibilityElement[] = [
