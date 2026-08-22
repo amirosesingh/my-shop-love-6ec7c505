@@ -10,14 +10,21 @@ export type CompareCaller =
   | { ok: true; storeId: string | null; isAdmin: boolean };
 
 async function branchOf(column: "user_id" | "id", value: string) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data } = await supabaseAdmin
-    .from("app_users")
-    .select("store_id, role, is_active")
-    .eq(column, value)
-    .maybeSingle();
-  return data ?? null;
+  const { serviceRest } = await import("./pos-relay.server");
+  try {
+    const res = await serviceRest(
+      `app_users?select=store_id,role,is_active&${encodeURIComponent(column)}=eq.${encodeURIComponent(value)}&limit=1`,
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json()) as
+      | { store_id: string | null; role: string | null; is_active: boolean | null }[]
+      | null;
+    return rows?.[0] ?? null;
+  } catch {
+    return null;
+  }
 }
+
 
 export async function resolveCompareCaller(input: {
   accessToken?: string | undefined;
