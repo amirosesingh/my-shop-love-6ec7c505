@@ -109,6 +109,7 @@ export function SyncHub() {
     } else {
       setLocalConnected(false);
       setLocalQueue([]);
+      setLocalStats([]);
     }
     setConflicts(listConflicts());
     setUnapplied(listUnappliedStock());
