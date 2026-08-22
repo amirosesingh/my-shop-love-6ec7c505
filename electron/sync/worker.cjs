@@ -24,7 +24,6 @@ function setPhase(next) {
   phase = next;
   notify();
 }
-const attempts = new Map(); // `${table}:${id}` -> failed attempts
 let credentials = {};
 let relayUrl = null;
 // Which timestamp column each catalogue table actually has. Probed once so a
@@ -105,14 +104,29 @@ async function applyStockDeltas(rows) {
   if (!movements.length) return null;
 
   // One round trip for the whole push batch; each movement is still applied
-  // once, keyed on its own id.
+  // once, keyed on its own id. Refusals come back per movement so the exact
+  // rows can be parked with their reason instead of vanishing as "synced".
+  const asRefusals = (rows) =>
+    (rows ?? [])
+      .filter((r) => r?.status === "refused")
+      .map((r) => ({
+        id: String(r.movement_id ?? "").toLowerCase(),
+        reason: r.reason ?? "refused",
+      }))
+      .filter((r) => r.id);
+
   const { data, error } = await supabase.rpc("stock_apply_deltas", { _movements: movements });
   if (!error) {
-    const refused = (data ?? []).filter((r) => r.status === "refused");
-    return refused.length ? `${refused.length} stock movement(s) refused: ${refused[0].reason}` : null;
+    const refused = asRefusals(data);
+    return refused.length
+      ? { error: `${refused.length} stock movement(s) refused: ${refused[0].reason}`, refused }
+      : null;
   }
   // Older central database without the batch routine: fall back per movement.
-  if (!/does not exist|not find|schema cache|PGRST202/i.test(error.message || "")) return error.message;
+  if (!/does not exist|not find|schema cache|PGRST202/i.test(error.message || "")) {
+    return { error: error.message, refused: [] };
+  }
+  const refused = [];
   let failure = null;
   for (const m of movements) {
     const res = await supabase.rpc("stock_apply_delta", {
@@ -121,9 +135,17 @@ async function applyStockDeltas(rows) {
       _store_id: m.store_id,
       _delta: m.delta,
     });
-    if (res.error) failure = res.error.message;
+    if (res.error) {
+      failure = res.error.message;
+      continue;
+    }
+    const rows2 = Array.isArray(res.data) ? res.data : res.data ? [res.data] : [];
+    refused.push(...asRefusals(rows2));
   }
-  return failure;
+  if (refused.length) {
+    return { error: `${refused.length} stock movement(s) refused: ${refused[0].reason}`, refused };
+  }
+  return failure ? { error: failure, refused: [] } : null;
 }
 
 function init({ url, key, accessToken, sessionToken, cashierToken, terminalToken, branchId, relayUrl: relay, onChange }) {
