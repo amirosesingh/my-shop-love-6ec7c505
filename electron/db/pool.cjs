@@ -1414,6 +1414,7 @@ module.exports = {
   schemaFile,
   schemaStatus,
   schemaTableSql,
+  schemaTableBatches,
   describeSqlError,
   parseServerField,
   openConnection,

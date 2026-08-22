@@ -153,9 +153,30 @@ export type SqlAdminBridge = {
     schemaName?: string,
   ) => Promise<{ ok: true; columns: SqlColumn[] } | (SqlAdminFailure & { columns: SqlColumn[] })>;
   executeQuery: (dbName: string, queryText: string) => Promise<SqlQueryResult>;
+  /**
+   * Elevated schema repair: signs in with an administrator login, replays the
+   * guarded master-schema batches for the chosen tables, then disconnects.
+   */
+  repair?: (payload: {
+    credentials: SqlAdminCredentials;
+    database: string;
+    tables: string[];
+  }) => Promise<SqlAdminRepairResult>;
   disconnect: () => Promise<{ ok: boolean }>;
   status: () => Promise<SqlAdminStatus>;
 };
+
+export type SqlAdminRepairResult =
+  | {
+      ok: true;
+      stage: "repair";
+      ran: number;
+      total: number;
+      repairedTables?: string[];
+      unknownTables?: string[];
+      results?: { ok: boolean; error?: string }[];
+    }
+  | (SqlAdminFailure & { stage?: "prepare" | "connect" | "repair"; ran?: number; total?: number });
 
 declare global {
   interface Window {
