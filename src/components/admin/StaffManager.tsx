@@ -41,6 +41,7 @@ import {
 import { useAuth } from "@/lib/pos-auth";
 import { usePos } from "@/lib/pos-store";
 import { getRolesWithPermissions, type RoleDef } from "@/lib/role-admin";
+import { syncNow } from "@/lib/sync-engine";
 import { isExternalEmail, isInternalAddress } from "@/lib/internal-domains";
 import {
   createStaffMember,
