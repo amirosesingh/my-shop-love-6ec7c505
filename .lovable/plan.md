@@ -1,47 +1,49 @@
-# Self-healing local schema — auto-create missing tables & columns
+# Fix payment_transactions sync + self-healing schema (local & cloud)
 
-## What you asked for
+## What you reported
 
-Cash sales now save cleanly. The remaining pain: when the till touches a table or column that does not exist yet in the local SQL Server (new products tables, recently added columns), the operation fails with "table doesn't exist" / "permission denied" instead of fixing itself. You want the engine to **create the table if it is missing and add the column if it is missing — dynamically, at the moment it is needed**.
+1. **Cash sale syncs with an error on `payment_transactions`** — you can't tell whether it fails offline (local SQL Server) or online (central database).
+2. **Missing tables/columns should fix themselves** — if a table is missing, create it; if a column is missing, add it; on every operation (insert / update / delete), dynamically.
+3. **If Windows/SQL admin permission is needed, the app should ask** — not just fail with a raw permission error.
 
-## Root cause (confirmed in code)
+## Root causes found in code
 
-- `electron/db/repo.cjs` `tableColumns()` queries `INFORMATION_SCHEMA.COLUMNS`; for a **missing table it silently returns an empty set**, and the write then crashes with `Invalid object name 'dbo.<table>'` (SQL error 208). No recovery exists anywhere in repo.cjs.
-- For a **missing column**, the write path silently *drops* the value (`known.has(c)` filter in `upsertRow`) — the sale succeeds but data is lost — or, on read/push paths, fails with `Invalid column name` (error 207). Nothing attempts an `ALTER TABLE ADD`.
-- The Schema manager (`pool.cjs`) already has everything needed to repair — the parsed manifest of `database/schema.sql` and guarded, idempotent batches — but it only runs when you click Repair manually.
+- **Payment rows carry no idempotency key.** `salePaymentRows` (`src/lib/pos-db.ts`) never sets `client_transaction_id` on `payment_transactions` rows, unlike sales/sale_items. If a push half-fails and retries with regenerated ids, the central database can reject it with a duplicate-key error — the exact "payment_transaction sync error" symptom.
+- **No self-heal in the local engine.** `electron/db/repo.cjs` crashes with `Invalid object name` when a table is missing (the column lookup silently returns empty and the write then fails), and silently *drops* values for columns the local table doesn't have yet. Nothing ever runs a guarded `CREATE`/`ALTER` on demand.
+- **Cloud drift is invisible.** If your own central project is missing a newer table/column, the sync worker retries the same failing batch every 30s forever; the only trace is a parked row.
+- **Permission failures are dead ends.** When the SQL login can't run CREATE/ALTER, the app shows a raw error instead of asking for an admin login.
 
 ## Changes
 
-### 1. `electron/db/pool.cjs` — expose single-table repair for the engine
-- Cache the parsed manifest (re-parse only if the file's mtime changes).
-- New exported `ensureSchemaTable(table)`:
-  - Runs exactly that table's guarded batches from the master schema (same idempotent path as the Schema manager's "Repair selected", shared engine rules included).
-  - An **in-flight lock per table** so a sale and the sync worker hitting the same missing table at once trigger one repair, not two.
-  - Returns `{ ok, created, error }`; on a permission failure (SQL 262/229) the error text tells the operator precisely what to grant: `db_ddladmin` on the POS database (or sign in with a login that has it, then use Schema manager → Repair).
-- New exported `schemaColumnType(table, column)` → the SQL type string from the manifest, or `null` when the master schema does not declare that column.
+### 1. Make payment push idempotent — `src/lib/pos-db.ts`, `src/lib/pos-relay.server.ts`
+- `salePaymentRows` stamps every tender row with `client_transaction_id = <sale attempt id>:pay:<n>` (the column already exists in both schemas, so old and new databases both accept it).
+- Relay: if a `payment_transactions` upsert is rejected with a duplicate-key error, look the row up by `client_transaction_id`; if it is already stored centrally, report success instead of failing the sale's sync.
 
-### 2. `electron/db/repo.cjs` — self-healing on every read/write
-- **Missing table**: `tableColumns()` returns an empty set → call `ensureSchemaTable(table)`, clear the column cache, re-read once. Still empty → throw a plain-language error naming the table.
-- **Retry wrapper** `withSchemaRetry(table, fn)` around every table-touching operation (`upsertRow`, `updateRows`, `deleteRows`, `pendingRows`, `markSynced`, `markFailed`, `mergeFromCloud`, `rows`, `getProducts`, watermark/state helpers):
-  - Catch `Invalid object name` (208) → `ensureSchemaTable(table)` + retry the operation **once**.
-  - Catch `Invalid column name '<col>'` (207) → if the master schema declares that column, run the guarded `ALTER TABLE dbo.[table] ADD [<col>] <type>`; refresh cache; retry once. If the master schema doesn't declare it → rethrow the original error (no guessing column types).
-- **Missing column on write**: in `upsertRow`, columns currently dropped because the local table lacks them are first checked against the manifest — if the master schema declares them, the column is added (guarded `ALTER`) and the value is written instead of dropped. Columns the master schema does not know keep the current drop-and-warn behaviour (this is the drift protection that keeps cloud pushes safe — unchanged).
-- A repair that fails on permission throws one clear message: *"The login '<x>' cannot create/alter tables in '<db>'. Grant it db_ddladmin, or open Settings → Sync & backup → Schema manager and press Repair with an admin login."*
+### 2. Local self-healing engine — `electron/db/pool.cjs`, `electron/db/repo.cjs`
+- `pool.cjs`: new `ensureSchemaTable(table)` — runs just that table's guarded batches from the master `database/schema.sql` (same idempotent statements the Schema manager uses, never drops data), with a per-table in-flight lock so the sync worker and a sale can't double-repair. New `schemaColumnType(table, column)` reads the expected type from the manifest.
+- `repo.cjs`: every table operation (insert/upsert/update/delete/read/sync-queue) wrapped in a one-time retry:
+  - `Invalid object name` → create the table from the master schema, retry once.
+  - `Invalid column name` → if the master schema declares the column, `ALTER TABLE ADD` it (guarded) and retry once; if not declared, keep the current safe drop-and-warn.
+  - Writes that currently *silently drop* a schema-known column now add the column and keep the data.
+- Net effect: insert / update / delete / sync against a missing table or column just works — the schema repairs itself at the moment it's needed.
 
-### 3. Sync worker (`electron/sync/worker.cjs`)
-- No logic change needed — it goes through `repo.cjs`, so pulls/pushes inherit the self-heal. Verified while editing.
+### 3. Permission: the app asks for an admin login — `electron/db/admin-pool.cjs`, `electron/main.cjs`, `electron/preload.cjs`, Schema manager UI
+- When self-heal or Repair hits a permission error (SQL 262/229), the app shows a dialog: *"Windows/SQL permission needed — sign in with a database admin login (e.g. sa) to create the missing tables."*
+- The dialog runs the repair through the existing admin connection pool with those credentials, then continues as the normal login. No PC-level changes, no manual SSMS session.
+- If the admin login also fails, the exact grant needed is shown (`db_ddladmin` on the POS database).
 
-### 4. What stays the same
-- Applying schema on boot: still never automatic — self-heal only triggers when an operation actually touches the missing object, and only runs the already-guarded statements from `database/schema.sql` (never drops data).
-- Schema manager UI, cloud push column whitelist, and all sync semantics unchanged.
+### 4. Cloud schema check & graceful degradation — relay + sync worker + Sync Hub
+- New relay read: fetch the central database's table/column list (via the service key) and compare with the schema the app expects → a "Central schema" panel listing missing tables/columns, with a **Download SQL** button producing the exact PostgreSQL script to run once in your central project's SQL editor (no pen drive).
+- Sync worker: when a push fails because the cloud table/column doesn't exist, park that table's rows with a clear message ("table `payment_transactions` missing in central database — open Settings → Central schema") and skip it in later cycles instead of failing every 30s; it resumes automatically once the table exists.
+- The Sync Hub error row keeps the full server message so we can see the real reason if anything still fails.
 
-### 5. Verification
-- `node --check` on both Electron files; `bunx tsgo` typecheck.
-- A small Node harness with a mocked pool asserting: missing table → ensure + retry succeeds; missing column declared in schema → ALTER issued + value written; undeclared column → dropped with warning; permission denied → clear grant hint, no retry loop.
-- Parser re-run against the real `database/schema.sql` to confirm `schemaColumnType` resolves types for the recently added columns (`tension_main`, `client_transaction_id`, etc.).
+## Verification
+- `node --check` on Electron files, `bunx tsgo` typecheck.
+- Node harness with a mocked pool: missing table → created + retried; missing column → added + value written; undeclared column → dropped with warning; permission denied → admin prompt path, no retry loop.
+- Parser re-run against `database/schema.sql` to confirm column types resolve for the new columns (`client_transaction_id`, `status`, `metadata`, …).
+- Payment idempotency: unit-level check that a re-pushed tender row resolves as already-stored.
 
 ## Technical details
-
-- Files touched: `electron/db/pool.cjs`, `electron/db/repo.cjs` only (plus the throwaway test harness, not shipped). No UI, no migrations, no cloud changes.
-- Self-heal DDL is the same guarded `IF OBJECT_ID… / COL_LENGTH…` batches already used by the Schema manager — idempotent and safe to run mid-sale.
-- One honest limitation: if the SQL login has no DDL rights, the database itself will refuse CREATE/ALTER no matter what the app does — in that case the till shows the exact grant needed instead of a raw error.
+- Files: `src/lib/pos-db.ts`, `src/lib/pos-relay.server.ts`, `electron/db/pool.cjs`, `electron/db/repo.cjs`, `electron/db/admin-pool.cjs`, `electron/main.cjs`, `electron/preload.cjs`, `src/lib/local-db.ts`, Schema manager / Sync Hub UI components.
+- One honest limit: the central (PostgreSQL) database cannot be altered by the app itself — PostgREST has no DDL. That's why the cloud side gets a check + ready-to-run SQL download, while the local SQL Server side is fully automatic.
+- No cloud migration is run by me; the central-project SQL is delivered as a downloadable script for you to execute.
