@@ -1059,6 +1059,28 @@ function registerIpc() {
       return { ok: false, ...pool.describeSqlError(err) };
     }
   });
+  /* Per-table schema manager: live status, selective repair, SQL export. */
+  ipcMain.handle("pos:schema-status", async () => {
+    try {
+      return await pool.schemaStatus();
+    } catch (err) {
+      return { ok: false, ...pool.describeSqlError(err) };
+    }
+  });
+  ipcMain.handle("pos:apply-schema-tables", async (_e, tables) => {
+    try {
+      return await pool.applySchemaTables(tables);
+    } catch (err) {
+      return { ok: false, ...pool.describeSqlError(err) };
+    }
+  });
+  ipcMain.handle("pos:schema-table-sql", (_e, tables) => {
+    try {
+      return pool.schemaTableSql(tables);
+    } catch (err) {
+      return { ok: false, error: err?.message ?? "SQL could not be prepared" };
+    }
+  });
 
   ipcMain.handle("pos:scan-network", async () => {
     try {
