@@ -202,7 +202,7 @@ export function StaffManager() {
         await updateStaffMember({
           username: editing.user_id,
           displayName: form.displayName.trim(),
-          branchId: form.branchId === "none" ? null : form.branchId,
+          branchId,
           roleSlug: selectedRole.slug,
           baseRole: selectedRole.baseLevel,
           active: form.active,
@@ -216,25 +216,28 @@ export function StaffManager() {
           });
           if (error) throw error;
         }
-        toast.success("Account updated");
+        toast.success(`${form.displayName.trim()} saved — ${branchLabel}`);
       } else {
         await createStaffMember({
           displayName: form.displayName.trim(),
           username: form.username.trim().toLowerCase(),
           ...(emailMode ? { password: form.credential } : { pin: form.credential }),
-          branchId: form.branchId === "none" ? null : form.branchId,
+          branchId,
           roleSlug: selectedRole.slug,
           baseRole: selectedRole.baseLevel,
           active: form.active,
         });
-        toast.success("Account created");
+        toast.success(`${form.displayName.trim()} created — ${branchLabel}`);
       }
       setFormOpen(false);
       setForm({ ...EMPTY });
       await load();
+      // Push the change to this shop's own database straight away.
+      void syncNow("staff account saved");
     } catch (error) {
-      toast.error(editing ? "Account could not be updated" : "Account could not be created", {
-        description: friendlyError(error),
+      // Lead with the real reason; the generic wording hid every cause.
+      toast.error(friendlyError(error), {
+        description: editing ? "The account was not updated." : "The account was not created.",
       });
     } finally {
       setBusy("");
