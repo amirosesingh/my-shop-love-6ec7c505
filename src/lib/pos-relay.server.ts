@@ -174,7 +174,7 @@ export async function runRelayOp(
 
   let res: Response;
   switch (safeOp.kind) {
-    case "insert":
+    case "insert": {
       // Client-generated ids make retry an acknowledgement of the same row,
       // not a second insert that fails with a duplicate-key error.
       const keyed =
@@ -188,6 +188,7 @@ export async function runRelayOp(
         },
       );
       break;
+    }
     case "upsert":
       res = await serviceRest(`${safeOp.table}?on_conflict=${conflictKey(safeOp.table)}`, {
         method: "POST",
