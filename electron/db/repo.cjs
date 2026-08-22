@@ -170,7 +170,11 @@ function parseJsonColumns(table, row) {
   const copy = { ...row };
   for (const column of JSON_COLUMNS[table] ?? []) {
     if (typeof copy[column] !== "string") continue;
-    try { copy[column] = JSON.parse(copy[column]); } catch { /* preserve invalid legacy text */ }
+    try {
+      copy[column] = JSON.parse(copy[column]);
+    } catch {
+      /* preserve invalid legacy text */
+    }
   }
   return copy;
 }
@@ -274,7 +278,6 @@ async function updateRows(tx, table, values, match) {
   `);
 }
 
-
 async function deleteRows(tx, table, match) {
   assertTable(table);
   const request = new sql.Request(tx);
@@ -303,15 +306,15 @@ async function deleteRows(tx, table, match) {
  * its lines either both land or neither does.
  */
 async function applyOpInTransaction(tx, op) {
-    if (op.kind === "insert" || op.kind === "upsert") {
-      for (const row of op.rows ?? []) await upsertRow(tx, op.table, row);
-    } else if (op.kind === "update") {
-      await updateRows(tx, op.table, op.values ?? {}, op.match ?? {});
-    } else if (op.kind === "delete") {
-      await deleteRows(tx, op.table, op.match ?? {});
-    } else {
-      throw new Error(`Unsupported operation: ${op.kind}`);
-    }
+  if (op.kind === "insert" || op.kind === "upsert") {
+    for (const row of op.rows ?? []) await upsertRow(tx, op.table, row);
+  } else if (op.kind === "update") {
+    await updateRows(tx, op.table, op.values ?? {}, op.match ?? {});
+  } else if (op.kind === "delete") {
+    await deleteRows(tx, op.table, op.match ?? {});
+  } else {
+    throw new Error(`Unsupported operation: ${op.kind}`);
+  }
 }
 
 async function applyOps(ops) {
@@ -333,10 +336,7 @@ async function applyOp(op) {
 
 async function pendingRows(table, limit = 200) {
   assertTable(table);
-  const res = await getPool()
-    .request()
-    .input("limit", sql.Int, limit)
-    .query(`
+  const res = await getPool().request().input("limit", sql.Int, limit).query(`
       SELECT TOP (@limit) * FROM dbo.[${table}]
        WHERE is_synced = 0 AND sync_status <> N'quarantined'
        ORDER BY created_at ASC;
@@ -428,10 +428,7 @@ async function queueRows(limit = 100) {
   for (const table of TABLES) {
     let res;
     try {
-      res = await getPool()
-        .request()
-        .input("limit", sql.Int, limit)
-        .query(`
+      res = await getPool().request().input("limit", sql.Int, limit).query(`
           SELECT TOP (@limit)
                  CONVERT(NVARCHAR(64), id) AS id,
                  sync_status,
@@ -567,7 +564,6 @@ async function compareRows(table, { since = null, limit = 2000 } = {}) {
   }));
 }
 
-
 async function stats() {
   const out = [];
   for (const table of TABLES) {
@@ -624,8 +620,7 @@ async function setWatermark(table, isoAt, { rowsPushed = 0, error = null, pushed
     .input("at", sql.DateTime2, isoAt ? new Date(isoAt) : null)
     .input("rows", sql.Int, rowsPushed)
     .input("pushed", sql.Bit, pushed ? 1 : 0)
-    .input("err", sql.NVarChar(sql.MAX), error ? String(error).slice(0, 3000) : null)
-    .query(`
+    .input("err", sql.NVarChar(sql.MAX), error ? String(error).slice(0, 3000) : null).query(`
       MERGE dbo.sync_metadata AS t
       USING (SELECT @t AS table_name, @store AS store_id, @term AS terminal_id) AS s
         ON t.table_name = s.table_name AND t.store_id = s.store_id AND t.terminal_id = s.terminal_id
@@ -646,8 +641,7 @@ async function setState(key, value) {
   await getPool()
     .request()
     .input("key", sql.NVarChar(60), key)
-    .input("value", sql.NVarChar(400), value)
-    .query(`
+    .input("value", sql.NVarChar(400), value).query(`
       MERGE dbo.sync_state AS t
       USING (SELECT @key AS [key], @value AS [value]) AS s ON t.[key] = s.[key]
       WHEN MATCHED THEN UPDATE SET t.[value] = s.[value], t.updated_at = SYSUTCDATETIME()
@@ -671,8 +665,7 @@ async function setSetting(key, value) {
   await getPool()
     .request()
     .input("key", sql.NVarChar(120), key)
-    .input("value", sql.NVarChar(sql.MAX), value == null ? null : String(value))
-    .query(`
+    .input("value", sql.NVarChar(sql.MAX), value == null ? null : String(value)).query(`
       MERGE dbo.system_settings AS t
       USING (SELECT @key AS [key], @value AS [value]) AS s ON t.[key] = s.[key]
       WHEN MATCHED THEN UPDATE SET t.[value] = s.[value], t.updated_at = SYSUTCDATETIME()
@@ -686,7 +679,14 @@ async function setSetting(key, value) {
  * land together or not at all. Rows are stamped `is_synced = 0` so the
  * background worker pushes them whenever the branch is back online.
  */
-async function createSale({ sale, items, products = [], member = null, branchId = null, exchangeOfBillNumber = null }) {
+async function createSale({
+  sale,
+  items,
+  products = [],
+  member = null,
+  branchId = null,
+  exchangeOfBillNumber = null,
+}) {
   const pool = getPool();
   const tx = new sql.Transaction(pool);
   await tx.begin();
@@ -727,12 +727,19 @@ async function rows(table) {
 
 async function snapshot() {
   const [products, members, stores, shifts, promotions, tiers, settings] = await Promise.all([
-    rows("products"), rows("members"), rows("stores"), rows("shifts"), rows("promotions"),
-    rows("membership_tiers"), rows("pos_settings"),
+    rows("products"),
+    rows("members"),
+    rows("stores"),
+    rows("shifts"),
+    rows("promotions"),
+    rows("membership_tiers"),
+    rows("pos_settings"),
   ]);
   const setting = settings[0];
   const payload = setting
-    ? (typeof setting.payload === "string" ? JSON.parse(setting.payload) : setting.payload)
+    ? typeof setting.payload === "string"
+      ? JSON.parse(setting.payload)
+      : setting.payload
     : null;
   return { products, members, stores, shifts, promotions, tiers, settings: payload };
 }
@@ -767,10 +774,7 @@ async function housekeep({ retentionDays = 90 } = {}) {
     const columns = await tableColumns(table);
     if (!columns.has("synced_at")) continue;
     try {
-      const res = await pool
-        .request()
-        .input("days", sql.Int, days)
-        .query(`
+      const res = await pool.request().input("days", sql.Int, days).query(`
           DELETE FROM dbo.[${table}]
            WHERE is_synced = 1
              AND synced_at IS NOT NULL

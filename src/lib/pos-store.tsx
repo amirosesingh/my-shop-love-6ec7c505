@@ -74,7 +74,6 @@ import {
   loadBranchSettings,
   resolveScopedSettings,
   saveSectionOverride,
-
   setSectionLock,
   SETTING_TIERS,
   type BranchSettingsState,
@@ -94,27 +93,26 @@ import {
 } from "./settings-sections";
 import { schedulePersist } from "./pos-persist";
 
-
 const KEY = "pos-state-v2";
 
-export const stockAt = (product: Product, storeId: string) =>
-  product.stockByStore?.[storeId] ?? 0;
+export const stockAt = (product: Product, storeId: string) => product.stockByStore?.[storeId] ?? 0;
 
 /** Units held back at a store by still-open bookings. */
 export const reservedAt = (bookings: Booking[], productId: string, storeId: string) =>
   bookings
     .filter((b) => b.status === "active" && b.storeId === storeId)
     .reduce(
-      (a, b) => a + b.lines.filter((l) => l.productId === productId && !l.credit).reduce((x, l) => x + l.qty, 0),
+      (a, b) =>
+        a +
+        b.lines
+          .filter((l) => l.productId === productId && !l.credit)
+          .reduce((x, l) => x + l.qty, 0),
       0,
     );
 
 /** Stock a cashier may actually sell right now: on hand minus booked units. */
-export const availableAt = (
-  product: Product,
-  storeId: string,
-  bookings: Booking[] = [],
-) => stockAt(product, storeId) - reservedAt(bookings, product.id, storeId);
+export const availableAt = (product: Product, storeId: string, bookings: Booking[] = []) =>
+  stockAt(product, storeId) - reservedAt(bookings, product.id, storeId);
 
 const bump = (p: Product, storeId: string, delta: number): Product => ({
   ...p,
@@ -450,7 +448,10 @@ export function PosProvider({ children }: { children: ReactNode }) {
           if (!cancelled && cloudBookings.length) {
             setState((s: PosState) => {
               const seen = new Set(cloudBookings.map((b) => b.id));
-              return { ...s, bookings: [...cloudBookings, ...s.bookings.filter((b) => !seen.has(b.id))] };
+              return {
+                ...s,
+                bookings: [...cloudBookings, ...s.bookings.filter((b) => !seen.has(b.id))],
+              };
             });
           }
         } catch {
@@ -475,7 +476,6 @@ export function PosProvider({ children }: { children: ReactNode }) {
     schedulePersist(KEY, () => JSON.stringify(state));
   }, [state, ready]);
 
-
   // Overrides follow the cluster, branch and person in context.
   useEffect(() => {
     if (!signedIn || !state.currentStoreId) return;
@@ -493,8 +493,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
   // activation claim still knows the branch, so use it rather than showing a
   // placeholder that reads "No branch yet" and locks the register.
   const currentStore = useMemo(() => {
-    const found =
-      state.stores.find((s) => s.id === state.currentStoreId) ?? state.stores[0];
+    const found = state.stores.find((s) => s.id === state.currentStoreId) ?? state.stores[0];
     if (found) return found;
     const terminal = readTerminalConfig();
     const boundId = (terminal?.locationId ?? "").trim() || state.currentStoreId.trim();
@@ -528,10 +527,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setPosTimeZone(state.settings.integrations.timeZone);
-    setPosFormats(
-      state.settings.integrations.dateFormat,
-      state.settings.integrations.timeFormat,
-    );
+    setPosFormats(state.settings.integrations.dateFormat, state.settings.integrations.timeFormat);
   }, [
     state.settings.integrations.timeZone,
     state.settings.integrations.dateFormat,
@@ -551,7 +547,8 @@ export function PosProvider({ children }: { children: ReactNode }) {
   const refreshActiveShift = useCallback(async () => {
     // The terminal's registered branch wins, so the read always matches the
     // branch the shift was opened against.
-    const storeId = activeBranchId(stateRef.current.currentStoreId) ?? stateRef.current.currentStoreId;
+    const storeId =
+      activeBranchId(stateRef.current.currentStoreId) ?? stateRef.current.currentStoreId;
     try {
       const found = await loadActiveShift(storeId);
       const fresh = justOpenedRef.current;
@@ -675,9 +672,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     if (dbShift && dbShift.storeId === branch && !dbShift.closedAt) return dbShift;
     if (shiftChecked) return null;
     return (
-      state.shifts.find(
-        (s) => s.storeId === branch && s.status !== "CLOSED" && !s.closedAt,
-      ) ?? null
+      state.shifts.find((s) => s.storeId === branch && s.status !== "CLOSED" && !s.closedAt) ?? null
     );
   }, [dbShift, shiftChecked, state.shifts, currentStore.id]);
 
@@ -852,11 +847,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
   );
 
   const closeShift = useCallback(
-    async (
-      countedCash: number,
-      note: string,
-      extras: Partial<Shift> = {},
-    ) => {
+    async (countedCash: number, note: string, extras: Partial<Shift> = {}) => {
       if (!activeShift) return null;
       // Only the PC that opened the shift may close it — unless a manager or
       // admin is signed in, who can close from anywhere.
@@ -925,157 +916,161 @@ export function PosProvider({ children }: { children: ReactNode }) {
     [activeShift, user, terminalUser, isAdmin, isSupervisor],
   );
 
-  const recordSale = useCallback(async (
-    input: Omit<Sale, "id" | "receiptNo" | "createdAt"> & { receiptNo?: string },
-  ) => {
-    const snapshot = stateRef.current;
-    const counter = snapshot.counter + 1;
-    // Never write a bill without a branch — the terminal's branch is authoritative.
-    const branchId = requireBranchId(input.storeId || snapshot.currentStoreId);
-    input = { ...input, storeId: branchId };
-    const store = snapshot.stores.find((x) => x.id === branchId);
-    // Branch + platform + terminal + day + sequence, so two registers can
-    // never mint the same bill number, online or off. A number reserved when
-    // the ticket started wins, so the header, the held record and the printed
-    // bill all agree. The reservation is awaited: if it cannot be stored the
-    // sale stops here rather than risking a duplicate bill number.
-    const receiptNo =
-      input.receiptNo ||
-      (await reserveBillNumber(
-        store?.receiptPrefix?.trim() || store?.code || "R",
-        snapshot.sales.map((s) => s.receiptNo),
-        {
-          ...(snapshot.settings.integrations.billNumbering ?? {}),
-          timeZone: snapshot.settings.integrations.timeZone || undefined,
-        },
-      ));
-    const clientTxnId = input.clientTxnId ?? crypto.randomUUID();
-    let sale: Sale = {
-      ...input,
-      // Freeze how this branch reads right now, so a later rename never
-      // rewrites a printed bill or a historical report.
-      storeName: input.storeName ?? store?.name ?? "",
-      storeAddress: input.storeAddress ?? store?.address ?? "",
-      // Stamp the cost price of every line at the moment of sale so margin
-      // reports stay accurate when prices change later.
-      lines: input.lines.map((l) => ({
-        ...l,
-        cost:
-          l.cost ??
-          snapshot.products.find((p) => p.id === l.productId)?.cost ??
-          0,
-      })),
-      id: clientTxnId,
-      receiptNo,
-      clientTxnId,
-      createdAt: new Date().toISOString(),
-    };
-
-
-    const touchedProducts = snapshot.products
-      .filter((p) => input.lines.some((l) => l.productId === p.id))
-      .map((p) => {
-        const line = input.lines.find((l) => l.productId === p.id)!;
-        return bump(p, input.storeId, -line.qty);
-      });
-    const member = snapshot.members.find((m) => m.id === input.memberId) ?? null;
-    const updatedMember = member
-      ? {
-          ...member,
-          points:
-            member.points + input.pointsEarned - (input.method === "points" ? input.paid : 0),
-          totalSpend: Number((member.totalSpend + input.total).toFixed(2)),
-        }
-      : null;
-    // The bill is only real once it is stored somewhere.
-    //
-    // A retried payment keeps the ticket's reserved number, so the database can
-    // refuse it as already used. When that happens: if this exact checkout
-    // attempt is already stored the sale is simply complete; otherwise a fresh
-    // number is minted and the bill goes through, instead of the cashier being
-    // stuck on a "duplicate bill" error.
-    for (let attempt = 0; ; attempt++) {
-      try {
-        await db.commitSale(sale, touchedProducts, updatedMember);
-        break;
-      } catch (error) {
-        if (attempt >= 2 || !isDuplicateBillNumber(error)) throw error;
-        if (sale.clientTxnId && (await db.saleAttemptExists(sale.clientTxnId)) === "yes") break;
-        const nextNo = await reserveBillNumber(
+  const recordSale = useCallback(
+    async (input: Omit<Sale, "id" | "receiptNo" | "createdAt"> & { receiptNo?: string }) => {
+      const snapshot = stateRef.current;
+      const counter = snapshot.counter + 1;
+      // Never write a bill without a branch — the terminal's branch is authoritative.
+      const branchId = requireBranchId(input.storeId || snapshot.currentStoreId);
+      input = { ...input, storeId: branchId };
+      const store = snapshot.stores.find((x) => x.id === branchId);
+      // Branch + platform + terminal + day + sequence, so two registers can
+      // never mint the same bill number, online or off. A number reserved when
+      // the ticket started wins, so the header, the held record and the printed
+      // bill all agree. The reservation is awaited: if it cannot be stored the
+      // sale stops here rather than risking a duplicate bill number.
+      const receiptNo =
+        input.receiptNo ||
+        (await reserveBillNumber(
           store?.receiptPrefix?.trim() || store?.code || "R",
-          [...snapshot.sales.map((s) => s.receiptNo), sale.receiptNo],
+          snapshot.sales.map((s) => s.receiptNo),
           {
             ...(snapshot.settings.integrations.billNumbering ?? {}),
             timeZone: snapshot.settings.integrations.timeZone || undefined,
           },
-        );
-        sale = { ...sale, receiptNo: nextNo };
-      }
-    }
-
-    setState((s) => {
-      const products = s.products.map((p) => {
-        const line = input.lines.find((l) => l.productId === p.id);
-        return line ? bump(p, input.storeId, -line.qty) : p;
-      });
-      const members = s.members.map((m) =>
-        m.id === input.memberId
-          ? {
-              ...m,
-              points: m.points + input.pointsEarned - (input.method === "points" ? input.paid : 0),
-              totalSpend: Number((m.totalSpend + input.total).toFixed(2)),
-            }
-          : m,
-      );
-      const tagged = input.exchangeOfReceiptNo
-        ? s.sales.map((x) =>
-            x.receiptNo === input.exchangeOfReceiptNo
-              ? { ...x, exchangedToReceiptNo: sale.receiptNo }
-              : x,
-          )
-        : s.sales;
-      return { ...s, counter: Math.max(counter, s.counter + 1), products, members, sales: [sale, ...tagged] };
-    });
-    logger.log(
-      "sale_event",
-      sale.exchangeOfReceiptNo ? "Exchange bill created" : "Bill created",
-      "register",
-      {
-        receiptNo: sale.receiptNo,
-        storeId: sale.storeId,
-        paymentMethod: sale.method,
-        subtotal: sale.subtotal,
-        discount: sale.discount,
-        tax: sale.tax,
-        total: sale.total,
-        paid: sale.paid,
-        memberId: sale.memberId ?? null,
-        pointsEarned: sale.pointsEarned,
-        exchangeOfReceiptNo: sale.exchangeOfReceiptNo ?? null,
-        cart: sale.lines.map((l) => ({
-          productId: l.productId,
-          name: l.name,
-          qty: l.qty,
-          price: l.price,
-          discount: l.discount,
-          discountType: l.discountType,
-          credit: !!l.credit,
+        ));
+      const clientTxnId = input.clientTxnId ?? crypto.randomUUID();
+      let sale: Sale = {
+        ...input,
+        // Freeze how this branch reads right now, so a later rename never
+        // rewrites a printed bill or a historical report.
+        storeName: input.storeName ?? store?.name ?? "",
+        storeAddress: input.storeAddress ?? store?.address ?? "",
+        // Stamp the cost price of every line at the moment of sale so margin
+        // reports stay accurate when prices change later.
+        lines: input.lines.map((l) => ({
+          ...l,
+          cost: l.cost ?? snapshot.products.find((p) => p.id === l.productId)?.cost ?? 0,
         })),
-      },
-    );
-    recordActivity({
-      type: "sale_complete",
-      title: sale.exchangeOfReceiptNo ? "Exchange bill created" : "Sale completed",
-      message: `Bill ${sale.receiptNo} for ${sale.total} paid by ${sale.method}.`,
-      actorName: sale.cashier ?? null,
-      storeId: sale.storeId,
-      entityType: "sale",
-      entityId: sale.receiptNo,
-      amount: sale.total,
-      meta: { lines: sale.lines.length, discount: sale.discount },
-    });
-    return sale;
-  }, []);
+        id: clientTxnId,
+        receiptNo,
+        clientTxnId,
+        createdAt: new Date().toISOString(),
+      };
+
+      const touchedProducts = snapshot.products
+        .filter((p) => input.lines.some((l) => l.productId === p.id))
+        .map((p) => {
+          const line = input.lines.find((l) => l.productId === p.id)!;
+          return bump(p, input.storeId, -line.qty);
+        });
+      const member = snapshot.members.find((m) => m.id === input.memberId) ?? null;
+      const updatedMember = member
+        ? {
+            ...member,
+            points:
+              member.points + input.pointsEarned - (input.method === "points" ? input.paid : 0),
+            totalSpend: Number((member.totalSpend + input.total).toFixed(2)),
+          }
+        : null;
+      // The bill is only real once it is stored somewhere.
+      //
+      // A retried payment keeps the ticket's reserved number, so the database can
+      // refuse it as already used. When that happens: if this exact checkout
+      // attempt is already stored the sale is simply complete; otherwise a fresh
+      // number is minted and the bill goes through, instead of the cashier being
+      // stuck on a "duplicate bill" error.
+      for (let attempt = 0; ; attempt++) {
+        try {
+          await db.commitSale(sale, touchedProducts, updatedMember);
+          break;
+        } catch (error) {
+          if (attempt >= 2 || !isDuplicateBillNumber(error)) throw error;
+          if (sale.clientTxnId && (await db.saleAttemptExists(sale.clientTxnId)) === "yes") break;
+          const nextNo = await reserveBillNumber(
+            store?.receiptPrefix?.trim() || store?.code || "R",
+            [...snapshot.sales.map((s) => s.receiptNo), sale.receiptNo],
+            {
+              ...(snapshot.settings.integrations.billNumbering ?? {}),
+              timeZone: snapshot.settings.integrations.timeZone || undefined,
+            },
+          );
+          sale = { ...sale, receiptNo: nextNo };
+        }
+      }
+
+      setState((s) => {
+        const products = s.products.map((p) => {
+          const line = input.lines.find((l) => l.productId === p.id);
+          return line ? bump(p, input.storeId, -line.qty) : p;
+        });
+        const members = s.members.map((m) =>
+          m.id === input.memberId
+            ? {
+                ...m,
+                points:
+                  m.points + input.pointsEarned - (input.method === "points" ? input.paid : 0),
+                totalSpend: Number((m.totalSpend + input.total).toFixed(2)),
+              }
+            : m,
+        );
+        const tagged = input.exchangeOfReceiptNo
+          ? s.sales.map((x) =>
+              x.receiptNo === input.exchangeOfReceiptNo
+                ? { ...x, exchangedToReceiptNo: sale.receiptNo }
+                : x,
+            )
+          : s.sales;
+        return {
+          ...s,
+          counter: Math.max(counter, s.counter + 1),
+          products,
+          members,
+          sales: [sale, ...tagged],
+        };
+      });
+      logger.log(
+        "sale_event",
+        sale.exchangeOfReceiptNo ? "Exchange bill created" : "Bill created",
+        "register",
+        {
+          receiptNo: sale.receiptNo,
+          storeId: sale.storeId,
+          paymentMethod: sale.method,
+          subtotal: sale.subtotal,
+          discount: sale.discount,
+          tax: sale.tax,
+          total: sale.total,
+          paid: sale.paid,
+          memberId: sale.memberId ?? null,
+          pointsEarned: sale.pointsEarned,
+          exchangeOfReceiptNo: sale.exchangeOfReceiptNo ?? null,
+          cart: sale.lines.map((l) => ({
+            productId: l.productId,
+            name: l.name,
+            qty: l.qty,
+            price: l.price,
+            discount: l.discount,
+            discountType: l.discountType,
+            credit: !!l.credit,
+          })),
+        },
+      );
+      recordActivity({
+        type: "sale_complete",
+        title: sale.exchangeOfReceiptNo ? "Exchange bill created" : "Sale completed",
+        message: `Bill ${sale.receiptNo} for ${sale.total} paid by ${sale.method}.`,
+        actorName: sale.cashier ?? null,
+        storeId: sale.storeId,
+        entityType: "sale",
+        entityId: sale.receiptNo,
+        amount: sale.total,
+        meta: { lines: sale.lines.length, discount: sale.discount },
+      });
+      return sale;
+    },
+    [],
+  );
 
   const createBooking = useCallback(async (input: NewBooking) => {
     const snapshot = stateRef.current;
@@ -1189,7 +1184,9 @@ export function PosProvider({ children }: { children: ReactNode }) {
       ...current,
       status: "cancelled",
       closedAt: new Date().toISOString(),
-      note: reason ? `${current.note ? `${current.note} · ` : ""}Cancelled: ${reason}` : current.note,
+      note: reason
+        ? `${current.note ? `${current.note} · ` : ""}Cancelled: ${reason}`
+        : current.note,
     };
     setState((s) => ({
       ...s,
@@ -1221,35 +1218,33 @@ export function PosProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /** Move a racket through received → strung → ready → collected. */
-  const setBookingJobStatus = useCallback((
-    id: string,
-    status: JobStatus,
-    who: string,
-    incidentNote?: string,
-  ) => {
-    const current = stateRef.current.bookings.find((b) => b.id === id);
-    if (!current) return null;
-    const updated: Booking = {
-      ...current,
-      jobStatus: status,
-      jobStatusBy: who,
-      jobStatusAt: new Date().toISOString(),
-      ...(incidentNote ? { incidentNote } : {}),
-    };
-    setState((s) => ({
-      ...s,
-      bookings: s.bookings.map((b) => (b.id === id ? updated : b)),
-    }));
-    saveBookingQuietly(updated);
-    logger.log("sale_event", "Job card status changed", "bookings", {
-      ref: updated.ref,
-      status,
-      by: who,
-      customer: updated.customerName,
-      ...(incidentNote ? { incident: incidentNote } : {}),
-    });
-    return updated;
-  }, []);
+  const setBookingJobStatus = useCallback(
+    (id: string, status: JobStatus, who: string, incidentNote?: string) => {
+      const current = stateRef.current.bookings.find((b) => b.id === id);
+      if (!current) return null;
+      const updated: Booking = {
+        ...current,
+        jobStatus: status,
+        jobStatusBy: who,
+        jobStatusAt: new Date().toISOString(),
+        ...(incidentNote ? { incidentNote } : {}),
+      };
+      setState((s) => ({
+        ...s,
+        bookings: s.bookings.map((b) => (b.id === id ? updated : b)),
+      }));
+      saveBookingQuietly(updated);
+      logger.log("sale_event", "Job card status changed", "bookings", {
+        ref: updated.ref,
+        status,
+        by: who,
+        customer: updated.customerName,
+        ...(incidentNote ? { incident: incidentNote } : {}),
+      });
+      return updated;
+    },
+    [],
+  );
 
   /** Rewrite the job card of a booking that has not been collected yet. */
   const updateBookingSpecs = useCallback((id: string, job: RacketJob) => {
@@ -1322,7 +1317,6 @@ export function PosProvider({ children }: { children: ReactNode }) {
   );
 
   const refundSale = useCallback((saleId: string) => {
-
     logger.log("sale_event", "Sale refunded", "receipts", {
       saleId,
       receiptNo: stateRef.current.sales.find((x) => x.id === saleId)?.receiptNo ?? null,
@@ -1413,7 +1407,10 @@ export function PosProvider({ children }: { children: ReactNode }) {
     const target = await db.commitProduct(record);
     // A branch that keeps a private catalogue owns whatever it creates, so
     // the item never shows up at the other shops.
-    if (!prev && branchPolicy(stateRef.current.settings, stateRef.current.currentStoreId).privateCatalogue) {
+    if (
+      !prev &&
+      branchPolicy(stateRef.current.settings, stateRef.current.currentStoreId).privateCatalogue
+    ) {
       const owners = {
         ...(stateRef.current.settings.integrations.productOwners ?? {}),
         [record.id]: stateRef.current.currentStoreId,
@@ -1519,40 +1516,40 @@ export function PosProvider({ children }: { children: ReactNode }) {
    */
   const mergeProducts = useCallback(
     async (masterId: string, duplicateIds: string[]): Promise<BlockedDelete[]> => {
-    const all = stateRef.current.products;
-    const master = all.find((p) => p.id === masterId);
-    if (!master) return [];
-    const losers = all.filter((p) => duplicateIds.includes(p.id) && p.id !== masterId);
-    if (!losers.length) return [];
+      const all = stateRef.current.products;
+      const master = all.find((p) => p.id === masterId);
+      if (!master) return [];
+      const losers = all.filter((p) => duplicateIds.includes(p.id) && p.id !== masterId);
+      if (!losers.length) return [];
 
-    const stockByStore = { ...master.stockByStore };
-    const aliases = new Set([...(master.barcodes ?? [])]);
-    for (const loser of losers) {
-      for (const [storeId, qty] of Object.entries(loser.stockByStore ?? {})) {
-        stockByStore[storeId] = (stockByStore[storeId] ?? 0) + (qty || 0);
+      const stockByStore = { ...master.stockByStore };
+      const aliases = new Set([...(master.barcodes ?? [])]);
+      for (const loser of losers) {
+        for (const [storeId, qty] of Object.entries(loser.stockByStore ?? {})) {
+          stockByStore[storeId] = (stockByStore[storeId] ?? 0) + (qty || 0);
+        }
+        for (const code of [loser.barcode, loser.sku, ...(loser.barcodes ?? [])]) {
+          if (code && code !== master.barcode && code !== master.sku) aliases.add(code);
+        }
       }
-      for (const code of [loser.barcode, loser.sku, ...(loser.barcodes ?? [])]) {
-        if (code && code !== master.barcode && code !== master.sku) aliases.add(code);
-      }
-    }
-    const merged: Product = { ...master, stockByStore, barcodes: [...aliases] };
+      const merged: Product = { ...master, stockByStore, barcodes: [...aliases] };
 
-    logger.log("inventory_edit", "Products merged", "inventory", {
-      masterId,
-      masterName: master.name,
-      merged: losers.map((l) => ({ id: l.id, name: l.name, barcode: l.barcode })),
-      aliasBarcodes: merged.barcodes,
-    });
+      logger.log("inventory_edit", "Products merged", "inventory", {
+        masterId,
+        masterName: master.name,
+        merged: losers.map((l) => ({ id: l.id, name: l.name, barcode: l.barcode })),
+        aliasBarcodes: merged.barcodes,
+      });
 
-    void db.upsertProduct(merged);
-    setState((s) => ({
-      ...s,
-      products: s.products.map((p) => (p.id === masterId ? merged : p)),
-    }));
-    return deleteProductIds(
-      losers.map((l) => l.id),
-      true,
-    );
+      void db.upsertProduct(merged);
+      setState((s) => ({
+        ...s,
+        products: s.products.map((p) => (p.id === masterId ? merged : p)),
+      }));
+      return deleteProductIds(
+        losers.map((l) => l.id),
+        true,
+      );
     },
     [deleteProductIds],
   );
@@ -1846,7 +1843,12 @@ export function PosProvider({ children }: { children: ReactNode }) {
 
   /** Start or stop overriding one block at one tier. */
   const setSectionScope = useCallback(
-    async (section: SettingsSectionId, on: boolean, tier: SettingTier = "BRANCH", scopeId?: string) => {
+    async (
+      section: SettingsSectionId,
+      on: boolean,
+      tier: SettingTier = "BRANCH",
+      scopeId?: string,
+    ) => {
       const target = scopeId || scopeIdsRef.current[tier];
       const def = SECTION_BY_ID[section];
       if (!def) return;
@@ -1965,8 +1967,9 @@ export function PosProvider({ children }: { children: ReactNode }) {
         ),
       };
     });
-    void setTransferStatus(id, "in_transit", actorRef.current)
-      .catch((e: unknown) => dbError("Approving transfer", e));
+    void setTransferStatus(id, "in_transit", actorRef.current).catch((e: unknown) =>
+      dbError("Approving transfer", e),
+    );
     const transfer = stateRef.current.transfers.find((x) => x.id === id);
     logger.log("inventory", "Stock transfer approved", "transfers", {
       transferId: id,
@@ -2029,9 +2032,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       if (!t || (t.status !== "requested" && t.status !== "in_transit")) return s;
       // If stock already left the source store, put it back.
       const products =
-        t.status === "in_transit"
-          ? bumpItems(s.products, t.items, t.fromStoreId, 1)
-          : s.products;
+        t.status === "in_transit" ? bumpItems(s.products, t.items, t.fromStoreId, 1) : s.products;
       void setTransferStatus(
         id,
         t.status === "in_transit" ? "cancelled" : "rejected",
@@ -2051,12 +2052,17 @@ export function PosProvider({ children }: { children: ReactNode }) {
         ),
       };
     });
-    logger.log("inventory", transfer?.status === "in_transit" ? "Stock transfer cancelled" : "Stock transfer rejected", "transfers", {
-      transferId: id,
-      ref: transfer?.ref ?? null,
-      fromStoreId: transfer?.fromStoreId ?? null,
-      toStoreId: transfer?.toStoreId ?? null,
-    });
+    logger.log(
+      "inventory",
+      transfer?.status === "in_transit" ? "Stock transfer cancelled" : "Stock transfer rejected",
+      "transfers",
+      {
+        transferId: id,
+        ref: transfer?.ref ?? null,
+        fromStoreId: transfer?.fromStoreId ?? null,
+        toStoreId: transfer?.toStoreId ?? null,
+      },
+    );
   }, []);
 
   const reset = useCallback(() => setState(emptyState), []);
@@ -2068,7 +2074,6 @@ export function PosProvider({ children }: { children: ReactNode }) {
     if (!touched) return state;
     return { ...state, settings };
   }, [state, scope]);
-
 
   /** Which tier is supplying the value at a dotted settings path right now. */
   const sourceOfPath = useCallback(

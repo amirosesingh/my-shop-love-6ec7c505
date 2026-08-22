@@ -21,11 +21,7 @@ import { applyStockDeltaBatch } from "./stock-recovery";
 import { canRelay, relayStores } from "./sync-relay";
 import { isOperationalTable } from "./pos-auth-route";
 import { keyset, nextCursor, PAGE_SIZE, type Cursor, type Page } from "./keyset";
-import {
-  isLinkedRecordError,
-  usageBlock,
-  type ProductUsage,
-} from "./product-delete";
+import { isLinkedRecordError, usageBlock, type ProductUsage } from "./product-delete";
 import type {
   AppSettings,
   Member,
@@ -56,7 +52,10 @@ export function dbError(context: string, error: unknown) {
   // Offline is a normal state for a till: the change is already stored here
   // and will sync later. Say so rather than failing silently.
   if (typeof navigator !== "undefined" && !navigator.onLine) {
-    showNotification(`${context} saved on this terminal — it will sync when the connection is back.`, "info");
+    showNotification(
+      `${context} saved on this terminal — it will sync when the connection is back.`,
+      "info",
+    );
     return;
   }
   notifyError(error, context);
@@ -66,9 +65,7 @@ const num = (v: unknown, fallback = 0) => (v == null ? fallback : Number(v));
 
 /** Guard verdict: blocked with a reason, clear to delete, or not verifiable. */
 export type DeleteGuardVerdict =
-  | { state: "blocked"; code: string; reason: string }
-  | { state: "clear" }
-  | { state: "unknown" };
+  { state: "blocked"; code: string; reason: string } | { state: "clear" } | { state: "unknown" };
 
 /**
  * Which records still point at a product.
@@ -162,7 +159,7 @@ const safeNumOrNull = (value: unknown): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
-const safeArray = <T,>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
+const safeArray = <T>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
 
 const safeStockMap = (value: unknown): Record<string, number> => {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
@@ -180,39 +177,39 @@ export const productToRow = (p: Product): Row => {
       ? safeStockMap(p.stockByStore)
       : null;
   return {
-  id: p.id,
-  barcode: p.barcode || p.sku || p.id,
-  name: p.name,
-  sku: p.sku ?? null,
-  category: p.category ?? null,
-  product_group: p.group ?? null,
-  sub_category: p.subCategory ?? null,
-  unit: p.unit ?? null,
-  packs: safeArray(p.packs),
-  barcode_aliases: safeArray<string>(p.barcodes)
-    .map((b) => String(b ?? "").trim())
-    .filter(Boolean),
-  barcode_variants: safeArray<{ code?: string; label?: string }>(p.variants)
-    .map((v) => ({ code: String(v?.code ?? "").trim(), label: v?.label?.trim() || undefined }))
-    .filter((v) => v.code),
-  cost_price: safeNum(p.cost),
-  selling_price: safeNum(p.price),
-  ecom_price: safeNumOrNull(p.ecomPrice),
-  ecom_visible: p.ecomVisible ?? true,
-  is_archived: p.archived === true,
-  archived_at: p.archived ? new Date().toISOString() : null,
-  // Stock is only ever written when the caller actually carries the per-branch
-  // map. A product saved without it (a price or name edit, a partial import)
-  // must never zero the quantity that is already banked in the database.
-  ...(stock
-    ? {
-        stock_quantity: safeInt(Object.values(stock).reduce((a, b) => a + b, 0)),
-        stock_by_store: stock,
-      }
-    : {}),
-  reorder_level: safeInt(p.reorderLevel),
-  tax_rate: safeNum(p.taxRate),
-  custom_points: safeNumOrNull(p.customPoints),
+    id: p.id,
+    barcode: p.barcode || p.sku || p.id,
+    name: p.name,
+    sku: p.sku ?? null,
+    category: p.category ?? null,
+    product_group: p.group ?? null,
+    sub_category: p.subCategory ?? null,
+    unit: p.unit ?? null,
+    packs: safeArray(p.packs),
+    barcode_aliases: safeArray<string>(p.barcodes)
+      .map((b) => String(b ?? "").trim())
+      .filter(Boolean),
+    barcode_variants: safeArray<{ code?: string; label?: string }>(p.variants)
+      .map((v) => ({ code: String(v?.code ?? "").trim(), label: v?.label?.trim() || undefined }))
+      .filter((v) => v.code),
+    cost_price: safeNum(p.cost),
+    selling_price: safeNum(p.price),
+    ecom_price: safeNumOrNull(p.ecomPrice),
+    ecom_visible: p.ecomVisible ?? true,
+    is_archived: p.archived === true,
+    archived_at: p.archived ? new Date().toISOString() : null,
+    // Stock is only ever written when the caller actually carries the per-branch
+    // map. A product saved without it (a price or name edit, a partial import)
+    // must never zero the quantity that is already banked in the database.
+    ...(stock
+      ? {
+          stock_quantity: safeInt(Object.values(stock).reduce((a, b) => a + b, 0)),
+          stock_by_store: stock,
+        }
+      : {}),
+    reorder_level: safeInt(p.reorderLevel),
+    tax_rate: safeNum(p.taxRate),
+    custom_points: safeNumOrNull(p.customPoints),
   };
 };
 
@@ -361,24 +358,15 @@ const rowToSettings = (r: Row | null): AppSettings =>
         review: {
           maxVoids: num(r.review_max_voids, defaultSettings.review.maxVoids),
           maxRefunds: num(r.review_max_refunds, defaultSettings.review.maxRefunds),
-          maxRefundValue: num(
-            r.review_max_refund_value,
-            defaultSettings.review.maxRefundValue,
-          ),
+          maxRefundValue: num(r.review_max_refund_value, defaultSettings.review.maxRefundValue),
           maxNoSaleOpens: num(r.review_max_nosale, defaultSettings.review.maxNoSaleOpens),
-          maxDiscountPct: num(
-            r.review_max_discount_pct,
-            defaultSettings.review.maxDiscountPct,
-          ),
+          maxDiscountPct: num(r.review_max_discount_pct, defaultSettings.review.maxDiscountPct),
         },
         hours: {
           dayStart: r.day_start_time ?? defaultSettings.hours.dayStart,
           dayEnd: r.day_end_time ?? defaultSettings.hours.dayEnd,
           maxShiftHours: num(r.max_shift_hours, defaultSettings.hours.maxShiftHours),
-          reminderMinutes: num(
-            r.shift_reminder_minutes,
-            defaultSettings.hours.reminderMinutes,
-          ),
+          reminderMinutes: num(r.shift_reminder_minutes, defaultSettings.hours.reminderMinutes),
         },
         visibility: {
           hidden: ((r.ui_visibility as { hidden?: Record<string, string[]> } | null)?.hidden ??
@@ -601,7 +589,6 @@ const forgetTxnColumn = (message?: string | null) => {
   }
 };
 
-
 const rowToSale = (r: Row): Sale => ({
   id: r.id,
   receiptNo: r.bill_number,
@@ -717,7 +704,15 @@ const salePaymentRows = (s: Sale) => {
           referenceNote: (p.referenceNote ?? "").trim(),
           bankName: (p.bankName ?? "").trim(),
         }))
-      : [{ method: String(s.method), amount: s.paid, reference: "", referenceNote: "", bankName: "" }];
+      : [
+          {
+            method: String(s.method),
+            amount: s.paid,
+            reference: "",
+            referenceNote: "",
+            bankName: "",
+          },
+        ];
   return tenders
     .filter((t) => t.amount !== 0)
     .map((t, index) => ({
@@ -965,9 +960,12 @@ export async function loadActiveShift(storeId: string): Promise<Shift | null> {
   if (hasStaffSession()) {
     // The server routine answers for every staff account, whatever branch is
     // written on their profile, and hands back the whole row in one call.
-    const rpc = await supabase.rpc("shift_active_for_branch" as never, {
-      p_store_id: storeId,
-    } as never);
+    const rpc = await supabase.rpc(
+      "shift_active_for_branch" as never,
+      {
+        p_store_id: storeId,
+      } as never,
+    );
     if (!rpc.error) {
       const row = (Array.isArray(rpc.data) ? rpc.data[0] : rpc.data) as Row | null;
       return row?.id ? rowToShift(row) : null;
@@ -1010,17 +1008,20 @@ export async function openShiftOnServer(s: Shift): Promise<Shift | null> {
   const { hasStaffSession } = await import("./sync-relay");
   if (!hasStaffSession()) return null;
   try {
-    const res = await supabase.rpc("shift_open" as never, {
-      p_id: s.id,
-      p_store_id: s.storeId,
-      p_opened_by_name: s.cashier,
-      p_opening_float: s.openingFloat,
-      p_terminal_id: s.terminalId ?? null,
-      p_terminal_name: s.terminalName ?? null,
-      p_opened_by_staff_id: s.openedByStaffId ?? null,
-      p_opened_by_role: s.openedByRole ?? null,
-      p_user_id: s.userId ?? null,
-    } as never);
+    const res = await supabase.rpc(
+      "shift_open" as never,
+      {
+        p_id: s.id,
+        p_store_id: s.storeId,
+        p_opened_by_name: s.cashier,
+        p_opening_float: s.openingFloat,
+        p_terminal_id: s.terminalId ?? null,
+        p_terminal_name: s.terminalName ?? null,
+        p_opened_by_staff_id: s.openedByStaffId ?? null,
+        p_opened_by_role: s.openedByRole ?? null,
+        p_user_id: s.userId ?? null,
+      } as never,
+    );
     if (res.error) return null;
     const row = (Array.isArray(res.data) ? res.data[0] : res.data) as Row | null;
     return row?.id ? rowToShift(row) : null;
@@ -1380,7 +1381,12 @@ async function applyStockDeltas(deltas: StockDelta[]) {
   const outcomes = await applyStockDeltaBatch(deltas);
   for (const outcome of outcomes) {
     if (outcome.status !== "refused") continue;
-    logSync("push", "products", false, `Stock delta: ${outcome.reason ?? outcome.code ?? "failed"}`);
+    logSync(
+      "push",
+      "products",
+      false,
+      `Stock delta: ${outcome.reason ?? outcome.code ?? "failed"}`,
+    );
   }
 }
 
@@ -1829,9 +1835,15 @@ export const db = {
 
   async saleAttemptId(clientTxnId: string): Promise<string | null> {
     try {
-      const res = await supabase.from("sales" as never).select("id").eq("client_transaction_id", clientTxnId).limit(1);
+      const res = await supabase
+        .from("sales" as never)
+        .select("id")
+        .eq("client_transaction_id", clientTxnId)
+        .limit(1);
       if (res.error) return null;
-      const first = Array.isArray(res.data) ? (res.data[0] as { id?: string } | undefined) : undefined;
+      const first = Array.isArray(res.data)
+        ? (res.data[0] as { id?: string } | undefined)
+        : undefined;
       return first?.id ?? null;
     } catch {
       return null;
@@ -1969,9 +1981,7 @@ export const db = {
 
   /** Save one product and wait until it is stored somewhere. */
   commitProduct: (p: Product) =>
-    commitOps("Saving product", [
-      { kind: "upsert", table: "products", rows: [productToRow(p)] },
-    ]),
+    commitOps("Saving product", [{ kind: "upsert", table: "products", rows: [productToRow(p)] }]),
 
   /** Save a promotion and wait until it is stored somewhere. */
   commitPromotion: (p: Promotion) =>

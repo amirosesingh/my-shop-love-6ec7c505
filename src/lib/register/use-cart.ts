@@ -74,7 +74,9 @@ export function useCart(deps: CartDeps) {
     setLines((ls) => {
       const found = ls.find((l) => l.productId === productId && !l.credit);
       if (found)
-        return ls.map((l) => (l.productId === productId && !l.credit ? { ...l, qty: l.qty + 1 } : l));
+        return ls.map((l) =>
+          l.productId === productId && !l.credit ? { ...l, qty: l.qty + 1 } : l,
+        );
       return [
         ...ls,
         {

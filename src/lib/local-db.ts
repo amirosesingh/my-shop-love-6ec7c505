@@ -43,7 +43,6 @@ export const defaultLocalDbConfig: LocalDbConfig = {
   directConnect: false,
 };
 
-
 export type TableSyncStat = {
   table: string;
   pending: number;
@@ -198,7 +197,6 @@ export function reconnectReason(status: {
   return parts.length ? parts.join(" ") : "Trying to reach the saved database.";
 }
 
-
 /**
  * Reads the saved-connection audit. Never throws: diagnostics failing must not
  * take the settings screen down with them.
@@ -223,8 +221,7 @@ export async function readConnectionAudit(): Promise<LocalConnectionAudit | null
  */
 export async function saveDiagnosticReport(): Promise<{ ok: boolean; file?: string }> {
   const bridge = localDb() as
-    | (PosBridge & { collectDiagnostics?: () => Promise<{ ok: boolean; file?: string }> })
-    | null;
+    (PosBridge & { collectDiagnostics?: () => Promise<{ ok: boolean; file?: string }> }) | null;
   if (!bridge?.collectDiagnostics) return { ok: false };
   try {
     return await withIpcTimeout(bridge.collectDiagnostics(), 10_000, "The report timed out.");
@@ -234,11 +231,7 @@ export async function saveDiagnosticReport(): Promise<{ ok: boolean; file?: stri
 }
 
 /** No IPC call may hang the UI: everything gets an outer deadline. */
-export async function withIpcTimeout<T>(
-  work: Promise<T>,
-  ms: number,
-  message: string,
-): Promise<T> {
+export async function withIpcTimeout<T>(work: Promise<T>, ms: number, message: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout>;
   return (await Promise.race([
     work.finally(() => clearTimeout(timer)),
@@ -443,9 +436,7 @@ export type PosBridge = {
 
   /* ---- offline cashier sign-in, backed by the local SQL database ---- */
   staffRoster?: (storeId?: string | null) => Promise<{ ok: boolean; rows: LocalStaffRow[] }>;
-  cacheStaffRoster?: (
-    rows: Record<string, unknown>[],
-  ) => Promise<{ ok: boolean; written: number }>;
+  cacheStaffRoster?: (rows: Record<string, unknown>[]) => Promise<{ ok: boolean; written: number }>;
   verifyStaffPin?: (
     username: string,
     pin: string,
@@ -770,7 +761,6 @@ export async function reconnectLocalDatabase(
   }
 }
 
-
 /** Nudge the background retry loop to attempt right now. */
 export async function retryLocalDatabaseNow(): Promise<{ ok: boolean }> {
   const bridge = localDb();
@@ -800,7 +790,6 @@ export async function resetLocalDatabase(): Promise<{ ok: boolean; error?: strin
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
-
 
 /**
  * Delete the stored credentials for good. The shell unlinks the sealed file,

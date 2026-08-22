@@ -37,11 +37,7 @@ export type RelayScope = {
 export type RelayDenial = {
   ok: false;
   code:
-    | "TABLE_FORBIDDEN"
-    | "STORE_FORBIDDEN"
-    | "PERMISSION_DENIED"
-    | "SCOPE_MISSING"
-    | "SCOPE_STALE";
+    "TABLE_FORBIDDEN" | "STORE_FORBIDDEN" | "PERMISSION_DENIED" | "SCOPE_MISSING" | "SCOPE_STALE";
   error: string;
 };
 
@@ -66,7 +62,11 @@ const PARENT_OF: Record<string, { table: string; fk: string; parentStoreColumn: 
   sale_items: { table: "sales", fk: "sale_id", parentStoreColumn: "store_id" },
   booking_payments: { table: "bookings", fk: "booking_id", parentStoreColumn: "store_id" },
   purchase_order_items: { table: "purchase_orders", fk: "po_id", parentStoreColumn: "store_id" },
-  stock_transfer_items: { table: "stock_transfers", fk: "transfer_id", parentStoreColumn: "from_store_id" },
+  stock_transfer_items: {
+    table: "stock_transfers",
+    fk: "transfer_id",
+    parentStoreColumn: "from_store_id",
+  },
 };
 
 /** Global catalogue tables: no branch, but permission-gated columns. */
@@ -157,7 +157,11 @@ export const RELAY_WRITABLE_TABLES = new Set([
   STORES_TABLE,
 ]);
 
-const deny = (code: RelayDenial["code"], error: string): RelayDenial => ({ ok: false, code, error });
+const deny = (code: RelayDenial["code"], error: string): RelayDenial => ({
+  ok: false,
+  code,
+  error,
+});
 
 type AppUserRow = {
   user_id?: string | null;
@@ -169,8 +173,7 @@ type AppUserRow = {
   is_active?: boolean | null;
 };
 
-const SELECT_APP_USER =
-  "select=user_id,full_name,store_id,role,role_slug,permissions,is_active";
+const SELECT_APP_USER = "select=user_id,full_name,store_id,role,role_slug,permissions,is_active";
 
 /**
  * Short-lived cache so a burst of queued operations from one till costs a
@@ -212,8 +215,7 @@ export async function resolveRelayScope(caller: {
   claims?: CallerClaims | null;
 }): Promise<RelayScope> {
   const claims = caller.claims ?? null;
-  const fastEnough =
-    claims && claims.storeId && claims.role && claims.permissions !== null;
+  const fastEnough = claims && claims.storeId && claims.role && claims.permissions !== null;
 
   let row: AppUserRow | null = null;
   if (!fastEnough) {
@@ -233,9 +235,7 @@ export async function resolveRelayScope(caller: {
 
   const role = row?.role ?? claims?.role ?? null;
   const roleSlug = row?.role_slug ?? claims?.roleSlug ?? null;
-  const permissions = row
-    ? normalisePermissions(row.permissions)
-    : (claims?.permissions ?? {});
+  const permissions = row ? normalisePermissions(row.permissions) : (claims?.permissions ?? {});
   const staffUserId = row?.user_id ?? caller.staffUserId ?? claims?.staffUserId ?? null;
   const isSupervisor = supervisorRole(role, roleSlug);
 
@@ -264,10 +264,7 @@ export { claimsFromPayload };
 const allowed = (scope: RelayScope, flag: string | undefined) =>
   !flag || scope.isSupervisor || scope.permissions[flag] === true;
 
-async function parentStore(
-  child: string,
-  id: unknown,
-): Promise<string | null | undefined> {
+async function parentStore(child: string, id: unknown): Promise<string | null | undefined> {
   const parent = PARENT_OF[child];
   if (!parent || id === undefined || id === null) return undefined;
   const res = await serviceRest(
@@ -318,7 +315,11 @@ export async function authorizeRelayOp(
   const columnGate = COLUMN_PERMISSIONS[op.table];
   if (columnGate) {
     const payloads =
-      op.kind === "insert" || op.kind === "upsert" ? op.rows : op.kind === "update" ? [op.values] : [];
+      op.kind === "insert" || op.kind === "upsert"
+        ? op.rows
+        : op.kind === "update"
+          ? [op.values]
+          : [];
     for (const payload of payloads) {
       for (const column of Object.keys(payload)) {
         const flag = columnGate[column];
@@ -356,8 +357,7 @@ function stampActor(op: RelayOp, scope: RelayScope): RelayOp {
     // an unrelated edit does not rewrite the opener.
     if (cols.id && scope.staffUserId) out[cols.id] = scope.staffUserId;
     if (cols.name && scope.actorName) out[cols.name] = scope.actorName;
-    if (cols.role && (scope.roleSlug ?? scope.role))
-      out[cols.role] = scope.roleSlug ?? scope.role;
+    if (cols.role && (scope.roleSlug ?? scope.role)) out[cols.role] = scope.roleSlug ?? scope.role;
     return out;
   };
 
@@ -403,7 +403,11 @@ function pinToStore(
   const match = scope.isSupervisor ? op.match : { ...op.match, [column]: scope.storeId };
   if (op.kind === "update") {
     const values = { ...op.values };
-    if (!scope.isSupervisor && values[column] !== undefined && String(values[column]) !== scope.storeId)
+    if (
+      !scope.isSupervisor &&
+      values[column] !== undefined &&
+      String(values[column]) !== scope.storeId
+    )
       return deny("STORE_FORBIDDEN", "A record cannot be moved to another branch.");
     return { ok: true, op: { ...op, values, match } };
   }
@@ -416,10 +420,7 @@ class StoreViolation extends Error {}
  * Branch registry rules. Creating or renaming a branch is an administrator's
  * job; a till may at most keep its own branch row up to date.
  */
-function authorizeStores(
-  op: RelayOp,
-  scope: RelayScope,
-): { ok: true; op: RelayOp } | RelayDenial {
+function authorizeStores(op: RelayOp, scope: RelayScope): { ok: true; op: RelayOp } | RelayDenial {
   if (scope.isSupervisor) return { ok: true, op };
 
   if (op.kind === "delete")
@@ -481,7 +482,9 @@ async function transferInvolvesCaller(
   const rows = (await res.json()) as Record<string, unknown>[];
   const row = rows[0];
   if (!row) return deny("STORE_FORBIDDEN", "That transfer no longer exists.");
-  const ends = [row["from_store_id"], row["to_store_id"]].map((v) => (v == null ? null : String(v)));
+  const ends = [row["from_store_id"], row["to_store_id"]].map((v) =>
+    v == null ? null : String(v),
+  );
   if (!ends.includes(scope.storeId))
     return deny("STORE_FORBIDDEN", "You cannot change another branch's transfer.");
   return { ok: true, op };

@@ -44,7 +44,10 @@ process.on("uncaughtException", (error) => {
   try {
     const detail = {
       error: error?.message ?? String(error),
-      stack: String(error?.stack ?? "").split("\n").slice(0, 4).join(" | "),
+      stack: String(error?.stack ?? "")
+        .split("\n")
+        .slice(0, 4)
+        .join(" | "),
     };
     pool.logConnection("main.uncaught-exception", detail);
     diagnostics.logCrash("main.uncaught-exception", detail);
@@ -433,7 +436,6 @@ function scheduleReconnect(immediate = false) {
     }
   }, delay);
 }
-
 
 /**
  * Escape hatch that keeps the credentials: drop everything that might be
@@ -983,7 +985,6 @@ function registerIpc() {
     pool.resetDriverCrashState();
     try {
       return await reconnectNow(override);
-
     } catch (error) {
       return { ok: false, stage: "database", ...pool.describeSqlError(error) };
     }
@@ -1045,7 +1046,6 @@ function registerIpc() {
 
   ipcMain.handle("pos:forget-connection", removeStoredConnection);
   ipcMain.handle("pos:remove-connection", removeStoredConnection);
-
 
   /*
     Schema lifecycle. Reading the master file is always safe; applying it only
@@ -1261,7 +1261,11 @@ function registerIpc() {
       return { ok: true, value: await repo.getSetting(String(key)) };
     } catch (error) {
       // Offline fallback: the embedded database answers when SQL Server is out.
-      return { ok: true, value: localDb.getState(`setting:${String(key)}`), degraded: error.message };
+      return {
+        ok: true,
+        value: localDb.getState(`setting:${String(key)}`),
+        degraded: error.message,
+      };
     }
   });
   ipcMain.handle("settings:set", async (_e, key, value) => {
@@ -1303,18 +1307,26 @@ function registerIpc() {
     ok: true,
     written: localDb.mirror(String(entity), rows ?? []),
   }));
-  ipcMain.handle("local:list", (_e, entity, limit) =>
-    ({ ok: true, rows: localDb.listMirror(String(entity), Number(limit) || 500) }));
+  ipcMain.handle("local:list", (_e, entity, limit) => ({
+    ok: true,
+    rows: localDb.listMirror(String(entity), Number(limit) || 500),
+  }));
   ipcMain.handle("local:enqueue", (_e, entity, payload) => ({
     ok: true,
     row: localDb.enqueue(String(entity), payload ?? {}),
   }));
-  ipcMain.handle("local:pending", (_e, limit) => ({ ok: true, rows: localDb.pending(Number(limit) || 200) }));
+  ipcMain.handle("local:pending", (_e, limit) => ({
+    ok: true,
+    rows: localDb.pending(Number(limit) || 200),
+  }));
   ipcMain.handle("local:mark", (_e, id, status, error) => {
     localDb.markOutbox(String(id), String(status), error ?? null);
     return { ok: true };
   });
-  ipcMain.handle("local:audit-log", (_e, entry) => ({ ok: true, row: localDb.logAudit(entry ?? {}) }));
+  ipcMain.handle("local:audit-log", (_e, entry) => ({
+    ok: true,
+    row: localDb.logAudit(entry ?? {}),
+  }));
   ipcMain.handle("local:audit-list", (_e, limit) => ({
     ok: true,
     rows: localDb.listAudit(Number(limit) || 200),
