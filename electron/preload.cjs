@@ -117,6 +117,16 @@ contextBridge.exposeInMainWorld("pos", {
   /* keys the bundled app server needs to reach the central database */
   serverKeyStatus: () => invoke("server-keys:status"),
   setServerServiceKey: (value) => invoke("server-keys:set", value),
+  /* tenant cloud credentials sealed in the OS vault (DPAPI) */
+  cloudKeyStatus: () => invoke("cloud:status"),
+  bootstrapCloudCredentials: () => invoke("cloud:bootstrap"),
+  setCloudCredentials: (value) => invoke("cloud:set", value),
+  removeCloudCredentials: () => invoke("cloud:remove"),
+  onCloudSetupRequired: (cb) => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on("cloud:setup-required", handler);
+    return () => ipcRenderer.removeListener("cloud:setup-required", handler);
+  },
   /* branding mirror — survives updates and cleared browser storage */
   readBranding: () => invoke("branding:read"),
   writeBranding: (branding) => invoke("branding:write", branding),
