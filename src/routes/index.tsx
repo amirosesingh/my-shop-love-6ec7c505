@@ -1736,11 +1736,16 @@ function Register() {
         <Separator />
       </div>
       <div className="h-12">{atom_balanceDue}</div>
-      <div className="h-12 px-3">{atom_actCharge}</div>
-      <div className="h-11 px-3">{atom_actBooking}</div>
+      {visible("register.paymentExecution") && (
+        <>
+          <div className="h-12 px-3">{atom_actCharge}</div>
+          <div className="h-11 px-3">{atom_actBooking}</div>
+        </>
+      )}
       {lastSale && <div className="border-t border-border">{atom_reprintDeck}</div>}
     </div>
   );
+
 
   const atom_actHold =
     visible("register.holdOrder") && lines.length > 0 ? (
