@@ -14,9 +14,15 @@ const rowsInput = callerInput.extend({
   limit: z.number().int().min(1).max(5000).optional(),
 });
 
+/** Without the central-database service key the comparison can only show zeros. */
+const NO_KEY =
+  "Comparison unavailable: this server has no central database service key configured.";
+
 export const compareServerSummary = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => callerInput.parse(input))
   .handler(async ({ data }) => {
+    const { hasServiceKey } = await import("./pos-relay.server");
+    if (!hasServiceKey()) return { ok: false as const, error: NO_KEY, tables: [] };
     const { resolveCompareCaller } = await import("./data-compare-access.server");
     const caller = await resolveCompareCaller(data);
     if (!caller.ok) return { ok: false as const, error: caller.error, tables: [] };
@@ -35,10 +41,13 @@ export const compareServerSummary = createServerFn({ method: "POST" })
 export const compareServerRows = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => rowsInput.parse(input))
   .handler(async ({ data }) => {
+    const { hasServiceKey } = await import("./pos-relay.server");
+    if (!hasServiceKey()) return { ok: false as const, error: NO_KEY, rows: [] };
     const { resolveCompareCaller } = await import("./data-compare-access.server");
     const caller = await resolveCompareCaller(data);
     if (!caller.ok) return { ok: false as const, error: caller.error, rows: [] };
     const { serverRows } = await import("./data-compare.server");
+
     try {
       return {
         ok: true as const,
