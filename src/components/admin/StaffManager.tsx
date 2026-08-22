@@ -169,7 +169,7 @@ export function StaffManager() {
       username: row.user_id,
       credential: "",
       roleSlug: row.role_slug,
-      branchId: row.store_id ?? "none",
+      branchId: row.store_id ?? "all",
       active: row.is_active,
     });
     setFormOpen(true);
