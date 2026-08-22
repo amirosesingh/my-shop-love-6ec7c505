@@ -31,6 +31,20 @@ describe("relay authorisation", () => {
     if (out.ok && out.op.kind === "insert") expect(out.op.rows[0]!["store_id"]).toBe("STORE-A");
   });
 
+  it.each(["payment_transactions", "item_activity_logs"])(
+    "pins %s rows to the proven branch",
+    async (table) => {
+      const out = await safeAuthorizeRelayOp(
+        { kind: "upsert", table, rows: [{ id: "row-1" }] },
+        cashier,
+      );
+      expect(out.ok).toBe(true);
+      if (out.ok && out.op.kind === "upsert") {
+        expect(out.op.rows[0]?.["store_id"]).toBe("STORE-A");
+      }
+    },
+  );
+
   it("refuses a row that claims another branch", async () => {
     const out = await safeAuthorizeRelayOp(
       { kind: "insert", table: "sales", rows: [{ id: "1", store_id: "STORE-B" }] },

@@ -300,7 +300,7 @@ async function push() {
         cloudMissing.set(table, Date.now() + CLOUD_MISSING_RETRY_MS);
         const message =
           `This app version cannot relay "${table}". Update the POS/central app, then use Retry all parked rows. (${error.message})`;
-        await repo.markFailed(table, ids, message, Number.MAX_SAFE_INTEGER).catch(() => {});
+        await repo.markFailed(table, ids, message, 2_147_483_647).catch(() => {});
         await repo.setWatermark(table, null, { error: message }).catch(() => {});
         notify();
         continue;
@@ -314,7 +314,7 @@ async function push() {
             table,
             ids,
             `Table "${table}" is missing or out of date in the central database — open Settings → Central schema, download the repair SQL and run it once in the central project. (${error.message})`,
-            Number.MAX_SAFE_INTEGER,
+            2_147_483_647,
           )
           .catch(() => {});
         await repo
