@@ -745,13 +745,29 @@ export function startSyncEngine() {
         if (syncState().phase === "offline") wake();
       });
   }, 30000);
+  // Live listener: an account or settings change made anywhere lands in this
+  // shop's own database within a second instead of waiting for the timer.
+  const live = supabaseExternal.channel("pos-live-settings");
+  for (const table of LIVE_TABLES) {
+    live.on("postgres_changes", { event: "*", schema: "public", table }, () => {
+      if (liveTimer) window.clearTimeout(liveTimer);
+      // One catch-up for a burst of related edits.
+      liveTimer = window.setTimeout(() => {
+        liveTimer = undefined;
+        void syncNow(`live:${table}`);
+      }, 400);
+    });
+  }
+  live.subscribe();
   tick();
   return () => {
     window.clearInterval(timer);
     window.clearInterval(ping);
     if (debounce) window.clearTimeout(debounce);
+    if (liveTimer) window.clearTimeout(liveTimer);
     window.removeEventListener("online", wake);
     window.removeEventListener("offline", sleep);
+    void supabaseExternal.removeChannel(live);
     offMode();
     started = false;
   };
