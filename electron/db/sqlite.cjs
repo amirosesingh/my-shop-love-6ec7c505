@@ -28,7 +28,7 @@ let lastError = null;
 let scope = { storeId: "", terminalId: "" };
 
 /** Attempts a queued change gets before it is parked for an operator. */
-const MAX_ATTEMPTS = 10;
+
 
 /** Local mirror tables that carry sync bookkeeping columns. */
 const SYNCED_TABLES = [
@@ -71,7 +71,7 @@ function init(directory) {
     // so the local shape stays reviewable next to the cloud schema.
     db.exec(fs.readFileSync(path.join(__dirname, "offline_sqlite_v2.sql"), "utf8"));
     migrate();
-    drainLegacyOutbox();
+    
     lastError = null;
     return { ok: true, engine: "sqlite", path: dbPath };
   } catch (error) {
@@ -744,7 +744,6 @@ module.exports = {
   setStaffVerifier,
   forgetStaffVerifier,
   MIRROR_ENTITIES,
-  MAX_ATTEMPTS,
   init,
   info,
   relationalHealth,
@@ -752,13 +751,6 @@ module.exports = {
   mirror,
   listMirror,
   counts,
-  enqueue,
-  pending,
-  deadLetters,
-  retryDeadLetters,
-  discardDeadLetters,
-  pendingCounts,
-  markOutbox,
   logAudit,
   listAudit,
   clearAudit,
