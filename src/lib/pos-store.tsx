@@ -36,7 +36,14 @@ import type {
 import { bookingBalance, lineUnitDiscount, r2, type DiscountType } from "./pos-types";
 import { logger } from "./audit-log";
 import { toast } from "sonner";
-import { db, dbError, loadActiveShift, loadCloudState, openShiftOnServer } from "./pos-db";
+import {
+  db,
+  dbError,
+  isDuplicateBillNumber,
+  loadActiveShift,
+  loadCloudState,
+  openShiftOnServer,
+} from "./pos-db";
 import { recordActivity } from "./activity-events";
 import type { CloudSlice, CommitTarget } from "./pos-db";
 import { clearSnapshot, readSnapshot, writeSnapshot } from "./offline-snapshot";
