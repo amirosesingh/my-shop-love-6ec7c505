@@ -122,7 +122,6 @@ export type LocalEngineInfo = {
   engine: string;
   path?: string;
   counts: Record<string, number>;
-  pending: { total: number; byEntity: Record<string, number> };
 };
 
 /** Embedded database telemetry, or null in a plain browser. */
@@ -136,7 +135,6 @@ export async function localEngineInfo(): Promise<LocalEngineInfo | null> {
       engine: res.engine ?? "unknown",
       path: res.path,
       counts: res.counts ?? {},
-      pending: res.pending ?? { total: 0, byEntity: {} },
     };
   } catch {
     return null;

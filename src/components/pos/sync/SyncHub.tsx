@@ -76,6 +76,7 @@ export function SyncHub() {
   const [engine, setEngine] = useState<LocalEngineInfo | null>(null);
   const [queue, setQueue] = useState<QueueView[]>([]);
   const [localQueue, setLocalQueue] = useState<SyncQueueRow[]>([]);
+  const [localStats, setLocalStats] = useState<{ table: string; pending: number; errored: number }[]>([]);
   const [localConnected, setLocalConnected] = useState(false);
   const [conflicts, setConflicts] = useState<SyncConflict[]>([]);
   const [unapplied, setUnapplied] = useState<UnappliedMovement[]>([]);
