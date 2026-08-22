@@ -144,6 +144,7 @@ export async function saveCloudCredentials(
     setTerminalSupabaseOverride(cleanUrl, cleanKey);
     resetExternalClient();
     notifyCloudKeysChanged();
+    afterCredentialsSaved();
     return { ok: true, encrypted: res.encrypted };
   }
   if (isNative()) {
@@ -154,6 +155,7 @@ export async function saveCloudCredentials(
       setTerminalSupabaseOverride(cleanUrl, cleanKey);
       resetExternalClient();
       notifyCloudKeysChanged();
+      afterCredentialsSaved();
       return { ok: true, encrypted: true };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
@@ -170,6 +172,7 @@ export async function removeCloudCredentials(): Promise<{ ok: boolean; error?: s
     clearTerminalSupabaseOverride();
     resetExternalClient();
     notifyCloudKeysChanged();
+    setSyncState({ cloudConfigured: false });
     return { ok: true };
   }
   if (isNative()) {
@@ -180,6 +183,7 @@ export async function removeCloudCredentials(): Promise<{ ok: boolean; error?: s
       clearTerminalSupabaseOverride();
       resetExternalClient();
       notifyCloudKeysChanged();
+      setSyncState({ cloudConfigured: false });
       return { ok: true };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
