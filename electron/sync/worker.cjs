@@ -217,7 +217,7 @@ async function push() {
   setPhase("pushing");
   let pushed = 0;
   let failed = 0;
-  for (const table of repo.TABLES) {
+  for (const table of repo.PUSH_TABLES ?? repo.TABLES) {
     let rows;
     try {
       rows = await repo.pendingRows(table, BATCH);
@@ -241,14 +241,9 @@ async function push() {
 
     if (error) {
       failed += ids.length;
-      let quarantine = false;
-      for (const id of ids) {
-        const key = `${table}:${id}`;
-        const n = (attempts.get(key) ?? 0) + 1;
-        attempts.set(key, n);
-        if (n >= MAX_ATTEMPTS) quarantine = true;
-      }
-      await repo.markFailed(table, ids, error.message, quarantine);
+      // The attempt counter lives in the database: a parked row stays parked
+      // across restarts until someone retries it from the Sync Hub.
+      await repo.markFailed(table, ids, error.message, MAX_ATTEMPTS);
       await repo
         .setWatermark(table, null, { error: error.message })
         .catch(() => {});
@@ -256,15 +251,37 @@ async function push() {
       continue;
     }
 
-    // Inventory moves only after the movement rows themselves are up.
+    // Inventory moves only after the movement rows themselves are up. A
+    // refusal (e.g. the central negative-stock guard) is not "synced": the
+    // movement row keeps its place in the queue with the reason attached, so
+    // the Sync Hub shows it and a later retry can still apply it.
     let deltaError = null;
-    if (table === "item_activity_logs") deltaError = await applyStockDeltas(payload);
+    let syncedIds = ids;
+    if (table === "item_activity_logs") {
+      const result = await applyStockDeltas(payload);
+      if (result) {
+        deltaError = result.error;
+        if (result.refused?.length) {
+          const refusedIds = new Set(result.refused.map((r) => r.id));
+          const parked = ids.filter((id) => refusedIds.has(String(id).toLowerCase()));
+          if (parked.length) {
+            await repo.markFailed(
+              table,
+              parked,
+              `Stock movement refused centrally: ${result.refused[0].reason ?? "guard"}`,
+              MAX_ATTEMPTS,
+            );
+            syncedIds = ids.filter((id) => !refusedIds.has(String(id).toLowerCase()));
+            failed += parked.length;
+          }
+        }
+      }
+    }
 
-    await repo.markSynced(table, ids);
-    for (const id of ids) attempts.delete(`${table}:${id}`);
-    pushed += ids.length;
+    await repo.markSynced(table, syncedIds);
+    pushed += syncedIds.length;
     await repo
-      .setWatermark(table, null, { rowsPushed: ids.length, pushed: true, error: deltaError })
+      .setWatermark(table, null, { rowsPushed: syncedIds.length, pushed: true, error: deltaError })
       .catch(() => {});
     notify();
   }
