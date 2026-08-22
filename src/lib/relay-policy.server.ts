@@ -57,6 +57,8 @@ const STORE_COLUMN: Record<string, string> = {
   sku_audit: "store_id",
   purchase_orders: "store_id",
   whatsapp_queue: "store_id",
+  payment_transactions: "store_id",
+  item_activity_logs: "store_id",
 };
 
 /** Child rows carry no branch of their own; their parent decides. */
