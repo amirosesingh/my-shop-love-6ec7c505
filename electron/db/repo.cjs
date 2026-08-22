@@ -456,7 +456,7 @@ async function markFailed(table, ids, message, maxAttempts = 5) {
 }
 
 async function retryErrored() {
-  for (const table of TABLES) {
+  for (const table of PUSH_TABLES) {
     await getPool()
       .request()
       .query(
@@ -500,7 +500,7 @@ async function discardRow(table, id) {
 
 async function queueRows(limit = 100) {
   const rows = [];
-  for (const table of TABLES) {
+  for (const table of PUSH_TABLES) {
     let res;
     try {
       res = await getPool().request().input("limit", sql.Int, limit).query(`
