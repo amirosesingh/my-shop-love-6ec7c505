@@ -220,7 +220,8 @@ function Inventory() {
             <h1 className="text-2xl font-semibold">Inventory · {currentStore.name}</h1>
             <p className="text-sm text-muted-foreground">
               {state.products.length} products ·{" "}
-              {showMoney && (
+              {showStockValue && (
+
                 <>
                   stock value <span className="numeric">{money(stockValue)}</span> ·{" "}
                 </>
