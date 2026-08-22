@@ -6,14 +6,25 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 
-export const fetchCentralSchema = createServerFn({ method: "GET" }).handler(async () => {
-  const { hasServiceKey, runRelayRead } = await import("./pos-relay.server");
-  if (!hasServiceKey()) {
-    return {
-      ok: false as const,
-      error:
-        "The central database service key is not configured — open System status and save it first.",
-    };
-  }
-  return runRelayRead({ kind: "cloudSchema" });
-});
+export type CentralSchemaResult =
+  | { ok: true; rows: { table: string; column: string }[] }
+  | { ok: false; error: string };
+
+export const fetchCentralSchema = createServerFn({ method: "GET" }).handler(
+  async (): Promise<CentralSchemaResult> => {
+    const { hasServiceKey, runRelayRead } = await import("./pos-relay.server");
+    if (!hasServiceKey()) {
+      return {
+        ok: false,
+        error:
+          "The central database service key is not configured — open System status and save it first.",
+      };
+    }
+    const res = await runRelayRead({ kind: "cloudSchema" });
+    if (!res.ok) return { ok: false, error: res.error ?? "The central schema could not be read." };
+    const rows = (res.rows ?? [])
+      .map((r) => ({ table: String(r.table ?? ""), column: String(r.column ?? "") }))
+      .filter((r) => r.table && r.column);
+    return { ok: true, rows };
+  },
+);
