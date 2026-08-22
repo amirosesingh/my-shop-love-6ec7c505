@@ -186,7 +186,13 @@ export function StaffManager() {
     : emailMode
       ? form.credential.length >= 8
       : form.credential.length >= 4 && form.credential.length <= 32;
-  const canSave = nameValid && identifierValid && credentialValid && !!selectedRole;
+  // The branch must be an explicit decision: a real branch, or "all".
+  const branchValid = form.branchId === "all" || stores.some((store) => store.id === form.branchId);
+  const branchId = form.branchId === "all" ? null : form.branchId;
+  const branchLabel = branchId
+    ? (stores.find((store) => store.id === branchId)?.name ?? branchId)
+    : "All branches";
+  const canSave = nameValid && identifierValid && credentialValid && branchValid && !!selectedRole;
 
   const save = async () => {
     if (!canSave || !selectedRole) return;
