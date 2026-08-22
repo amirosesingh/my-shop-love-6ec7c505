@@ -79,7 +79,8 @@ const EMPTY: Form = {
   username: "",
   credential: "",
   roleSlug: "cashier",
-  branchId: "none",
+  // Empty until the administrator makes an explicit branch choice.
+  branchId: "",
   active: true,
 };
 
