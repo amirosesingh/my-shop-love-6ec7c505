@@ -1541,8 +1541,9 @@ export const db = {
   upsertShift: (s: Shift) =>
     queue("Saving shift", { kind: "upsert", table: "shifts", rows: [shiftToRow(s)] }),
 
+  // Sign-in visibility only: a till on an older database must keep trading.
   upsertShiftSession: (s: ShiftSession) =>
-    queue("Saving shift sign-in", {
+    queueSoft("Saving shift sign-in", {
       kind: "upsert",
       table: "shift_sessions",
       rows: [shiftSessionToRow(s)],
