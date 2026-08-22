@@ -55,6 +55,7 @@ import { Route as ReportsSalesRouteImport } from './routes/reports.sales'
 import { Route as ReportsStockRouteImport } from './routes/reports.stock'
 import { Route as ReportsVoidsRouteImport } from './routes/reports.voids'
 import { Route as SettingsIndexRouteImport } from './routes/settings.index'
+import { Route as SettingsAccessRouteImport } from './routes/settings.access'
 import { Route as SettingsAccountsRouteImport } from './routes/settings.accounts'
 import { Route as SettingsBookingRulesRouteImport } from './routes/settings.booking-rules'
 import { Route as SettingsBookingSlipRouteImport } from './routes/settings.booking-slip'
@@ -331,6 +332,11 @@ const ReportsVoidsRoute = ReportsVoidsRouteImport.update({
 const SettingsIndexRoute = SettingsIndexRouteImport.update({
   id: '/settings/',
   path: '/settings/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsAccessRoute = SettingsAccessRouteImport.update({
+  id: '/settings/access',
+  path: '/settings/access',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsAccountsRoute = SettingsAccountsRouteImport.update({
@@ -615,6 +621,7 @@ export interface FileRoutesByFullPath {
   '/reports/sales': typeof ReportsSalesRoute
   '/reports/stock': typeof ReportsStockRoute
   '/reports/voids': typeof ReportsVoidsRoute
+  '/settings/access': typeof SettingsAccessRoute
   '/settings/accounts': typeof SettingsAccountsRoute
   '/settings/booking-rules': typeof SettingsBookingRulesRoute
   '/settings/booking-slip': typeof SettingsBookingSlipRoute
@@ -710,6 +717,7 @@ export interface FileRoutesByTo {
   '/reports/sales': typeof ReportsSalesRoute
   '/reports/stock': typeof ReportsStockRoute
   '/reports/voids': typeof ReportsVoidsRoute
+  '/settings/access': typeof SettingsAccessRoute
   '/settings/accounts': typeof SettingsAccountsRoute
   '/settings/booking-rules': typeof SettingsBookingRulesRoute
   '/settings/booking-slip': typeof SettingsBookingSlipRoute
@@ -806,6 +814,7 @@ export interface FileRoutesById {
   '/reports/sales': typeof ReportsSalesRoute
   '/reports/stock': typeof ReportsStockRoute
   '/reports/voids': typeof ReportsVoidsRoute
+  '/settings/access': typeof SettingsAccessRoute
   '/settings/accounts': typeof SettingsAccountsRoute
   '/settings/booking-rules': typeof SettingsBookingRulesRoute
   '/settings/booking-slip': typeof SettingsBookingSlipRoute
@@ -903,6 +912,7 @@ export interface FileRouteTypes {
     | '/reports/sales'
     | '/reports/stock'
     | '/reports/voids'
+    | '/settings/access'
     | '/settings/accounts'
     | '/settings/booking-rules'
     | '/settings/booking-slip'
@@ -998,6 +1008,7 @@ export interface FileRouteTypes {
     | '/reports/sales'
     | '/reports/stock'
     | '/reports/voids'
+    | '/settings/access'
     | '/settings/accounts'
     | '/settings/booking-rules'
     | '/settings/booking-slip'
@@ -1093,6 +1104,7 @@ export interface FileRouteTypes {
     | '/reports/sales'
     | '/reports/stock'
     | '/reports/voids'
+    | '/settings/access'
     | '/settings/accounts'
     | '/settings/booking-rules'
     | '/settings/booking-slip'
@@ -1189,6 +1201,7 @@ export interface RootRouteChildren {
   ReportsSalesRoute: typeof ReportsSalesRoute
   ReportsStockRoute: typeof ReportsStockRoute
   ReportsVoidsRoute: typeof ReportsVoidsRoute
+  SettingsAccessRoute: typeof SettingsAccessRoute
   SettingsAccountsRoute: typeof SettingsAccountsRoute
   SettingsBookingRulesRoute: typeof SettingsBookingRulesRoute
   SettingsBookingSlipRoute: typeof SettingsBookingSlipRoute
@@ -1560,6 +1573,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings/'
       preLoaderRoute: typeof SettingsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/access': {
+      id: '/settings/access'
+      path: '/settings/access'
+      fullPath: '/settings/access'
+      preLoaderRoute: typeof SettingsAccessRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings/accounts': {
@@ -1953,6 +1973,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReportsSalesRoute: ReportsSalesRoute,
   ReportsStockRoute: ReportsStockRoute,
   ReportsVoidsRoute: ReportsVoidsRoute,
+  SettingsAccessRoute: SettingsAccessRoute,
   SettingsAccountsRoute: SettingsAccountsRoute,
   SettingsBookingRulesRoute: SettingsBookingRulesRoute,
   SettingsBookingSlipRoute: SettingsBookingSlipRoute,
