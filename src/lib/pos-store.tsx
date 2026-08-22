@@ -980,7 +980,30 @@ export function PosProvider({ children }: { children: ReactNode }) {
         }
       : null;
     // The bill is only real once it is stored somewhere.
-    await db.commitSale(sale, touchedProducts, updatedMember);
+    //
+    // A retried payment keeps the ticket's reserved number, so the database can
+    // refuse it as already used. When that happens: if this exact checkout
+    // attempt is already stored the sale is simply complete; otherwise a fresh
+    // number is minted and the bill goes through, instead of the cashier being
+    // stuck on a "duplicate bill" error.
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await db.commitSale(sale, touchedProducts, updatedMember);
+        break;
+      } catch (error) {
+        if (attempt >= 2 || !isDuplicateBillNumber(error)) throw error;
+        if (sale.clientTxnId && (await db.saleAttemptExists(sale.clientTxnId)) === "yes") break;
+        const nextNo = await reserveBillNumber(
+          store?.receiptPrefix?.trim() || store?.code || "R",
+          [...snapshot.sales.map((s) => s.receiptNo), sale.receiptNo],
+          {
+            ...(snapshot.settings.integrations.billNumbering ?? {}),
+            timeZone: snapshot.settings.integrations.timeZone || undefined,
+          },
+        );
+        sale = { ...sale, receiptNo: nextNo };
+      }
+    }
 
     setState((s) => {
       const products = s.products.map((p) => {
