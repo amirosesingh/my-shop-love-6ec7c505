@@ -850,41 +850,45 @@ async function getWatermark(table) {
 }
 
 async function setWatermark(table, isoAt, { rowsPushed = 0, error = null, pushed = false } = {}) {
-  await getPool()
-    .request()
-    .input("t", sql.NVarChar(120), table)
-    .input("store", sql.NVarChar(60), scope.storeId)
-    .input("term", sql.NVarChar(80), scope.terminalId)
-    .input("at", sql.DateTime2, isoAt ? new Date(isoAt) : null)
-    .input("rows", sql.Int, rowsPushed)
-    .input("pushed", sql.Bit, pushed ? 1 : 0)
-    .input("err", sql.NVarChar(sql.MAX), error ? String(error).slice(0, 3000) : null).query(`
-      MERGE dbo.sync_metadata AS t
-      USING (SELECT @t AS table_name, @store AS store_id, @term AS terminal_id) AS s
-        ON t.table_name = s.table_name AND t.store_id = s.store_id AND t.terminal_id = s.terminal_id
-      WHEN MATCHED THEN UPDATE SET
-        t.last_synced_at = ISNULL(@at, t.last_synced_at),
-        t.last_pushed_at = CASE WHEN @pushed = 1 THEN SYSUTCDATETIME() ELSE t.last_pushed_at END,
-        t.rows_pushed = t.rows_pushed + @rows,
-        t.last_error = @err,
-        t.updated_at = SYSUTCDATETIME()
-      WHEN NOT MATCHED THEN
-        INSERT (table_name, store_id, terminal_id, last_synced_at, last_pushed_at, rows_pushed, last_error)
-        VALUES (@t, @store, @term, @at,
-                CASE WHEN @pushed = 1 THEN SYSUTCDATETIME() ELSE NULL END, @rows, @err);
-    `);
+  return withHeal("sync_metadata", () =>
+    getPool()
+      .request()
+      .input("t", sql.NVarChar(120), table)
+      .input("store", sql.NVarChar(60), scope.storeId)
+      .input("term", sql.NVarChar(80), scope.terminalId)
+      .input("at", sql.DateTime2, isoAt ? new Date(isoAt) : null)
+      .input("rows", sql.Int, rowsPushed)
+      .input("pushed", sql.Bit, pushed ? 1 : 0)
+      .input("err", sql.NVarChar(sql.MAX), error ? String(error).slice(0, 3000) : null).query(`
+        MERGE dbo.sync_metadata AS t
+        USING (SELECT @t AS table_name, @store AS store_id, @term AS terminal_id) AS s
+          ON t.table_name = s.table_name AND t.store_id = s.store_id AND t.terminal_id = s.terminal_id
+        WHEN MATCHED THEN UPDATE SET
+          t.last_synced_at = ISNULL(@at, t.last_synced_at),
+          t.last_pushed_at = CASE WHEN @pushed = 1 THEN SYSUTCDATETIME() ELSE t.last_pushed_at END,
+          t.rows_pushed = t.rows_pushed + @rows,
+          t.last_error = @err,
+          t.updated_at = SYSUTCDATETIME()
+        WHEN NOT MATCHED THEN
+          INSERT (table_name, store_id, terminal_id, last_synced_at, last_pushed_at, rows_pushed, last_error)
+          VALUES (@t, @store, @term, @at,
+                  CASE WHEN @pushed = 1 THEN SYSUTCDATETIME() ELSE NULL END, @rows, @err);
+      `),
+  );
 }
 
 async function setState(key, value) {
-  await getPool()
-    .request()
-    .input("key", sql.NVarChar(60), key)
-    .input("value", sql.NVarChar(400), value).query(`
-      MERGE dbo.sync_state AS t
-      USING (SELECT @key AS [key], @value AS [value]) AS s ON t.[key] = s.[key]
-      WHEN MATCHED THEN UPDATE SET t.[value] = s.[value], t.updated_at = SYSUTCDATETIME()
-      WHEN NOT MATCHED THEN INSERT ([key], [value]) VALUES (s.[key], s.[value]);
-    `);
+  return withHeal("sync_state", () =>
+    getPool()
+      .request()
+      .input("key", sql.NVarChar(60), key)
+      .input("value", sql.NVarChar(400), value).query(`
+        MERGE dbo.sync_state AS t
+        USING (SELECT @key AS [key], @value AS [value]) AS s ON t.[key] = s.[key]
+        WHEN MATCHED THEN UPDATE SET t.[value] = s.[value], t.updated_at = SYSUTCDATETIME()
+        WHEN NOT MATCHED THEN INSERT ([key], [value]) VALUES (s.[key], s.[value]);
+      `),
+  );
 }
 
 /**
@@ -892,23 +896,27 @@ async function setState(key, value) {
  * connection details) so they survive a cleared browser and an app update.
  */
 async function getSetting(key) {
-  const res = await getPool()
-    .request()
-    .input("key", sql.NVarChar(120), key)
-    .query("SELECT [value] FROM dbo.system_settings WHERE [key] = @key;");
-  return res.recordset[0]?.value ?? null;
+  return withHeal("system_settings", async () => {
+    const res = await getPool()
+      .request()
+      .input("key", sql.NVarChar(120), key)
+      .query("SELECT [value] FROM dbo.system_settings WHERE [key] = @key;");
+    return res.recordset[0]?.value ?? null;
+  });
 }
 
 async function setSetting(key, value) {
-  await getPool()
-    .request()
-    .input("key", sql.NVarChar(120), key)
-    .input("value", sql.NVarChar(sql.MAX), value == null ? null : String(value)).query(`
-      MERGE dbo.system_settings AS t
-      USING (SELECT @key AS [key], @value AS [value]) AS s ON t.[key] = s.[key]
-      WHEN MATCHED THEN UPDATE SET t.[value] = s.[value], t.updated_at = SYSUTCDATETIME()
-      WHEN NOT MATCHED THEN INSERT ([key], [value]) VALUES (s.[key], s.[value]);
-    `);
+  return withHeal("system_settings", () =>
+    getPool()
+      .request()
+      .input("key", sql.NVarChar(120), key)
+      .input("value", sql.NVarChar(sql.MAX), value == null ? null : String(value)).query(`
+        MERGE dbo.system_settings AS t
+        USING (SELECT @key AS [key], @value AS [value]) AS s ON t.[key] = s.[key]
+        WHEN MATCHED THEN UPDATE SET t.[value] = s.[value], t.updated_at = SYSUTCDATETIME()
+        WHEN NOT MATCHED THEN INSERT ([key], [value]) VALUES (s.[key], s.[value]);
+      `),
+  );
 }
 
 /**
