@@ -21,7 +21,7 @@ async function branchOf(column: "user_id" | "id", value: string) {
 
 export async function resolveCompareCaller(input: {
   accessToken?: string | undefined;
-  terminalToken?: string | undefined;
+  cashierToken?: string | undefined;
   storeId?: string | null | undefined;
 }): Promise<CompareCaller> {
   if (input.accessToken) {
@@ -40,9 +40,9 @@ export async function resolveCompareCaller(input: {
     }
   }
 
-  if (input.terminalToken) {
+  if (input.cashierToken) {
     const { verifyCashierSession } = await import("./pos-session.server");
-    const session = verifyCashierSession(input.terminalToken);
+    const session = verifyCashierSession(input.cashierToken);
     if (session) {
       const row = await branchOf("id", session.id);
       if (row?.is_active === false) return { ok: false, error: "Account disabled", storeId: null };

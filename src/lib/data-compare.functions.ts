@@ -3,7 +3,7 @@ import { z } from "zod";
 
 const callerInput = z.object({
   accessToken: z.string().min(10).optional(),
-  terminalToken: z.string().min(10).optional(),
+  cashierToken: z.string().min(10).optional(),
   storeId: z.string().max(64).nullish(),
   since: z.string().datetime().nullish(),
   tables: z.array(z.string().max(80)).max(60).optional(),
