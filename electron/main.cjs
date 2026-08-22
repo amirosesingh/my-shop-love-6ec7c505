@@ -1685,6 +1685,14 @@ app.whenReady().then(async () => {
     return;
   }
   createWindows();
+  // Cloud sync boots straight from the OS-sealed store — the till never waits
+  // for a renderer to hand credentials over before the worker can start.
+  const sealedCloud = cloudCredentials.read();
+  if (sealedCloud) {
+    void initializeWorker({ url: sealedCloud.url, key: sealedCloud.key }).catch((error) => {
+      console.warn("[pos] cloud sync could not start from saved keys:", fail(error).error);
+    });
+  }
   // One-time migration from the legacy general config into the dedicated,
   // OS-encrypted SQL store. Afterwards there is one canonical copy only.
   let savedDbConfig = dbConfigStore.read();
