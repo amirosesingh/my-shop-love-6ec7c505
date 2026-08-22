@@ -28,9 +28,10 @@ describe("duplicate bill detection", () => {
 
 describe("local write whitelist", () => {
   it("allows the sign-in log and drawer openings", async () => {
-    const repo = await import("../../../electron/db/repo.cjs");
-    const tables: string[] = repo.TABLES ?? [];
-    expect(tables).toContain("shift_sessions");
-    expect(tables).toContain("drawer_events");
+    const { readFileSync } = await import("node:fs");
+    const source = readFileSync("electron/db/repo.cjs", "utf8");
+    const list = source.slice(source.indexOf("const TABLES = ["), source.indexOf("];"));
+    expect(list).toContain('"shift_sessions"');
+    expect(list).toContain('"drawer_events"');
   });
 });
