@@ -845,6 +845,8 @@ module.exports = {
   queueRows,
   mergeFromCloud,
   stats,
+  compareSummary,
+  compareRows,
   getState,
   setState,
   getWatermark,
