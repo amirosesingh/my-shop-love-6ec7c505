@@ -31,6 +31,8 @@ export async function cashierLoginServer(input: {
   pin: string;
   platform?: string | null;
   terminalId?: string | null;
+  /** Branch this till is set to; used when the account works at all branches. */
+  branchId?: string | null;
 }): Promise<CashierLoginResult> {
   const username = input.username.trim().toLowerCase();
   if (!username) return { ok: false, error: "Enter your username" };
@@ -107,11 +109,26 @@ export async function cashierLoginServer(input: {
   const profile = profiles[0];
   if (!profile?.is_active) return { ok: false, error: "Account deactivated" };
 
+  // An account with no branch of its own works at every branch: the till's
+  // own branch decides. It is only trusted once it names a real store.
+  const ownBranch = profile.store_id ?? row.store_id ?? null;
+  let tillBranch: string | null = null;
+  const claimed = (input.branchId ?? "").trim();
+  if (!ownBranch && claimed) {
+    const storeRes = await serviceRest(
+      `stores?id=eq.${encodeURIComponent(claimed)}&select=id&limit=1`,
+    );
+    if (storeRes.ok) {
+      const found = (await storeRes.json()) as { id: string }[];
+      tillBranch = found[0]?.id ?? null;
+    }
+  }
+
   const cashier = {
     id: profile.id,
     username: profile.user_id,
     full_name: profile.full_name || profile.user_id,
-    store_id: profile.store_id ?? row.store_id ?? null,
+    store_id: ownBranch ?? tillBranch,
     permissions: profile.permissions ?? {},
   };
 
