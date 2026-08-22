@@ -25,6 +25,32 @@ import { recordSync } from "./sync-audit";
 import { mirrorToLocal } from "./sync-audit";
 
 /**
+ * The central project rejecting this device's keys (HTTP 401/403, "Invalid
+ * API key", an expired JWT). Never a row fault: queued writes keep their
+ * place, sync parks, and the badge points at Settings → Database & Cloud
+ * Connection. Saving fresh keys clears the flag and wakes the engine.
+ */
+const CREDENTIAL_ERROR_RE = /invalid api ?key|bad jwt|jwt expired|invalid token/i;
+
+function isCredentialError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const e = error as { status?: unknown; message?: unknown };
+  const status = Number(e.status ?? 0);
+  if (status === 401 || status === 403) return true;
+  return CREDENTIAL_ERROR_RE.test(String(e.message ?? ""));
+}
+
+function noteCredentialsInvalid(detail: string) {
+  setSyncState({
+    credentialsInvalid: true,
+    lastError:
+      "Sync paused — the central database rejected this device's keys. " +
+      "Update them in Settings → Database & Cloud Connection.",
+  });
+  recordSync({ direction: "system", entity: "credentials", status: "failed", error: detail });
+}
+
+/**
  * Copy the freshly pulled catalogue into the embedded local database.
  * Catalogue is server-wins, so a straight overwrite is the correct merge.
  */
@@ -312,6 +338,7 @@ async function reconcileVersions(entry: QueuedOp): Promise<void> {
  */
 function recordRelayFailure(entry: QueuedOp, relayed: { error?: string; code?: string }) {
   const message = relayed.error ?? "The server could not save this change";
+  if (relayed.error && CREDENTIAL_ERROR_RE.test(relayed.error)) noteCredentialsInvalid(relayed.error);
   if (relayed.code && REFUSAL_CODES.has(relayed.code)) refuseOp(entry.id, message);
   else failOp(entry.id, message);
   logSync("push", entry.op.table, false, `${entry.context}: ${message}`);
@@ -354,6 +381,12 @@ async function runOne(entry: QueuedOp): Promise<boolean> {
     }
   }
   if (res.error) {
+    // Keys rejected: park the whole engine; the entry keeps its place and no
+    // attempt counter burns while the credentials are wrong.
+    if (isCredentialError(res.error)) {
+      noteCredentialsInvalid(String(res.error.message ?? "credential error"));
+      return false;
+    }
     // A till signed in with a username + PIN has no cloud account, so the row
     // rules refuse the write. Send the very same operation through the server
     // relay, which proves the till and writes on its behalf.
@@ -435,6 +468,8 @@ let draining = false;
 export async function drainOutbox(): Promise<{ pushed: number; failed: number }> {
   // A revoked terminal keeps selling locally but is cut off from the cloud.
   if (!isOnline()) setSyncState({ phase: "offline", pending: listQueue().length });
+  // Keys rejected: stay parked until fresh ones are saved — no retry storm.
+  if (syncState().credentialsInvalid) return { pushed: 0, failed: 0 };
   if (draining || !isOnline() || !isOnlineSyncEnabled() || isTerminalRevoked())
     return { pushed: 0, failed: 0 };
   draining = true;
@@ -466,7 +501,10 @@ export async function drainOutbox(): Promise<{ pushed: number; failed: number }>
     setSyncState({
       phase: isOnline() ? "idle" : "offline",
       pending: listQueue().length,
-      ...(pushed && !failed ? { lastSyncAt: new Date().toISOString(), lastError: null } : {}),
+      // A clean push proves the saved keys work — clear any earlier rejection.
+      ...(pushed && !failed
+        ? { lastSyncAt: new Date().toISOString(), lastError: null, credentialsInvalid: false }
+        : {}),
     });
   }
   return { pushed, failed };
@@ -519,6 +557,8 @@ async function countChangedSince(table: (typeof PULL_TABLES)[number], since: str
  */
 export async function pullDelta(): Promise<{ merged: number }> {
   if (pulling || !isOnline() || !isOnlineSyncEnabled()) return { merged: 0 };
+  // Keys rejected: stay parked until fresh ones are saved.
+  if (syncState().credentialsInvalid) return { merged: 0 };
   pulling = true;
   const fallbackSince = lastSuccessfulPull() ?? "1970-01-01T00:00:00.000Z";
   const startedAt = new Date().toISOString();
@@ -533,6 +573,10 @@ export async function pullDelta(): Promise<{ merged: number }> {
       // Only ask how many rows moved; the full refresh below does the reading.
       const { count, error } = await countChangedSince(table, since);
       if (error) {
+        if (isCredentialError(error)) {
+          noteCredentialsInvalid(error.message);
+          return { merged: changed };
+        }
         logSync("pull", table, false, error.message);
         recordSync({ direction: "pull", entity: table, status: "failed", error: error.message });
         continue;
@@ -555,9 +599,11 @@ export async function pullDelta(): Promise<{ merged: number }> {
     // Marks only advance for tables that answered and were merged cleanly.
     for (const table of clean) setLastTablePull(table, startedAt);
     setLastSuccessfulPull(startedAt);
-    setSyncState({ lastSyncAt: startedAt });
+    // A clean pull proves the saved keys work — clear any earlier rejection.
+    setSyncState({ lastSyncAt: startedAt, credentialsInvalid: false });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
+    if (isCredentialError(e) || CREDENTIAL_ERROR_RE.test(message)) noteCredentialsInvalid(message);
     setSyncState({ lastError: message });
     recordSync({ direction: "pull", entity: "catalogue", status: "failed", error: message });
   } finally {

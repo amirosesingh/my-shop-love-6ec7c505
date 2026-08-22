@@ -320,6 +320,8 @@ export type LocalSyncStatus = {
   configured?: boolean;
   phase?: "idle" | "pushing" | "pulling";
   enabled?: boolean;
+  /** The central project rejected this device's keys — sync is parked. */
+  credentialsInvalid?: boolean;
   tables: TableSyncStat[];
   queue?: SyncQueueRow[];
   lastPushAt: string | null;
@@ -506,6 +508,24 @@ export type PosBridge = {
   setServerServiceKey?: (
     value: string,
   ) => Promise<{ ok: boolean; error?: string; hasServiceKey?: boolean; serviceKeyHint?: string }>;
+
+  /* ---- tenant cloud credentials sealed in the OS vault ---- */
+  cloudKeyStatus?: () => Promise<{
+    ok: boolean;
+    configured: boolean;
+    url: string;
+    keyHint: string;
+    encrypted: boolean;
+  }>;
+  /** Boot-time read of the sealed pair so the renderer can configure its client. */
+  bootstrapCloudCredentials?: () => Promise<{ ok: boolean; url?: string; key?: string }>;
+  setCloudCredentials?: (value: {
+    url: string;
+    key: string;
+  }) => Promise<{ ok: boolean; error?: string; encrypted?: boolean }>;
+  removeCloudCredentials?: () => Promise<{ ok: boolean; error?: string }>;
+  /** Fired by the shell at launch when no cloud keys are configured yet. */
+  onCloudSetupRequired?: (cb: (payload: { platform: string }) => void) => () => void;
 };
 
 /** A staff row mirrored into the till's local database. */

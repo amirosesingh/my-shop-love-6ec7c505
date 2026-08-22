@@ -14,9 +14,26 @@ export type SyncState = {
   lastSyncAt: string | null;
   /** last error worth showing, if any */
   lastError: string | null;
+  /**
+   * The central project rejected our credentials (HTTP 401/403). Sync is
+   * parked — queued rows stay put — until fresh keys are saved in Settings.
+   */
+  credentialsInvalid: boolean;
+  /**
+   * Terminal apps only: whether this device has cloud keys at all.
+   * `null` = not a terminal app / not checked yet (web builds stay null).
+   */
+  cloudConfigured: boolean | null;
 };
 
-let state: SyncState = { phase: "idle", pending: 0, lastSyncAt: null, lastError: null };
+let state: SyncState = {
+  phase: "idle",
+  pending: 0,
+  lastSyncAt: null,
+  lastError: null,
+  credentialsInvalid: false,
+  cloudConfigured: null,
+};
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
@@ -38,7 +55,9 @@ export function setSyncState(patch: Partial<SyncState>) {
     next.phase === state.phase &&
     next.pending === state.pending &&
     next.lastSyncAt === state.lastSyncAt &&
-    next.lastError === state.lastError
+    next.lastError === state.lastError &&
+    next.credentialsInvalid === state.credentialsInvalid &&
+    next.cloudConfigured === state.cloudConfigured
   )
     return;
   state = next;

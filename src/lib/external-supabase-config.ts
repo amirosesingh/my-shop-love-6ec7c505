@@ -7,6 +7,8 @@
  * service key is server-only and lives in `pos-relay.server.ts`.
  */
 
+import { isTerminalApp } from "./native";
+
 type Source = { url: string; key: string };
 
 /**
@@ -114,9 +116,12 @@ const PAIRS: [string, string][] = [
 export class SupabaseConfigError extends Error {
   constructor() {
     super(
-      "Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY " +
-        "(and the matching SUPABASE_URL / SUPABASE_ANON_KEY for the server) to your " +
-        "own Supabase project before starting the app.",
+      isTerminalApp()
+        ? "Cloud sync is not set up on this device. Open Settings → Database & Cloud Connection " +
+            "and enter the central database URL and API key. Local trading is unaffected."
+        : "Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY " +
+            "(and the matching SUPABASE_URL / SUPABASE_ANON_KEY for the server) to your " +
+            "own Supabase project before starting the app.",
     );
     this.name = "SupabaseConfigError";
   }
@@ -131,6 +136,10 @@ export function supabaseConfig(): Source {
     cached = terminalOverride;
     return cached;
   }
+  // On a till or phone the tenant comes only from the sealed per-device store
+  // (applied above as the terminal override). Bundle-baked and environment
+  // values belong to the web deployment and are deliberately invisible here.
+  if (isTerminalApp()) throw new SupabaseConfigError();
   if (POS_PROJECT.url && POS_PROJECT.key) {
     cached = POS_PROJECT;
     return cached;

@@ -61,6 +61,8 @@ import { closeCustomerDisplay } from "@/lib/customer-display";
 import { reportAppReady } from "@/lib/app-health";
 import { localDb } from "@/lib/local-db";
 import { supabaseConfig } from "@/lib/external-supabase-config";
+import { initCloudConfigFromShell } from "@/lib/secure-cloud-config";
+import { CloudSetupGate } from "@/components/pos/CloudSetupGate";
 import { readCredentials } from "@/lib/pos-credentials";
 import { TillLoader } from "@/components/pos/TillLoader";
 import { LocationBootGuard } from "@/components/pos/LocationBootGuard";
@@ -161,21 +163,30 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     void hydrateBillSequence();
   }, []);
-  // The web client already knows the activated tenant. Hand the same public
-  // connection details to Electron's sync worker on every launch so desktop
-  // catalogue pulls and local recovery do not depend on opening Settings first.
+  // Hand this device's cloud connection details to Electron's sync worker on
+  // every launch. The keys sealed in the platform vault win over anything
+  // baked into the build; with no keys saved yet the shell boots its worker
+  // from its own sealed store once an admin saves them in Settings.
   useEffect(() => {
     const bridge = localDb();
     if (!bridge) return;
-    const { url, key } = supabaseConfig();
-    void readCredentials().then((credentials) =>
-      bridge.configureCloud({
-        url,
-        key,
+    void (async () => {
+      await initCloudConfigFromShell().catch(() => {});
+      let cloud: { url: string; key: string } | null = null;
+      try {
+        cloud = supabaseConfig();
+      } catch {
+        // Unconfigured device — trading stays local, sync stays parked.
+      }
+      if (!cloud) return;
+      const credentials = await readCredentials();
+      void bridge.configureCloud({
+        url: cloud.url,
+        key: cloud.key,
         ...credentials,
         branchId: terminal.config?.locationId ?? currentStore?.id,
-      }),
-    );
+      });
+    })();
   }, [
     terminal.config?.supabaseUrl,
     terminal.config?.supabaseKey,
@@ -253,7 +264,13 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (terminal.revoked) return <TerminalRevokedScreen onReactivate={clearRevocation} />;
     if (!terminal.config) return <TerminalActivation onActivated={() => clearRevocation()} />;
   }
-  if (!user) return <TerminalLogin />;
+  if (!user)
+    return (
+      <>
+        <CloudSetupGate />
+        <TerminalLogin />
+      </>
+    );
   if (!dataReady && !offlineBypass)
     return <TillLoader onContinueOffline={() => setOfflineBypass(true)} />;
   // Nothing can be sold, received or moved without somewhere to book it to.
@@ -364,6 +381,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="pos-scaled flex h-dvh min-h-dvh flex-col overflow-hidden bg-background text-foreground">
       <DbConnectionModal />
+      <CloudSetupGate />
       {/* Frameless desktop shell: draggable strip under the native window buttons. */}
       {isDesktop() && (
         <div className="app-drag flex h-[34px] shrink-0 items-center gap-2 border-b border-border bg-sidebar pl-3">
