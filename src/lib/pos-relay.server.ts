@@ -27,7 +27,10 @@ export type RelayOp =
   | { kind: "delete"; table: string; match: Record<string, unknown> };
 
 /** Read requests the relay may answer for a proven till. */
-export type RelayRead = { kind: "activeShift"; storeId: string } | { kind: "stores" };
+export type RelayRead =
+  | { kind: "activeShift"; storeId: string }
+  | { kind: "stores" }
+  | { kind: "cloudSchema" };
 
 /**
  * Only operational tables may be written through the relay. `stores` is
@@ -110,6 +113,22 @@ export async function runRelayRead(read: RelayRead): Promise<{
   rows?: Record<string, unknown>[];
   error?: string;
 }> {
+  if (read.kind === "cloudSchema") {
+    // The PostgREST root document lists every exposed table with its columns,
+    // which is exactly what the till needs to spot central-schema drift.
+    const res = await serviceRest("");
+    if (!res.ok) return { ok: false, error: (await res.text()).slice(0, 400) };
+    const spec = (await res.json()) as {
+      definitions?: Record<string, { properties?: Record<string, unknown> }>;
+    };
+    const rows: Record<string, unknown>[] = [];
+    for (const [table, def] of Object.entries(spec.definitions ?? {})) {
+      for (const column of Object.keys(def?.properties ?? {})) {
+        rows.push({ table, column });
+      }
+    }
+    return { ok: true, rows };
+  }
   if (read.kind === "stores") {
     const res = await serviceRest("stores?select=id,code,name,address,phone,group_id&order=name");
     if (!res.ok) return { ok: false, error: (await res.text()).slice(0, 400) };
@@ -212,6 +231,37 @@ export async function runRelayOp(
   }
 
   if (res.ok) return { ok: true };
+
+  // A re-pushed tender can collide with the copy the first attempt already
+  // stored. The per-tender idempotency key settles it: when every row is
+  // already present centrally, the push is acknowledged, not failed.
+  if (
+    (safeOp.kind === "upsert" || safeOp.kind === "insert") &&
+    safeOp.table === "payment_transactions" &&
+    res.status === 409
+  ) {
+    const keys = [
+      ...new Set(
+        safeOp.rows
+          .map((r) =>
+            typeof r.client_transaction_id === "string" ? r.client_transaction_id : null,
+          )
+          .filter((k): k is string => Boolean(k)),
+      ),
+    ];
+    if (keys.length > 0 && keys.length === safeOp.rows.length) {
+      const check = await serviceRest(
+        `payment_transactions?select=id&client_transaction_id=in.(${keys
+          .map((k) => encodeURIComponent(k))
+          .join(",")})`,
+      );
+      if (check.ok) {
+        const found = (await check.json()) as unknown[];
+        if (found.length >= keys.length) return { ok: true };
+      }
+    }
+  }
+
   const text = await res.text();
   let message = text;
   try {
