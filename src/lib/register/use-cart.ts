@@ -114,11 +114,16 @@ export function useCart(deps: CartDeps) {
         storeId: deps.currentStore.id,
       });
     }
-    setLines((ls) =>
-      ls
+    setLines((ls) => {
+      const next = ls
         .map((l, i) => (i === index ? { ...l, qty: l.credit ? l.qty - delta : l.qty + delta } : l))
-        .filter((l) => (l.credit ? l.qty < 0 : l.qty > 0)),
-    );
+        .filter((l) => (l.credit ? l.qty < 0 : l.qty > 0));
+      if (!next.length) {
+        setBillNo(null);
+        clearCartDraft(deps.currentStore.id);
+      }
+      return next;
+    });
   }
 
   function patchLine(index: number, patch: Partial<CartLine>) {

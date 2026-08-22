@@ -685,7 +685,8 @@ const saleToRow = (s: Sale): Row => ({
 });
 
 const saleItemRows = (s: Sale) =>
-  s.lines.map((l) => ({
+  s.lines.map((l, index) => ({
+    id: stableChildId(s.id, "1", index),
     sale_id: s.id,
     product_id: l.productId || null,
     product_name: l.name,
@@ -719,8 +720,8 @@ const salePaymentRows = (s: Sale) => {
       : [{ method: String(s.method), amount: s.paid, reference: "", referenceNote: "", bankName: "" }];
   return tenders
     .filter((t) => t.amount !== 0)
-    .map((t) => ({
-      id: crypto.randomUUID(),
+    .map((t, index) => ({
+      id: stableChildId(s.id, "2", index),
       source_type: "sale",
       sale_id: s.id,
       member_id: s.memberId,
@@ -751,8 +752,8 @@ const salePaymentRows = (s: Sale) => {
 const saleActivityRows = (s: Sale) =>
   s.lines
     .filter((l) => l.productId)
-    .map((l) => ({
-      id: crypto.randomUUID(),
+    .map((l, index) => ({
+      id: stableChildId(s.id, "3", index),
       product_id: l.productId,
       product_name: l.name,
       store_id: s.storeId,
@@ -764,6 +765,14 @@ const saleActivityRows = (s: Sale) =>
       note: "",
       created_at: s.createdAt,
     }));
+
+/** Stable UUID children: rebuilding a checkout after a restart reuses the same keys. */
+export function stableChildId(parentId: string, group: string, index: number): string {
+  const hex = parentId.replace(/-/g, "").toLowerCase();
+  if (!/^[0-9a-f]{32}$/.test(hex)) return crypto.randomUUID();
+  const suffix = `${group}${index.toString(16).padStart(11, "0")}`.slice(-12);
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${suffix}`;
+}
 
 /* --------------------------- tier name cache --------------------------- */
 
@@ -1423,10 +1432,16 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
       if (!isConnectionError(cloud)) throw cloud;
       noteConnectionLost();
       try {
-        for (const op of ops) {
-          const res = await bridge.write(context, op);
-          if (!res.ok) throw new Error(res.error ?? `${context} could not be stored locally`);
-        }
+        const result = bridge.writeBatch
+          ? await bridge.writeBatch(context, ops)
+          : await (async () => {
+              for (const op of ops) {
+                const res = await bridge.write(context, op);
+                if (!res.ok) return res;
+              }
+              return { ok: true };
+            })();
+        if (!result.ok) throw new Error(result.error ?? `${context} could not be stored locally`);
         setCloudDirect(false);
         if (bridge.push) void bridge.push();
         return noteCommitTarget("local");
@@ -1785,20 +1800,20 @@ export const db = {
 
   /** Save a completed bill and wait until it is stored somewhere. */
   async commitSale(sale: Sale, products: Product[], member: Member | null): Promise<CommitTarget> {
-    // A retried checkout (double click, network drop) must never bill twice:
-    // if this attempt already reached the central database, stop here.
-    if (sale.clientTxnId && (await db.saleAttemptExists(sale.clientTxnId)) === "yes")
-      return "cloud";
+    // A retry may find the header already committed. Reuse its real id and
+    // reconcile every required child rather than mistaking a partial sale for completion.
+    const storedId = sale.clientTxnId ? await db.saleAttemptId(sale.clientTxnId) : null;
+    if (storedId) sale.id = storedId;
     const ops: SyncOp[] = [
-      { kind: "insert", table: "sales", rows: [saleToRow(sale)] },
-      { kind: "insert", table: "sale_items", rows: saleItemRows(sale) },
+      { kind: "upsert", table: "sales", rows: [saleToRow(sale)], onConflict: "id" },
+      { kind: "upsert", table: "sale_items", rows: saleItemRows(sale), onConflict: "id" },
     ];
     const tenders = salePaymentRows(sale);
     if (tenders.length)
-      ops.push({ kind: "insert", table: "payment_transactions", rows: tenders });
+      ops.push({ kind: "upsert", table: "payment_transactions", rows: tenders, onConflict: "id" });
     const movements = saleActivityRows(sale);
     if (movements.length)
-      ops.push({ kind: "insert", table: "item_activity_logs", rows: movements });
+      ops.push({ kind: "upsert", table: "item_activity_logs", rows: movements, onConflict: "id" });
     if (products.length)
       ops.push({ kind: "upsert", table: "products", rows: products.map(productToRow) });
     if (member) ops.push({ kind: "upsert", table: "members", rows: [memberToRow(member, tierId)] });
@@ -1809,31 +1824,17 @@ export const db = {
         values: { exchanged_to_bill_number: sale.receiptNo },
         match: { bill_number: sale.exchangeOfReceiptNo },
       });
+    return commitOps("Saving sale", ops);
+  },
+
+  async saleAttemptId(clientTxnId: string): Promise<string | null> {
     try {
-      return await commitOps("Saving sale", ops);
-    } catch (error) {
-      // The records are written one after another. If the bill itself landed
-      // and something later failed, the sale is real: finish the rest in the
-      // background as keyed writes (so nothing can double up) rather than
-      // telling the cashier the payment was lost.
-      if (sale.clientTxnId && (await db.saleAttemptExists(sale.clientTxnId)) === "yes") {
-        for (const op of ops.slice(1)) {
-          queueSoft(
-            "Completing sale",
-            op.kind === "insert"
-              ? { kind: "upsert", table: op.table, rows: op.rows, onConflict: "id" }
-              : op,
-          );
-        }
-        recordDiagnostic({
-          kind: "local_mirror_failed",
-          entity: "sales",
-          code: reasonCode(error),
-          recordId: sale.receiptNo,
-        });
-        return "cloud";
-      }
-      throw error;
+      const res = await supabase.from("sales" as never).select("id").eq("client_transaction_id", clientTxnId).limit(1);
+      if (res.error) return null;
+      const first = Array.isArray(res.data) ? (res.data[0] as { id?: string } | undefined) : undefined;
+      return first?.id ?? null;
+    } catch {
+      return null;
     }
   },
 

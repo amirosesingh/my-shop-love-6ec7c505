@@ -302,11 +302,7 @@ async function deleteRows(tx, table, match) {
  * Applies one operation from the app inside a single transaction, so a sale and
  * its lines either both land or neither does.
  */
-async function applyOp(op) {
-  const pool = getPool();
-  const tx = new sql.Transaction(pool);
-  await tx.begin();
-  try {
+async function applyOpInTransaction(tx, op) {
     if (op.kind === "insert" || op.kind === "upsert") {
       for (const row of op.rows ?? []) await upsertRow(tx, op.table, row);
     } else if (op.kind === "update") {
@@ -316,11 +312,23 @@ async function applyOp(op) {
     } else {
       throw new Error(`Unsupported operation: ${op.kind}`);
     }
+}
+
+async function applyOps(ops) {
+  const pool = getPool();
+  const tx = new sql.Transaction(pool);
+  await tx.begin();
+  try {
+    for (const op of ops ?? []) await applyOpInTransaction(tx, op);
     await tx.commit();
   } catch (err) {
     await tx.rollback();
     throw err;
   }
+}
+
+async function applyOp(op) {
+  return applyOps([op]);
 }
 
 async function pendingRows(table, limit = 200) {
@@ -834,6 +842,7 @@ module.exports = {
   SETTINGS_ID,
   setScope,
   applyOp,
+  applyOps,
   createSale,
   forgetColumnCache,
   getProducts,

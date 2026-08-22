@@ -949,6 +949,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
           timeZone: snapshot.settings.integrations.timeZone || undefined,
         },
       ));
+    const clientTxnId = input.clientTxnId ?? crypto.randomUUID();
     let sale: Sale = {
       ...input,
       // Freeze how this branch reads right now, so a later rename never
@@ -964,9 +965,9 @@ export function PosProvider({ children }: { children: ReactNode }) {
           snapshot.products.find((p) => p.id === l.productId)?.cost ??
           0,
       })),
-      id: crypto.randomUUID(),
+      id: clientTxnId,
       receiptNo,
-      clientTxnId: input.clientTxnId ?? crypto.randomUUID(),
+      clientTxnId,
       createdAt: new Date().toISOString(),
     };
 

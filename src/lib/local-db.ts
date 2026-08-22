@@ -338,6 +338,8 @@ export type LocalSyncStatus = {
 export type PosBridge = {
   /** Persist one operation to local SQL Server. Resolves once committed. */
   write: (context: string, op: SyncOp) => Promise<{ ok: boolean; error?: string }>;
+  /** Persist a related operation set in one SQL transaction. */
+  writeBatch?: (context: string, ops: SyncOp[]) => Promise<{ ok: boolean; error?: string }>;
   connect: (
     config: LocalDbConfig,
     cloud?: CloudBridgeConfig,

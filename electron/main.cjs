@@ -1159,6 +1159,15 @@ function registerIpc() {
       return fail(err);
     }
   });
+  ipcMain.handle("pos:write-batch", async (_e, _context, ops) => {
+    try {
+      await repo.applyOps(ops);
+      void worker.run();
+      return { ok: true };
+    } catch (err) {
+      return fail(err);
+    }
+  });
 
   ipcMain.handle("pos:status", () => statusPayload());
   ipcMain.handle("pos:housekeep", async (_e, options) => {
