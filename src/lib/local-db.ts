@@ -388,6 +388,28 @@ export type PosBridge = {
   push: () => Promise<{ ok: boolean; pushed: number; failed: number; error?: string }>;
   pull: () => Promise<{ ok: boolean; merged: number; error?: string }>;
   setSyncEnabled: (on: boolean) => Promise<void>;
+  /** Live per-table counts on this till, for the server/shop comparison. */
+  compareSummary?: (options?: { since?: string | null; tables?: string[] }) => Promise<{
+    ok: boolean;
+    error?: string;
+    tables?: Array<{
+      table: string;
+      count: number;
+      maxUpdatedAt: string | null;
+      pending?: number;
+      errored?: number;
+      missing?: boolean;
+      error?: string | null;
+    }>;
+  }>;
+  compareRows?: (
+    table: string,
+    options?: { since?: string | null; limit?: number },
+  ) => Promise<{
+    ok: boolean;
+    error?: string;
+    rows?: Array<{ id: string; updatedAt: string | null; status?: string | null }>;
+  }>;
   backup: (path?: string) => Promise<{ ok: boolean; path?: string; error?: string }>;
   retryErrored: () => Promise<{ ok: boolean }>;
   retryRow?: (table: string, id: string) => Promise<{ ok: boolean; error?: string }>;
