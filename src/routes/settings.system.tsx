@@ -9,6 +9,7 @@ import { LogicHealthPanel } from "@/components/pos/settings/panels/LogicHealthPa
 import { SecurityAlertsPanel } from "@/components/pos/settings/panels/SecurityAlertsPanel";
 import { InheritancePanel } from "@/components/pos/settings/panels/InheritancePanel";
 import { SyncHub } from "@/components/pos/sync/SyncHub";
+import { DataComparison } from "@/components/pos/sync/DataComparison";
 import { SYSTEM_TAB_IDS, systemTab, type SystemTabId } from "@/lib/settings-groups";
 
 export const Route = createFileRoute("/settings/system")({
@@ -62,6 +63,7 @@ function SystemSettingsPage() {
         {tab === "logic-health" && <LogicHealthPanel />}
         {tab === "security-alerts" && <SecurityAlertsPanel />}
         {tab === "data-sync" && <SyncHub />}
+        {tab === "data-comparison" && <DataComparison />}
         {tab === "inheritance" && <InheritancePanel />}
       </div>
     </SettingsFrame>
