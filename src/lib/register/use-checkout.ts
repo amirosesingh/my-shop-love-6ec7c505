@@ -6,7 +6,7 @@
  * lifted out of the register screen unchanged, so the till behaves exactly as
  * before.
  */
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { notifyError } from "@/lib/notify";
 import { openCashDrawer, printBookingSlip, printJobTag, printSaleReceipt } from "@/lib/pos-print";
@@ -83,6 +83,12 @@ export function useCheckout(deps: CheckoutDeps) {
   const { state, recordSale, createBooking } = usePos();
   const [saving, setSaving] = useState(false);
   const [lastSale, setLastSale] = useState<Sale | null>(null);
+  /**
+   * One attempt id per ticket, kept across retries and cleared only once the
+   * bill is stored. It is what lets the till recognise a payment that already
+   * reached the database instead of billing the customer twice.
+   */
+  const attemptId = useRef<string | null>(null);
 
   /** Sends the finished bill to the customer's WhatsApp. */
   async function sendSaleOnWhatsApp(sale: Sale, to: string) {
@@ -394,8 +400,10 @@ export function useCheckout(deps: CheckoutDeps) {
     let sale: Sale;
     try {
       setSaving(true);
+      if (!attemptId.current) attemptId.current = crypto.randomUUID();
       sale = await recordSale({
         storeId: currentStore.id,
+        clientTxnId: attemptId.current,
         ...(billNo ? { receiptNo: billNo } : {}),
         shiftId: activeShift.id,
         lines,
@@ -432,6 +440,7 @@ export function useCheckout(deps: CheckoutDeps) {
     } finally {
       setSaving(false);
     }
+    attemptId.current = null;
     if (coupon) {
       logger.log("promotion", "Coupon redeemed on a bill", "register", {
         receiptNo: sale.receiptNo,
