@@ -2706,8 +2706,10 @@ CREATE OR REPLACE FUNCTION public.app_users_require_store() RETURNS trigger
     SET search_path TO 'public', 'pg_temp'
     AS $$
 BEGIN
-  IF NEW.store_id IS NULL AND NEW.role NOT IN ('admin', 'manager') THEN
-    RAISE EXCEPTION 'A till account must be assigned to a branch';
+  -- NULL is an explicit "All branches" assignment. The physical terminal
+  -- supplies the branch when this person signs in and performs operations.
+  IF NEW.store_id IS NOT NULL AND btrim(NEW.store_id) = '' THEN
+    NEW.store_id := NULL;
   END IF;
   RETURN NEW;
 END;
@@ -4222,7 +4224,8 @@ CREATE OR REPLACE FUNCTION public.user_has_store_access(_store_id text) RETURNS 
       SELECT 1 FROM public.app_users u
       WHERE u.auth_user_id = (SELECT auth.uid())
         AND u.is_active
-        AND u.store_id = _store_id
+        AND (u.store_id = _store_id
+             OR nullif(btrim(coalesce(u.store_id, '')), '') IS NULL)
     )
   END
 $$;
