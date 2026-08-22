@@ -144,7 +144,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Windows tills must be registered to a location before they can be used.
   const terminal = useRevocationCheck();
   const location = useLocation();
-  const { visibleRoute, role: visibilityRole } = useVisibility();
+  const { visibleRoute } = useVisibility();
 
   // Terminal-wide font / control scaling preference.
   useUiScale();
