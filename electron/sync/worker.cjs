@@ -381,6 +381,17 @@ async function pull() {
     // Delta only: anything the cloud has touched since our last clean pull.
     const { data, error } = await selectChangedSince(table, since);
     if (error) {
+      if (isCredentialError(error)) {
+        credentialsInvalid = true;
+        await repo
+          .setWatermark(table, null, {
+            error: "Cloud credentials rejected — update them in Settings → Database & Cloud Connection.",
+          })
+          .catch(() => {});
+        setPhase("idle");
+        notify();
+        return { ok: false, merged, error: "credentials" };
+      }
       await repo.setWatermark(table, null, { error: error.message }).catch(() => {});
       if (MISSING_CLOUD_RE.test(String(error.message ?? ""))) {
         // A table the central project has not grown yet is skipped, not fatal.
@@ -452,6 +463,9 @@ async function pull() {
 
 async function run() {
   if (running || !enabled || !supabase) return;
+  // Credentials rejected: stay parked (local trading unaffected) until an
+  // admin saves fresh keys, which re-inits the worker and clears the flag.
+  if (credentialsInvalid) return;
   running = true;
   try {
     if (!(await reachable())) return;
@@ -470,6 +484,7 @@ async function status() {
       connected: true,
       phase,
       enabled,
+      credentialsInvalid,
       cloudMissing: [...cloudMissing.keys()],
       tables: await repo.stats(),
       queue: await repo.queueRows(60),
