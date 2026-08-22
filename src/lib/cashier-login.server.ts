@@ -31,6 +31,8 @@ export async function cashierLoginServer(input: {
   pin: string;
   platform?: string | null;
   terminalId?: string | null;
+  /** Branch this till is set to; used when the account works at all branches. */
+  branchId?: string | null;
 }): Promise<CashierLoginResult> {
   const username = input.username.trim().toLowerCase();
   if (!username) return { ok: false, error: "Enter your username" };
