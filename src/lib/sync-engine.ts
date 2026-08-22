@@ -25,6 +25,32 @@ import { recordSync } from "./sync-audit";
 import { mirrorToLocal } from "./sync-audit";
 
 /**
+ * The central project rejecting this device's keys (HTTP 401/403, "Invalid
+ * API key", an expired JWT). Never a row fault: queued writes keep their
+ * place, sync parks, and the badge points at Settings → Database & Cloud
+ * Connection. Saving fresh keys clears the flag and wakes the engine.
+ */
+const CREDENTIAL_ERROR_RE = /invalid api ?key|bad jwt|jwt expired|invalid token/i;
+
+function isCredentialError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const e = error as { status?: unknown; message?: unknown };
+  const status = Number(e.status ?? 0);
+  if (status === 401 || status === 403) return true;
+  return CREDENTIAL_ERROR_RE.test(String(e.message ?? ""));
+}
+
+function noteCredentialsInvalid(detail: string) {
+  setSyncState({
+    credentialsInvalid: true,
+    lastError:
+      "Sync paused — the central database rejected this device's keys. " +
+      "Update them in Settings → Database & Cloud Connection.",
+  });
+  recordSync({ direction: "system", entity: "credentials", status: "failed", error: detail });
+}
+
+/**
  * Copy the freshly pulled catalogue into the embedded local database.
  * Catalogue is server-wins, so a straight overwrite is the correct merge.
  */
@@ -312,6 +338,7 @@ async function reconcileVersions(entry: QueuedOp): Promise<void> {
  */
 function recordRelayFailure(entry: QueuedOp, relayed: { error?: string; code?: string }) {
   const message = relayed.error ?? "The server could not save this change";
+  if (relayed.error && CREDENTIAL_ERROR_RE.test(relayed.error)) noteCredentialsInvalid(relayed.error);
   if (relayed.code && REFUSAL_CODES.has(relayed.code)) refuseOp(entry.id, message);
   else failOp(entry.id, message);
   logSync("push", entry.op.table, false, `${entry.context}: ${message}`);
@@ -354,6 +381,12 @@ async function runOne(entry: QueuedOp): Promise<boolean> {
     }
   }
   if (res.error) {
+    // Keys rejected: park the whole engine; the entry keeps its place and no
+    // attempt counter burns while the credentials are wrong.
+    if (isCredentialError(res.error)) {
+      noteCredentialsInvalid(String(res.error.message ?? "credential error"));
+      return false;
+    }
     // A till signed in with a username + PIN has no cloud account, so the row
     // rules refuse the write. Send the very same operation through the server
     // relay, which proves the till and writes on its behalf.
