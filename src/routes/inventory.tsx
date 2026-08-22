@@ -38,6 +38,8 @@ import {
 } from "@/components/ui/table";
 import { money, stockAt, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
+import { useVisibility } from "@/lib/ui-visibility";
+
 import { productVisibleAt } from "@/lib/branch-policy";
 import { TablePagination, usePagination } from "@/components/pos/TablePagination";
 import { Switch } from "@/components/ui/switch";
