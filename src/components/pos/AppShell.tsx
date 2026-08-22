@@ -268,15 +268,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Receipt identity wins; the locally captured install name is the fallback.
   const companyName = state.settings.receipt.companyName?.trim() || branding.company;
 
+  // The sidebar and the route guard below run exactly the same test, so a link
+  // that is shown always opens, and a link that is hidden cannot be reached by
+  // typing its address either.
   const canSee = (item: NavItem) => {
     if (item.desktopHidden && isDesktop()) return false;
     if (item.flag && !can(item.flag)) return false;
     if (item.adminOnly && !isAdmin && !item.flag) return false;
-    if (!visibleRoute(item.to)) return false;
-    const tag = item.tag ?? (item.flag ? tagOfPermission(item.flag) : null);
-    if (tag && !roleHasTag((visibilityRole as StaffRole) ?? "cashier", tag)) return false;
-    return true;
+    return visibleRoute(item.to);
   };
+
 
   const Brand = ({ mini }: { mini?: boolean }) => (
     <div className={cn("flex items-center gap-2 px-3 py-4", mini && "justify-center px-0")}>
