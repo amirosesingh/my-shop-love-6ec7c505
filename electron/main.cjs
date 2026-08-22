@@ -23,6 +23,7 @@ const netHttp = require("./net.cjs");
 const diagnostics = require("./diagnostics.cjs");
 const serverKeys = require("./server-keys.cjs");
 const staffAuth = require("./staff-auth.cjs");
+const cloudCredentials = require("./cloud-credentials.cjs");
 
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
 const DEBUG = process.env.POS_DEBUG === "1";
@@ -571,6 +572,18 @@ async function runHousekeeping() {
   return summary;
 }
 
+/**
+ * The tenant URL and publishable key come from the OS-sealed store whenever
+ * one exists — renderer-provided copies (from bundle fallbacks or older
+ * settings) never win over what an admin saved on this device. Tokens the
+ * renderer holds (session, cashier, terminal) still pass through unchanged.
+ */
+function withSealedCloud(cloud) {
+  const sealed = cloudCredentials.read();
+  if (sealed) return { ...(cloud ?? {}), url: sealed.url, key: sealed.key };
+  return cloud;
+}
+
 async function initializeWorker(config) {
   if (!config?.url || !config?.key) return null;
   cloudConfig = config;
@@ -918,7 +931,7 @@ function registerIpc() {
     // Cloud sync is started but never awaited: a slow or unreachable cloud must
     // not hold the setup wizard open. Its outcome arrives on pos:status-changed.
     Promise.resolve()
-      .then(() => initializeWorker(cloud))
+      .then(() => initializeWorker(withSealedCloud(cloud)))
       .catch(async (error) => {
         const message = fail(error).error;
         console.warn("[pos] cloud sync could not start:", message);
@@ -935,7 +948,7 @@ function registerIpc() {
 
   ipcMain.handle("pos:configure-cloud", async (_e, cloud) => {
     try {
-      await initializeWorker(cloud);
+      await initializeWorker(withSealedCloud(cloud));
       return { ok: true };
     } catch (error) {
       return fail(error);
