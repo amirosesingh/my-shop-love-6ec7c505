@@ -820,6 +820,307 @@ function readSchemaFile() {
   }
 }
 
+/* ================= schema manifest (per-table view of schema.sql) ================= */
+
+/**
+ * Columns the sync engine adds itself through cursor batches, to every table
+ * that carries is_synced / sync_status. They never appear in a CREATE TABLE
+ * block, so the comparison must not report them as unexpected extras.
+ */
+const ENGINE_SYNC_COLUMNS = new Set([
+  "synced_at",
+  "pending_sync",
+  "temp_id",
+  "sync_error",
+  "sync_attempts",
+  "last_error_at",
+  "row_version",
+]);
+
+const TYPE_PATTERN =
+  "(?:UNIQUEIDENTIFIER|N?VARCHAR\\s*\\([^)]*\\)|N?CHAR\\s*\\([^)]*\\)|" +
+  "DECIMAL\\s*\\([^)]*\\)|NUMERIC\\s*\\([^)]*\\)|DATETIME2\\s*\\([^)]*\\)|" +
+  "DATETIME|SMALLDATETIME|DATE|TIME|BIGINT|SMALLINT|TINYINT|INT|BIT|" +
+  "FLOAT|REAL|MONEY|VARBINARY\\s*\\([^)]*\\)|BINARY\\s*\\([^)]*\\)|XML)";
+
+const SKIP_COLUMN_WORDS = new Set([
+  "CONSTRAINT",
+  "PRIMARY",
+  "FOREIGN",
+  "UNIQUE",
+  "CHECK",
+  "REFERENCES",
+]);
+
+/** Removes block and line comments so statement detection is never fooled. */
+function stripComments(text) {
+  return text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/--[^\n]*/g, "");
+}
+
+/** Splits on GO separators, keeping indexes aligned with the original text. */
+function splitBatches(text) {
+  return text.split(/^\s*GO\s*$/gim);
+}
+
+const normalizeType = (raw) => raw.replace(/\s+/g, "").toUpperCase();
+
+/**
+ * Parses the master schema file into a per-table manifest. Because the list
+ * is derived from the file itself, any table added to schema.sql in a future
+ * update shows up automatically — nothing here is hard-coded.
+ *
+ * Batch assignment: a batch that references exactly one known table belongs
+ * to it; engine-wide cursor batches and multi-table guarded batches are
+ * "shared" and run with every apply (they are all idempotent).
+ */
+function parseSchemaManifest(text) {
+  const clean = stripComments(text);
+  const cleanBatches = splitBatches(clean);
+  const rawBatches = splitBatches(text);
+
+  // Pass 1 — every table and the batch that creates it.
+  const tables = new Map(); // lower -> { name, createIdx, columns: Map, batchIdx: [] }
+  const createRe = /CREATE\s+TABLE\s+dbo\.\[?([A-Za-z_]\w*)\]?/gi;
+  cleanBatches.forEach((batch, i) => {
+    createRe.lastIndex = 0;
+    let m;
+    while ((m = createRe.exec(batch))) {
+      const key = m[1].toLowerCase();
+      if (!tables.has(key)) {
+        tables.set(key, { name: m[1], createIdx: i, columns: new Map(), batchIdx: [] });
+      }
+    }
+  });
+
+  // Pass 2 — assign each batch to its table, or to the shared set. Dynamic
+  // references such as dbo.[' + @t never match the word pattern, so cursor
+  // batches land in shared automatically.
+  const refRe = /dbo\.\[?([A-Za-z_]\w*)\]?/gi;
+  const sharedIdx = [];
+  cleanBatches.forEach((batch, i) => {
+    if (!batch.trim()) return;
+    refRe.lastIndex = 0;
+    const refs = new Set();
+    let m;
+    while ((m = refRe.exec(batch))) {
+      const key = m[1].toLowerCase();
+      if (tables.has(key)) refs.add(key);
+    }
+    if (refs.size === 1) tables.get([...refs][0]).batchIdx.push(i);
+    else sharedIdx.push(i);
+  });
+
+  // Pass 3 — columns from the CREATE TABLE body plus guarded ALTER … ADD
+  // statements that belong to the table.
+  const colTypeRe = new RegExp(`^\\s*\\[?([A-Za-z_]\\w*)\\]?\\s+(${TYPE_PATTERN})`, "i");
+  const addRe = new RegExp(
+    `\\bADD\\s+(?:COLUMN\\s+)?\\[?([A-Za-z_]\\w*)\\]?\\s+(${TYPE_PATTERN})`,
+    "gi",
+  );
+  for (const t of tables.values()) {
+    const createBatch = cleanBatches[t.createIdx] ?? "";
+    const open = createBatch.indexOf("(");
+    const close = createBatch.lastIndexOf(")");
+    if (open !== -1 && close > open) {
+      for (const line of createBatch.slice(open + 1, close).split("\n")) {
+        const m = colTypeRe.exec(line);
+        if (!m || SKIP_COLUMN_WORDS.has(m[1].toUpperCase())) continue;
+        const key = m[1].toLowerCase();
+        if (!t.columns.has(key)) t.columns.set(key, { name: m[1], type: normalizeType(m[2]) });
+      }
+    }
+    for (const idx of t.batchIdx) {
+      const batch = cleanBatches[idx] ?? "";
+      addRe.lastIndex = 0;
+      let m;
+      while ((m = addRe.exec(batch))) {
+        const key = m[1].toLowerCase();
+        if (!t.columns.has(key)) t.columns.set(key, { name: m[1], type: normalizeType(m[2]) });
+      }
+    }
+  }
+
+  return {
+    tables: [...tables.values()].map((t) => ({
+      name: t.name,
+      key: t.name.toLowerCase(),
+      columns: [...t.columns.values()],
+    })),
+    sharedIdx,
+    tableBatches: new Map([...tables.entries()].map(([k, t]) => [k, t.batchIdx])),
+    rawBatches,
+  };
+}
+
+/**
+ * Live comparison of the master file against the connected database. Without
+ * a connection it still returns the manifest (exists/present = null) so the
+ * panel can show what the file defines.
+ */
+async function schemaStatus() {
+  const file = schemaFile();
+  let text;
+  try {
+    text = fs.readFileSync(file, "utf8");
+  } catch (err) {
+    return { ok: false, error: err?.message ?? "Schema file could not be read" };
+  }
+  const manifest = parseSchemaManifest(text);
+
+  if (!pool) {
+    return {
+      ok: true,
+      connected: false,
+      file,
+      text,
+      tables: manifest.tables.map((t) => ({
+        name: t.name,
+        exists: null,
+        columns: t.columns.map((c) => ({ ...c, present: null })),
+        missingColumns: [],
+        extraColumns: [],
+        columnCount: null,
+      })),
+      unknownTables: [],
+    };
+  }
+
+  const res = await pool
+    .request()
+    .query(
+      `SELECT t.name AS tableName, c.name AS columnName
+         FROM sys.tables t
+         LEFT JOIN sys.columns c ON c.object_id = t.object_id
+        WHERE SCHEMA_NAME(t.schema_id) = N'dbo'`,
+    );
+  const actual = new Map(); // lower table -> Set of lower columns
+  for (const row of res.recordset) {
+    const key = String(row.tableName).toLowerCase();
+    if (!actual.has(key)) actual.set(key, new Set());
+    if (row.columnName) actual.get(key).add(String(row.columnName).toLowerCase());
+  }
+
+  const known = new Set(manifest.tables.map((t) => t.key));
+  const tables = manifest.tables.map((t) => {
+    const have = actual.get(t.key);
+    const exists = have != null;
+    const expected = new Set(t.columns.map((c) => c.name.toLowerCase()));
+    return {
+      name: t.name,
+      exists,
+      columns: t.columns.map((c) => ({
+        ...c,
+        present: exists ? have.has(c.name.toLowerCase()) : null,
+      })),
+      missingColumns: exists
+        ? t.columns.filter((c) => !have.has(c.name.toLowerCase())).map((c) => c.name)
+        : [],
+      extraColumns: exists
+        ? [...have].filter((c) => !expected.has(c) && !ENGINE_SYNC_COLUMNS.has(c))
+        : [],
+      columnCount: exists ? have.size : null,
+    };
+  });
+  const unknownTables = [...actual.keys()].filter((k) => !known.has(k)).sort();
+  return { ok: true, connected: true, file, text, tables, unknownTables };
+}
+
+/**
+ * Applies only the batches that belong to the selected tables, plus the
+ * shared engine batches (sync columns, retry bookkeeping). Every statement
+ * is guarded, so re-running never drops or rewrites existing objects. A
+ * failing batch is recorded and the rest still run.
+ */
+async function applySchemaTables(tableNames) {
+  if (!pool) return { ok: false, error: "Connect to the local database first." };
+  const file = schemaFile();
+  let text;
+  try {
+    text = fs.readFileSync(file, "utf8");
+  } catch (err) {
+    return { ok: false, error: err?.message ?? "Schema file could not be read" };
+  }
+  const manifest = parseSchemaManifest(text);
+  const wanted = new Set(
+    (Array.isArray(tableNames) ? tableNames : []).map((n) => String(n).toLowerCase()),
+  );
+  const unknown = [...wanted].filter((w) => !manifest.tableBatches.has(w));
+
+  const selected = new Set(manifest.sharedIdx);
+  const owner = new Map();
+  for (const i of manifest.sharedIdx) owner.set(i, "shared engine rules");
+  for (const [key, idxs] of manifest.tableBatches) {
+    if (!wanted.has(key)) continue;
+    for (const i of idxs) {
+      selected.add(i);
+      owner.set(i, key);
+    }
+  }
+
+  const errors = [];
+  let batchCount = 0;
+  for (const i of [...selected].sort((a, b) => a - b)) {
+    const batch = (manifest.rawBatches[i] ?? "").trim();
+    if (!batch) continue;
+    try {
+      await pool.request().batch(batch);
+      batchCount += 1;
+    } catch (err) {
+      errors.push({ scope: owner.get(i) ?? "unknown", ...describeSqlError(err) });
+    }
+  }
+  try {
+    require("./repo.cjs").forgetColumnCache();
+  } catch {
+    /* repo not loaded yet */
+  }
+  return {
+    ok: errors.length === 0 && unknown.length === 0,
+    applied: [...wanted].filter((w) => manifest.tableBatches.has(w)),
+    unknownTables: unknown,
+    batchCount,
+    errors,
+  };
+}
+
+/**
+ * Builds a runnable SQL script for the chosen tables (shared engine batches
+ * included, original comments preserved). Used for the in-app SQL download
+ * so migration files never travel by pen drive again.
+ */
+function schemaTableSql(tableNames) {
+  const file = schemaFile();
+  let text;
+  try {
+    text = fs.readFileSync(file, "utf8");
+  } catch (err) {
+    return { ok: false, error: err?.message ?? "Schema file could not be read" };
+  }
+  const wanted = (Array.isArray(tableNames) ? tableNames : [])
+    .map((n) => String(n).toLowerCase())
+    .filter(Boolean);
+  if (!wanted.length) return { ok: true, file, text };
+
+  const manifest = parseSchemaManifest(text);
+  const wantedSet = new Set(wanted);
+  const selected = new Set(manifest.sharedIdx);
+  for (const [key, idxs] of manifest.tableBatches) {
+    if (!wantedSet.has(key)) continue;
+    for (const i of idxs) selected.add(i);
+  }
+  const names = manifest.tables.filter((t) => wantedSet.has(t.key)).map((t) => t.name);
+  const body = [...selected]
+    .sort((a, b) => a - b)
+    .map((i) => (manifest.rawBatches[i] ?? "").trim())
+    .filter(Boolean)
+    .join("\nGO\n");
+  const header =
+    `/* POS local schema — tables: ${names.join(", ")}\n` +
+    `   Extracted from database/schema.sql. Every statement is guarded:\n` +
+    `   safe to run repeatedly, never drops data. */\n\n`;
+  return { ok: true, file, tables: names, text: header + body + "\nGO\n" };
+}
+
 const HEALTH_TABLE = "dbo.pos_connection_health";
 
 /**
