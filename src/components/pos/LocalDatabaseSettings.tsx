@@ -380,10 +380,13 @@ export function LocalDatabaseSettings() {
                 ? "Signs in with this Windows account."
                 : `SQL Server login${config.user ? ` (${config.user})` : ""}`}
             </p>
-            <SchemaPanel />
           </div>
         )}
       </div>
+
+      {/* Table-by-table repair and SQL export — visible right after connecting. */}
+      <SchemaPanel />
+
 
       <div className="grid gap-2 text-sm sm:grid-cols-3">
         <Stat label="Waiting to sync" value={String(totals.pending)} />
