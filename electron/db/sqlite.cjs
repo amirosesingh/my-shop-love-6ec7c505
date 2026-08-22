@@ -53,6 +53,8 @@ const SYNCED_TABLES = [
   "stock_transfers",
   "stock_transfer_items",
   "held_orders",
+  "shift_sessions",
+  "drawer_events",
 ];
 
 const nowIso = () => new Date().toISOString();
