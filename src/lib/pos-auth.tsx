@@ -485,6 +485,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             username: code,
             pin,
             platform: typeof navigator === "undefined" ? "web" : navigator.platform || "web",
+            // An all-branches account has no branch of its own, so the
+            // terminal's branch is what the session is stamped with.
+            branchId: activeBranchId(null),
           }),
         }).finally(() => window.clearTimeout(timer));
         const payload = (await res.json().catch(() => null)) as ServerLogin | null;
