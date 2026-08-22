@@ -398,7 +398,9 @@ export type PosBridge = {
     applied?: string[];
     unknownTables?: string[];
     batchCount?: number;
-    errors?: Array<{ scope: string; code?: string; error?: string }>;
+    errors?: Array<{ scope: string; code?: string; error?: string; permission?: boolean }>;
+    /** True when the login lacks CREATE/ALTER rights — offer admin repair. */
+    permission?: boolean;
     error?: string;
   }>;
   /** Runnable SQL script for the chosen tables (empty array = full file). */
