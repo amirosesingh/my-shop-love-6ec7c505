@@ -920,7 +920,9 @@ function parseSchemaManifest(text) {
   );
   for (const t of tables.values()) {
     const createBatch = cleanBatches[t.createIdx] ?? "";
-    const open = createBatch.indexOf("(");
+    createRe.lastIndex = 0;
+    const createMatch = createRe.exec(createBatch);
+    const open = createMatch ? createBatch.indexOf("(", createMatch.index + createMatch[0].length) : -1;
     const close = createBatch.lastIndexOf(")");
     if (open !== -1 && close > open) {
       for (const line of createBatch.slice(open + 1, close).split("\n")) {
