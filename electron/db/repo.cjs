@@ -224,9 +224,9 @@ function normaliseRow(table, row) {
 }
 
 const JSON_COLUMNS = {
-  products: ["stock_by_store", "packs", "barcode_aliases"],
+  products: ["stock_by_store", "packs", "barcode_aliases", "barcode_variants"],
   promotions: ["tier_rates"],
-  bookings: ["lines"],
+  bookings: ["lines", "charges"],
   transfers: ["items"],
   audit_logs: ["details"],
   held_orders: ["lines", "coupon"],
@@ -641,7 +641,7 @@ async function compareRows(table, { since = null, limit = 2000 } = {}) {
 
 async function stats() {
   const out = [];
-  for (const table of TABLES) {
+  for (const table of PUSH_TABLES) {
     const res = await getPool().request().query(`
       SELECT
         SUM(CASE WHEN is_synced = 0 AND sync_status = N'pending' THEN 1 ELSE 0 END) AS pending,
@@ -823,7 +823,7 @@ async function snapshot() {
 async function pendingSyncCount() {
   let total = 0;
   let sales = 0;
-  for (const table of TABLES) {
+  for (const table of PUSH_TABLES) {
     const res = await getPool()
       .request()
       .query(`SELECT COUNT(*) AS n FROM dbo.[${table}] WHERE is_synced = 0;`);
@@ -916,6 +916,8 @@ function toCloudRow(table, row) {
 
 module.exports = {
   TABLES,
+  PUSH_TABLES,
+  CLOUD_COLUMNS,
   buildSetList,
   CATALOGUE_TABLES,
   SCOPED_PULL_TABLES,
