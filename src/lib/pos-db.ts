@@ -1257,6 +1257,43 @@ const queue = (context: string, op: SyncOp) => {
   void drainOutbox();
 };
 
+/**
+ * Best-effort write, routed exactly like `queue`, but a failure is recorded in
+ * diagnostics instead of interrupting the cashier. Used for visibility-only
+ * records — the sign-in log, drawer openings — which must never stop trading
+ * on a till whose database has not had the latest script applied.
+ */
+const queueSoft = (context: string, op: SyncOp) => {
+  const note = (e: unknown) =>
+    recordDiagnostic({ kind: "soft_write_failed", entity: op.table, code: reasonCode(e) });
+  if (isLiveOnly()) {
+    void runOpLive(context, op).catch(note);
+    return;
+  }
+  const bridge = localDb();
+  if (bridge) {
+    void bridge
+      .write(context, op)
+      .then((res) => {
+        if (!res.ok) note(new Error(res.error ?? "local write failed"));
+      })
+      .catch(note);
+    return;
+  }
+  void runOpLive(context, op).catch(note);
+};
+
+/** Does this failure mean "a bill with that number is already stored"? */
+export function isDuplicateBillNumber(error: unknown): boolean {
+  const e = error as { code?: string; message?: string };
+  if (e?.code === "23505") return true;
+  const text = String(e?.message ?? error ?? "").toLowerCase();
+  return (
+    /duplicate|already exists|unique constraint|unique index|violation of unique/.test(text) &&
+    /bill_number|receipt|sales/.test(text)
+  );
+}
+
 /* ---------------------------- durable commits --------------------------- */
 
 /** Where a committed change actually landed. */
@@ -1504,8 +1541,9 @@ export const db = {
   upsertShift: (s: Shift) =>
     queue("Saving shift", { kind: "upsert", table: "shifts", rows: [shiftToRow(s)] }),
 
+  // Sign-in visibility only: a till on an older database must keep trading.
   upsertShiftSession: (s: ShiftSession) =>
-    queue("Saving shift sign-in", {
+    queueSoft("Saving shift sign-in", {
       kind: "upsert",
       table: "shift_sessions",
       rows: [shiftSessionToRow(s)],
@@ -1771,7 +1809,32 @@ export const db = {
         values: { exchanged_to_bill_number: sale.receiptNo },
         match: { bill_number: sale.exchangeOfReceiptNo },
       });
-    return commitOps("Saving sale", ops);
+    try {
+      return await commitOps("Saving sale", ops);
+    } catch (error) {
+      // The records are written one after another. If the bill itself landed
+      // and something later failed, the sale is real: finish the rest in the
+      // background as keyed writes (so nothing can double up) rather than
+      // telling the cashier the payment was lost.
+      if (sale.clientTxnId && (await db.saleAttemptExists(sale.clientTxnId)) === "yes") {
+        for (const op of ops.slice(1)) {
+          queueSoft(
+            "Completing sale",
+            op.kind === "insert"
+              ? { kind: "upsert", table: op.table, rows: op.rows, onConflict: "id" }
+              : op,
+          );
+        }
+        recordDiagnostic({
+          kind: "local_mirror_failed",
+          entity: "sales",
+          code: reasonCode(error),
+          recordId: sale.receiptNo,
+        });
+        return "cloud";
+      }
+      throw error;
+    }
   },
 
   /**

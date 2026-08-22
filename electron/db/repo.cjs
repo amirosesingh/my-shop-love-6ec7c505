@@ -19,6 +19,10 @@ const TABLES = [
   "pos_settings",
   "suppliers",
   "shifts",
+  // Sign-in visibility and drawer openings are written by the till too; they
+  // must be on this list or every write is refused as an unknown table.
+  "shift_sessions",
+  "drawer_events",
   "sales",
   "sale_items",
   "payment_transactions",
