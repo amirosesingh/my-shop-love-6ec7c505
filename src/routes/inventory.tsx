@@ -38,6 +38,8 @@ import {
 } from "@/components/ui/table";
 import { money, stockAt, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
+import { useVisibility } from "@/lib/ui-visibility";
+
 import { productVisibleAt } from "@/lib/branch-policy";
 import { TablePagination, usePagination } from "@/components/pos/TablePagination";
 import { Switch } from "@/components/ui/switch";
@@ -116,7 +118,12 @@ function Inventory() {
     restoreProducts,
   } = usePos();
   const { can } = useAuth();
-  const showMoney = can("can_view_sales_reports");
+  const { visible } = useVisibility();
+  // Money columns need the reporting permission *and* the administrator's
+  // "show cost & margin" switch for this role.
+  const showMoney = can("can_view_sales_reports") && visible("inventory.costColumns");
+  const showStockValue = can("can_view_sales_reports") && visible("inventory.stockValue");
+
   const canEdit = can("can_add_new_product");
   const canPrice = can("can_edit_product_price");
   const canAdjust = can("can_adjust_stock");
@@ -213,7 +220,8 @@ function Inventory() {
             <h1 className="text-2xl font-semibold">Inventory · {currentStore.name}</h1>
             <p className="text-sm text-muted-foreground">
               {state.products.length} products ·{" "}
-              {showMoney && (
+              {showStockValue && (
+
                 <>
                   stock value <span className="numeric">{money(stockValue)}</span> ·{" "}
                 </>

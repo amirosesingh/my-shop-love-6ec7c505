@@ -476,15 +476,16 @@ export const SETTINGS_CARDS: SettingsCard[] = [
 
   /* ---- Access & visibility --------------------------------------------- */
   {
-    id: "visibility",
-    label: "Screen visibility",
-    blurb: "Hide register actions, payments or cost columns per role.",
+    id: "access",
+    label: "Roles & access",
+    blurb: "One page: what each role may do, and what it can see.",
     icon: EyeOff,
     category: "access",
-    to: "/settings/visibility",
-    panel: page(() => import("@/routes/settings.visibility")),
+    to: "/settings/access",
+    panel: page(() => import("@/routes/settings.access")),
   },
 ];
+
 
 /** Areas pinned to the top of the workspace — the ones opened most often. */
 export const PINNED_SETTINGS = [
