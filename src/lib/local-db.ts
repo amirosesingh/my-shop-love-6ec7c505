@@ -320,6 +320,8 @@ export type LocalSyncStatus = {
   configured?: boolean;
   phase?: "idle" | "pushing" | "pulling";
   enabled?: boolean;
+  /** The central project rejected this device's keys — sync is parked. */
+  credentialsInvalid?: boolean;
   tables: TableSyncStat[];
   queue?: SyncQueueRow[];
   lastPushAt: string | null;
