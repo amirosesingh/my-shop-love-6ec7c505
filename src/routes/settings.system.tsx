@@ -4,6 +4,7 @@ import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
 import { SettingsTabs } from "@/components/pos/settings/SettingsTabs";
 import { SystemStatusPanel } from "@/components/pos/settings/panels/SystemStatusPanel";
 import { ServerKeysPanel } from "@/components/pos/settings/panels/ServerKeysPanel";
+import { CloudConnectionPanel } from "@/components/pos/settings/panels/CloudConnectionPanel";
 import { DatabaseHealthPanel } from "@/components/pos/settings/panels/DatabaseHealthPanel";
 import { LogicHealthPanel } from "@/components/pos/settings/panels/LogicHealthPanel";
 import { SecurityAlertsPanel } from "@/components/pos/settings/panels/SecurityAlertsPanel";
@@ -55,6 +56,7 @@ function SystemSettingsPage() {
       <div className="w-full min-w-0 max-w-full">
         {tab === "system" && (
           <div className="space-y-4">
+            <CloudConnectionPanel />
             <ServerKeysPanel />
             <SystemStatusPanel />
           </div>
