@@ -24,7 +24,11 @@ const FORBIDDEN = [
   /from\s+["']@\/integrations\/supabase\/client\.server["']/,
   /from\s+["']@\/integrations\/supabase\/auth-middleware["']/,
   /from\s+["'](\.\.?\/)+integrations\/supabase\/client(\.server)?["']/,
+  // Deferred imports count too: `await import("...client.server")` was how the
+  // comparison page quietly read the managed database instead of the operator's.
+  /import\s*\(\s*["']@?[\w./-]*integrations\/supabase\/client(\.server)?["']\s*\)/,
 ];
+
 
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
