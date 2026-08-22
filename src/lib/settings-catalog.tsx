@@ -441,6 +441,18 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     })),
   },
   {
+    id: "data-comparison",
+    label: "Server vs. shop data",
+    blurb: "Record counts here against the company server.",
+    icon: Database,
+    category: "diagnostics",
+    to: "/settings/system?tab=data-comparison",
+    raw: true,
+    panel: lazy(async () => ({
+      default: (await import("@/components/pos/sync/DataComparison")).DataComparison,
+    })),
+  },
+  {
     id: "inheritance",
     label: "Settings inheritance",
     blurb: "Which values come from global, cluster or this branch.",
