@@ -102,9 +102,13 @@ export function SyncHub() {
         setLocalQueue(
           (st.queue ?? []).filter((r) => r.status === "error" || r.status === "quarantined"),
         );
+        setLocalStats(
+          (st as { tables?: { table: string; pending: number; errored: number }[] }).tables ?? [],
+        );
       } catch {
         setLocalConnected(false);
         setLocalQueue([]);
+        setLocalStats([]);
       }
     } else {
       setLocalConnected(false);
@@ -245,7 +249,7 @@ export function SyncHub() {
                     {engine ? (engine.counts[entity] ?? 0) : "—"}
                   </td>
                   <td className="py-1.5 text-right tabular-nums">
-                    {engine?.pending.byEntity[entity] ??
+                    {localStats.find((t) => t.table === entity)?.pending ??
                       queue.filter((q) => q.op.table === entity).length}
                   </td>
                 </tr>
