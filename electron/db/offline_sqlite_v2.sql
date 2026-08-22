@@ -178,14 +178,28 @@ CREATE TABLE IF NOT EXISTS payment_transactions (
   method       TEXT NOT NULL DEFAULT 'cash',
   kind         TEXT NOT NULL DEFAULT 'payment',
   reference    TEXT,
+  cashier_id   TEXT,
   cashier_name TEXT,
   note         TEXT NOT NULL DEFAULT '',
   paid_at      TEXT NOT NULL,
-  created_at   TEXT NOT NULL
+  created_at   TEXT NOT NULL,
+  updated_at   TEXT,
+  status       TEXT NOT NULL DEFAULT 'completed',
+  metadata     TEXT NOT NULL DEFAULT '{}',
+  client_transaction_id TEXT,
+  is_synced    INTEGER NOT NULL DEFAULT 0,
+  sync_status  TEXT NOT NULL DEFAULT 'pending',
+  row_version  INTEGER NOT NULL DEFAULT 1,
+  sync_attempts INTEGER NOT NULL DEFAULT 0,
+  sync_error   TEXT,
+  last_error_at TEXT,
+  synced_at    TEXT
 );
 CREATE INDEX IF NOT EXISTS payment_transactions_sale_idx ON payment_transactions (sale_id);
 CREATE INDEX IF NOT EXISTS payment_transactions_booking_idx ON payment_transactions (booking_id);
 CREATE INDEX IF NOT EXISTS payment_transactions_created_idx ON payment_transactions (created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS payment_transactions_client_txn_idx
+  ON payment_transactions (client_transaction_id) WHERE client_transaction_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS item_activity_logs (
   id             TEXT PRIMARY KEY,
@@ -201,9 +215,20 @@ CREATE TABLE IF NOT EXISTS item_activity_logs (
   stock_before   INTEGER,
   stock_after    INTEGER,
   unit_cost      REAL NOT NULL DEFAULT 0,
+  staff_id       TEXT,
   staff_name     TEXT,
+  role           TEXT,
   note           TEXT NOT NULL DEFAULT '',
-  created_at     TEXT NOT NULL
+  created_at     TEXT NOT NULL,
+  updated_at     TEXT,
+  client_transaction_id TEXT,
+  is_synced      INTEGER NOT NULL DEFAULT 0,
+  sync_status    TEXT NOT NULL DEFAULT 'pending',
+  row_version    INTEGER NOT NULL DEFAULT 1,
+  sync_attempts INTEGER NOT NULL DEFAULT 0,
+  sync_error     TEXT,
+  last_error_at TEXT,
+  synced_at      TEXT
 );
 CREATE INDEX IF NOT EXISTS item_activity_logs_product_idx ON item_activity_logs (product_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS item_activity_logs_created_idx ON item_activity_logs (created_at DESC);

@@ -37,6 +37,9 @@ const stampColumn = new Map();
 const MISSING_CLOUD_RE =
   /PGRST20[45]|schema cache|does not exist|could not find the table|not found in the schema/i;
 
+/** A deployed app/relay mismatch is configuration drift, never a bad row. */
+const UNSUPPORTED_RELAY_TABLE_RE = /["']?[a-z_]+["']? cannot be synced/i;
+
 /**
  * Tables the central project has not grown yet, with the earliest moment we
  * re-probe. Instead of failing the same batch every 30 seconds, the table is
@@ -293,6 +296,15 @@ async function push() {
         return { ok: false, pushed, failed, error: "credentials" };
       }
       failed += ids.length;
+      if (UNSUPPORTED_RELAY_TABLE_RE.test(String(error.message ?? ""))) {
+        cloudMissing.set(table, Date.now() + CLOUD_MISSING_RETRY_MS);
+        const message =
+          `This app version cannot relay "${table}". Update the POS/central app, then use Retry all parked rows. (${error.message})`;
+        await repo.markFailed(table, ids, message, Number.MAX_SAFE_INTEGER).catch(() => {});
+        await repo.setWatermark(table, null, { error: message }).catch(() => {});
+        notify();
+        continue;
+      }
       if (MISSING_CLOUD_RE.test(String(error.message ?? ""))) {
         // Central drift is not a row fault: park with a clear pointer and
         // leave the attempt counter untouched so the rows resume cleanly.

@@ -40,6 +40,8 @@ export type RelayRead =
 export const RELAY_TABLES = new Set([
   "sales",
   "sale_items",
+  "payment_transactions",
+  "item_activity_logs",
   "shifts",
   "shift_sessions",
   "held_orders",
