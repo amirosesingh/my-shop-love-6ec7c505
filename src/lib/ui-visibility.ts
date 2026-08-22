@@ -92,13 +92,16 @@ export const VISIBILITY_ELEMENTS: VisibilityElement[] = [
     label: "Bill search & history",
     blurb: "Look up and reprint earlier bills.",
     group: "Sales & Operations",
+    route: "/receipts",
   },
   {
     key: "sales.bookings",
     label: "Bookings / pay later",
     blurb: "Deposits, balances and collections.",
     group: "Sales & Operations",
+    route: "/bookings",
   },
+
   {
     key: "inventory.costColumns",
     label: "Cost & margin columns",
