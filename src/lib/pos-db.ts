@@ -1809,7 +1809,32 @@ export const db = {
         values: { exchanged_to_bill_number: sale.receiptNo },
         match: { bill_number: sale.exchangeOfReceiptNo },
       });
-    return commitOps("Saving sale", ops);
+    try {
+      return await commitOps("Saving sale", ops);
+    } catch (error) {
+      // The records are written one after another. If the bill itself landed
+      // and something later failed, the sale is real: finish the rest in the
+      // background as keyed writes (so nothing can double up) rather than
+      // telling the cashier the payment was lost.
+      if (sale.clientTxnId && (await db.saleAttemptExists(sale.clientTxnId)) === "yes") {
+        for (const op of ops.slice(1)) {
+          queueSoft(
+            "Completing sale",
+            op.kind === "insert"
+              ? { kind: "upsert", table: op.table, rows: op.rows, onConflict: "id" }
+              : op,
+          );
+        }
+        recordDiagnostic({
+          kind: "local_mirror_failed",
+          entity: "sales",
+          code: reasonCode(error),
+          recordId: sale.receiptNo,
+        });
+        return "cloud";
+      }
+      throw error;
+    }
   },
 
   /**
