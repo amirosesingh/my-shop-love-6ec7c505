@@ -900,7 +900,9 @@ function toCloudRow(table, row) {
   // change is skipped centrally, the next pull brings the newer copy down.
   const out = parseJsonColumns(table, rest);
   if (typeof row.row_version !== "number") delete out.row_version;
-  return out;
+  // Never send a column the central database does not have: one unknown key
+  // makes PostgREST refuse the whole batch.
+  return filterCloudColumns(table, out);
 }
 
 module.exports = {
