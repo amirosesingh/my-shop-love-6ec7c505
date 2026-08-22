@@ -652,6 +652,50 @@ export async function runExclusive(reason: string = "timer"): Promise<void> {
 /** True while a sync cycle holds the mutex. */
 export const syncBusy = () => cycleRunning;
 
+/**
+ * Tables whose changes must reach this shop's own database at once rather
+ * than on the next timer tick: staff accounts, roles and settings.
+ */
+const LIVE_TABLES = [
+  "app_users",
+  "staff_roles",
+  "stores",
+  "pos_settings",
+  "pos_store_settings",
+] as const;
+
+/** Refresh the offline staff roster so a PIN sign-in works without the cloud. */
+async function refreshStaffMirror(): Promise<void> {
+  const { data, error } = await supabaseExternal.rpc("list_app_users");
+  if (error) throw new Error(error.message);
+  const { cacheStaffRoster } = await import("./local-staff");
+  await cacheStaffRoster((data ?? []) as Record<string, unknown>[]);
+}
+
+const RETRY_DELAYS_MS = [2000, 10000, 30000];
+let liveTimer: number | undefined;
+
+/**
+ * Push a just-made change straight through instead of waiting for the timer.
+ * Failures are retried with growing gaps and every attempt is logged, so a
+ * record that never reaches the shop database is visible rather than silent.
+ */
+export async function syncNow(reason: string, attempt = 0): Promise<void> {
+  try {
+    await runExclusive(reason);
+    await refreshStaffMirror();
+    logSync("push", reason, true, "sent to this shop's database");
+    recordSync({ direction: "push", entity: reason, status: "success" });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logSync("push", reason, false, message);
+    recordSync({ direction: "push", entity: reason, status: "failed", error: message });
+    const delay = RETRY_DELAYS_MS[attempt];
+    if (delay === undefined || typeof window === "undefined") return;
+    window.setTimeout(() => void syncNow(reason, attempt + 1), delay);
+  }
+}
+
 const NETWORK_DEBOUNCE_MS = 5000;
 
 /** Start the background sync loop (called once from the app shell). */
@@ -701,13 +745,29 @@ export function startSyncEngine() {
         if (syncState().phase === "offline") wake();
       });
   }, 30000);
+  // Live listener: an account or settings change made anywhere lands in this
+  // shop's own database within a second instead of waiting for the timer.
+  const live = supabaseExternal.channel("pos-live-settings");
+  for (const table of LIVE_TABLES) {
+    live.on("postgres_changes", { event: "*", schema: "public", table }, () => {
+      if (liveTimer) window.clearTimeout(liveTimer);
+      // One catch-up for a burst of related edits.
+      liveTimer = window.setTimeout(() => {
+        liveTimer = undefined;
+        void syncNow(`live:${table}`);
+      }, 400);
+    });
+  }
+  live.subscribe();
   tick();
   return () => {
     window.clearInterval(timer);
     window.clearInterval(ping);
     if (debounce) window.clearTimeout(debounce);
+    if (liveTimer) window.clearTimeout(liveTimer);
     window.removeEventListener("online", wake);
     window.removeEventListener("offline", sleep);
+    void supabaseExternal.removeChannel(live);
     offMode();
     started = false;
   };

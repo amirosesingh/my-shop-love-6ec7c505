@@ -41,6 +41,7 @@ import {
 import { useAuth } from "@/lib/pos-auth";
 import { usePos } from "@/lib/pos-store";
 import { getRolesWithPermissions, type RoleDef } from "@/lib/role-admin";
+import { syncNow } from "@/lib/sync-engine";
 import { isExternalEmail, isInternalAddress } from "@/lib/internal-domains";
 import {
   createStaffMember,
@@ -78,7 +79,8 @@ const EMPTY: Form = {
   username: "",
   credential: "",
   roleSlug: "cashier",
-  branchId: "none",
+  // Empty until the administrator makes an explicit branch choice.
+  branchId: "",
   active: true,
 };
 
@@ -169,7 +171,7 @@ export function StaffManager() {
       username: row.user_id,
       credential: "",
       roleSlug: row.role_slug,
-      branchId: row.store_id ?? "none",
+      branchId: row.store_id ?? "all",
       active: row.is_active,
     });
     setFormOpen(true);
@@ -186,7 +188,13 @@ export function StaffManager() {
     : emailMode
       ? form.credential.length >= 8
       : form.credential.length >= 4 && form.credential.length <= 32;
-  const canSave = nameValid && identifierValid && credentialValid && !!selectedRole;
+  // The branch must be an explicit decision: a real branch, or "all".
+  const branchValid = form.branchId === "all" || stores.some((store) => store.id === form.branchId);
+  const branchId = form.branchId === "all" ? null : form.branchId;
+  const branchLabel = branchId
+    ? (stores.find((store) => store.id === branchId)?.name ?? branchId)
+    : "All branches";
+  const canSave = nameValid && identifierValid && credentialValid && branchValid && !!selectedRole;
 
   const save = async () => {
     if (!canSave || !selectedRole) return;
@@ -196,7 +204,7 @@ export function StaffManager() {
         await updateStaffMember({
           username: editing.user_id,
           displayName: form.displayName.trim(),
-          branchId: form.branchId === "none" ? null : form.branchId,
+          branchId,
           roleSlug: selectedRole.slug,
           baseRole: selectedRole.baseLevel,
           active: form.active,
@@ -210,25 +218,28 @@ export function StaffManager() {
           });
           if (error) throw error;
         }
-        toast.success("Account updated");
+        toast.success(`${form.displayName.trim()} saved — ${branchLabel}`);
       } else {
         await createStaffMember({
           displayName: form.displayName.trim(),
           username: form.username.trim().toLowerCase(),
           ...(emailMode ? { password: form.credential } : { pin: form.credential }),
-          branchId: form.branchId === "none" ? null : form.branchId,
+          branchId,
           roleSlug: selectedRole.slug,
           baseRole: selectedRole.baseLevel,
           active: form.active,
         });
-        toast.success("Account created");
+        toast.success(`${form.displayName.trim()} created — ${branchLabel}`);
       }
       setFormOpen(false);
       setForm({ ...EMPTY });
       await load();
+      // Push the change to this shop's own database straight away.
+      void syncNow("staff account saved");
     } catch (error) {
-      toast.error(editing ? "Account could not be updated" : "Account could not be created", {
-        description: friendlyError(error),
+      // Lead with the real reason; the generic wording hid every cause.
+      toast.error(friendlyError(error), {
+        description: editing ? "The account was not updated." : "The account was not created.",
       });
     } finally {
       setBusy("");
@@ -348,7 +359,7 @@ export function StaffManager() {
             <div className="space-y-1"><Label htmlFor="staff-identifier">Username or email *</Label><Input id="staff-identifier" disabled={!!editing} value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value.replace(/\s+/g, "") })} aria-invalid={!identifierValid} />{!identifierValid && <p className="text-xs text-destructive">Enter a valid username or email.</p>}</div>
             <div className="space-y-1"><Label htmlFor="staff-credential">{emailMode ? "Password" : "PIN or passcode (4–32)"}{editing ? "" : " *"}</Label><Input id="staff-credential" type="password" maxLength={emailMode ? 200 : 32} autoComplete="new-password" value={form.credential} onChange={(e) => setForm({ ...form, credential: emailMode ? e.target.value : e.target.value.slice(0, 32) })} aria-invalid={!credentialValid} />{!credentialValid && <p className="text-xs text-destructive">{emailMode ? "Use at least 8 characters." : "Use 4 to 32 characters."}</p>}</div>
             <div className="space-y-1"><Label>Role *</Label><Select value={form.roleSlug} onValueChange={(roleSlug) => setForm({ ...form, roleSlug })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{roles.map((role) => <SelectItem key={role.slug} value={role.slug}>{role.name}</SelectItem>)}</SelectContent></Select></div>
-            <div className="space-y-1"><Label>Branch</Label><Select value={form.branchId} onValueChange={(branchId) => setForm({ ...form, branchId })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">All branches — terminal decides</SelectItem>{stores.map((store) => <SelectItem key={store.id} value={store.id}>{store.code} · {store.name}</SelectItem>)}</SelectContent></Select><p className="text-xs text-muted-foreground">Leave on “All branches” for staff who work at any till; every sale is still stamped with the terminal’s branch.</p></div>
+            <div className="space-y-1"><Label>Branch *</Label><Select value={form.branchId} onValueChange={(branchId) => setForm({ ...form, branchId })}><SelectTrigger aria-invalid={!branchValid}><SelectValue placeholder="Select a branch" /></SelectTrigger><SelectContent><SelectItem value="all">All branches — terminal decides</SelectItem>{stores.map((store) => <SelectItem key={store.id} value={store.id}>{store.code} · {store.name}</SelectItem>)}</SelectContent></Select>{branchValid ? <p className="text-xs text-muted-foreground">Pick “All branches” for staff who work at any till; every sale is still stamped with the terminal’s branch.</p> : <p className="text-xs text-destructive">Choose a branch, or “All branches”.</p>}</div>
             <label className="flex items-center justify-between rounded-md border border-border p-3 text-sm sm:col-span-2">Active immediately<Switch checked={form.active} onCheckedChange={(active) => setForm({ ...form, active })} /></label>
           </div>
           <DialogFooter><Button variant="outline" onClick={() => setFormOpen(false)} disabled={busy === "save"}>Cancel</Button><Button onClick={() => void save()} disabled={!canSave || busy === "save"}>{busy === "save" && <Loader2 className="size-4 animate-spin" />}{editing ? "Save changes" : "Create account"}</Button></DialogFooter>
