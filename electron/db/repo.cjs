@@ -2,7 +2,8 @@
  * Table helpers: turn the app's serialisable sync operations into parameterised
  * T-SQL, and expose the queries the sync worker needs.
  */
-const { sql, getPool } = require("./pool.cjs");
+const poolDb = require("./pool.cjs");
+const { sql, getPool } = poolDb;
 
 const SETTINGS_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -199,6 +200,111 @@ function forgetColumnCache() {
   columnCache.clear();
 }
 
+/* ================= on-demand schema self-heal ================= */
+
+/**
+ * Sync bookkeeping columns are added by the engine's shared cursor batches,
+ * so the per-table manifest never declares them. Their types live here so a
+ * table created before the sync engine existed can still grow them on demand.
+ */
+const ENGINE_COLUMN_TYPES = {
+  is_synced: "BIT",
+  sync_status: "NVARCHAR(20)",
+  synced_at: "DATETIME2",
+  sync_error: "NVARCHAR(MAX)",
+  sync_attempts: "INT",
+  last_error_at: "DATETIME2",
+  pending_sync: "BIT",
+  temp_id: "NVARCHAR(120)",
+  row_version: "INT",
+};
+
+/** Distinct error shape the UI recognises and turns into an admin prompt. */
+function schemaPermissionError(table, detail) {
+  const err = new Error(
+    `Missing database structure (${table || "schema"}) could not be created: ` +
+      `${detail || "the sign-in has no permission to create or alter tables"}. ` +
+      `Open Settings → Local database and run the repair with an admin login.`,
+  );
+  err.code = "ESCHEMA_PERMISSION";
+  err.table = table ?? null;
+  return err;
+}
+
+/**
+ * Turns a schema-drift failure into a one-time repair. Resolves true when the
+ * caller should retry the exact same operation; false when the error was not
+ * schema-related. Permission failures throw so the till can ask for an admin
+ * login instead of silently retrying forever.
+ */
+async function healFromError(err, candidateTables = []) {
+  const full = `${err?.message ?? ""} ${err?.originalError?.message ?? ""}`;
+  const objectMatch = /invalid object name\s+'(?:dbo\.)?\[?([^\]'.\s]+)\]?'/i.exec(full);
+  if (objectMatch) {
+    const heal = await poolDb.ensureSchemaTable(objectMatch[1]);
+    if (heal.ok) return true;
+    if (heal.permission) throw schemaPermissionError(objectMatch[1], heal.errors?.[0]?.error);
+    return false;
+  }
+  const columnMatch = /invalid column name\s+'\[?([^\]']+)\]?'/i.exec(full);
+  if (columnMatch) {
+    const column = columnMatch[1];
+    for (const table of candidateTables) {
+      if (!table) continue;
+      const type =
+        poolDb.schemaColumnType(table, column)?.type ??
+        ENGINE_COLUMN_TYPES[String(column).toLowerCase()] ??
+        null;
+      if (!type) continue;
+      const heal = await poolDb.ensureColumn(table, column, type);
+      if (heal.ok) return true;
+      if (heal.permission) throw schemaPermissionError(table, heal.error);
+    }
+    return false;
+  }
+  if (poolDb.isDdlPermissionError(err)) {
+    throw schemaPermissionError(candidateTables[0] ?? "", err?.message);
+  }
+  return false;
+}
+
+/** Runs fn, and exactly once more when a missing table/column was repaired. */
+async function withHeal(tables, fn) {
+  try {
+    return await fn();
+  } catch (err) {
+    if (await healFromError(err, Array.isArray(tables) ? tables : [tables])) {
+      return fn();
+    }
+    throw err;
+  }
+}
+
+/**
+ * Proactive column growth before a transaction opens: a write carrying a
+ * column the master schema declares but this till has not grown yet gets the
+ * column added, so the value is kept instead of being silently dropped.
+ */
+async function healOpsColumns(ops) {
+  for (const op of ops ?? []) {
+    if (!op?.table || !TABLES.includes(op.table)) continue;
+    const opRows = op.rows ?? (op.values ? [op.values] : null);
+    if (!opRows?.length) continue;
+    const known = await tableColumns(op.table).catch(() => null);
+    if (!known || !known.size) continue; // a missing table heals from the error path
+    for (const row of opRows.slice(0, 5)) {
+      for (const key of Object.keys(row)) {
+        if (SYNC_COLUMNS.has(key) || known.has(key.toLowerCase())) continue;
+        const decl = poolDb.schemaColumnType(op.table, key);
+        if (!decl) continue; // truly unknown columns are still dropped with a warning
+        const heal = await poolDb.ensureColumn(op.table, key, decl.type);
+        if (heal.ok) known.add(key.toLowerCase());
+        else if (heal.permission) throw schemaPermissionError(op.table, heal.error);
+      }
+    }
+  }
+}
+
 /** Picks a driver type so values bind safely instead of being interpolated. */
 function bind(request, name, value) {
   if (value === null || value === undefined) return request.input(name, sql.NVarChar, null);
@@ -383,7 +489,7 @@ async function applyOpInTransaction(tx, op) {
   }
 }
 
-async function applyOps(ops) {
+async function applyOpsOnce(ops) {
   const pool = getPool();
   const tx = new sql.Transaction(pool);
   await tx.begin();
@@ -396,32 +502,52 @@ async function applyOps(ops) {
   }
 }
 
+/**
+ * Entry point for app writes. Schema drift is repaired before the transaction
+ * opens (new columns) and once more from the error itself (missing tables),
+ * so an out-of-date local database no longer fails the sale.
+ */
+async function applyOps(ops) {
+  await healOpsColumns(ops);
+  try {
+    return await applyOpsOnce(ops);
+  } catch (err) {
+    const tables = (ops ?? []).map((o) => o?.table).filter(Boolean);
+    if (await healFromError(err, tables)) return applyOpsOnce(ops);
+    throw err;
+  }
+}
+
 async function applyOp(op) {
   return applyOps([op]);
 }
 
 async function pendingRows(table, limit = 200) {
   assertTable(table);
-  const res = await getPool().request().input("limit", sql.Int, limit).query(`
-      SELECT TOP (@limit) * FROM dbo.[${table}]
-       WHERE is_synced = 0 AND sync_status <> N'quarantined'
-       ORDER BY created_at ASC;
-    `);
-  return res.recordset;
+  return withHeal(table, async () => {
+    const res = await getPool().request().input("limit", sql.Int, limit).query(`
+        SELECT TOP (@limit) * FROM dbo.[${table}]
+         WHERE is_synced = 0 AND sync_status <> N'quarantined'
+         ORDER BY created_at ASC;
+      `);
+    return res.recordset;
+  });
 }
 
 async function markSynced(table, ids) {
   if (!ids.length) return;
   assertTable(table);
-  const request = getPool().request();
-  // Most keys are GUIDs, but held tickets carry the app's own string id.
-  ids.forEach((id, i) => bind(request, `id${i}`, id));
-  await request.query(`
-    UPDATE dbo.[${table}]
-       SET is_synced = 1, sync_status = N'synced', synced_at = SYSUTCDATETIME(),
-           updated_at = updated_at
-     WHERE id IN (${ids.map((_, i) => `@id${i}`).join(", ")});
-  `);
+  return withHeal(table, async () => {
+    const request = getPool().request();
+    // Most keys are GUIDs, but held tickets carry the app's own string id.
+    ids.forEach((id, i) => bind(request, `id${i}`, id));
+    await request.query(`
+      UPDATE dbo.[${table}]
+         SET is_synced = 1, sync_status = N'synced', synced_at = SYSUTCDATETIME(),
+             updated_at = updated_at
+       WHERE id IN (${ids.map((_, i) => `@id${i}`).join(", ")});
+    `);
+  });
 }
 
 /**
@@ -433,50 +559,56 @@ async function markSynced(table, ids) {
 async function markFailed(table, ids, message, maxAttempts = 5) {
   if (!ids.length) return;
   assertTable(table);
-  const request = getPool()
-    .request()
-    .input("maxAttempts", sql.Int, Math.max(1, Number(maxAttempts) || 5))
-    .input("msg", sql.NVarChar(sql.MAX), String(message).slice(0, 3000));
-  ids.forEach((id, i) => bind(request, `id${i}`, id));
-  await request.query(`
-    UPDATE dbo.[${table}]
-       SET sync_status = CASE
-             WHEN ISNULL(sync_attempts, 0) + 1 >= @maxAttempts THEN N'quarantined'
-             ELSE N'error'
-           END,
-           sync_error = @msg,
-           sync_attempts = ISNULL(sync_attempts, 0) + 1,
-           last_error_at = SYSUTCDATETIME()
-     WHERE id IN (${ids.map((_, i) => `@id${i}`).join(", ")});
-    MERGE dbo.sync_state AS t
-    USING (SELECT N'last_error' AS [key], @msg AS [value]) AS s ON t.[key] = s.[key]
-    WHEN MATCHED THEN UPDATE SET t.[value] = s.[value], t.updated_at = SYSUTCDATETIME()
-    WHEN NOT MATCHED THEN INSERT ([key], [value]) VALUES (s.[key], s.[value]);
-  `);
+  return withHeal([table, "sync_state"], async () => {
+    const request = getPool()
+      .request()
+      .input("maxAttempts", sql.Int, Math.max(1, Number(maxAttempts) || 5))
+      .input("msg", sql.NVarChar(sql.MAX), String(message).slice(0, 3000));
+    ids.forEach((id, i) => bind(request, `id${i}`, id));
+    await request.query(`
+      UPDATE dbo.[${table}]
+         SET sync_status = CASE
+               WHEN ISNULL(sync_attempts, 0) + 1 >= @maxAttempts THEN N'quarantined'
+               ELSE N'error'
+             END,
+             sync_error = @msg,
+             sync_attempts = ISNULL(sync_attempts, 0) + 1,
+             last_error_at = SYSUTCDATETIME()
+       WHERE id IN (${ids.map((_, i) => `@id${i}`).join(", ")});
+      MERGE dbo.sync_state AS t
+      USING (SELECT N'last_error' AS [key], @msg AS [value]) AS s ON t.[key] = s.[key]
+      WHEN MATCHED THEN UPDATE SET t.[value] = s.[value], t.updated_at = SYSUTCDATETIME()
+      WHEN NOT MATCHED THEN INSERT ([key], [value]) VALUES (s.[key], s.[value]);
+    `);
+  });
 }
 
 async function retryErrored() {
   for (const table of PUSH_TABLES) {
-    await getPool()
-      .request()
-      .query(
-        `UPDATE dbo.[${table}] SET sync_status = N'pending', sync_error = NULL,
-                sync_attempts = 0, last_error_at = NULL
-          WHERE is_synced = 0 AND sync_status IN (N'error', N'quarantined');`,
-      );
+    await withHeal(table, () =>
+      getPool()
+        .request()
+        .query(
+          `UPDATE dbo.[${table}] SET sync_status = N'pending', sync_error = NULL,
+                  sync_attempts = 0, last_error_at = NULL
+            WHERE is_synced = 0 AND sync_status IN (N'error', N'quarantined');`,
+        ),
+    );
   }
 }
 
 /** Puts a single parked row back at the front of the queue. */
 async function retryRow(table, id) {
   assertTable(table);
-  const request = getPool().request();
-  bind(request, "id", id);
-  await request.query(
-    `UPDATE dbo.[${table}] SET sync_status = N'pending', sync_error = NULL,
-            is_synced = 0
-      WHERE id = @id;`,
-  );
+  return withHeal(table, async () => {
+    const request = getPool().request();
+    bind(request, "id", id);
+    await request.query(
+      `UPDATE dbo.[${table}] SET sync_status = N'pending', sync_error = NULL,
+              is_synced = 0
+        WHERE id = @id;`,
+    );
+  });
 }
 
 /**
@@ -489,21 +621,22 @@ async function retryRow(table, id) {
  */
 async function discardRow(table, id) {
   assertTable(table);
-  const request = getPool().request();
-  bind(request, "id", id);
-  await request.query(
-    `UPDATE dbo.[${table}]
-        SET is_synced = 1, sync_status = N'discarded', synced_at = SYSUTCDATETIME()
-      WHERE id = @id;`,
-  );
+  return withHeal(table, async () => {
+    const request = getPool().request();
+    bind(request, "id", id);
+    await request.query(
+      `UPDATE dbo.[${table}]
+          SET is_synced = 1, sync_status = N'discarded', synced_at = SYSUTCDATETIME()
+        WHERE id = @id;`,
+    );
+  });
 }
 
 async function queueRows(limit = 100) {
   const rows = [];
   for (const table of PUSH_TABLES) {
-    let res;
-    try {
-      res = await getPool().request().input("limit", sql.Int, limit).query(`
+    const read = () =>
+      getPool().request().input("limit", sql.Int, limit).query(`
           SELECT TOP (@limit)
                  CONVERT(NVARCHAR(64), id) AS id,
                  sync_status,
@@ -514,8 +647,18 @@ async function queueRows(limit = 100) {
            ORDER BY CASE WHEN sync_status IN (N'error', N'quarantined') THEN 0 ELSE 1 END,
                     updated_at DESC;
         `);
-    } catch {
-      continue; // a table the local schema hasn't grown yet
+    let res;
+    try {
+      res = await read();
+    } catch (err) {
+      // A table the local schema hasn't grown yet is repaired on the spot;
+      // only a failed repair removes it from this listing.
+      try {
+        if (!(await healFromError(err, [table]))) continue;
+        res = await read();
+      } catch {
+        continue;
+      }
     }
     for (const row of res.recordset) {
       rows.push({
@@ -538,17 +681,20 @@ async function queueRows(limit = 100) {
 /** Cloud rows land through MERGE and are flagged as already synced. */
 async function mergeFromCloud(table, rows) {
   if (!rows.length) return 0;
-  const pool = getPool();
-  const tx = new sql.Transaction(pool);
-  await tx.begin();
-  try {
-    for (const row of rows) await upsertRow(tx, table, row, { markPending: false });
-    await tx.commit();
-    return rows.length;
-  } catch (err) {
-    await tx.rollback();
-    throw err;
-  }
+  await healOpsColumns([{ table, rows }]);
+  return withHeal(table, async () => {
+    const pool = getPool();
+    const tx = new sql.Transaction(pool);
+    await tx.begin();
+    try {
+      for (const row of rows) await upsertRow(tx, table, row, { markPending: false });
+      await tx.commit();
+      return rows.length;
+    } catch (err) {
+      await tx.rollback();
+      throw err;
+    }
+  });
 }
 
 /**
@@ -642,30 +788,45 @@ async function compareRows(table, { since = null, limit = 2000 } = {}) {
 async function stats() {
   const out = [];
   for (const table of PUSH_TABLES) {
-    const res = await getPool().request().query(`
-      SELECT
-        SUM(CASE WHEN is_synced = 0 AND sync_status = N'pending' THEN 1 ELSE 0 END) AS pending,
-        SUM(CASE WHEN is_synced = 1 THEN 1 ELSE 0 END) AS synced,
-        SUM(CASE WHEN sync_status IN (N'error', N'quarantined') THEN 1 ELSE 0 END) AS errored
-      FROM dbo.[${table}];
-    `);
-    const r = res.recordset[0] ?? {};
-    out.push({
-      table,
-      pending: r.pending ?? 0,
-      synced: r.synced ?? 0,
-      errored: r.errored ?? 0,
-    });
+    try {
+      const res = await withHeal(table, () =>
+        getPool().request().query(`
+          SELECT
+            SUM(CASE WHEN is_synced = 0 AND sync_status = N'pending' THEN 1 ELSE 0 END) AS pending,
+            SUM(CASE WHEN is_synced = 1 THEN 1 ELSE 0 END) AS synced,
+            SUM(CASE WHEN sync_status IN (N'error', N'quarantined') THEN 1 ELSE 0 END) AS errored
+          FROM dbo.[${table}];
+        `),
+      );
+      const r = res.recordset[0] ?? {};
+      out.push({
+        table,
+        pending: r.pending ?? 0,
+        synced: r.synced ?? 0,
+        errored: r.errored ?? 0,
+      });
+    } catch (err) {
+      // One broken table must never blank the whole sync overview.
+      out.push({
+        table,
+        pending: 0,
+        synced: 0,
+        errored: 0,
+        error: err?.message ?? String(err),
+      });
+    }
   }
   return out;
 }
 
 async function getState(key) {
-  const res = await getPool()
-    .request()
-    .input("key", sql.NVarChar(60), key)
-    .query("SELECT [value] FROM dbo.sync_state WHERE [key] = @key;");
-  return res.recordset[0]?.value ?? null;
+  return withHeal("sync_state", async () => {
+    const res = await getPool()
+      .request()
+      .input("key", sql.NVarChar(60), key)
+      .query("SELECT [value] FROM dbo.sync_state WHERE [key] = @key;");
+    return res.recordset[0]?.value ?? null;
+  });
 }
 
 /**
@@ -673,55 +834,61 @@ async function getState(key) {
  * `last_synced_at`, so one slow table never holds the others back.
  */
 async function getWatermark(table) {
-  const res = await getPool()
-    .request()
-    .input("t", sql.NVarChar(120), table)
-    .input("store", sql.NVarChar(60), scope.storeId)
-    .input("term", sql.NVarChar(80), scope.terminalId)
-    .query(
-      `SELECT last_synced_at FROM dbo.sync_metadata
-        WHERE table_name = @t AND store_id = @store AND terminal_id = @term;`,
-    );
-  const at = res.recordset[0]?.last_synced_at ?? null;
-  return at ? new Date(at).toISOString() : null;
+  return withHeal("sync_metadata", async () => {
+    const res = await getPool()
+      .request()
+      .input("t", sql.NVarChar(120), table)
+      .input("store", sql.NVarChar(60), scope.storeId)
+      .input("term", sql.NVarChar(80), scope.terminalId)
+      .query(
+        `SELECT last_synced_at FROM dbo.sync_metadata
+          WHERE table_name = @t AND store_id = @store AND terminal_id = @term;`,
+      );
+    const at = res.recordset[0]?.last_synced_at ?? null;
+    return at ? new Date(at).toISOString() : null;
+  });
 }
 
 async function setWatermark(table, isoAt, { rowsPushed = 0, error = null, pushed = false } = {}) {
-  await getPool()
-    .request()
-    .input("t", sql.NVarChar(120), table)
-    .input("store", sql.NVarChar(60), scope.storeId)
-    .input("term", sql.NVarChar(80), scope.terminalId)
-    .input("at", sql.DateTime2, isoAt ? new Date(isoAt) : null)
-    .input("rows", sql.Int, rowsPushed)
-    .input("pushed", sql.Bit, pushed ? 1 : 0)
-    .input("err", sql.NVarChar(sql.MAX), error ? String(error).slice(0, 3000) : null).query(`
-      MERGE dbo.sync_metadata AS t
-      USING (SELECT @t AS table_name, @store AS store_id, @term AS terminal_id) AS s
-        ON t.table_name = s.table_name AND t.store_id = s.store_id AND t.terminal_id = s.terminal_id
-      WHEN MATCHED THEN UPDATE SET
-        t.last_synced_at = ISNULL(@at, t.last_synced_at),
-        t.last_pushed_at = CASE WHEN @pushed = 1 THEN SYSUTCDATETIME() ELSE t.last_pushed_at END,
-        t.rows_pushed = t.rows_pushed + @rows,
-        t.last_error = @err,
-        t.updated_at = SYSUTCDATETIME()
-      WHEN NOT MATCHED THEN
-        INSERT (table_name, store_id, terminal_id, last_synced_at, last_pushed_at, rows_pushed, last_error)
-        VALUES (@t, @store, @term, @at,
-                CASE WHEN @pushed = 1 THEN SYSUTCDATETIME() ELSE NULL END, @rows, @err);
-    `);
+  return withHeal("sync_metadata", () =>
+    getPool()
+      .request()
+      .input("t", sql.NVarChar(120), table)
+      .input("store", sql.NVarChar(60), scope.storeId)
+      .input("term", sql.NVarChar(80), scope.terminalId)
+      .input("at", sql.DateTime2, isoAt ? new Date(isoAt) : null)
+      .input("rows", sql.Int, rowsPushed)
+      .input("pushed", sql.Bit, pushed ? 1 : 0)
+      .input("err", sql.NVarChar(sql.MAX), error ? String(error).slice(0, 3000) : null).query(`
+        MERGE dbo.sync_metadata AS t
+        USING (SELECT @t AS table_name, @store AS store_id, @term AS terminal_id) AS s
+          ON t.table_name = s.table_name AND t.store_id = s.store_id AND t.terminal_id = s.terminal_id
+        WHEN MATCHED THEN UPDATE SET
+          t.last_synced_at = ISNULL(@at, t.last_synced_at),
+          t.last_pushed_at = CASE WHEN @pushed = 1 THEN SYSUTCDATETIME() ELSE t.last_pushed_at END,
+          t.rows_pushed = t.rows_pushed + @rows,
+          t.last_error = @err,
+          t.updated_at = SYSUTCDATETIME()
+        WHEN NOT MATCHED THEN
+          INSERT (table_name, store_id, terminal_id, last_synced_at, last_pushed_at, rows_pushed, last_error)
+          VALUES (@t, @store, @term, @at,
+                  CASE WHEN @pushed = 1 THEN SYSUTCDATETIME() ELSE NULL END, @rows, @err);
+      `),
+  );
 }
 
 async function setState(key, value) {
-  await getPool()
-    .request()
-    .input("key", sql.NVarChar(60), key)
-    .input("value", sql.NVarChar(400), value).query(`
-      MERGE dbo.sync_state AS t
-      USING (SELECT @key AS [key], @value AS [value]) AS s ON t.[key] = s.[key]
-      WHEN MATCHED THEN UPDATE SET t.[value] = s.[value], t.updated_at = SYSUTCDATETIME()
-      WHEN NOT MATCHED THEN INSERT ([key], [value]) VALUES (s.[key], s.[value]);
-    `);
+  return withHeal("sync_state", () =>
+    getPool()
+      .request()
+      .input("key", sql.NVarChar(60), key)
+      .input("value", sql.NVarChar(400), value).query(`
+        MERGE dbo.sync_state AS t
+        USING (SELECT @key AS [key], @value AS [value]) AS s ON t.[key] = s.[key]
+        WHEN MATCHED THEN UPDATE SET t.[value] = s.[value], t.updated_at = SYSUTCDATETIME()
+        WHEN NOT MATCHED THEN INSERT ([key], [value]) VALUES (s.[key], s.[value]);
+      `),
+  );
 }
 
 /**
@@ -729,23 +896,27 @@ async function setState(key, value) {
  * connection details) so they survive a cleared browser and an app update.
  */
 async function getSetting(key) {
-  const res = await getPool()
-    .request()
-    .input("key", sql.NVarChar(120), key)
-    .query("SELECT [value] FROM dbo.system_settings WHERE [key] = @key;");
-  return res.recordset[0]?.value ?? null;
+  return withHeal("system_settings", async () => {
+    const res = await getPool()
+      .request()
+      .input("key", sql.NVarChar(120), key)
+      .query("SELECT [value] FROM dbo.system_settings WHERE [key] = @key;");
+    return res.recordset[0]?.value ?? null;
+  });
 }
 
 async function setSetting(key, value) {
-  await getPool()
-    .request()
-    .input("key", sql.NVarChar(120), key)
-    .input("value", sql.NVarChar(sql.MAX), value == null ? null : String(value)).query(`
-      MERGE dbo.system_settings AS t
-      USING (SELECT @key AS [key], @value AS [value]) AS s ON t.[key] = s.[key]
-      WHEN MATCHED THEN UPDATE SET t.[value] = s.[value], t.updated_at = SYSUTCDATETIME()
-      WHEN NOT MATCHED THEN INSERT ([key], [value]) VALUES (s.[key], s.[value]);
-    `);
+  return withHeal("system_settings", () =>
+    getPool()
+      .request()
+      .input("key", sql.NVarChar(120), key)
+      .input("value", sql.NVarChar(sql.MAX), value == null ? null : String(value)).query(`
+        MERGE dbo.system_settings AS t
+        USING (SELECT @key AS [key], @value AS [value]) AS s ON t.[key] = s.[key]
+        WHEN MATCHED THEN UPDATE SET t.[value] = s.[value], t.updated_at = SYSUTCDATETIME()
+        WHEN NOT MATCHED THEN INSERT ([key], [value]) VALUES (s.[key], s.[value]);
+      `),
+  );
 }
 
 /**
@@ -762,42 +933,60 @@ async function createSale({
   branchId = null,
   exchangeOfBillNumber = null,
 }) {
-  const pool = getPool();
-  const tx = new sql.Transaction(pool);
-  await tx.begin();
-  try {
-    await upsertRow(tx, "sales", { ...sale, branch_id: sale.branch_id ?? branchId });
-    for (const line of items) {
-      await upsertRow(tx, "sale_items", { ...line, branch_id: line.branch_id ?? branchId });
+  // Grow any schema-declared columns before the transaction opens, so a
+  // behind-schedule local database keeps the data instead of dropping it.
+  await healOpsColumns([
+    { table: "sales", rows: [{ ...sale, branch_id: sale.branch_id ?? branchId }] },
+    { table: "sale_items", rows: items.map((l) => ({ ...l, branch_id: l.branch_id ?? branchId })) },
+    { table: "products", rows: products },
+    ...(member ? [{ table: "members", rows: [member] }] : []),
+    ...(exchangeOfBillNumber
+      ? [{ table: "sales", values: { exchanged_to_bill_number: sale.bill_number } }]
+      : []),
+  ]);
+  const run = async () => {
+    const pool = getPool();
+    const tx = new sql.Transaction(pool);
+    await tx.begin();
+    try {
+      await upsertRow(tx, "sales", { ...sale, branch_id: sale.branch_id ?? branchId });
+      for (const line of items) {
+        await upsertRow(tx, "sale_items", { ...line, branch_id: line.branch_id ?? branchId });
+      }
+      for (const product of products) await upsertRow(tx, "products", product);
+      if (member) await upsertRow(tx, "members", member);
+      if (exchangeOfBillNumber) {
+        await updateRows(
+          tx,
+          "sales",
+          { exchanged_to_bill_number: sale.bill_number },
+          { bill_number: exchangeOfBillNumber },
+        );
+      }
+      await tx.commit();
+      return { id: sale.id, billNumber: sale.bill_number };
+    } catch (err) {
+      await tx.rollback();
+      throw err;
     }
-    for (const product of products) await upsertRow(tx, "products", product);
-    if (member) await upsertRow(tx, "members", member);
-    if (exchangeOfBillNumber) {
-      await updateRows(
-        tx,
-        "sales",
-        { exchanged_to_bill_number: sale.bill_number },
-        { bill_number: exchangeOfBillNumber },
-      );
-    }
-    await tx.commit();
-    return { id: sale.id, billNumber: sale.bill_number };
-  } catch (err) {
-    await tx.rollback();
-    throw err;
-  }
+  };
+  return withHeal(["sales", "sale_items", "products", "members"], run);
 }
 
 /** Full local catalogue — the register never fetches products over HTTP. */
 async function getProducts() {
-  const res = await getPool().request().query("SELECT * FROM dbo.products ORDER BY name ASC;");
-  return res.recordset.map((row) => parseJsonColumns("products", row));
+  return withHeal("products", async () => {
+    const res = await getPool().request().query("SELECT * FROM dbo.products ORDER BY name ASC;");
+    return res.recordset.map((row) => parseJsonColumns("products", row));
+  });
 }
 
 async function rows(table) {
   assertTable(table);
-  const result = await getPool().request().query(`SELECT * FROM dbo.[${table}];`);
-  return result.recordset.map((row) => parseJsonColumns(table, row));
+  return withHeal(table, async () => {
+    const result = await getPool().request().query(`SELECT * FROM dbo.[${table}];`);
+    return result.recordset.map((row) => parseJsonColumns(table, row));
+  });
 }
 
 async function snapshot() {
@@ -824,12 +1013,18 @@ async function pendingSyncCount() {
   let total = 0;
   let sales = 0;
   for (const table of PUSH_TABLES) {
-    const res = await getPool()
-      .request()
-      .query(`SELECT COUNT(*) AS n FROM dbo.[${table}] WHERE is_synced = 0;`);
-    const n = res.recordset[0]?.n ?? 0;
-    total += n;
-    if (table === "sales") sales = n;
+    try {
+      const res = await withHeal(table, () =>
+        getPool()
+          .request()
+          .query(`SELECT COUNT(*) AS n FROM dbo.[${table}] WHERE is_synced = 0;`),
+      );
+      const n = res.recordset[0]?.n ?? 0;
+      total += n;
+      if (table === "sales") sales = n;
+    } catch {
+      // A table that could not be repaired simply has no countable backlog.
+    }
   }
   return { total, sales };
 }

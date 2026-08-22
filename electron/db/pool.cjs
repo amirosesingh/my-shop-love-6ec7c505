@@ -1066,7 +1066,11 @@ async function applySchemaTables(tableNames) {
       await pool.request().batch(batch);
       batchCount += 1;
     } catch (err) {
-      errors.push({ scope: owner.get(i) ?? "unknown", ...describeSqlError(err) });
+      errors.push({
+        scope: owner.get(i) ?? "unknown",
+        ...describeSqlError(err),
+        permission: isDdlPermissionError(err),
+      });
     }
   }
   try {
@@ -1080,6 +1084,7 @@ async function applySchemaTables(tableNames) {
     unknownTables: unknown,
     batchCount,
     errors,
+    permission: errors.some((e) => e.permission),
   };
 }
 
@@ -1119,6 +1124,185 @@ function schemaTableSql(tableNames) {
     `   Extracted from database/schema.sql. Every statement is guarded:\n` +
     `   safe to run repeatedly, never drops data. */\n\n`;
   return { ok: true, file, tables: names, text: header + body + "\nGO\n" };
+}
+
+/**
+ * The raw guarded batches for the chosen tables — the exact statements the
+ * elevated administrator-repair channel replays. Batches only ever come from
+ * the master schema file on disk, never from renderer-supplied SQL, so this
+ * channel cannot be turned into an arbitrary-DDL bridge.
+ */
+function schemaTableBatches(tableNames) {
+  const wanted = (Array.isArray(tableNames) ? tableNames : [])
+    .map((n) => String(n).toLowerCase())
+    .filter(Boolean);
+  if (!wanted.length) return { ok: false, error: "Choose at least one table to repair." };
+  const manifest = schemaManifest();
+  if (!manifest) return { ok: false, error: "Master schema file could not be read." };
+  const unknown = wanted.filter((w) => !manifest.tableBatches.has(w));
+  const known = new Set(wanted.filter((w) => manifest.tableBatches.has(w)));
+  if (!known.size) {
+    return { ok: false, error: `Not in the master schema file: ${unknown.join(", ")}` };
+  }
+  const selected = new Set(manifest.sharedIdx);
+  for (const [key, idxs] of manifest.tableBatches) {
+    if (!known.has(key)) continue;
+    for (const i of idxs) selected.add(i);
+  }
+  const batches = [...selected]
+    .sort((a, b) => a - b)
+    .map((i) => (manifest.rawBatches[i] ?? "").trim())
+    .filter(Boolean);
+  return {
+    ok: unknown.length === 0 && batches.length > 0,
+    batches,
+    tables: manifest.tables.filter((t) => known.has(t.key)).map((t) => t.name),
+    unknownTables: unknown,
+    error: batches.length
+      ? unknown.length
+        ? `Not in the master schema file: ${unknown.join(", ")}`
+        : null
+      : "Nothing to repair for the chosen tables.",
+  };
+}
+
+/* ================= on-demand schema self-heal ================= */
+
+/**
+ * Cached parse of database/schema.sql. Every repo operation may ask the
+ * manifest whether a column is declared, so the file is re-read only when it
+ * actually changes on disk.
+ */
+let manifestCache = null;
+
+function schemaManifest() {
+  const file = schemaFile();
+  let stat;
+  try {
+    stat = fs.statSync(file);
+  } catch {
+    return null;
+  }
+  if (manifestCache && manifestCache.file === file && manifestCache.mtimeMs === stat.mtimeMs) {
+    return manifestCache.manifest;
+  }
+  const manifest = parseSchemaManifest(fs.readFileSync(file, "utf8"));
+  manifestCache = { file, mtimeMs: stat.mtimeMs, manifest };
+  return manifest;
+}
+
+/** Expected `{ name, type }` of a column per the master schema, or null. */
+function schemaColumnType(table, column) {
+  const manifest = schemaManifest();
+  if (!manifest) return null;
+  const t = manifest.tables.find((x) => x.key === String(table).toLowerCase());
+  const c = t?.columns.find((x) => x.name.toLowerCase() === String(column).toLowerCase());
+  return c ? { name: c.name, type: c.type } : null;
+}
+
+/** SQL Server 262/229/297 — the login may read/write but not create/alter. */
+function isDdlPermissionError(err) {
+  const num = err?.number ?? err?.originalError?.number ?? null;
+  if (num === 262 || num === 229 || num === 297) return true;
+  return /permission(\s+was)?\s+denied|denied\s+on\s+(object|database)/i.test(
+    `${err?.message ?? ""} ${err?.originalError?.message ?? ""}`,
+  );
+}
+
+/**
+ * One repair per table/column at a time: a sale and the sync worker hitting
+ * the same missing object share the run instead of racing identical ALTERs.
+ */
+const healInflight = new Map();
+
+function sharedHeal(name, fn) {
+  const pending = healInflight.get(name);
+  if (pending) return pending;
+  const run = (async () => fn())().finally(() => healInflight.delete(name));
+  healInflight.set(name, run);
+  return run;
+}
+
+/** Normalised manifest types only: letters, optional (n), (n,m) or (MAX). */
+const SAFE_ALTER_TYPE = /^[A-Z]{2,20}\((?:\d+|MAX)(?:,\d+)?\)$|^[A-Z]{2,20}$/i;
+
+/**
+ * Adds one column to an existing table, guarded so a retry after a partial
+ * failure is a no-op. Nullable on purpose: existing rows keep working.
+ */
+async function ensureColumn(table, column, type) {
+  if (!pool) return { ok: false, error: "Local database is not connected." };
+  if (!/^[A-Za-z_]\w*$/.test(table) || !/^[A-Za-z_]\w*$/.test(column)) {
+    return { ok: false, error: "Invalid table or column name." };
+  }
+  const t = String(type ?? "").trim();
+  if (!SAFE_ALTER_TYPE.test(t)) return { ok: false, error: `Unsafe column type "${type}".` };
+  const key = `${table.toLowerCase()}.${column.toLowerCase()}`;
+  return sharedHeal(`col:${key}`, async () => {
+    try {
+      await pool
+        .request()
+        .batch(
+          `SET LOCK_TIMEOUT 4000;\n` +
+            `IF COL_LENGTH('dbo.${table}', '${column}') IS NULL\n` +
+            `ALTER TABLE dbo.[${table}] ADD [${column}] ${t} NULL;`,
+        );
+      try {
+        require("./repo.cjs").forgetColumnCache();
+      } catch {
+        /* repo not loaded yet */
+      }
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, ...describeSqlError(err), permission: isDdlPermissionError(err) };
+    }
+  });
+}
+
+/**
+ * Repairs exactly one table from the master schema — the shared engine
+ * batches plus the table's own guarded batches. Called when an operation
+ * proves the table is missing or broken, never on a schedule.
+ */
+async function ensureSchemaTable(table) {
+  if (!pool) return { ok: false, error: "Local database is not connected." };
+  const key = String(table).toLowerCase();
+  return sharedHeal(`table:${key}`, async () => {
+    const manifest = schemaManifest();
+    if (!manifest || !manifest.tableBatches.has(key)) {
+      return {
+        ok: false,
+        code: "EUNKNOWNTABLE",
+        error: `"${table}" is not in the master schema file.`,
+      };
+    }
+    const selected = new Set(manifest.sharedIdx);
+    for (const i of manifest.tableBatches.get(key)) selected.add(i);
+    const errors = [];
+    for (const i of [...selected].sort((a, b) => a - b)) {
+      const batch = (manifest.rawBatches[i] ?? "").trim();
+      if (!batch) continue;
+      try {
+        await pool.request().batch(batch);
+      } catch (err) {
+        errors.push({
+          scope: key,
+          ...describeSqlError(err),
+          permission: isDdlPermissionError(err),
+        });
+      }
+    }
+    try {
+      require("./repo.cjs").forgetColumnCache();
+    } catch {
+      /* repo not loaded yet */
+    }
+    return {
+      ok: errors.length === 0,
+      errors,
+      permission: errors.some((e) => e.permission),
+    };
+  });
 }
 
 const HEALTH_TABLE = "dbo.pos_connection_health";
@@ -1222,10 +1406,15 @@ module.exports = {
   applySchema,
   applySchemaNow,
   applySchemaTables,
+  ensureSchemaTable,
+  ensureColumn,
+  schemaColumnType,
+  isDdlPermissionError,
   readSchema,
   schemaFile,
   schemaStatus,
   schemaTableSql,
+  schemaTableBatches,
   describeSqlError,
   parseServerField,
   openConnection,

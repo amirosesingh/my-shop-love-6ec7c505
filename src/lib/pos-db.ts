@@ -717,6 +717,9 @@ const salePaymentRows = (s: Sale) => {
     .filter((t) => t.amount !== 0)
     .map((t, index) => ({
       id: stableChildId(s.id, "2", index),
+      // Idempotency key per tender: a retry after a half-failed push resolves
+      // against the row already stored instead of raising a duplicate key.
+      client_transaction_id: s.clientTxnId ? `${s.clientTxnId}:pay:${index}` : null,
       source_type: "sale",
       sale_id: s.id,
       member_id: s.memberId,

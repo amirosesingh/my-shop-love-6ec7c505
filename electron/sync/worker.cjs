@@ -30,6 +30,22 @@ let relayUrl = null;
 // table without updated_at doesn't fire a failing request on every pull.
 const stampColumn = new Map();
 
+/**
+ * The central database rejecting a table because it (or a column) does not
+ * exist there. PostgREST answers PGRST205/204 or a 404 schema-cache message.
+ */
+const MISSING_CLOUD_RE =
+  /PGRST20[45]|schema cache|does not exist|could not find the table|not found in the schema/i;
+
+/**
+ * Tables the central project has not grown yet, with the earliest moment we
+ * re-probe. Instead of failing the same batch every 30 seconds, the table is
+ * skipped and the Sync Hub shows exactly what is missing; the push resumes by
+ * itself once the table exists centrally.
+ */
+const cloudMissing = new Map(); // table -> retry-after epoch ms
+const CLOUD_MISSING_RETRY_MS = 10 * 60 * 1000;
+
 async function selectChangedSince(table, since) {
   const ask = (column) => supabase.from(table).select("*").gt(column, since);
   const known = stampColumn.get(table);
@@ -218,6 +234,8 @@ async function push() {
   let pushed = 0;
   let failed = 0;
   for (const table of repo.PUSH_TABLES ?? repo.TABLES) {
+    const retryAt = cloudMissing.get(table);
+    if (retryAt && Date.now() < retryAt) continue; // parked: central schema missing
     let rows;
     try {
       rows = await repo.pendingRows(table, BATCH);
@@ -235,12 +253,33 @@ async function push() {
     let error = null;
     try {
       await cloudUpsert(table, payload);
+      cloudMissing.delete(table); // the central schema caught up
     } catch (err) {
       error = err;
     }
 
     if (error) {
       failed += ids.length;
+      if (MISSING_CLOUD_RE.test(String(error.message ?? ""))) {
+        // Central drift is not a row fault: park with a clear pointer and
+        // leave the attempt counter untouched so the rows resume cleanly.
+        cloudMissing.set(table, Date.now() + CLOUD_MISSING_RETRY_MS);
+        await repo
+          .markFailed(
+            table,
+            ids,
+            `Table "${table}" is missing or out of date in the central database — open Settings → Central schema, download the repair SQL and run it once in the central project. (${error.message})`,
+            Number.MAX_SAFE_INTEGER,
+          )
+          .catch(() => {});
+        await repo
+          .setWatermark(table, null, {
+            error: `central schema missing: ${table} (see Settings → Central schema)`,
+          })
+          .catch(() => {});
+        notify();
+        continue;
+      }
       // The attempt counter lives in the database: a parked row stays parked
       // across restarts until someone retries it from the Sync Hub.
       await repo.markFailed(table, ids, error.message, MAX_ATTEMPTS);
@@ -310,6 +349,12 @@ async function pull() {
     const { data, error } = await selectChangedSince(table, since);
     if (error) {
       await repo.setWatermark(table, null, { error: error.message }).catch(() => {});
+      if (MISSING_CLOUD_RE.test(String(error.message ?? ""))) {
+        // A table the central project has not grown yet is skipped, not fatal.
+        cloudMissing.set(table, Date.now() + CLOUD_MISSING_RETRY_MS);
+        notify();
+        continue;
+      }
       setPhase("idle");
       return { ok: false, merged, error: error.message };
     }
@@ -336,6 +381,10 @@ async function pull() {
     if (error) {
       // A branch-scoped table must never block catalogue sync.
       await repo.setWatermark(spec.table, null, { error: error.message }).catch(() => {});
+      if (MISSING_CLOUD_RE.test(String(error.message ?? ""))) {
+        cloudMissing.set(spec.table, Date.now() + CLOUD_MISSING_RETRY_MS);
+        notify();
+      }
       continue;
     }
     const rows = data ?? [];
@@ -388,6 +437,7 @@ async function status() {
       connected: true,
       phase,
       enabled,
+      cloudMissing: [...cloudMissing.keys()],
       tables: await repo.stats(),
       queue: await repo.queueRows(60),
       lastPushAt: await repo.getState("last_push_at"),

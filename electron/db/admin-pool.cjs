@@ -555,6 +555,44 @@ function status() {
   };
 }
 
+/**
+ * The deliberate schema-repair channel. Unlike executeQuery this runs DDL,
+ * but only the guarded batches the main process extracted from the master
+ * schema file — never free-form text from the renderer. Each batch runs
+ * on its own so one failure cannot hide the ones that follow.
+ */
+async function runRepair(dbName, batches) {
+  requirePool();
+  const list = (Array.isArray(batches) ? batches : [])
+    .map((b) => String(b ?? "").trim())
+    .filter(Boolean);
+  if (!list.length) return { ok: false, error: "No repair statements were supplied." };
+  const results = [];
+  for (const batch of list) {
+    try {
+      await withDeadline(
+        inDatabase(dbName, batch),
+        30_000,
+        "ETIMEOUT",
+        "A repair statement did not finish in time.",
+      );
+      results.push({ ok: true });
+    } catch (err) {
+      results.push({ ok: false, ...describeSqlError(err) });
+    }
+  }
+  const failed = results.filter((r) => !r.ok);
+  return {
+    ok: failed.length === 0,
+    ran: results.length - failed.length,
+    total: results.length,
+    results,
+    error: failed.length
+      ? (failed[0].error ?? failed[0].originalMessage ?? "A repair statement failed")
+      : null,
+  };
+}
+
 module.exports = {
   connectInstance,
   cancel,
@@ -564,6 +602,7 @@ module.exports = {
   getTables,
   getTableColumns,
   executeQuery,
+  runRepair,
   disconnect,
   status,
   validateReadOnly,
