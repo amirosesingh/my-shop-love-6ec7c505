@@ -467,6 +467,95 @@ async function mergeFromCloud(table, rows) {
   }
 }
 
+/**
+ * Shop-side half of the server/shop comparison.
+ *
+ * Counts are read live from the tables themselves — never from the sync
+ * counters — so a queue that silently stopped still shows up as a difference.
+ * `since` is an ISO timestamp; null compares everything.
+ */
+async function compareSummary({ since = null, tables = TABLES } = {}) {
+  const wanted = tables.filter((t) => TABLES.includes(t));
+  const out = [];
+  for (const table of wanted) {
+    const columns = await tableColumns(table).catch(() => new Set());
+    if (!columns.size) {
+      out.push({ table, missing: true, count: 0, maxUpdatedAt: null, pending: 0, errored: 0 });
+      continue;
+    }
+    const stamp = columns.has("updated_at")
+      ? "updated_at"
+      : columns.has("created_at")
+        ? "created_at"
+        : null;
+    const where = since && stamp ? `WHERE [${stamp}] >= @since` : "";
+    const request = getPool().request();
+    if (since && stamp) request.input("since", sql.DateTime2, new Date(since));
+    try {
+      const res = await request.query(`
+        SELECT COUNT(*) AS total,
+               ${stamp ? `CONVERT(NVARCHAR(40), MAX([${stamp}]), 127)` : "NULL"} AS newest,
+               ${columns.has("is_synced") ? "SUM(CASE WHEN is_synced = 0 THEN 1 ELSE 0 END)" : "0"} AS pending,
+               ${
+                 columns.has("sync_status")
+                   ? "SUM(CASE WHEN sync_status IN (N'error', N'quarantined') THEN 1 ELSE 0 END)"
+                   : "0"
+               } AS errored
+          FROM dbo.[${table}] ${where};
+      `);
+      const row = res.recordset[0] ?? {};
+      out.push({
+        table,
+        missing: false,
+        count: Number(row.total ?? 0),
+        maxUpdatedAt: row.newest ?? null,
+        pending: Number(row.pending ?? 0),
+        errored: Number(row.errored ?? 0),
+      });
+    } catch (err) {
+      out.push({
+        table,
+        missing: false,
+        error: err?.message ?? String(err),
+        count: 0,
+        maxUpdatedAt: null,
+        pending: 0,
+        errored: 0,
+      });
+    }
+  }
+  return out;
+}
+
+/** Row keys for one table, used to work out exactly which records differ. */
+async function compareRows(table, { since = null, limit = 2000 } = {}) {
+  assertTable(table);
+  const columns = await tableColumns(table).catch(() => new Set());
+  if (!columns.size) return [];
+  const stamp = columns.has("updated_at")
+    ? "updated_at"
+    : columns.has("created_at")
+      ? "created_at"
+      : null;
+  const request = getPool().request().input("limit", sql.Int, Math.min(limit, 5000));
+  if (since && stamp) request.input("since", sql.DateTime2, new Date(since));
+  const res = await request.query(`
+    SELECT TOP (@limit)
+           CONVERT(NVARCHAR(64), id) AS id,
+           ${stamp ? `CONVERT(NVARCHAR(40), [${stamp}], 127)` : "NULL"} AS updated_at,
+           ${columns.has("sync_status") ? "sync_status" : "NULL"} AS sync_status
+      FROM dbo.[${table}]
+     ${since && stamp ? `WHERE [${stamp}] >= @since` : ""}
+     ${stamp ? `ORDER BY [${stamp}] DESC` : ""};
+  `);
+  return res.recordset.map((r) => ({
+    id: r.id,
+    updatedAt: r.updated_at ?? null,
+    status: r.sync_status ?? null,
+  }));
+}
+
+
 async function stats() {
   const out = [];
   for (const table of TABLES) {
@@ -756,6 +845,8 @@ module.exports = {
   queueRows,
   mergeFromCloud,
   stats,
+  compareSummary,
+  compareRows,
   getState,
   setState,
   getWatermark,

@@ -1439,6 +1439,22 @@ function registerIpc() {
   ipcMain.handle("pos:push", () => worker.push());
   ipcMain.handle("pos:pull", () => worker.pull());
   ipcMain.handle("pos:set-sync-enabled", (_e, on) => worker.setEnabled(on));
+
+  /* ---- shop side of the server/shop data comparison ---- */
+  ipcMain.handle("pos:compare-summary", async (_e, options) => {
+    try {
+      return { ok: true, tables: await repo.compareSummary(options ?? {}) };
+    } catch (err) {
+      return fail(err);
+    }
+  });
+  ipcMain.handle("pos:compare-rows", async (_e, table, options) => {
+    try {
+      return { ok: true, rows: await repo.compareRows(table, options ?? {}) };
+    } catch (err) {
+      return fail(err);
+    }
+  });
   ipcMain.handle("pos:retry-errored", async () => {
     try {
       await repo.retryErrored();

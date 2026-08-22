@@ -45,6 +45,9 @@ contextBridge.exposeInMainWorld("pos", {
   push: () => invoke("pos:push"),
   pull: () => invoke("pos:pull"),
   setSyncEnabled: (on) => invoke("pos:set-sync-enabled", on),
+  /** Live per-table counts for the server/shop comparison page. */
+  compareSummary: (options) => invoke("pos:compare-summary", options),
+  compareRows: (table, options) => invoke("pos:compare-rows", table, options),
   backup: (path) => invoke("pos:backup", path),
   retryErrored: () => invoke("pos:retry-errored"),
   retryRow: (table, id) => invoke("pos:retry-row", table, id),

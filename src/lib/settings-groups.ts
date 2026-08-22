@@ -103,6 +103,13 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
       },
       {
         to: "/settings/system",
+        tab: "data-comparison",
+        label: "Server vs. shop data",
+        blurb: "Record counts here against the company server.",
+        shared: true,
+      },
+      {
+        to: "/settings/system",
         tab: "inheritance",
         label: "Inheritance",
         blurb: "Global, cluster and branch tiers.",
@@ -119,6 +126,7 @@ export const SYSTEM_TAB_IDS = [
   "logic-health",
   "security-alerts",
   "data-sync",
+  "data-comparison",
   "inheritance",
 ] as const;
 
