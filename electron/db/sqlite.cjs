@@ -129,11 +129,15 @@ function migrate() {
     add("is_synced", "INTEGER NOT NULL DEFAULT 0");
     add("sync_status", "TEXT NOT NULL DEFAULT 'PENDING'");
     add("row_version", "INTEGER NOT NULL DEFAULT 1");
+    add("sync_attempts", "INTEGER NOT NULL DEFAULT 0");
+    add("sync_error", "TEXT");
+    add("last_error_at", "TEXT");
+    add("synced_at", "TEXT");
     if (!have.has("updated_at")) db.exec(`ALTER TABLE ${table} ADD COLUMN updated_at TEXT`);
   }
 
   // 2. Idempotency key on the transaction tables.
-  for (const table of ["sales", "sale_items"]) {
+  for (const table of ["sales", "sale_items", "payment_transactions", "item_activity_logs"]) {
     if (!columnsOf(table).size) continue;
     if (!columnsOf(table).has("client_transaction_id")) {
       db.exec(`ALTER TABLE ${table} ADD COLUMN client_transaction_id TEXT`);
@@ -142,6 +146,19 @@ function migrate() {
       `CREATE UNIQUE INDEX IF NOT EXISTS ${table}_client_txn_idx
          ON ${table} (client_transaction_id) WHERE client_transaction_id IS NOT NULL`,
     );
+  }
+
+  // Columns introduced with the split-payment and stock-ledger sync paths.
+  const payment = columnsOf("payment_transactions");
+  if (payment.size) {
+    if (!payment.has("cashier_id")) db.exec("ALTER TABLE payment_transactions ADD COLUMN cashier_id TEXT");
+    if (!payment.has("status")) db.exec("ALTER TABLE payment_transactions ADD COLUMN status TEXT DEFAULT 'completed'");
+    if (!payment.has("metadata")) db.exec("ALTER TABLE payment_transactions ADD COLUMN metadata TEXT DEFAULT '{}'");
+  }
+  const activity = columnsOf("item_activity_logs");
+  if (activity.size) {
+    if (!activity.has("staff_id")) db.exec("ALTER TABLE item_activity_logs ADD COLUMN staff_id TEXT");
+    if (!activity.has("role")) db.exec("ALTER TABLE item_activity_logs ADD COLUMN role TEXT");
   }
 
   // 3. Queue: DELETE actions, dead letters and persistent retry state.

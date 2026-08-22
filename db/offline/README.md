@@ -11,6 +11,12 @@ Server Management Studio. Note the instance name, usually
 
 ## 2. Run the script
 
+This file and `database/schema.sql` are **Microsoft SQL Server** scripts. Do not
+run either one in MySQL or in the central PostgreSQL SQL editor. The preferred
+upgrade method is **POS → Settings → Database & Cloud Connection → Schema
+Manager → Local SQL Server**, where tables can be checked and repaired one by
+one.
+
 Command prompt:
 
 ```
@@ -88,3 +94,8 @@ the file can be run again at any time.
 The cloud counterpart is `supabase/schema.sql`: one file that installs the whole
 Postgres schema on an empty project and tops up a live one, including grants,
 row-level security and every policy and routine.
+
+Central repairs use a different SQL dialect. In the Schema Manager choose
+**Download central PostgreSQL repair script**, review it, and run it in the
+external central project's SQL editor. Never run the downloaded central script
+in SQL Server Management Studio, and never run `database/schema.sql` centrally.

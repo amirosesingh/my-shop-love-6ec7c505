@@ -880,6 +880,7 @@ function parseSchemaManifest(text) {
 
   // Pass 1 — every table and the batch that creates it.
   const tables = new Map(); // lower -> { name, createIdx, columns: Map, batchIdx: [] }
+  const warnings = [];
   const createRe = /CREATE\s+TABLE\s+dbo\.\[?([A-Za-z_]\w*)\]?/gi;
   cleanBatches.forEach((batch, i) => {
     createRe.lastIndex = 0;
@@ -919,12 +920,23 @@ function parseSchemaManifest(text) {
   );
   for (const t of tables.values()) {
     const createBatch = cleanBatches[t.createIdx] ?? "";
-    const open = createBatch.indexOf("(");
+    createRe.lastIndex = 0;
+    const createMatch = createRe.exec(createBatch);
+    const open = createMatch ? createBatch.indexOf("(", createMatch.index + createMatch[0].length) : -1;
     const close = createBatch.lastIndexOf(")");
     if (open !== -1 && close > open) {
       for (const line of createBatch.slice(open + 1, close).split("\n")) {
         const m = colTypeRe.exec(line);
-        if (!m || SKIP_COLUMN_WORDS.has(m[1].toUpperCase())) continue;
+        if (!m) {
+          const candidate = line.trim().match(/^\[?([A-Za-z_]\w*)\]?\s+([A-Za-z][A-Za-z0-9_]*)/);
+          if (candidate && !SKIP_COLUMN_WORDS.has(candidate[1].toUpperCase())) {
+            warnings.push(
+              `${t.name}.${candidate[1]} uses an unsupported manifest type (${candidate[2]}).`,
+            );
+          }
+          continue;
+        }
+        if (SKIP_COLUMN_WORDS.has(m[1].toUpperCase())) continue;
         const key = m[1].toLowerCase();
         if (!t.columns.has(key)) t.columns.set(key, { name: m[1], type: normalizeType(m[2]) });
       }
@@ -949,6 +961,7 @@ function parseSchemaManifest(text) {
     sharedIdx,
     tableBatches: new Map([...tables.entries()].map(([k, t]) => [k, t.batchIdx])),
     rawBatches,
+    warnings,
   };
 }
 
@@ -982,6 +995,7 @@ async function schemaStatus() {
         columnCount: null,
       })),
       unknownTables: [],
+      warnings: manifest.warnings,
     };
   }
 
@@ -1022,7 +1036,15 @@ async function schemaStatus() {
     };
   });
   const unknownTables = [...actual.keys()].filter((k) => !known.has(k)).sort();
-  return { ok: true, connected: true, file, text, tables, unknownTables };
+  return {
+    ok: true,
+    connected: true,
+    file,
+    text,
+    tables,
+    unknownTables,
+    warnings: manifest.warnings,
+  };
 }
 
 /**
@@ -1415,6 +1437,7 @@ module.exports = {
   schemaStatus,
   schemaTableSql,
   schemaTableBatches,
+  parseSchemaManifest,
   describeSqlError,
   parseServerField,
   openConnection,

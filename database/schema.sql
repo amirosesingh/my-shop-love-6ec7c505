@@ -2101,6 +2101,22 @@ BEGIN
   IF COL_LENGTH('dbo.payment_transactions', 'client_transaction_id') IS NULL ALTER TABLE dbo.payment_transactions ADD [client_transaction_id] NVARCHAR(120);
 END
 GO
+IF OBJECT_ID('dbo.payment_transactions', 'U') IS NOT NULL
+AND COL_LENGTH('dbo.payment_transactions', 'client_transaction_id') IS NOT NULL
+AND NOT EXISTS (
+  SELECT 1 FROM sys.indexes
+   WHERE object_id = OBJECT_ID('dbo.payment_transactions')
+     AND name = N'UX_payment_transactions_client_txn'
+)
+AND NOT EXISTS (
+  SELECT client_transaction_id FROM dbo.payment_transactions
+   WHERE client_transaction_id IS NOT NULL
+   GROUP BY client_transaction_id HAVING COUNT(*) > 1
+)
+  CREATE UNIQUE INDEX UX_payment_transactions_client_txn
+    ON dbo.payment_transactions (client_transaction_id)
+    WHERE client_transaction_id IS NOT NULL;
+GO
 IF OBJECT_ID('dbo.payment_types', 'U') IS NOT NULL
 BEGIN
   IF COL_LENGTH('dbo.payment_types', 'id') IS NULL ALTER TABLE dbo.payment_types ADD [id] UNIQUEIDENTIFIER DEFAULT NEWID();

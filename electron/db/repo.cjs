@@ -605,7 +605,7 @@ async function retryRow(table, id) {
     bind(request, "id", id);
     await request.query(
       `UPDATE dbo.[${table}] SET sync_status = N'pending', sync_error = NULL,
-              is_synced = 0
+              sync_attempts = 0, last_error_at = NULL, is_synced = 0
         WHERE id = @id;`,
     );
   });

@@ -392,6 +392,7 @@ export type PosBridge = {
       columnCount: number | null;
     }>;
     unknownTables?: string[];
+    warnings?: string[];
     error?: string;
   }>;
   /** Repair only the selected tables. Guarded batches — never drops data. */
