@@ -186,7 +186,7 @@ export async function removeCloudCredentials(): Promise<{ ok: boolean; error?: s
  */
 export async function initCloudConfigFromShell(): Promise<CloudKeyStatus> {
   if (!isTerminalApp()) return cloudKeyStatus();
-  if (isElectron() && window.pos?.cloudKeyStatus) {
+  if (isElectron() && window.pos?.bootstrapCloudCredentials) {
     // The main process owns the key; ask it for the live pair through the
     // dedicated bootstrap channel so the renderer can configure its client.
     const res = await window.pos.bootstrapCloudCredentials();
