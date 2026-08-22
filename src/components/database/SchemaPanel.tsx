@@ -58,6 +58,7 @@ type SchemaStatus = {
   text?: string;
   tables?: TableStatus[];
   unknownTables?: string[];
+  warnings?: string[];
   error?: string;
 };
 type ApplyOutcome = { ok: boolean; lines: string[]; permission?: boolean };
@@ -201,8 +202,8 @@ export function SchemaPanel() {
 
   const downloadFull = () => {
     if (!status?.text) return;
-    downloadText("pos-local-schema.sql", status.text);
-    toast.success("Full schema SQL downloaded");
+    downloadText("pos-local-sql-server-schema.sql", status.text);
+    toast.success("Local SQL Server schema downloaded");
   };
 
   const downloadTable = async (name: string) => {
@@ -213,7 +214,7 @@ export function SchemaPanel() {
       toast.error(res.error ?? "SQL could not be prepared");
       return;
     }
-    downloadText(`${name}.sql`, res.text);
+    downloadText(`pos-local-sql-server-${name}.sql`, res.text);
   };
 
   return (
@@ -222,7 +223,7 @@ export function SchemaPanel() {
         <div>
           <p className="flex items-center gap-2 text-sm">
             <FileCode2 className="h-4 w-4" />
-            Schema manager
+            Local SQL Server schema manager
           </p>
           <p className="text-xs text-muted-foreground">
             Every table and column the app needs, compared with this machine&apos;s database.
@@ -290,10 +291,10 @@ export function SchemaPanel() {
             </Button>
             <Button type="button" size="sm" variant="outline" onClick={downloadFull}>
               <Download className="mr-1.5 h-3.5 w-3.5" />
-              Download full SQL
+              Download local SQL Server script
             </Button>
             <RepairDialog
-              label={`Repair selected (${selected.size})`}
+               label={`Local SQL Server — Repair selected (${selected.size})`}
               title={`Repair ${selected.size} selected table(s)?`}
               disabled={!connected || busy || !selected.size}
               busy={busy}
@@ -332,6 +333,15 @@ export function SchemaPanel() {
                   once through that login.
                 </p>
               )}
+            </div>
+          )}
+
+          {!!status.warnings?.length && (
+            <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs">
+              <p className="font-medium">Master schema parser warnings</p>
+              {status.warnings.map((warning) => (
+                <p key={warning} className="text-muted-foreground">{warning}</p>
+              ))}
             </div>
           )}
 
@@ -748,6 +758,13 @@ function CentralSchemaCard({ manifestTables }: { manifestTables: TableStatus[] }
 
   const downloadRepair = () => {
     if (!cloud) return;
+    const missingTables = drift.filter((d) => d.missingTable).map((d) => d.spec.table);
+    if (missingTables.length) {
+      toast.error(
+        `A complete secured migration is required for missing table(s): ${missingTables.join(", ")}. Use the authoritative central schema; a column-only repair cannot safely create policies and constraints.`,
+      );
+      return;
+    }
     const lines: string[] = [
       "-- POS central schema repair",
       "-- Generated from the master schema file. Every statement is idempotent:",
@@ -759,18 +776,7 @@ function CentralSchemaCard({ manifestTables }: { manifestTables: TableStatus[] }
     for (const d of drift) {
       const local = manifestByName.get(d.spec.table)!;
       const wanted = local.columns.filter((c) => !SYNC_ONLY_COLUMNS.has(c.name.toLowerCase()));
-      if (d.missingTable) {
-        lines.push(`create table if not exists public.${q(d.spec.table)} (`);
-        lines.push(
-          wanted.map((c) => `  ${q(c.name)} ${pgType(c.type)}`).join(",\n"),
-          ");",
-          `grant select, insert, update, delete on public.${q(d.spec.table)} to authenticated;`,
-          `grant all on public.${q(d.spec.table)} to service_role;`,
-          `-- TODO: copy the row-level security policies for ${d.spec.table} from the full migration bundle.`,
-          "",
-        );
-        statements += wanted.length ? 3 : 1;
-      } else if (d.missingColumns.length) {
+      if (d.missingColumns.length) {
         for (const c of wanted) {
           if (!d.missingColumns.includes(c.name)) continue;
           lines.push(
@@ -785,8 +791,8 @@ function CentralSchemaCard({ manifestTables }: { manifestTables: TableStatus[] }
       toast.success("Central database already matches — nothing to repair");
       return;
     }
-    downloadText("pos-central-repair.sql", lines.join("\n"));
-    toast.success("Central repair SQL downloaded");
+    downloadText("pos-central-postgresql-column-repair.sql", lines.join("\n"));
+    toast.success("Central PostgreSQL repair SQL downloaded");
   };
 
   return (
@@ -800,14 +806,15 @@ function CentralSchemaCard({ manifestTables }: { manifestTables: TableStatus[] }
           <p className="text-xs text-muted-foreground">
             Compares the synced tables with the central database. If a table or column is missing
             there (the &quot;unable to sync&quot; errors), download the repair script and run it
-            once in the central project.
+            once in the external central project&apos;s PostgreSQL SQL editor. Never run it in SQL
+            Server Management Studio.
           </p>
         </div>
         <div className="flex items-center gap-2">
           {cloud && (
             <Button type="button" size="sm" variant="outline" onClick={downloadRepair}>
               <Download className="mr-1.5 h-3.5 w-3.5" />
-              Download repair SQL
+               Download central PostgreSQL repair script
             </Button>
           )}
           <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => void check()}>

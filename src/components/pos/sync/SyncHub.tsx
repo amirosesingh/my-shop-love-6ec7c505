@@ -484,6 +484,39 @@ export function SyncHub() {
             <CardTitle className="text-base">Changes needing attention</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
+            {localQueue.length > 1 && (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border p-2">
+                <p className="text-xs text-muted-foreground">
+                  Re-queue all parked rows after updating the app or repairing the database. Original
+                  row and transaction IDs are preserved.
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={retrying}
+                  onClick={async () => {
+                    setRetrying(true);
+                    try {
+                      const res = await localDb()?.retryErrored();
+                      if (res && !res.ok) throw new Error("The parked rows could not be re-queued.");
+                      toast.success("All parked rows were re-queued safely");
+                    } catch (error) {
+                      toast.error(error instanceof Error ? error.message : "Retry failed");
+                    } finally {
+                      setRetrying(false);
+                      await refresh();
+                    }
+                  }}
+                >
+                  {retrying ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <RotateCcw className="size-3.5" />
+                  )}
+                  Retry all parked rows
+                </Button>
+              </div>
+            )}
             {localQueue.map((r) => (
               <div
                 key={`local-${r.table}-${r.id}`}
