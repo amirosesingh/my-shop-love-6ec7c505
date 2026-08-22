@@ -372,6 +372,43 @@ export type PosBridge = {
   }>;
   /** Apply database/schema.sql. Only ever called from an explicit user click. */
   applySchema?: () => Promise<{ ok: boolean; file?: string; error?: string }>;
+  /**
+   * Per-table schema manifest compared live against the connected database.
+   * When not connected, tables still come back with exists/present = null.
+   */
+  schemaStatus?: () => Promise<{
+    ok: boolean;
+    connected?: boolean;
+    file?: string;
+    text?: string;
+    tables?: Array<{
+      name: string;
+      exists: boolean | null;
+      columns: Array<{ name: string; type: string; present: boolean | null }>;
+      missingColumns: string[];
+      extraColumns: string[];
+      columnCount: number | null;
+    }>;
+    unknownTables?: string[];
+    error?: string;
+  }>;
+  /** Repair only the selected tables. Guarded batches — never drops data. */
+  applySchemaTables?: (tables: string[]) => Promise<{
+    ok: boolean;
+    applied?: string[];
+    unknownTables?: string[];
+    batchCount?: number;
+    errors?: Array<{ scope: string; code?: string; error?: string }>;
+    error?: string;
+  }>;
+  /** Runnable SQL script for the chosen tables (empty array = full file). */
+  schemaTableSql?: (tables: string[]) => Promise<{
+    ok: boolean;
+    file?: string;
+    tables?: string[];
+    text?: string;
+    error?: string;
+  }>;
   /** Discover local/LAN SQL Server instances (desktop shell only). */
   scanNetwork?: () => Promise<ScanNetworkResult>;
   scanLocalDatabases?: () => Promise<ScanNetworkResult>;

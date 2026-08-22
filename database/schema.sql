@@ -626,8 +626,6 @@ CLOSE errtbl;
 DEALLOCATE errtbl;
 GO
 
-*/
-
 SET NOCOUNT ON;
 
 IF OBJECT_ID('dbo.sync_metadata', 'U') IS NULL

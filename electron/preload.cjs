@@ -30,6 +30,12 @@ contextBridge.exposeInMainWorld("pos", {
   /* schema lifecycle — read is passive, apply needs an operator click */
   readSchema: () => invoke("pos:read-schema"),
   applySchema: () => invoke("pos:apply-schema"),
+  /** Per-table schema manager: live comparison against the connected database. */
+  schemaStatus: () => invoke("pos:schema-status"),
+  /** Repair only the selected tables (guarded batches, never drops data). */
+  applySchemaTables: (tables) => invoke("pos:apply-schema-tables", tables),
+  /** Runnable SQL script for the chosen tables (empty array = full file). */
+  schemaTableSql: (tables) => invoke("pos:schema-table-sql", tables),
   /** Discover SQL Server instances on this machine and the local network. */
   scanNetwork: () => invoke("pos:scan-network"),
   scanLocalDatabases: () => invoke("pos:scan-network"),
