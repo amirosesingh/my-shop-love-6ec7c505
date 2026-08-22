@@ -4,70 +4,85 @@
  * Reads live counts and the newest timestamp for each shared table, scoped to
  * one branch so the numbers can be held next to the till's own copy. Reads are
  * count-only projections — no customer or sale detail leaves the server.
+ *
+ * These reads go to the operator's OWN database through the same service-key
+ * relay every other server path uses, so the numbers describe the database the
+ * tills actually write to.
  */
 import { COMPARE_TABLES, type CompareKey, type CompareSide } from "./data-compare";
-
-type Client = Awaited<
-  typeof import("@/integrations/supabase/client.server")
->["supabaseAdmin"];
-
-async function admin(): Promise<Client> {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  return supabaseAdmin;
-}
+import { serviceRest } from "./pos-relay.server";
 
 const specFor = (table: string) => COMPARE_TABLES.find((t) => t.table === table) ?? null;
 
-/** Applies the branch filter for a table, whether it owns the branch or inherits it. */
-function scoped(
-  client: Client,
-  table: string,
-  columns: string,
-  storeId: string | null,
-  options: { count?: boolean } = {},
-) {
+const enc = encodeURIComponent;
+
+/** Query parts that restrict a table to one branch, directly or via its parent. */
+function scopeParams(table: string, columns: string, storeId: string | null): string[] {
   const spec = specFor(table);
   const parent = spec?.parent;
-  const select = parent && storeId ? `${columns}, ${parent.table}!inner(store_id)` : columns;
-  let query = client
-    .from(table as never)
-    .select(select, options.count ? { count: "exact", head: true } : {});
+  const select = parent && storeId ? `${columns},${parent.table}!inner(store_id)` : columns;
+  const params = [`select=${enc(select)}`];
 
-  if (!storeId || spec?.shared) return query;
-  if (parent) return query.eq(`${parent.table}.store_id`, storeId);
-  const storeColumns = spec?.storeColumns ?? [];
-  if (storeColumns.length === 1) query = query.eq(storeColumns[0]!, storeId);
-  else if (storeColumns.length) {
-    query = query.or(storeColumns.map((c) => `${c}.eq.${storeId}`).join(","));
+  if (!storeId || spec?.shared) return params;
+  if (parent) {
+    params.push(`${enc(`${parent.table}.store_id`)}=eq.${enc(storeId)}`);
+    return params;
   }
-  return query;
+  const storeColumns = spec?.storeColumns ?? [];
+  if (storeColumns.length === 1) params.push(`${enc(storeColumns[0]!)}=eq.${enc(storeId)}`);
+  else if (storeColumns.length) {
+    params.push(`or=${enc(`(${storeColumns.map((c) => `${c}.eq.${storeId}`).join(",")})`)}`);
+  }
+  return params;
 }
 
 const stampOf = (table: string) => (table === "sale_items" ? "created_at" : "updated_at");
 
+async function failOrJson(res: Response): Promise<unknown> {
+  if (res.ok) return await res.json();
+  const body = await res.text();
+  throw new Error(body || `Read failed (${res.status})`);
+}
+
+/** Exact row count via PostgREST's Content-Range header. */
+async function countRows(table: string, params: string[]): Promise<number> {
+  const res = await serviceRest(`${table}?${params.join("&")}`, {
+    method: "HEAD",
+    prefer: "count=exact",
+  });
+  if (!res.ok) throw new Error(`Count failed (${res.status})`);
+  const range = res.headers.get("content-range") ?? "";
+  const total = Number(range.split("/")[1]);
+  return Number.isFinite(total) ? total : 0;
+}
+
 async function sideFor(
-  client: Client,
   table: string,
   storeId: string | null,
   since: string | null,
 ): Promise<CompareSide> {
   const stamp = stampOf(table);
+  const sinceParam = since ? [`${enc(stamp)}=gte.${enc(since)}`] : [];
   try {
-    let countQuery = scoped(client, table, "id", storeId, { count: true });
-    if (since) countQuery = countQuery.gte(stamp, since);
-    const { count, error } = await countQuery;
-    if (error) throw error;
+    const count = await countRows(table, [
+      ...scopeParams(table, "id", storeId),
+      ...sinceParam,
+    ]);
 
-    let newestQuery = scoped(client, table, `id, ${stamp}`, storeId)
-      .order(stamp, { ascending: false })
-      .limit(1);
-    if (since) newestQuery = newestQuery.gte(stamp, since);
-    const newest = await newestQuery;
-    const row = (newest.data?.[0] ?? null) as Record<string, unknown> | null;
+    const newestParams = [
+      ...scopeParams(table, `id,${stamp}`, storeId),
+      ...sinceParam,
+      `order=${enc(`${stamp}.desc`)}`,
+      "limit=1",
+    ];
+    const rows = (await failOrJson(
+      await serviceRest(`${table}?${newestParams.join("&")}`),
+    )) as Record<string, unknown>[];
+    const row = rows[0] ?? null;
 
     return {
       table,
-      count: count ?? 0,
+      count,
       maxUpdatedAt: (row?.[stamp] as string | undefined) ?? null,
     };
   } catch (err) {
@@ -85,12 +100,11 @@ export async function serverSummary(input: {
   since: string | null;
   tables?: string[];
 }): Promise<CompareSide[]> {
-  const client = await admin();
   const wanted = COMPARE_TABLES.filter(
     (spec) => !input.tables?.length || input.tables.includes(spec.table),
   );
   return await Promise.all(
-    wanted.map((spec) => sideFor(client, spec.table, input.storeId, input.since)),
+    wanted.map((spec) => sideFor(spec.table, input.storeId, input.since)),
   );
 }
 
@@ -102,15 +116,17 @@ export async function serverRows(input: {
   limit?: number;
 }): Promise<CompareKey[]> {
   if (!specFor(input.table)) throw new Error(`Unknown table: ${input.table}`);
-  const client = await admin();
   const stamp = stampOf(input.table);
-  let query = scoped(client, input.table, `id, ${stamp}`, input.storeId)
-    .order(stamp, { ascending: false })
-    .limit(Math.min(input.limit ?? 2000, 5000));
-  if (input.since) query = query.gte(stamp, input.since);
-  const { data, error } = await query;
-  if (error) throw error;
-  return ((data ?? []) as unknown as Record<string, unknown>[]).map((row) => ({
+  const params = [
+    ...scopeParams(input.table, `id,${stamp}`, input.storeId),
+    ...(input.since ? [`${enc(stamp)}=gte.${enc(input.since)}`] : []),
+    `order=${enc(`${stamp}.desc`)}`,
+    `limit=${Math.min(input.limit ?? 2000, 5000)}`,
+  ];
+  const data = (await failOrJson(
+    await serviceRest(`${input.table}?${params.join("&")}`),
+  )) as Record<string, unknown>[];
+  return data.map((row) => ({
     id: String(row["id"] ?? ""),
     updatedAt: (row[stamp] as string | undefined) ?? null,
   }));
