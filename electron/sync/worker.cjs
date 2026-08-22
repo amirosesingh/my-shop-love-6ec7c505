@@ -30,6 +30,22 @@ let relayUrl = null;
 // table without updated_at doesn't fire a failing request on every pull.
 const stampColumn = new Map();
 
+/**
+ * The central database rejecting a table because it (or a column) does not
+ * exist there. PostgREST answers PGRST205/204 or a 404 schema-cache message.
+ */
+const MISSING_CLOUD_RE =
+  /PGRST20[45]|schema cache|does not exist|could not find the table|not found in the schema/i;
+
+/**
+ * Tables the central project has not grown yet, with the earliest moment we
+ * re-probe. Instead of failing the same batch every 30 seconds, the table is
+ * skipped and the Sync Hub shows exactly what is missing; the push resumes by
+ * itself once the table exists centrally.
+ */
+const cloudMissing = new Map(); // table -> retry-after epoch ms
+const CLOUD_MISSING_RETRY_MS = 10 * 60 * 1000;
+
 async function selectChangedSince(table, since) {
   const ask = (column) => supabase.from(table).select("*").gt(column, since);
   const known = stampColumn.get(table);
