@@ -234,6 +234,8 @@ async function push() {
   let pushed = 0;
   let failed = 0;
   for (const table of repo.PUSH_TABLES ?? repo.TABLES) {
+    const retryAt = cloudMissing.get(table);
+    if (retryAt && Date.now() < retryAt) continue; // parked: central schema missing
     let rows;
     try {
       rows = await repo.pendingRows(table, BATCH);
@@ -251,12 +253,33 @@ async function push() {
     let error = null;
     try {
       await cloudUpsert(table, payload);
+      cloudMissing.delete(table); // the central schema caught up
     } catch (err) {
       error = err;
     }
 
     if (error) {
       failed += ids.length;
+      if (MISSING_CLOUD_RE.test(String(error.message ?? ""))) {
+        // Central drift is not a row fault: park with a clear pointer and
+        // leave the attempt counter untouched so the rows resume cleanly.
+        cloudMissing.set(table, Date.now() + CLOUD_MISSING_RETRY_MS);
+        await repo
+          .markFailed(
+            table,
+            ids,
+            `Table "${table}" is missing or out of date in the central database — open Settings → Central schema, download the repair SQL and run it once in the central project. (${error.message})`,
+            Number.MAX_SAFE_INTEGER,
+          )
+          .catch(() => {});
+        await repo
+          .setWatermark(table, null, {
+            error: `central schema missing: ${table} (see Settings → Central schema)`,
+          })
+          .catch(() => {});
+        notify();
+        continue;
+      }
       // The attempt counter lives in the database: a parked row stays parked
       // across restarts until someone retries it from the Sync Hub.
       await repo.markFailed(table, ids, error.message, MAX_ATTEMPTS);
