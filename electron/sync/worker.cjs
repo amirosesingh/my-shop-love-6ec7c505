@@ -381,6 +381,10 @@ async function pull() {
     if (error) {
       // A branch-scoped table must never block catalogue sync.
       await repo.setWatermark(spec.table, null, { error: error.message }).catch(() => {});
+      if (MISSING_CLOUD_RE.test(String(error.message ?? ""))) {
+        cloudMissing.set(spec.table, Date.now() + CLOUD_MISSING_RETRY_MS);
+        notify();
+      }
       continue;
     }
     const rows = data ?? [];
