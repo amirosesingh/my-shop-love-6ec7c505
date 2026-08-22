@@ -17,7 +17,9 @@ export type DiagnosticKind =
   | "stock_reconcile_drift"
   | "local_mirror_failed"
   | "sale_idempotency_unavailable"
-  | "shift_lookup_unavailable";
+  | "shift_lookup_unavailable"
+  /** A visibility-only write (sign-in log, drawer opening) could not be stored. */
+  | "soft_write_failed";
 
 export type DiagnosticEvent = {
   id: string;
