@@ -468,6 +468,8 @@ let draining = false;
 export async function drainOutbox(): Promise<{ pushed: number; failed: number }> {
   // A revoked terminal keeps selling locally but is cut off from the cloud.
   if (!isOnline()) setSyncState({ phase: "offline", pending: listQueue().length });
+  // Keys rejected: stay parked until fresh ones are saved — no retry storm.
+  if (syncState().credentialsInvalid) return { pushed: 0, failed: 0 };
   if (draining || !isOnline() || !isOnlineSyncEnabled() || isTerminalRevoked())
     return { pushed: 0, failed: 0 };
   draining = true;
@@ -499,7 +501,10 @@ export async function drainOutbox(): Promise<{ pushed: number; failed: number }>
     setSyncState({
       phase: isOnline() ? "idle" : "offline",
       pending: listQueue().length,
-      ...(pushed && !failed ? { lastSyncAt: new Date().toISOString(), lastError: null } : {}),
+      // A clean push proves the saved keys work — clear any earlier rejection.
+      ...(pushed && !failed
+        ? { lastSyncAt: new Date().toISOString(), lastError: null, credentialsInvalid: false }
+        : {}),
     });
   }
   return { pushed, failed };
@@ -552,6 +557,8 @@ async function countChangedSince(table: (typeof PULL_TABLES)[number], since: str
  */
 export async function pullDelta(): Promise<{ merged: number }> {
   if (pulling || !isOnline() || !isOnlineSyncEnabled()) return { merged: 0 };
+  // Keys rejected: stay parked until fresh ones are saved.
+  if (syncState().credentialsInvalid) return { merged: 0 };
   pulling = true;
   const fallbackSince = lastSuccessfulPull() ?? "1970-01-01T00:00:00.000Z";
   const startedAt = new Date().toISOString();
