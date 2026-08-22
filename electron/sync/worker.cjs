@@ -46,6 +46,25 @@ const MISSING_CLOUD_RE =
 const cloudMissing = new Map(); // table -> retry-after epoch ms
 const CLOUD_MISSING_RETRY_MS = 10 * 60 * 1000;
 
+/**
+ * The central project rejecting our credentials (HTTP 401/403, "Invalid API
+ * key", a bad JWT). This is never a row fault: every queued row keeps its
+ * place, all cloud traffic parks silently, and the Sync Hub points at
+ * Settings → Database & Cloud Connection. Saving fresh keys re-inits the
+ * worker, which clears the flag.
+ */
+let credentialsInvalid = false;
+const CREDENTIAL_ERROR_RE =
+  /invalid api ?key|bad jwt|jwt expired|invalid token|unauthorized|not recognised|forbidden/i;
+
+function isCredentialError(err) {
+  const status = Number(err?.status ?? err?.statusCode ?? 0);
+  if (status === 401 || status === 403) return true;
+  const msg = String(err?.message ?? err ?? "");
+  // A bare HTTP 400/401/403 embedded in a relay error message counts too.
+  return CREDENTIAL_ERROR_RE.test(msg) || /\((401|403)\)/.test(msg);
+}
+
 async function selectChangedSince(table, since) {
   const ask = (column) => supabase.from(table).select("*").gt(column, since);
   const known = stampColumn.get(table);
@@ -176,6 +195,8 @@ function init({ url, key, accessToken, sessionToken, cashierToken, terminalToken
     repo.setScope({ storeId: branchId, terminalId: credentials.terminalToken ?? "" });
   }
   relayUrl = relay || null;
+  // Fresh credentials (re)saved: any earlier rejection no longer applies.
+  credentialsInvalid = false;
   if (onChange) notify = onChange;
 }
 
@@ -259,6 +280,18 @@ async function push() {
     }
 
     if (error) {
+      if (isCredentialError(error)) {
+        // Keys rejected: leave every row queued untouched and park the worker.
+        credentialsInvalid = true;
+        await repo
+          .setWatermark(table, null, {
+            error: "Cloud credentials rejected — update them in Settings → Database & Cloud Connection.",
+          })
+          .catch(() => {});
+        setPhase("idle");
+        notify();
+        return { ok: false, pushed, failed, error: "credentials" };
+      }
       failed += ids.length;
       if (MISSING_CLOUD_RE.test(String(error.message ?? ""))) {
         // Central drift is not a row fault: park with a clear pointer and
