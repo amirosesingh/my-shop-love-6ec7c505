@@ -349,6 +349,12 @@ async function pull() {
     const { data, error } = await selectChangedSince(table, since);
     if (error) {
       await repo.setWatermark(table, null, { error: error.message }).catch(() => {});
+      if (MISSING_CLOUD_RE.test(String(error.message ?? ""))) {
+        // A table the central project has not grown yet is skipped, not fatal.
+        cloudMissing.set(table, Date.now() + CLOUD_MISSING_RETRY_MS);
+        notify();
+        continue;
+      }
       setPhase("idle");
       return { ok: false, merged, error: error.message };
     }
@@ -427,6 +433,7 @@ async function status() {
       connected: true,
       phase,
       enabled,
+      cloudMissing: [...cloudMissing.keys()],
       tables: await repo.stats(),
       queue: await repo.queueRows(60),
       lastPushAt: await repo.getState("last_push_at"),
