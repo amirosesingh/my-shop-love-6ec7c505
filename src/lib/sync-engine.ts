@@ -573,6 +573,10 @@ export async function pullDelta(): Promise<{ merged: number }> {
       // Only ask how many rows moved; the full refresh below does the reading.
       const { count, error } = await countChangedSince(table, since);
       if (error) {
+        if (isCredentialError(error)) {
+          noteCredentialsInvalid(error.message);
+          return { merged: changed };
+        }
         logSync("pull", table, false, error.message);
         recordSync({ direction: "pull", entity: table, status: "failed", error: error.message });
         continue;
@@ -595,9 +599,11 @@ export async function pullDelta(): Promise<{ merged: number }> {
     // Marks only advance for tables that answered and were merged cleanly.
     for (const table of clean) setLastTablePull(table, startedAt);
     setLastSuccessfulPull(startedAt);
-    setSyncState({ lastSyncAt: startedAt });
+    // A clean pull proves the saved keys work — clear any earlier rejection.
+    setSyncState({ lastSyncAt: startedAt, credentialsInvalid: false });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
+    if (isCredentialError(e) || CREDENTIAL_ERROR_RE.test(message)) noteCredentialsInvalid(message);
     setSyncState({ lastError: message });
     recordSync({ direction: "pull", entity: "catalogue", status: "failed", error: message });
   } finally {
