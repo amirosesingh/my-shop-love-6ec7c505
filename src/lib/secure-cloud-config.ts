@@ -20,6 +20,15 @@ import {
   supabaseConfig,
 } from "./external-supabase-config";
 import { resetExternalClient, createTenantClient } from "@/integrations/supabase/external-client";
+import { setSyncState } from "./sync-status";
+
+/** Fresh keys saved: unpark the sync engine and let it catch up at once. */
+function afterCredentialsSaved() {
+  setSyncState({ credentialsInvalid: false, lastError: null, cloudConfigured: true });
+  void import("./sync-engine")
+    .then((m) => void m.runExclusive("credentials-saved"))
+    .catch(() => {});
+}
 
 export type CloudKeyStatus = {
   configured: boolean;
