@@ -250,7 +250,13 @@ function createWindows() {
   });
   instrument(mainWindow, "/");
   void load(mainWindow, "/");
-  mainWindow.once("ready-to-show", () => mainWindow.show());
+  mainWindow.once("ready-to-show", () => {
+    mainWindow.show();
+    // No tenant keys sealed on this device yet: nudge once, never block.
+    if (!cloudCredentials.read()) {
+      mainWindow.webContents.send("cloud:setup-required", { platform: "electron" });
+    }
+  });
 
   // Keep the in-app maximise icon in step with the real window state.
   const sendWindowState = () =>
@@ -1451,6 +1457,40 @@ function registerIpc() {
       return fail(err);
     }
     return { ok: true, ...serverKeys.status() };
+  });
+
+  /* ------------- tenant cloud credentials (OS-sealed store) ------------- */
+  ipcMain.handle("cloud:status", () => ({ ok: true, ...cloudCredentials.status() }));
+  // Boot-time read so the renderer can point its own client at the tenant.
+  // The key crosses the bridge only into this device's renderer, never to disk.
+  ipcMain.handle("cloud:bootstrap", () => {
+    const saved = cloudCredentials.read();
+    return saved ? { ok: true, url: saved.url, key: saved.key } : { ok: false };
+  });
+  ipcMain.handle("cloud:set", async (_e, value) => {
+    const saved = cloudCredentials.write(value);
+    if (saved.ok === false) return saved;
+    try {
+      // Hot-switch the sync worker to the new tenant without an app restart.
+      const sealed = cloudCredentials.read();
+      if (sealed) {
+        await initializeWorker({ ...(cloudConfig ?? {}), url: sealed.url, key: sealed.key });
+      } else {
+        worker.stop();
+        cloudConfig = null;
+      }
+      broadcastStatus(await statusPayload());
+    } catch (err) {
+      return fail(err);
+    }
+    return { ok: true, ...cloudCredentials.status() };
+  });
+  ipcMain.handle("cloud:remove", async () => {
+    const removed = cloudCredentials.remove();
+    worker.stop();
+    cloudConfig = null;
+    broadcastStatus(await statusPayload());
+    return removed;
   });
   /** Offline relationship check straight from the local mirror's catalogue. */
   ipcMain.handle("local:relational-health", () => {
