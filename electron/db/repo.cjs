@@ -424,18 +424,27 @@ async function markSynced(table, ids) {
   `);
 }
 
-/** Repeated failures park the row so one bad record can't block the queue. */
-async function markFailed(table, ids, message, quarantine) {
+/**
+ * Repeated failures park the row so one bad record can't block the queue.
+ * The attempt counter and the quarantine decision are both persisted here, in
+ * SQL — a till restart can no longer unpark a row that already failed five
+ * times, which the old in-memory counter allowed.
+ */
+async function markFailed(table, ids, message, maxAttempts = 5) {
   if (!ids.length) return;
   assertTable(table);
   const request = getPool()
     .request()
-    .input("status", sql.NVarChar(20), quarantine ? "quarantined" : "error")
+    .input("maxAttempts", sql.Int, Math.max(1, Number(maxAttempts) || 5))
     .input("msg", sql.NVarChar(sql.MAX), String(message).slice(0, 3000));
   ids.forEach((id, i) => bind(request, `id${i}`, id));
   await request.query(`
     UPDATE dbo.[${table}]
-       SET sync_status = @status, sync_error = @msg,
+       SET sync_status = CASE
+             WHEN ISNULL(sync_attempts, 0) + 1 >= @maxAttempts THEN N'quarantined'
+             ELSE N'error'
+           END,
+           sync_error = @msg,
            sync_attempts = ISNULL(sync_attempts, 0) + 1,
            last_error_at = SYSUTCDATETIME()
      WHERE id IN (${ids.map((_, i) => `@id${i}`).join(", ")});
