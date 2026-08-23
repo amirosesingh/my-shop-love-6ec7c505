@@ -39,7 +39,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { localDb } from "@/lib/local-db";
 import { sqlAdmin } from "@/lib/sql-admin";
-import { fetchCentralSchema } from "@/lib/central-schema.functions";
+import {
+  fetchCentralSchema,
+  probeCentralTables,
+  type CentralProbeRow,
+} from "@/lib/central-schema.functions";
 import centralPushColumns from "../../../electron/db/cloud-columns.json";
 import { CENTRAL_SCHEMA, CENTRAL_SCHEMA_VERSION } from "@/lib/central-schema";
 import {
@@ -688,6 +692,28 @@ function CentralSchemaCard() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [drift, setDrift] = useState<CentralDriftRow[] | null>(null);
+  const [probeBusy, setProbeBusy] = useState(false);
+  const [probe, setProbe] = useState<CentralProbeRow[] | null>(null);
+  const [probeError, setProbeError] = useState<string | null>(null);
+
+  const runProbe = async () => {
+    setProbeBusy(true);
+    setProbeError(null);
+    try {
+      const res = await probeCentralTables();
+      if (!res.ok) {
+        setProbeError(res.error);
+        setProbe(null);
+        return;
+      }
+      setProbe(res.rows);
+    } catch (err) {
+      setProbeError(err instanceof Error ? err.message : "The fetch diagnostics could not run.");
+      setProbe(null);
+    } finally {
+      setProbeBusy(false);
+    }
+  };
 
   const check = async () => {
     setBusy(true);
