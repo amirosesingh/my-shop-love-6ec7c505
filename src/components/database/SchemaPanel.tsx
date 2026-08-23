@@ -40,10 +40,11 @@ import { Label } from "@/components/ui/label";
 import { localDb } from "@/lib/local-db";
 import { sqlAdmin } from "@/lib/sql-admin";
 import { fetchCentralSchema } from "@/lib/central-schema.functions";
-import { COMPARE_TABLES } from "@/lib/data-compare";
+import centralPushColumns from "../../../electron/db/cloud-columns.json";
+import { CENTRAL_SCHEMA, CENTRAL_SCHEMA_VERSION } from "@/lib/central-schema";
 import {
+  actualFromRows,
   buildCentralRepairSql,
-  centralExpectedSpecs,
   computeCentralDrift,
   type CentralDriftRow,
 } from "@/lib/central-drift";
@@ -347,7 +348,7 @@ export function SchemaPanel() {
             </p>
           )}
 
-          <CentralSchemaCard manifestTables={tables} />
+          <CentralSchemaCard />
         </>
       )}
     </div>
