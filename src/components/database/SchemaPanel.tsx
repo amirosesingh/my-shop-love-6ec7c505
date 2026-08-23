@@ -778,6 +778,21 @@ function CentralSchemaCard() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={probeBusy}
+            title="Read every central table once and show the exact error for any that fail"
+            onClick={() => void runProbe()}
+          >
+            {probeBusy ? (
+              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <TriangleAlert className="mr-1.5 h-3.5 w-3.5" />
+            )}
+            Fetch diagnostics
+          </Button>
           {drift && (
             <Button type="button" size="sm" variant="outline" onClick={downloadRepair}>
               <Download className="mr-1.5 h-3.5 w-3.5" />
@@ -891,6 +906,13 @@ function CentralSchemaCard() {
               );
             })}
           </div>
+          {probeError && (
+            <p className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs">
+              <TriangleAlert className="mt-0.5 h-3.5 w-3.5 text-destructive" />
+              {probeError}
+            </p>
+          )}
+          {probe && <ProbeResults rows={probe} />}
           <SyncCompatibilityCard />
         </>
       )}
