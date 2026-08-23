@@ -1,186 +1,210 @@
 import { describe, expect, it } from "vitest";
 import {
+  actualFromRows,
   buildCentralRepairSql,
-  centralExpectedSpecs,
   computeCentralDrift,
-  type CentralDriftRow,
+  type ActualCentralSchema,
 } from "../central-drift";
-import type { CompareTableSpec } from "../data-compare";
+import { CENTRAL_SCHEMA, CENTRAL_SCHEMA_VERSION } from "../central-schema";
+import { COMPARE_TABLES } from "../data-compare";
 
-const col = (name: string, type = "nvarchar(50)") => ({ name, type });
-
-/** Master-schema fixture: the real file carries local-only extras per table. */
-const manifest = new Map<string, { columns: { name: string; type: string }[] }>([
-  [
-    "sales",
-    {
-      columns: [
-        col("id", "uniqueidentifier"),
-        col("bill_number"),
-        col("total_amount", "decimal(19,4)"),
-        col("client_transaction_id"),
-        col("created_at", "datetime2"),
-        // Local-only columns that must never be expected centrally:
-        col("updated_at", "datetime2"),
-        col("branch_id", "uniqueidentifier"),
-        col("is_synced", "bit"),
-        col("sync_status"),
-        col("last_error_at", "datetime2"),
-      ],
-    },
-  ],
-  [
-    "payment_transactions",
-    {
-      columns: [
-        col("id", "uniqueidentifier"),
-        col("sale_id", "uniqueidentifier"),
-        col("amount", "decimal(19,4)"),
-        col("method"),
-        col("client_transaction_id"),
-        col("row_version", "int"),
-        col("is_synced", "bit"),
-        col("sync_status"),
-        col("last_error_at", "datetime2"),
-      ],
-    },
-  ],
-  [
-    "audit_logs",
-    {
-      columns: [
-        col("id", "uniqueidentifier"),
-        col("action"),
-        col("details", "nvarchar(max)"),
-        // Present in the local master schema but never pushed centrally:
-        col("updated_at", "datetime2"),
-        col("row_version", "int"),
-        col("is_synced", "bit"),
-        col("sync_status"),
-        col("last_error_at", "datetime2"),
-      ],
-    },
-  ],
-  [
-    "held_orders",
-    {
-      columns: [
-        col("id", "uniqueidentifier"),
-        col("label"),
-        col("total", "decimal(19,4)"),
-        // The till stamps one, but the sync contract does not send it:
-        col("client_transaction_id"),
-        col("is_synced", "bit"),
-        col("sync_status"),
-        col("last_error_at", "datetime2"),
-      ],
-    },
-  ],
-  ["sync_state", { columns: [col("id"), col("last_sync_at", "datetime2")] }],
-]);
-
-const compareSpecs: CompareTableSpec[] = [
-  { table: "sales", label: "Sales", storeColumns: ["store_id"] },
-  { table: "payment_transactions", label: "Payments" },
-  { table: "audit_logs", label: "Audit log" },
-  { table: "held_orders", label: "Held orders" },
-  { table: "sync_state", label: "Sync state" },
-];
-
-const specs = centralExpectedSpecs(compareSpecs, manifest);
-
-/** A central database that matches the expected contract exactly. */
-const fullCloud = () =>
-  new Map(specs.map((s) => [s.table, new Set(s.columns.map((c) => c.name.toLowerCase()))]));
-
-/** The real drifted state: contract minus the five genuinely missing columns. */
-const driftedCloud = () => {
-  const cloud = fullCloud();
-  cloud.get("payment_transactions")!.delete("client_transaction_id");
-  cloud.get("pos_settings")!.delete("receipt_css");
-  for (const c of ["require_pin_terminal_reset", "row_version", "updated_by"]) {
-    cloud.get("pos_store_settings")!.delete(c);
-  }
-  return cloud;
+/** PostgREST-style format for each authoritative type family. */
+const FORMATS: Record<string, { type: string; format: string }> = {
+  uuid: { type: "string", format: "uuid" },
+  text: { type: "string", format: "text" },
+  "text[]": { type: "array", format: "text[]" },
+  jsonb: { type: "string", format: "jsonb" },
+  integer: { type: "integer", format: "integer" },
+  bigint: { type: "integer", format: "bigint" },
+  smallint: { type: "integer", format: "smallint" },
+  boolean: { type: "boolean", format: "boolean" },
+  timestamptz: { type: "string", format: "timestamp with time zone" },
+  date: { type: "string", format: "date" },
+  time: { type: "string", format: "time without time zone" },
 };
 
-describe("centralExpectedSpecs", () => {
-  it("keeps only the columns the sync contract actually pushes", () => {
-    const names = specs.find((s) => s.table === "sales")!.columns.map((c) => c.name);
-    expect(names).toContain("client_transaction_id");
-    for (const phantom of ["is_synced", "sync_status", "last_error_at", "updated_at", "branch_id"]) {
-      expect(names).not.toContain(phantom);
+function familyOf(pgType: string): string {
+  const t = pgType.split(/\s+/)[0];
+  return t.startsWith("numeric") || t.startsWith("decimal") ? "numeric" : t;
+}
+
+/** A central database that matches the authoritative definition exactly. */
+function fullCloud(): ActualCentralSchema {
+  const rows = CENTRAL_SCHEMA.flatMap((t) =>
+    t.columns.map((c) => {
+      const family = familyOf(c.pgType);
+      const f =
+        FORMATS[c.pgType.split(/\s+/)[0]] ??
+        (family === "numeric" ? { type: "number", format: "numeric" } : { type: "string", format: "text" });
+      return { table: t.table, column: c.name, ...f };
+    }),
+  );
+  return actualFromRows(rows);
+}
+
+/** The verified live drift: exactly five genuinely missing central columns. */
+const KNOWN_MISSING: [string, string][] = [
+  ["payment_transactions", "client_transaction_id"],
+  ["pos_settings", "receipt_css"],
+  ["pos_store_settings", "require_pin_terminal_reset"],
+  ["pos_store_settings", "row_version"],
+  ["pos_store_settings", "updated_by"],
+];
+
+function driftedCloud(): ActualCentralSchema {
+  const cloud = new Map(
+    [...fullCloud()].map(([t, cols]) => [t, new Map(cols)] as [string, Map<string, never>]),
+  );
+  for (const [table, column] of KNOWN_MISSING) cloud.get(table)!.delete(column);
+  return cloud as ActualCentralSchema;
+}
+
+const missingPairs = (drift: ReturnType<typeof computeCentralDrift>) =>
+  drift.flatMap((d) => d.missingColumns.map((c) => `${d.table}.${c.name}`)).sort();
+
+describe("authoritative central schema definition", () => {
+  it("has its own version, independent of app and local database versions", () => {
+    expect(Number.isInteger(CENTRAL_SCHEMA_VERSION)).toBe(true);
+    expect(CENTRAL_SCHEMA_VERSION).toBeGreaterThanOrEqual(1);
+  });
+
+  it("never demands local-only sync bookkeeping columns centrally (Test C)", () => {
+    const localOnly = [
+      "is_synced",
+      "sync_status",
+      "last_error_at",
+      "synced_at",
+      "pending_sync",
+      "sync_attempts",
+      "sync_error",
+    ];
+    for (const table of CENTRAL_SCHEMA) {
+      for (const column of localOnly) {
+        expect(
+          table.columns.some((c) => c.name === column),
+          `${table.table}.${column} must not be a central requirement`,
+        ).toBe(false);
+      }
     }
   });
 
-  it("expects client_transaction_id on payment_transactions but not on held_orders", () => {
-    expect(
-      specs.find((s) => s.table === "payment_transactions")!.columns.map((c) => c.name),
-    ).toContain("client_transaction_id");
-    expect(
-      specs.find((s) => s.table === "held_orders")!.columns.map((c) => c.name),
-    ).not.toContain("client_transaction_id");
+  it("never demands local-only tables centrally (Test D)", () => {
+    const localOnlyTables = ["sync_state", "system_settings", "transfers", "shift_notifications"];
+    for (const t of localOnlyTables) {
+      expect(CENTRAL_SCHEMA.some((s) => s.table === t)).toBe(false);
+    }
   });
 
-  it("drops audit-log columns the central database never had", () => {
-    const names = specs.find((s) => s.table === "audit_logs")!.columns.map((c) => c.name);
-    expect(names).toContain("action");
-    expect(names).not.toContain("updated_at");
-    expect(names).not.toContain("row_version");
+  it("requires client_transaction_id on sales and payments only (Test E)", () => {
+    for (const table of ["sales", "payment_transactions"]) {
+      const spec = CENTRAL_SCHEMA.find((s) => s.table === table)!;
+      const col = spec.columns.find((c) => c.name === "client_transaction_id");
+      expect(col, `${table}.client_transaction_id`).toBeDefined();
+      expect(col!.classification ?? "required").toBe("required");
+    }
+    const held = CENTRAL_SCHEMA.find((s) => s.table === "held_orders")!;
+    expect(held.columns.some((c) => c.name === "client_transaction_id")).toBe(false);
   });
 
-  it("skips till-only tables and adds the central settings contract", () => {
-    expect(specs.some((s) => s.table === "sync_state")).toBe(false);
-    expect(specs.find((s) => s.table === "pos_settings")!.columns.map((c) => c.name)).toEqual([
-      "receipt_css",
-    ]);
-    expect(
-      specs
-        .find((s) => s.table === "pos_store_settings")!
-        .columns.map((c) => c.name)
-        .sort(),
-    ).toEqual(["require_pin_terminal_reset", "row_version", "updated_by"].sort());
+  it("covers every table the reports compare, so no report loses data (Test G)", () => {
+    for (const spec of COMPARE_TABLES) {
+      expect(
+        CENTRAL_SCHEMA.some((s) => s.table === spec.table),
+        `${spec.table} is required by reporting but missing from the central definition`,
+      ).toBe(true);
+    }
+  });
+
+  it("keeps user/terminal/branch/shift context on auditable tables (Test H)", () => {
+    const audit = CENTRAL_SCHEMA.find((s) => s.table === "audit_logs")!;
+    for (const c of ["user_name", "created_at", "details"]) {
+      expect(audit.columns.some((x) => x.name === c), `audit_logs.${c}`).toBe(true);
+    }
+    const activity = CENTRAL_SCHEMA.find((s) => s.table === "item_activity_logs")!;
+    for (const c of ["store_id", "terminal_id", "staff_id", "staff_name", "created_at"]) {
+      expect(activity.columns.some((x) => x.name === c), `item_activity_logs.${c}`).toBe(true);
+    }
+    const shifts = CENTRAL_SCHEMA.find((s) => s.table === "shifts")!;
+    for (const c of ["store_id", "terminal_id", "opened_by_staff_id", "opened_at"]) {
+      expect(shifts.columns.some((x) => x.name === c), `shifts.${c}`).toBe(true);
+    }
+  });
+
+  it("keeps full stock-movement context so reconciliation stays traceable (Test J)", () => {
+    const movements = CENTRAL_SCHEMA.find((s) => s.table === "item_activity_logs")!;
+    for (const c of ["product_id", "quantity_delta", "stock_before", "stock_after", "activity_type"]) {
+      expect(movements.columns.some((x) => x.name === c), `item_activity_logs.${c}`).toBe(true);
+    }
+    const adjustments = CENTRAL_SCHEMA.find((s) => s.table === "stock_adjustments")!;
+    for (const c of ["product_id", "previous_stock", "updated_stock", "delta", "store_id"]) {
+      expect(adjustments.columns.some((x) => x.name === c), `stock_adjustments.${c}`).toBe(true);
+    }
+  });
+
+  it("ships the payments idempotency index with the sales twin behaviour (Test I)", () => {
+    const payments = CENTRAL_SCHEMA.find((s) => s.table === "payment_transactions")!;
+    const index = payments.indexes?.find((i) => i.name === "payment_transactions_client_txn_idx");
+    expect(index).toBeDefined();
+    expect(index!.sql).toContain("client_transaction_id");
+    expect(index!.dependsOnColumns).toContain("client_transaction_id");
   });
 });
 
 describe("computeCentralDrift", () => {
-  it("flags exactly the real gaps in the drifted central database", () => {
-    const drift = computeCentralDrift(specs, driftedCloud());
-    const flagged = drift.filter((d) => d.missingTable || d.missingColumns.length);
-    expect(flagged.map((d) => d.table).sort()).toEqual(
-      ["payment_transactions", "pos_settings", "pos_store_settings"].sort(),
+  it("flags exactly the five genuine gaps in the live central database (Test A)", () => {
+    const drift = computeCentralDrift(driftedCloud());
+    expect(missingPairs(drift)).toEqual(
+      KNOWN_MISSING.map(([t, c]) => `${t}.${c}`).sort(),
     );
-    expect(
-      flagged.find((d) => d.table === "payment_transactions")!.missingColumns.map((c) => c.name),
-    ).toEqual(["client_transaction_id"]);
-    expect(
-      flagged
-        .find((d) => d.table === "pos_store_settings")!
-        .missingColumns.map((c) => c.name)
-        .sort(),
-    ).toEqual(["require_pin_terminal_reset", "row_version", "updated_by"].sort());
   });
 
-  it("reports a fully repaired central database as clean", () => {
-    const drift = computeCentralDrift(specs, fullCloud());
+  it("reports a fully repaired central database as clean (Test B)", () => {
+    const drift = computeCentralDrift(fullCloud());
     expect(drift.every((d) => !d.missingTable && d.missingColumns.length === 0)).toBe(true);
   });
 
   it("marks an absent central table as a missing table", () => {
-    const cloud = fullCloud();
+    const cloud = new Map(fullCloud());
     cloud.delete("payment_transactions");
-    const drift = computeCentralDrift(specs, cloud);
+    const drift = computeCentralDrift(cloud);
     const row = drift.find((d) => d.table === "payment_transactions")!;
     expect(row.missingTable).toBe(true);
     expect(row.missingColumns.length).toBeGreaterThan(0);
   });
+
+  it("classifies extra central columns as legacy, never as drift (Test F)", () => {
+    const cloud = new Map(fullCloud());
+    const payments = new Map(cloud.get("payment_transactions"));
+    // Historical columns that exist centrally but are not in the definition.
+    payments.set("order_id", { type: "string", format: "uuid" });
+    payments.set("payment_method", { type: "string", format: "text" });
+    payments.set("transaction_reference", { type: "string", format: "text" });
+    cloud.set("payment_transactions", payments);
+    const drift = computeCentralDrift(cloud);
+    const row = drift.find((d) => d.table === "payment_transactions")!;
+    expect(row.missingColumns).toEqual([]);
+    expect(row.legacyColumns).toEqual(["order_id", "payment_method", "transaction_reference"]);
+  });
+
+  it("warns when a present column has the wrong type family", () => {
+    const cloud = new Map(fullCloud());
+    const sales = new Map(cloud.get("sales"));
+    sales.set("total_amount", { type: "string", format: "text" });
+    cloud.set("sales", sales);
+    const drift = computeCentralDrift(cloud);
+    const row = drift.find((d) => d.table === "sales")!;
+    expect(row.typeWarnings).toEqual([
+      { column: "total_amount", expected: "numeric", found: "text" },
+    ]);
+  });
 });
 
 describe("buildCentralRepairSql", () => {
-  const drifted = (): CentralDriftRow[] => computeCentralDrift(specs, driftedCloud());
-
-  it("emits additive statements, the payment idempotency index and a schema reload", () => {
-    const script = buildCentralRepairSql(drifted(), new Date("2026-08-23T00:00:00.000Z"));
+  it("emits additive statements, the idempotency index and a schema reload", () => {
+    const script = buildCentralRepairSql(
+      computeCentralDrift(driftedCloud()),
+      new Date("2026-08-23T00:00:00.000Z"),
+    );
     expect(script.ok).toBe(true);
     if (!script.ok) return;
     expect(script.sql).toContain(
@@ -199,32 +223,44 @@ describe("buildCentralRepairSql", () => {
       'alter table public."pos_store_settings" add column if not exists "updated_by" text;',
     );
     expect(script.sql).toContain(
-      'create unique index if not exists "payment_transactions_client_transaction_id_uidx" on public.payment_transactions (client_transaction_id) where client_transaction_id is not null;',
+      'create unique index if not exists "payment_transactions_client_txn_idx" on public.payment_transactions (client_transaction_id) where client_transaction_id is not null;',
     );
     expect(script.sql).toContain("notify pgrst, 'reload schema';");
     expect(script.sql).toContain("2026-08-23T00:00:00.000Z");
   });
 
-  it("omits the payment index when the column is already present", () => {
-    const cloud = fullCloud();
-    cloud.get("pos_settings")!.delete("receipt_css");
-    const script = buildCentralRepairSql(computeCentralDrift(specs, cloud));
+  it("never emits destructive statements, even for legacy columns (Test F)", () => {
+    const script = buildCentralRepairSql(computeCentralDrift(driftedCloud()));
     expect(script.ok).toBe(true);
     if (!script.ok) return;
-    expect(script.sql).not.toContain("payment_transactions_client_transaction_id_uidx");
+    const lower = script.sql.toLowerCase();
+    for (const forbidden of ["drop ", "delete ", "truncate", "alter column", "rename"]) {
+      expect(lower).not.toContain(forbidden);
+    }
+  });
+
+  it("omits the payments index when the column is already present", () => {
+    const cloud = new Map(fullCloud());
+    const settings = new Map(cloud.get("pos_settings"));
+    settings.delete("receipt_css");
+    cloud.set("pos_settings", settings);
+    const script = buildCentralRepairSql(computeCentralDrift(cloud));
+    expect(script.ok).toBe(true);
+    if (!script.ok) return;
+    expect(script.sql).not.toContain("payment_transactions_client_txn_idx");
   });
 
   it("refuses to generate a script while a table is missing", () => {
-    const cloud = fullCloud();
+    const cloud = new Map(fullCloud());
     cloud.delete("payment_transactions");
-    const script = buildCentralRepairSql(computeCentralDrift(specs, cloud));
+    const script = buildCentralRepairSql(computeCentralDrift(cloud));
     expect(script.ok).toBe(false);
     if (script.ok) return;
     expect(script.missingTables).toContain("payment_transactions");
   });
 
   it("reports nothing to repair when the central database matches", () => {
-    const script = buildCentralRepairSql(computeCentralDrift(specs, fullCloud()));
+    const script = buildCentralRepairSql(computeCentralDrift(fullCloud()));
     expect(script.ok).toBe(false);
     if (script.ok) return;
     expect(script.missingTables).toEqual([]);
