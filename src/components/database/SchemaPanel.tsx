@@ -39,11 +39,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { localDb } from "@/lib/local-db";
 import { sqlAdmin } from "@/lib/sql-admin";
-import { fetchCentralSchema } from "@/lib/central-schema.functions";
-import { COMPARE_TABLES } from "@/lib/data-compare";
 import {
+  fetchCentralSchema,
+  probeCentralTables,
+  type CentralProbeRow,
+} from "@/lib/central-schema.functions";
+import centralPushColumns from "../../../electron/db/cloud-columns.json";
+import { CENTRAL_SCHEMA, CENTRAL_SCHEMA_VERSION } from "@/lib/central-schema";
+import {
+  actualFromRows,
   buildCentralRepairSql,
-  centralExpectedSpecs,
   computeCentralDrift,
   type CentralDriftRow,
 } from "@/lib/central-drift";
@@ -347,7 +352,7 @@ export function SchemaPanel() {
             </p>
           )}
 
-          <CentralSchemaCard manifestTables={tables} />
+          <CentralSchemaCard />
         </>
       )}
     </div>
@@ -676,27 +681,39 @@ function AdminRepairDialog({
 }
 
 /**
- * Central-schema drift check. The tables this app keeps in step centrally are
- * compared against the central database's own column list, using the exact
- * push contract (electron/db/cloud-columns.json) plus the central settings
- * columns the web app writes. Anything missing is listed and a ready-to-run
- * PostgreSQL repair script can be downloaded.
+ * Authoritative central-schema drift check. The central PostgreSQL database
+ * is compared one-way against the authoritative definition in
+ * src/lib/central-schema.ts — the local till schema plays no part, so
+ * till-only bookkeeping columns and tables can never raise a false alarm.
+ * Extra columns found centrally are shown as legacy (kept, never dropped),
+ * and genuine gaps produce a ready-to-run additive PostgreSQL repair script.
  */
-function CentralSchemaCard({ manifestTables }: { manifestTables: TableStatus[] }) {
+function CentralSchemaCard() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [cloud, setCloud] = useState<Map<string, Set<string>> | null>(null);
+  const [drift, setDrift] = useState<CentralDriftRow[] | null>(null);
+  const [probeBusy, setProbeBusy] = useState(false);
+  const [probe, setProbe] = useState<CentralProbeRow[] | null>(null);
+  const [probeError, setProbeError] = useState<string | null>(null);
 
-  const manifestByName = useMemo(() => {
-    const map = new Map<string, TableStatus>();
-    for (const t of manifestTables) map.set(t.name.toLowerCase(), t);
-    return map;
-  }, [manifestTables]);
-
-  const expected = useMemo(
-    () => centralExpectedSpecs(COMPARE_TABLES, manifestByName),
-    [manifestByName],
-  );
+  const runProbe = async () => {
+    setProbeBusy(true);
+    setProbeError(null);
+    try {
+      const res = await probeCentralTables();
+      if (!res.ok) {
+        setProbeError(res.error);
+        setProbe(null);
+        return;
+      }
+      setProbe(res.rows);
+    } catch (err) {
+      setProbeError(err instanceof Error ? err.message : "The fetch diagnostics could not run.");
+      setProbe(null);
+    } finally {
+      setProbeBusy(false);
+    }
+  };
 
   const check = async () => {
     setBusy(true);
@@ -705,37 +722,30 @@ function CentralSchemaCard({ manifestTables }: { manifestTables: TableStatus[] }
       const res = await fetchCentralSchema();
       if (!res.ok) {
         setError(res.error);
-        setCloud(null);
+        setDrift(null);
         return;
       }
-      const map = new Map<string, Set<string>>();
-      for (const row of res.rows) {
-        const key = row.table.toLowerCase();
-        if (!map.has(key)) map.set(key, new Set());
-        map.get(key)!.add(row.column.toLowerCase());
-      }
-      setCloud(map);
+      setDrift(computeCentralDrift(actualFromRows(res.rows)));
     } catch (err) {
       setError(err instanceof Error ? err.message : "The central schema could not be read.");
-      setCloud(null);
+      setDrift(null);
     } finally {
       setBusy(false);
     }
   };
 
-  const drift = useMemo<CentralDriftRow[]>(
-    () => (cloud ? computeCentralDrift(expected, cloud) : []),
-    [cloud, expected],
-  );
-
-  const driftCount = drift.filter((d) => d.missingTable || d.missingColumns.length).length;
+  const rows = drift ?? [];
+  const driftCount = rows.filter((d) => d.missingTable || d.missingColumns.length).length;
+  const optionalCount = rows.reduce((n, d) => n + d.optionalMissing.length, 0);
+  const legacyCount = rows.reduce((n, d) => n + d.legacyColumns.length, 0);
+  const warningCount = rows.reduce((n, d) => n + d.typeWarnings.length, 0);
 
   const downloadRepair = () => {
-    const script = buildCentralRepairSql(drift);
+    const script = buildCentralRepairSql(rows);
     if (!script.ok) {
       if (script.missingTables.length) {
         toast.error(
-          `A complete secured migration is required for missing table(s): ${script.missingTables.join(", ")}. Use the authoritative central schema; a column-only repair cannot safely create policies and constraints.`,
+          `A complete secured migration is required for missing table(s): ${script.missingTables.join(", ")}. Use the authoritative central schema; a column-only repair cannot create policies and constraints.`,
         );
       } else {
         toast.success("Central database already matches — nothing to repair");
@@ -752,21 +762,41 @@ function CentralSchemaCard({ manifestTables }: { manifestTables: TableStatus[] }
         <div>
           <p className="flex items-center gap-2 text-sm">
             <Cloud className="h-4 w-4" />
-            Central schema
+            Authoritative central schema
+            <Badge variant="outline" className="font-normal">
+              definition v{CENTRAL_SCHEMA_VERSION}
+            </Badge>
           </p>
           <p className="text-xs text-muted-foreground">
-            Compares the tables this app keeps in step with the central database (sales, payments,
-            settings, …) against the columns the app actually sends. If a table or column is
-            missing there (the &quot;unable to sync&quot; errors), download the repair script and
-            run it once in the external central project&apos;s PostgreSQL SQL editor. Never run it
-            in SQL Server Management Studio.
+            The central PostgreSQL database is the source of truth for central structure. This
+            compares it one-way against the authoritative definition (never against the local
+            till). Columns the central database has beyond the definition are legacy data — kept,
+            listed, never dropped. If a required table or column is missing there (the
+            &quot;unable to sync&quot; errors), download the repair script and run it once in the
+            central project&apos;s PostgreSQL SQL editor. Never run it in SQL Server Management
+            Studio.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {cloud && (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={probeBusy}
+            title="Read every central table once and show the exact error for any that fail"
+            onClick={() => void runProbe()}
+          >
+            {probeBusy ? (
+              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <TriangleAlert className="mr-1.5 h-3.5 w-3.5" />
+            )}
+            Fetch diagnostics
+          </Button>
+          {drift && (
             <Button type="button" size="sm" variant="outline" onClick={downloadRepair}>
               <Download className="mr-1.5 h-3.5 w-3.5" />
-               Download central PostgreSQL repair script
+              Download central PostgreSQL repair script
             </Button>
           )}
           <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => void check()}>
@@ -775,7 +805,7 @@ function CentralSchemaCard({ manifestTables }: { manifestTables: TableStatus[] }
             ) : (
               <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
             )}
-            {cloud ? "Re-check" : "Check central schema"}
+            {drift ? "Re-check" : "Check central schema"}
           </Button>
         </div>
       </div>
@@ -787,16 +817,21 @@ function CentralSchemaCard({ manifestTables }: { manifestTables: TableStatus[] }
         </p>
       )}
 
-      {cloud && (
+      {drift && (
         <>
           <p className="text-xs text-muted-foreground">
             {driftCount
-              ? `${driftCount} of ${drift.length} synced table(s) need attention in the central database.`
-              : `All ${drift.length} synced tables match the central database.`}
+              ? `${driftCount} of ${drift.length} central table(s) need attention`
+              : `All ${drift.length} central tables match the authoritative definition`}
+            {optionalCount ? ` · ${optionalCount} optional column(s) absent` : ""}
+            {warningCount ? ` · ${warningCount} type difference(s)` : ""}
+            {legacyCount
+              ? ` · ${legacyCount} legacy column(s) kept beyond the definition (never dropped)`
+              : ""}
+            .
           </p>
           <div className="max-h-64 overflow-auto rounded-md border border-border">
             {drift.map((d) => {
-              const bad = d.missingTable || d.missingColumns.length > 0;
               const missingNames = d.missingColumns.map((c) => c.name).join(", ");
               return (
                 <div
@@ -831,7 +866,36 @@ function CentralSchemaCard({ manifestTables }: { manifestTables: TableStatus[] }
                       OK
                     </Badge>
                   )}
-                  {bad && (
+                  {!!d.optionalMissing.length && (
+                    <Badge
+                      variant="outline"
+                      className="font-normal text-muted-foreground"
+                      title={d.optionalMissing.map((c) => c.name).join(", ")}
+                    >
+                      {d.optionalMissing.length} optional
+                    </Badge>
+                  )}
+                  {!!d.typeWarnings.length && (
+                    <Badge
+                      variant="outline"
+                      className="border-amber-500/40 bg-amber-500/10 font-normal text-amber-600 dark:text-amber-400"
+                      title={d.typeWarnings
+                        .map((w) => `${w.column}: expected ${w.expected}, found ${w.found}`)
+                        .join("\n")}
+                    >
+                      {d.typeWarnings.length} type diff
+                    </Badge>
+                  )}
+                  {!!d.legacyColumns.length && (
+                    <Badge
+                      variant="outline"
+                      className="font-normal text-muted-foreground"
+                      title={`Legacy columns kept, never dropped: ${d.legacyColumns.join(", ")}`}
+                    >
+                      {d.legacyColumns.length} legacy
+                    </Badge>
+                  )}
+                  {(d.missingTable || !!d.missingColumns.length) && (
                     <span className="max-w-56 truncate text-[11px] text-muted-foreground">
                       {d.missingTable
                         ? "needs the full central schema — a column-only repair cannot create it"
@@ -842,8 +906,91 @@ function CentralSchemaCard({ manifestTables }: { manifestTables: TableStatus[] }
               );
             })}
           </div>
+          {probeError && (
+            <p className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs">
+              <TriangleAlert className="mt-0.5 h-3.5 w-3.5 text-destructive" />
+              {probeError}
+            </p>
+          )}
+          {probe && <ProbeResults rows={probe} />}
+          <SyncCompatibilityCard />
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * Local till sync compatibility — which authoritative central tables the
+ * till's sync engine pushes to (electron/db/cloud-columns.json), and which
+ * are central-only (written by the web app, never by a till). Informational;
+ * it answers "does this central schema still accept my till's pushes?".
+ */
+function SyncCompatibilityCard() {
+  const push = centralPushColumns as Record<string, string[]>;
+  const synced = CENTRAL_SCHEMA.filter((t) => push[t.table]);
+  const centralOnly = CENTRAL_SCHEMA.filter((t) => !push[t.table]);
+  return (
+    <div className="space-y-1 rounded-md border border-border px-3 py-2 text-xs">
+      <p className="font-medium">Local till sync compatibility</p>
+      <p className="text-muted-foreground">
+        {synced.length} of {CENTRAL_SCHEMA.length} central tables accept pushes from this
+        till&apos;s sync engine. The rest are written by the web app only.
+      </p>
+      <div className="grid gap-x-4 sm:grid-cols-2">
+        {synced.map((t) => (
+          <p key={t.table} className="flex items-baseline justify-between gap-2 text-[11px]">
+            <span>{t.label}</span>
+            <span className="text-muted-foreground">
+              pushes {push[t.table].length}/{t.columns.length} cols
+            </span>
+          </p>
+        ))}
+      </div>
+      {!!centralOnly.length && (
+        <p className="text-[11px] text-muted-foreground">
+          Web app only (no till pushes): {centralOnly.map((t) => t.table).join(", ")}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Fetch diagnostics — the result of reading every authoritative central table
+ * once through the service relay. Failures name the exact PostgREST error
+ * (missing table, permission, connectivity) instead of a generic "unable to
+ * fetch", so the operator sees precisely where the problem lives.
+ */
+function ProbeResults({ rows }: { rows: CentralProbeRow[] }) {
+  const failing = rows.filter((r) => !r.ok);
+  if (!failing.length) {
+    return (
+      <p className="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-600 dark:text-emerald-400">
+        Fetch diagnostics: all {rows.length} central tables answered a read. If a screen still
+        shows &quot;unable to fetch&quot;, the failure is on the local side (till database or
+        offline mirror), not the central database.
+      </p>
+    );
+  }
+  return (
+    <div className="space-y-1 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs">
+      <p className="font-medium">
+        Fetch diagnostics: {failing.length} of {rows.length} central table(s) failed a read
+      </p>
+      {failing.map((r) => (
+        <p key={r.table} className="break-all">
+          <span className="font-medium">
+            {r.label} ({r.table})
+          </span>
+          <span className="text-muted-foreground"> — {r.error}</span>
+        </p>
+      ))}
+      <p className="text-muted-foreground">
+        A &quot;relation does not exist&quot; or schema-cache error means the central database is
+        missing the table or a column — run the repair script above. A permission error means the
+        service key or row-security policies need attention.
+      </p>
     </div>
   );
 }

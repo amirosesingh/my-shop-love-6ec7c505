@@ -30,7 +30,8 @@ export type RelayOp =
 export type RelayRead =
   | { kind: "activeShift"; storeId: string }
   | { kind: "stores" }
-  | { kind: "cloudSchema" };
+  | { kind: "cloudSchema" }
+  | { kind: "cloudProbe"; table: string };
 
 /**
  * Only operational tables may be written through the relay. `stores` is
@@ -116,20 +117,51 @@ export async function runRelayRead(read: RelayRead): Promise<{
   error?: string;
 }> {
   if (read.kind === "cloudSchema") {
-    // The PostgREST root document lists every exposed table with its columns,
-    // which is exactly what the till needs to spot central-schema drift.
+    // The PostgREST root document lists every exposed table with its columns
+    // (including type and nullability), which is exactly what the till needs
+    // to spot central-schema drift against the authoritative definition.
     const res = await serviceRest("");
     if (!res.ok) return { ok: false, error: (await res.text()).slice(0, 400) };
     const spec = (await res.json()) as {
-      definitions?: Record<string, { properties?: Record<string, unknown> }>;
+      definitions?: Record<
+        string,
+        {
+          properties?: Record<string, { type?: string; format?: string }>;
+          required?: string[];
+        }
+      >;
     };
     const rows: Record<string, unknown>[] = [];
     for (const [table, def] of Object.entries(spec.definitions ?? {})) {
-      for (const column of Object.keys(def?.properties ?? {})) {
-        rows.push({ table, column });
+      const required = new Set(def?.required ?? []);
+      for (const [column, prop] of Object.entries(def?.properties ?? {})) {
+        rows.push({
+          table,
+          column,
+          type: typeof prop?.type === "string" ? prop.type : null,
+          format: typeof prop?.format === "string" ? prop.format : null,
+          nullable: !required.has(column),
+        });
       }
     }
     return { ok: true, rows };
+  }
+  if (read.kind === "cloudProbe") {
+    // One cheap probe per table: answers "can the central database serve this
+    // table right now?" with the exact PostgREST error when it cannot — the
+    // difference between a missing table (schema cache), a permission problem
+    // and a plain connectivity failure.
+    const table = read.table.replace(/[^a-z0-9_]/gi, "");
+    if (!table) return { ok: false, error: "Invalid table name" };
+    try {
+      const res = await serviceRest(`${table}?select=*&limit=1`);
+      if (!res.ok) {
+        return { ok: false, error: `HTTP ${res.status}: ${(await res.text()).slice(0, 300)}` };
+      }
+      return { ok: true, rows: [] };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : "Network error" };
+    }
   }
   if (read.kind === "stores") {
     const res = await serviceRest("stores?select=id,code,name,address,phone,group_id&order=name");
