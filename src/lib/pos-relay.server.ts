@@ -30,7 +30,8 @@ export type RelayOp =
 export type RelayRead =
   | { kind: "activeShift"; storeId: string }
   | { kind: "stores" }
-  | { kind: "cloudSchema" };
+  | { kind: "cloudSchema" }
+  | { kind: "cloudProbe"; table: string };
 
 /**
  * Only operational tables may be written through the relay. `stores` is
@@ -144,6 +145,23 @@ export async function runRelayRead(read: RelayRead): Promise<{
       }
     }
     return { ok: true, rows };
+  }
+  if (read.kind === "cloudProbe") {
+    // One cheap probe per table: answers "can the central database serve this
+    // table right now?" with the exact PostgREST error when it cannot — the
+    // difference between a missing table (schema cache), a permission problem
+    // and a plain connectivity failure.
+    const table = read.table.replace(/[^a-z0-9_]/gi, "");
+    if (!table) return { ok: false, error: "Invalid table name" };
+    try {
+      const res = await serviceRest(`${table}?select=*&limit=1`);
+      if (!res.ok) {
+        return { ok: false, error: `HTTP ${res.status}: ${(await res.text()).slice(0, 300)}` };
+      }
+      return { ok: true, rows: [] };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : "Network error" };
+    }
   }
   if (read.kind === "stores") {
     const res = await serviceRest("stores?select=id,code,name,address,phone,group_id&order=name");
