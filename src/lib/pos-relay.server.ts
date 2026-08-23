@@ -116,17 +116,31 @@ export async function runRelayRead(read: RelayRead): Promise<{
   error?: string;
 }> {
   if (read.kind === "cloudSchema") {
-    // The PostgREST root document lists every exposed table with its columns,
-    // which is exactly what the till needs to spot central-schema drift.
+    // The PostgREST root document lists every exposed table with its columns
+    // (including type and nullability), which is exactly what the till needs
+    // to spot central-schema drift against the authoritative definition.
     const res = await serviceRest("");
     if (!res.ok) return { ok: false, error: (await res.text()).slice(0, 400) };
     const spec = (await res.json()) as {
-      definitions?: Record<string, { properties?: Record<string, unknown> }>;
+      definitions?: Record<
+        string,
+        {
+          properties?: Record<string, { type?: string; format?: string }>;
+          required?: string[];
+        }
+      >;
     };
     const rows: Record<string, unknown>[] = [];
     for (const [table, def] of Object.entries(spec.definitions ?? {})) {
-      for (const column of Object.keys(def?.properties ?? {})) {
-        rows.push({ table, column });
+      const required = new Set(def?.required ?? []);
+      for (const [column, prop] of Object.entries(def?.properties ?? {})) {
+        rows.push({
+          table,
+          column,
+          type: typeof prop?.type === "string" ? prop.type : null,
+          format: typeof prop?.format === "string" ? prop.format : null,
+          nullable: !required.has(column),
+        });
       }
     }
     return { ok: true, rows };
