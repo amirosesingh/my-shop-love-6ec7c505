@@ -40,7 +40,13 @@ import { Label } from "@/components/ui/label";
 import { localDb } from "@/lib/local-db";
 import { sqlAdmin } from "@/lib/sql-admin";
 import { fetchCentralSchema } from "@/lib/central-schema.functions";
-import { COMPARE_TABLES, compareTableLabel } from "@/lib/data-compare";
+import { COMPARE_TABLES } from "@/lib/data-compare";
+import {
+  buildCentralRepairSql,
+  centralExpectedSpecs,
+  computeCentralDrift,
+  type CentralDriftRow,
+} from "@/lib/central-drift";
 
 type ColumnInfo = { name: string; type: string; present: boolean | null };
 type TableStatus = {
@@ -74,30 +80,6 @@ const downloadText = (filename: string, text: string) => {
 };
 
 const hasIssue = (t: TableStatus) => t.exists === false || t.missingColumns.length > 0;
-
-/** Columns the sync engine adds locally but the central database never holds. */
-const SYNC_ONLY_COLUMNS = new Set(["synced_at", "pending_sync", "sync_attempts", "sync_error"]);
-
-/** Master-schema (SQL Server) type → central database (PostgreSQL) type. */
-export function pgType(mssqlType: string): string {
-  const up = String(mssqlType ?? "").toUpperCase();
-  if (up.startsWith("UNIQUEIDENTIFIER")) return "uuid";
-  if (up.startsWith("BIGINT")) return "bigint";
-  if (up.startsWith("SMALLINT") || up.startsWith("TINYINT")) return "smallint";
-  if (up.startsWith("INT")) return "integer";
-  if (up.startsWith("BIT")) return "boolean";
-  if (/^(DECIMAL|NUMERIC)/.test(up)) return up.toLowerCase().replace("decimal", "numeric");
-  if (up.startsWith("MONEY")) return "numeric(19,4)";
-  if (up.startsWith("FLOAT")) return "double precision";
-  if (up.startsWith("REAL")) return "real";
-  if (/^DATETIME/.test(up)) return "timestamptz";
-  if (up.startsWith("DATE")) return "date";
-  if (up.startsWith("TIME")) return "time";
-  if (up.startsWith("VARBINARY")) return "bytea";
-  return "text";
-}
-
-const q = (ident: string) => `"${ident.replace(/"/g, '""')}"`;
 
 /**
  * Schema manager — one panel that lists every table and column the master
@@ -694,10 +676,11 @@ function AdminRepairDialog({
 }
 
 /**
- * Central-schema drift check. The synced tables are compared against the
- * central database's own table/column list; anything missing is listed and a
- * ready-to-run PostgreSQL repair script can be downloaded. Types are derived
- * from the same master schema file, so one file drives both databases.
+ * Central-schema drift check. The tables this app keeps in step centrally are
+ * compared against the central database's own column list, using the exact
+ * push contract (electron/db/cloud-columns.json) plus the central settings
+ * columns the web app writes. Anything missing is listed and a ready-to-run
+ * PostgreSQL repair script can be downloaded.
  */
 function CentralSchemaCard({ manifestTables }: { manifestTables: TableStatus[] }) {
   const [busy, setBusy] = useState(false);
@@ -711,7 +694,7 @@ function CentralSchemaCard({ manifestTables }: { manifestTables: TableStatus[] }
   }, [manifestTables]);
 
   const expected = useMemo(
-    () => COMPARE_TABLES.filter((spec) => manifestByName.has(spec.table)),
+    () => centralExpectedSpecs(COMPARE_TABLES, manifestByName),
     [manifestByName],
   );
 
@@ -740,58 +723,26 @@ function CentralSchemaCard({ manifestTables }: { manifestTables: TableStatus[] }
     }
   };
 
-  const drift = useMemo(() => {
-    if (!cloud) return [];
-    return expected.map((spec) => {
-      const local = manifestByName.get(spec.table)!;
-      const wanted = local.columns.filter((c) => !SYNC_ONLY_COLUMNS.has(c.name.toLowerCase()));
-      const have = cloud.get(spec.table);
-      if (!have) return { spec, missingTable: true, missingColumns: wanted.map((c) => c.name) };
-      const missingColumns = wanted
-        .filter((c) => !have.has(c.name.toLowerCase()))
-        .map((c) => c.name);
-      return { spec, missingTable: false, missingColumns };
-    });
-  }, [cloud, expected, manifestByName]);
+  const drift = useMemo<CentralDriftRow[]>(
+    () => (cloud ? computeCentralDrift(expected, cloud) : []),
+    [cloud, expected],
+  );
 
   const driftCount = drift.filter((d) => d.missingTable || d.missingColumns.length).length;
 
   const downloadRepair = () => {
-    if (!cloud) return;
-    const missingTables = drift.filter((d) => d.missingTable).map((d) => d.spec.table);
-    if (missingTables.length) {
-      toast.error(
-        `A complete secured migration is required for missing table(s): ${missingTables.join(", ")}. Use the authoritative central schema; a column-only repair cannot safely create policies and constraints.`,
-      );
-      return;
-    }
-    const lines: string[] = [
-      "-- POS central schema repair",
-      "-- Generated from the master schema file. Every statement is idempotent:",
-      "-- safe to run repeatedly, never drops or rewrites existing data.",
-      "-- Run once in the central project's SQL editor, then re-check here.",
-      "",
-    ];
-    let statements = 0;
-    for (const d of drift) {
-      const local = manifestByName.get(d.spec.table)!;
-      const wanted = local.columns.filter((c) => !SYNC_ONLY_COLUMNS.has(c.name.toLowerCase()));
-      if (d.missingColumns.length) {
-        for (const c of wanted) {
-          if (!d.missingColumns.includes(c.name)) continue;
-          lines.push(
-            `alter table public.${q(d.spec.table)} add column if not exists ${q(c.name)} ${pgType(c.type)};`,
-          );
-          statements += 1;
-        }
-        lines.push("");
+    const script = buildCentralRepairSql(drift);
+    if (!script.ok) {
+      if (script.missingTables.length) {
+        toast.error(
+          `A complete secured migration is required for missing table(s): ${script.missingTables.join(", ")}. Use the authoritative central schema; a column-only repair cannot safely create policies and constraints.`,
+        );
+      } else {
+        toast.success("Central database already matches — nothing to repair");
       }
-    }
-    if (!statements) {
-      toast.success("Central database already matches — nothing to repair");
       return;
     }
-    downloadText("pos-central-postgresql-column-repair.sql", lines.join("\n"));
+    downloadText("pos-central-postgresql-column-repair.sql", script.sql);
     toast.success("Central PostgreSQL repair SQL downloaded");
   };
 
@@ -804,10 +755,11 @@ function CentralSchemaCard({ manifestTables }: { manifestTables: TableStatus[] }
             Central schema
           </p>
           <p className="text-xs text-muted-foreground">
-            Compares the synced tables with the central database. If a table or column is missing
-            there (the &quot;unable to sync&quot; errors), download the repair script and run it
-            once in the external central project&apos;s PostgreSQL SQL editor. Never run it in SQL
-            Server Management Studio.
+            Compares the tables this app keeps in step with the central database (sales, payments,
+            settings, …) against the columns the app actually sends. If a table or column is
+            missing there (the &quot;unable to sync&quot; errors), download the repair script and
+            run it once in the external central project&apos;s PostgreSQL SQL editor. Never run it
+            in SQL Server Management Studio.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -845,14 +797,15 @@ function CentralSchemaCard({ manifestTables }: { manifestTables: TableStatus[] }
           <div className="max-h-64 overflow-auto rounded-md border border-border">
             {drift.map((d) => {
               const bad = d.missingTable || d.missingColumns.length > 0;
+              const missingNames = d.missingColumns.map((c) => c.name).join(", ");
               return (
                 <div
-                  key={d.spec.table}
+                  key={d.table}
                   className="flex items-center gap-2 border-b border-border px-2 py-1.5 last:border-b-0"
                 >
                   <span className="min-w-0 flex-1 truncate text-xs font-medium">
-                    {compareTableLabel(d.spec.table)}
-                    <span className="ml-1 text-muted-foreground">({d.spec.table})</span>
+                    {d.label}
+                    <span className="ml-1 text-muted-foreground">({d.table})</span>
                   </span>
                   {d.missingTable ? (
                     <Badge
@@ -865,7 +818,7 @@ function CentralSchemaCard({ manifestTables }: { manifestTables: TableStatus[] }
                     <Badge
                       variant="outline"
                       className="border-amber-500/40 bg-amber-500/10 font-normal text-amber-600 dark:text-amber-400"
-                      title={d.missingColumns.join(", ")}
+                      title={missingNames}
                     >
                       {d.missingColumns.length} column{d.missingColumns.length === 1 ? "" : "s"}{" "}
                       missing
@@ -880,7 +833,9 @@ function CentralSchemaCard({ manifestTables }: { manifestTables: TableStatus[] }
                   )}
                   {bad && (
                     <span className="max-w-56 truncate text-[11px] text-muted-foreground">
-                      {d.missingTable ? "will be created by the script" : d.missingColumns.join(", ")}
+                      {d.missingTable
+                        ? "needs the full central schema — a column-only repair cannot create it"
+                        : missingNames}
                     </span>
                   )}
                 </div>
