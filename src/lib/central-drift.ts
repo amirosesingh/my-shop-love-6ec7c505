@@ -1,184 +1,201 @@
 /**
- * Central schema drift — compares the central (online) database against the
- * exact set of columns the app writes to it.
+ * Central schema drift — compares the AUTHORITATIVE central schema
+ * (src/lib/central-schema.ts) against the actual central PostgreSQL database.
  *
- * Two authorities, one answer:
+ * The comparison is deliberately one-way:
  *
- * - electron/db/cloud-columns.json — the per-table push allow-list the sync
- *   engine and relay actually send. The till's master schema carries extra
- *   local-only columns (is_synced, sync_status, updated_at, branch_id, …) and
- *   alternative names the central database never had; comparing those raised
- *   false "missing column" alarms. The push contract is the honest yardstick.
- * - CENTRAL_EXTRA_SPECS — columns the web app writes on the wide central
- *   settings tables. The till stores settings differently, so the master
- *   schema file cannot describe them; this list is verified against the
- *   reference central schema.
+ *   Authoritative Central Schema  →  Actual Central PostgreSQL
+ *
+ * The local till schema plays no part here. Till-only bookkeeping columns
+ * (is_synced, sync_status, last_error_at, …) and till-only tables
+ * (sync_state, system_settings, transfers, shift_notifications) are not in
+ * the authoritative definition, so they can never raise a false alarm.
+ *
+ * Columns found centrally but not in the definition are NOT drift: they are
+ * reported as legacy/informational so historical business data is visible,
+ * and they are never included in the repair script and never dropped.
  */
-import centralPushColumns from "../../electron/db/cloud-columns.json";
-import type { CompareTableSpec } from "./data-compare";
+import {
+  CENTRAL_SCHEMA,
+  type CentralColumnSpec,
+  type CentralTableSchema,
+} from "./central-schema";
 
-export type CentralColumn = {
-  name: string;
-  /** Master-schema (SQL Server) type, when the column comes from the manifest. */
-  type?: string;
-  /** Exact PostgreSQL type — used for central-only columns with no local twin. */
-  pgType?: string;
-};
+/** What the introspected central database reports for one column. */
+export type ActualColumn = { type?: string | null; format?: string | null };
 
-export type CentralTableSpec = {
-  table: string;
-  label: string;
-  columns: CentralColumn[];
-};
+/** table (lowercase) → column (lowercase) → metadata. */
+export type ActualCentralSchema = ReadonlyMap<string, ReadonlyMap<string, ActualColumn>>;
+
+export type TypeWarning = { column: string; expected: string; found: string };
 
 export type CentralDriftRow = {
   table: string;
   label: string;
   missingTable: boolean;
-  missingColumns: CentralColumn[];
+  /** Required columns the central database lacks — genuine drift. */
+  missingColumns: CentralColumnSpec[];
+  /** Optional columns the central database lacks — reported, never blocking. */
+  optionalMissing: CentralColumnSpec[];
+  /**
+   * Columns present centrally but not in the authoritative definition.
+   * Legacy/informational only: historical data stays, nothing is repaired
+   * or removed.
+   */
+  legacyColumns: string[];
+  /** Present but with a different type family — informational. */
+  typeWarnings: TypeWarning[];
 };
 
-/** table → the exact columns pushed centrally (lowercase). */
-const PUSH_COLUMNS: Record<string, Set<string>> = Object.fromEntries(
-  Object.entries(centralPushColumns).map(([table, cols]) => [
-    table,
-    new Set(cols.map((c) => c.toLowerCase())),
-  ]),
-);
-
-/**
- * Columns the web app writes on the wide central settings tables; the till
- * keeps settings in a different shape, so these have no master-schema twin.
- * Verified against the reference central database (2026-08).
- */
-const CENTRAL_EXTRA_SPECS: CentralTableSpec[] = [
-  {
-    table: "pos_settings",
-    label: "POS settings",
-    columns: [{ name: "receipt_css", pgType: "text not null default ''" }],
-  },
-  {
-    table: "pos_store_settings",
-    label: "Branch settings",
-    columns: [
-      { name: "require_pin_terminal_reset", pgType: "boolean" },
-      { name: "row_version", pgType: "integer not null default 1" },
-      { name: "updated_by", pgType: "text" },
-    ],
-  },
-];
-
-/**
- * The tables and columns the central database must have: every synced table's
- * master-schema columns narrowed to the push contract, plus the central-only
- * settings columns. Till-only tables (no push entry) are skipped.
- */
-export function centralExpectedSpecs(
-  compareSpecs: CompareTableSpec[],
-  manifestTables: Map<string, { columns: { name: string; type: string }[] }>,
-): CentralTableSpec[] {
-  const specs: CentralTableSpec[] = [];
-  for (const spec of compareSpecs) {
-    const local = manifestTables.get(spec.table);
-    const push = PUSH_COLUMNS[spec.table];
-    if (!local || !push) continue;
-    specs.push({
-      table: spec.table,
-      label: spec.label,
-      columns: local.columns
-        .filter((c) => push.has(c.name.toLowerCase()))
-        .map((c) => ({ name: c.name, type: c.type })),
+/** Build the actual-schema map from relay introspection rows. */
+export function actualFromRows(
+  rows: { table: string; column: string; type?: string | null; format?: string | null }[],
+): ActualCentralSchema {
+  const map = new Map<string, Map<string, ActualColumn>>();
+  for (const row of rows) {
+    const table = row.table.toLowerCase();
+    if (!map.has(table)) map.set(table, new Map());
+    map.get(table)!.set(row.column.toLowerCase(), {
+      type: row.type ?? null,
+      format: row.format ?? null,
     });
   }
-  return [...specs, ...CENTRAL_EXTRA_SPECS];
+  return map;
 }
 
-/** Compare the expected contract with the central database's own column list. */
+/**
+ * Coarse type family so a column's type can be sanity-checked across the
+ * SQL Server → PostgreSQL → PostgREST boundary without false alarms over
+ * representation differences (numeric(19,4) vs numeric, nvarchar vs text).
+ */
+function typeFamilyOfSpec(pgType: string): string {
+  const t = pgType.split(/\s+/)[0]?.toLowerCase() ?? "";
+  if (t.endsWith("[]")) return "array";
+  if (t.startsWith("numeric") || t.startsWith("decimal")) return "numeric";
+  if (t === "double precision" || t === "real") return "numeric";
+  return t || "unknown";
+}
+
+function typeFamilyOfActual(col: ActualColumn): string | null {
+  const format = (col.format ?? "").toLowerCase();
+  const type = (col.type ?? "").toLowerCase();
+  if (format.includes("uuid")) return "uuid";
+  if (format.includes("timestamp")) return "timestamptz";
+  if (format.startsWith("date")) return "date";
+  if (format.startsWith("time")) return "time";
+  if (format === "jsonb" || format === "json") return "jsonb";
+  if (format.includes("numeric") || format.includes("decimal") || format === "double precision")
+    return "numeric";
+  if (format === "integer" || format === "bigint" || format === "smallint") return format;
+  if (format === "boolean") return "boolean";
+  if (format === "text" || format.includes("character")) return "text";
+  if (type === "array") return "array";
+  if (type === "integer") return "integer";
+  if (type === "number") return "numeric";
+  if (type === "boolean") return "boolean";
+  if (type === "string") return "text";
+  if (type === "object") return "jsonb";
+  return null;
+}
+
+const isRequired = (c: CentralColumnSpec) => (c.classification ?? "required") === "required";
+
+/** Compare the authoritative definition with the actual central schema. */
 export function computeCentralDrift(
-  specs: CentralTableSpec[],
-  cloud: Map<string, Set<string>>,
+  actual: ActualCentralSchema,
+  schema: CentralTableSchema[] = CENTRAL_SCHEMA,
 ): CentralDriftRow[] {
-  return specs.map((spec) => {
-    const present = cloud.get(spec.table);
+  return schema.map((spec) => {
+    const present = actual.get(spec.table);
     if (!present) {
       return {
         table: spec.table,
         label: spec.label,
         missingTable: true,
-        missingColumns: spec.columns,
+        missingColumns: spec.columns.filter(isRequired),
+        optionalMissing: spec.columns.filter((c) => !isRequired(c)),
+        legacyColumns: [],
+        typeWarnings: [],
       };
     }
+    const known = new Set(spec.columns.map((c) => c.name.toLowerCase()));
+    const missingColumns: CentralColumnSpec[] = [];
+    const optionalMissing: CentralColumnSpec[] = [];
+    const typeWarnings: TypeWarning[] = [];
+    for (const col of spec.columns) {
+      const actualCol = present.get(col.name.toLowerCase());
+      if (!actualCol) {
+        (isRequired(col) ? missingColumns : optionalMissing).push(col);
+        continue;
+      }
+      const expected = typeFamilyOfSpec(col.pgType);
+      const found = typeFamilyOfActual(actualCol);
+      if (found && expected !== "unknown" && expected !== found) {
+        typeWarnings.push({ column: col.name, expected, found });
+      }
+    }
+    const legacyColumns = [...present.keys()].filter((c) => !known.has(c)).sort();
     return {
       table: spec.table,
       label: spec.label,
       missingTable: false,
-      missingColumns: spec.columns.filter((c) => !present.has(c.name.toLowerCase())),
+      missingColumns,
+      optionalMissing,
+      legacyColumns,
+      typeWarnings,
     };
   });
 }
-
-/** Master-schema (SQL Server) type → central database (PostgreSQL) type. */
-export function pgType(mssqlType: string): string {
-  const up = String(mssqlType ?? "").toUpperCase();
-  if (up.startsWith("UNIQUEIDENTIFIER")) return "uuid";
-  if (up.startsWith("BIGINT")) return "bigint";
-  if (up.startsWith("SMALLINT") || up.startsWith("TINYINT")) return "smallint";
-  if (up.startsWith("INT")) return "integer";
-  if (up.startsWith("BIT")) return "boolean";
-  if (/^(DECIMAL|NUMERIC)/.test(up)) return up.toLowerCase().replace("decimal", "numeric");
-  if (up.startsWith("MONEY")) return "numeric(19,4)";
-  if (up.startsWith("FLOAT")) return "double precision";
-  if (up.startsWith("REAL")) return "real";
-  if (/^DATETIME/.test(up)) return "timestamptz";
-  if (up.startsWith("DATE")) return "date";
-  if (up.startsWith("TIME")) return "time";
-  if (up.startsWith("VARBINARY")) return "bytea";
-  return "text";
-}
-
-/** Quote an identifier for the central (PostgreSQL) database. */
-const q = (ident: string) => `"${ident.replace(/"/g, '""')}"`;
 
 export type CentralRepairScript =
   | { ok: true; sql: string }
   | { ok: false; missingTables: string[] };
 
+/** Quote an identifier for the central (PostgreSQL) database. */
+const q = (ident: string) => `"${ident.replace(/"/g, '""')}"`;
+
 /**
  * Build the additive PostgreSQL repair script for the current drift. Every
- * statement is idempotent and data-preserving. A missing table blocks the
- * script: creating a table without its grants and row-security policies
- * would leave it unreachable, so that case needs the authoritative central
- * schema instead.
+ * statement is idempotent and data-preserving: columns are added if absent,
+ * never dropped, never rewritten, and legacy extra columns are untouched.
+ *
+ * A missing table blocks the script: creating a table without its grants and
+ * row-security policies would leave it unreachable, so that case needs the
+ * authoritative central schema migration instead.
  */
 export function buildCentralRepairSql(
   drift: CentralDriftRow[],
   generatedAt = new Date(),
+  schema: CentralTableSchema[] = CENTRAL_SCHEMA,
 ): CentralRepairScript {
   const missingTables = drift.filter((d) => d.missingTable).map((d) => d.table);
   if (missingTables.length) return { ok: false, missingTables };
 
   const statements: string[] = [];
+  const repairedColumns = new Map<string, Set<string>>();
   for (const d of drift) {
-    for (const c of d.missingColumns) {
+    const cols = [...d.missingColumns, ...d.optionalMissing];
+    if (!cols.length) continue;
+    repairedColumns.set(d.table, new Set(cols.map((c) => c.name.toLowerCase())));
+    for (const c of cols) {
       statements.push(
-        `alter table public.${q(d.table)} add column if not exists ${q(c.name)} ${c.pgType ?? pgType(c.type ?? "")};`,
+        `alter table public.${q(d.table)} add column if not exists ${q(c.name)} ${c.pgType};`,
       );
     }
   }
   if (!statements.length) return { ok: false, missingTables: [] };
 
-  // The payments idempotency key needs its lookup index so a retried push can
-  // resolve an already-stored row instead of failing, matching the sales twin.
-  if (
-    drift.some(
-      (d) =>
-        d.table === "payment_transactions" &&
-        d.missingColumns.some((c) => c.name.toLowerCase() === "client_transaction_id"),
-    )
-  ) {
-    statements.push(
-      `create unique index if not exists "payment_transactions_client_transaction_id_uidx" on public.payment_transactions (client_transaction_id) where client_transaction_id is not null;`,
-    );
+  // Indexes that depend on a just-repaired column (for example the payments
+  // idempotency key) are created so a retried push can resolve an
+  // already-stored row instead of failing.
+  for (const spec of schema) {
+    const repaired = repairedColumns.get(spec.table);
+    if (!repaired) continue;
+    for (const index of spec.indexes ?? []) {
+      if (index.dependsOnColumns.some((c) => repaired.has(c.toLowerCase()))) {
+        statements.push(index.sql);
+      }
+    }
   }
   // Ask PostgREST to reload its schema cache so the new columns work at once.
   statements.push(`notify pgrst, 'reload schema';`);
