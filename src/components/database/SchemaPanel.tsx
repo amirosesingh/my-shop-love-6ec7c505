@@ -955,3 +955,42 @@ function SyncCompatibilityCard() {
     </div>
   );
 }
+
+/**
+ * Fetch diagnostics — the result of reading every authoritative central table
+ * once through the service relay. Failures name the exact PostgREST error
+ * (missing table, permission, connectivity) instead of a generic "unable to
+ * fetch", so the operator sees precisely where the problem lives.
+ */
+function ProbeResults({ rows }: { rows: CentralProbeRow[] }) {
+  const failing = rows.filter((r) => !r.ok);
+  if (!failing.length) {
+    return (
+      <p className="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-600 dark:text-emerald-400">
+        Fetch diagnostics: all {rows.length} central tables answered a read. If a screen still
+        shows &quot;unable to fetch&quot;, the failure is on the local side (till database or
+        offline mirror), not the central database.
+      </p>
+    );
+  }
+  return (
+    <div className="space-y-1 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs">
+      <p className="font-medium">
+        Fetch diagnostics: {failing.length} of {rows.length} central table(s) failed a read
+      </p>
+      {failing.map((r) => (
+        <p key={r.table} className="break-all">
+          <span className="font-medium">
+            {r.label} ({r.table})
+          </span>
+          <span className="text-muted-foreground"> — {r.error}</span>
+        </p>
+      ))}
+      <p className="text-muted-foreground">
+        A &quot;relation does not exist&quot; or schema-cache error means the central database is
+        missing the table or a column — run the repair script above. A permission error means the
+        service key or row-security policies need attention.
+      </p>
+    </div>
+  );
+}
