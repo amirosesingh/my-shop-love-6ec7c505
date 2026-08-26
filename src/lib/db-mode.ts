@@ -9,7 +9,7 @@
  * local on its own. The stored preference is never changed by a failover, so
  * the till returns to online working the moment the internet is back.
  */
-import { isLiveOnly } from "./live-mode";
+import { isOnlineOnly } from "./live-mode";
 import { isElectron } from "./native";
 
 export type DatabaseMode = "online" | "local";
@@ -60,7 +60,7 @@ export function setPreferredDatabaseMode(mode: DatabaseMode) {
 }
 
 /** True when the phone build pins the mode and the switch cannot be used. */
-export const databaseModeLocked = (): boolean => isLiveOnly();
+export const databaseModeLocked = (): boolean => isOnlineOnly();
 
 /** Has the app dropped to local working because the connection failed? */
 export const isFailingOver = (): boolean => failingOver;
@@ -81,7 +81,7 @@ export function setCloudDirect(on: boolean) {
  * database to mention; Windows and the browser have both targets.
  */
 export function unreachableMessage(): string {
-  return isLiveOnly()
+  return isOnlineOnly()
     ? "Shift cannot be opened: Central server relay is offline. Please contact an administrator."
     : "Database Connection Required: Unable to reach the local database server or online database. " +
         "Please check your network connection.";
@@ -122,7 +122,7 @@ const online = () => !isBrowser() || window.navigator.onLine;
  * connection is down, in which case local keeps the till trading.
  */
 export function effectiveDatabaseMode(): DatabaseMode {
-  if (isLiveOnly()) return "online";
+  if (isOnlineOnly()) return "online";
   if (preferredDatabaseMode() === "local") return "local";
   return online() && !failingOver ? "online" : "local";
 }

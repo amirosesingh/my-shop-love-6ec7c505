@@ -71,7 +71,10 @@ function SettingsHub() {
   const term = query.trim().toLowerCase();
 
   const cards = SETTINGS_CARDS.filter(
-    (c) => !(c.cloudOnly && desktop) && visibleRoute(c.to.split("?")[0] as string),
+    (c) =>
+      !(c.cloudOnly && desktop) &&
+      !(c.desktopOnly && !desktop) &&
+      visibleRoute(c.to.split("?")[0] as string),
   );
   const categories = SETTINGS_CATEGORIES.filter((g) => cards.some((c) => c.category === g.id));
   const activeCat = cat && categories.some((g) => g.id === cat) ? cat : categories[0]?.id;

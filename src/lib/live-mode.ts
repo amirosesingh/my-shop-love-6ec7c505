@@ -6,10 +6,20 @@
  * the Windows till keep their offline-first behaviour untouched — every caller
  * of `isLiveOnly()` falls through to the existing path when it returns false.
  */
-import { isNative } from "./native";
+import { isElectron, isNative } from "./native";
 
 export function isLiveOnly(): boolean {
   return isNative();
+}
+
+/**
+ * True on every build without a local database engine behind it: the browser
+ * and the phone. Both are live clients of the central system — they never
+ * queue writes, never keep a snapshot and never offer the Local/Online
+ * switch. Only the Windows desktop shell works offline.
+ */
+export function isOnlineOnly(): boolean {
+  return !isElectron();
 }
 
 /** Storage keys the phone is still allowed to keep (interface preferences). */
@@ -27,7 +37,6 @@ export const UI_STORAGE_KEYS = [
   "pos.android.update.dismissed",
   "pos.journal.terminalId",
 ];
-
 
 export function isUiKey(key: string): boolean {
   return UI_STORAGE_KEYS.includes(key);
@@ -48,9 +57,7 @@ export const DEVICE_STATE_KEYS = [
 const DEVICE_STATE_PREFIXES = ["pos.secure."];
 
 export function isDeviceStateKey(key: string): boolean {
-  return (
-    DEVICE_STATE_KEYS.includes(key) || DEVICE_STATE_PREFIXES.some((p) => key.startsWith(p))
-  );
+  return DEVICE_STATE_KEYS.includes(key) || DEVICE_STATE_PREFIXES.some((p) => key.startsWith(p));
 }
 
 /**

@@ -19,6 +19,8 @@ import { defaultReceiptSettings } from "./pos-seed";
 import qrcode from "qrcode-generator";
 import { toast } from "sonner";
 import {
+  canOpenDrawer,
+  canPrintReceipts,
   drawerPulseBytes,
   getPrinterPrefs,
   rawPulse,
@@ -578,6 +580,12 @@ function memberBody(member: Member, sales: Sale[]) {
  * Browser                -> classic hidden iframe with the print dialog.
  */
 function printHtml(title: string, body: string, slip = true, barcode?: string) {
+  if (!canPrintReceipts()) {
+    toast.error("Printing not available on this device", {
+      description: "Receipts print from the Windows till or a browser with a printer attached.",
+    });
+    return;
+  }
   const desktopHtml = shell(title, body, false);
   const paper = receiptCfg.paper;
   const mode = getPrinterPrefs().printMode ?? "dialog";
@@ -1005,6 +1013,12 @@ export function printTransferNote(
  * installed it is used instead.
  */
 export function openCashDrawer() {
+  if (!canOpenDrawer()) {
+    toast.error("Cash drawer not available on this device", {
+      description: "The drawer opens through the receipt printer on the Windows till.",
+    });
+    return;
+  }
   const bytes = drawerPulseBytes();
   void rawPulse(bytes).then((res) => {
     if (res.handled) {

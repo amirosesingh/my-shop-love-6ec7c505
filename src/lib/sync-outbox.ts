@@ -8,7 +8,7 @@
  * allow it.
  */
 import { stamp } from "./activity-journal";
-import { isLiveOnly } from "./live-mode";
+import { isOnlineOnly } from "./live-mode";
 import { touchedIds as versionedIds, versionsFor } from "./row-versions";
 
 export type Row = Record<string, unknown>;
@@ -88,7 +88,7 @@ const isBrowser = () => typeof window !== "undefined";
  */
 const hasLocalEngine = () => isBrowser() && !!(window as unknown as { pos?: unknown }).pos;
 
-const canQueue = () => hasLocalEngine() && !isLiveOnly();
+const canQueue = () => hasLocalEngine() && !isOnlineOnly();
 
 function read(): QueuedOp[] {
   // The phone and the web build never queue: writes go straight to the backend.
@@ -161,7 +161,7 @@ export function resolveOp(id: string) {
  */
 export function persisted(ids: string[]): boolean {
   if (!ids.length) return true;
-  if (isLiveOnly()) return false;
+  if (isOnlineOnly()) return false;
   const have = new Set(read().map((q) => q.id));
   return ids.every((id) => have.has(id));
 }

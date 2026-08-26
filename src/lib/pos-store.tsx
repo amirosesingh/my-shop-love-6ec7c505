@@ -47,7 +47,7 @@ import {
 import { recordActivity } from "./activity-events";
 import type { CloudSlice, CommitTarget } from "./pos-db";
 import { clearSnapshot, readSnapshot, writeSnapshot } from "./offline-snapshot";
-import { isLiveOnly } from "./live-mode";
+import { isOnlineOnly } from "./live-mode";
 import { useAuth } from "@/lib/pos-auth";
 import { readTerminalConfig } from "./terminal-tokens";
 import { reserveBillNumber } from "./bill-number";
@@ -382,8 +382,8 @@ export function PosProvider({ children }: { children: ReactNode }) {
     // Local-only slices (stores, shifts, transfers, counters) stay on the
     // terminal; catalogue, members, bills, promos and settings come from cloud.
     try {
-      // Android keeps nothing on the device — every slice is loaded live.
-      const raw = isLiveOnly() ? null : window.localStorage.getItem(KEY);
+      // Web and Android keep nothing locally — every slice is loaded live.
+      const raw = isOnlineOnly() ? null : window.localStorage.getItem(KEY);
       if (raw) {
         const saved = JSON.parse(raw) as PosState;
         // Migrate single-product transfers saved before multi-item support.
@@ -472,7 +472,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!ready) return;
-    if (isLiveOnly()) return;
+    if (isOnlineOnly()) return;
     schedulePersist(KEY, () => JSON.stringify(state));
   }, [state, ready]);
 
@@ -615,10 +615,10 @@ export function PosProvider({ children }: { children: ReactNode }) {
     setState((s) => (s.currentStoreId === bound ? s : { ...s, currentStoreId: bound }));
   }, [state.stores, signedIn]);
 
-  // Android holds nothing locally, so coming back to the app must re-read the
+  // Web and Android hold nothing locally, so returning to the app must re-read the
   // catalogue, members, prices and shift from the backend.
   useEffect(() => {
-    if (!isLiveOnly() || !signedIn) return;
+    if (!isOnlineOnly() || !signedIn) return;
     const resume = () => {
       if (document.visibilityState !== "visible" || !navigator.onLine) return;
       void loadCloudState()
@@ -641,7 +641,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
   // connection comes back, so register search and barcode scans stay current
   // even when the machine later goes offline again.
   useEffect(() => {
-    if (isLiveOnly() || !signedIn) return;
+    if (isOnlineOnly() || !signedIn) return;
     let cancelled = false;
     const pull = () => {
       if (typeof navigator !== "undefined" && !navigator.onLine) return;

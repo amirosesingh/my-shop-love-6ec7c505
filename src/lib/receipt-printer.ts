@@ -6,6 +6,7 @@
  * neither exists, so callers fall back to the classic hidden-iframe print.
  */
 
+import { isNative } from "./native";
 import type { SlipEncoding, SlipLineEnding } from "./escpos";
 
 const PRINTER_KEY = "pos-receipt-printer-v1";
@@ -204,6 +205,20 @@ export async function rawPulse(bytes: number[]): Promise<PulseResult> {
     console.error("Drawer kick failed:", error);
     return { handled: true, ok: false, error };
   }
+}
+
+/**
+ * Receipt hardware is Windows-only. The desktop shell talks to the printer
+ * directly; a browser can still fall back to its own print dialog, but the
+ * phone build has neither, so the buttons are shown as unavailable there.
+ */
+export function canPrintReceipts(): boolean {
+  return !isNative();
+}
+
+/** A cash drawer only opens through a printer, so it follows the same rule. */
+export function canOpenDrawer(): boolean {
+  return printBridge() !== null || !isNative();
 }
 
 /** ESC/POS drawer kick bytes for the configured connector pin. */

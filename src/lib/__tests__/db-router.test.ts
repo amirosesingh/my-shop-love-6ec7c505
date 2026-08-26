@@ -35,7 +35,7 @@ describe("dbRouter", () => {
   it("describes a total failure in plain language", () => {
     const e = new AllTargetsFailed("Saving sale");
     expect(e.name).toBe("AllTargetsFailed");
-    expect(e.message).toMatch(/Database Connection Required/);
+    expect(e.message).toMatch(/Database Connection Required|Central server relay is offline/);
   });
 
   it("exposes the same gateway under both names", () => {
