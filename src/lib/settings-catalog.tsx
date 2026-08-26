@@ -73,6 +73,11 @@ export type SettingsCard = {
   raw?: boolean;
   /** Managed in the web console only — hidden in the Windows desktop build. */
   cloudOnly?: boolean;
+  /**
+   * Needs the local database engine — hidden on web and phone, which work
+   * live against the central database and have nothing local to inspect.
+   */
+  desktopOnly?: boolean;
   /** Extra words the search box should match. */
   keywords?: string;
 };
@@ -355,6 +360,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     category: "data",
     to: "/settings/system?tab=data-sync",
     raw: true,
+    desktopOnly: true,
     panel: lazy(async () => ({
       default: (await import("@/components/pos/sync/SyncHub")).SyncHub,
     })),
@@ -472,6 +478,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     category: "diagnostics",
     to: "/settings/database-explorer",
     panel: page(() => import("@/routes/settings.database-explorer")),
+    desktopOnly: true,
   },
 
   /* ---- Access & visibility --------------------------------------------- */
