@@ -1,10 +1,10 @@
 /**
- * "No internet connection" screen for the Android build.
+ * "No internet connection" screen for the browser and Android builds.
  *
- * The phone holds no business data, so every screen needs the backend. When
- * the connection drops this covers the app, watches for the network coming
- * back and reloads the current page automatically. Web and Windows never
- * render it: `isOnlineOnly()` is false there and children pass straight through.
+ * Neither holds business data, so every screen needs the backend. When the
+ * connection drops this covers the app, watches for the network coming back
+ * and reloads the current page automatically. The Windows till never renders
+ * it: `isOnlineOnly()` is false there and children pass straight through.
  */
 import { useEffect, useState, type ReactNode } from "react";
 import { WifiOff, RefreshCw } from "lucide-react";
