@@ -34,6 +34,7 @@ describe("commitOps in online mode with a local database present", () => {
         removeItem: (k: string) => void store.delete(k),
       },
       navigator: { onLine: true },
+      dispatchEvent: () => true,
       addEventListener: () => {},
       removeEventListener: () => {},
     };
