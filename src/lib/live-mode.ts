@@ -6,10 +6,20 @@
  * the Windows till keep their offline-first behaviour untouched — every caller
  * of `isLiveOnly()` falls through to the existing path when it returns false.
  */
-import { isNative } from "./native";
+import { isElectron, isNative } from "./native";
 
 export function isLiveOnly(): boolean {
   return isNative();
+}
+
+/**
+ * True on every build without a local database engine behind it: the browser
+ * and the phone. Both are live clients of the central system — they never
+ * queue writes, never keep a snapshot and never offer the Local/Online
+ * switch. Only the Windows desktop shell works offline.
+ */
+export function isOnlineOnly(): boolean {
+  return !isElectron();
 }
 
 /** Storage keys the phone is still allowed to keep (interface preferences). */
