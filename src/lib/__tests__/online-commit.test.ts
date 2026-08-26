@@ -26,7 +26,17 @@ describe("commitOps in online mode with a local database present", () => {
   // The local engine only exists inside the Electron shell; `window.pos` is
   // how the app recognises it.
   beforeEach(() => {
-    (globalThis as unknown as { window: Record<string, unknown> }).window ??= {};
+    const store = new Map<string, string>();
+    (globalThis as unknown as { window: Record<string, unknown> }).window ??= {
+      localStorage: {
+        getItem: (k: string) => store.get(k) ?? null,
+        setItem: (k: string, v: string) => void store.set(k, v),
+        removeItem: (k: string) => void store.delete(k),
+      },
+      navigator: { onLine: true },
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    };
     (globalThis as unknown as { window: Record<string, unknown> }).window["pos"] = {};
     live.mockReset();
     localWrite.mockReset();
