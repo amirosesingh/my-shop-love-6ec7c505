@@ -10,6 +10,7 @@ import {
   pendingCount,
   subscribeOutbox,
 } from "@/lib/sync-outbox";
+import { isOnlineOnly } from "@/lib/live-mode";
 
 /** Header pill: connection, queued writes and a manual push button. */
 export function SyncStatus({ className = "" }: { className?: string }) {
@@ -40,8 +41,14 @@ export function SyncStatus({ className = "" }: { className?: string }) {
   const phase = syncState().phase;
   const busy = phase === "syncing";
 
-  const label = !online
-    ? "Offline"
+  const liveOnly = isOnlineOnly();
+
+  const label = liveOnly
+    ? online
+      ? "Live"
+      : "No connection"
+    : !online
+      ? "Offline"
     : !syncOn
       ? "Sync paused"
       : busy

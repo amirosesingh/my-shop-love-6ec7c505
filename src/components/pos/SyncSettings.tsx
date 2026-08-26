@@ -33,6 +33,7 @@ import {
   subscribeOutbox,
 } from "@/lib/sync-outbox";
 import type { QueueView } from "@/lib/sync-outbox";
+import { isOnlineOnly } from "@/lib/live-mode";
 
 /** Offline-first controls: sync toggle, outbox inspector and SQL backup. */
 export function SyncSettings() {
@@ -53,6 +54,29 @@ export function SyncSettings() {
   const last = lastSyncedAt();
   const localMode = preferredDatabaseMode() === "local";
   const locked = databaseModeLocked();
+
+  // Web and Android have no local database engine behind them: there is
+  // nothing to queue, mirror or back up, so the offline controls are hidden
+  // rather than shown permanently empty.
+  if (isOnlineOnly()) {
+    return (
+      <div className="space-y-3">
+        <div className="rounded-md border border-border px-3 py-2">
+          <p className="text-sm">Live connection only</p>
+          <p className="text-xs text-muted-foreground">
+            This device works directly with the central database. Every sale, shift and stock
+            change is saved centrally as it happens — nothing is stored on the device and there is
+            no queue to push. If the connection drops, the app pauses until it is back.
+          </p>
+        </div>
+        <div className="grid gap-2 rounded-md border border-border px-3 py-2 text-sm sm:grid-cols-2">
+          <Stat label="Connection" value={isOnline() ? "Live" : "No connection"} />
+          <Stat label="Writing to" value="Central database" />
+        </div>
+        <ConnectionCheck />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">
