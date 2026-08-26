@@ -49,18 +49,21 @@ export function SyncStatus({ className = "" }: { className?: string }) {
       : "No connection"
     : !online
       ? "Offline"
-    : !syncOn
-      ? "Sync paused"
-      : busy
-        ? pending
-          ? `Syncing ${pending}…`
-          : "Syncing…"
-        : pending
-          ? `${pending} pending`
-          : "Synced";
+      : !syncOn
+        ? "Sync paused"
+        : busy
+          ? pending
+            ? `Syncing ${pending}…`
+            : "Syncing…"
+          : pending
+            ? `${pending} pending`
+            : "Synced";
 
-  const tone =
-    !online || !syncOn
+  const tone = liveOnly
+    ? online
+      ? "text-success"
+      : "text-warning"
+    : !online || !syncOn
       ? "text-warning"
       : conflicts
         ? "text-destructive"

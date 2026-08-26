@@ -38,7 +38,6 @@ export const UI_STORAGE_KEYS = [
   "pos.journal.terminalId",
 ];
 
-
 export function isUiKey(key: string): boolean {
   return UI_STORAGE_KEYS.includes(key);
 }
@@ -58,9 +57,7 @@ export const DEVICE_STATE_KEYS = [
 const DEVICE_STATE_PREFIXES = ["pos.secure."];
 
 export function isDeviceStateKey(key: string): boolean {
-  return (
-    DEVICE_STATE_KEYS.includes(key) || DEVICE_STATE_PREFIXES.some((p) => key.startsWith(p))
-  );
+  return DEVICE_STATE_KEYS.includes(key) || DEVICE_STATE_PREFIXES.some((p) => key.startsWith(p));
 }
 
 /**
