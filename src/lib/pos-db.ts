@@ -1247,9 +1247,9 @@ export async function loadProductsByIds(ids: string[]): Promise<Product[]> {
  * in-page sync engine drains them. Either way the till keeps working offline.
  */
 const queue = (context: string, op: SyncOp) => {
-  // Android is live-only: the write goes to the backend now, and any failure
-  // is surfaced instead of being queued for later.
-  if (isLiveOnly()) {
+  // Web and Android are live-only: the write goes to the backend now, and any
+  // failure is surfaced instead of being queued for later.
+  if (isOnlineOnly()) {
     void runOpLive(context, op).catch((e) => dbError(context, e));
     return;
   }
@@ -1279,7 +1279,7 @@ const queue = (context: string, op: SyncOp) => {
 const queueSoft = (context: string, op: SyncOp) => {
   const note = (e: unknown) =>
     recordDiagnostic({ kind: "soft_write_failed", entity: op.table, code: reasonCode(e) });
-  if (isLiveOnly()) {
+  if (isOnlineOnly()) {
     void runOpLive(context, op).catch(note);
     return;
   }
@@ -1413,8 +1413,8 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
   // still receives the full row, so the till shows the new count at once.
   const { ops: cloudOps, deltas } = withRelativeStock(ops);
 
-  // Android / live-only: the backend is the single source of truth.
-  if (isLiveOnly()) {
+  // Web and Android are live-only: the backend is the single source of truth.
+  if (isOnlineOnly()) {
     try {
       for (const op of cloudOps) await runOpLive(context, op);
       await applyStockDeltas(deltas);
