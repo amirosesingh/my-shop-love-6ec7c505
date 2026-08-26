@@ -8,7 +8,7 @@
  * allow it.
  */
 import { stamp } from "./activity-journal";
-import { isLiveOnly, isOnlineOnly } from "./live-mode";
+import { isOnlineOnly } from "./live-mode";
 import { touchedIds as versionedIds, versionsFor } from "./row-versions";
 
 export type Row = Record<string, unknown>;
