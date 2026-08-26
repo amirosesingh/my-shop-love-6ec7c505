@@ -11,6 +11,11 @@ export const Route = createFileRoute("/api/public/sync-health")({
   server: {
     handlers: {
       GET: async () => {
+        const { publiclyReadable } = await import("@/lib/public-api-guard.server");
+        const denied = publiclyReadable(
+          "presence-only flags: no key values, lengths or prefixes are returned",
+        );
+        if (denied) return denied;
         const { hasServiceKey } = await import("@/lib/pos-relay.server");
         const { hasSupabaseConfig, supabaseConfigSource, runtimeEnvValue } = await import(
           "@/lib/external-supabase-config"
