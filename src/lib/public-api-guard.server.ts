@@ -71,3 +71,13 @@ export function verifySharedSecret(options: {
 export function publiclyReadable(_reason: string): GuardResult {
   return null;
 }
+
+/**
+ * Marks an endpoint whose caller check happens further down the call — the
+ * sync relay and the cashier sign-in both verify credentials inside the shared
+ * server module they delegate to. Calling this keeps the decision visible in
+ * the route file, so the "every public route names its guard" rule holds.
+ */
+export function callerVerifiedDownstream(_reason: string): GuardResult {
+  return null;
+}

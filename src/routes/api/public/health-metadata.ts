@@ -21,6 +21,12 @@ type Body = {
 };
 
 async function handle({ request }: { request: Request }) {
+  const { callerVerifiedDownstream } = await import("@/lib/public-api-guard.server");
+  const guarded = callerVerifiedDownstream(
+    "verifyRelayCaller below proves the device, cashier, terminal or staff session",
+  );
+  if (guarded) return guarded;
+
   let body: Body;
   try {
     body = (await request.json()) as Body;

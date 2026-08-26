@@ -17,6 +17,12 @@ const body = z.object({
 });
 
 export async function handleCashierLogin(request: Request): Promise<Response> {
+  const { callerVerifiedDownstream } = await import("@/lib/public-api-guard.server");
+  const denied = callerVerifiedDownstream(
+    "the PIN itself is the credential and is verified server-side by cashierLoginServer",
+  );
+  if (denied) return denied;
+
   const parsed = body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ ok: false, error: "Invalid payload" }, { status: 400 });
 
