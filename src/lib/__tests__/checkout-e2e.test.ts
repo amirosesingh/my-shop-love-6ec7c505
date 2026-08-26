@@ -72,10 +72,12 @@ describe("checkout commit", () => {
   it("writes bill, lines, tender ledger and stock movement together", async () => {
     await db.commitSale(sale(), [], null);
     const tables = opsSent().map((o) => `${o.kind}:${o.table}`);
-    expect(tables).toContain("insert:sales");
-    expect(tables).toContain("insert:sale_items");
-    expect(tables).toContain("insert:payment_transactions");
-    expect(tables).toContain("insert:item_activity_logs");
+    // Every part of the bill goes out as a conflict-safe upsert, so a retry
+    // after a half-written batch repairs it instead of duplicating it.
+    expect(tables).toContain("upsert:sales");
+    expect(tables).toContain("upsert:sale_items");
+    expect(tables).toContain("upsert:payment_transactions");
+    expect(tables).toContain("upsert:item_activity_logs");
   });
 
   it("records one ledger row per tender on a split payment", async () => {
@@ -108,7 +110,10 @@ describe("checkout commit", () => {
     attemptRows.mockReturnValue({ data: [{ id: "sale-1" }], error: null });
     const target = await db.commitSale(sale(), [], null);
     expect(target).toBe("cloud");
-    expect(live).not.toHaveBeenCalled();
+    // The bill already exists, so the retry must not create a second one: it
+    // replays the same rows under the same keys as upserts.
+    const kinds = new Set(opsSent().map((o) => o.kind));
+    expect([...kinds]).toEqual(["upsert"]);
   });
 
   it("still saves when the duplicate check itself cannot run", async () => {

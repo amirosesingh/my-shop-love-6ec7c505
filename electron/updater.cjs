@@ -11,6 +11,7 @@
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const crypto = require("node:crypto");
 const { spawn } = require("node:child_process");
 const { app, BrowserWindow, net } = require("electron");
 
@@ -193,10 +194,146 @@ function download(url, destination, onProgress) {
   });
 }
 
+/** Read a small text file off the update feed; null when it is not published. */
+function fetchText(url) {
+  return new Promise((resolve) => {
+    try {
+      const request = net.request({ url, redirect: "follow" });
+      request.on("response", (response) => {
+        if (response.statusCode !== 200) {
+          response.resume?.();
+          resolve(null);
+          return;
+        }
+        let body = "";
+        response.on("data", (chunk) => {
+          body += chunk.toString("utf8");
+        });
+        response.on("end", () => resolve(body));
+        response.on("error", () => resolve(null));
+      });
+      request.on("error", () => resolve(null));
+      request.end();
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
 /**
- * Fetch the installer for an earlier version and run it silently. NSIS
- * reinstalls in place, so the user-data folder — activation mirror, settings,
- * local database pointer — is left alone.
+ * The publisher's sha512 for an earlier installer, taken from the release
+ * manifest the build pipeline uploads next to it. electron-builder writes one
+ * `<version>.yml` per release for generic feeds; a plain `<artifact>.sha512`
+ * sidecar is honoured too.
+ */
+async function publishedHash(version) {
+  const target = feed();
+  if (!target || target.provider !== "generic") return null;
+  const base = target.url.replace(/\/+$/, "");
+  const file = encodeURIComponent(artifact(version));
+
+  const sidecar = await fetchText(`${base}/${file}.sha512`);
+  if (sidecar && sidecar.trim()) return sidecar.trim().split(/\s+/)[0];
+
+  const manifest = await fetchText(`${base}/${encodeURIComponent(version)}.yml`);
+  if (!manifest) return null;
+  // Only trust the entry that actually names this artifact.
+  if (!manifest.includes(artifact(version))) return null;
+  return /^\s*sha512:\s*(.+)\s*$/m.exec(manifest)?.[1]?.trim().replace(/^["']|["']$/g, "") ?? null;
+}
+
+/** base64 sha512 of a file, in the same encoding electron-builder publishes. */
+function fileHash(file) {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash("sha512");
+    const stream = fs.createReadStream(file);
+    stream.on("data", (chunk) => hash.update(chunk));
+    stream.on("end", () => resolve(hash.digest("base64")));
+    stream.on("error", reject);
+  });
+}
+
+/**
+ * Windows Authenticode check. Used as the second proof when the feed publishes
+ * no hash: an installer that is not validly signed never runs.
+ */
+function authenticodeSigner(file) {
+  return new Promise((resolve) => {
+    try {
+      const ps = spawn(
+        "powershell.exe",
+        [
+          "-NoProfile",
+          "-NonInteractive",
+          "-Command",
+          `$s = Get-AuthenticodeSignature -LiteralPath ${JSON.stringify(file)}; ` +
+            `Write-Output ($s.Status.ToString() + '|' + $s.SignerCertificate.Subject)`,
+        ],
+        { windowsHide: true },
+      );
+      let out = "";
+      ps.stdout.on("data", (chunk) => {
+        out += chunk.toString("utf8");
+      });
+      ps.on("error", () => resolve(null));
+      ps.on("close", () => {
+        const [status, ...rest] = out.trim().split("|");
+        if (!status) return resolve(null);
+        resolve({ status: status.trim(), subject: rest.join("|").trim() });
+      });
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+/**
+ * Nothing downloaded from the feed is executed until it proves it came from
+ * us. A published sha512 is the strongest proof; a valid Authenticode
+ * signature (matching POS_UPDATE_PUBLISHER when that is configured) is the
+ * fallback. If neither can be established the file is deleted, not run —
+ * transport security alone is not enough to justify running an installer
+ * silently as the logged-in operator.
+ */
+async function verifyInstaller(file, version) {
+  const expected = await publishedHash(version);
+  if (expected) {
+    const actual = await fileHash(file).catch(() => null);
+    if (!actual) return { ok: false, error: "The downloaded installer could not be read." };
+    const a = Buffer.from(actual, "base64");
+    const b = Buffer.from(expected, "base64");
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b))
+      return {
+        ok: false,
+        error: "The downloaded installer does not match the published release. It was discarded.",
+      };
+    return { ok: true, proof: "checksum" };
+  }
+
+  const signature = await authenticodeSigner(file);
+  if (!signature)
+    return {
+      ok: false,
+      error: "This installer could not be verified (no published checksum and no signature check).",
+    };
+  if (signature.status !== "Valid")
+    return {
+      ok: false,
+      error: `This installer is not validly signed (${signature.status}). It was discarded.`,
+    };
+  const publisher = (process.env.POS_UPDATE_PUBLISHER || "").trim();
+  if (publisher && !signature.subject.toLowerCase().includes(publisher.toLowerCase()))
+    return {
+      ok: false,
+      error: "This installer is signed by an unexpected publisher. It was discarded.",
+    };
+  return { ok: true, proof: "signature" };
+}
+
+/**
+ * Fetch the installer for an earlier version, prove it came from us, and only
+ * then run it silently. NSIS reinstalls in place, so the user-data folder —
+ * activation mirror, settings, local database pointer — is left alone.
  */
 async function rollback(version, onProgress) {
   if (!version) return { ok: false, error: "No earlier version has been recorded yet." };
@@ -204,11 +341,18 @@ async function rollback(version, onProgress) {
     return { ok: false, error: "Roll back is only supported on Windows." };
   const url = rollbackUrl(version);
   if (!url) return { ok: false, error: "No update feed is configured for this build." };
+  if (!/^https:\/\//i.test(url))
+    return { ok: false, error: "The update feed is not served over a secure connection." };
   const file = path.join(os.tmpdir(), `pos-rollback-${version}.exe`);
   try {
     await download(url, file, onProgress);
   } catch (err) {
     return { ok: false, error: `Could not download version ${version}: ${err?.message || err}` };
+  }
+  const verified = await verifyInstaller(file, version);
+  if (!verified.ok) {
+    fs.rm(file, { force: true }, () => {});
+    return { ok: false, error: verified.error };
   }
   try {
     spawn(file, ["/S"], { detached: true, stdio: "ignore", windowsHide: true }).unref();
@@ -216,8 +360,9 @@ async function rollback(version, onProgress) {
     return { ok: false, error: `Could not start the installer: ${err?.message || err}` };
   }
   setTimeout(() => app.quit(), 1500);
-  return { ok: true, version };
+  return { ok: true, version, verifiedBy: verified.proof };
 }
+
 
 module.exports = {
   start,

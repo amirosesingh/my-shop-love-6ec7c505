@@ -3,10 +3,14 @@
  *
  * The open ticket must survive a page refresh, a route change or an app
  * restart — it only disappears when the cashier clears/voids it, takes
- * payment, or holds/books the order. Android runs live-only, so there the
- * draft lives in sessionStorage and never touches device storage long term.
+ * payment, or holds/books the order.
+ *
+ * Android keeps it too, in device storage rather than sessionStorage: the
+ * system reclaims the app whenever the camera opens for a barcode scan, and
+ * sessionStorage does not survive that, so the cashier would come back to an
+ * empty basket. It is the only business key the phone persists, it never
+ * leaves the device, and it is removed as soon as the ticket is settled.
  */
-import { isLiveOnly } from "./live-mode";
 import type { CartLine, DiscountType } from "./pos-types";
 
 export type CartDraft = {
@@ -25,7 +29,7 @@ const key = (storeId: string) => `pos.cart.draft.${storeId}`;
 function store(): Storage | null {
   if (typeof window === "undefined") return null;
   try {
-    return isLiveOnly() ? window.sessionStorage : window.localStorage;
+    return window.localStorage;
   } catch {
     return null;
   }
