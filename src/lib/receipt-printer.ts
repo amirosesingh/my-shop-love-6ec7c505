@@ -1,4 +1,3 @@
-import { isNative } from "./native";
 /**
  * Receipt-printer plumbing shared by the browser and the Electron till.
  *
@@ -7,6 +6,7 @@ import { isNative } from "./native";
  * neither exists, so callers fall back to the classic hidden-iframe print.
  */
 
+import { isNative } from "./native";
 import type { SlipEncoding, SlipLineEnding } from "./escpos";
 
 const PRINTER_KEY = "pos-receipt-printer-v1";

@@ -19,6 +19,8 @@ import { defaultReceiptSettings } from "./pos-seed";
 import qrcode from "qrcode-generator";
 import { toast } from "sonner";
 import {
+  canOpenDrawer,
+  canPrintReceipts,
   drawerPulseBytes,
   getPrinterPrefs,
   rawPulse,
