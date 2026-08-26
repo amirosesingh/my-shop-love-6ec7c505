@@ -6,7 +6,7 @@
  * into a working register instead of waiting on a request that cannot finish.
  */
 import type { CloudSlice } from "./pos-db";
-import { isLiveOnly } from "./live-mode";
+import { isOnlineOnly } from "./live-mode";
 
 const KEY = "pos.offline.snapshot.v1";
 
@@ -17,7 +17,7 @@ const isBrowser = () => typeof window !== "undefined";
  * host shell. A plain browser build keeps nothing: it reads live or not at all.
  */
 const canSnapshot = () =>
-  isBrowser() && !!(window as unknown as { pos?: unknown }).pos && !isLiveOnly();
+  isBrowser() && !!(window as unknown as { pos?: unknown }).pos && !isOnlineOnly();
 
 export type Snapshot = CloudSlice & { savedAt: string };
 

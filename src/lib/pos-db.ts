@@ -6,7 +6,7 @@ import { localDb } from "./local-db";
 import { routedQuery } from "./db-query";
 import { readSnapshot } from "./offline-snapshot";
 import { enqueue, type SyncOp } from "./sync-outbox";
-import { isLiveOnly } from "./live-mode";
+import { isLiveOnly, isOnlineOnly } from "./live-mode";
 import {
   AllTargetsFailed,
   isConnectionError,
@@ -1534,7 +1534,7 @@ export const db = {
       const message = (e as { message?: string })?.message ?? String(e);
       if (isLinkedRecordError(message)) throw e instanceof Error ? e : new Error(message);
       const offline = typeof navigator !== "undefined" && !navigator.onLine;
-      if (!isLiveOnly() && (offline || /failed to fetch|network|timeout/i.test(message))) {
+      if (!isOnlineOnly() && (offline || /failed to fetch|network|timeout/i.test(message))) {
         enqueue("Deleting product", op);
         void drainOutbox();
         return;
