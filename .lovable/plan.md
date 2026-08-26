@@ -1,50 +1,229 @@
-# Held bills: audit findings and fix
+# Held bills: verified audit and end-to-end fix
 
-Note on naming: there is no `held_bills` table. Held bills live in `held_orders` (cloud) plus a per-device localStorage list. The audit below uses the real table.
+## Important database distinction
 
-## Step-by-step audit
+The live preview network is using the app’s externally configured central database, while the database inspection tool is connected to the Lovable Cloud mirror. Therefore, the policy text found in the mirror is useful architecture evidence but **not proof of the live external database policy**. The implementation will first inspect the live database through the existing secured server relay and will not alter a policy until its exact production definition has been captured.
 
-**1. Bill held on the terminal — mostly correct.**
-`src/lib/register/use-held-orders.ts` builds the ticket with an id, `storeId`, `heldBy`, bill number, lines, discounts, member and coupon, then `addHeldOrder` writes it to localStorage and calls `persistHeldOrder` → `db.commitHeldOrder` (`src/lib/pos-db.ts:1998`). The local-first commit path and outbox are in place. Two gaps:
-- The id is `H${Date.now()}` (and `C${Date.now()}` for cancelled bills), not a UUID — collision-prone across terminals since the cloud `id` is the primary key.
-- `holdCancelledBill` in `src/lib/held-orders.ts` sets no `storeId`, so a cancelled-bill hold lands with an empty branch.
+The real table name in this codebase is `held_orders`, not `held_bills`.
 
-**2. Sync to cloud — correct.** The row goes through the same outbox/relay as every other table (`held_orders` is allow-listed in `src/lib/pos-relay.server.ts` and `src/lib/sync-engine.ts`, branch column `store_id` enforced in `src/lib/relay-policy.server.ts`), and is only marked synced on confirmation. Matches the evidence: the row reached the cloud correctly.
+## Current audit: steps 1–6
 
-**3. RLS — correct and branch-scoped, one hole.** Single policy on `held_orders`, `FOR ALL TO authenticated`:
+### 1. Creation on Electron — partially correct
 
+Current creation flow:
+
+```text
+Register currentStore.id
+  → useRegisterHeldOrders({ storeId: currentStore.id })
+  → order.storeId = storeId
+  → addHeldOrder(order)
+  → persistHeldOrder(order)
+  → db.commitHeldOrder({ storeId: order.storeId, ... })
+  → local SQL held_orders.store_id
 ```
-USING       (is_staff_now() AND store_visible(store_id))
-WITH CHECK  (is_staff_now() AND store_visible(store_id))
+
+The terminal’s registered branch is available from `TerminalConfig.locationId`. Activation writes it in `writeTerminalConfig(config)`, which Electron mirrors into its OS-encrypted terminal config. `activeBranchId()` resolves in this order:
+
+```text
+readTerminalConfig().locationId
+→ persisted terminal_branch_id
+→ branch currently in view
+→ desktop local branch mirror
+→ sole known branch
 ```
 
-`store_visible(_store_id)` returns true for supervisors, for all-branch users (`user_store_id() IS NULL`), or on exact branch match — and also **when the passed branch is blank**. So it is not `true`/role-only, read and write are equally scoped, and branch isolation holds for rows that carry a branch. The hole is rows with a blank/NULL `store_id` (produced by step 1's cancelled-bill path): those are visible to every branch.
+`pos-store.tsx` normally turns this into `currentStore.id`, so the normal register path generally receives the terminal branch. However, held-order creation does **not call the authoritative resolver at the moment of creation**; it trusts the derived `currentStore.id`. This does not satisfy the stricter requirement and leaves a stale/fallback path.
 
-**4. The app's held-bills query — THIS IS THE BUG.** Nothing in the UI ever queries the cloud. `useHeldOrders()` (`src/lib/held-orders.ts:124`) reads `localStorage["pos.held.orders"]` only. `db.listHeldOrders()` exists at `src/lib/pos-db.ts:2048` but is called from nowhere. `/holds` and the register both render the localStorage list. A bill held on the Electron till is therefore invisible on web/phone by construction, even though the row is in the cloud — exactly the reported symptom.
+Additional schema gaps confirmed in both `database/schema.sql` and the central schema definition:
 
-**5. Realtime — absent.** No `postgres_changes` subscription for `held_orders` anywhere.
+```text
+id              NVARCHAR/text generated as H${Date.now()} (not UUID)
+store_id        present but nullable
+terminal_id     missing
+status          missing
+created_by      represented only by held_by name, no immutable actor id
+created_at      present
+is_synced       local only, defaults false
+lines           present
+```
 
-**6. Shift close — reads a different source than the screen.** `assertShiftClosable` (`src/lib/pos-rules.functions.ts:230`) calls `heldOrderCountResult` → RPC `held_orders_open_count(_store_id)`, which counts **cloud** rows `WHERE cancelled_from IS NULL AND store_id = branch`. So close is blocked by cloud rows the screen never shows and no one can release — the only escape was deleting the row in the database. Two further mismatches: the client-side pre-check at `src/routes/index.tsx:3413` uses the localStorage list, and the RPC excludes cancelled-bill holds, which the screen does show.
+The cancelled-receipt path is worse: `holdCancelledBill()` currently supplies no `storeId`, producing a branch-less hold.
 
-**Broken steps: 4 and 5 (plus the id/branch gaps in 1, the blank-branch RLS hole from those, and the count/display mismatch in 6).**
+**Verdict: broken.** The physical terminal binding exists and is uniquely persisted from the claimed activation token, but creation must resolve it directly and fail closed if an activated Electron terminal has no branch.
 
-## The fix
+### 2. Offline sync — correct confirmation semantics; row contract incomplete
 
-1. **Make held bills cloud-backed** — rewrite `src/lib/held-orders.ts` so the held list is loaded from `held_orders` for the current branch (`select` of list columns only: id, label, store_id, held_by, bill_no, total, lines, member_name, cancelled_from, held_at — no payment or customer contact data), with localStorage kept purely as an offline cache/merge layer so the till still works with no network. Release/discard continues to delete the cloud row.
-2. **Add Realtime** — one `postgres_changes` channel on `held_orders` filtered by `store_id`, subscribed in a `useEffect` and torn down on unmount, so holds appear and disappear live on web and phone.
-3. **Stamp branch and a real UUID at creation** — `crypto.randomUUID()` for the id, and `holdCancelledBill` takes the current branch, so no row can be created branch-less again.
-4. **Align shift close with the screen** — the register pre-check uses the same branch-scoped cloud-backed list as the server RPC, and the RPC stops excluding cancelled-bill holds so both sides count the same rows. Closing stays blocked while a genuine hold exists and unblocks as soon as it is resumed or discarded through the app.
-5. **Close the blank-branch RLS hole** — one migration: backfill any blank `store_id`, make `store_id` NOT NULL on `held_orders`, and tighten the policy so a blank branch is no longer treated as visible-to-all, while keeping `is_staff_now() AND` branch match for SELECT/INSERT/UPDATE/DELETE. No `true`, no role-only check, no temporary allow-all at any point.
+The desktop worker reads only `is_synced = 0`, sends the stored row, and executes:
 
-## Verification before I call it done
+```text
+await cloudUpsert(table, payload)
+await repo.markSynced(table, ids)
+```
 
-- Branch A session lists only Branch A holds; a Branch B row is absent from both the list and the shift-close count — proved with a query run as each branch's role.
-- Insert/update/delete of a Branch B hold from a Branch A session is refused.
-- Hold offline on the till → reconnect → row appears live on web/phone for the right branch without refresh.
-- Resume or discard it in the app → shift closes with no database edit.
-- Version bumped via `node scripts/bump-version.cjs`.
+Failures call `markFailed`, persist the error/attempt count, retry, and eventually quarantine. No optimistic synced flag was found.
 
-## Technical notes
+The secured relay does not silently trust or overwrite a normal till’s branch from the request body. For `held_orders`, `pinToStore()` compares the submitted `store_id` to the branch from the verified cashier/terminal session and rejects a mismatch; if omitted, it stamps the verified branch. This is a useful second defence, but the local record still must capture the terminal branch correctly at creation.
 
-- No service-role key is involved on any client path; sync keeps going through the existing relay.
-- Files touched: `src/lib/held-orders.ts`, `src/lib/register/use-held-orders.ts`, `src/routes/holds.tsx`, `src/routes/index.tsx` (pre-check only), plus one migration for `held_orders` policy/column and `held_orders_open_count`.
+Because `terminal_id` and `status` do not exist in the current row contract, they cannot currently be pushed.
+
+**Verdict: transport/retry is correct; payload contract is incomplete.**
+
+### 3. RLS — mirror policy is scoped; live policy still needs direct verification
+
+Mirror policy currently reads:
+
+```sql
+FOR ALL TO authenticated
+USING      (is_staff_now() AND store_visible(store_id))
+WITH CHECK (is_staff_now() AND store_visible(store_id))
+```
+
+It is not creator-scoped and applies to SELECT/INSERT/UPDATE/DELETE. `store_id` is text on both sides. However, `store_visible('')` currently permits blank branches, which is unsafe, and this mirror policy cannot be assumed to equal the live external policy.
+
+**Verdict: live production policy unconfirmed; blank-branch behavior is unsafe in the inspected definition.** The first implementation step is to retrieve and record exact live policies/grants/types using a protected server-only diagnostic authenticated against the configured central database.
+
+### 4. Web/phone query — primary visibility bug confirmed
+
+There is no cloud query in the UI. The exact current read is:
+
+```ts
+const raw = window.localStorage.getItem("pos.held.orders")
+```
+
+`db.listHeldOrders()` exists and performs `.from("held_orders").select("*").order("held_at")`, but nothing calls it. `/holds`, the register hold menu and the client close pre-check all render a device-local list. There is no branch/status query because `status` does not exist.
+
+**Verdict: broken and directly explains why a synced Electron hold is invisible on web/phone.**
+
+### 5. Realtime — missing
+
+No `postgres_changes` subscription exists for `held_orders`, and the table is not present in the checked Realtime publication migration.
+
+**Verdict: broken.**
+
+### 6. Shift close — authoritative count and UI use different sources
+
+Server close check:
+
+```sql
+SELECT count(*)
+FROM held_orders h
+WHERE h.cancelled_from IS NULL
+  AND h.store_id = requested_branch;
+```
+
+It is called through `held_orders_open_count(_store_id)` and fails closed if the count cannot be read. The register pre-check instead uses the localStorage list. The server also excludes cancelled-receipt holds while the UI includes them.
+
+**Verdict: broken source/filter parity.** It explains a cloud hold blocking close while remaining impossible to release from the device-local UI.
+
+## Confirmed broken areas
+
+- Step 1: creation does not directly resolve the live terminal registration; ids are not UUIDs; branch can be null; required terminal/status/creator fields are absent.
+- Step 2: delivery semantics are correct, but the schema cannot carry all required fields.
+- Step 3: live external RLS has not yet been inspected; blank-branch behavior in the mirror is unsafe.
+- Step 4: UI is localStorage-only — the main visibility bug.
+- Step 5: Realtime is absent.
+- Step 6: display and shift-close use different sources and filters.
+
+## Implementation plan
+
+### A. Diagnose the live configured database first
+
+- Add a temporary **server-only, supervisor-protected diagnostic** through the existing secured relay to return only `held_orders` columns, grants, policy expressions and Realtime publication membership from the configured external database; never return credentials or row contents.
+- Capture exact live policy text and compare `store_id`/`terminal_id` types before preparing SQL.
+- Remove the diagnostic after verification; no debug bypass remains.
+
+### B. Establish one held-order contract everywhere
+
+Add to central and all local schema definitions/migrations:
+
+```text
+id UUID-shaped client id (central may remain text for compatibility, validated as UUID)
+store_id NOT NULL
+terminal_id NOT NULL for registered tills
+status: held | released | cancelled
+created_by actor id (nullable only for legacy rows)
+held_by display name
+created_at / held_at
+lines and existing ticket context
+local is_synced / sync_status fields remain local-only
+```
+
+- Generate ids with `crypto.randomUUID()`.
+- At hold time, hydrate/read the terminal registration and resolve `store_id` with `requireBranchId()` so `TerminalConfig.locationId` wins; never use a user profile or global default for an activated till.
+- Stamp `terminal_id` from the unique activation token id and `created_by` from the authenticated/cashier identity.
+- Fix cancelled-receipt creation to pass the same branch, terminal and actor context.
+- Preserve legacy rows; no business-data deletion. Backfill only where a branch can be determined unambiguously, otherwise quarantine/report legacy orphan rows rather than exposing them.
+
+### C. Keep sync behavior, extend only its payload
+
+- Add the new cloud columns to the authoritative contract and local-to-cloud allow-list.
+- Preserve the existing `cloudUpsert → markSynced` ordering, retry/backoff and persistent failure logs.
+- Keep relay branch pinning: a non-supervisor payload whose stored `store_id` differs from the verified terminal/session branch is rejected, not rewritten into another branch. Missing branch is rejected at creation before entering the queue.
+
+### D. Replace device-only display with branch-scoped cloud + offline cache
+
+Use one shared active-held predicate everywhere:
+
+```sql
+SELECT id, label, store_id, terminal_id, status, held_by,
+       total, lines, member_name, held_at, bill_no,
+       cart_discount, cart_discount_type, exchange_ref, coupon, note
+FROM held_orders
+WHERE store_id = :current_terminal_branch
+  AND status = 'held'
+ORDER BY held_at DESC;
+```
+
+- No `created_by`, terminal, date-range or current-user filter.
+- Do not select payment data, customer contact data, or unrelated columns.
+- Electron merges this branch-scoped result with its local unsynced holds; web/phone uses the central result. localStorage becomes an offline cache only, never the authoritative cross-device list.
+- Releasing/resuming updates `status` away from `held` (rather than requiring manual deletion), preserving the record and auditability.
+
+### E. Add branch-filtered Realtime safely
+
+- Add `held_orders` to the Realtime publication once.
+- Subscribe inside `useEffect` to INSERT/UPDATE/DELETE filtered by the current `store_id`; refetch the restricted projection on relevant events and remove the channel on cleanup/branch change.
+- RLS remains the final boundary; the client filter is not treated as authorization.
+
+### F. Make shift close use the identical predicate
+
+- Update `held_orders_open_count` to count `store_id = branch AND status = 'held'` with no cancelled/creator/terminal discrepancy.
+- Keep the server check authoritative and fail-closed.
+- Make the client pre-check consume the same cloud-backed branch list, so any blocking ticket is visible and releasable.
+- Once resumed/released/cancelled in the app, the status changes and both the list and server count clear without database deletion.
+
+### G. Tighten live RLS without widening access
+
+After exact live inspection, install separate explicit policies (or equivalent combined policies) for SELECT/INSERT/UPDATE/DELETE:
+
+```text
+is_staff_now()
+AND store_id is nonblank
+AND (supervisor/all-branch privilege OR store_id = verified user/terminal branch)
+```
+
+- No `USING (true)`, `1=1`, authenticated-role-only or creator-only policy.
+- `WITH CHECK` prevents inserting or moving a row into another branch.
+- The secured PIN-terminal relay continues to validate branch from its signed/verified caller before any elevated write; no service credential enters Electron, web, phone, local storage or a client bundle.
+
+## Verification gate
+
+Before calling the work complete:
+
+1. Create Branch A and Branch B test holds through the real write path.
+2. Branch A authenticated read returns only Branch A active holds; Branch B row is absent.
+3. Branch A direct SELECT/UPDATE/DELETE against Branch B is denied/returns no row; cross-branch INSERT is rejected by `WITH CHECK` or relay pinning.
+4. Inspect final policies and prove none contains allow-all, role-only or creator-only scoping.
+5. Hold offline on Electron A, verify local row has UUID, terminal A id, Branch A id, `status='held'`, `is_synced=0`; reconnect, verify cloud confirmation precedes `is_synced=1`.
+6. Open web/phone on Branch A and verify the row appears live without refresh; Branch B does not receive it.
+7. Shift close on Branch A is blocked while the row is `held`; resume/release it through the app; Realtime removes it and close succeeds without database edits.
+8. Run focused held-order, relay branch-isolation and shift-close tests; run backend linter; remove the diagnostic endpoint; scan for credentials and debug bypasses.
+9. Bump the version with `node scripts/bump-version.cjs`.
+
+## Expected touched areas
+
+- Held-order model/hooks and register/receipts call sites.
+- Local SQL Server + SQLite authoritative schemas and migrations.
+- Central schema contract and cloud column mapping.
+- One central migration for columns, constraints, policies, RPC predicate and Realtime publication.
+- Focused tests for terminal stamping, cross-branch access, cloud display/Realtime and shift-close parity.
