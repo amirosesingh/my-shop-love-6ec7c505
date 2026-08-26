@@ -12,7 +12,7 @@ import { activeBranchId, activeBranchName } from "./active-branch";
 import { isMissingSchema } from "./schema-guard";
 import { databaseModeLabel, effectiveDatabaseMode, isFailingOver } from "./db-mode";
 import { hasLocalSqlEngine } from "./local-db";
-import { isLiveOnly } from "./live-mode";
+import { isOnlineOnly } from "./live-mode";
 import { conflictCount, isOnline, lastSyncedAt, pendingCount } from "./sync-outbox";
 import { readTerminalConfig } from "./terminal-tokens";
 import { APP_VERSION } from "@/version";
@@ -46,8 +46,7 @@ export type TelemetryRow = {
 export function storageEngine(): string {
   if (typeof window === "undefined") return "cloud";
   if (hasLocalSqlEngine()) return "sqlite";
-  if (isLiveOnly()) return "live";
-  return "indexeddb";
+  return isOnlineOnly() ? "live" : "indexeddb";
 }
 
 /** Plain-language connection state used by the monitoring centre. */

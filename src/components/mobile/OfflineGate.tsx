@@ -4,19 +4,19 @@
  * The phone holds no business data, so every screen needs the backend. When
  * the connection drops this covers the app, watches for the network coming
  * back and reloads the current page automatically. Web and Windows never
- * render it: `isLiveOnly()` is false there and children pass straight through.
+ * render it: `isOnlineOnly()` is false there and children pass straight through.
  */
 import { useEffect, useState, type ReactNode } from "react";
 import { WifiOff, RefreshCw } from "lucide-react";
 
-import { isLiveOnly } from "../../lib/live-mode";
+import { isOnlineOnly } from "../../lib/live-mode";
 
 function online(): boolean {
   return typeof navigator === "undefined" ? true : navigator.onLine;
 }
 
 export function OfflineGate({ children }: { children: ReactNode }) {
-  const live = isLiveOnly();
+  const live = isOnlineOnly();
   const [connected, setConnected] = useState(true);
   const [checking, setChecking] = useState(false);
 

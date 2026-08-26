@@ -1,12 +1,12 @@
 import { QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
-import { isLiveOnly } from "./lib/live-mode";
+import { isOnlineOnly } from "./lib/live-mode";
 
 export const getRouter = () => {
-  // Android is a live client: nothing is served from cache, and every screen
+  // Web and Android are live clients: nothing is served from cache, and every screen
   // refetches when it is opened or the app comes back to the foreground.
-  const queryClient = isLiveOnly()
+  const queryClient = isOnlineOnly()
     ? new QueryClient({
         defaultOptions: {
           queries: {
