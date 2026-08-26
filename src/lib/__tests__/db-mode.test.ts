@@ -49,7 +49,8 @@ describe("database mode", () => {
     expect(effectiveDatabaseMode()).toBe("online");
   });
 
-  it("fails over to local without changing the chosen mode", () => {
+  it("fails over to local on a till without changing the chosen mode", () => {
+    asDesktop();
     setPreferredDatabaseMode("online");
     noteConnectionLost();
     expect(effectiveDatabaseMode()).toBe("local");
