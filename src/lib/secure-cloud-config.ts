@@ -194,7 +194,9 @@ export async function removeCloudCredentials(): Promise<{ ok: boolean; error?: s
   }
   if (isNative()) {
     try {
-      const store = await androidStore();
+      const loaded = await androidStore();
+      if (!loaded) return { ok: false, error: "Secure storage is unavailable on this device." };
+      const store = loaded.value;
       await store.remove({ key: ANDROID_URL_KEY });
       await store.remove({ key: ANDROID_KEY_KEY });
       clearTerminalSupabaseOverride();
