@@ -41,7 +41,9 @@ function walk(dir: string): string[] {
 
 const HARDCODED = [
   // A project endpoint or publishable key must never be baked into source.
-  /https:\/\/[a-z0-9-]+\.supabase\.co/,
+  // Project refs are exactly 20 lowercase letters, so form placeholders such
+  // as "https://your-project.supabase.co" are not flagged.
+  /https:\/\/[a-z]{20}\.supabase\.co/,
   /sb_publishable_[A-Za-z0-9_-]{10,}/,
   /sb_secret_[A-Za-z0-9_-]{10,}/,
 ];
