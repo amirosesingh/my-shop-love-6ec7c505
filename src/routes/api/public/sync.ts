@@ -11,6 +11,11 @@ export const Route = createFileRoute("/api/public/sync")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const { callerVerifiedDownstream } = await import("@/lib/public-api-guard.server");
+        const denied = callerVerifiedDownstream(
+          "handleSyncRequest verifies the till token before touching any record",
+        );
+        if (denied) return denied;
         const { handleSyncRequest } = await import("@/lib/sync-endpoint.server");
         return handleSyncRequest(request);
       },
