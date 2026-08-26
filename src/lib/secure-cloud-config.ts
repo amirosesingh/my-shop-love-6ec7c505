@@ -164,7 +164,9 @@ export async function saveCloudCredentials(
   }
   if (isNative()) {
     try {
-      const store = await androidStore();
+      const loaded = await androidStore();
+      if (!loaded) return { ok: false, error: "Secure storage is unavailable on this device." };
+      const store = loaded.value;
       await store.set({ key: ANDROID_URL_KEY, value: cleanUrl });
       await store.set({ key: ANDROID_KEY_KEY, value: cleanKey });
       setTerminalSupabaseOverride(cleanUrl, cleanKey);
