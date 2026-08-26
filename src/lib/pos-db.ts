@@ -6,7 +6,7 @@ import { localDb } from "./local-db";
 import { routedQuery } from "./db-query";
 import { readSnapshot } from "./offline-snapshot";
 import { enqueue, type SyncOp } from "./sync-outbox";
-import { isLiveOnly, isOnlineOnly } from "./live-mode";
+import { isOnlineOnly } from "./live-mode";
 import {
   AllTargetsFailed,
   isConnectionError,
