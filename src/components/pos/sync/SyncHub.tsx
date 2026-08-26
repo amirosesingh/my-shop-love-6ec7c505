@@ -5,6 +5,7 @@
  * it, and what happened on the last few cycles. Force push / force pull go
  * through the sync engine's mutex, so nothing can overlap.
  */
+import { isOnlineOnly } from "@/lib/live-mode";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CloudDownload,
@@ -68,6 +69,23 @@ const STATUS_TONE: Record<SyncAuditRow["status"], string> = {
 };
 
 export function SyncHub() {
+  // Web and Android write straight to the central database, so there is no
+  // queue, mirror or audit trail of local pushes to show here.
+  if (isOnlineOnly()) {
+    return (
+      <div className="rounded-md border border-border px-3 py-2">
+        <p className="text-sm">Live connection only</p>
+        <p className="text-xs text-muted-foreground">
+          This device saves every sale, shift and stock change straight to the central database,
+          so there is nothing waiting to be pushed and no local copy to compare.
+        </p>
+      </div>
+    );
+  }
+  return <SyncHubDesktop />;
+}
+
+function SyncHubDesktop() {
   const { state } = usePos();
   const { isAdmin } = useAuth();
   const badge = useSyncBadge();
