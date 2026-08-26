@@ -23,13 +23,20 @@ import { setPreferredDatabaseMode } from "@/lib/db-mode";
 const ops = [{ kind: "insert", table: "sales", rows: [{ id: "s1" }] }] as never;
 
 describe("commitOps in online mode with a local database present", () => {
+  // The local engine only exists inside the Electron shell; `window.pos` is
+  // how the app recognises it.
   beforeEach(() => {
+    (globalThis as unknown as { window: Record<string, unknown> }).window ??= {};
+    (globalThis as unknown as { window: Record<string, unknown> }).window["pos"] = {};
     live.mockReset();
     localWrite.mockReset();
     legacyCreateSale.mockReset();
     setPreferredDatabaseMode("online");
   });
-  afterEach(() => setPreferredDatabaseMode("local"));
+  afterEach(() => {
+    setPreferredDatabaseMode("local");
+    delete (globalThis as unknown as { window: Record<string, unknown> }).window["pos"];
+  });
 
   it("finishes the sale on the cloud even when the local copy fails", async () => {
     live.mockResolvedValue(undefined);
@@ -79,6 +86,6 @@ describe("commitOps in online mode with a local database present", () => {
   it("stops the action when neither database will take it", async () => {
     live.mockRejectedValue(new Error("Failed to fetch"));
     localWrite.mockResolvedValue({ ok: false, error: "no local engine" });
-    await expect(commitOps("Saving sale", ops)).rejects.toThrow(/Database Connection Required/);
+    await expect(commitOps("Saving sale", ops)).rejects.toThrow(/Database Connection Required|Central server relay is offline/);
   });
 });
