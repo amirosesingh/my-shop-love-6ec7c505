@@ -452,23 +452,19 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <ReceiptText className="size-4 shrink-0 text-primary" />
                 <span className="truncate text-sm font-semibold">{companyName}</span>
               </div>
-              {mayPickStore ? (
-                <div className="ml-auto w-32 shrink-0">
-                  <StorePicker />
-                </div>
-              ) : (
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    "ml-auto shrink-0 text-[10px]",
-                    activeShift
-                      ? "border-success/40 bg-success/10 text-success"
-                      : "border-destructive/40 bg-destructive/10 text-destructive",
-                  )}
-                >
-                  {currentStore.code}
-                </Badge>
-              )}
+              {/* The branch picker lives in the side menu only; the top bar
+                  just states which branch is in use. */}
+              <Badge
+                variant="outline"
+                className={cn(
+                  "ml-auto shrink-0 text-[10px]",
+                  activeShift
+                    ? "border-success/40 bg-success/10 text-success"
+                    : "border-destructive/40 bg-destructive/10 text-destructive",
+                )}
+              >
+                {currentStore.code}
+              </Badge>
               {/* Narrow phones only get the essentials; the rest lives in the sheet. */}
               <span className="hidden sm:inline-flex">
                 <LiveClock compact />
