@@ -50,14 +50,28 @@ type SecureStoragePluginType = {
   remove(options: { key: string }): Promise<{ value: boolean }>;
 };
 
-async function androidStore(): Promise<SecureStoragePluginType> {
-  const mod = await import("capacitor-secure-storage-plugin");
-  return mod.SecureStoragePlugin as unknown as SecureStoragePluginType;
+/**
+ * The plugin handle is returned inside a wrapper object: a Capacitor plugin
+ * Proxy answers every property — `then` included — with a native call, so
+ * returning it straight from an `async` function makes the runtime call
+ * `SecureStoragePlugin.then(...)` and Android replies "not implemented".
+ */
+async function androidStore(): Promise<{ value: SecureStoragePluginType } | null> {
+  try {
+    const mod = await import("capacitor-secure-storage-plugin");
+    const plugin = mod.SecureStoragePlugin as unknown as SecureStoragePluginType | undefined;
+    if (!plugin || typeof plugin.get !== "function") return null;
+    return { value: plugin };
+  } catch {
+    return null;
+  }
 }
 
 async function androidRead(): Promise<{ url: string; key: string } | null> {
   try {
-    const store = await androidStore();
+    const loaded = await androidStore();
+    if (!loaded) return null;
+    const store = loaded.value;
     const [url, key] = await Promise.all([
       store.get({ key: ANDROID_URL_KEY }).then((r) => r.value, () => ""),
       store.get({ key: ANDROID_KEY_KEY }).then((r) => r.value, () => ""),
@@ -67,6 +81,7 @@ async function androidRead(): Promise<{ url: string; key: string } | null> {
     return null;
   }
 }
+
 
 const mask = (key: string) => (key.length > 10 ? `${key.slice(0, 6)}…${key.slice(-4)}` : "••••");
 
