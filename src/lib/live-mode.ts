@@ -53,7 +53,20 @@ export function isDeviceStateKey(key: string): boolean {
   );
 }
 
+/**
+ * The ticket the cashier is ringing up right now. It is the one piece of
+ * business data the phone must keep: it exists nowhere else until payment,
+ * hold or void, and Android routinely reclaims the app mid-sale (opening the
+ * camera to scan a barcode is enough). Losing it means re-scanning the whole
+ * basket. It is cleared the moment the sale is taken, held or voided.
+ */
+const OPEN_TICKET_PREFIX = "pos.cart.draft.";
+
+export function isOpenTicketKey(key: string): boolean {
+  return key.startsWith(OPEN_TICKET_PREFIX);
+}
+
 /** Keys the phone keeps between launches (preferences + device identity). */
 export function isPersistentKey(key: string): boolean {
-  return isUiKey(key) || isDeviceStateKey(key);
+  return isUiKey(key) || isDeviceStateKey(key) || isOpenTicketKey(key);
 }
