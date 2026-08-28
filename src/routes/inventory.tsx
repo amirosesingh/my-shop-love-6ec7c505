@@ -2,7 +2,6 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
   ArrowLeftRight,
-  ClipboardCheck,
   Combine,
   FileSpreadsheet,
   Inbox,
