@@ -86,6 +86,7 @@ export const getAuthorizationRules = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { loadRuleRows } = await import("./authorization.server");
     try {
+      await assertCaller(data);
       const rows = await loadRuleRows(data.storeId ?? "");
       return { ok: true as const, rules: rows };
     } catch (e) {
@@ -364,6 +365,33 @@ export const cancelAuthorizationRequest = createServerFn({ method: "POST" })
       return done
         ? { ok: true as const }
         : { ok: false as const, error: "That request can no longer be cancelled" };
+    } catch (e) {
+      return { ok: false as const, error: (e as Error).message.slice(0, 300) };
+    }
+  });
+
+/** Administrators set another person's authorisation PIN; it is never read back. */
+export const setStaffAuthorizationPin = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    caller.extend({ userId: z.string().min(1), pin: z.string().regex(/^\d{4,6}$/) }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    try {
+      const who = await assertCaller(data);
+      if (!who.isSupervisor) return { ok: false as const, error: "Administrators only" };
+      const { setUserAuthorizationPin, writeLog } = await import("./authorization.server");
+      await setUserAuthorizationPin(data.userId, data.pin, who.id);
+      await writeLog({
+        actionKey: "staff.set_pin",
+        mode: "none",
+        outcome: "approved",
+        requestedBy: who.id,
+        requestedByName: who.name,
+        decidedBy: who.id,
+        decidedByName: who.name,
+        payload: { target: data.userId },
+      }).catch(() => undefined);
+      return { ok: true as const };
     } catch (e) {
       return { ok: false as const, error: (e as Error).message.slice(0, 300) };
     }

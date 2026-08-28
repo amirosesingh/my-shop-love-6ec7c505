@@ -259,3 +259,17 @@ export async function verifyAuthorizationPin(
     return null;
   }
 }
+
+/** Set (or clear) a person's authorisation PIN. Hashing happens in the database. */
+export async function setUserAuthorizationPin(
+  targetUserId: string,
+  pin: string,
+  setBy: string,
+): Promise<void> {
+  const { rpc } = await import("./pos-rules.server");
+  await rpc<unknown>("set_authorization_pin", {
+    p_user_id: targetUserId,
+    p_pin: pin,
+    p_set_by: setBy,
+  });
+}
