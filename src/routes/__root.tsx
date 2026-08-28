@@ -204,7 +204,6 @@ function RootComponent() {
         <PermissionsProvider>
         <PosProvider>
           <RulesBridge>
-          <ManagerGateProvider>
           {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
           <AuditTracker />
           <TelemetryAgent />
@@ -214,7 +213,6 @@ function RootComponent() {
           <AndroidUpdateBanner />
           <Toaster position="top-center" />
           <ErrorNotifier />
-          </ManagerGateProvider>
           </RulesBridge>
         </PosProvider>
         </PermissionsProvider>
@@ -233,5 +231,10 @@ function RootComponent() {
  */
 function RulesBridge({ children }: { children: ReactNode }) {
   const pos = usePosOptional();
-  return <PosRulesProvider storeId={pos?.currentStore?.id ?? ""}>{children}</PosRulesProvider>;
+  const storeId = pos?.currentStore?.id ?? "";
+  return (
+    <PosRulesProvider storeId={storeId}>
+      <ManagerGateProvider storeId={storeId}>{children}</ManagerGateProvider>
+    </PosRulesProvider>
+  );
 }
