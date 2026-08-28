@@ -1133,6 +1133,9 @@ export type ReceivingInvoice = {
   createdAt: string;
   /** Legacy rows carry no status; they are treated as posted. */
   status: ReceivingStatus;
+  /** Set while an edit of this posted entry waits for approval. */
+  pendingEditRequestId: string | null;
+  pendingEditBy: string | null;
   lines: ReceivingLine[];
 };
 
@@ -1162,6 +1165,8 @@ const rowToReceivingInvoice = (r: Row): ReceivingInvoice => ({
   itemCount: num(r.total_items_count),
   createdAt: r.created_at ?? new Date().toISOString(),
   status: (r.status as ReceivingStatus) || "posted",
+  pendingEditRequestId: r.pending_edit_request_id ?? null,
+  pendingEditBy: r.pending_edit_by ?? null,
   lines: (Array.isArray(r.purchase_order_items) ? (r.purchase_order_items as Row[]) : []).map(
     rowToReceivingLine,
   ),
