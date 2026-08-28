@@ -2,7 +2,6 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
   ArrowLeftRight,
-  ClipboardCheck,
   Combine,
   FileSpreadsheet,
   Inbox,
@@ -59,7 +58,7 @@ import {
   useUnits,
 } from "@/lib/catalog-meta";
 import { checkCodeAvailable } from "@/lib/product-lookup";
-import { StockAdjustDialog, StockCountDialog } from "@/components/pos/StockAdjust";
+
 import { ItemActivityDrawer } from "@/components/pos/ItemActivityDrawer";
 import type { Product } from "@/lib/pos-types";
 import { nextSku, peekSku, readSkuSettings } from "@/lib/sku";
@@ -145,9 +144,9 @@ function Inventory() {
   const [groupFilter, setGroupFilter] = useState("all");
   const [subFilter, setSubFilter] = useState("all");
   const [bulkCategory, setBulkCategory] = useState("");
-  const [adjustTarget, setAdjustTarget] = useState<Product | null>(null);
+  
   const [logTarget, setLogTarget] = useState<Product | null>(null);
-  const [countOpen, setCountOpen] = useState(false);
+  
   const [skuOverride, setSkuOverride] = useState(false);
   const autoSku = readSkuSettings().mode === "auto";
   const categories = useCategories();
@@ -253,11 +252,6 @@ function Inventory() {
             >
               <FileSpreadsheet className="size-4" /> Export to Excel
             </Button>
-            {canAdjust && (
-              <Button variant="outline" onClick={() => setCountOpen(true)}>
-                <ClipboardCheck className="size-4" /> Stock check
-              </Button>
-            )}
             {canEdit && (
             <Dialog
               open={!!draft}
@@ -849,21 +843,6 @@ function Inventory() {
           toast.success(`${ids.length > 1 ? "Products" : "Product"} archived — history kept`);
         }}
       />
-      {canAdjust && (
-        <>
-          <StockAdjustDialog
-            product={adjustTarget}
-            storeId={currentStore.id}
-            onClose={() => setAdjustTarget(null)}
-          />
-          <StockCountDialog
-            open={countOpen}
-            products={rows}
-            storeId={currentStore.id}
-            onClose={() => setCountOpen(false)}
-          />
-        </>
-      )}
       <ItemActivityDrawer product={logTarget} onClose={() => setLogTarget(null)} />
     </AppShell>
   );
