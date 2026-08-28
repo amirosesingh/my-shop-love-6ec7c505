@@ -146,7 +146,7 @@ function Inventory() {
   const [bulkCategory, setBulkCategory] = useState("");
   
   const [logTarget, setLogTarget] = useState<Product | null>(null);
-  const [countOpen, setCountOpen] = useState(false);
+  
   const [skuOverride, setSkuOverride] = useState(false);
   const autoSku = readSkuSettings().mode === "auto";
   const categories = useCategories();
