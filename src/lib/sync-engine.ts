@@ -76,7 +76,7 @@ import {
   subscribeConnectivity,
   type Connectivity,
 } from "./connection-health";
-import { syncConfig } from "./sync-config";
+import { subscribeSyncConfig, syncConfig } from "./sync-config";
 import { noteVersions } from "./row-versions";
 import { recordConflict } from "./sync-conflicts";
 import {
@@ -762,7 +762,25 @@ export function startSyncEngine() {
   // Push queued work first, then bring central changes down, then converge the
   // terminal's own database in both directions — one cycle at a time.
   const tick = () => void runExclusive("timer");
-  const timer = window.setInterval(tick, syncConfig().intervalMs);
+  // The cycle timer and the heartbeat both follow the saved settings, so a
+  // change in Settings -> Sync takes effect at once, without a restart.
+  let timer = window.setInterval(tick, syncConfig().intervalMs);
+  let stopMonitor = startConnectivityMonitor(syncConfig().heartbeatMs);
+  let appliedInterval = syncConfig().intervalMs;
+  let appliedHeartbeat = syncConfig().heartbeatMs;
+  const offConfig = subscribeSyncConfig(() => {
+    const cfg = syncConfig();
+    if (cfg.intervalMs !== appliedInterval) {
+      appliedInterval = cfg.intervalMs;
+      window.clearInterval(timer);
+      timer = window.setInterval(tick, appliedInterval);
+    }
+    if (cfg.heartbeatMs !== appliedHeartbeat) {
+      appliedHeartbeat = cfg.heartbeatMs;
+      stopMonitor();
+      stopMonitor = startConnectivityMonitor(appliedHeartbeat);
+    }
+  });
   let debounce: number | undefined;
   // Five seconds of quiet before reacting: network flap protection.
   const wake = () => {
@@ -790,7 +808,6 @@ export function startSyncEngine() {
   // One heartbeat for the whole app decides whether we are online — the
   // browser's own flag lies on captive networks. A confirmed reconnect forces
   // a catch-up pass at once instead of waiting for the next tick.
-  const stopMonitor = startConnectivityMonitor(syncConfig().heartbeatMs);
   const offConnectivity = subscribeConnectivity((state: Connectivity) => {
     if (state === "offline") sleep();
     else if (state === "online") wake();
@@ -813,6 +830,7 @@ export function startSyncEngine() {
   tick();
   return () => {
     window.clearInterval(timer);
+    offConfig();
     stopMonitor();
     offConnectivity();
     if (debounce) window.clearTimeout(debounce);

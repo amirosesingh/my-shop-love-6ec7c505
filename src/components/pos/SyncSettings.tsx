@@ -7,6 +7,7 @@ import { downloadSqlBackup } from "@/lib/backup-sql";
 import { drainOutbox, pullDelta } from "@/lib/sync-engine";
 import { LocalDatabaseSettings } from "@/components/pos/LocalDatabaseSettings";
 import { ConnectionCheck } from "@/components/pos/ConnectionCheck";
+import { SyncBehaviourSettings } from "@/components/pos/SyncBehaviourSettings";
 import { SyncLogViewer } from "@/components/SyncLogViewer";
 import { logSync } from "@/lib/sync-log";
 import { describeError, showNotification } from "@/lib/notify";
@@ -74,6 +75,7 @@ export function SyncSettings() {
           <Stat label="Writing to" value="Central database" />
         </div>
         <ConnectionCheck />
+        <SyncBehaviourSettings />
       </div>
     );
   }
@@ -108,6 +110,8 @@ export function SyncSettings() {
           }}
         />
       </div>
+
+      <SyncBehaviourSettings />
 
       <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
         <div>
