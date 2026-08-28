@@ -36,6 +36,7 @@ import { useAuth } from "@/lib/pos-auth";
 import { db } from "@/lib/pos-db";
 import { money, usePos } from "@/lib/pos-store";
 import { canEditPosted } from "@/lib/stock-ref";
+import { useManagerGate } from "@/lib/manager-gate";
 import { StockCountDialog, type StockRecordRow } from "@/components/pos/StockCountDialog";
 import { StockRecordView } from "@/components/pos/StockRecordView";
 
@@ -43,6 +44,19 @@ const ALL = "all";
 
 function StockOperationsPage() {
   const { state, currentStore } = usePos();
+  const { authorize } = useManagerGate();
+
+  /** Reopening a posted count goes through the configured authorisation. */
+  const editPosted = async (row: StockRecordRow) => {
+    const res = await authorize({
+      action: "edit_posted_stock",
+      title: "Edit a posted stock record",
+      reason: `Reopen ${row.reference || row.id}`,
+      storeId: row.store_id ?? currentStore.id,
+      detail: { reference: row.reference ?? "", lines: row.line_count ?? 0 },
+    });
+    if (res.ok) resume(row);
+  };
   const { user } = useAuth();
   const multiBranch = state.stores.length > 1;
 
@@ -226,10 +240,15 @@ function StockOperationsPage() {
                             <Button
                               size="sm"
                               variant="outline"
-                              disabled={!canEditPosted()}
-                              title="Editing a posted count needs an approved request."
+                              onClick={() => void editPosted(r)}
+                              title="Editing a posted count needs authorisation."
                             >
-                              <Lock className="mr-1 size-3" /> Edit · needs approval
+                              {canEditPosted() ? (
+                                <Pencil className="mr-1 size-3" />
+                              ) : (
+                                <Lock className="mr-1 size-3" />
+                              )}{" "}
+                              Edit
                             </Button>
                           ) : null}
                         </TableCell>

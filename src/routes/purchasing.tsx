@@ -1283,16 +1283,7 @@ function Purchasing() {
                                 ? undefined
                                 : "Editing a received entry needs approval"
                           }
-                          onClick={() => {
-                            if (!canEditPosted()) {
-                              toast.message("Approval required", {
-                                description:
-                                  "Changing a received entry will go through the approval flow.",
-                              });
-                            }
-                            setRemovedLineIds([]);
-                            setEditing(structuredClone(h));
-                          }}
+                          onClick={() => void editReceived(h)}
                         >
                           {canEditPosted() ? (
                             <Pencil className="size-3.5" />
