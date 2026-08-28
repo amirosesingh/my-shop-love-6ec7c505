@@ -15,7 +15,7 @@ import {
   roleHasTag,
   type PermissionKey,
 } from "@/lib/permissions";
-import { isRouteVisibleFor } from "@/lib/ui-visibility";
+import { isRouteVisibleFor, withVisibility } from "@/lib/ui-visibility";
 
 /**
  * Snapshot of the least-privilege presets. If a preset is widened, this test
