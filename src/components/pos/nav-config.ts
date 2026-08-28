@@ -255,7 +255,6 @@ export const navGroups: NavGroup[] = [
         to: "/approvals",
         label: "Pending Approvals",
         icon: ShieldCheck,
-        flag: "can_approve_overrides",
         keywords: "authorisation approval request override pin queue",
         blurb: "Decide the actions waiting on an authorisation.",
       },
