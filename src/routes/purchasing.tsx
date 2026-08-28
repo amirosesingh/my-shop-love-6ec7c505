@@ -832,8 +832,9 @@ function Purchasing() {
       toast.success(`Invoice ${next.invoiceNo} updated`);
       setEditing(null);
       setRemovedLineIds([]);
-      await syncProducts(next.lines.map((l) => l.productId ?? "").filter(Boolean));
-      await refreshHistory();
+      showAsPosted(next);
+      void reconcileAfterPost(next, next.lines.map((l) => l.productId ?? "").filter(Boolean));
+
     } catch (e) {
       notifyError(e, "The correction was not saved");
     } finally {
