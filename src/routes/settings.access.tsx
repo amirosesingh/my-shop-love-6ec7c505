@@ -277,7 +277,8 @@ function AccessSettingsPage() {
                 <h2 className="text-sm font-semibold">What this role sees</h2>
                 <p className="text-xs text-muted-foreground">
                   Hiding something only removes it from the screen; the permission above still
-                  decides what may be done. Owner-only areas cannot be handed to another role.
+                  decides what may be done. A few core areas stay with the owner; sensitive areas
+                  can be handed over, but stay hidden until you switch them on.
                 </p>
               </header>
               {screenGroups.map(({ group, rows }) => (
@@ -287,7 +288,8 @@ function AccessSettingsPage() {
                   </div>
                   <ul>
                     {rows.map((el) => {
-                      const locked = !!el.ownerOnly;
+                      const locked = el.lock === "core";
+                      const sensitive = el.lock === "sensitive";
                       const shown =
                         !locked && !!visibilityRole && isVisibleFor(hidden, el.key, visibilityRole);
                       return (
@@ -298,6 +300,11 @@ function AccessSettingsPage() {
                           <div className="min-w-0">
                             <span className="block text-sm">{el.label}</span>
                             <span className="block text-xs text-muted-foreground">{el.blurb}</span>
+                            {sensitive && (
+                              <span className="mt-0.5 block text-xs text-amber-600 dark:text-amber-500">
+                                Sensitive area — off unless you grant it.
+                              </span>
+                            )}
                           </div>
                           {locked ? (
                             <Badge variant="outline" className="shrink-0 gap-1">
@@ -320,6 +327,7 @@ function AccessSettingsPage() {
                   </ul>
                 </div>
               ))}
+
             </section>
           </>
         )}
