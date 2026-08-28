@@ -691,11 +691,12 @@ function Purchasing() {
             targetId: defaultPutAwayId,
           })),
         ]);
+      const postedIds = lines.map((l) => l.productId);
+      showAsPosted(invoice);
       clearForm();
-      await syncProducts(lines.map((l) => l.productId));
-      await refreshHistory();
-      await refreshDrafts();
+      void reconcileAfterPost(invoice, postedIds);
       scanRef.current?.focus();
+
     } catch (e) {
       notifyError(e, "The invoice was not saved");
     } finally {
