@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { KeyRound, Loader2, Pencil, Plus, RefreshCw, Search, Trash2, UserX } from "lucide-react";
+import { KeyRound, Loader2, Pencil, Plus, RefreshCw, Search, ShieldCheck, Trash2, UserX } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -43,6 +43,8 @@ import { usePos } from "@/lib/pos-store";
 import { getRolesWithPermissions, type RoleDef } from "@/lib/role-admin";
 import { syncNow } from "@/lib/sync-engine";
 import { isExternalEmail, isInternalAddress } from "@/lib/internal-domains";
+import { getPosCallerAuth } from "@/lib/pos-caller-auth";
+import { setStaffAuthorizationPin } from "@/lib/authorization.functions";
 import {
   createStaffMember,
   looksLikeEmail,
@@ -109,6 +111,31 @@ export function StaffManager() {
   const [permissionsFor, setPermissionsFor] = useState<Row | null>(null);
   const [deleteFor, setDeleteFor] = useState<Row | null>(null);
   const [confirmation, setConfirmation] = useState("");
+  // The authorisation PIN is separate from signing in: it only approves a
+  // gated action, so administrators and supervisors need one too.
+  const [pinFor, setPinFor] = useState<Row | null>(null);
+  const [pinValue, setPinValue] = useState("");
+
+  async function saveAuthPin() {
+    if (!pinFor || !/^\d{4,6}$/.test(pinValue)) return;
+    setBusy("auth-pin");
+    try {
+      const auth = await getPosCallerAuth();
+      const res = await setStaffAuthorizationPin({
+        data: { ...auth, userId: pinFor.user_id, pin: pinValue },
+      });
+      if (!res.ok) toast.error(res.error ?? "Could not save the PIN");
+      else {
+        toast.success(`Authorisation PIN set for ${pinFor.full_name}`);
+        setPinFor(null);
+        setPinValue("");
+      }
+    } catch (e) {
+      notifyError(e, "Could not save the PIN");
+    } finally {
+      setBusy("");
+    }
+  }
   const [offline, setOffline] = useState(false);
 
   const load = useCallback(async () => {
@@ -341,6 +368,7 @@ export function StaffManager() {
                 <td className="pr-3"><Switch checked={row.is_active} disabled={busy === row.user_id || row.auth_user_id === authUserId} onCheckedChange={(active) => void setActive(row, active)} aria-label={`${row.full_name} active`} /></td>
                 <td><div className="flex justify-end gap-1">
                   <Button size="icon" variant="ghost" title="Edit account" disabled={offline} onClick={() => openEdit(row)}><Pencil className="size-4" /></Button>
+                  <Button size="icon" variant="ghost" title="Set authorisation PIN" disabled={offline} onClick={() => { setPinFor(row); setPinValue(""); }}><ShieldCheck className="size-4" /></Button>
                   <Button size="icon" variant="ghost" title="Edit permissions" disabled={offline} onClick={() => setPermissionsFor({ ...row, permissions: { ...row.permissions } })}><KeyRound className="size-4" /></Button>
                   {!row.is_active && <Button size="icon" variant="ghost" title="Delete inactive account" disabled={offline || row.auth_user_id === authUserId} onClick={() => { setDeleteFor(row); setConfirmation(""); }}><Trash2 className="size-4 text-destructive" /></Button>}
                 </div></td>
@@ -350,6 +378,33 @@ export function StaffManager() {
           </tbody>
         </table>
       </div>
+
+      <Dialog open={!!pinFor} onOpenChange={(open) => { if (!open) { setPinFor(null); setPinValue(""); } }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Authorisation PIN</DialogTitle>
+            <DialogDescription>
+              A 4–6 digit PIN for {pinFor?.full_name}, used only to approve gated actions at a
+              till. It does not change how they sign in, and it is never shown again.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            autoFocus
+            inputMode="numeric"
+            type="password"
+            maxLength={6}
+            value={pinValue}
+            onChange={(e) => setPinValue(e.target.value.replace(/\D/g, "").slice(0, 6))}
+            aria-label="New authorisation PIN"
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setPinFor(null); setPinValue(""); }}>Cancel</Button>
+            <Button disabled={!/^\d{4,6}$/.test(pinValue) || busy === "auth-pin"} onClick={() => void saveAuthPin()}>
+              {busy === "auth-pin" && <Loader2 className="size-4 animate-spin" />}Save PIN
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={formOpen} onOpenChange={(open) => { if (!busy) setFormOpen(open); }}>
         <DialogContent className="sm:max-w-lg">

@@ -82,6 +82,7 @@ const ROUTE_PERMISSIONS: Record<string, PermissionFlag> = {
   "/promotions": "can_manage_promotions",
   "/coupons": "can_manage_promotions",
   "/suppliers": "can_receive_purchase_order",
+  "/approvals": "can_view_audit_trail",
   "/audit": "can_view_audit_trail",
   "/dashboard": "can_view_dashboard",
   "/analytics": "can_view_sales_reports",

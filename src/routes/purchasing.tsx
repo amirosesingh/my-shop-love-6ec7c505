@@ -13,6 +13,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useManagerGate } from "@/lib/manager-gate";
 import { notifyError } from "@/lib/notify";
 import * as XLSX from "xlsx";
 import { AppShell } from "@/components/pos/AppShell";
@@ -122,6 +123,7 @@ const localDateTime = (iso: string) => {
 const units = (inv: ReceivingInvoice) => inv.lines.reduce((a, l) => a + l.qty, 0);
 
 function Purchasing() {
+  const { authorize } = useManagerGate();
   const { state, currentStore, allStores, upsertProduct, adjustStock, syncProducts } = usePos();
   const { can, user, isAdmin, isSupervisor } = useAuth();
   const [invoiceNo, setInvoiceNo] = useState("");
@@ -194,6 +196,20 @@ function Purchasing() {
   }, []);
 
   /** Invoice history is a database read, so it survives reloads and restarts. */
+  /** Reopening a received entry goes through the configured authorisation. */
+  const editReceived = async (h: ReceivingInvoice) => {
+    const res = await authorize({
+      action: "edit_posted_purchase",
+      title: "Edit a received purchase",
+      reason: `Reopen ${h.reference || h.id}`,
+      storeId: h.storeId ?? currentStore.id,
+      detail: `${h.reference ?? h.id} · ${h.supplier ?? ""}`.trim(),
+    });
+    if (!res.ok) return;
+    setRemovedLineIds([]);
+    setEditing(structuredClone(h));
+  };
+
   /** True when this record was entered on a branch the user is not on. */
   const otherBranch = (h: ReceivingInvoice) =>
     !isAdmin && !!h.storeId && h.storeId !== currentStore.id;
@@ -1283,16 +1299,7 @@ function Purchasing() {
                                 ? undefined
                                 : "Editing a received entry needs approval"
                           }
-                          onClick={() => {
-                            if (!canEditPosted()) {
-                              toast.message("Approval required", {
-                                description:
-                                  "Changing a received entry will go through the approval flow.",
-                              });
-                            }
-                            setRemovedLineIds([]);
-                            setEditing(structuredClone(h));
-                          }}
+                          onClick={() => void editReceived(h)}
                         >
                           {canEditPosted() ? (
                             <Pencil className="size-3.5" />

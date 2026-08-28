@@ -3055,3 +3055,150 @@ BEGIN
   IF COL_LENGTH('dbo.stock_adjustments', 'draft_id') IS NULL ALTER TABLE dbo.stock_adjustments ADD [draft_id] NVARCHAR(80) NULL;
 END
 GO
+
+
+-- =====================================================================
+-- Authorisation framework: rules, approval queue and the decision log.
+-- Guarded so the file stays safe to re-run against a live till.
+-- =====================================================================
+IF OBJECT_ID('dbo.authorization_actions', 'U') IS NULL
+CREATE TABLE dbo.authorization_actions (
+  id NVARCHAR(80) NOT NULL PRIMARY KEY,
+  action_key NVARCHAR(80) NOT NULL,
+  scope_type NVARCHAR(20) NOT NULL DEFAULT N'global',
+  scope_id NVARCHAR(60) NOT NULL DEFAULT N'',
+  mode NVARCHAR(20) NOT NULL DEFAULT N'none',
+  allowed_roles NVARCHAR(MAX) NOT NULL DEFAULT N'[]',
+  allowed_user_ids NVARCHAR(MAX) NOT NULL DEFAULT N'[]',
+  require_reason BIT NOT NULL DEFAULT 0,
+  threshold DECIMAL(18,4) NULL,
+  is_enabled BIT NOT NULL DEFAULT 1,
+  is_synced BIT NOT NULL DEFAULT 0, sync_status NVARCHAR(40) NOT NULL DEFAULT N'pending',
+  row_version INT NOT NULL DEFAULT 0, sync_attempts INT NOT NULL DEFAULT 0,
+  last_error_at DATETIME2(3) NULL, client_transaction_id NVARCHAR(120) NULL,
+  created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+IF OBJECT_ID('dbo.authorization_actions', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.authorization_actions', 'action_key') IS NULL ALTER TABLE dbo.authorization_actions ADD [action_key] NVARCHAR(80);
+  IF COL_LENGTH('dbo.authorization_actions', 'scope_type') IS NULL ALTER TABLE dbo.authorization_actions ADD [scope_type] NVARCHAR(20) DEFAULT N'global';
+  IF COL_LENGTH('dbo.authorization_actions', 'scope_id') IS NULL ALTER TABLE dbo.authorization_actions ADD [scope_id] NVARCHAR(60) DEFAULT N'';
+  IF COL_LENGTH('dbo.authorization_actions', 'mode') IS NULL ALTER TABLE dbo.authorization_actions ADD [mode] NVARCHAR(20) DEFAULT N'none';
+  IF COL_LENGTH('dbo.authorization_actions', 'allowed_roles') IS NULL ALTER TABLE dbo.authorization_actions ADD [allowed_roles] NVARCHAR(MAX) DEFAULT N'[]';
+  IF COL_LENGTH('dbo.authorization_actions', 'allowed_user_ids') IS NULL ALTER TABLE dbo.authorization_actions ADD [allowed_user_ids] NVARCHAR(MAX) DEFAULT N'[]';
+  IF COL_LENGTH('dbo.authorization_actions', 'require_reason') IS NULL ALTER TABLE dbo.authorization_actions ADD [require_reason] BIT DEFAULT 0;
+  IF COL_LENGTH('dbo.authorization_actions', 'threshold') IS NULL ALTER TABLE dbo.authorization_actions ADD [threshold] DECIMAL(18,4) NULL;
+  IF COL_LENGTH('dbo.authorization_actions', 'is_enabled') IS NULL ALTER TABLE dbo.authorization_actions ADD [is_enabled] BIT DEFAULT 1;
+  IF COL_LENGTH('dbo.authorization_actions', 'is_synced') IS NULL ALTER TABLE dbo.authorization_actions ADD [is_synced] BIT DEFAULT 0;
+  IF COL_LENGTH('dbo.authorization_actions', 'sync_status') IS NULL ALTER TABLE dbo.authorization_actions ADD [sync_status] NVARCHAR(40) DEFAULT N'pending';
+  IF COL_LENGTH('dbo.authorization_actions', 'row_version') IS NULL ALTER TABLE dbo.authorization_actions ADD [row_version] INT DEFAULT 0;
+  IF COL_LENGTH('dbo.authorization_actions', 'sync_attempts') IS NULL ALTER TABLE dbo.authorization_actions ADD [sync_attempts] INT DEFAULT 0;
+  IF COL_LENGTH('dbo.authorization_actions', 'last_error_at') IS NULL ALTER TABLE dbo.authorization_actions ADD [last_error_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.authorization_actions', 'client_transaction_id') IS NULL ALTER TABLE dbo.authorization_actions ADD [client_transaction_id] NVARCHAR(120) NULL;
+  IF COL_LENGTH('dbo.authorization_actions', 'created_at') IS NULL ALTER TABLE dbo.authorization_actions ADD [created_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.authorization_actions', 'updated_at') IS NULL ALTER TABLE dbo.authorization_actions ADD [updated_at] DATETIME2(3) NULL;
+END
+GO
+IF OBJECT_ID('dbo.authorization_requests', 'U') IS NULL
+CREATE TABLE dbo.authorization_requests (
+  id NVARCHAR(80) NOT NULL PRIMARY KEY,
+  action_key NVARCHAR(80) NOT NULL,
+  requested_by NVARCHAR(120) NOT NULL,
+  requested_by_name NVARCHAR(200) NULL,
+  store_id NVARCHAR(60) NOT NULL DEFAULT N'',
+  terminal_id NVARCHAR(80) NOT NULL DEFAULT N'',
+  reason NVARCHAR(400) NULL,
+  payload NVARCHAR(MAX) NOT NULL DEFAULT N'{}',
+  status NVARCHAR(20) NOT NULL DEFAULT N'pending',
+  decided_by NVARCHAR(120) NULL,
+  decided_by_name NVARCHAR(200) NULL,
+  decided_at DATETIME2(3) NULL,
+  decision_note NVARCHAR(400) NULL,
+  expires_at DATETIME2(3) NULL,
+  consumed_at DATETIME2(3) NULL,
+  is_synced BIT NOT NULL DEFAULT 0, sync_status NVARCHAR(40) NOT NULL DEFAULT N'pending',
+  row_version INT NOT NULL DEFAULT 0, sync_attempts INT NOT NULL DEFAULT 0,
+  last_error_at DATETIME2(3) NULL, client_transaction_id NVARCHAR(120) NULL,
+  created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+IF OBJECT_ID('dbo.authorization_requests', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.authorization_requests', 'action_key') IS NULL ALTER TABLE dbo.authorization_requests ADD [action_key] NVARCHAR(80);
+  IF COL_LENGTH('dbo.authorization_requests', 'requested_by') IS NULL ALTER TABLE dbo.authorization_requests ADD [requested_by] NVARCHAR(120);
+  IF COL_LENGTH('dbo.authorization_requests', 'requested_by_name') IS NULL ALTER TABLE dbo.authorization_requests ADD [requested_by_name] NVARCHAR(200) NULL;
+  IF COL_LENGTH('dbo.authorization_requests', 'store_id') IS NULL ALTER TABLE dbo.authorization_requests ADD [store_id] NVARCHAR(60) DEFAULT N'';
+  IF COL_LENGTH('dbo.authorization_requests', 'terminal_id') IS NULL ALTER TABLE dbo.authorization_requests ADD [terminal_id] NVARCHAR(80) DEFAULT N'';
+  IF COL_LENGTH('dbo.authorization_requests', 'reason') IS NULL ALTER TABLE dbo.authorization_requests ADD [reason] NVARCHAR(400) NULL;
+  IF COL_LENGTH('dbo.authorization_requests', 'payload') IS NULL ALTER TABLE dbo.authorization_requests ADD [payload] NVARCHAR(MAX) DEFAULT N'{}';
+  IF COL_LENGTH('dbo.authorization_requests', 'status') IS NULL ALTER TABLE dbo.authorization_requests ADD [status] NVARCHAR(20) DEFAULT N'pending';
+  IF COL_LENGTH('dbo.authorization_requests', 'decided_by') IS NULL ALTER TABLE dbo.authorization_requests ADD [decided_by] NVARCHAR(120) NULL;
+  IF COL_LENGTH('dbo.authorization_requests', 'decided_by_name') IS NULL ALTER TABLE dbo.authorization_requests ADD [decided_by_name] NVARCHAR(200) NULL;
+  IF COL_LENGTH('dbo.authorization_requests', 'decided_at') IS NULL ALTER TABLE dbo.authorization_requests ADD [decided_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.authorization_requests', 'decision_note') IS NULL ALTER TABLE dbo.authorization_requests ADD [decision_note] NVARCHAR(400) NULL;
+  IF COL_LENGTH('dbo.authorization_requests', 'expires_at') IS NULL ALTER TABLE dbo.authorization_requests ADD [expires_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.authorization_requests', 'consumed_at') IS NULL ALTER TABLE dbo.authorization_requests ADD [consumed_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.authorization_requests', 'is_synced') IS NULL ALTER TABLE dbo.authorization_requests ADD [is_synced] BIT DEFAULT 0;
+  IF COL_LENGTH('dbo.authorization_requests', 'sync_status') IS NULL ALTER TABLE dbo.authorization_requests ADD [sync_status] NVARCHAR(40) DEFAULT N'pending';
+  IF COL_LENGTH('dbo.authorization_requests', 'row_version') IS NULL ALTER TABLE dbo.authorization_requests ADD [row_version] INT DEFAULT 0;
+  IF COL_LENGTH('dbo.authorization_requests', 'sync_attempts') IS NULL ALTER TABLE dbo.authorization_requests ADD [sync_attempts] INT DEFAULT 0;
+  IF COL_LENGTH('dbo.authorization_requests', 'last_error_at') IS NULL ALTER TABLE dbo.authorization_requests ADD [last_error_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.authorization_requests', 'client_transaction_id') IS NULL ALTER TABLE dbo.authorization_requests ADD [client_transaction_id] NVARCHAR(120) NULL;
+  IF COL_LENGTH('dbo.authorization_requests', 'created_at') IS NULL ALTER TABLE dbo.authorization_requests ADD [created_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.authorization_requests', 'updated_at') IS NULL ALTER TABLE dbo.authorization_requests ADD [updated_at] DATETIME2(3) NULL;
+END
+GO
+IF OBJECT_ID('dbo.authorization_log', 'U') IS NULL
+CREATE TABLE dbo.authorization_log (
+  id NVARCHAR(80) NOT NULL PRIMARY KEY,
+  action_key NVARCHAR(80) NOT NULL,
+  mode_used NVARCHAR(20) NOT NULL,
+  request_id NVARCHAR(80) NULL,
+  requested_by NVARCHAR(120) NULL,
+  authorized_by NVARCHAR(120) NULL,
+  authorizer_role NVARCHAR(40) NULL,
+  store_id NVARCHAR(60) NOT NULL DEFAULT N'',
+  terminal_id NVARCHAR(80) NOT NULL DEFAULT N'',
+  outcome NVARCHAR(20) NOT NULL,
+  detail NVARCHAR(MAX) NOT NULL DEFAULT N'{}',
+  is_synced BIT NOT NULL DEFAULT 0, sync_status NVARCHAR(40) NOT NULL DEFAULT N'pending',
+  row_version INT NOT NULL DEFAULT 0, sync_attempts INT NOT NULL DEFAULT 0,
+  last_error_at DATETIME2(3) NULL, client_transaction_id NVARCHAR(120) NULL,
+  created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+IF OBJECT_ID('dbo.authorization_log', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.authorization_log', 'action_key') IS NULL ALTER TABLE dbo.authorization_log ADD [action_key] NVARCHAR(80);
+  IF COL_LENGTH('dbo.authorization_log', 'mode_used') IS NULL ALTER TABLE dbo.authorization_log ADD [mode_used] NVARCHAR(20);
+  IF COL_LENGTH('dbo.authorization_log', 'request_id') IS NULL ALTER TABLE dbo.authorization_log ADD [request_id] NVARCHAR(80) NULL;
+  IF COL_LENGTH('dbo.authorization_log', 'requested_by') IS NULL ALTER TABLE dbo.authorization_log ADD [requested_by] NVARCHAR(120) NULL;
+  IF COL_LENGTH('dbo.authorization_log', 'authorized_by') IS NULL ALTER TABLE dbo.authorization_log ADD [authorized_by] NVARCHAR(120) NULL;
+  IF COL_LENGTH('dbo.authorization_log', 'authorizer_role') IS NULL ALTER TABLE dbo.authorization_log ADD [authorizer_role] NVARCHAR(40) NULL;
+  IF COL_LENGTH('dbo.authorization_log', 'store_id') IS NULL ALTER TABLE dbo.authorization_log ADD [store_id] NVARCHAR(60) DEFAULT N'';
+  IF COL_LENGTH('dbo.authorization_log', 'terminal_id') IS NULL ALTER TABLE dbo.authorization_log ADD [terminal_id] NVARCHAR(80) DEFAULT N'';
+  IF COL_LENGTH('dbo.authorization_log', 'outcome') IS NULL ALTER TABLE dbo.authorization_log ADD [outcome] NVARCHAR(20);
+  IF COL_LENGTH('dbo.authorization_log', 'detail') IS NULL ALTER TABLE dbo.authorization_log ADD [detail] NVARCHAR(MAX) DEFAULT N'{}';
+  IF COL_LENGTH('dbo.authorization_log', 'is_synced') IS NULL ALTER TABLE dbo.authorization_log ADD [is_synced] BIT DEFAULT 0;
+  IF COL_LENGTH('dbo.authorization_log', 'sync_status') IS NULL ALTER TABLE dbo.authorization_log ADD [sync_status] NVARCHAR(40) DEFAULT N'pending';
+  IF COL_LENGTH('dbo.authorization_log', 'row_version') IS NULL ALTER TABLE dbo.authorization_log ADD [row_version] INT DEFAULT 0;
+  IF COL_LENGTH('dbo.authorization_log', 'sync_attempts') IS NULL ALTER TABLE dbo.authorization_log ADD [sync_attempts] INT DEFAULT 0;
+  IF COL_LENGTH('dbo.authorization_log', 'last_error_at') IS NULL ALTER TABLE dbo.authorization_log ADD [last_error_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.authorization_log', 'client_transaction_id') IS NULL ALTER TABLE dbo.authorization_log ADD [client_transaction_id] NVARCHAR(120) NULL;
+  IF COL_LENGTH('dbo.authorization_log', 'created_at') IS NULL ALTER TABLE dbo.authorization_log ADD [created_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.authorization_log', 'updated_at') IS NULL ALTER TABLE dbo.authorization_log ADD [updated_at] DATETIME2(3) NULL;
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_authorization_actions_scope')
+CREATE UNIQUE INDEX ux_authorization_actions_scope ON dbo.authorization_actions (action_key, scope_type, scope_id);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_authorization_requests_status')
+CREATE INDEX ix_authorization_requests_status ON dbo.authorization_requests (status, store_id, created_at);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_authorization_log_created')
+CREATE INDEX ix_authorization_log_created ON dbo.authorization_log (created_at);
+GO

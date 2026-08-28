@@ -92,6 +92,8 @@ export type Database = {
           permissions: Json
           pin_hash: string
           pin_length: number
+          pin_set_at: string | null
+          pin_updated_by: string | null
           role: Database["public"]["Enums"]["app_role"]
           role_slug: string | null
           row_version: number
@@ -110,6 +112,8 @@ export type Database = {
           permissions?: Json
           pin_hash?: string
           pin_length?: number
+          pin_set_at?: string | null
+          pin_updated_by?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           role_slug?: string | null
           row_version?: number
@@ -128,6 +132,8 @@ export type Database = {
           permissions?: Json
           pin_hash?: string
           pin_length?: number
+          pin_set_at?: string | null
+          pin_updated_by?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           role_slug?: string | null
           row_version?: number
@@ -179,6 +185,156 @@ export type Database = {
           target_module?: string | null
           user_id?: string | null
           user_name?: string | null
+        }
+        Relationships: []
+      }
+      authorization_actions: {
+        Row: {
+          action_key: string
+          allowed_roles: string[]
+          allowed_user_ids: string[]
+          created_at: string
+          id: string
+          is_enabled: boolean
+          mode: string
+          require_reason: boolean
+          scope_id: string
+          scope_type: string
+          threshold: number | null
+          updated_at: string
+        }
+        Insert: {
+          action_key: string
+          allowed_roles?: string[]
+          allowed_user_ids?: string[]
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          mode?: string
+          require_reason?: boolean
+          scope_id?: string
+          scope_type?: string
+          threshold?: number | null
+          updated_at?: string
+        }
+        Update: {
+          action_key?: string
+          allowed_roles?: string[]
+          allowed_user_ids?: string[]
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          mode?: string
+          require_reason?: boolean
+          scope_id?: string
+          scope_type?: string
+          threshold?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      authorization_log: {
+        Row: {
+          action_key: string
+          authorized_by: string | null
+          authorizer_role: string | null
+          created_at: string
+          detail: Json
+          id: string
+          mode_used: string
+          outcome: string
+          request_id: string | null
+          requested_by: string | null
+          store_id: string
+          terminal_id: string
+        }
+        Insert: {
+          action_key: string
+          authorized_by?: string | null
+          authorizer_role?: string | null
+          created_at?: string
+          detail?: Json
+          id?: string
+          mode_used: string
+          outcome: string
+          request_id?: string | null
+          requested_by?: string | null
+          store_id?: string
+          terminal_id?: string
+        }
+        Update: {
+          action_key?: string
+          authorized_by?: string | null
+          authorizer_role?: string | null
+          created_at?: string
+          detail?: Json
+          id?: string
+          mode_used?: string
+          outcome?: string
+          request_id?: string | null
+          requested_by?: string | null
+          store_id?: string
+          terminal_id?: string
+        }
+        Relationships: []
+      }
+      authorization_requests: {
+        Row: {
+          action_key: string
+          consumed_at: string | null
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          decided_by_name: string | null
+          decision_note: string | null
+          expires_at: string
+          id: string
+          payload: Json
+          reason: string
+          requested_by: string
+          requested_by_name: string
+          status: string
+          store_id: string
+          terminal_id: string
+          updated_at: string
+        }
+        Insert: {
+          action_key: string
+          consumed_at?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decided_by_name?: string | null
+          decision_note?: string | null
+          expires_at?: string
+          id?: string
+          payload?: Json
+          reason?: string
+          requested_by: string
+          requested_by_name?: string
+          status?: string
+          store_id?: string
+          terminal_id?: string
+          updated_at?: string
+        }
+        Update: {
+          action_key?: string
+          consumed_at?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decided_by_name?: string | null
+          decision_note?: string | null
+          expires_at?: string
+          id?: string
+          payload?: Json
+          reason?: string
+          requested_by?: string
+          requested_by_name?: string
+          status?: string
+          store_id?: string
+          terminal_id?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -3312,6 +3468,19 @@ export type Database = {
       }
     }
     Functions: {
+      authorization_verify_pin: {
+        Args: {
+          p_allowed_roles?: string[]
+          p_allowed_users?: string[]
+          p_pin: string
+          p_user_id: string
+        }
+        Returns: {
+          full_name: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }[]
+      }
       campaign_is_live: {
         Args: { _c: Database["public"]["Tables"]["coupon_campaigns"]["Row"] }
         Returns: boolean
@@ -3491,6 +3660,10 @@ export type Database = {
           p_user_id: string
         }
         Returns: undefined
+      }
+      set_authorization_pin: {
+        Args: { p_pin: string; p_updated_by?: string; p_user_id: string }
+        Returns: boolean
       }
       set_cashier_permissions: {
         Args: { p_id: string; p_permissions: Json }
