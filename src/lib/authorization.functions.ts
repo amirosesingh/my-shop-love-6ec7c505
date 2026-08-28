@@ -383,13 +383,12 @@ export const setStaffAuthorizationPin = createServerFn({ method: "POST" })
       await setUserAuthorizationPin(data.userId, data.pin, who.id);
       await writeLog({
         actionKey: "staff.set_pin",
-        mode: "none",
+        modeUsed: "admin_auto",
         outcome: "approved",
         requestedBy: who.id,
-        requestedByName: who.name,
-        decidedBy: who.id,
-        decidedByName: who.name,
-        payload: { target: data.userId },
+        authorizedBy: who.id,
+        authorizerRole: who.role,
+        detail: { target: data.userId },
       }).catch(() => undefined);
       return { ok: true as const };
     } catch (e) {
