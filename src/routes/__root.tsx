@@ -226,8 +226,12 @@ function RootComponent() {
   );
 }
 
-/** Rules are per-branch, so the provider needs the active store from the till. */
+/**
+ * Rules are per-branch, so the provider needs the active store from the till.
+ * Read the store optionally: during a hot reload the POS context can briefly be
+ * missing, and that must degrade to "no branch yet" rather than blank the app.
+ */
 function RulesBridge({ children }: { children: ReactNode }) {
-  const { currentStore } = usePos();
-  return <PosRulesProvider storeId={currentStore?.id ?? ""}>{children}</PosRulesProvider>;
+  const pos = usePosOptional();
+  return <PosRulesProvider storeId={pos?.currentStore?.id ?? ""}>{children}</PosRulesProvider>;
 }
