@@ -25,6 +25,14 @@ export const VISIBILITY_ROLES: { id: VisibilityRole; label: string }[] = [
   { id: "warehouse", label: "Warehouse" },
 ];
 
+/**
+ * How tightly a screen is locked.
+ * - `core`: never grantable — it could hand over the whole install.
+ * - `sensitive`: grantable, but hidden from every role until an admin says so.
+ * - `none`: an ordinary day-to-day screen, visible unless hidden.
+ */
+export type VisibilityLock = "core" | "sensitive" | "none";
+
 export type VisibilityElement = {
   key: string;
   label: string;
@@ -32,9 +40,11 @@ export type VisibilityElement = {
   group: string;
   /** Route this element hides. Set for whole screens such as settings pages. */
   route?: string;
-  /** Owner-only screens can never be granted to another role. */
+  lock?: VisibilityLock;
+  /** Legacy alias: true only for the locked core screens. */
   ownerOnly?: boolean;
 };
+
 
 
 /** Every element an administrator can hide, grouped by the screen it lives on. */
@@ -119,59 +129,62 @@ export const VISIBILITY_ELEMENTS: VisibilityElement[] = [
 /**
  * Whole settings pages an administrator can hide from a role.
  *
- * The last column marks the pages that stay with the owner whatever the
- * switches say: staff, devices, sync, security, money identity and the access
- * screen itself. Everything else is a day-to-day page that can genuinely be
- * handed to a cashier, supervisor or warehouse user.
+ * The last column is the lock level. Only four screens stay with the owner
+ * whatever the switches say — the access screen itself, terminal activation
+ * and sync — because handing those over hands over the install. Money and
+ * system screens are `sensitive`: an admin can grant them, but they are hidden
+ * from every role until that happens. Everything else is an ordinary page.
  */
 export const SETTINGS_VISIBILITY_ELEMENTS: VisibilityElement[] = (
   [
-    ["/settings/display", "Display & text size", "Interface scale, density and theme.", false],
-    ["/settings/updates", "Software updates", "App version and background updates.", true],
-    ["/settings/terminals", "Terminal activation", "Register tills and activation codes.", true],
-    ["/settings/mobile-terminals", "Mobile terminals", "Phones and tablets running the POS.", true],
-    ["/settings/sessions", "Active sessions", "Who is signed in, with remote sign-out.", true],
-    ["/settings/printer", "Receipt printer", "Device, margins, drawer pin, test print.", false],
-    ["/settings/elements", "Receipt elements", "Paper size, logo, points and barcode.", false],
-    ["/settings/type", "Receipt typography", "Fonts, sizes and spacing on slips.", false],
-    ["/settings/lines", "Receipt extra lines", "Policy notes and opening hours.", false],
-    ["/settings/qr", "Receipt QR code", "QR payload, size and placement.", false],
-    ["/settings/receipt-designer", "Receipt designer", "Lay the slip out visually.", false],
-    ["/settings/booking-slip", "Booking slip wording", "Terms and the signature line.", false],
-    ["/settings/identity", "Business identity", "Company name, tax numbers, header.", true],
-    ["/settings/tax", "Tax & pricing", "Global tax rate and inclusive pricing.", true],
-    ["/settings/rules", "POS rules & enforcement", "Shift, discount and refund limits.", true],
-    ["/settings/sku", "SKU numbering", "Automatic product codes.", false],
-    ["/settings/numbering", "Bill numbering", "Branch, till and running number.", true],
-    ["/settings/catalog", "Categories & units", "Category groups and units of measure.", false],
-    ["/settings/region", "Region & time", "Country, time zone and clock format.", true],
-    ["/settings/visibility", "Roles & access", "What each role may do and see.", true],
-    ["/settings/access", "Roles & access", "What each role may do and see.", true],
-    ["/settings/payment", "Bank transfer details", "Bank account and payment QR.", true],
-    ["/settings/payment-methods", "Payment methods", "Tenders cashiers can collect at checkout.", true],
-    ["/settings/accounts", "Payment accounts", "Card machines, banks and e-wallets.", true],
-    ["/settings/services", "Booking services", "Jobs and their default fee.", false],
-    ["/settings/whatsapp", "WhatsApp bills", "Send receipts over WhatsApp.", true],
-    ["/settings/sync", "Sync & backup", "Branch identity, queue and backups.", true],
-    ["/settings/system", "System status & integrations", "Connection health and public domains.", true],
-    ["/settings/security-alerts", "Security alerts", "Scan findings and posture checks.", true],
-    ["/settings/diagnostics", "Database health", "Per-table reading and saving status.", true],
-    ["/settings/logic-health", "Logic health", "Relational flow checks.", true],
-    ["/settings/database-explorer", "Database explorer", "Browse the local SQL database.", true],
-    ["/settings/branch-telemetry", "Branch telemetry", "Heartbeats from every till.", true],
-    ["/settings/notifications", "Notifications", "Where alerts are delivered.", true],
-    ["/settings/shift-alerts", "Shift alerts", "How the day-end summary is delivered.", false],
-    ["/settings/booking-rules", "Booking rules", "Deposits, timing and liability wording.", false],
-    ["/settings/hardware", "Hardware", "Scanners, drawers and displays.", false],
-    ["/settings/inheritance", "Settings inheritance", "Global, cluster and branch tiers.", true],
+    ["/settings/display", "Display & text size", "Interface scale, density and theme.", "none"],
+    ["/settings/updates", "Software updates", "App version and background updates.", "sensitive"],
+    ["/settings/terminals", "Terminal activation", "Register tills and activation codes.", "core"],
+    ["/settings/mobile-terminals", "Mobile terminals", "Phones and tablets running the POS.", "sensitive"],
+    ["/settings/sessions", "Active sessions", "Who is signed in, with remote sign-out.", "sensitive"],
+    ["/settings/printer", "Receipt printer", "Device, margins, drawer pin, test print.", "none"],
+    ["/settings/elements", "Receipt elements", "Paper size, logo, points and barcode.", "none"],
+    ["/settings/type", "Receipt typography", "Fonts, sizes and spacing on slips.", "none"],
+    ["/settings/lines", "Receipt extra lines", "Policy notes and opening hours.", "none"],
+    ["/settings/qr", "Receipt QR code", "QR payload, size and placement.", "none"],
+    ["/settings/receipt-designer", "Receipt designer", "Lay the slip out visually.", "none"],
+    ["/settings/booking-slip", "Booking slip wording", "Terms and the signature line.", "none"],
+    ["/settings/identity", "Business identity", "Company name, tax numbers, header.", "sensitive"],
+    ["/settings/tax", "Tax & pricing", "Global tax rate and inclusive pricing.", "sensitive"],
+    ["/settings/rules", "POS rules & enforcement", "Shift, discount and refund limits.", "sensitive"],
+    ["/settings/sku", "SKU numbering", "Automatic product codes.", "none"],
+    ["/settings/numbering", "Bill numbering", "Branch, till and running number.", "sensitive"],
+    ["/settings/catalog", "Categories & units", "Category groups and units of measure.", "none"],
+    ["/settings/region", "Region & time", "Country, time zone and clock format.", "sensitive"],
+    ["/settings/visibility", "Roles & access", "What each role may do and see.", "core"],
+    ["/settings/access", "Roles & access", "What each role may do and see.", "core"],
+    ["/settings/payment", "Bank transfer details", "Bank account and payment QR.", "sensitive"],
+    ["/settings/payment-methods", "Payment methods", "Tenders cashiers can collect at checkout.", "sensitive"],
+    ["/settings/accounts", "Payment accounts", "Card machines, banks and e-wallets.", "sensitive"],
+    ["/settings/services", "Booking services", "Jobs and their default fee.", "none"],
+    ["/settings/whatsapp", "WhatsApp bills", "Send receipts over WhatsApp.", "sensitive"],
+    ["/settings/sync", "Sync & backup", "Branch identity, queue and backups.", "core"],
+    ["/settings/system", "System status & integrations", "Connection health and public domains.", "sensitive"],
+    ["/settings/security-alerts", "Security alerts", "Scan findings and posture checks.", "sensitive"],
+    ["/settings/diagnostics", "Database health", "Per-table reading and saving status.", "sensitive"],
+    ["/settings/logic-health", "Logic health", "Relational flow checks.", "sensitive"],
+    ["/settings/database-explorer", "Database explorer", "Browse the local SQL database.", "sensitive"],
+    ["/settings/branch-telemetry", "Branch telemetry", "Heartbeats from every till.", "sensitive"],
+    ["/settings/notifications", "Notifications", "Where alerts are delivered.", "sensitive"],
+    ["/settings/shift-alerts", "Shift alerts", "How the day-end summary is delivered.", "none"],
+    ["/settings/booking-rules", "Booking rules", "Deposits, timing and liability wording.", "none"],
+    ["/settings/hardware", "Hardware", "Scanners, drawers and displays.", "none"],
+    ["/settings/data-sync", "Data sync & audit", "Server versus shop data comparison.", "sensitive"],
+    ["/settings/inheritance", "Settings inheritance", "Global, cluster and branch tiers.", "sensitive"],
   ] as const
-).map(([route, label, blurb, ownerOnly]) => ({
+).map(([route, label, blurb, lock]) => ({
   key: `route:${route}`,
   label,
   blurb,
   group: "Settings pages",
   route,
-  ownerOnly,
+  lock: lock as VisibilityLock,
+  ownerOnly: lock === "core",
 }));
 
 VISIBILITY_ELEMENTS.push(...SETTINGS_VISIBILITY_ELEMENTS);
@@ -179,9 +192,18 @@ VISIBILITY_ELEMENTS.push(...SETTINGS_VISIBILITY_ELEMENTS);
 /** Every element that stands for a whole screen, settings or otherwise. */
 const ROUTE_ELEMENTS = VISIBILITY_ELEMENTS.filter((e) => e.route);
 
+const LOCK_BY_KEY = new Map(VISIBILITY_ELEMENTS.map((e) => [e.key, e.lock ?? "none"]));
+
+/** Sensitive screens are hidden from every role until an admin grants them. */
+export const lockFor = (key: string): VisibilityLock => LOCK_BY_KEY.get(key) ?? "none";
+
+/** Where an explicit grant for a sensitive element is stored. */
+const grantKey = (key: string) => `grant:${key}`;
+
 /** Screens the owner keeps whatever the switches say. */
 export const isOwnerOnlyRoute = (path: string): boolean =>
-  !!routeElementFor(path)?.ownerOnly;
+  routeElementFor(path)?.lock === "core";
+
 
 function routeElementFor(path: string): VisibilityElement | undefined {
   return ROUTE_ELEMENTS.filter(
@@ -202,7 +224,7 @@ export function isRouteVisibleFor(
   if (!role || role === "admin") return true;
   const match = routeElementFor(path);
   if (!match) return true;
-  if (match.ownerOnly) return false;
+  if (match.lock === "core") return false;
   return isVisibleFor(hidden, match.key, role);
 }
 
@@ -211,10 +233,38 @@ export const VISIBILITY_GROUPS = Array.from(new Set(VISIBILITY_ELEMENTS.map((e) 
 
 export type VisibilityMap = Record<string, string[]>;
 
-/** True when this element should be shown to someone holding `role`. */
+/**
+ * True when this element should be shown to someone holding `role`.
+ *
+ * Ordinary elements are visible until an administrator hides them. Sensitive
+ * screens work the other way round: they stay hidden until an administrator
+ * grants them to that role, so relaxing a lock never opens anything by itself.
+ */
 export function isVisibleFor(hidden: VisibilityMap, key: string, role: string | null): boolean {
   if (!role || role === "admin") return true;
+  const lock = lockFor(key);
+  if (lock === "core") return false;
+  if (lock === "sensitive") return (hidden[grantKey(key)] ?? []).includes(role);
   return !(hidden[key] ?? []).includes(role);
+}
+
+/** The stored map after showing / hiding `key` for `forRole`. */
+export function withVisibility(
+  hidden: VisibilityMap,
+  key: string,
+  forRole: VisibilityRole,
+  hide: boolean,
+): VisibilityMap {
+  const sensitive = lockFor(key) === "sensitive";
+  // Sensitive rows keep an allow-list; everything else keeps a deny-list.
+  const storeKey = sensitive ? grantKey(key) : key;
+  const listed = sensitive ? !hide : hide;
+  const current = new Set(hidden[storeKey] ?? []);
+  if (listed) current.add(forRole);
+  else current.delete(forRole);
+  const next: VisibilityMap = { ...hidden, [storeKey]: [...current] };
+  if (!next[storeKey].length) delete next[storeKey];
+  return next;
 }
 
 /**
@@ -241,15 +291,11 @@ export function useVisibility() {
 
   const setHidden = useCallback(
     (key: string, forRole: VisibilityRole, hide: boolean) => {
-      const current = new Set(hidden[key] ?? []);
-      if (hide) current.add(forRole);
-      else current.delete(forRole);
-      const next: VisibilityMap = { ...hidden, [key]: [...current] };
-      if (!next[key].length) delete next[key];
-      updateSettings({ visibility: { hidden: next } });
+      updateSettings({ visibility: { hidden: withVisibility(hidden, key, forRole, hide) } });
     },
     [hidden, updateSettings],
   );
+
 
   return { hidden, role, visible, visibleRoute, setHidden };
 }

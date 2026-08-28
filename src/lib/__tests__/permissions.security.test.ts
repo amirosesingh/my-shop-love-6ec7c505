@@ -15,7 +15,7 @@ import {
   roleHasTag,
   type PermissionKey,
 } from "@/lib/permissions";
-import { isRouteVisibleFor } from "@/lib/ui-visibility";
+import { isRouteVisibleFor, withVisibility } from "@/lib/ui-visibility";
 
 /**
  * Snapshot of the least-privilege presets. If a preset is widened, this test
@@ -189,4 +189,18 @@ describe("route visibility", () => {
     expect(isRouteVisibleFor({}, "/", "cashier")).toBe(true);
     expect(isRouteVisibleFor({}, "/reports/sales", "supervisor")).toBe(true);
   });
+
+  it("a sensitive page is hidden until it is granted, and can never be granted for a core page", () => {
+    const key = "route:/settings/rules";
+    expect(isRouteVisibleFor({}, "/settings/rules", "supervisor")).toBe(false);
+    const granted = withVisibility({}, key, "supervisor", false);
+    expect(isRouteVisibleFor(granted, "/settings/rules", "supervisor")).toBe(true);
+    expect(isRouteVisibleFor(granted, "/settings/rules", "cashier")).toBe(false);
+    const revoked = withVisibility(granted, key, "supervisor", true);
+    expect(isRouteVisibleFor(revoked, "/settings/rules", "supervisor")).toBe(false);
+
+    const core = withVisibility({}, "route:/settings/access", "supervisor", false);
+    expect(isRouteVisibleFor(core, "/settings/access", "supervisor")).toBe(false);
+  });
 });
+
