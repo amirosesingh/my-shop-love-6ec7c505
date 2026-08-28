@@ -146,11 +146,52 @@ export async function writeRecordEdit(entry: {
   }
 }
 
-/** History for one record, newest first. */
-export async function listRecordEdits(kind: RecordKind, recordId: string): Promise<Row[]> {
+/** One line of a record's edit history, in the shape the screens read. */
+export type RecordEditRow = {
+  id: string;
+  record_type: string;
+  record_id: string;
+  reference: string | null;
+  store_id: string | null;
+  action_key: string;
+  edited_by: string | null;
+  edited_by_name: string | null;
+  authorized_by: string | null;
+  mode_used: string | null;
+  before_value: string;
+  after_value: string;
+  stock_deltas: string;
+  note: string | null;
+  created_at: string;
+};
+
+const asText = (v: unknown): string =>
+  v == null ? "" : typeof v === "string" ? v : JSON.stringify(v);
+
+/** History for one record, newest first. Nested values travel as JSON text. */
+export async function listRecordEdits(
+  kind: RecordKind,
+  recordId: string,
+): Promise<RecordEditRow[]> {
   const res = await rest(
     `record_edits?select=*&record_type=eq.${kind}&record_id=eq.${encodeURIComponent(recordId)}&order=created_at.desc&limit=50`,
   );
   if (!res.ok) return [];
-  return (await res.json()) as Row[];
+  return ((await res.json()) as Row[]).map((r) => ({
+    id: String(r["id"] ?? ""),
+    record_type: String(r["record_type"] ?? ""),
+    record_id: String(r["record_id"] ?? ""),
+    reference: (r["reference"] as string) ?? null,
+    store_id: (r["store_id"] as string) ?? null,
+    action_key: String(r["action_key"] ?? ""),
+    edited_by: (r["edited_by"] as string) ?? null,
+    edited_by_name: (r["edited_by_name"] as string) ?? null,
+    authorized_by: (r["authorized_by"] as string) ?? null,
+    mode_used: (r["mode_used"] as string) ?? null,
+    before_value: asText(r["before_value"]),
+    after_value: asText(r["after_value"]),
+    stock_deltas: asText(r["stock_deltas"]),
+    note: (r["note"] as string) ?? null,
+    created_at: String(r["created_at"] ?? ""),
+  }));
 }
