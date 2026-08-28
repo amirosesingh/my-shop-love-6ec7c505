@@ -1088,7 +1088,9 @@ CREATE INDEX IF NOT EXISTS ix_user_roles_created_at ON user_roles (created_at);
 -- ---- stock_count_drafts ----
 CREATE TABLE IF NOT EXISTS stock_count_drafts (
   id           TEXT PRIMARY KEY NOT NULL,
+  reference    TEXT,
   store_id     TEXT,
+  store_code   TEXT,
   terminal_id  TEXT,
   staff_id     TEXT,
   staff_name   TEXT,
@@ -1110,3 +1112,5 @@ CREATE TABLE IF NOT EXISTS stock_count_drafts (
   client_transaction_id TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_stock_count_drafts_store ON stock_count_drafts (store_id, status, updated_at);
+CREATE INDEX IF NOT EXISTS ix_stock_count_drafts_created ON stock_count_drafts (store_id, status, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_stock_count_drafts_reference ON stock_count_drafts (reference) WHERE reference IS NOT NULL;

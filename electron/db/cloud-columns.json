@@ -483,7 +483,9 @@
   ],
   "stock_count_drafts": [
     "id",
+    "reference",
     "store_id",
+    "store_code",
     "terminal_id",
     "staff_id",
     "staff_name",

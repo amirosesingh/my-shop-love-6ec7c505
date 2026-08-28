@@ -2150,7 +2150,9 @@ export const db = {
    */
   saveStockCountDraft: (row: {
     id: string;
+    reference?: string | null;
     storeId: string | null;
+    storeCode?: string | null;
     terminalId?: string | null;
     staffId?: string | null;
     staffName?: string | null;
@@ -2170,7 +2172,9 @@ export const db = {
       rows: [
         {
           id: row.id,
+          reference: row.reference ?? null,
           store_id: row.storeId,
+          store_code: row.storeCode ?? null,
           terminal_id: row.terminalId ?? null,
           staff_id: row.staffId ?? null,
           staff_name: row.staffName ?? null,
@@ -2215,6 +2219,21 @@ export const db = {
     });
     return rows as Row[];
   },
+
+  /**
+   * Every stock count record for the history list: one branch, or all of them
+   * when `storeId` is omitted. Status filtering happens in the caller so the
+   * same read serves the tab's filter chips.
+   */
+  async listStockCountRecords(opts: { storeId?: string | null; limit?: number } = {}) {
+    const rows = await routedQuery("stock_count_drafts", {
+      ...(opts.storeId ? { match: { store_id: opts.storeId } } : {}),
+      orderBy: { column: "created_at", ascending: false },
+      limit: opts.limit ?? 200,
+    });
+    return rows as Row[];
+  },
+
 
 
   /* ------------------------ whatsapp outbox ----------------------- */

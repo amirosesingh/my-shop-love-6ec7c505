@@ -619,7 +619,9 @@ export const CENTRAL_SCHEMA: CentralTableSchema[] = [
     primaryKey: "id",
     columns: [
       { name: "id", pgType: "uuid" },
+      { name: "reference", pgType: "text" },
       { name: "store_id", pgType: "text" },
+      { name: "store_code", pgType: "text" },
       { name: "terminal_id", pgType: "text" },
       { name: "staff_id", pgType: "text" },
       { name: "staff_name", pgType: "text" },

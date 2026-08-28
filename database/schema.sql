@@ -3007,6 +3007,7 @@ GO
 IF OBJECT_ID('dbo.stock_count_drafts', 'U') IS NULL
 CREATE TABLE dbo.stock_count_drafts (
   id NVARCHAR(80) NOT NULL PRIMARY KEY,
+  reference NVARCHAR(60) NULL, store_code NVARCHAR(40) NULL,
   store_id NVARCHAR(60) NULL, terminal_id NVARCHAR(80) NULL,
   staff_id NVARCHAR(80) NULL, staff_name NVARCHAR(200) NULL,
   status NVARCHAR(20) NOT NULL DEFAULT N'draft',
@@ -3023,6 +3024,8 @@ CREATE TABLE dbo.stock_count_drafts (
 GO
 IF OBJECT_ID('dbo.stock_count_drafts', 'U') IS NOT NULL
 BEGIN
+  IF COL_LENGTH('dbo.stock_count_drafts', 'reference') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [reference] NVARCHAR(60) NULL;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'store_code') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [store_code] NVARCHAR(40) NULL;
   IF COL_LENGTH('dbo.stock_count_drafts', 'store_id') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [store_id] NVARCHAR(60) NULL;
   IF COL_LENGTH('dbo.stock_count_drafts', 'terminal_id') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [terminal_id] NVARCHAR(80) NULL;
   IF COL_LENGTH('dbo.stock_count_drafts', 'staff_id') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [staff_id] NVARCHAR(80) NULL;

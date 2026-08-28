@@ -86,6 +86,7 @@ import { Route as SettingsServicesRouteImport } from './routes/settings.services
 import { Route as SettingsSessionsRouteImport } from './routes/settings.sessions'
 import { Route as SettingsShiftAlertsRouteImport } from './routes/settings.shift-alerts'
 import { Route as SettingsSkuRouteImport } from './routes/settings.sku'
+import { Route as SettingsStockNumberingRouteImport } from './routes/settings.stock-numbering'
 import { Route as SettingsSyncRouteImport } from './routes/settings.sync'
 import { Route as SettingsSystemRouteImport } from './routes/settings.system'
 import { Route as SettingsTaxRouteImport } from './routes/settings.tax'
@@ -490,6 +491,11 @@ const SettingsSkuRoute = SettingsSkuRouteImport.update({
   path: '/settings/sku',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsStockNumberingRoute = SettingsStockNumberingRouteImport.update({
+  id: '/settings/stock-numbering',
+  path: '/settings/stock-numbering',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsSyncRoute = SettingsSyncRouteImport.update({
   id: '/settings/sync',
   path: '/settings/sync',
@@ -652,6 +658,7 @@ export interface FileRoutesByFullPath {
   '/settings/sessions': typeof SettingsSessionsRoute
   '/settings/shift-alerts': typeof SettingsShiftAlertsRoute
   '/settings/sku': typeof SettingsSkuRoute
+  '/settings/stock-numbering': typeof SettingsStockNumberingRoute
   '/settings/sync': typeof SettingsSyncRoute
   '/settings/system': typeof SettingsSystemRoute
   '/settings/tax': typeof SettingsTaxRoute
@@ -748,6 +755,7 @@ export interface FileRoutesByTo {
   '/settings/sessions': typeof SettingsSessionsRoute
   '/settings/shift-alerts': typeof SettingsShiftAlertsRoute
   '/settings/sku': typeof SettingsSkuRoute
+  '/settings/stock-numbering': typeof SettingsStockNumberingRoute
   '/settings/sync': typeof SettingsSyncRoute
   '/settings/system': typeof SettingsSystemRoute
   '/settings/tax': typeof SettingsTaxRoute
@@ -845,6 +853,7 @@ export interface FileRoutesById {
   '/settings/sessions': typeof SettingsSessionsRoute
   '/settings/shift-alerts': typeof SettingsShiftAlertsRoute
   '/settings/sku': typeof SettingsSkuRoute
+  '/settings/stock-numbering': typeof SettingsStockNumberingRoute
   '/settings/sync': typeof SettingsSyncRoute
   '/settings/system': typeof SettingsSystemRoute
   '/settings/tax': typeof SettingsTaxRoute
@@ -943,6 +952,7 @@ export interface FileRouteTypes {
     | '/settings/sessions'
     | '/settings/shift-alerts'
     | '/settings/sku'
+    | '/settings/stock-numbering'
     | '/settings/sync'
     | '/settings/system'
     | '/settings/tax'
@@ -1039,6 +1049,7 @@ export interface FileRouteTypes {
     | '/settings/sessions'
     | '/settings/shift-alerts'
     | '/settings/sku'
+    | '/settings/stock-numbering'
     | '/settings/sync'
     | '/settings/system'
     | '/settings/tax'
@@ -1135,6 +1146,7 @@ export interface FileRouteTypes {
     | '/settings/sessions'
     | '/settings/shift-alerts'
     | '/settings/sku'
+    | '/settings/stock-numbering'
     | '/settings/sync'
     | '/settings/system'
     | '/settings/tax'
@@ -1232,6 +1244,7 @@ export interface RootRouteChildren {
   SettingsSessionsRoute: typeof SettingsSessionsRoute
   SettingsShiftAlertsRoute: typeof SettingsShiftAlertsRoute
   SettingsSkuRoute: typeof SettingsSkuRoute
+  SettingsStockNumberingRoute: typeof SettingsStockNumberingRoute
   SettingsSyncRoute: typeof SettingsSyncRoute
   SettingsSystemRoute: typeof SettingsSystemRoute
   SettingsTaxRoute: typeof SettingsTaxRoute
@@ -1792,6 +1805,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsSkuRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/stock-numbering': {
+      id: '/settings/stock-numbering'
+      path: '/settings/stock-numbering'
+      fullPath: '/settings/stock-numbering'
+      preLoaderRoute: typeof SettingsStockNumberingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings/sync': {
       id: '/settings/sync'
       path: '/settings/sync'
@@ -2004,6 +2024,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsSessionsRoute: SettingsSessionsRoute,
   SettingsShiftAlertsRoute: SettingsShiftAlertsRoute,
   SettingsSkuRoute: SettingsSkuRoute,
+  SettingsStockNumberingRoute: SettingsStockNumberingRoute,
   SettingsSyncRoute: SettingsSyncRoute,
   SettingsSystemRoute: SettingsSystemRoute,
   SettingsTaxRoute: SettingsTaxRoute,

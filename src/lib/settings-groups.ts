@@ -35,7 +35,9 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
       { to: "/settings/rules", label: "Rules & enforcement", blurb: "Shift, discount, refund and terminal limits." },
       { to: "/settings/tax", label: "Tax & pricing", blurb: "Global rate and inclusive or exclusive pricing." },
       { to: "/settings/numbering", label: "Bill numbering", blurb: "Branch, till, date and running number." },
+      { to: "/settings/stock-numbering", label: "Stock numbering", blurb: "Reference numbers for stock count records." },
       { to: "/settings/sku", label: "SKU numbering", blurb: "Automatic product codes, or manual entry." },
+
     ],
   },
   {
