@@ -2354,6 +2354,8 @@ BEGIN
   IF COL_LENGTH('dbo.purchase_orders', 'sync_attempts') IS NULL ALTER TABLE dbo.purchase_orders ADD [sync_attempts] INT DEFAULT 0;
   IF COL_LENGTH('dbo.purchase_orders', 'last_error_at') IS NULL ALTER TABLE dbo.purchase_orders ADD [last_error_at] DATETIME2(3);
   IF COL_LENGTH('dbo.purchase_orders', 'client_transaction_id') IS NULL ALTER TABLE dbo.purchase_orders ADD [client_transaction_id] NVARCHAR(120);
+  -- Draft receiving orders: 'draft' until finalized, then 'posted' (or 'cancelled').
+  IF COL_LENGTH('dbo.purchase_orders', 'status') IS NULL ALTER TABLE dbo.purchase_orders ADD [status] NVARCHAR(20) NOT NULL DEFAULT N'posted';
 END
 GO
 IF OBJECT_ID('dbo.sale_items', 'U') IS NOT NULL

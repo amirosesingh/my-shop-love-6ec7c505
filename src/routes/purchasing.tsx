@@ -17,6 +17,7 @@ import { AppShell } from "@/components/pos/AppShell";
 import {
   db,
   invoiceNumberTaken,
+  loadReceivingDrafts,
   loadReceivingInvoices,
   type ReceivingInvoice,
 } from "@/lib/pos-db";
@@ -133,6 +134,17 @@ function Purchasing() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [draft, setDraft] = useState<Product | null>(null);
   const [draftQty, setDraftQty] = useState("1");
+  /*
+    Draft receiving orders. The entry is written to the database as soon as the
+    first line lands, and every later change updates that same row, so a part-
+    entered delivery survives navigating away, logging out or a restart. A
+    draft never touches stock — only Finalize does.
+  */
+  const [openDraftId, setOpenDraftId] = useState<string | null>(null);
+  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
+  const [draftLineRemovals, setDraftLineRemovals] = useState<string[]>([]);
+  const [drafts, setDrafts] = useState<ReceivingInvoice[]>([]);
+  const [discardId, setDiscardId] = useState<string | null>(null);
   const catalogLists = useCategories();
   const scanRef = useRef<HTMLInputElement>(null);
   const [suppliers, setSuppliers] = useState<Supplier[]>(cachedSuppliers());
@@ -182,10 +194,121 @@ function Purchasing() {
     }
   };
 
+  /** Unfinished entries for this branch, so nothing half-typed gets lost. */
+  const refreshDrafts = async () => {
+    try {
+      setDrafts(await loadReceivingDrafts(currentStore.id, masterView));
+    } catch {
+      /* offline: the list simply stays as it was */
+    }
+  };
+
   useEffect(() => {
     void refreshHistory();
+    void refreshDrafts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStore.id, masterView]);
+
+  /** The entry as it stands right now, in the shape the database stores. */
+  const buildInvoice = (status: "draft" | "posted", id: string): ReceivingInvoice => ({
+    id,
+    invoiceNo: invoiceNo.trim(),
+    supplier: supplier.trim(),
+    supplierId: suppliers.find((s) => s.name === supplier.trim())?.id ?? null,
+    operator: user?.name ?? "—",
+    storeId: currentStore.id || activeBranchId(currentStore.id),
+    storeCode: currentStore.code,
+    invoiceDate,
+    entryDate: new Date(entryDate).toISOString(),
+    totalCost: totals.cost,
+    itemCount: lines.length,
+    createdAt: new Date().toISOString(),
+    status,
+    lines: lines.map((l) => ({
+      // The queue line id *is* the stored line id, so autosaves update rows
+      // in place instead of piling up duplicates.
+      id: l.id,
+      productId: l.productId,
+      barcode: l.barcode,
+      sku: l.barcode,
+      name: l.name,
+      cost: l.cost,
+      price: l.price,
+      qty: l.qty,
+    })),
+  });
+
+  // Debounced autosave: fast scanning must not hammer the database.
+  useEffect(() => {
+    if (!lines.length) return;
+    const id = openDraftId ?? crypto.randomUUID();
+    const removals = draftLineRemovals;
+    const t = setTimeout(() => {
+      void (async () => {
+        try {
+          await db.saveReceivingDraft(buildInvoice("draft", id), removals);
+          setOpenDraftId(id);
+          setDraftLineRemovals((r) => r.filter((x) => !removals.includes(x)));
+          setDraftSavedAt(new Date().toISOString());
+        } catch {
+          /* the outbox retries; the queue on screen is unaffected */
+        }
+      })();
+    }, 800);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lines, invoiceNo, supplier, invoiceDate, entryDate, openDraftId, draftLineRemovals]);
+
+  /** Load a saved draft back into the form for more items or invoices. */
+  function resumeDraft(inv: ReceivingInvoice) {
+    setOpenDraftId(inv.id);
+    setDraftLineRemovals([]);
+    setInvoiceNo(inv.invoiceNo);
+    setSupplier(inv.supplier);
+    setInvoiceDate(inv.invoiceDate ?? today());
+    setEntryDate(localDateTime(inv.entryDate));
+    setLines(
+      inv.lines.map((l) => ({
+        id: l.id,
+        productId: l.productId ?? "",
+        barcode: l.barcode ?? "",
+        name: l.name,
+        cost: l.cost,
+        price: l.price,
+        qty: l.qty,
+      })),
+    );
+    setDraftSavedAt(inv.entryDate);
+    toast.success(`Draft ${inv.invoiceNo || "(no number yet)"} reopened`);
+    scanRef.current?.focus();
+  }
+
+  /** Clear the form back to a fresh entry without touching what is stored. */
+  function clearForm() {
+    setOpenDraftId(null);
+    setDraftLineRemovals([]);
+    setDraftSavedAt(null);
+    setInvoiceNo("");
+    setSupplier("");
+    setInvoiceDate(today());
+    setEntryDate(localDateTime(new Date().toISOString()));
+    setLines([]);
+  }
+
+  /** Abandon a draft. The row is kept as cancelled for audit, never deleted. */
+  async function discardDraft(id: string) {
+    try {
+      await db.discardReceivingDraft(id);
+      if (openDraftId === id) clearForm();
+      toast.success("Draft discarded");
+      await refreshDrafts();
+    } catch (e) {
+      notifyError(e, "The draft was not discarded");
+    } finally {
+      setDiscardId(null);
+    }
+  }
+
 
   if (!can("can_receive_purchase_order")) {
     return (
@@ -401,7 +524,6 @@ function Purchasing() {
         return;
       }
 
-      const picked = suppliers.find((s) => s.name === supplier.trim());
       // A receiving order must never land without a branch: fall back to the
       // branch this terminal is bound to when the view has not resolved one.
       // Stock itself is always posted into the hub, never straight to a floor.
@@ -413,32 +535,17 @@ function Purchasing() {
         return;
       }
       const hubId = hub.id || storeId;
+      // Finalizing a resumed draft posts the very same record, so the entry
+      // keeps its id and can never be posted twice as two invoices.
+      const wasDraft = openDraftId;
       const invoice: ReceivingInvoice = {
-        id: crypto.randomUUID(),
+        ...buildInvoice("posted", wasDraft ?? crypto.randomUUID()),
         invoiceNo: ref,
-        supplier: supplier.trim(),
-        supplierId: picked?.id ?? null,
-        operator: user?.name ?? "—",
         storeId,
-        storeCode: currentStore.code,
-        invoiceDate,
-        entryDate: new Date(entryDate).toISOString(),
-        totalCost: totals.cost,
-        itemCount: lines.length,
-        createdAt: new Date().toISOString(),
-        lines: lines.map((l) => ({
-          id: crypto.randomUUID(),
-          productId: l.productId,
-          barcode: l.barcode,
-          sku: l.barcode,
-          name: l.name,
-          cost: l.cost,
-          price: l.price,
-          qty: l.qty,
-        })),
       };
 
-      await db.commitReceivingInvoice(invoice);
+      if (wasDraft) await db.updateReceivingInvoice(invoice, draftLineRemovals);
+      else await db.commitReceivingInvoice(invoice);
 
       const movements = lines.map((l) => {
         const previousStock = stockAt(
@@ -489,13 +596,10 @@ function Purchasing() {
             targetId: defaultPutAwayId,
           })),
         ]);
-      setInvoiceNo("");
-      setSupplier("");
-      setInvoiceDate(today());
-      setEntryDate(localDateTime(new Date().toISOString()));
-      setLines([]);
+      clearForm();
       await syncProducts(lines.map((l) => l.productId));
       await refreshHistory();
+      await refreshDrafts();
       scanRef.current?.focus();
     } catch (e) {
       notifyError(e, "The invoice was not saved");
@@ -798,7 +902,11 @@ function Purchasing() {
                       variant="ghost"
                       size="icon"
                       aria-label="Remove line"
-                      onClick={() => setLines((ls) => ls.filter((x) => x.id !== l.id))}
+                      onClick={() => {
+                        setLines((ls) => ls.filter((x) => x.id !== l.id));
+                        // Already autosaved into the draft? Delete that row too.
+                        if (openDraftId) setDraftLineRemovals((r) => [...r, l.id]);
+                      }}
                     >
                       <Trash2 className="size-4 text-destructive" />
                     </Button>
@@ -824,13 +932,75 @@ function Purchasing() {
               <span className="numeric font-semibold text-foreground">{totals.units}</span> units ·
               total cost{" "}
               <span className="numeric font-semibold text-foreground">{money(totals.cost)}</span>
+              {draftSavedAt && (
+                <span className="ml-2 text-xs text-muted-foreground">
+                  · Draft saved {new Date(draftSavedAt).toLocaleTimeString()}
+                </span>
+              )}
             </div>
-            <Button className="h-11" disabled={saving} onClick={() => void finalize()}>
-              <PackagePlus className="size-4" />{" "}
-              {saving ? "Saving invoice…" : "Finalize & receive stock"}
-            </Button>
+            <div className="flex items-center gap-2">
+              {openDraftId && (
+                <Button
+                  variant="outline"
+                  className="h-11"
+                  onClick={() => setDiscardId(openDraftId)}
+                >
+                  <Trash2 className="size-4" /> Discard draft
+                </Button>
+              )}
+              <Button className="h-11" disabled={saving} onClick={() => void finalize()}>
+                <PackagePlus className="size-4" />{" "}
+                {saving ? "Saving invoice…" : "Finalize & receive stock"}
+              </Button>
+            </div>
           </div>
         </section>
+
+        {drafts.length > 0 && (
+          <section className="rounded-lg border border-warning/40 bg-warning/5 p-5">
+            <h2 className="text-sm font-semibold">Draft receiving orders</h2>
+            <p className="text-xs text-muted-foreground">
+              Unfinished entries. Nothing here has touched stock yet — reopen one to keep adding
+              items, or discard it.
+            </p>
+            <div className="mt-3 space-y-2">
+              {drafts.map((d) => (
+                <div
+                  key={d.id}
+                  className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-card p-2"
+                >
+                  <div className="min-w-[200px] flex-1">
+                    <p className="truncate text-sm font-medium">
+                      {d.invoiceNo || "(no invoice number yet)"} · {d.supplier || "no supplier"}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {d.lines.length} items · {units(d)} units · {money(d.totalCost)} · saved{" "}
+                      {new Date(d.entryDate).toLocaleString()}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={openDraftId === d.id ? "secondary" : "default"}
+                    className="h-9"
+                    disabled={openDraftId === d.id}
+                    onClick={() => resumeDraft(d)}
+                  >
+                    {openDraftId === d.id ? "Open" : "Resume"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-9"
+                    onClick={() => setDiscardId(d.id)}
+                  >
+                    <Trash2 className="size-4 text-destructive" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
 
         {pending.length > 0 && (
           <section className="space-y-3 rounded-lg border border-primary/40 bg-primary/5 p-5">
@@ -1247,6 +1417,28 @@ function Purchasing() {
               Cancel
             </Button>
             <Button onClick={saveDraft}>Save &amp; add to invoice</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!discardId} onOpenChange={(o) => !o && setDiscardId(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Discard this draft?</DialogTitle>
+            <DialogDescription>
+              The entry is removed from your drafts and kept only for audit. No stock is affected.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDiscardId(null)}>
+              Keep draft
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => discardId && void discardDraft(discardId)}
+            >
+              Discard draft
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -1886,8 +1886,9 @@ export type Database = {
           invoice_date: string | null
           invoice_entry_date: string | null
           operator_name: string | null
-          po_number: string
+          po_number: string | null
           row_version: number
+          status: string
           store_code: string | null
           store_id: string | null
           supplier_id: string | null
@@ -1902,8 +1903,9 @@ export type Database = {
           invoice_date?: string | null
           invoice_entry_date?: string | null
           operator_name?: string | null
-          po_number: string
+          po_number?: string | null
           row_version?: number
+          status?: string
           store_code?: string | null
           store_id?: string | null
           supplier_id?: string | null
@@ -1918,8 +1920,9 @@ export type Database = {
           invoice_date?: string | null
           invoice_entry_date?: string | null
           operator_name?: string | null
-          po_number?: string
+          po_number?: string | null
           row_version?: number
+          status?: string
           store_code?: string | null
           store_id?: string | null
           supplier_id?: string | null
