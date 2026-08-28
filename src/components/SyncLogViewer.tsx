@@ -7,7 +7,25 @@ import { Badge } from "@/components/ui/badge";
 import { drainOutbox } from "@/lib/sync-engine";
 import { isOnline, lastSyncedAt, listQueue, subscribeOutbox } from "@/lib/sync-outbox";
 import { electronDb, readBranch } from "@/lib/local-db";
-import { clearSyncLog, listSyncLog, subscribeSyncLog, type SyncDirection } from "@/lib/sync-log";
+import {
+  clearSyncLog,
+  listSyncLog,
+  subscribeSyncLog,
+  type SyncDirection,
+  type SyncFailureKind,
+} from "@/lib/sync-log";
+
+/** Plain-language name and colour for each kind of failure. */
+const FAILURE: Record<SyncFailureKind, { label: string; className: string }> = {
+  network: { label: "Connection", className: "border-warning/40 bg-warning/10 text-warning" },
+  auth: { label: "Sign-in", className: "border-destructive/40 bg-destructive/10 text-destructive" },
+  conflict: { label: "Conflict", className: "border-accent/40 bg-accent/10 text-accent" },
+  validation: {
+    label: "Data problem",
+    className: "border-destructive/40 bg-destructive/10 text-destructive",
+  },
+  unknown: { label: "Unknown", className: "border-border bg-surface-2 text-muted-foreground" },
+};
 
 const stamp = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" }) : "Never";
@@ -63,6 +81,14 @@ export function SyncLogViewer() {
   }, [refreshPending]);
 
   const entries = listSyncLog();
+  // "It isn't syncing" — this is the answer, grouped by reason.
+  const failureCounts = entries.reduce<Partial<Record<SyncFailureKind, number>>>((acc, e) => {
+    if (e.ok) return acc;
+    const kind = e.kind ?? "unknown";
+    acc[kind] = (acc[kind] ?? 0) + 1;
+    return acc;
+  }, {});
+  const failureKinds = Object.entries(failureCounts) as [SyncFailureKind, number][];
 
   const syncNow = async () => {
     setBusy(true);
@@ -111,6 +137,20 @@ export function SyncLogViewer() {
           </Button>
         </div>
       </header>
+
+      {failureKinds.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border border-border px-3 py-2 text-xs">
+          <span className="text-muted-foreground">Recent failures:</span>
+          {failureKinds.map(([kind, count]) => (
+            <span
+              key={kind}
+              className={`rounded-full border px-2 py-0.5 ${FAILURE[kind].className}`}
+            >
+              {FAILURE[kind].label} · {count}
+            </span>
+          ))}
+        </div>
+      )}
 
       {!online && (
         <p className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
@@ -162,6 +202,13 @@ export function SyncLogViewer() {
                     <Badge variant={e.ok ? "secondary" : "destructive"}>
                       {e.ok ? "Synced" : "Error"}
                     </Badge>
+                    {!e.ok && (
+                      <span
+                        className={`ml-1 rounded-full border px-2 py-0.5 text-[10px] ${FAILURE[e.kind ?? "unknown"].className}`}
+                      >
+                        {FAILURE[e.kind ?? "unknown"].label}
+                      </span>
+                    )}
                   </td>
                   <td className="max-w-[24rem] break-words px-3 py-2 text-muted-foreground">
                     {e.details || (e.ok ? "Completed" : "Unknown error")}
