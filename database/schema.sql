@@ -3202,3 +3202,57 @@ GO
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_authorization_log_created')
 CREATE INDEX ix_authorization_log_created ON dbo.authorization_log (created_at);
 GO
+
+/* ------------------------------------------------------------------ */
+/* record_edits — before/after history of authorised edits to posted   */
+/* stock counts and receiving entries.                                 */
+/* ------------------------------------------------------------------ */
+IF OBJECT_ID('dbo.record_edits', 'U') IS NULL
+CREATE TABLE dbo.record_edits (
+  id NVARCHAR(80) NOT NULL PRIMARY KEY,
+  record_type NVARCHAR(40) NOT NULL,
+  record_id NVARCHAR(80) NOT NULL,
+  reference NVARCHAR(60) NULL,
+  store_id NVARCHAR(60) NULL,
+  terminal_id NVARCHAR(80) NULL,
+  action_key NVARCHAR(64) NOT NULL,
+  request_id NVARCHAR(80) NULL,
+  edited_by NVARCHAR(80) NULL,
+  edited_by_name NVARCHAR(200) NULL,
+  authorized_by NVARCHAR(80) NULL,
+  authorized_by_name NVARCHAR(200) NULL,
+  mode_used NVARCHAR(20) NULL,
+  before_value NVARCHAR(MAX) NOT NULL DEFAULT N'{}',
+  after_value NVARCHAR(MAX) NOT NULL DEFAULT N'{}',
+  stock_deltas NVARCHAR(MAX) NOT NULL DEFAULT N'{}',
+  note NVARCHAR(400) NULL,
+  is_synced BIT NOT NULL DEFAULT 0, sync_status NVARCHAR(40) NOT NULL DEFAULT N'pending',
+  row_version INT NOT NULL DEFAULT 0, sync_attempts INT NOT NULL DEFAULT 0,
+  last_error_at DATETIME2(3) NULL, client_transaction_id NVARCHAR(120) NULL,
+  created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+IF OBJECT_ID('dbo.record_edits', 'U') IS NOT NULL
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_record_edits_record' AND object_id = OBJECT_ID('dbo.record_edits'))
+    CREATE INDEX ix_record_edits_record ON dbo.record_edits (record_type, record_id, created_at DESC);
+  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_record_edits_store' AND object_id = OBJECT_ID('dbo.record_edits'))
+    CREATE INDEX ix_record_edits_store ON dbo.record_edits (store_id, created_at DESC);
+END
+GO
+
+/* Pending-edit hold on already-posted records. */
+IF OBJECT_ID('dbo.stock_count_drafts', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.stock_count_drafts', 'pending_edit_request_id') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [pending_edit_request_id] NVARCHAR(80) NULL;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'pending_edit_by') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [pending_edit_by] NVARCHAR(80) NULL;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'pending_edit_at') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [pending_edit_at] DATETIME2(3) NULL;
+END
+GO
+IF OBJECT_ID('dbo.purchase_orders', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.purchase_orders', 'pending_edit_request_id') IS NULL ALTER TABLE dbo.purchase_orders ADD [pending_edit_request_id] NVARCHAR(80) NULL;
+  IF COL_LENGTH('dbo.purchase_orders', 'pending_edit_by') IS NULL ALTER TABLE dbo.purchase_orders ADD [pending_edit_by] NVARCHAR(80) NULL;
+  IF COL_LENGTH('dbo.purchase_orders', 'pending_edit_at') IS NULL ALTER TABLE dbo.purchase_orders ADD [pending_edit_at] DATETIME2(3) NULL;
+END
+GO
