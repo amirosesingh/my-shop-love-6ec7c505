@@ -3000,3 +3000,51 @@ BEGIN
   IF COL_LENGTH('dbo.members', 'verified_channel') IS NULL ALTER TABLE dbo.members ADD [verified_channel] NVARCHAR(30) NULL;
 END
 GO
+
+/* Draft physical counts: saved automatically so a count survives a restart. */
+IF OBJECT_ID('dbo.stock_count_drafts', 'U') IS NULL
+CREATE TABLE dbo.stock_count_drafts (
+  id NVARCHAR(80) NOT NULL PRIMARY KEY,
+  store_id NVARCHAR(60) NULL, terminal_id NVARCHAR(80) NULL,
+  staff_id NVARCHAR(80) NULL, staff_name NVARCHAR(200) NULL,
+  status NVARCHAR(20) NOT NULL DEFAULT N'draft',
+  reason NVARCHAR(80) NULL, note NVARCHAR(400) NOT NULL DEFAULT N'',
+  lines NVARCHAR(MAX) NOT NULL DEFAULT N'[]',
+  line_count INT NOT NULL DEFAULT 0, total_impact DECIMAL(18,4) NOT NULL DEFAULT 0,
+  posted_at DATETIME2(3) NULL, posted_by NVARCHAR(200) NULL,
+  is_synced BIT NOT NULL DEFAULT 0, sync_status NVARCHAR(40) NOT NULL DEFAULT N'pending',
+  row_version INT NOT NULL DEFAULT 0, sync_attempts INT NOT NULL DEFAULT 0,
+  last_error_at DATETIME2(3) NULL, client_transaction_id NVARCHAR(120) NULL,
+  created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+IF OBJECT_ID('dbo.stock_count_drafts', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.stock_count_drafts', 'store_id') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [store_id] NVARCHAR(60) NULL;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'terminal_id') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [terminal_id] NVARCHAR(80) NULL;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'staff_id') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [staff_id] NVARCHAR(80) NULL;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'staff_name') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [staff_name] NVARCHAR(200) NULL;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'status') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [status] NVARCHAR(20) DEFAULT N'draft';
+  IF COL_LENGTH('dbo.stock_count_drafts', 'reason') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [reason] NVARCHAR(80) NULL;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'note') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [note] NVARCHAR(400) DEFAULT N'';
+  IF COL_LENGTH('dbo.stock_count_drafts', 'lines') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [lines] NVARCHAR(MAX) DEFAULT N'[]';
+  IF COL_LENGTH('dbo.stock_count_drafts', 'line_count') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [line_count] INT DEFAULT 0;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'total_impact') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [total_impact] DECIMAL(18,4) DEFAULT 0;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'posted_at') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [posted_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'posted_by') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [posted_by] NVARCHAR(200) NULL;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'is_synced') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [is_synced] BIT DEFAULT 0;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'sync_status') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [sync_status] NVARCHAR(40) DEFAULT N'pending';
+  IF COL_LENGTH('dbo.stock_count_drafts', 'row_version') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [row_version] INT DEFAULT 0;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'sync_attempts') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [sync_attempts] INT DEFAULT 0;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'last_error_at') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [last_error_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'client_transaction_id') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [client_transaction_id] NVARCHAR(120) NULL;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'created_at') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [created_at] DATETIME2(3) DEFAULT SYSUTCDATETIME();
+  IF COL_LENGTH('dbo.stock_count_drafts', 'updated_at') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [updated_at] DATETIME2(3) DEFAULT SYSUTCDATETIME();
+END
+GO
+IF OBJECT_ID('dbo.stock_adjustments', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.stock_adjustments', 'draft_id') IS NULL ALTER TABLE dbo.stock_adjustments ADD [draft_id] NVARCHAR(80) NULL;
+END
+GO

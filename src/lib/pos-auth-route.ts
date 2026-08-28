@@ -24,6 +24,7 @@ export const OPERATIONAL_TABLES = new Set([
   "shift_sessions",
   "drawer_events",
   "stock_adjustments",
+  "stock_count_drafts",
   "booking_payments",
 ]);
 

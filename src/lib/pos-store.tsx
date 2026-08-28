@@ -262,6 +262,7 @@ type Ctx = {
     reason: StockAdjustmentReason,
     note?: string,
     storeId?: string,
+    draftId?: string | null,
   ) => void;
   upsertMember: (member: Member) => Promise<CommitTarget>;
   removeMember: (id: string) => void;
@@ -1619,6 +1620,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       reason: StockAdjustmentReason,
       note = "",
       storeId?: string,
+      draftId?: string | null,
     ) => {
       const target = storeId ?? stateRef.current.currentStoreId;
       const changes = entries
@@ -1662,6 +1664,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
           updatedStock: c.counted,
           delta: c.delta,
           costImpact: r2(c.delta * (c.product.cost ?? 0)),
+          draftId: draftId ?? null,
         });
         void db.upsertProduct({
           ...c.product,

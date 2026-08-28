@@ -36,6 +36,7 @@ const TABLES = [
   "stock_transfers",
   "stock_transfer_items",
   "stock_adjustments",
+  "stock_count_drafts",
   "held_orders",
   "audit_logs",
 ];
