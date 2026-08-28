@@ -224,7 +224,7 @@ export function isRouteVisibleFor(
   if (!role || role === "admin") return true;
   const match = routeElementFor(path);
   if (!match) return true;
-  if (match.ownerOnly) return false;
+  if (match.lock === "core") return false;
   return isVisibleFor(hidden, match.key, role);
 }
 
@@ -233,10 +233,38 @@ export const VISIBILITY_GROUPS = Array.from(new Set(VISIBILITY_ELEMENTS.map((e) 
 
 export type VisibilityMap = Record<string, string[]>;
 
-/** True when this element should be shown to someone holding `role`. */
+/**
+ * True when this element should be shown to someone holding `role`.
+ *
+ * Ordinary elements are visible until an administrator hides them. Sensitive
+ * screens work the other way round: they stay hidden until an administrator
+ * grants them to that role, so relaxing a lock never opens anything by itself.
+ */
 export function isVisibleFor(hidden: VisibilityMap, key: string, role: string | null): boolean {
   if (!role || role === "admin") return true;
+  const lock = lockFor(key);
+  if (lock === "core") return false;
+  if (lock === "sensitive") return (hidden[grantKey(key)] ?? []).includes(role);
   return !(hidden[key] ?? []).includes(role);
+}
+
+/** The stored map after showing / hiding `key` for `forRole`. */
+export function withVisibility(
+  hidden: VisibilityMap,
+  key: string,
+  forRole: VisibilityRole,
+  hide: boolean,
+): VisibilityMap {
+  const sensitive = lockFor(key) === "sensitive";
+  // Sensitive rows keep an allow-list; everything else keeps a deny-list.
+  const storeKey = sensitive ? grantKey(key) : key;
+  const listed = sensitive ? !hide : hide;
+  const current = new Set(hidden[storeKey] ?? []);
+  if (listed) current.add(forRole);
+  else current.delete(forRole);
+  const next: VisibilityMap = { ...hidden, [storeKey]: [...current] };
+  if (!next[storeKey].length) delete next[storeKey];
+  return next;
 }
 
 /**
@@ -263,15 +291,11 @@ export function useVisibility() {
 
   const setHidden = useCallback(
     (key: string, forRole: VisibilityRole, hide: boolean) => {
-      const current = new Set(hidden[key] ?? []);
-      if (hide) current.add(forRole);
-      else current.delete(forRole);
-      const next: VisibilityMap = { ...hidden, [key]: [...current] };
-      if (!next[key].length) delete next[key];
-      updateSettings({ visibility: { hidden: next } });
+      updateSettings({ visibility: { hidden: withVisibility(hidden, key, forRole, hide) } });
     },
     [hidden, updateSettings],
   );
+
 
   return { hidden, role, visible, visibleRoute, setHidden };
 }
