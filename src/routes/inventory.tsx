@@ -144,7 +144,7 @@ function Inventory() {
   const [groupFilter, setGroupFilter] = useState("all");
   const [subFilter, setSubFilter] = useState("all");
   const [bulkCategory, setBulkCategory] = useState("");
-  const [adjustTarget, setAdjustTarget] = useState<Product | null>(null);
+  
   const [logTarget, setLogTarget] = useState<Product | null>(null);
   const [countOpen, setCountOpen] = useState(false);
   const [skuOverride, setSkuOverride] = useState(false);
