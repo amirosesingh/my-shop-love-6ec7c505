@@ -112,4 +112,127 @@ export function resetHealthCache() {
   inflight = null;
 }
 
+/* ------------------------------------------------------------------ */
+/* Connectivity: the single source of truth for "are we online?"       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * `connecting` is the honest answer before the first heartbeat has come
+ * back. The app shows a pulsing cloud during that window and never claims to
+ * be offline on a guess — `navigator.onLine` is only ever used as a hint that
+ * it is worth running a probe right now.
+ */
+export type Connectivity = "connecting" | "online" | "offline";
+
+/** Shortest time the "connecting" cloud stays on screen, so the eye sees it. */
+export const MIN_CONNECTING_MS = 1500;
+
+type ConnListener = (state: Connectivity) => void;
+const connListeners = new Set<ConnListener>();
+
+let connectivityState: Connectivity = "connecting";
+let resolvedOnce = false;
+let minElapsed = false;
+let pendingResolved: Exclude<Connectivity, "connecting"> | null = null;
+let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
+let minTimer: ReturnType<typeof setTimeout> | undefined;
+
+/** Connectivity as it stands right now. */
+export const connectivity = (): Connectivity => connectivityState;
+
+export function subscribeConnectivity(listener: ConnListener) {
+  connListeners.add(listener);
+  return () => {
+    connListeners.delete(listener);
+  };
+}
+
+function publish(next: Connectivity) {
+  if (next === connectivityState) return;
+  connectivityState = next;
+  for (const l of connListeners) l(next);
+}
+
+/**
+ * A definitive answer is only shown once the minimum display time has also
+ * elapsed; until then it waits. There is no upper cap — a slow network keeps
+ * the connecting cloud on screen for as long as the probe really takes.
+ */
+function settle(next: Exclude<Connectivity, "connecting">) {
+  resolvedOnce = true;
+  pendingResolved = next;
+  if (minElapsed) publish(next);
+}
+
+function startMinTimer() {
+  if (minTimer || minElapsed) return;
+  minTimer = setTimeout(() => {
+    minTimer = undefined;
+    minElapsed = true;
+    if (pendingResolved) publish(pendingResolved);
+  }, MIN_CONNECTING_MS);
+}
+
+/**
+ * The first probe never races a stopwatch: it waits for the request to give a
+ * real answer instead of assuming offline after a second.
+ */
+async function probeDefinitive(): Promise<boolean> {
+  try {
+    return await probeCloud();
+  } catch {
+    return false;
+  }
+}
+
+/** Run one heartbeat now and publish the result. */
+export async function heartbeat(): Promise<Connectivity> {
+  const cloud = resolvedOnce
+    ? await withTimeout(probeCloud(), CLOUD_TIMEOUT)
+    : await probeDefinitive();
+  const local = await withTimeout(probeLocal(), LOCAL_TIMEOUT);
+  cached = { cloud, local, anyOnline: cloud || local, at: Date.now() };
+  for (const l of listeners) l(cached);
+  settle(cloud ? "online" : "offline");
+  return connectivityState;
+}
+
+let monitoring = false;
+
+/**
+ * Start the one heartbeat loop for the whole app. Browser online/offline
+ * events only nudge it to probe sooner; the probe result decides the state.
+ */
+export function startConnectivityMonitor(intervalMs = 20_000): () => void {
+  if (typeof window === "undefined" || monitoring) return () => {};
+  monitoring = true;
+  startMinTimer();
+  void heartbeat();
+  heartbeatTimer = setInterval(() => void heartbeat(), intervalMs);
+  const nudge = () => void heartbeat();
+  window.addEventListener("online", nudge);
+  window.addEventListener("offline", nudge);
+  return () => {
+    monitoring = false;
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    heartbeatTimer = undefined;
+    window.removeEventListener("online", nudge);
+    window.removeEventListener("offline", nudge);
+  };
+}
+
+/** Test seam: back to the pre-startup "connecting" state. */
+export function resetConnectivity() {
+  connectivityState = "connecting";
+  resolvedOnce = false;
+  minElapsed = false;
+  pendingResolved = null;
+  monitoring = false;
+  if (minTimer) clearTimeout(minTimer);
+  minTimer = undefined;
+  if (heartbeatTimer) clearInterval(heartbeatTimer);
+  heartbeatTimer = undefined;
+}
+
+
 export { OFFLINE as offlineHealth };

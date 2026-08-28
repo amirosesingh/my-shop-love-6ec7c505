@@ -45,10 +45,7 @@ import {
   SOURCE_LABEL,
   type SecurityFinding,
 } from "@/lib/security-alerts";
-import { useSyncBadge } from "@/components/pos/sync/SyncBadge";
-import { databaseModeLabel, effectiveDatabaseMode } from "@/lib/db-mode";
-import { hasLocalDb, localDb, type LocalSyncStatus } from "@/lib/local-db";
-import { drainOutbox } from "@/lib/sync-engine";
+import { SystemStatusBadge } from "@/components/pos/status/SystemStatus";
 
 const DOT: Record<ServiceState, string> = {
   ok: "bg-success",
@@ -301,110 +298,5 @@ export function SystemAlertsButton({ className }: { className?: string }) {
 /* ------------------------------------------------------------------ */
 
 export function ConnectionStatusButton({ className }: { className?: string }) {
-  const { tone: syncTone, label, pending, conflicts, lastError, lastSyncAt } = useSyncBadge();
-  const [local, setLocal] = useState<LocalSyncStatus | null>(null);
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    if (!hasLocalDb()) return;
-    const bridge = localDb();
-    if (!bridge) return;
-    let alive = true;
-    const read = async () => {
-      const next = await bridge.status();
-      if (alive && next) setLocal(next);
-    };
-    void read();
-    const off = bridge.onStatus((next) => setLocal(next));
-    const timer = setInterval(read, 10_000);
-    return () => {
-      alive = false;
-      clearInterval(timer);
-      off();
-    };
-  }, []);
-
-  const cloudTone: Tone =
-    syncTone === "error" ? "bad" : syncTone === "syncing" ? "warn" : syncTone === "offline" ? "warn" : "ok";
-  const localConnected = !!local?.connected;
-  const localInUse = localConnected && (effectiveDatabaseMode() === "local" || syncTone === "offline");
-  const split = localConnected && (cloudTone !== "ok" || localInUse);
-
-  const CloudIcon =
-    syncTone === "error"
-      ? TriangleAlert
-      : syncTone === "syncing"
-        ? RefreshCw
-        : syncTone === "offline"
-          ? CloudOff
-          : CloudCheck;
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <span className={cn("inline-flex", className)}>
-          <SplitTrigger
-            split={split}
-            leftTone={cloudTone}
-            rightTone={localConnected ? (localInUse ? "warn" : "ok") : "idle"}
-            label={`Sync: ${label}${localConnected ? " · local database connected" : ""}`}
-            left={<CloudIcon className={cn("size-3.5", syncTone === "syncing" && "animate-spin")} />}
-            right={<Database className="size-3.5" />}
-          />
-        </span>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 space-y-3">
-        <div className="flex items-center gap-2">
-          <CloudIcon className="size-4 text-primary" />
-          <p className="text-sm font-semibold">Connection</p>
-          <span className="ml-auto text-[11px] text-muted-foreground">{label}</span>
-        </div>
-        <dl className="space-y-1.5 text-[11px]">
-          <div className="flex justify-between gap-3">
-            <dt className="text-muted-foreground">Database in use</dt>
-            <dd className="truncate font-medium">{databaseModeLabel()}</dd>
-          </div>
-          <div className="flex justify-between gap-3">
-            <dt className="text-muted-foreground">Waiting to sync</dt>
-            <dd className="font-medium">{pending ? `${pending} item(s)` : "Nothing"}</dd>
-          </div>
-          {conflicts > 0 && (
-            <div className="flex justify-between gap-3">
-              <dt className="text-muted-foreground">Conflicts</dt>
-              <dd className="font-medium text-destructive">{conflicts}</dd>
-            </div>
-          )}
-          <div className="flex justify-between gap-3">
-            <dt className="text-muted-foreground">Last sync</dt>
-            <dd className="font-medium">
-              {lastSyncAt ? new Date(lastSyncAt).toLocaleTimeString() : "—"}
-            </dd>
-          </div>
-          {lastError && <p className="text-destructive">Last error: {lastError}</p>}
-        </dl>
-        {localConnected && (
-          <div className="rounded-md border border-border bg-surface-2 p-2">
-            <div className="flex items-center gap-1.5">
-              <Database className="size-3.5 text-emerald-600" />
-              <p className="text-xs font-medium">Branch SQL Server</p>
-            </div>
-            <p className="mt-1 break-all text-[11px] text-muted-foreground">
-              {local?.server ?? "Local instance"}
-              {local?.database ? ` · ${local.database}` : ""}
-            </p>
-          </div>
-        )}
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" className="flex-1" onClick={() => void drainOutbox()}>
-            <RefreshCw className="size-3.5" /> Sync now
-          </Button>
-          <Button asChild size="sm" className="flex-1">
-            <Link to="/settings/data-sync" onClick={() => setOpen(false)}>
-              Sync hub
-            </Link>
-          </Button>
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
+  return <SystemStatusBadge className={className} showLabel={false} />;
 }

@@ -1,35 +1,46 @@
 /**
  * The start-up screen of the till, with the connection state written on it.
  *
- * Green while the central database answers, amber while the till is working
- * from its own copy, blue and moving while data is being exchanged. It also
- * refuses to spin for ever: after a short wait the operator gets a retry and
- * a way into the app on local data.
+ * While the first heartbeat is still in flight the screen says "Connecting…"
+ * and shows the pulsing cloud — it never claims the till is offline on a
+ * guess, and it waits as long as the check needs. Only once the check has
+ * actually answered does it turn green (central database connected) or amber
+ * (working from this terminal), and only then may it offer a way out.
  */
 import { useEffect, useState } from "react";
-import { CloudCheck, CloudOff, Loader2, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { checkHealth, lastHealth, type HealthReport } from "@/lib/connection-health";
+import {
+  connectivity,
+  lastHealth,
+  startConnectivityMonitor,
+  subscribeConnectivity,
+  type Connectivity,
+  type HealthReport,
+} from "@/lib/connection-health";
+import { syncConfig } from "@/lib/sync-config";
 import { subscribeSyncState, syncState } from "@/lib/sync-status";
+import { CloudStateIcon } from "@/components/pos/status/SystemStatus";
+import type { StatusTone } from "@/lib/system-status";
 import { cn } from "@/lib/utils";
 
-type Tone = "online" | "offline" | "syncing";
-
-const TONE = {
-  online: {
-    bar: "bg-success",
-    text: "text-success",
-    label: "Online — central database connected",
+const TONE: Record<StatusTone, { bar: string; text: string; label: string }> = {
+  connecting: {
+    bar: "bg-muted-foreground/40",
+    text: "text-muted-foreground",
+    label: "Connecting…",
   },
+  ok: { bar: "bg-success", text: "text-success", label: "Online — central database connected" },
+  busy: { bar: "bg-accent", text: "text-accent", label: "Syncing data…" },
   offline: {
     bar: "bg-warning",
     text: "text-warning",
     label: "Offline — working from this terminal",
   },
-  syncing: { bar: "bg-accent", text: "text-accent", label: "Syncing data…" },
-} as const;
+  error: { bar: "bg-destructive", text: "text-destructive", label: "Connection problem" },
+};
 
-/** How long the till may sit on the loader before offering a way out. */
+/** How long the till may sit here, once the check answered, before offering a way out. */
 const STALL_MS = 12000;
 
 export function TillLoader({
@@ -40,39 +51,51 @@ export function TillLoader({
   onContinueOffline?: () => void;
 }) {
   const [health, setHealth] = useState<HealthReport | null>(lastHealth());
+  const [state, setState] = useState<Connectivity>(connectivity());
   const [phase, setPhase] = useState(syncState().phase);
   const [stalled, setStalled] = useState(false);
 
   useEffect(() => {
-    let live = true;
-    const probe = () => void checkHealth(true).then((h) => live && setHealth(h));
-    probe();
-    const timer = window.setInterval(probe, 4000);
-    const off = subscribeSyncState(() => setPhase(syncState().phase));
-    const stall = window.setTimeout(() => live && setStalled(true), STALL_MS);
+    const stop = startConnectivityMonitor(syncConfig().heartbeatMs);
+    const off = subscribeConnectivity((next) => {
+      setState(next);
+      setHealth(lastHealth());
+    });
+    const offSync = subscribeSyncState(() => setPhase(syncState().phase));
     return () => {
-      live = false;
-      window.clearInterval(timer);
-      window.clearTimeout(stall);
       off();
+      offSync();
+      stop();
     };
   }, []);
 
-  const tone: Tone =
-    phase === "syncing" ? "syncing" : health?.cloud ? "online" : "offline";
+  // The stall escape only starts counting once we actually know where we are.
+  useEffect(() => {
+    if (state === "connecting") {
+      setStalled(false);
+      return;
+    }
+    const stall = window.setTimeout(() => setStalled(true), STALL_MS);
+    return () => window.clearTimeout(stall);
+  }, [state]);
+
+  const tone: StatusTone =
+    state === "connecting"
+      ? "connecting"
+      : phase === "syncing"
+        ? "busy"
+        : state === "online"
+          ? "ok"
+          : "offline";
   const style = TONE[tone];
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-6">
       <div className="flex items-center gap-2">
-        {tone === "offline" ? (
-          <CloudOff className={cn("size-5", style.text)} />
-        ) : tone === "online" ? (
-          <CloudCheck className={cn("size-5", style.text)} />
-        ) : (
-          <Loader2 className={cn("size-5 animate-spin", style.text)} />
-        )}
-        <p className="text-sm font-medium">{message}</p>
+        <CloudStateIcon tone={tone} className="size-5" />
+        <p className="text-sm font-medium">
+          {tone === "connecting" ? "Connecting…" : message}
+        </p>
         {tone === "offline" && (
           <span className="rounded-full border border-warning px-2 py-0.5 text-[11px] uppercase tracking-wide text-warning">
             Offline
@@ -85,13 +108,13 @@ export function TillLoader({
           className={cn(
             "h-full rounded-full",
             style.bar,
-            tone === "syncing" ? "w-1/2 animate-pulse" : tone === "online" ? "w-full" : "w-1/3",
+            tone === "ok" ? "w-full" : tone === "offline" ? "w-1/3" : "w-1/2 animate-pulse",
           )}
         />
       </div>
 
       <p className={cn("text-xs", style.text)}>{style.label}</p>
-      {health && (
+      {state !== "connecting" && health && (
         <p className="text-xs text-muted-foreground">
           Terminal database {health.local ? "ready" : "unavailable"}
         </p>
