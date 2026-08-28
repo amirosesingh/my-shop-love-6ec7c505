@@ -41,6 +41,7 @@ import { localTerminalId } from "@/lib/shift-hours";
 import { money, stockAt, usePos } from "@/lib/pos-store";
 import { resolveByBarcode } from "@/lib/product-lookup";
 import { nextStockRef } from "@/lib/stock-ref";
+import { saveRecordEditHistory, type EditGrant } from "@/lib/record-edit-flow";
 import { STOCK_ADJUSTMENT_REASONS, type StockAdjustmentReason } from "@/lib/pos-types";
 
 export type CountRow = {
@@ -66,6 +67,9 @@ export type StockRecordRow = {
   lines: string | null;
   line_count: number | null;
   total_impact: number | null;
+  pending_edit_request_id: string | null;
+  pending_edit_by: string | null;
+  pending_edit_at: string | null;
   posted_at: string | null;
   posted_by: string | null;
   updated_at: string | null;
@@ -168,10 +172,13 @@ export function StockCountDialog({
   onOpenChange,
   onChanged,
   onDiscard,
+  editGrant,
 }: {
   open: boolean;
   /** A draft being resumed, or null for a fresh count. */
   draft?: StockRecordRow | null;
+  /** Set when a *posted* record was reopened under authorisation. */
+  editGrant?: EditGrant | null;
   onOpenChange: (open: boolean) => void;
   /** Fires whenever the record list should be refreshed. */
   onChanged: () => void;
@@ -364,9 +371,47 @@ export function StockCountDialog({
     setPosting(true);
     try {
       if (timerRef.current) clearTimeout(timerRef.current);
+      // What the record looked like before this posting, kept for the audit
+      // trail whenever an already-posted count is being corrected.
+      const before = draft?.status === "posted"
+        ? {
+            reason: draft.reason ?? "",
+            note: draft.note ?? "",
+            lines: parseLines(draft.lines),
+            lineCount: draft.line_count ?? 0,
+            totalImpact: Number(draft.total_impact ?? 0),
+            postedAt: draft.posted_at,
+            postedBy: draft.posted_by,
+          }
+        : null;
       persistDraft();
       applyStockCount(entries, reason, note, currentStore.id, draftId);
       if (draftId) db.setStockCountDraftStatus(draftId, "posted", user?.name ?? null);
+      if (before && draftId) {
+        const deltas: Record<string, number> = {};
+        for (const r of rows) {
+          if (r.counted !== r.system) deltas[r.productId] = r.counted - r.system;
+        }
+        void saveRecordEditHistory({
+          kind: "stock_count",
+          recordId: draftId,
+          ...(reference ? { reference } : {}),
+          storeId: draft?.store_id ?? currentStore.id,
+          actionKey: "edit_posted_stock",
+          grant: editGrant ?? null,
+          before,
+          after: {
+            reason,
+            note,
+            lines: rows,
+            lineCount: rows.length,
+            totalImpact: Number(
+              rows.reduce((a, r) => a + (r.counted - r.system) * r.cost, 0).toFixed(2),
+            ),
+          },
+          stockDeltas: deltas,
+        });
+      }
       toast.success(
         `${entries.length} item${entries.length === 1 ? "" : "s"} adjusted${reference ? ` · ${reference}` : ""}.`,
       );
