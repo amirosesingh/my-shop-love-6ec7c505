@@ -201,9 +201,9 @@ function Purchasing() {
     const res = await authorize({
       action: "edit_posted_purchase",
       title: "Edit a received purchase",
-      reason: `Reopen ${h.reference || h.poNumber || h.id}`,
+      reason: `Reopen ${h.reference || h.id}`,
       storeId: h.storeId ?? currentStore.id,
-      detail: { reference: h.reference ?? "", supplier: h.supplierName ?? "" },
+      detail: `${h.reference ?? h.id} · ${h.supplier ?? ""}`.trim(),
     });
     if (!res.ok) return;
     setRemovedLineIds([]);

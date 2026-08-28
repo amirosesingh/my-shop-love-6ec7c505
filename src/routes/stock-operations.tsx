@@ -53,7 +53,7 @@ function StockOperationsPage() {
       title: "Edit a posted stock record",
       reason: `Reopen ${row.reference || row.id}`,
       storeId: row.store_id ?? currentStore.id,
-      detail: { reference: row.reference ?? "", lines: row.line_count ?? 0 },
+      detail: `${row.reference ?? row.id} · ${row.line_count ?? 0} lines`,
     });
     if (res.ok) resume(row);
   };
