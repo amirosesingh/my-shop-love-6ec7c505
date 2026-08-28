@@ -1,52 +1,111 @@
 /**
- * One authorisation path for every sensitive till action.
+ * One authorisation path for every sensitive action.
  *
- * 1. The branch rules say whether this action needs a manager PIN at all.
- * 2. An administrator is never prompted — the server records their approval.
- * 3. Everyone else gets the manager PIN dialog, checked in the database.
+ * 1. The branch rule says how the action must be authorised — not at all, by
+ *    PIN, by an approval request, or either.
+ * 2. An administrator is never prompted; the server records their approval.
+ * 3. Everyone else gets the one prompt, and the answer comes from the server.
  */
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import {
-  ManagerOverrideDialog,
-  type OverrideRequest,
-} from "@/components/pos/ManagerOverrideDialog";
+  AuthorizationDialog,
+  type AuthorizationPrompt,
+  type PromptOutcome,
+} from "@/components/pos/AuthorizationDialog";
 import { useAuthOptional } from "@/lib/pos-auth";
 import { usePosRules } from "@/lib/pos-rules.tsx";
-import { GATE_RULE_KEY, requiresManagerPin, type GateAction } from "@/lib/pos-rules";
+import { GATE_RULE_KEY } from "@/lib/pos-rules";
 import { authorizeAsAdmin } from "@/lib/pos-rules.functions";
+import { getAuthorizationRules } from "@/lib/authorization.functions";
 import { getPosCallerAuth } from "@/lib/pos-caller-auth";
+import {
+  AUTH_ACTION_LABEL,
+  normalizeRule,
+  resolveRules,
+  rulesFromLegacy,
+  type AuthActionKey,
+  type AuthPayload,
+  type RuleMap,
+} from "@/lib/authorization";
 
 export type GateRequest = {
-  action: GateAction;
+  action: AuthActionKey;
   title: string;
   reason: string;
   storeId?: string | null;
   terminalId?: string | null;
   requestedBy?: string | null;
   detail?: string;
+  /** What the approver needs to see when the action is queued. */
+  payload?: AuthPayload;
 };
 
-export type GateResult = { ok: boolean; grantToken: string | null };
+export type GateResult = {
+  ok: boolean;
+  grantToken: string | null;
+  /** Set when the action was queued instead of run. */
+  pendingRequestId?: string;
+};
 
-type Ctx = { authorize: (request: GateRequest) => Promise<GateResult> };
+type Ctx = { authorize: (request: GateRequest) => Promise<GateResult>; rules: RuleMap };
 
 const ManagerGateContext = createContext<Ctx | null>(null);
 
-export function ManagerGateProvider({ children }: { children: ReactNode }) {
-  const { rules } = usePosRules();
+export function ManagerGateProvider({
+  storeId,
+  children,
+}: {
+  storeId?: string | null;
+  children: ReactNode;
+}) {
+  const { rules: legacyRules } = usePosRules();
   const auth = useAuthOptional();
   const isAdmin = auth?.user?.role === "admin";
-  const [pending, setPending] = useState<OverrideRequest | null>(null);
-  const resolver = useRef<((grant: string | null) => void) | null>(null);
+  const [pending, setPending] = useState<AuthorizationPrompt | null>(null);
+  const resolver = useRef<((outcome: PromptOutcome) => void) | null>(null);
+
+  const query = useQuery({
+    queryKey: ["authorization-rules", storeId ?? ""],
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
+    queryFn: async () => {
+      const caller = await getPosCallerAuth();
+      const res = await getAuthorizationRules({ data: { ...caller, storeId: storeId ?? "" } });
+      if (!res.ok) throw new Error(res.error);
+      return res.rules.map((r) => normalizeRule({ ...r, action_key: r.actionKey }));
+    },
+  });
+
+  // Until the table answers, the branch's existing manager-PIN switches decide.
+  const rules = useMemo<RuleMap>(() => {
+    const rows = query.data;
+    if (!rows) return rulesFromLegacy(legacyRules);
+    return resolveRules(
+      rows.map((r) => ({ ...r })),
+      storeId ?? "",
+    );
+  }, [query.data, legacyRules, storeId]);
 
   const authorize = useCallback(
     async (request: GateRequest): Promise<GateResult> => {
-      // 1 · the branch does not gate this action
-      if (!requiresManagerPin(rules, request.action)) return { ok: true, grantToken: null };
+      const rule = rules[request.action];
+      const mode = rule?.mode ?? "none";
 
-      // 2 · administrators skip the prompt; the approval is logged server-side
+      // 1 · this branch does not gate the action
+      if (mode === "none") return { ok: true, grantToken: null };
+
+      // 2 · administrators are not prompted; the approval is logged server-side
       if (isAdmin) {
         try {
           const caller = await getPosCallerAuth();
@@ -55,7 +114,8 @@ export function ManagerGateProvider({ children }: { children: ReactNode }) {
               data: {
                 accessToken: caller.accessToken,
                 action: request.action,
-                ruleKey: GATE_RULE_KEY[request.action],
+                ruleKey:
+                  (GATE_RULE_KEY as Record<string, string>)[request.action] ?? request.action,
                 ...(request.storeId ? { storeId: request.storeId } : {}),
                 ...(request.terminalId ? { terminalId: request.terminalId } : {}),
                 ...(request.detail ? { detail: request.detail } : {}),
@@ -74,29 +134,34 @@ export function ManagerGateProvider({ children }: { children: ReactNode }) {
         return { ok: true, grantToken: null };
       }
 
-      // 3 · everyone else: manager PIN, verified in the database
-      const grant = await new Promise<string | null>((resolve) => {
+      // 3 · everyone else: PIN, an approval request, or their choice of both
+      const outcome = await new Promise<PromptOutcome>((resolve) => {
         resolver.current = resolve;
         setPending({
-          action: request.action,
-          ruleKey: GATE_RULE_KEY[request.action],
-          title: request.title,
+          actionKey: request.action,
+          mode,
+          title: request.title || AUTH_ACTION_LABEL[request.action] || "Authorisation",
           reason: request.reason,
+          requireReason: rule?.requireReason ?? false,
           ...(request.storeId ? { storeId: request.storeId } : {}),
           ...(request.terminalId ? { terminalId: request.terminalId } : {}),
-          ...(request.requestedBy ? { requestedBy: request.requestedBy } : {}),
-          ...(request.detail ? { detail: request.detail } : {}),
+          ...(request.payload ? { payload: request.payload } : {}),
         });
       });
-      return { ok: !!grant, grantToken: grant };
+
+      if (outcome.kind === "approved") return { ok: true, grantToken: outcome.grantToken };
+      if (outcome.kind === "submitted") {
+        return { ok: false, grantToken: null, pendingRequestId: outcome.requestId };
+      }
+      return { ok: false, grantToken: null };
     },
     [rules, isAdmin],
   );
 
-  const value = useMemo<Ctx>(() => ({ authorize }), [authorize]);
+  const value = useMemo<Ctx>(() => ({ authorize, rules }), [authorize, rules]);
 
-  const finish = (grant: string | null) => {
-    resolver.current?.(grant);
+  const finish = (outcome: PromptOutcome) => {
+    resolver.current?.(outcome);
     resolver.current = null;
     setPending(null);
   };
@@ -104,11 +169,7 @@ export function ManagerGateProvider({ children }: { children: ReactNode }) {
   return (
     <ManagerGateContext.Provider value={value}>
       {children}
-      <ManagerOverrideDialog
-        request={pending}
-        onClose={() => finish(null)}
-        onApproved={(grantToken) => finish(grantToken)}
-      />
+      <AuthorizationDialog prompt={pending} onFinish={finish} />
     </ManagerGateContext.Provider>
   );
 }
@@ -117,6 +178,7 @@ export function useManagerGate(): Ctx {
   return (
     useContext(ManagerGateContext) ?? {
       authorize: async () => ({ ok: true, grantToken: null }),
+      rules: {},
     }
   );
 }
