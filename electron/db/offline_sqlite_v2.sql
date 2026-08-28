@@ -1116,3 +1116,77 @@ CREATE TABLE IF NOT EXISTS stock_count_drafts (
 CREATE INDEX IF NOT EXISTS ix_stock_count_drafts_store ON stock_count_drafts (store_id, status, updated_at);
 CREATE INDEX IF NOT EXISTS ix_stock_count_drafts_created ON stock_count_drafts (store_id, status, created_at);
 CREATE UNIQUE INDEX IF NOT EXISTS ux_stock_count_drafts_reference ON stock_count_drafts (reference) WHERE reference IS NOT NULL;
+
+-- ---- authorization_actions ----
+CREATE TABLE IF NOT EXISTS authorization_actions (
+  id            TEXT PRIMARY KEY NOT NULL,
+  action_key    TEXT NOT NULL,
+  scope_type    TEXT NOT NULL DEFAULT 'global',
+  scope_id      TEXT NOT NULL DEFAULT '',
+  mode          TEXT NOT NULL DEFAULT 'none',
+  allowed_roles TEXT NOT NULL DEFAULT '[]',
+  allowed_user_ids TEXT NOT NULL DEFAULT '[]',
+  require_reason INTEGER NOT NULL DEFAULT 0,
+  threshold     REAL,
+  is_enabled    INTEGER NOT NULL DEFAULT 1,
+  created_at    TEXT,
+  updated_at    TEXT,
+  is_synced     INTEGER DEFAULT 0,
+  sync_status   TEXT DEFAULT 'pending',
+  row_version   INTEGER DEFAULT 0,
+  sync_attempts INTEGER DEFAULT 0,
+  last_error_at TEXT,
+  client_transaction_id TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_authorization_actions_scope ON authorization_actions (action_key, scope_type, scope_id);
+
+-- ---- authorization_requests ----
+CREATE TABLE IF NOT EXISTS authorization_requests (
+  id            TEXT PRIMARY KEY NOT NULL,
+  action_key    TEXT NOT NULL,
+  requested_by  TEXT NOT NULL,
+  requested_by_name TEXT,
+  store_id      TEXT NOT NULL DEFAULT '',
+  terminal_id   TEXT NOT NULL DEFAULT '',
+  reason        TEXT,
+  payload       TEXT NOT NULL DEFAULT '{}',
+  status        TEXT NOT NULL DEFAULT 'pending',
+  decided_by    TEXT,
+  decided_by_name TEXT,
+  decided_at    TEXT,
+  decision_note TEXT,
+  expires_at    TEXT,
+  consumed_at   TEXT,
+  created_at    TEXT,
+  updated_at    TEXT,
+  is_synced     INTEGER DEFAULT 0,
+  sync_status   TEXT DEFAULT 'pending',
+  row_version   INTEGER DEFAULT 0,
+  sync_attempts INTEGER DEFAULT 0,
+  last_error_at TEXT,
+  client_transaction_id TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_authorization_requests_status ON authorization_requests (status, store_id, created_at);
+
+-- ---- authorization_log ----
+CREATE TABLE IF NOT EXISTS authorization_log (
+  id            TEXT PRIMARY KEY NOT NULL,
+  action_key    TEXT NOT NULL,
+  mode_used     TEXT NOT NULL,
+  request_id    TEXT,
+  requested_by  TEXT,
+  authorized_by TEXT,
+  authorizer_role TEXT,
+  store_id      TEXT NOT NULL DEFAULT '',
+  terminal_id   TEXT NOT NULL DEFAULT '',
+  outcome       TEXT NOT NULL,
+  detail        TEXT NOT NULL DEFAULT '{}',
+  created_at    TEXT,
+  is_synced     INTEGER DEFAULT 0,
+  sync_status   TEXT DEFAULT 'pending',
+  row_version   INTEGER DEFAULT 0,
+  sync_attempts INTEGER DEFAULT 0,
+  last_error_at TEXT,
+  client_transaction_id TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_authorization_log_created ON authorization_log (created_at);
