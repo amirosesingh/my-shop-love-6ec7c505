@@ -12,7 +12,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { PosProvider } from "@/lib/pos-store";
-import { usePos } from "@/lib/pos-store";
+import { usePosOptional } from "@/lib/pos-store";
 import { PosRulesProvider } from "@/lib/pos-rules.tsx";
 import { ManagerGateProvider } from "@/lib/manager-gate";
 import { AuthProvider } from "@/lib/pos-auth";
