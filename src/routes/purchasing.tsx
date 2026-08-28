@@ -198,13 +198,15 @@ function Purchasing() {
   const otherBranch = (h: ReceivingInvoice) =>
     !isAdmin && !!h.storeId && h.storeId !== currentStore.id;
 
-  const refreshHistory = async () => {
+  const refreshHistory = async (): Promise<ReceivingInvoice[] | null> => {
     try {
       const rows = await loadReceivingInvoices(currentStore.id, 100, masterView, "any");
       setHistory(rows);
       setHistoryError(null);
+      return rows;
     } catch (e) {
       setHistoryError((e as Error).message || "Could not read the invoice history");
+      return null;
     }
   };
 
@@ -216,6 +218,30 @@ function Purchasing() {
       /* offline: the list simply stays as it was */
     }
   };
+
+  /**
+   * Show the result of a finalize the moment it is stored, the way a posted
+   * stock count does: the entry moves into history and out of the drafts list
+   * from what we already know, without waiting for the central copy.
+   */
+  const showAsPosted = (inv: ReceivingInvoice) => {
+    setHistory((h) => [inv, ...h.filter((x) => x.id !== inv.id)]);
+    setDrafts((d) => d.filter((x) => x.id !== inv.id));
+  };
+
+  /**
+   * Bring the lists back in line with what is stored, and only pull server
+   * quantities once that copy actually shows the posted entry. Reading them
+   * earlier would hand back pre-receipt figures and undo the numbers on
+   * screen, which is exactly what forced a manual reload before.
+   */
+  const reconcileAfterPost = async (inv: ReceivingInvoice, productIds: string[]) => {
+    const rows = await refreshHistory();
+    await refreshDrafts();
+    const stored = rows?.find((r) => r.id === inv.id);
+    if (stored && stored.status === "posted") await syncProducts(productIds);
+  };
+
 
   useEffect(() => {
     void refreshHistory();
