@@ -7,7 +7,6 @@ import {
   Inbox,
   History,
   Plus,
-  Scale,
   Search,
   Trash2,
   Loader2,
