@@ -114,3 +114,19 @@ describe("failure classification", () => {
     expect(classifyFailure("something odd")).toBe("unknown");
   });
 });
+
+describe("settings changes reach the worker", () => {
+  it("tells subscribers as soon as a value changes, so timers can be rebuilt", async () => {
+    const mod = await import("../sync-config");
+    mod.resetSyncConfig();
+    const seen: number[] = [];
+    const off = mod.subscribeSyncConfig(() => seen.push(mod.syncConfig().intervalMs));
+    mod.setSyncConfig({ intervalMs: 60_000 });
+    mod.setSyncConfig({ heartbeatMs: 30_000 });
+    off();
+    mod.setSyncConfig({ intervalMs: 45_000 });
+    expect(seen).toEqual([60_000, 60_000]);
+    expect(mod.syncConfig().heartbeatMs).toBe(30_000);
+    mod.resetSyncConfig();
+  });
+});
