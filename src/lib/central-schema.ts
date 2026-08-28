@@ -448,6 +448,7 @@ export const CENTRAL_SCHEMA: CentralTableSchema[] = [
       { name: "invoice_entry_date", pgType: "timestamptz" },
       { name: "updated_at", pgType: "timestamptz" },
       { name: "row_version", pgType: "integer" },
+      { name: "status", pgType: "text" },
     ],
   },
   {

@@ -315,7 +315,7 @@ CREATE TABLE IF NOT EXISTS promotions (
 
 CREATE TABLE IF NOT EXISTS purchase_orders (
   id                TEXT PRIMARY KEY,
-  po_number         TEXT NOT NULL,
+  po_number         TEXT,
   supplier_id       TEXT,
   supplier_name     TEXT,
   operator_name     TEXT,
@@ -323,10 +323,12 @@ CREATE TABLE IF NOT EXISTS purchase_orders (
   invoice_date      TEXT,
   total_cost        REAL NOT NULL DEFAULT 0,
   total_items_count INTEGER NOT NULL DEFAULT 0,
+  status            TEXT NOT NULL DEFAULT 'posted',
   created_at        TEXT NOT NULL,
   updated_at        TEXT
 );
 CREATE INDEX IF NOT EXISTS purchase_orders_created_idx ON purchase_orders (created_at DESC);
+CREATE INDEX IF NOT EXISTS purchase_orders_store_status_idx ON purchase_orders (store_id, status);
 
 CREATE TABLE IF NOT EXISTS purchase_order_items (
   id                TEXT PRIMARY KEY,

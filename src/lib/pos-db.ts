@@ -1112,6 +1112,9 @@ export type ReceivingLine = {
   qty: number;
 };
 
+/** Lifecycle of a receiving order: unfinished, received, or abandoned. */
+export type ReceivingStatus = "draft" | "posted" | "cancelled";
+
 export type ReceivingInvoice = {
   id: string;
   invoiceNo: string;
@@ -1125,6 +1128,8 @@ export type ReceivingInvoice = {
   totalCost: number;
   itemCount: number;
   createdAt: string;
+  /** Legacy rows carry no status; they are treated as posted. */
+  status: ReceivingStatus;
   lines: ReceivingLine[];
 };
 
@@ -1152,6 +1157,7 @@ const rowToReceivingInvoice = (r: Row): ReceivingInvoice => ({
   totalCost: num(r.total_cost),
   itemCount: num(r.total_items_count),
   createdAt: r.created_at ?? new Date().toISOString(),
+  status: (r.status as ReceivingStatus) || "posted",
   lines: (Array.isArray(r.purchase_order_items) ? (r.purchase_order_items as Row[]) : []).map(
     rowToReceivingLine,
   ),
@@ -1169,6 +1175,7 @@ const invoiceRow = (inv: ReceivingInvoice): Row => ({
   invoice_entry_date: inv.entryDate,
   total_cost: inv.totalCost,
   total_items_count: inv.itemCount,
+  status: inv.status ?? "posted",
 });
 
 const invoiceLineRow = (poId: string, l: ReceivingLine): Row => ({
@@ -1194,12 +1201,17 @@ export async function loadReceivingInvoices(
   storeId: string | null,
   limit = 100,
   allStores = false,
+  status: ReceivingStatus = "posted",
 ): Promise<ReceivingInvoice[]> {
   let q = supabase
     .from("purchase_orders" as never)
     .select("*, purchase_order_items(*)")
     .order("invoice_entry_date", { ascending: false })
     .limit(limit);
+  // Rows written before drafts existed have no status; they are received stock.
+  q = (
+    status === "posted" ? q.or("status.eq.posted,status.is.null") : q.eq("status", status)
+  ) as typeof q;
   if (storeId && !allStores) {
     // PostgREST needs the literal quoted; branch ids are free text and may hold
     // a comma, dot or space that would otherwise break the filter (400).
@@ -1211,15 +1223,24 @@ export async function loadReceivingInvoices(
   return ((res.data as Row[] | null) ?? []).map(rowToReceivingInvoice);
 }
 
-/** True when another invoice already uses this number (the column is unique). */
+/** Unfinished receiving orders for a branch, newest first. */
+export const loadReceivingDrafts = (storeId: string | null, allStores = false) =>
+  loadReceivingInvoices(storeId, 50, allStores, "draft");
+
+/**
+ * True when another *finalized* invoice already uses this number. Drafts are
+ * ignored: their number is provisional until the order is posted.
+ */
 export async function invoiceNumberTaken(invoiceNo: string, exceptId?: string): Promise<boolean> {
   const res = await supabase
     .from("purchase_orders" as never)
-    .select("id")
+    .select("id, status")
     .eq("po_number", invoiceNo)
-    .limit(2);
+    .limit(20);
   if (res.error) return false; // offline: the unique index is still the last word
-  return ((res.data as Row[] | null) ?? []).some((r) => r.id !== exceptId);
+  return ((res.data as Row[] | null) ?? []).some(
+    (r) => r.id !== exceptId && (r.status ?? "posted") === "posted",
+  );
 }
 
 /** Latest catalogue rows for a set of products, straight from the database. */
@@ -1803,6 +1824,24 @@ export const db = {
         table: "purchase_order_items",
         match: { id },
       })),
+    ]),
+
+  /**
+   * Autosave an unfinished receiving order. Same rows as a finalized one, but
+   * flagged `draft` so it never reaches history or touches stock.
+   */
+  saveReceivingDraft: (inv: ReceivingInvoice, removedLineIds: string[] = []) =>
+    db.updateReceivingInvoice({ ...inv, status: "draft" }, removedLineIds),
+
+  /** Abandon a draft. Kept in the table for audit, hidden from every list. */
+  discardReceivingDraft: (id: string) =>
+    commitOps("Discarding receiving draft", [
+      {
+        kind: "update",
+        table: "purchase_orders",
+        values: { status: "cancelled", updated_at: new Date().toISOString() },
+        match: { id },
+      },
     ]),
 
   /* --------------------- awaited, confirmed versions --------------------- */

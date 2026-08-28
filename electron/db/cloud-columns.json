@@ -311,7 +311,8 @@
     "invoice_date",
     "invoice_entry_date",
     "updated_at",
-    "row_version"
+    "row_version",
+    "status"
   ],
   "purchase_order_items": [
     "id",
