@@ -845,6 +845,8 @@ function Purchasing() {
       for (const l of next.lines) {
         if (l.productId) deltas[l.productId] = (deltas[l.productId] ?? 0) + l.qty;
       }
+      // Keep an untouched copy: the loop below zeroes each delta as it goes.
+      const auditDeltas: Record<string, number> = { ...deltas };
       for (const l of next.lines) {
         if (!l.productId) continue;
         applyLineToStock(l.productId, deltas[l.productId] ?? 0, l.cost, l.price);
@@ -906,7 +908,7 @@ function Purchasing() {
         grant: editGrant,
         before: snapshot(original),
         after: snapshot(next),
-        stockDeltas: deltas,
+        stockDeltas: auditDeltas,
         note: `Invoice ${next.invoiceNo} corrected`,
       });
 

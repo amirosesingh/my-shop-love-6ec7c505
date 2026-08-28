@@ -314,6 +314,11 @@ export const decideAuthorizationRequest = createServerFn({ method: "POST" })
         outcome: data.approve ? "approved" : "rejected",
         detail: { note: data.note },
       });
+      // A rejected request must not leave a posted record locked.
+      if (!data.approve) {
+        const { releaseDecidedHold } = await import("./record-edits.server");
+        await releaseDecidedHold(existing.id).catch(() => undefined);
+      }
       return { ok: true as const, request: updated };
     } catch (e) {
       return { ok: false as const, error: (e as Error).message.slice(0, 300) };
