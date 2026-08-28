@@ -2612,9 +2612,11 @@ export type Database = {
           posted_at: string | null
           posted_by: string | null
           reason: string | null
+          reference: string | null
           staff_id: string | null
           staff_name: string | null
           status: string
+          store_code: string | null
           store_id: string | null
           terminal_id: string | null
           total_impact: number
@@ -2629,9 +2631,11 @@ export type Database = {
           posted_at?: string | null
           posted_by?: string | null
           reason?: string | null
+          reference?: string | null
           staff_id?: string | null
           staff_name?: string | null
           status?: string
+          store_code?: string | null
           store_id?: string | null
           terminal_id?: string | null
           total_impact?: number
@@ -2646,9 +2650,11 @@ export type Database = {
           posted_at?: string | null
           posted_by?: string | null
           reason?: string | null
+          reference?: string | null
           staff_id?: string | null
           staff_name?: string | null
           status?: string
+          store_code?: string | null
           store_id?: string | null
           terminal_id?: string | null
           total_impact?: number
