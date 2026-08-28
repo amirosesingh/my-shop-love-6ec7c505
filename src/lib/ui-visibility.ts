@@ -25,6 +25,14 @@ export const VISIBILITY_ROLES: { id: VisibilityRole; label: string }[] = [
   { id: "warehouse", label: "Warehouse" },
 ];
 
+/**
+ * How tightly a screen is locked.
+ * - `core`: never grantable — it could hand over the whole install.
+ * - `sensitive`: grantable, but hidden from every role until an admin says so.
+ * - `none`: an ordinary day-to-day screen, visible unless hidden.
+ */
+export type VisibilityLock = "core" | "sensitive" | "none";
+
 export type VisibilityElement = {
   key: string;
   label: string;
@@ -32,9 +40,11 @@ export type VisibilityElement = {
   group: string;
   /** Route this element hides. Set for whole screens such as settings pages. */
   route?: string;
-  /** Owner-only screens can never be granted to another role. */
+  lock?: VisibilityLock;
+  /** Legacy alias: true only for the locked core screens. */
   ownerOnly?: boolean;
 };
+
 
 
 /** Every element an administrator can hide, grouped by the screen it lives on. */
