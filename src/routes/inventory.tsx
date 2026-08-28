@@ -252,11 +252,6 @@ function Inventory() {
             >
               <FileSpreadsheet className="size-4" /> Export to Excel
             </Button>
-            {canAdjust && (
-              <Button variant="outline" onClick={() => setCountOpen(true)}>
-                <ClipboardCheck className="size-4" /> Stock check
-              </Button>
-            )}
             {canEdit && (
             <Dialog
               open={!!draft}
