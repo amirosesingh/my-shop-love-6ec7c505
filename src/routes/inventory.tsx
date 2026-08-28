@@ -58,7 +58,7 @@ import {
   useUnits,
 } from "@/lib/catalog-meta";
 import { checkCodeAvailable } from "@/lib/product-lookup";
-import { StockAdjustDialog, StockCountDialog } from "@/components/pos/StockAdjust";
+
 import { ItemActivityDrawer } from "@/components/pos/ItemActivityDrawer";
 import type { Product } from "@/lib/pos-types";
 import { nextSku, peekSku, readSkuSettings } from "@/lib/sku";
