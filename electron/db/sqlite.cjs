@@ -43,6 +43,7 @@ const SYNCED_TABLES = [
   "payment_transactions",
   "item_activity_logs",
   "stock_adjustments",
+  "stock_count_drafts",
   "suppliers",
   "product_categories",
   "uom_units",

@@ -244,6 +244,7 @@ CREATE TABLE IF NOT EXISTS stock_adjustments (
   updated_stock  INTEGER NOT NULL DEFAULT 0,
   delta          INTEGER NOT NULL DEFAULT 0,
   staff_name     TEXT,
+  draft_id       TEXT,
   created_at     TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS stock_adjustments_product_idx ON stock_adjustments (product_id, created_at DESC);
@@ -1081,3 +1082,29 @@ CREATE TABLE IF NOT EXISTS user_roles (
   client_transaction_id TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_user_roles_created_at ON user_roles (created_at);
+
+-- ---- stock_count_drafts ----
+CREATE TABLE IF NOT EXISTS stock_count_drafts (
+  id           TEXT PRIMARY KEY NOT NULL,
+  store_id     TEXT,
+  terminal_id  TEXT,
+  staff_id     TEXT,
+  staff_name   TEXT,
+  status       TEXT NOT NULL DEFAULT 'draft',
+  reason       TEXT,
+  note         TEXT NOT NULL DEFAULT '',
+  lines        TEXT NOT NULL DEFAULT '[]',
+  line_count   INTEGER NOT NULL DEFAULT 0,
+  total_impact REAL NOT NULL DEFAULT 0,
+  posted_at    TEXT,
+  posted_by    TEXT,
+  created_at   TEXT NOT NULL,
+  updated_at   TEXT,
+  is_synced    INTEGER DEFAULT 0,
+  sync_status  TEXT DEFAULT 'pending',
+  row_version  INTEGER DEFAULT 0,
+  sync_attempts INTEGER DEFAULT 0,
+  last_error_at TEXT,
+  client_transaction_id TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_stock_count_drafts_store ON stock_count_drafts (store_id, status, updated_at);

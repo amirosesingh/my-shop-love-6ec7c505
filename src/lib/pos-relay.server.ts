@@ -50,6 +50,7 @@ export const RELAY_TABLES = new Set([
   "booking_payments",
   "drawer_events",
   "stock_adjustments",
+  "stock_count_drafts",
   "sku_audit",
   "audit_logs",
   "members",
@@ -68,6 +69,7 @@ const RELAY_CONFLICT_KEYS: Readonly<Record<string, string>> = {
   sale_items: "id",
   payment_transactions: "id",
   item_activity_logs: "id",
+  stock_count_drafts: "id",
 };
 
 function conflictKey(table: string): string {

@@ -2073,6 +2073,7 @@ export const db = {
     staffId?: string | null;
     staffName?: string | null;
     role?: string | null;
+    draftId?: string | null;
     at?: string;
   }) =>
     queue("Recording stock adjustment", {
@@ -2095,10 +2096,87 @@ export const db = {
           staff_id: row.staffId ?? null,
           staff_name: row.staffName ?? null,
           role: row.role ?? null,
+          draft_id: row.draftId ?? null,
           created_at: row.at ?? new Date().toISOString(),
         },
       ],
     }),
+
+  /* --------------------- stock count drafts ----------------------- */
+
+  /**
+   * Save (or re-save) an in-progress physical count. One row per counting
+   * session: the same id is written every time the queue changes, so a till
+   * can never leave two drafts behind for one session.
+   */
+  saveStockCountDraft: (row: {
+    id: string;
+    storeId: string | null;
+    terminalId?: string | null;
+    staffId?: string | null;
+    staffName?: string | null;
+    status?: "draft" | "posted" | "discarded";
+    reason?: string | null;
+    note?: string;
+    lines: unknown[];
+    totalImpact: number;
+    postedAt?: string | null;
+    postedBy?: string | null;
+    createdAt?: string;
+  }) =>
+    queue("Saving stock count draft", {
+      kind: "upsert",
+      table: "stock_count_drafts",
+      onConflict: "id",
+      rows: [
+        {
+          id: row.id,
+          store_id: row.storeId,
+          terminal_id: row.terminalId ?? null,
+          staff_id: row.staffId ?? null,
+          staff_name: row.staffName ?? null,
+          status: row.status ?? "draft",
+          reason: row.reason ?? null,
+          note: row.note ?? "",
+          lines: JSON.stringify(row.lines ?? []),
+          line_count: Array.isArray(row.lines) ? row.lines.length : 0,
+          total_impact: row.totalImpact ?? 0,
+          posted_at: row.postedAt ?? null,
+          posted_by: row.postedBy ?? null,
+          created_at: row.createdAt ?? new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ],
+    }),
+
+  /** Close a draft off: posted (locked) or discarded (no stock impact). */
+  setStockCountDraftStatus: (
+    id: string,
+    status: "posted" | "discarded",
+    by?: string | null,
+  ) =>
+    queue(status === "posted" ? "Posting stock count draft" : "Discarding stock count draft", {
+      kind: "update",
+      table: "stock_count_drafts",
+      values: {
+        status,
+        posted_at: status === "posted" ? new Date().toISOString() : null,
+        posted_by: status === "posted" ? (by ?? null) : null,
+        updated_at: new Date().toISOString(),
+      },
+      match: { id },
+    }),
+
+  /** Open drafts for a branch, newest first. */
+  async listStockCountDrafts(storeId: string) {
+    const rows = await routedQuery("stock_count_drafts", {
+      match: { store_id: storeId, status: "draft" },
+      orderBy: { column: "updated_at", ascending: false },
+      limit: 50,
+    });
+    return rows as Row[];
+  },
+
 
   /* ------------------------ whatsapp outbox ----------------------- */
 

@@ -6,8 +6,8 @@
  * snaps straight back to the punch bar for the next item.
  */
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
-import { ArrowLeftRight, ScanBarcode, Trash2, UploadCloud } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeftRight, ClipboardList, ScanBarcode, Trash2, UploadCloud } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { AppShell } from "@/components/pos/AppShell";
@@ -26,6 +26,19 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useAuth } from "@/lib/pos-auth";
+import { db } from "@/lib/pos-db";
+import { localTerminalId } from "@/lib/shift-hours";
 import { money, stockAt, usePos } from "@/lib/pos-store";
 import { resolveByBarcode } from "@/lib/product-lookup";
 import { STOCK_ADJUSTMENT_REASONS, type StockAdjustmentReason } from "@/lib/pos-types";
@@ -41,20 +54,102 @@ type CountRow = {
   cost: number;
 };
 
+type DraftRow = {
+  id: string;
+  store_id: string | null;
+  staff_name: string | null;
+  status: string;
+  reason: string | null;
+  note: string | null;
+  lines: string | null;
+  line_count: number | null;
+  total_impact: number | null;
+  updated_at: string | null;
+  created_at: string | null;
+};
+
+const parseLines = (raw: unknown): CountRow[] => {
+  if (Array.isArray(raw)) return raw as CountRow[];
+  if (typeof raw !== "string" || !raw.trim()) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as CountRow[]) : [];
+  } catch {
+    return [];
+  }
+};
+
 function StockOperationsPage() {
   const { state, currentStore, applyStockCount } = usePos();
+  const { user } = useAuth();
   const products = state.products;
   const [code, setCode] = useState("");
   const [counted, setCounted] = useState("");
   const [rows, setRows] = useState<CountRow[]>([]);
-  const [reason, setReason] = useState<StockAdjustmentReason>("stock_count");
+  const [reason, setReason] = useState<StockAdjustmentReason | "">("");
   const [note, setNote] = useState("");
   const [errors, setErrors] = useState<string[]>([]);
   const [dragging, setDragging] = useState(false);
+  const [tab, setTab] = useState("count");
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<DraftRow[]>([]);
+  const [loadingDrafts, setLoadingDrafts] = useState(false);
+  const [discardTarget, setDiscardTarget] = useState<string | null>(null);
+  const [posting, setPosting] = useState(false);
   const codeRef = useRef<HTMLInputElement>(null);
   const countRef = useRef<HTMLInputElement>(null);
+  const draftCreatedAt = useRef<string | null>(null);
 
   const match = useMemo(() => resolveByBarcode(products, code), [products, code]);
+
+  const refreshDrafts = useCallback(async () => {
+    setLoadingDrafts(true);
+    try {
+      const list = (await db.listStockCountDrafts(currentStore.id)) as unknown as DraftRow[];
+      setDrafts(list);
+    } catch {
+      setDrafts([]);
+    } finally {
+      setLoadingDrafts(false);
+    }
+  }, [currentStore.id]);
+
+  useEffect(() => {
+    void refreshDrafts();
+  }, [refreshDrafts]);
+
+  /**
+   * The queue is the draft. The first counted line mints the record and every
+   * later change re-saves the same id, so one counting session can never leave
+   * two drafts behind — and a restart resumes exactly where it stopped.
+   */
+  useEffect(() => {
+    if (!rows.length && !draftId) return;
+    const id = draftId ?? crypto.randomUUID();
+    if (!draftId) {
+      draftCreatedAt.current = new Date().toISOString();
+      setDraftId(id);
+    }
+    const impact = rows.reduce((s, r) => s + (r.counted - r.system) * r.cost, 0);
+    const timer = setTimeout(() => {
+      db.saveStockCountDraft({
+        id,
+        storeId: currentStore.id,
+        terminalId: localTerminalId(),
+        staffId: user?.staffId ?? null,
+        staffName: user?.name ?? null,
+        status: "draft",
+        reason: reason || null,
+        note,
+        lines: rows,
+        totalImpact: impact,
+        createdAt: draftCreatedAt.current ?? new Date().toISOString(),
+      });
+      setSavedAt(new Date().toISOString());
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [rows, reason, note, draftId, currentStore.id, user?.staffId, user?.name]);
 
   const queue = (productId: string, qty: number) => {
     const p = products.find((x: (typeof products)[number]) => x.id === productId);
@@ -100,7 +195,21 @@ function StockOperationsPage() {
 
   const totalImpact = rows.reduce((s, r) => s + (r.counted - r.system) * r.cost, 0);
 
+  const resetSession = () => {
+    setRows([]);
+    setNote("");
+    setReason("");
+    setDraftId(null);
+    setSavedAt(null);
+    draftCreatedAt.current = null;
+  };
+
   const save = () => {
+    if (posting) return;
+    if (!reason) {
+      toast.warning("Choose a reason before posting this count.");
+      return;
+    }
     const entries = rows
       .filter((r) => r.counted !== r.system)
       .map((r) => ({ productId: r.productId, counted: r.counted }));
@@ -108,11 +217,49 @@ function StockOperationsPage() {
       toast.warning("Nothing to post — every counted quantity matches the system.");
       return;
     }
-    applyStockCount(entries, reason, note, currentStore.id);
-    toast.success(`${entries.length} item${entries.length === 1 ? "" : "s"} adjusted.`);
-    setRows([]);
-    setNote("");
-    codeRef.current?.focus();
+    setPosting(true);
+    try {
+      applyStockCount(entries, reason, note, currentStore.id, draftId);
+      if (draftId) db.setStockCountDraftStatus(draftId, "posted", user?.name ?? null);
+      toast.success(`${entries.length} item${entries.length === 1 ? "" : "s"} adjusted.`);
+      resetSession();
+      void refreshDrafts();
+      codeRef.current?.focus();
+    } finally {
+      setPosting(false);
+    }
+  };
+
+  /** Load a saved draft back into the queue against today's system figures. */
+  const resumeDraft = (draft: DraftRow) => {
+    const saved = parseLines(draft.lines);
+    let moved = 0;
+    const restored = saved.map((line) => {
+      const product = products.find((p: (typeof products)[number]) => p.id === line.productId);
+      const system = product ? stockAt(product, currentStore.id) : line.system;
+      if (system !== line.system) moved += 1;
+      return { ...line, system, cost: product?.cost ?? line.cost };
+    });
+    draftCreatedAt.current = draft.created_at ?? new Date().toISOString();
+    setDraftId(draft.id);
+    setRows(restored);
+    setReason((draft.reason as StockAdjustmentReason) ?? "");
+    setNote(draft.note ?? "");
+    setSavedAt(draft.updated_at ?? null);
+    setTab("count");
+    toast.success(
+      moved
+        ? `Draft resumed — ${moved} item${moved === 1 ? "'s" : "s'"} system stock changed since it was saved.`
+        : "Draft resumed.",
+    );
+  };
+
+  const discardDraft = (id: string) => {
+    db.setStockCountDraftStatus(id, "discarded", user?.name ?? null);
+    setDrafts((prev) => prev.filter((d) => d.id !== id));
+    if (draftId === id) resetSession();
+    setDiscardTarget(null);
+    toast.success("Draft discarded — no stock was changed.");
   };
 
   const importFile = async (file: File) => {
@@ -143,13 +290,21 @@ function StockOperationsPage() {
   return (
     <AppShell>
       <div className="mx-auto w-full max-w-6xl space-y-4 p-4">
-        <Tabs defaultValue="count">
+        <Tabs value={tab} onValueChange={setTab}>
           <TabsList>
             <TabsTrigger value="count">
               <ScanBarcode className="mr-2 size-4" /> Physical count
             </TabsTrigger>
             <TabsTrigger value="import">
               <UploadCloud className="mr-2 size-4" /> Bulk import
+            </TabsTrigger>
+            <TabsTrigger value="drafts">
+              <ClipboardList className="mr-2 size-4" /> Open drafts
+              {drafts.length > 0 && (
+                <Badge variant="outline" className="ml-2 numeric">
+                  {drafts.length}
+                </Badge>
+              )}
             </TabsTrigger>
             <TabsTrigger value="transfers">
               <ArrowLeftRight className="mr-2 size-4" /> Transfers
@@ -212,6 +367,13 @@ function StockOperationsPage() {
               </div>
             </div>
 
+            {draftId && (
+              <p className="text-xs text-muted-foreground">
+                Draft saved automatically
+                {savedAt ? ` · last saved ${new Date(savedAt).toLocaleTimeString()}` : ""}
+              </p>
+            )}
+
             <ReviewTable rows={rows} onRemove={(id) => setRows((p) => p.filter((r) => r.productId !== id))} />
 
             <div className="grid gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-[220px_1fr_auto]">
@@ -234,11 +396,16 @@ function StockOperationsPage() {
                   placeholder="Optional context for the audit trail"
                 />
               </div>
-              <div className="flex items-end justify-end gap-3">
+              <div className="flex flex-wrap items-end justify-end gap-3">
                 <span className="numeric text-sm text-muted-foreground">
                   Impact {money(totalImpact)}
                 </span>
-                <Button onClick={save} disabled={!rows.length}>
+                {draftId && (
+                  <Button variant="outline" onClick={() => setDiscardTarget(draftId)}>
+                    Discard draft
+                  </Button>
+                )}
+                <Button onClick={save} disabled={!rows.length || posting}>
                   Post adjustments
                 </Button>
               </div>
@@ -287,6 +454,64 @@ function StockOperationsPage() {
             <ReviewTable rows={rows} onRemove={(id) => setRows((p) => p.filter((r) => r.productId !== id))} />
           </TabsContent>
 
+          <TabsContent value="drafts" className="space-y-4">
+            {loadingDrafts ? (
+              <p className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                Loading drafts…
+              </p>
+            ) : drafts.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                No open drafts for this branch.
+              </p>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Started</TableHead>
+                      <TableHead>Last saved</TableHead>
+                      <TableHead>Staff</TableHead>
+                      <TableHead>Reason</TableHead>
+                      <TableHead className="text-right">Items</TableHead>
+                      <TableHead className="text-right">Impact</TableHead>
+                      <TableHead />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {drafts.map((d) => (
+                      <TableRow key={d.id}>
+                        <TableCell>
+                          {d.created_at ? new Date(d.created_at).toLocaleString() : "—"}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {d.updated_at ? new Date(d.updated_at).toLocaleString() : "—"}
+                        </TableCell>
+                        <TableCell>{d.staff_name || "—"}</TableCell>
+                        <TableCell className="text-muted-foreground">{d.reason || "—"}</TableCell>
+                        <TableCell className="numeric text-right">{d.line_count ?? 0}</TableCell>
+                        <TableCell className="numeric text-right">
+                          {money(Number(d.total_impact ?? 0))}
+                        </TableCell>
+                        <TableCell className="space-x-2 text-right">
+                          <Button size="sm" onClick={() => resumeDraft(d)}>
+                            Resume
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setDiscardTarget(d.id)}
+                          >
+                            Discard
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </TabsContent>
+
           <TabsContent value="transfers">
             <div className="rounded-xl border border-border bg-card p-6 text-sm">
               <p className="font-medium">Branch and cluster transfers</p>
@@ -300,6 +525,23 @@ function StockOperationsPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <AlertDialog open={!!discardTarget} onOpenChange={(open) => !open && setDiscardTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard this draft count?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The counted lines are removed from the open list. No stock levels change.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep draft</AlertDialogCancel>
+            <AlertDialogAction onClick={() => discardTarget && discardDraft(discardTarget)}>
+              Discard draft
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppShell>
   );
 }

@@ -2531,6 +2531,7 @@ export type Database = {
           cost_impact: number
           created_at: string
           delta: number
+          draft_id: string | null
           id: string
           note: string
           previous_stock: number
@@ -2551,6 +2552,7 @@ export type Database = {
           cost_impact?: number
           created_at?: string
           delta?: number
+          draft_id?: string | null
           id?: string
           note?: string
           previous_stock?: number
@@ -2571,6 +2573,7 @@ export type Database = {
           cost_impact?: number
           created_at?: string
           delta?: number
+          draft_id?: string | null
           id?: string
           note?: string
           previous_stock?: number
@@ -2595,6 +2598,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      stock_count_drafts: {
+        Row: {
+          created_at: string
+          id: string
+          line_count: number
+          lines: string
+          note: string
+          posted_at: string | null
+          posted_by: string | null
+          reason: string | null
+          staff_id: string | null
+          staff_name: string | null
+          status: string
+          store_id: string | null
+          terminal_id: string | null
+          total_impact: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          line_count?: number
+          lines?: string
+          note?: string
+          posted_at?: string | null
+          posted_by?: string | null
+          reason?: string | null
+          staff_id?: string | null
+          staff_name?: string | null
+          status?: string
+          store_id?: string | null
+          terminal_id?: string | null
+          total_impact?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          line_count?: number
+          lines?: string
+          note?: string
+          posted_at?: string | null
+          posted_by?: string | null
+          reason?: string | null
+          staff_id?: string | null
+          staff_name?: string | null
+          status?: string
+          store_id?: string | null
+          terminal_id?: string | null
+          total_impact?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       stock_delta_applied: {
         Row: {
