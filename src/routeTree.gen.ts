@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AllShopsRouteImport } from './routes/all-shops'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
+import { Route as ApprovalsRouteImport } from './routes/approvals'
 import { Route as AuditRouteImport } from './routes/audit'
 import { Route as BookingsRouteImport } from './routes/bookings'
 import { Route as CouponsRouteImport } from './routes/coupons'
@@ -123,6 +124,11 @@ const AllShopsRoute = AllShopsRouteImport.update({
 const AnalyticsRoute = AnalyticsRouteImport.update({
   id: '/analytics',
   path: '/analytics',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApprovalsRoute = ApprovalsRouteImport.update({
+  id: '/approvals',
+  path: '/approvals',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuditRoute = AuditRouteImport.update({
@@ -587,6 +593,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRoute
   '/all-shops': typeof AllShopsRoute
   '/analytics': typeof AnalyticsRoute
+  '/approvals': typeof ApprovalsRoute
   '/audit': typeof AuditRoute
   '/bookings': typeof BookingsRoute
   '/coupons': typeof CouponsRoute
@@ -684,6 +691,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminRoute
   '/all-shops': typeof AllShopsRoute
   '/analytics': typeof AnalyticsRoute
+  '/approvals': typeof ApprovalsRoute
   '/audit': typeof AuditRoute
   '/bookings': typeof BookingsRoute
   '/coupons': typeof CouponsRoute
@@ -782,6 +790,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRoute
   '/all-shops': typeof AllShopsRoute
   '/analytics': typeof AnalyticsRoute
+  '/approvals': typeof ApprovalsRoute
   '/audit': typeof AuditRoute
   '/bookings': typeof BookingsRoute
   '/coupons': typeof CouponsRoute
@@ -881,6 +890,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/all-shops'
     | '/analytics'
+    | '/approvals'
     | '/audit'
     | '/bookings'
     | '/coupons'
@@ -978,6 +988,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/all-shops'
     | '/analytics'
+    | '/approvals'
     | '/audit'
     | '/bookings'
     | '/coupons'
@@ -1075,6 +1086,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/all-shops'
     | '/analytics'
+    | '/approvals'
     | '/audit'
     | '/bookings'
     | '/coupons'
@@ -1173,6 +1185,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRoute
   AllShopsRoute: typeof AllShopsRoute
   AnalyticsRoute: typeof AnalyticsRoute
+  ApprovalsRoute: typeof ApprovalsRoute
   AuditRoute: typeof AuditRoute
   BookingsRoute: typeof BookingsRoute
   CouponsRoute: typeof CouponsRoute
@@ -1292,6 +1305,13 @@ declare module '@tanstack/react-router' {
       path: '/analytics'
       fullPath: '/analytics'
       preLoaderRoute: typeof AnalyticsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/approvals': {
+      id: '/approvals'
+      path: '/approvals'
+      fullPath: '/approvals'
+      preLoaderRoute: typeof ApprovalsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/audit': {
@@ -1953,6 +1973,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRoute,
   AllShopsRoute: AllShopsRoute,
   AnalyticsRoute: AnalyticsRoute,
+  ApprovalsRoute: ApprovalsRoute,
   AuditRoute: AuditRoute,
   BookingsRoute: BookingsRoute,
   CouponsRoute: CouponsRoute,

@@ -252,6 +252,14 @@ export const navGroups: NavGroup[] = [
         blurb: "Accounts, PINs, roles and the permission matrix.",
       },
       {
+        to: "/approvals",
+        label: "Pending Approvals",
+        icon: ShieldCheck,
+        flag: "can_approve_overrides",
+        keywords: "authorisation approval request override pin queue",
+        blurb: "Decide the actions waiting on an authorisation.",
+      },
+      {
         to: "/audit",
         label: "Audit Logs & Activity",
         icon: ScanEye,
