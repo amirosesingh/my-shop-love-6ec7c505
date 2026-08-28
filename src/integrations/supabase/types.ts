@@ -2042,6 +2042,9 @@ export type Database = {
           invoice_date: string | null
           invoice_entry_date: string | null
           operator_name: string | null
+          pending_edit_at: string | null
+          pending_edit_by: string | null
+          pending_edit_request_id: string | null
           po_number: string | null
           reference: string | null
           row_version: number
@@ -2060,6 +2063,9 @@ export type Database = {
           invoice_date?: string | null
           invoice_entry_date?: string | null
           operator_name?: string | null
+          pending_edit_at?: string | null
+          pending_edit_by?: string | null
+          pending_edit_request_id?: string | null
           po_number?: string | null
           reference?: string | null
           row_version?: number
@@ -2078,6 +2084,9 @@ export type Database = {
           invoice_date?: string | null
           invoice_entry_date?: string | null
           operator_name?: string | null
+          pending_edit_at?: string | null
+          pending_edit_by?: string | null
+          pending_edit_request_id?: string | null
           po_number?: string | null
           reference?: string | null
           row_version?: number
@@ -2099,6 +2108,69 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      record_edits: {
+        Row: {
+          action_key: string
+          after_value: Json
+          authorized_by: string | null
+          authorized_by_name: string | null
+          before_value: Json
+          created_at: string
+          edited_by: string | null
+          edited_by_name: string | null
+          id: string
+          mode_used: string | null
+          note: string | null
+          record_id: string
+          record_type: string
+          reference: string | null
+          request_id: string | null
+          stock_deltas: Json
+          store_id: string | null
+          terminal_id: string | null
+        }
+        Insert: {
+          action_key: string
+          after_value?: Json
+          authorized_by?: string | null
+          authorized_by_name?: string | null
+          before_value?: Json
+          created_at?: string
+          edited_by?: string | null
+          edited_by_name?: string | null
+          id?: string
+          mode_used?: string | null
+          note?: string | null
+          record_id: string
+          record_type: string
+          reference?: string | null
+          request_id?: string | null
+          stock_deltas?: Json
+          store_id?: string | null
+          terminal_id?: string | null
+        }
+        Update: {
+          action_key?: string
+          after_value?: Json
+          authorized_by?: string | null
+          authorized_by_name?: string | null
+          before_value?: Json
+          created_at?: string
+          edited_by?: string | null
+          edited_by_name?: string | null
+          id?: string
+          mode_used?: string | null
+          note?: string | null
+          record_id?: string
+          record_type?: string
+          reference?: string | null
+          request_id?: string | null
+          stock_deltas?: Json
+          store_id?: string | null
+          terminal_id?: string | null
+        }
+        Relationships: []
       }
       sale_items: {
         Row: {
@@ -2768,6 +2840,9 @@ export type Database = {
           line_count: number
           lines: string
           note: string
+          pending_edit_at: string | null
+          pending_edit_by: string | null
+          pending_edit_request_id: string | null
           posted_at: string | null
           posted_by: string | null
           reason: string | null
@@ -2787,6 +2862,9 @@ export type Database = {
           line_count?: number
           lines?: string
           note?: string
+          pending_edit_at?: string | null
+          pending_edit_by?: string | null
+          pending_edit_request_id?: string | null
           posted_at?: string | null
           posted_by?: string | null
           reason?: string | null
@@ -2806,6 +2884,9 @@ export type Database = {
           line_count?: number
           lines?: string
           note?: string
+          pending_edit_at?: string | null
+          pending_edit_by?: string | null
+          pending_edit_request_id?: string | null
           posted_at?: string | null
           posted_by?: string | null
           reason?: string | null
