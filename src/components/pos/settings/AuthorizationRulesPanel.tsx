@@ -179,21 +179,15 @@ export function AuthorizationRulesPanel({
                         <Label className="text-sm">{action.label}</Label>
                         <p className="text-xs text-muted-foreground">{action.blurb}</p>
                       </div>
-                      <ThemedSelect
-                        aria-label={`${action.label} authorisation`}
-                        className="h-8 w-48"
-                        disabled={!mayEdit}
-                        value={rule.mode}
-                        onChange={(e) =>
-                          patch(action.key, { mode: e.target.value as AuthMode })
-                        }
-                      >
-                        {AUTH_MODES.map((m) => (
-                          <option key={m.value} value={m.value}>
-                            {m.label}
-                          </option>
-                        ))}
-                      </ThemedSelect>
+                      <div className={mayEdit ? "" : "pointer-events-none opacity-60"}>
+                        <ThemedSelect
+                          ariaLabel={`${action.label} authorisation`}
+                          className="h-8 w-48"
+                          value={rule.mode}
+                          onChange={(v) => patch(action.key, { mode: v as AuthMode })}
+                          options={AUTH_MODES.map((m) => ({ value: m.value, label: m.label }))}
+                        />
+                      </div>
                     </div>
 
                     {rule.mode !== "none" && (
