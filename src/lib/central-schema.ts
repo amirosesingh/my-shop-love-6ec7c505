@@ -436,6 +436,7 @@ export const CENTRAL_SCHEMA: CentralTableSchema[] = [
     columns: [
       { name: "id", pgType: "uuid" },
       { name: "po_number", pgType: "text" },
+      { name: "reference", pgType: "text" },
       { name: "supplier_name", pgType: "text" },
       { name: "operator_name", pgType: "text" },
       { name: "total_cost", pgType: "numeric(18,4)" },

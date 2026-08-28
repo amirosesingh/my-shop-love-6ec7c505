@@ -1117,6 +1117,9 @@ export type ReceivingStatus = "draft" | "posted" | "cancelled";
 
 export type ReceivingInvoice = {
   id: string;
+  /** Our own goods-received number, minted when the draft is created. */
+  reference: string | null;
+  /** The supplier's invoice number, typed in from their paperwork. */
   invoiceNo: string;
   supplier: string;
   supplierId: string | null;
@@ -1146,6 +1149,7 @@ const rowToReceivingLine = (r: Row): ReceivingLine => ({
 
 const rowToReceivingInvoice = (r: Row): ReceivingInvoice => ({
   id: r.id,
+  reference: r.reference ?? null,
   invoiceNo: r.po_number ?? "",
   supplier: r.supplier_name ?? "",
   supplierId: r.supplier_id ?? null,
@@ -1165,6 +1169,7 @@ const rowToReceivingInvoice = (r: Row): ReceivingInvoice => ({
 
 const invoiceRow = (inv: ReceivingInvoice): Row => ({
   id: inv.id,
+  reference: inv.reference,
   po_number: inv.invoiceNo,
   supplier_name: inv.supplier,
   supplier_id: inv.supplierId,
@@ -1201,7 +1206,7 @@ export async function loadReceivingInvoices(
   storeId: string | null,
   limit = 100,
   allStores = false,
-  status: ReceivingStatus = "posted",
+  status: ReceivingStatus | "any" = "posted",
 ): Promise<ReceivingInvoice[]> {
   let q = supabase
     .from("purchase_orders" as never)
@@ -1209,9 +1214,11 @@ export async function loadReceivingInvoices(
     .order("invoice_entry_date", { ascending: false })
     .limit(limit);
   // Rows written before drafts existed have no status; they are received stock.
-  q = (
-    status === "posted" ? q.or("status.eq.posted,status.is.null") : q.eq("status", status)
-  ) as typeof q;
+  if (status !== "any") {
+    q = (
+      status === "posted" ? q.or("status.eq.posted,status.is.null") : q.eq("status", status)
+    ) as typeof q;
+  }
   if (storeId && !allStores) {
     // PostgREST needs the literal quoted; branch ids are free text and may hold
     // a comma, dot or space that would otherwise break the filter (400).

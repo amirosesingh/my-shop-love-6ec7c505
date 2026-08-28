@@ -316,6 +316,7 @@ CREATE TABLE IF NOT EXISTS promotions (
 CREATE TABLE IF NOT EXISTS purchase_orders (
   id                TEXT PRIMARY KEY,
   po_number         TEXT,
+  reference         TEXT,
   supplier_id       TEXT,
   supplier_name     TEXT,
   operator_name     TEXT,
@@ -329,6 +330,7 @@ CREATE TABLE IF NOT EXISTS purchase_orders (
 );
 CREATE INDEX IF NOT EXISTS purchase_orders_created_idx ON purchase_orders (created_at DESC);
 CREATE INDEX IF NOT EXISTS purchase_orders_store_status_idx ON purchase_orders (store_id, status);
+CREATE UNIQUE INDEX IF NOT EXISTS purchase_orders_reference_uidx ON purchase_orders (reference) WHERE reference IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS purchase_order_items (
   id                TEXT PRIMARY KEY,

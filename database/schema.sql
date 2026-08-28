@@ -165,6 +165,7 @@ IF OBJECT_ID('dbo.purchase_orders', 'U') IS NULL
 CREATE TABLE dbo.purchase_orders (
   id                UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
   po_number         NVARCHAR(60)     NOT NULL,
+  [reference]       NVARCHAR(60)     NULL,
   supplier_name     NVARCHAR(160)    NULL,
   operator_name     NVARCHAR(120)    NULL,
   total_cost        DECIMAL(18, 4)   NOT NULL DEFAULT 0,
@@ -2337,6 +2338,7 @@ IF OBJECT_ID('dbo.purchase_orders', 'U') IS NOT NULL
 BEGIN
   IF COL_LENGTH('dbo.purchase_orders', 'id') IS NULL ALTER TABLE dbo.purchase_orders ADD [id] UNIQUEIDENTIFIER DEFAULT NEWID();
   IF COL_LENGTH('dbo.purchase_orders', 'po_number') IS NULL ALTER TABLE dbo.purchase_orders ADD [po_number] NVARCHAR(MAX);
+  IF COL_LENGTH('dbo.purchase_orders', 'reference') IS NULL ALTER TABLE dbo.purchase_orders ADD [reference] NVARCHAR(60) NULL;
   IF COL_LENGTH('dbo.purchase_orders', 'supplier_name') IS NULL ALTER TABLE dbo.purchase_orders ADD [supplier_name] NVARCHAR(400);
   IF COL_LENGTH('dbo.purchase_orders', 'operator_name') IS NULL ALTER TABLE dbo.purchase_orders ADD [operator_name] NVARCHAR(400);
   IF COL_LENGTH('dbo.purchase_orders', 'total_cost') IS NULL ALTER TABLE dbo.purchase_orders ADD [total_cost] DECIMAL(18,4) DEFAULT 0;

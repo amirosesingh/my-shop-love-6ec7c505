@@ -12,6 +12,15 @@ import { readLocalSetting, writeLocalSetting } from "./local-db";
 
 export type StockNumberReset = "never" | "yearly" | "monthly";
 
+/**
+ * Which run of numbers a reference comes from. Each series keeps its own
+ * counter, so a goods-received note can never take a stock count's number.
+ */
+export type RefSeries = "stock" | "receiving";
+
+/** The prefix each series falls back to when the admin has not set one. */
+const SERIES_PREFIX: Record<RefSeries, string> = { stock: "SO", receiving: "GRN" };
+
 /** Everything an admin can change about stock reference numbers. */
 export type StockNumberingSettings = {
   /** Leading marker, default "SO". */
@@ -97,8 +106,14 @@ export function periodStamp(at: Date, reset: StockNumberReset): string {
 const padOf = (cfg: StockNumberingSettings) =>
   Math.min(6, Math.max(3, Math.round(cfg.padding ?? 4)));
 
-const build = (cfg: StockNumberingSettings, branchCode: string, at: Date, seq: number) => {
-  const parts = [clean(cfg.prefix, "SO")];
+const build = (
+  cfg: StockNumberingSettings,
+  branchCode: string,
+  at: Date,
+  seq: number,
+  series: RefSeries,
+) => {
+  const parts = [clean(cfg.prefix, SERIES_PREFIX[series])];
   if (cfg.includeBranch !== false) parts.push(clean(branchCode, "BR"));
   const period = periodStamp(at, cfg.reset ?? "monthly");
   if (period) parts.push(period);
@@ -110,15 +125,24 @@ const build = (cfg: StockNumberingSettings, branchCode: string, at: Date, seq: n
 export function previewStockRef(
   cfg: StockNumberingSettings,
   branchCode: string,
+  series: RefSeries = "stock",
   at: Date = new Date(),
 ): string {
-  const key = counterKey(cfg, branchCode, at);
+  const key = counterKey(cfg, branchCode, at, series);
   const next = readAll()[key] ?? Math.max(1, Math.round(cfg.startNumber ?? 1));
-  return build(cfg, branchCode, at, next);
+  return build(cfg, branchCode, at, next, series);
 }
 
-const counterKey = (cfg: StockNumberingSettings, branchCode: string, at: Date) =>
-  `${clean(cfg.prefix, "SO")}|${clean(branchCode, "BR")}|${periodStamp(at, cfg.reset ?? "monthly")}`;
+const counterKey = (
+  cfg: StockNumberingSettings,
+  branchCode: string,
+  at: Date,
+  series: RefSeries,
+) =>
+  `${series}|${clean(cfg.prefix, SERIES_PREFIX[series])}|${clean(branchCode, "BR")}|${periodStamp(
+    at,
+    cfg.reset ?? "monthly",
+  )}`;
 
 /**
  * Reserve the next reference for a new draft. Consumes the counter, so it is
@@ -127,14 +151,15 @@ const counterKey = (cfg: StockNumberingSettings, branchCode: string, at: Date) =
 export function nextStockRef(
   cfg: StockNumberingSettings,
   branchCode: string,
+  series: RefSeries = "stock",
   at: Date = new Date(),
 ): string {
-  const key = counterKey(cfg, branchCode, at);
+  const key = counterKey(cfg, branchCode, at, series);
   const all = readAll();
   const seq = all[key] ?? Math.max(1, Math.round(cfg.startNumber ?? 1));
   all[key] = seq + 1;
   writeAll(all);
-  return build(cfg, branchCode, at, seq);
+  return build(cfg, branchCode, at, seq, series);
 }
 
 /**
@@ -144,9 +169,10 @@ export function nextStockRef(
 export function bumpStockRef(
   cfg: StockNumberingSettings,
   branchCode: string,
+  series: RefSeries = "stock",
   at: Date = new Date(),
 ): string {
-  return nextStockRef(cfg, branchCode, at);
+  return nextStockRef(cfg, branchCode, series, at);
 }
 
 /**

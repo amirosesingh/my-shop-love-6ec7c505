@@ -1887,6 +1887,7 @@ export type Database = {
           invoice_entry_date: string | null
           operator_name: string | null
           po_number: string | null
+          reference: string | null
           row_version: number
           status: string
           store_code: string | null
@@ -1904,6 +1905,7 @@ export type Database = {
           invoice_entry_date?: string | null
           operator_name?: string | null
           po_number?: string | null
+          reference?: string | null
           row_version?: number
           status?: string
           store_code?: string | null
@@ -1921,6 +1923,7 @@ export type Database = {
           invoice_entry_date?: string | null
           operator_name?: string | null
           po_number?: string | null
+          reference?: string | null
           row_version?: number
           status?: string
           store_code?: string | null

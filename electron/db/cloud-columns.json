@@ -300,6 +300,7 @@
   "purchase_orders": [
     "id",
     "po_number",
+    "reference",
     "supplier_name",
     "operator_name",
     "total_cost",
