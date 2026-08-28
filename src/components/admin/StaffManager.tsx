@@ -133,7 +133,7 @@ export function StaffManager() {
     } catch (e) {
       notifyError(e, "Could not save the PIN");
     } finally {
-      setBusy(null);
+      setBusy("");
     }
   }
   const [offline, setOffline] = useState(false);
