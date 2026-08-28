@@ -822,7 +822,10 @@ export type IntegrationSettings = {
   productOwners?: Record<string, string>;
   /** How receipt numbers are built on this branch's tills. */
   billNumbering?: BillNumberingSettings;
+  /** How Stock Operations reference numbers are built. */
+  stockNumbering?: import("./stock-ref").StockNumberingSettings;
 };
+
 
 /** Receipt numbering: [BRANCH]-[PLATFORM][TERMINAL]-[YYYYMMDD]-[SEQUENCE]. */
 export type BillNumberingSettings = {
