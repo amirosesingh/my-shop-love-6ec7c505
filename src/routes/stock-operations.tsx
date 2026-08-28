@@ -37,6 +37,13 @@ import { db } from "@/lib/pos-db";
 import { money, usePos } from "@/lib/pos-store";
 import { canEditPosted } from "@/lib/stock-ref";
 import { useManagerGate } from "@/lib/manager-gate";
+import {
+  beginPostedEdit,
+  continuePostedEdit,
+  myServerId,
+  withdrawPostedEdit,
+  type EditGrant,
+} from "@/lib/record-edit-flow";
 import { StockCountDialog, type StockRecordRow } from "@/components/pos/StockCountDialog";
 import { StockRecordView } from "@/components/pos/StockRecordView";
 
@@ -46,17 +53,6 @@ function StockOperationsPage() {
   const { state, currentStore } = usePos();
   const { authorize } = useManagerGate();
 
-  /** Reopening a posted count goes through the configured authorisation. */
-  const editPosted = async (row: StockRecordRow) => {
-    const res = await authorize({
-      action: "edit_posted_stock",
-      title: "Edit a posted stock record",
-      reason: `Reopen ${row.reference || row.id}`,
-      storeId: row.store_id ?? currentStore.id,
-      detail: `${row.reference ?? row.id} · ${row.line_count ?? 0} lines`,
-    });
-    if (res.ok) resume(row);
-  };
   const { user } = useAuth();
   const multiBranch = state.stores.length > 1;
 
@@ -69,6 +65,13 @@ function StockOperationsPage() {
   const [resuming, setResuming] = useState<StockRecordRow | null>(null);
   const [viewing, setViewing] = useState<StockRecordRow | null>(null);
   const [discardTarget, setDiscardTarget] = useState<string | null>(null);
+  const [editGrant, setEditGrant] = useState<EditGrant | null>(null);
+  const [meId, setMeId] = useState("");
+  const [busyRow, setBusyRow] = useState("");
+
+  useEffect(() => {
+    void myServerId().then(setMeId);
+  }, []);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -102,6 +105,54 @@ function StockOperationsPage() {
   const resume = (row: StockRecordRow) => {
     setResuming(row);
     setCountOpen(true);
+  };
+
+  /** Reopening a posted count always goes through the configured authorisation. */
+  const editPosted = async (row: StockRecordRow) => {
+    setBusyRow(row.id);
+    try {
+      const outcome = await beginPostedEdit(authorize, {
+        action: "edit_posted_stock",
+        recordKind: "stock_count",
+        recordId: row.id,
+        reference: row.reference ?? row.id,
+        title: "Edit a posted stock record",
+        storeId: row.store_id ?? currentStore.id,
+        detail: `${row.reference ?? row.id} · ${row.line_count ?? 0} lines`,
+      });
+      if (outcome.kind === "open") {
+        setEditGrant(outcome.grant);
+        resume(row);
+      } else if (outcome.kind === "queued") {
+        await refresh();
+      }
+    } finally {
+      setBusyRow("");
+    }
+  };
+
+  /** Come back to a record whose edit was sent for approval. */
+  const continueEdit = async (row: StockRecordRow) => {
+    setBusyRow(row.id);
+    try {
+      const res = await continuePostedEdit("stock_count", row.id);
+      if (res.open) {
+        setEditGrant(res.grant ?? null);
+        resume(row);
+      }
+      await refresh();
+    } finally {
+      setBusyRow("");
+    }
+  };
+
+  const withdrawEdit = async (row: StockRecordRow) => {
+    setBusyRow(row.id);
+    try {
+      if (await withdrawPostedEdit("stock_count", row.id)) await refresh();
+    } finally {
+      setBusyRow("");
+    }
   };
 
   const discardDraft = (id: string) => {
@@ -237,19 +288,48 @@ function StockOperationsPage() {
                               </Button>
                             </>
                           ) : r.status === "posted" ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => void editPosted(r)}
-                              title="Editing a posted count needs authorisation."
-                            >
-                              {canEditPosted() ? (
-                                <Pencil className="mr-1 size-3" />
+                            r.pending_edit_request_id ? (
+                              (r.pending_edit_by ?? "").toLowerCase() === meId.toLowerCase() &&
+                              !!meId ? (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    disabled={busyRow === r.id}
+                                    onClick={() => void continueEdit(r)}
+                                  >
+                                    Continue edit
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    disabled={busyRow === r.id}
+                                    onClick={() => void withdrawEdit(r)}
+                                  >
+                                    Withdraw
+                                  </Button>
+                                </>
                               ) : (
-                                <Lock className="mr-1 size-3" />
-                              )}{" "}
-                              Edit
-                            </Button>
+                                <Badge variant="outline" className="border-primary/40 text-primary">
+                                  <Lock className="mr-1 size-3" /> Pending edit
+                                  {r.pending_edit_by ? ` · ${r.pending_edit_by}` : ""}
+                                </Badge>
+                              )
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={busyRow === r.id}
+                                onClick={() => void editPosted(r)}
+                                title="Editing a posted count needs authorisation."
+                              >
+                                {canEditPosted() ? (
+                                  <Pencil className="mr-1 size-3" />
+                                ) : (
+                                  <Lock className="mr-1 size-3" />
+                                )}{" "}
+                                Edit
+                              </Button>
+                            )
                           ) : null}
                         </TableCell>
                       </TableRow>
@@ -277,10 +357,12 @@ function StockOperationsPage() {
       <StockCountDialog
         open={countOpen}
         draft={resuming}
+        editGrant={editGrant}
         onOpenChange={(open) => {
           setCountOpen(open);
           if (!open) {
             setResuming(null);
+            setEditGrant(null);
             void refresh();
           }
         }}

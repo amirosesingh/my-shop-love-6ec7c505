@@ -325,7 +325,30 @@
     "invoice_entry_date",
     "updated_at",
     "row_version",
-    "status"
+    "status",
+    "pending_edit_request_id",
+    "pending_edit_by",
+    "pending_edit_at"
+  ],
+  "record_edits": [
+    "id",
+    "record_type",
+    "record_id",
+    "reference",
+    "store_id",
+    "terminal_id",
+    "action_key",
+    "request_id",
+    "edited_by",
+    "edited_by_name",
+    "authorized_by",
+    "authorized_by_name",
+    "mode_used",
+    "before_value",
+    "after_value",
+    "stock_deltas",
+    "note",
+    "created_at"
   ],
   "sale_items": [
     "id",
@@ -467,7 +490,10 @@
     "posted_at",
     "posted_by",
     "created_at",
-    "updated_at"
+    "updated_at",
+    "pending_edit_request_id",
+    "pending_edit_by",
+    "pending_edit_at"
   ],
   "stock_transfer_items": [
     "id",
