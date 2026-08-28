@@ -6,6 +6,8 @@ import {
   Download,
   PackagePlus,
   Pencil,
+  Lock,
+  Save,
   ScanBarcode,
   ShieldAlert,
   Trash2,
@@ -51,6 +53,9 @@ import {
 } from "@/lib/catalog-meta";
 import { resolveByBarcode } from "@/lib/product-lookup";
 import { centralHub, locationPath, primarySub, routingTargets } from "@/lib/locations";
+import { Badge } from "@/components/ui/badge";
+import { canEditPosted, nextStockRef } from "@/lib/stock-ref";
+import { ReceivingRecordView } from "@/components/pos/ReceivingRecordView";
 
 /** Sentinel for "no value picked" — Radix selects cannot hold an empty value. */
 const PO_NONE = "__none";
@@ -141,6 +146,11 @@ function Purchasing() {
     draft never touches stock — only Finalize does.
   */
   const [openDraftId, setOpenDraftId] = useState<string | null>(null);
+  /** Our own goods-received number, minted once when the draft row is created. */
+  const [reference, setReference] = useState<string | null>(null);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<"all" | "draft" | "posted" | "cancelled">("all");
+  const [viewing, setViewing] = useState<ReceivingInvoice | null>(null);
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
   const [draftLineRemovals, setDraftLineRemovals] = useState<string[]>([]);
   const [drafts, setDrafts] = useState<ReceivingInvoice[]>([]);
@@ -184,9 +194,13 @@ function Purchasing() {
   }, []);
 
   /** Invoice history is a database read, so it survives reloads and restarts. */
+  /** True when this record was entered on a branch the user is not on. */
+  const otherBranch = (h: ReceivingInvoice) =>
+    !isAdmin && !!h.storeId && h.storeId !== currentStore.id;
+
   const refreshHistory = async () => {
     try {
-      const rows = await loadReceivingInvoices(currentStore.id, 100, masterView);
+      const rows = await loadReceivingInvoices(currentStore.id, 100, masterView, "any");
       setHistory(rows);
       setHistoryError(null);
     } catch (e) {
@@ -210,8 +224,18 @@ function Purchasing() {
   }, [currentStore.id, masterView]);
 
   /** The entry as it stands right now, in the shape the database stores. */
-  const buildInvoice = (status: "draft" | "posted", id: string): ReceivingInvoice => ({
+  const visibleHistory = useMemo(
+    () => (statusFilter === "all" ? history : history.filter((h) => h.status === statusFilter)),
+    [history, statusFilter],
+  );
+
+  const buildInvoice = (
+    status: "draft" | "posted",
+    id: string,
+    ref: string | null = reference,
+  ): ReceivingInvoice => ({
     id,
+    reference: ref,
     invoiceNo: invoiceNo.trim(),
     supplier: supplier.trim(),
     supplierId: suppliers.find((s) => s.name === supplier.trim())?.id ?? null,
@@ -238,30 +262,66 @@ function Purchasing() {
     })),
   });
 
+  /*
+    The one and only way an unfinished entry reaches the database. The timer
+    below and the Save draft button both call this, so a click during an
+    autosave cannot write the same entry twice or mint a second draft.
+  */
+  const savingDraftRef = useRef(false);
+  async function persistDraft(): Promise<boolean> {
+    if (!lines.length || savingDraftRef.current) return false;
+    savingDraftRef.current = true;
+    const id = openDraftId ?? crypto.randomUUID();
+    // The reference is minted with the draft row and never regenerated.
+    const ref =
+      reference ??
+      nextStockRef(
+        state.settings.integrations.receivingNumbering ?? {},
+        currentStore.code || currentStore.id,
+        "receiving",
+      );
+    const removals = draftLineRemovals;
+    try {
+      await db.saveReceivingDraft(buildInvoice("draft", id, ref), removals);
+      setOpenDraftId(id);
+      setReference(ref);
+      setDraftLineRemovals((r) => r.filter((x) => !removals.includes(x)));
+      setDraftSavedAt(new Date().toISOString());
+      return true;
+    } catch {
+      /* the outbox retries; the queue on screen is unaffected */
+      return false;
+    } finally {
+      savingDraftRef.current = false;
+    }
+  }
+
   // Debounced autosave: fast scanning must not hammer the database.
   useEffect(() => {
     if (!lines.length) return;
-    const id = openDraftId ?? crypto.randomUUID();
-    const removals = draftLineRemovals;
-    const t = setTimeout(() => {
-      void (async () => {
-        try {
-          await db.saveReceivingDraft(buildInvoice("draft", id), removals);
-          setOpenDraftId(id);
-          setDraftLineRemovals((r) => r.filter((x) => !removals.includes(x)));
-          setDraftSavedAt(new Date().toISOString());
-        } catch {
-          /* the outbox retries; the queue on screen is unaffected */
-        }
-      })();
-    }, 800);
+    const t = setTimeout(() => void persistDraft(), 800);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lines, invoiceNo, supplier, invoiceDate, entryDate, openDraftId, draftLineRemovals]);
 
+  /** Save draft button: the same save, on demand, with a word of feedback. */
+  async function saveDraftNow() {
+    if (!lines.length) return toast.error("Scan at least one item before saving a draft");
+    setSavingDraft(true);
+    try {
+      const ok = await persistDraft();
+      if (ok) toast.success("Draft saved");
+      else toast.message("Saving…", { description: "The last change is still being written." });
+      await refreshDrafts();
+    } finally {
+      setSavingDraft(false);
+    }
+  }
+
   /** Load a saved draft back into the form for more items or invoices. */
   function resumeDraft(inv: ReceivingInvoice) {
     setOpenDraftId(inv.id);
+    setReference(inv.reference);
     setDraftLineRemovals([]);
     setInvoiceNo(inv.invoiceNo);
     setSupplier(inv.supplier);
@@ -286,6 +346,7 @@ function Purchasing() {
   /** Clear the form back to a fresh entry without touching what is stored. */
   function clearForm() {
     setOpenDraftId(null);
+    setReference(null);
     setDraftLineRemovals([]);
     setDraftSavedAt(null);
     setInvoiceNo("");
@@ -538,8 +599,16 @@ function Purchasing() {
       // Finalizing a resumed draft posts the very same record, so the entry
       // keeps its id and can never be posted twice as two invoices.
       const wasDraft = openDraftId;
+      // A never-autosaved entry still needs its own goods-received number.
+      const grn =
+        reference ??
+        nextStockRef(
+          state.settings.integrations.receivingNumbering ?? {},
+          currentStore.code || currentStore.id,
+          "receiving",
+        );
       const invoice: ReceivingInvoice = {
-        ...buildInvoice("posted", wasDraft ?? crypto.randomUUID()),
+        ...buildInvoice("posted", wasDraft ?? crypto.randomUUID(), grn),
         invoiceNo: ref,
         storeId,
       };
@@ -939,6 +1008,14 @@ function Purchasing() {
               )}
             </div>
             <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                className="h-11"
+                disabled={savingDraft || !lines.length}
+                onClick={() => void saveDraftNow()}
+              >
+                <Save className="size-4" /> {savingDraft ? "Saving…" : "Save draft"}
+              </Button>
               {openDraftId && (
                 <Button
                   variant="outline"
@@ -1056,8 +1133,21 @@ function Purchasing() {
 
         <section className="rounded-lg border border-border bg-card">
           <div className="flex items-center justify-between px-5 py-3">
-            <h2 className="text-sm font-semibold">Invoices received history</h2>
+            <h2 className="text-sm font-semibold">Receiving records</h2>
             <div className="flex items-center gap-3">
+              <div className="w-40">
+                <ThemedSelect
+                  value={statusFilter}
+                  onChange={(v) => setStatusFilter(v as typeof statusFilter)}
+                  options={[
+                    { value: "all", label: "All statuses" },
+                    { value: "draft", label: "Drafts" },
+                    { value: "posted", label: "Received" },
+                    { value: "cancelled", label: "Discarded" },
+                  ]}
+                  ariaLabel="Status filter"
+                />
+              </div>
               {historyError && (
                 <span className="text-xs text-warning-foreground">
                   Offline — showing what this terminal could read
@@ -1089,6 +1179,8 @@ function Purchasing() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Reference</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead>Invoice no.</TableHead>
                 <TableHead>Supplier</TableHead>
                 <TableHead>Invoice date</TableHead>
@@ -1102,9 +1194,27 @@ function Purchasing() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {history.map((h) => (
+              {visibleHistory.map((h) => (
                 <TableRow key={h.id}>
-                  <TableCell className="numeric font-medium">{h.invoiceNo}</TableCell>
+                  <TableCell className="numeric font-medium">{h.reference ?? "—"}</TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={
+                        h.status === "posted"
+                          ? "secondary"
+                          : h.status === "draft"
+                            ? "outline"
+                            : "destructive"
+                      }
+                    >
+                      {h.status === "posted"
+                        ? "Received"
+                        : h.status === "draft"
+                          ? "Draft"
+                          : "Discarded"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="numeric">{h.invoiceNo || "—"}</TableCell>
                   <TableCell>{h.supplier}</TableCell>
                   <TableCell className="numeric text-muted-foreground">
                     {h.invoiceDate ?? "—"}
@@ -1120,29 +1230,58 @@ function Purchasing() {
                     {h.storeCode ?? "—"}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={!isAdmin && !!h.storeId && h.storeId !== currentStore.id}
-                      title={
-                        !isAdmin && !!h.storeId && h.storeId !== currentStore.id
-                          ? "This invoice belongs to another branch"
-                          : undefined
-                      }
-                      onClick={() => {
-                        setRemovedLineIds([]);
-                        setEditing(structuredClone(h));
-                      }}
-                    >
-                      <Pencil className="size-3.5" /> Edit
-                    </Button>
+                    <div className="flex justify-end gap-2">
+                      <Button variant="ghost" size="sm" onClick={() => setViewing(h)}>
+                        View
+                      </Button>
+                      {h.status === "draft" ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={otherBranch(h)}
+                          onClick={() => resumeDraft(h)}
+                        >
+                          <Pencil className="size-3.5" /> Resume
+                        </Button>
+                      ) : h.status === "posted" ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={otherBranch(h)}
+                          title={
+                            otherBranch(h)
+                              ? "This entry belongs to another branch"
+                              : canEditPosted()
+                                ? undefined
+                                : "Editing a received entry needs approval"
+                          }
+                          onClick={() => {
+                            if (!canEditPosted()) {
+                              toast.message("Approval required", {
+                                description:
+                                  "Changing a received entry will go through the approval flow.",
+                              });
+                            }
+                            setRemovedLineIds([]);
+                            setEditing(structuredClone(h));
+                          }}
+                        >
+                          {canEditPosted() ? (
+                            <Pencil className="size-3.5" />
+                          ) : (
+                            <Lock className="size-3.5" />
+                          )}{" "}
+                          Edit
+                        </Button>
+                      ) : null}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
-              {!history.length && (
+              {!visibleHistory.length && (
                 <TableRow>
-                  <TableCell colSpan={10} className="py-10 text-center text-muted-foreground">
-                    No invoices received yet.
+                  <TableCell colSpan={12} className="py-10 text-center text-muted-foreground">
+                    No receiving records yet.
                   </TableCell>
                 </TableRow>
               )}
@@ -1150,6 +1289,8 @@ function Purchasing() {
           </Table>
         </section>
       </div>
+
+      <ReceivingRecordView record={viewing} onClose={() => setViewing(null)} />
 
       <Dialog
         open={!!editing}

@@ -824,6 +824,8 @@ export type IntegrationSettings = {
   billNumbering?: BillNumberingSettings;
   /** How Stock Operations reference numbers are built. */
   stockNumbering?: import("./stock-ref").StockNumberingSettings;
+  /** How goods-received (purchasing) reference numbers are built. */
+  receivingNumbering?: import("./stock-ref").StockNumberingSettings;
 };
 
 
