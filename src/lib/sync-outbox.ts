@@ -9,6 +9,7 @@
  */
 import { stamp } from "./activity-journal";
 import { isOnlineOnly } from "./live-mode";
+import { BACKOFF_FACTOR, BASE_BACKOFF_MS, syncConfig } from "./sync-config";
 import { touchedIds as versionedIds, versionsFor } from "./row-versions";
 
 export type Row = Record<string, unknown>;
@@ -52,23 +53,25 @@ const QUEUE_KEY = "pos.sync.outbox";
 const FLAG_KEY = "pos.sync.enabled";
 const STAMP_KEY = "pos.sync.lastSyncedAt";
 /** After this many failed sends a change is parked as a dead letter. */
-export const MAX_ATTEMPTS = 10;
+export const maxAttempts = () => syncConfig().maxAttempts;
 /** Longest a change ever waits between attempts. */
-export const MAX_BACKOFF_MS = 30_000;
+export const maxBackoffMs = () => syncConfig().maxBackoffMs;
 
 /**
- * Waiting time before the next attempt: 1s, 2s, 4s … capped at thirty
- * seconds, plus a small spread so a whole shop's tills do not all retry on
+ * Waiting time before the next attempt: 5s, 15s, 45s, 135s … capped at five
+ * minutes, plus a small spread so a whole shop's tills do not all retry on
  * the same tick. The spread is derived from the entry id, so the countdown
  * shown on screen matches the one the sync engine uses.
  */
 export function backoffMs(entry: Pick<QueuedOp, "id" | "attempts">): number {
   if (entry.attempts <= 0) return 0;
-  const base = Math.min(MAX_BACKOFF_MS, 2 ** (entry.attempts - 1) * 1000);
+  const cap = maxBackoffMs();
+  const base = Math.min(cap, BASE_BACKOFF_MS * BACKOFF_FACTOR ** (entry.attempts - 1));
   let hash = 0;
   for (const ch of entry.id) hash = (hash * 31 + ch.charCodeAt(0)) % 1000;
   return base + Math.round((hash / 1000) * Math.min(base, 5000));
 }
+
 
 /** When this entry may be tried again (epoch ms). */
 export function nextAttemptDue(entry: QueuedOp): number {
@@ -130,13 +133,36 @@ export function conflictCount(): number {
   return read().filter((q) => q.quarantined).length;
 }
 
+/**
+ * Origin and freshness stamp on the record itself, so a row that lands
+ * centrally still says which till wrote it and when it was last touched.
+ * Only columns the row already carries are filled in — a table that has no
+ * device or timestamp column is left exactly as it was, because inventing a
+ * column here would make the whole save fail.
+ */
+function stampRows(op: SyncOp, s: ReturnType<typeof stamp>): SyncOp {
+  const now = new Date().toISOString();
+  const apply = (row: Row): Row => {
+    const next = { ...row };
+    if ("device_id" in next && !next["device_id"]) next["device_id"] = s.terminalId;
+    if ("terminal_id" in next && !next["terminal_id"]) next["terminal_id"] = s.terminalId;
+    if ("updated_at" in next) next["updated_at"] = now;
+    if ("synced" in next) next["synced"] = false;
+    return next;
+  };
+  if (op.kind === "insert" || op.kind === "upsert") return { ...op, rows: op.rows.map(apply) };
+  if (op.kind === "update") return { ...op, values: apply(op.values) };
+  return op;
+}
+
 export function enqueue(context: string, op: SyncOp): QueuedOp {
   const s = stamp();
+  const stamped = stampRows(op, s);
   const baseVersions = versionsFor(op.table, versionedIds(op as never));
   const entry: QueuedOp = {
     id: crypto.randomUUID(),
     context,
-    op,
+    op: stamped,
     createdAt: new Date().toISOString(),
     attempts: 0,
     status: "pending",
@@ -149,6 +175,7 @@ export function enqueue(context: string, op: SyncOp): QueuedOp {
   write([...read(), entry]);
   return entry;
 }
+
 
 export function resolveOp(id: string) {
   write(read().filter((q) => q.id !== id));
@@ -176,7 +203,7 @@ export function failOp(id: string, message: string) {
             lastError: message,
             status: "failed",
             lastAttemptAt: new Date().toISOString(),
-            quarantined: q.attempts + 1 >= MAX_ATTEMPTS,
+            quarantined: q.attempts + 1 >= maxAttempts(),
           }
         : q,
     ),
@@ -194,7 +221,7 @@ export function refuseOp(id: string, message: string) {
       q.id === id
         ? {
             ...q,
-            attempts: MAX_ATTEMPTS,
+            attempts: maxAttempts(),
             lastError: message,
             status: "failed" as const,
             lastAttemptAt: new Date().toISOString(),

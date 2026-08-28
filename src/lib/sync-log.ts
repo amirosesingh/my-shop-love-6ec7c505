@@ -6,6 +6,9 @@
  */
 export type SyncDirection = "push" | "pull" | "backup";
 
+/** Why a sync attempt failed, in plain terms the log can group by. */
+export type SyncFailureKind = "network" | "auth" | "conflict" | "validation" | "unknown";
+
 export type SyncLogEntry = {
   id: string;
   at: string;
@@ -13,10 +16,23 @@ export type SyncLogEntry = {
   table: string;
   ok: boolean;
   details: string;
+  /** Only set when `ok` is false. */
+  kind?: SyncFailureKind;
 };
 
+/** Sort a failure message into one of the buckets above. */
+export function classifyFailure(details: string): SyncFailureKind {
+  const text = details.toLowerCase();
+  if (/network|fetch|timeout|timed out|offline|econn|unreachable/.test(text)) return "network";
+  if (/unauthor|forbidden|401|403|jwt|api key|credential/.test(text)) return "auth";
+  if (/conflict|duplicate|409|version|already exists/.test(text)) return "conflict";
+  if (/invalid|violates|constraint|column|schema|400|422/.test(text)) return "validation";
+  return "unknown";
+}
+
 const KEY = "pos.sync.log";
-const MAX = 300;
+/** A rolling window — enough to explain the last few hours, not a database. */
+const MAX = 50;
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
@@ -54,6 +70,7 @@ export function logSync(
     table,
     ok,
     details,
+    ...(ok ? {} : { kind: classifyFailure(details) }),
   };
   persist([entry, ...listSyncLog()]);
   return entry;

@@ -70,7 +70,13 @@ async function mirrorCloudState(state: unknown) {
 }
 import { loadCloudState } from "./pos-db";
 import { localDb } from "./local-db";
-import { checkHealth } from "./connection-health";
+import {
+  checkHealth,
+  startConnectivityMonitor,
+  subscribeConnectivity,
+  type Connectivity,
+} from "./connection-health";
+import { syncConfig } from "./sync-config";
 import { noteVersions } from "./row-versions";
 import { recordConflict } from "./sync-conflicts";
 import {
@@ -477,14 +483,18 @@ export async function drainOutbox(): Promise<{ pushed: number; failed: number }>
   let pushed = 0;
   let failed = 0;
   const blocked = new Set<string>();
+  // One pass sends at most a batch, so a long queue can never hold the
+  // checkout UI or the rest of the cycle behind it.
+  const batchSize = syncConfig().batchSize;
   try {
     for (const entry of replayOrder(listQueue())) {
+      if (pushed + failed >= batchSize) break;
       if (entry.quarantined) continue;
       // Branch-level switches: held writes stay queued, never dropped.
       if (!tableSyncAllowed(entry.op.table)) continue;
       const terminal = entry.terminalId ?? "legacy";
       if (blocked.has(terminal)) continue;
-      // Capped exponential backoff with spread: 1s, 2s, 4s … up to 30s.
+      // Capped exponential backoff with spread: 5s, 15s, 45s … up to 5 min.
       if (entry.attempts > 0 && Date.now() < nextAttemptDue(entry)) continue;
       const ok = await runOne(entry);
       if (ok) pushed += 1;
@@ -493,6 +503,7 @@ export async function drainOutbox(): Promise<{ pushed: number; failed: number }>
         blocked.add(terminal);
       }
     }
+
     if (pushed) markSynced();
     // A successful push proves the connection is back, so online mode resumes.
     if (pushed) noteConnectionRestored();
@@ -751,7 +762,7 @@ export function startSyncEngine() {
   // Push queued work first, then bring central changes down, then converge the
   // terminal's own database in both directions — one cycle at a time.
   const tick = () => void runExclusive("timer");
-  const timer = window.setInterval(tick, 15000);
+  const timer = window.setInterval(tick, syncConfig().intervalMs);
   let debounce: number | undefined;
   // Five seconds of quiet before reacting: network flap protection.
   const wake = () => {
@@ -767,8 +778,6 @@ export function startSyncEngine() {
     debounce = undefined;
     setSyncState({ phase: "offline" });
   };
-  window.addEventListener("online", wake);
-  window.addEventListener("offline", sleep);
   // Flipping the switch back to online catches up immediately instead of
   // waiting for the next timer tick.
   let lastMode = effectiveDatabaseMode();
@@ -778,19 +787,15 @@ export function startSyncEngine() {
     lastMode = mode;
     if (mode === "online") wake();
   });
-  // The browser's online flag lies on captive networks, so confirm by asking
-  // the central database every half minute and resume the moment it answers.
-  const ping = window.setInterval(() => {
-    if (!navigator.onLine) return;
-    void supabaseExternal
-      .from("public_flags")
-      .select("key")
-      .limit(1)
-      .then(({ error }) => {
-        if (error) return;
-        if (syncState().phase === "offline") wake();
-      });
-  }, 30000);
+  // One heartbeat for the whole app decides whether we are online — the
+  // browser's own flag lies on captive networks. A confirmed reconnect forces
+  // a catch-up pass at once instead of waiting for the next tick.
+  const stopMonitor = startConnectivityMonitor(syncConfig().heartbeatMs);
+  const offConnectivity = subscribeConnectivity((state: Connectivity) => {
+    if (state === "offline") sleep();
+    else if (state === "online") wake();
+  });
+
   // Live listener: an account or settings change made anywhere lands in this
   // shop's own database within a second instead of waiting for the timer.
   const live = supabaseExternal.channel("pos-live-settings");
@@ -808,13 +813,13 @@ export function startSyncEngine() {
   tick();
   return () => {
     window.clearInterval(timer);
-    window.clearInterval(ping);
+    stopMonitor();
+    offConnectivity();
     if (debounce) window.clearTimeout(debounce);
     if (liveTimer) window.clearTimeout(liveTimer);
-    window.removeEventListener("online", wake);
-    window.removeEventListener("offline", sleep);
     void supabaseExternal.removeChannel(live);
     offMode();
     started = false;
+
   };
 }

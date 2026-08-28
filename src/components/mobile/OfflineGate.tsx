@@ -1,60 +1,72 @@
 /**
- * "No internet connection" screen for the browser and Android builds.
+ * Connection gate for the browser and Android builds.
  *
- * Neither holds business data, so every screen needs the backend. When the
- * connection drops this covers the app, watches for the network coming back
- * and reloads the current page automatically. The Windows till never renders
- * it: `isOnlineOnly()` is false there and children pass straight through.
+ * Neither holds business data, so every screen needs the backend. Nothing is
+ * ever declared offline on a guess: while the first heartbeat is still in
+ * flight the app shows only the pulsing cloud icon — no logo, no toast, no
+ * error — and it keeps showing it for as long as the check takes. The Windows
+ * till never renders the gate: `isOnlineOnly()` is false there.
  */
 import { useEffect, useState, type ReactNode } from "react";
-import { WifiOff, RefreshCw } from "lucide-react";
+import { CloudOff, RefreshCw } from "lucide-react";
 
 import { isOnlineOnly } from "../../lib/live-mode";
-
-function online(): boolean {
-  return typeof navigator === "undefined" ? true : navigator.onLine;
-}
+import {
+  connectivity,
+  heartbeat,
+  startConnectivityMonitor,
+  subscribeConnectivity,
+  type Connectivity,
+} from "../../lib/connection-health";
+import { syncConfig } from "../../lib/sync-config";
 
 export function OfflineGate({ children }: { children: ReactNode }) {
   const live = isOnlineOnly();
-  const [connected, setConnected] = useState(true);
+  const [state, setState] = useState<Connectivity>(connectivity());
   const [checking, setChecking] = useState(false);
 
   useEffect(() => {
-    if (!live) return;
-    setConnected(online());
-    const up = () => {
-      setConnected(true);
-      // The screens behind the gate hold no data of their own, so the simplest
-      // correct recovery is a clean reload of the page the user was on.
-      window.location.reload();
-    };
-    const down = () => setConnected(false);
-    window.addEventListener("online", up);
-    window.addEventListener("offline", down);
+    // Safe on every platform: the monitor only ever starts once.
+    const stop = startConnectivityMonitor(syncConfig().heartbeatMs);
+    setState(connectivity());
+    const off = subscribeConnectivity(setState);
     return () => {
-      window.removeEventListener("online", up);
-      window.removeEventListener("offline", down);
+      off();
+      stop();
     };
-  }, [live]);
+  }, []);
 
-  if (!live || connected) return <>{children}</>;
+  if (!live) return <>{children}</>;
+
+  // Still checking: the cloud icon alone, nothing else on screen.
+  if (state === "connecting")
+    return (
+      <div
+        className="flex min-h-screen items-center justify-center bg-background"
+        role="status"
+        aria-label="Connecting"
+      >
+        <span className="relative flex size-12 items-center justify-center">
+          <span className="absolute inline-flex size-12 animate-ping rounded-full bg-primary/20" />
+          <CloudIconPulse />
+        </span>
+      </div>
+    );
+
+  if (state === "online") return <>{children}</>;
 
   const retry = () => {
     setChecking(true);
-    if (online()) window.location.reload();
-    else setTimeout(() => setChecking(false), 800);
+    void heartbeat().finally(() => setChecking(false));
   };
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background px-8 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-        <WifiOff className="h-7 w-7 text-muted-foreground" aria-hidden />
-      </div>
-      <h1 className="text-lg font-semibold text-foreground">No internet connection</h1>
+      <CloudOff className="size-10 text-destructive" aria-hidden />
+      <h1 className="text-lg font-semibold text-foreground">No connection</h1>
       <p className="max-w-xs text-sm text-muted-foreground">
-        This app works with live data from your central system, so it needs a connection. It will
-        continue automatically as soon as you are back online.
+        This app works with live data from your central system. It will continue automatically as
+        soon as the connection is back.
       </p>
       <button
         onClick={retry}
@@ -65,5 +77,22 @@ export function OfflineGate({ children }: { children: ReactNode }) {
         {checking ? "Checking…" : "Try again"}
       </button>
     </div>
+  );
+}
+
+function CloudIconPulse() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="relative size-8 animate-pulse text-primary"
+      aria-hidden
+    >
+      <path d="M17.5 19a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.6 1.6A3.7 3.7 0 0 0 6.5 19Z" />
+    </svg>
   );
 }
