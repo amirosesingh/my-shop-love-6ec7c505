@@ -325,6 +325,9 @@ CREATE TABLE IF NOT EXISTS purchase_orders (
   total_cost        REAL NOT NULL DEFAULT 0,
   total_items_count INTEGER NOT NULL DEFAULT 0,
   status            TEXT NOT NULL DEFAULT 'posted',
+  pending_edit_request_id TEXT,
+  pending_edit_by   TEXT,
+  pending_edit_at   TEXT,
   created_at        TEXT NOT NULL,
   updated_at        TEXT
 );
@@ -1104,6 +1107,9 @@ CREATE TABLE IF NOT EXISTS stock_count_drafts (
   total_impact REAL NOT NULL DEFAULT 0,
   posted_at    TEXT,
   posted_by    TEXT,
+  pending_edit_request_id TEXT,
+  pending_edit_by TEXT,
+  pending_edit_at TEXT,
   created_at   TEXT NOT NULL,
   updated_at   TEXT,
   is_synced    INTEGER DEFAULT 0,
@@ -1190,3 +1196,34 @@ CREATE TABLE IF NOT EXISTS authorization_log (
   client_transaction_id TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_authorization_log_created ON authorization_log (created_at);
+
+-- ---- record_edits ----
+-- Before/after history of every authorised change to an already-posted record.
+CREATE TABLE IF NOT EXISTS record_edits (
+  id            TEXT PRIMARY KEY NOT NULL,
+  record_type   TEXT NOT NULL,
+  record_id     TEXT NOT NULL,
+  reference     TEXT,
+  store_id      TEXT,
+  terminal_id   TEXT,
+  action_key    TEXT NOT NULL,
+  request_id    TEXT,
+  edited_by     TEXT,
+  edited_by_name TEXT,
+  authorized_by TEXT,
+  authorized_by_name TEXT,
+  mode_used     TEXT,
+  before_value  TEXT NOT NULL DEFAULT '{}',
+  after_value   TEXT NOT NULL DEFAULT '{}',
+  stock_deltas  TEXT NOT NULL DEFAULT '{}',
+  note          TEXT,
+  created_at    TEXT,
+  is_synced     INTEGER DEFAULT 0,
+  sync_status   TEXT DEFAULT 'pending',
+  row_version   INTEGER DEFAULT 0,
+  sync_attempts INTEGER DEFAULT 0,
+  last_error_at TEXT,
+  client_transaction_id TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_record_edits_record ON record_edits (record_type, record_id, created_at);
+CREATE INDEX IF NOT EXISTS ix_record_edits_store ON record_edits (store_id, created_at);
