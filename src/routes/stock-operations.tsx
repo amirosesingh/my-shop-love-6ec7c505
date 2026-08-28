@@ -7,7 +7,7 @@
  */
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeftRight, ClipboardList, Lock, Plus } from "lucide-react";
+import { ArrowLeftRight, ClipboardList, Lock, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
