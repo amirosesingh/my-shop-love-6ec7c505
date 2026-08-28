@@ -14,6 +14,14 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useManagerGate } from "@/lib/manager-gate";
+import {
+  beginPostedEdit,
+  continuePostedEdit,
+  myServerId,
+  saveRecordEditHistory,
+  withdrawPostedEdit,
+  type EditGrant,
+} from "@/lib/record-edit-flow";
 import { notifyError } from "@/lib/notify";
 import * as XLSX from "xlsx";
 import { AppShell } from "@/components/pos/AppShell";
@@ -124,6 +132,13 @@ const units = (inv: ReceivingInvoice) => inv.lines.reduce((a, l) => a + l.qty, 0
 
 function Purchasing() {
   const { authorize } = useManagerGate();
+  const [editGrant, setEditGrant] = useState<EditGrant | null>(null);
+  const [busyRow, setBusyRow] = useState("");
+  const [meId, setMeId] = useState("");
+
+  useEffect(() => {
+    void myServerId().then(setMeId);
+  }, []);
   const { state, currentStore, allStores, upsertProduct, adjustStock, syncProducts } = usePos();
   const { can, user, isAdmin, isSupervisor } = useAuth();
   const [invoiceNo, setInvoiceNo] = useState("");
@@ -196,18 +211,51 @@ function Purchasing() {
   }, []);
 
   /** Invoice history is a database read, so it survives reloads and restarts. */
-  /** Reopening a received entry goes through the configured authorisation. */
-  const editReceived = async (h: ReceivingInvoice) => {
-    const res = await authorize({
-      action: "edit_posted_purchase",
-      title: "Edit a received purchase",
-      reason: `Reopen ${h.reference || h.id}`,
-      storeId: h.storeId ?? currentStore.id,
-      detail: `${h.reference ?? h.id} · ${h.supplier ?? ""}`.trim(),
-    });
-    if (!res.ok) return;
+  /** Reopening a received entry always goes through the configured authorisation. */
+  const openForEdit = (h: ReceivingInvoice, grant: EditGrant | null) => {
+    setEditGrant(grant);
     setRemovedLineIds([]);
     setEditing(structuredClone(h));
+  };
+
+  const editReceived = async (h: ReceivingInvoice) => {
+    setBusyRow(h.id);
+    try {
+      const outcome = await beginPostedEdit(authorize, {
+        action: "edit_posted_purchase",
+        recordKind: "purchase_order",
+        recordId: h.id,
+        reference: h.reference ?? h.invoiceNo ?? h.id,
+        title: "Edit a received purchase",
+        storeId: h.storeId ?? currentStore.id,
+        detail: `${h.reference ?? h.id} · ${h.supplier ?? ""}`.trim(),
+      });
+      if (outcome.kind === "open") openForEdit(h, outcome.grant);
+      else if (outcome.kind === "queued") await refreshHistory();
+    } finally {
+      setBusyRow("");
+    }
+  };
+
+  /** Come back to an entry whose edit was sent for approval. */
+  const continueEdit = async (h: ReceivingInvoice) => {
+    setBusyRow(h.id);
+    try {
+      const res = await continuePostedEdit("purchase_order", h.id);
+      if (res.open) openForEdit(h, res.grant ?? null);
+      await refreshHistory();
+    } finally {
+      setBusyRow("");
+    }
+  };
+
+  const withdrawEdit = async (h: ReceivingInvoice) => {
+    setBusyRow(h.id);
+    try {
+      if (await withdrawPostedEdit("purchase_order", h.id)) await refreshHistory();
+    } finally {
+      setBusyRow("");
+    }
   };
 
   /** True when this record was entered on a branch the user is not on. */
@@ -290,6 +338,8 @@ function Purchasing() {
     itemCount: lines.length,
     createdAt: new Date().toISOString(),
     status,
+    pendingEditRequestId: null,
+    pendingEditBy: null,
     lines: lines.map((l) => ({
       // The queue line id *is* the stored line id, so autosaves update rows
       // in place instead of piling up duplicates.
@@ -845,8 +895,24 @@ function Purchasing() {
         note: `Invoice ${next.invoiceNo} corrected`,
       });
 
+      // The same before/after, in the authorisation record book, with who
+      // allowed the change and how it was allowed.
+      void saveRecordEditHistory({
+        kind: "purchase_order",
+        recordId: next.id,
+        ...(next.reference ? { reference: next.reference } : {}),
+        storeId: next.storeId,
+        actionKey: "edit_posted_purchase",
+        grant: editGrant,
+        before: snapshot(original),
+        after: snapshot(next),
+        stockDeltas: deltas,
+        note: `Invoice ${next.invoiceNo} corrected`,
+      });
+
       toast.success(`Invoice ${next.invoiceNo} updated`);
       setEditing(null);
+      setEditGrant(null);
       setRemovedLineIds([]);
       showAsPosted(next);
       void reconcileAfterPost(next, next.lines.map((l) => l.productId ?? "").filter(Boolean));
@@ -1288,26 +1354,54 @@ function Purchasing() {
                           <Pencil className="size-3.5" /> Resume
                         </Button>
                       ) : h.status === "posted" ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={otherBranch(h)}
-                          title={
-                            otherBranch(h)
-                              ? "This entry belongs to another branch"
-                              : canEditPosted()
-                                ? undefined
-                                : "Editing a received entry needs approval"
-                          }
-                          onClick={() => void editReceived(h)}
-                        >
-                          {canEditPosted() ? (
-                            <Pencil className="size-3.5" />
+                        h.pendingEditRequestId ? (
+                          !!meId &&
+                          (h.pendingEditBy ?? "").toLowerCase() === meId.toLowerCase() ? (
+                            <>
+                              <Button
+                                size="sm"
+                                disabled={busyRow === h.id}
+                                onClick={() => void continueEdit(h)}
+                              >
+                                Continue edit
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={busyRow === h.id}
+                                onClick={() => void withdrawEdit(h)}
+                              >
+                                Withdraw
+                              </Button>
+                            </>
                           ) : (
-                            <Lock className="size-3.5" />
-                          )}{" "}
-                          Edit
-                        </Button>
+                            <Badge variant="outline" className="border-primary/40 text-primary">
+                              <Lock className="mr-1 size-3" /> Pending edit
+                              {h.pendingEditBy ? ` · ${h.pendingEditBy}` : ""}
+                            </Badge>
+                          )
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={otherBranch(h) || busyRow === h.id}
+                            title={
+                              otherBranch(h)
+                                ? "This entry belongs to another branch"
+                                : canEditPosted()
+                                  ? undefined
+                                  : "Editing a received entry needs approval"
+                            }
+                            onClick={() => void editReceived(h)}
+                          >
+                            {canEditPosted() ? (
+                              <Pencil className="size-3.5" />
+                            ) : (
+                              <Lock className="size-3.5" />
+                            )}{" "}
+                            Edit
+                          </Button>
+                        )
                       ) : null}
                     </div>
                   </TableCell>
