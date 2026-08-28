@@ -7,7 +7,6 @@ import {
   Inbox,
   History,
   Plus,
-  Scale,
   Search,
   Trash2,
   Loader2,
@@ -125,7 +124,7 @@ function Inventory() {
 
   const canEdit = can("can_add_new_product");
   const canPrice = can("can_edit_product_price");
-  const canAdjust = can("can_adjust_stock");
+  
   const canBulk = can("can_bulk_edit_products");
   const canMerge = can("can_merge_products");
   const canEcom = canPrice;
@@ -737,20 +736,8 @@ function Inventory() {
                             : ""
                         }`}
                       >
-                        {stockAt(p, currentStore.id)} in stock
+                      {stockAt(p, currentStore.id)} in stock
                       </Badge>
-                      {canAdjust && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="size-7"
-                          title="Count or adjust in Stock Operations"
-                          aria-label={`Adjust stock for ${p.name}`}
-                          onClick={() => navigate({ to: "/stock-operations" })}
-                        >
-                          <Scale className="size-3.5" />
-                        </Button>
-                      )}
                     </div>
                   </TableCell>
                   <TableCell>
