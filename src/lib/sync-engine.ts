@@ -22,6 +22,11 @@ import {
 } from "./sync-status";
 import { writeSnapshot } from "./offline-snapshot";
 import { recordSync } from "./sync-audit";
+import {
+  beginSyncRun,
+  endSyncRun,
+  markTableSync,
+} from "./sync-progress";
 import { mirrorToLocal } from "./sync-audit";
 
 /**
@@ -576,8 +581,10 @@ export async function pullDelta(): Promise<{ merged: number }> {
   let changed = 0;
   const clean: string[] = [];
   try {
+    beginSyncRun(PULL_TABLES.filter((table) => tableSyncAllowed(table)));
     for (const table of PULL_TABLES) {
       if (!tableSyncAllowed(table)) continue;
+      markTableSync(table, "syncing", "Checking for changes…");
       // Each table resumes from its own mark, so one failing table never
       // drags the rest back or hides their changes.
       const since = lastTablePull(table) ?? fallbackSince;
@@ -590,13 +597,22 @@ export async function pullDelta(): Promise<{ merged: number }> {
         }
         logSync("pull", table, false, error.message);
         recordSync({ direction: "pull", entity: table, status: "failed", error: error.message });
+        markTableSync(
+          table,
+          /does not exist|not found|schema cache/i.test(error.message) ? "missing" : "failed",
+          error.message,
+        );
         continue;
       }
       clean.push(table);
-      if (!count) continue;
+      if (!count) {
+        markTableSync(table, "synced", "Already up to date");
+        continue;
+      }
       changed += count;
       logSync("pull", table, true, `${count} row(s) changed centrally`);
       recordSync({ direction: "pull", entity: table, records: count, status: "success" });
+      markTableSync(table, "synced", `${count} row(s) updated`);
     }
     // Something moved centrally: refresh the local copy in one consistent read.
     if (changed) {
@@ -612,11 +628,13 @@ export async function pullDelta(): Promise<{ merged: number }> {
     setLastSuccessfulPull(startedAt);
     // A clean pull proves the saved keys work — clear any earlier rejection.
     setSyncState({ lastSyncAt: startedAt, credentialsInvalid: false });
+    endSyncRun();
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     if (isCredentialError(e) || CREDENTIAL_ERROR_RE.test(message)) noteCredentialsInvalid(message);
     setSyncState({ lastError: message });
     recordSync({ direction: "pull", entity: "catalogue", status: "failed", error: message });
+    endSyncRun(message);
   } finally {
     pulling = false;
   }
