@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { CloudConnectionPanel } from "@/components/pos/settings/panels/CloudConnectionPanel";
 import { LocalDatabaseSettings } from "@/components/pos/LocalDatabaseSettings";
 import { ConnectionCheck } from "@/components/pos/ConnectionCheck";
-import { drainOutbox, pullDelta } from "@/lib/sync-engine";
+import { heartbeat } from "@/lib/connection-health";
 import { isOnlineOnly } from "@/lib/live-mode";
 import { useSystemStatus } from "@/lib/system-status";
 import {
@@ -72,7 +72,8 @@ export function DatabaseConnectionSettings() {
             onCheckedChange={(v) => {
               setPreferredDatabaseMode(v ? "local" : "online");
               force((n) => n + 1);
-              if (!v) void drainOutbox().then(() => pullDelta());
+              // Only re-check the connection: the sync panel owns transfers.
+              void heartbeat();
             }}
           />
         </div>
