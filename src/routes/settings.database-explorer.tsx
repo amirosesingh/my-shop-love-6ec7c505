@@ -29,6 +29,7 @@ function DatabaseExplorerPage() {
   const isAdmin = user?.role === "admin";
   return (
     <SettingsFrame
+      wide
       title="Database explorer"
       description="Connect to the Microsoft SQL Server on this machine, browse its databases and tables, and run read-only checks. This connection is separate from the one the register uses, so browsing never interrupts a sale."
     >

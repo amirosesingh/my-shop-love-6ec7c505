@@ -8,8 +8,6 @@
 import { isOnlineOnly } from "@/lib/live-mode";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  CloudDownload,
-  CloudUpload,
   Database,
   Loader2,
   RefreshCw,
@@ -20,14 +18,14 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
-import { useSyncBadge } from "@/components/pos/sync/SyncBadge";
+import { Link } from "@tanstack/react-router";
+import { useSystemStatus } from "@/lib/system-status";
 import { usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
 import { databaseModeLabel } from "@/lib/db-mode";
-import { drainOutbox, pullDelta, runExclusive, syncBusy } from "@/lib/sync-engine";
+import { drainOutbox, runExclusive, syncBusy } from "@/lib/sync-engine";
 import { lastSuccessfulPull, syncState } from "@/lib/sync-status";
 import {
   clearSyncAudit,
@@ -88,7 +86,13 @@ export function SyncHub() {
 function SyncHubDesktop() {
   const { state } = usePos();
   const { isAdmin } = useAuth();
-  const badge = useSyncBadge();
+  const system = useSystemStatus();
+  const badge = {
+    label: system.label,
+    pending: system.pending,
+    conflicts: system.conflicts,
+    online: system.connectivity === "online",
+  };
 
   const [rows, setRows] = useState<SyncAuditRow[]>([]);
   const [engine, setEngine] = useState<LocalEngineInfo | null>(null);
@@ -277,53 +281,21 @@ function SyncHubDesktop() {
         </CardContent>
       </Card>
 
-      {/* ------------------------------ actions ----------------------------- */}
+      {/* --------------------------- one trigger --------------------------- */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Force a sync</CardTitle>
+          <CardTitle className="text-base">Running a sync</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!!busy}
-              onClick={() => void run("push", () => drainOutbox())}
-            >
-              {busy === "push" ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <CloudUpload className="size-4" />
-              )}
-              Force push
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!!busy}
-              onClick={() => void run("pull", () => pullDelta())}
-            >
-              {busy === "pull" ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <CloudDownload className="size-4" />
-              )}
-              Force pull
-            </Button>
-            <Button
-              size="sm"
-              disabled={!!busy}
-              onClick={() => void run("cycle", () => runExclusive("manual"))}
-            >
-              {busy === "cycle" ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <RefreshCw className="size-4" />
-              )}
-              Full sync cycle
-            </Button>
-          </div>
-          {progress > 0 && <Progress value={progress} className="h-2" />}
+        <CardContent className="space-y-2">
+          <p className="text-xs text-muted-foreground">
+            Sync is started from one place only, so two passes can never overlap. Open the sync page
+            for the live table-by-table view and the single “Sync now” button.
+          </p>
+          <Button asChild size="sm" variant="outline">
+            <Link to="/settings/sync">
+              <RefreshCw className="size-4" /> Open the sync panel
+            </Link>
+          </Button>
           {!badge.online && (
             <p className="text-xs text-muted-foreground">
               This till is offline — sales keep working and queued changes go up as soon as the

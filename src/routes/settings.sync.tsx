@@ -1,25 +1,30 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
+import { SyncPanel } from "@/components/pos/sync/SyncPanel";
 import { SyncSettings } from "@/components/pos/SyncSettings";
-import { BranchSettings } from "@/components/pos/BranchSettings";
 
 export const Route = createFileRoute("/settings/sync")({
   head: () => ({
     meta: [
-      { title: "Sync & Backup — Northwind POS" },
-      { name: "description", content: "Branch identity, offline-first sync toggle, pending transaction queue, local SQL Server connection and database backups." },
-      { property: "og:title", content: "Sync & Backup — Northwind POS" },
-      { property: "og:description", content: "Offline sync, branch identity and backup controls." },
+      { title: "Sync — Northwind POS" },
+      {
+        name: "description",
+        content:
+          "The one place sync runs from: live table-by-table status, the pending queue, sync history and backups.",
+      },
+      { property: "og:title", content: "Sync — Northwind POS" },
+      { property: "og:description", content: "Trigger sync, watch progress and clear the queue." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
   }),
   component: () => (
     <SettingsFrame
-      title="Sync & backup"
-      description="This till always sells offline against its local database. Sync pushes finished bills to the central server whenever a connection is available."
+      wide
+      title="Sync"
+      description="This till always sells against its own database. Sync pushes finished work to the central database whenever a connection is available — start it here, and only here."
     >
-      <BranchSettings />
+      <SyncPanel />
       <SyncSettings />
     </SettingsFrame>
   ),

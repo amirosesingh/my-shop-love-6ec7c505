@@ -76,6 +76,7 @@ const ROUTE_PERMISSIONS: Record<string, PermissionFlag> = {
   "/settings/mobile-terminals": "can_manage_terminals",
   "/settings/sessions": "can_manage_terminals",
   "/settings/sync": "can_manage_sync_backup",
+  "/settings/database": "can_manage_sync_backup",
   "/settings": "can_access_pos_settings",
   "/staff": "can_manage_staff",
   "/stores": "can_manage_locations",

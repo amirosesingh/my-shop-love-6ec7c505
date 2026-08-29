@@ -4,22 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { usePos } from "@/lib/pos-store";
 import { downloadSqlBackup } from "@/lib/backup-sql";
-import { drainOutbox, pullDelta } from "@/lib/sync-engine";
-import { LocalDatabaseSettings } from "@/components/pos/LocalDatabaseSettings";
-import { ConnectionCheck } from "@/components/pos/ConnectionCheck";
+import { drainOutbox } from "@/lib/sync-engine";
 import { SyncBehaviourSettings } from "@/components/pos/SyncBehaviourSettings";
 import { SyncLogViewer } from "@/components/SyncLogViewer";
 import { logSync } from "@/lib/sync-log";
 import { describeError, showNotification } from "@/lib/notify";
 import { localDb } from "@/lib/local-db";
-import {
-  databaseModeLabel,
-  databaseModeLocked,
-  effectiveDatabaseMode,
-  preferredDatabaseMode,
-  setPreferredDatabaseMode,
-  subscribeDatabaseMode,
-} from "@/lib/db-mode";
+import { databaseModeLabel, effectiveDatabaseMode, subscribeDatabaseMode } from "@/lib/db-mode";
 import {
   discardQuarantined,
   discardOp,
@@ -53,8 +44,6 @@ export function SyncSettings() {
   const queue = listQueue();
   const quarantined = queue.filter((q) => q.quarantined);
   const last = lastSyncedAt();
-  const localMode = preferredDatabaseMode() === "local";
-  const locked = databaseModeLocked();
 
   // Web and Android have no local database engine behind them: there is
   // nothing to queue, mirror or back up, so the offline controls are hidden
@@ -74,7 +63,6 @@ export function SyncSettings() {
           <Stat label="Connection" value={isOnline() ? "Live" : "No connection"} />
           <Stat label="Writing to" value="Central database" />
         </div>
-        <ConnectionCheck />
         <SyncBehaviourSettings />
       </div>
     );
@@ -87,29 +75,6 @@ export function SyncSettings() {
         working with no internet. Queued changes are pushed to the cloud automatically as soon as
         the connection returns.
       </p>
-
-      <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
-        <div>
-          <p className="text-sm">Local database mode</p>
-          <p className="text-xs text-muted-foreground">
-            {locked
-              ? "This device is a live client: everything is read from and written to the central database."
-              : "On: every sale, shift and stock change is stored on this machine first and pushed up in the background. Off: changes go straight to the central database, and this terminal switches to local automatically if the connection drops."}
-          </p>
-        </div>
-        <Switch
-          aria-label="Local database mode"
-          disabled={locked}
-          checked={locked ? false : localMode}
-          onCheckedChange={(v) => {
-            setPreferredDatabaseMode(v ? "local" : "online");
-            bump();
-            // Back to online working: push what is waiting, then bring down
-            // anything that changed centrally while this till was on its own.
-            if (!v) void drainOutbox().then(() => pullDelta());
-          }}
-        />
-      </div>
 
       <SyncBehaviourSettings />
 
@@ -132,10 +97,6 @@ export function SyncSettings() {
           }}
         />
       </div>
-
-      <LocalDatabaseSettings />
-
-      <ConnectionCheck />
 
       <div className="grid gap-2 rounded-md border border-border px-3 py-2 text-sm sm:grid-cols-3">
         <Stat label="Connection" value={isOnline() ? "Online" : "Offline"} />

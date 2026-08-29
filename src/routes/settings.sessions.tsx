@@ -146,6 +146,7 @@ export const Route = createFileRoute("/settings/sessions")({
   }),
   component: () => (
     <SettingsFrame
+      wide
       title="Active sessions"
       description="Every device signed in to the company data. A remote reset ends that session at once — the terminal returns to the sign-in screen on its next call."
     >

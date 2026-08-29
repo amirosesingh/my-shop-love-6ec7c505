@@ -345,12 +345,21 @@ export const SETTINGS_CARDS: SettingsCard[] = [
   /* ---- Data & sync ----------------------------------------------------- */
   {
     id: "sync",
-    label: "Sync & backup",
-    blurb: "Branch identity, offline sync queue and backups.",
+    label: "Sync",
+    blurb: "Run a sync, watch each table and clear the queue.",
     icon: RefreshCw,
     category: "data",
     to: "/settings/sync",
     panel: page(() => import("@/routes/settings.sync")),
+  },
+  {
+    id: "database",
+    label: "Database connection",
+    blurb: "Central and local database connections, tests and schema health.",
+    icon: Database,
+    category: "data",
+    to: "/settings/database",
+    panel: page(() => import("@/routes/settings.database")),
   },
   {
     id: "data-sync",
