@@ -8,8 +8,6 @@
 import { isOnlineOnly } from "@/lib/live-mode";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  CloudDownload,
-  CloudUpload,
   Database,
   Loader2,
   RefreshCw,
@@ -20,7 +18,6 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { Link } from "@tanstack/react-router";
@@ -28,7 +25,7 @@ import { useSystemStatus } from "@/lib/system-status";
 import { usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
 import { databaseModeLabel } from "@/lib/db-mode";
-import { drainOutbox, pullDelta, runExclusive, syncBusy } from "@/lib/sync-engine";
+import { drainOutbox, runExclusive, syncBusy } from "@/lib/sync-engine";
 import { lastSuccessfulPull, syncState } from "@/lib/sync-status";
 import {
   clearSyncAudit,
