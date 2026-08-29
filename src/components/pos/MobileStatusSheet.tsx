@@ -18,9 +18,10 @@ import {
 } from "@/components/pos/StatusCluster";
 import { ActivityBell } from "@/components/pos/ActivityBell";
 import { databaseModeLabel, effectiveDatabaseMode, subscribeDatabaseMode } from "@/lib/db-mode";
-import { isOnline, isOnlineSyncEnabled, pendingCount, subscribeOutbox } from "@/lib/sync-outbox";
-import { subscribeSyncState, syncState } from "@/lib/sync-status";
-import { drainOutbox } from "@/lib/sync-engine";
+import { subscribeOutbox } from "@/lib/sync-outbox";
+import { subscribeSyncState } from "@/lib/sync-status";
+import { Link } from "@tanstack/react-router";
+import { useSystemStatus } from "@/lib/system-status";
 import { cn } from "@/lib/utils";
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
@@ -49,9 +50,10 @@ export function MobileStatusSheet({ className }: { className?: string }) {
     };
   }, []);
 
-  const online = isOnline() && isOnlineSyncEnabled();
-  const pending = pendingCount();
-  const busy = syncState().phase === "syncing";
+  const status = useSystemStatus();
+  const online = status.connectivity === "online";
+  const pending = status.pending;
+  const busy = status.syncing;
   const tone = !online ? "text-warning" : pending ? "text-accent" : "text-success";
 
   return (
@@ -94,17 +96,14 @@ export function MobileStatusSheet({ className }: { className?: string }) {
           <Row label="Waiting to sync">
             <span className="text-xs font-medium">{pending ? `${pending} item(s)` : "Nothing"}</span>
           </Row>
-          <Button
-            size="sm"
-            variant="outline"
-            className="w-full"
-            onClick={() => void drainOutbox()}
-          >
-            <RefreshCw className={cn("mr-1.5 size-3.5", busy && "animate-spin")} /> Sync now
+          {/* One trigger only: the sync panel owns starting a sync. */}
+          <Button asChild size="sm" variant="outline" className="w-full">
+            <Link to="/settings/sync">
+              <RefreshCw className={cn("mr-1.5 size-3.5", busy && "animate-spin")} /> Open sync panel
+            </Link>
           </Button>
 
-          <Row label="Sync &amp; local database">
-
+          <Row label="Connection detail">
             <ConnectionStatusButton />
           </Row>
           <Row label="Sync detail">
