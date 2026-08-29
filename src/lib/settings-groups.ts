@@ -97,6 +97,18 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
         shared: true,
       },
       {
+        to: "/settings/database",
+        label: "Database connection",
+        blurb: "Cloud keys, this terminal's SQL Server and schema health.",
+        shared: true,
+      },
+      {
+        to: "/settings/sync",
+        label: "Sync",
+        blurb: "Table-by-table sync progress, queue and backups.",
+        shared: true,
+      },
+      {
         to: "/settings/system",
         tab: "data-sync",
         label: "Data sync & audit",
