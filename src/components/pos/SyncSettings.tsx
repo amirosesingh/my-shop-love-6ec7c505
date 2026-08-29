@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { usePos } from "@/lib/pos-store";
 import { downloadSqlBackup } from "@/lib/backup-sql";
-import { drainOutbox, pullDelta } from "@/lib/sync-engine";
+import { drainOutbox } from "@/lib/sync-engine";
 import { SyncBehaviourSettings } from "@/components/pos/SyncBehaviourSettings";
 import { SyncLogViewer } from "@/components/SyncLogViewer";
 import { logSync } from "@/lib/sync-log";
