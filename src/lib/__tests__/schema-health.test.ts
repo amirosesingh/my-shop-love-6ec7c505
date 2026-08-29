@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   buildCloudSql,
   buildLocalSql,
@@ -11,6 +11,19 @@ import {
   type SchemaGap,
 } from "../schema-health";
 
+/** These helpers persist through window.localStorage; the node env has none. */
+function stubStorage() {
+  const store = new Map<string, string>();
+  (globalThis as { window?: unknown }).window = {
+    localStorage: {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => void store.set(k, v),
+      removeItem: (k: string) => void store.delete(k),
+      clear: () => store.clear(),
+    },
+  };
+}
+
 const gap = (over: Partial<SchemaGap> = {}): SchemaGap => ({
   environment: "cloud",
   table: "sales",
@@ -20,7 +33,8 @@ const gap = (over: Partial<SchemaGap> = {}): SchemaGap => ({
 });
 
 describe("schema health", () => {
-  beforeEach(() => window.localStorage.clear());
+  beforeAll(stubStorage);
+  beforeEach(() => (window as unknown as { localStorage: Storage }).localStorage.clear());
 
   it("names files per environment and version", () => {
     const at = new Date("2026-08-29T00:00:00Z");
