@@ -68,6 +68,11 @@ import { setPosFormats, setPosTimeZone } from "./time-zone";
 import { receiveTransferInDb, saveTransfer, setTransferStatus } from "./stock-transfers";
 import { commitBooking, deleteBookingRow, loadBookings, saveBookingQuietly } from "./bookings-db";
 import {
+  cancelBookingAuthoritative,
+  collectBookingPayment,
+  readBookingBalance,
+} from "./booking-collection";
+import {
   clearSectionOverride,
   emptyBranchSettings,
   emptyScopeIds,
@@ -1231,7 +1236,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       if (current.status !== "active") return { ok: false, error: "This booking is already closed." };
       const clean = reason.trim();
       if (clean.length < 3) return { ok: false, error: "A cancellation reason is required." };
-      const who = authRef.current?.name || current.cashier || "Counter";
+      const who = user?.name || current.cashier || "Counter";
       const res = await cancelBookingAuthoritative({
         bookingId: id,
         reason: clean,
