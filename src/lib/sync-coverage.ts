@@ -55,11 +55,80 @@ export const CLOUD_ONLY: Record<string, string> = {
   audit_logs: "Kept on the till, but not branch-scoped centrally.",
 };
 
-/** Every table any feature touches, in one sorted list. */
+/**
+ * The intent each table is meant to have, per table, where the feature
+ * registry does not say it on the operation itself. A table with no entry and
+ * no op-level declaration is reported as undecided rather than assumed safe.
+ */
+export const TABLE_INTENT: Record<
+  string,
+  { syncDirection: SyncDirection; restoreRequired: boolean; securityClass: SecurityClass }
+> = {
+  sales: { syncDirection: "push", restoreRequired: true, securityClass: "financial" },
+  sale_items: { syncDirection: "push", restoreRequired: true, securityClass: "financial" },
+  payment_transactions: { syncDirection: "push", restoreRequired: true, securityClass: "financial" },
+  booking_payments: { syncDirection: "both", restoreRequired: true, securityClass: "financial" },
+  bookings: { syncDirection: "both", restoreRequired: true, securityClass: "operational" },
+  shifts: { syncDirection: "push", restoreRequired: true, securityClass: "financial" },
+  shift_sessions: { syncDirection: "push", restoreRequired: true, securityClass: "financial" },
+  drawer_events: { syncDirection: "push", restoreRequired: true, securityClass: "financial" },
+  held_orders: { syncDirection: "push", restoreRequired: true, securityClass: "operational" },
+  stock_adjustments: { syncDirection: "push", restoreRequired: true, securityClass: "operational" },
+  item_activity_logs: { syncDirection: "push", restoreRequired: true, securityClass: "governance" },
+  purchase_orders: { syncDirection: "push", restoreRequired: true, securityClass: "operational" },
+  purchase_order_items: {
+    syncDirection: "push",
+    restoreRequired: true,
+    securityClass: "operational",
+  },
+  stock_transfers: { syncDirection: "both", restoreRequired: true, securityClass: "operational" },
+  stock_transfer_items: {
+    syncDirection: "both",
+    restoreRequired: true,
+    securityClass: "operational",
+  },
+  activity_events: { syncDirection: "push", restoreRequired: true, securityClass: "governance" },
+  audit_logs: { syncDirection: "push", restoreRequired: false, securityClass: "governance" },
+  members: { syncDirection: "both", restoreRequired: false, securityClass: "operational" },
+  products: { syncDirection: "both", restoreRequired: false, securityClass: "reference" },
+  product_barcodes: { syncDirection: "pull", restoreRequired: false, securityClass: "reference" },
+  product_categories: { syncDirection: "pull", restoreRequired: false, securityClass: "reference" },
+  promotions: { syncDirection: "pull", restoreRequired: false, securityClass: "reference" },
+  suppliers: { syncDirection: "pull", restoreRequired: false, securityClass: "reference" },
+  membership_tiers: { syncDirection: "cloud-only", restoreRequired: false, securityClass: "reference" },
+  coupon_campaigns: { syncDirection: "cloud-only", restoreRequired: false, securityClass: "reference" },
+  coupon_events: { syncDirection: "cloud-only", restoreRequired: false, securityClass: "financial" },
+  issued_vouchers: { syncDirection: "cloud-only", restoreRequired: false, securityClass: "financial" },
+};
+
+/** Every table any feature touches, in one sorted list. RPC ops are skipped. */
 export function registryTables(): string[] {
   const seen = new Set<string>();
-  for (const feature of FEATURES) for (const op of feature.ops) seen.add(op.table);
+  for (const feature of FEATURES) {
+    for (const op of feature.ops) if (!op.table.startsWith("rpc:")) seen.add(op.table);
+  }
   return [...seen].sort();
+}
+
+/** The declared intent for one table: op-level first, then the table map. */
+export function declaredIntent(table: string): {
+  syncDirection?: SyncDirection;
+  restoreRequired?: boolean;
+  securityClass?: SecurityClass;
+} {
+  for (const feature of FEATURES) {
+    for (const op of feature.ops) {
+      if (op.table !== table) continue;
+      if (op.syncDirection || op.restoreRequired !== undefined || op.securityClass) {
+        return {
+          ...(op.syncDirection ? { syncDirection: op.syncDirection } : {}),
+          ...(op.restoreRequired !== undefined ? { restoreRequired: op.restoreRequired } : {}),
+          ...(op.securityClass ? { securityClass: op.securityClass } : {}),
+        };
+      }
+    }
+  }
+  return TABLE_INTENT[table] ?? {};
 }
 
 /** Combine the registry with the sync contract into one coverage matrix. */
@@ -73,12 +142,38 @@ export function buildCoverage(contract: {
   const restore = new Set(contract.restore);
   return registryTables().map((table) => {
     const note = CLOUD_ONLY[table];
-    return {
-      table,
+    const intent = declaredIntent(table);
+    const actual = {
       push: push.has(table),
       pull: pull.has(table),
       restore: restore.has(table),
+    };
+    const issues: string[] = [];
+    if (!intent.syncDirection) {
+      issues.push("No sync decision has been recorded for this table.");
+    } else if (intent.syncDirection === "cloud-only") {
+      if (actual.push || actual.pull || actual.restore) {
+        issues.push("Declared central-only, but the till syncs it.");
+      }
+    } else {
+      if (intent.syncDirection !== "pull" && !actual.push) {
+        issues.push("Should travel up to head office, but is never pushed.");
+      }
+      if (intent.syncDirection !== "push" && !actual.pull) {
+        issues.push("Should come down to the till, but is never pulled.");
+      }
+    }
+    if (intent.restoreRequired && !actual.restore) {
+      issues.push("Needed after a rebuild, but is not restorable.");
+    }
+    return {
+      table,
+      ...actual,
       ...(note ? { note } : {}),
+      ...(intent.syncDirection ? { declared: intent.syncDirection } : {}),
+      ...(intent.securityClass ? { securityClass: intent.securityClass } : {}),
+      restoreRequired: !!intent.restoreRequired,
+      issues,
     };
   });
 }
@@ -86,6 +181,11 @@ export function buildCoverage(contract: {
 /** Tables a feature uses that are neither synced nor deliberately central. */
 export function uncovered(rows: Coverage[]): Coverage[] {
   return rows.filter((r) => !r.push && !r.pull && !r.restore && !r.note);
+}
+
+/** Every row where what the till does differs from what the feature declared. */
+export function mismatches(rows: Coverage[]): Coverage[] {
+  return rows.filter((r) => (r.issues?.length ?? 0) > 0);
 }
 
 /** The audit document, generated. */
