@@ -65,6 +65,61 @@ export function AuthorizationDialog({
   const [pin, setPin] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const auth = useAuthOptional();
+  const me = auth?.user ?? null;
+
+  /**
+   * The line is down. A PIN cannot be checked without the database, so the
+   * action is refused — but the attempt is still written to this till's
+   * governance trail and pushed with the next sync.
+   */
+  async function parkRefusedPin(message: string) {
+    const parked = await parkGovernanceRow("authorization_log", {
+      id: newId(),
+      action_key: prompt?.actionKey ?? "",
+      mode_used: "pin",
+      requested_by: me?.staffId ?? null,
+      authorized_by: authorizerId.trim() || null,
+      store_id: prompt?.storeId ?? "",
+      terminal_id: prompt?.terminalId ?? "",
+      outcome: "denied",
+      detail: { reason: note.trim(), offline: true, error: message.slice(0, 200) },
+    });
+    toast.error("No connection — a PIN cannot be checked", {
+      description: parked.parked
+        ? "The attempt was recorded on this till and will sync later."
+        : "The attempt could not be recorded on this till either.",
+    });
+  }
+
+  /**
+   * Queue the approval request on the till instead of centrally. It carries
+   * the same id it will have in the cloud, so the approver sees one request,
+   * not two, once the line is back.
+   */
+  async function parkRequest(message: string) {
+    const id = newId();
+    const parked = await parkGovernanceRow("authorization_requests", {
+      id,
+      action_key: prompt?.actionKey ?? "",
+      requested_by: me?.staffId ?? "till",
+      requested_by_name: me?.name ?? "",
+      store_id: prompt?.storeId ?? "",
+      terminal_id: prompt?.terminalId ?? "",
+      reason: note.trim(),
+      payload: prompt?.payload ?? {},
+      status: "pending",
+      expires_at: new Date(Date.now() + 24 * 3600_000).toISOString(),
+    });
+    if (!parked.parked) {
+      toast.error(message || "Could not send the request");
+      return;
+    }
+    toast.success("Recorded on this till", {
+      description: "It will reach the approvals queue as soon as the line is back.",
+    });
+    onFinish({ kind: "submitted", requestId: id });
+  }
 
   useEffect(() => {
     if (!prompt) return;
