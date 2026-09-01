@@ -110,6 +110,12 @@ const RESTORE_TABLES = [
   { table: "stock_adjustments", storeColumns: ["store_id"], dateColumn: "created_at" },
   { table: "item_activity_logs", storeColumns: ["store_id"], dateColumn: "created_at" },
   { table: "held_orders", storeColumns: ["store_id"], dateColumn: "created_at" },
+  // Purchasing history: the order first, then its lines through the parent so
+  // a line can never arrive without the order it belongs to.
+  { table: "purchase_orders", storeColumns: ["store_id"], dateColumn: "created_at" },
+  { table: "purchase_order_items", parent: { table: "purchase_orders", column: "po_id" } },
+  // Unfinished and posted stock counts belong to the branch that made them.
+  { table: "stock_count_drafts", storeColumns: ["store_id"], dateColumn: "created_at" },
   // Governance trail: who approved what, which posted records were edited,
   // and which members were verified at this branch.
   { table: "activity_events", storeColumns: ["store_id"], dateColumn: "created_at" },
