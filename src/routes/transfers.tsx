@@ -369,14 +369,16 @@ function Transfers() {
           </div>
         </header>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-4">
           <Metric label="Awaiting my approval" value={String(toApprove.length)} />
+          <Metric label="Approved · to send" value={String(toDispatch.length)} />
           <Metric label="Incoming in transit" value={String(inbound.length)} highlight />
           <Metric
             label="Completed"
             value={String(mine.filter((t) => t.status === "received").length)}
           />
         </div>
+
 
         <section className="rounded-lg border border-border bg-card">
           <div className="grid grid-cols-[minmax(0,1fr)] gap-2 px-5 py-3 sm:flex sm:items-center sm:justify-between">
