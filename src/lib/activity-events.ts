@@ -204,6 +204,9 @@ export function recordActivity(input: ActivityEventInput): void {
       void flushActivityQueue();
       return;
     }
+    // Offline: the till's own database keeps it if there is one, otherwise
+    // the browser queue holds it until the line is back.
+    if (await park(entry)) return;
     writeQueue([...readQueue(), entry]);
   })();
 }
