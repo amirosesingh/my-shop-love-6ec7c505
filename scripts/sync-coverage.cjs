@@ -44,6 +44,11 @@ async function main() {
   fs.writeFileSync(rulesOut, coverage.formatConflictRules(), "utf8");
   console.log(`Wrote ${path.relative(ROOT, rulesOut)}.`);
 
+  const recoveryOut = path.join(ROOT, "docs", "audit", "recovery.md");
+  const recovery = coverage.recoveryVerdicts(contract);
+  fs.writeFileSync(recoveryOut, coverage.formatRecovery(recovery), "utf8");
+  console.log(`Wrote ${path.relative(ROOT, recoveryOut)}.`);
+
   const bad = coverage.mismatches(rows);
   console.log(`Wrote ${path.relative(ROOT, OUT)} — ${rows.length} tables, ${bad.length} gap(s).`);
   for (const r of bad) console.log(`  ${r.table}: ${(r.issues || []).join(" ")}`);
