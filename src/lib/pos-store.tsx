@@ -1265,7 +1265,8 @@ export function PosProvider({ children }: { children: ReactNode }) {
       });
       return { ok: true };
     },
-    [],
+    [user],
+
   );
 
 
