@@ -190,9 +190,7 @@ export function settingsDuplicates(): SettingsDuplicate[] {
  * Every `/settings/*` page that exists, discovered from the route files rather
  * than kept by hand.
  */
-const SETTINGS_ROUTE_FILES = Object.keys(
-  import.meta.glob("/src/routes/settings.*.tsx"),
-);
+const SETTINGS_ROUTE_FILES = Object.keys(import.meta.glob("/src/routes/settings.*.tsx"));
 
 /**
  * Pages that only forward somewhere else. They are old links kept alive, not

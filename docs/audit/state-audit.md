@@ -52,7 +52,7 @@ down, never pushed, which is correct — head office owns it.
 | Incremental sync | PARTIAL | delta pull on `updated_at` with a per-table watermark (`electron/sync/worker.cjs:71-104`), retry and resume present; restore pages, routine pull does not | Add paging in Stage 4 |
 | Local outbox | COMPLETE | every write lands in the local database first with `is_synced` / `sync_status`, and the sync worker drains it; governance falls back to parking when the cloud refuses | None |
 | Sync health view | PARTIAL | connection, last sync, pending, failures and coverage exist across Logic Health and the Sync panel — but there is no per-feature recovery verdict | Build in Stage 5 |
-| Settings organisation | PARTIAL | Sync and Database are already grouped under System, but 42 pages remain, several near-duplicates | Restructure in Stage 7 |
+| Settings organisation | COMPLETE | One registry: the card catalogue names every area, the sub-tab groups take their wording from it, and Logic health lists any page with no card | None |
 | Terminal management | COMPLETE | `terminal_tokens`, `terminal_commands`, `branch_telemetry` with heartbeat and kill switch | None |
 | Backups | NOT VERIFIABLE FROM CODE | the central database is managed; backup policy is outside the repository | Confirm with the platform, not in code |
 
@@ -132,5 +132,7 @@ Stage 5 — per-feature recovery verdicts in Logic Health.
 Stage 6 — the wipe-and-restore test. **Delivered:** a rebuild check and a
 guarded, reversible drill on the till; see
 [`restore-test.md`](./restore-test.md).
-Stage 7 — settings restructure.
+Stage 7 — settings restructure. **Delivered:** groups derived from the card
+catalogue, document numbering given a card, bookings given their own category,
+and a coverage check in Logic health.
 Stage 8 — security sweep and final report.

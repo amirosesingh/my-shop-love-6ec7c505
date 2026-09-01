@@ -48,18 +48,42 @@ export type SettingsCategory = {
 };
 
 export const SETTINGS_CATEGORIES: SettingsCategory[] = [
-  { id: "terminal", label: "Terminal & display", blurb: "How this till looks, updates and activates." },
-  { id: "printing", label: "Printing & receipts", blurb: "The printer and everything printed on a slip." },
-  { id: "business", label: "Business & pricing", blurb: "Who you are, what you charge, how codes run." },
-  { id: "payments", label: "Payments & messaging", blurb: "How customers pay and how bills reach them." },
+  {
+    id: "terminal",
+    label: "Terminal & display",
+    blurb: "How this till looks, updates and activates.",
+  },
+  {
+    id: "printing",
+    label: "Printing & receipts",
+    blurb: "The printer and everything printed on a slip.",
+  },
+  {
+    id: "business",
+    label: "Business & pricing",
+    blurb: "Who you are, what you charge, how codes run.",
+  },
+  {
+    id: "payments",
+    label: "Payments & messaging",
+    blurb: "How customers pay and how bills reach them.",
+  },
   {
     id: "bookings",
     label: "Bookings & services",
     blurb: "Job cards, deposits, turnaround and the slip the customer signs.",
   },
   { id: "data", label: "Data & sync", blurb: "Keeping this till in step with the company." },
-  { id: "diagnostics", label: "Diagnostics & health", blurb: "Scanners, alerts and support tools." },
-  { id: "access", label: "Access & visibility", blurb: "What each role sees on the busiest screens." },
+  {
+    id: "diagnostics",
+    label: "Diagnostics & health",
+    blurb: "Scanners, alerts and support tools.",
+  },
+  {
+    id: "access",
+    label: "Access & visibility",
+    blurb: "What each role sees on the busiest screens.",
+  },
 ];
 
 export type SettingsCard = {
@@ -519,7 +543,6 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     panel: page(() => import("@/routes/settings.access")),
   },
 ];
-
 
 /** Areas pinned to the top of the workspace — the ones opened most often. */
 export const PINNED_SETTINGS = [

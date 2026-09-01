@@ -97,7 +97,11 @@ export function LogicHealthPanel() {
     <div className="w-full max-w-full space-y-5">
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/30 p-3">
         <Button size="sm" onClick={() => void scanNow()} disabled={!!step}>
-          {step ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
+          {step ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : (
+            <RefreshCw className="size-3.5" />
+          )}
           {step ? "Scanning…" : "Scan issues"}
         </Button>
         <span className="text-xs text-muted-foreground">
@@ -133,9 +137,7 @@ export function LogicHealthPanel() {
               <span className="flex items-center gap-2 text-sm font-semibold">
                 <Icon className="size-4" /> {SEVERITY_LABEL[sev]}
               </span>
-              <span className="numeric mt-1 block text-2xl font-semibold">
-                {counts[sev]}
-              </span>
+              <span className="numeric mt-1 block text-2xl font-semibold">{counts[sev]}</span>
               <span className="mt-1 block text-xs opacity-80">{SEVERITY_BLURB[sev]}</span>
             </button>
           );
@@ -171,8 +173,7 @@ export function LogicHealthPanel() {
         {duplicates.length === 0 ? (
           <p className="rounded-md border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
             Every settings page has exactly one home. Tax, bill numbering and SKU rules sit under
-            POS rules; receipt design under Receipts &amp; printing; scheduling under Booking
-            rules.
+            POS rules; receipt design under Receipts &amp; printing; scheduling under Booking rules.
           </p>
         ) : (
           <ul className="space-y-1 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
@@ -231,7 +232,9 @@ export function LogicHealthPanel() {
             {rows.slice(0, 400).map((f) => (
               <tr key={f.id} className="border-t border-border align-top">
                 <td className="px-3 py-2">
-                  <span className={`rounded-full border px-2 py-0.5 text-[11px] ${TONE[f.severity]}`}>
+                  <span
+                    className={`rounded-full border px-2 py-0.5 text-[11px] ${TONE[f.severity]}`}
+                  >
                     {SEVERITY_LABEL[f.severity]}
                   </span>
                 </td>
