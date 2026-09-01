@@ -256,7 +256,16 @@ type Ctx = {
     id: string,
     reason: string,
     terminal?: string | null,
+    moneyAction?: "refunded" | "retained" | null,
   ) => Promise<{ ok: true } | { ok: false; error: string }>;
+  /** Hand money back on a booking; the server caps it at what was taken. */
+  refundBooking: (
+    id: string,
+    amount: number,
+    method: PaymentMethod,
+    reason: string,
+  ) => Promise<{ ok: true; booking: Booking } | { ok: false; error: string }>;
+
 
   deleteBooking: (id: string, reason: string) => Promise<void>;
   upsertProduct: (product: Product) => Promise<CommitTarget>;
