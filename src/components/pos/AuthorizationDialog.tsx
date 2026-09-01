@@ -177,7 +177,8 @@ export function AuthorizationDialog({
         },
       });
       if (!res.ok || !res.request) {
-        toast.error(res.error ?? "Could not send the request");
+        if (looksOffline(res.error)) await parkRequest(res.error ?? "");
+        else toast.error(res.error ?? "Could not send the request");
         return;
       }
       toast.success("Sent for approval", {
@@ -185,7 +186,8 @@ export function AuthorizationDialog({
       });
       onFinish({ kind: "submitted", requestId: res.request.id });
     } catch (e) {
-      notifyError(e, "Could not send the request");
+      if (looksOffline(e)) await parkRequest(String((e as Error)?.message ?? e));
+      else notifyError(e, "Could not send the request");
     } finally {
       setBusy(false);
     }
