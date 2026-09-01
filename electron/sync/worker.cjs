@@ -473,6 +473,124 @@ async function pull() {
   return { ok: true, merged };
 }
 
+/* ------------------------------------------------------------------ *
+ * Transactional restore — explicit, never on the timer.
+ * ------------------------------------------------------------------ */
+
+const RESTORE_PAGE = 1000;
+let restoreState = null;
+
+function restoreStatus() {
+  return restoreState;
+}
+
+/** One page-by-page read of a restore table, store-scoped and date-windowed. */
+async function readRestorePage(spec, storeId, sinceIso, parentIds, from) {
+  let query = supabase.from(spec.table).select("*").range(from, from + RESTORE_PAGE - 1);
+  if (spec.storeColumns?.length === 1) query = query.eq(spec.storeColumns[0], storeId);
+  else if (spec.storeColumns?.length) {
+    query = query.or(spec.storeColumns.map((c) => `${c}.eq.${storeId}`).join(","));
+  }
+  if (spec.dateColumn && sinceIso) query = query.gte(spec.dateColumn, sinceIso);
+  if (spec.parent) query = query.in(spec.parent.column, parentIds ?? []);
+  return await query;
+}
+
+/**
+ * Pull this branch's trading history back down after a wipe or a new install.
+ *
+ * Runs only when an operator asks for it. Rows this till still owes the cloud
+ * are left alone (see repo.restoreMerge), so a restore can never destroy work
+ * that has not been pushed yet.
+ */
+async function restore({ days = 90 } = {}) {
+  if (!supabase) return { ok: false, error: "Cloud client not ready" };
+  if (restoreState?.running) return { ok: false, error: "A restore is already running" };
+  const storeId = credentials.branchId ? String(credentials.branchId) : "";
+  if (!storeId) {
+    return { ok: false, error: "This till is not pinned to a branch — set the branch before restoring." };
+  }
+  const specs = repo.RESTORE_TABLES ?? [];
+  const sinceIso = new Date(Date.now() - Math.max(1, Number(days) || 90) * 86_400_000).toISOString();
+  restoreState = {
+    running: true,
+    table: null,
+    index: 0,
+    total: specs.length,
+    restored: 0,
+    skipped: 0,
+    error: null,
+    startedAt: new Date().toISOString(),
+    finishedAt: null,
+    tables: [],
+  };
+  notify();
+
+  const parentIds = new Map();
+  try {
+    for (let i = 0; i < specs.length; i += 1) {
+      const spec = specs[i];
+      restoreState.index = i + 1;
+      restoreState.table = spec.table;
+      notify();
+      let ids = null;
+      if (spec.parent) {
+        ids = parentIds.get(spec.parent.table) ?? [];
+        if (!ids.length) {
+          restoreState.tables.push({ table: spec.table, restored: 0, skipped: 0 });
+          continue;
+        }
+      }
+      let restored = 0;
+      let skipped = 0;
+      const collected = [];
+      // Children are fetched per chunk of parents so the `in` list stays sane.
+      const parentChunks = spec.parent
+        ? Array.from({ length: Math.ceil(ids.length / 200) }, (_, n) => ids.slice(n * 200, n * 200 + 200))
+        : [null];
+      let failure = null;
+      for (const chunk of parentChunks) {
+        let from = 0;
+        for (;;) {
+          const { data, error } = await readRestorePage(spec, storeId, sinceIso, chunk, from);
+          if (error) {
+            if (isCredentialError(error)) throw new Error("Cloud credentials rejected");
+            failure = error.message ?? String(error);
+            break;
+          }
+          const rows = data ?? [];
+          if (!rows.length) break;
+          collected.push(...rows);
+          const res = await repo.restoreMerge(spec.table, rows);
+          restored += res.merged;
+          skipped += res.skipped;
+          restoreState.restored += res.merged;
+          restoreState.skipped += res.skipped;
+          notify();
+          if (rows.length < RESTORE_PAGE) break;
+          from += RESTORE_PAGE;
+        }
+        if (failure) break;
+      }
+      if (!spec.parent) parentIds.set(spec.table, collected.map((r) => r.id).filter(Boolean));
+      restoreState.tables.push({ table: spec.table, restored, skipped, error: failure });
+    }
+    restoreState.running = false;
+    restoreState.finishedAt = new Date().toISOString();
+    await repo.setState("last_restore_at", restoreState.finishedAt).catch(() => {});
+    notify();
+    return { ok: true, ...restoreState };
+  } catch (err) {
+    restoreState.running = false;
+    restoreState.error = String(err?.message ?? err);
+    restoreState.finishedAt = new Date().toISOString();
+    notify();
+    return { ok: false, error: restoreState.error, ...restoreState };
+  }
+}
+
+
+
 async function run() {
   if (running || !enabled || !supabase) return;
   // Credentials rejected: stay parked (local trading unaffected) until an
