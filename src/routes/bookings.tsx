@@ -647,6 +647,57 @@ function BookingsPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={!!cancelling} onOpenChange={(o) => !o && setCancelling(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancel booking · {cancelling?.ref}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>Why is this booking being cancelled?</Label>
+            <Textarea
+              rows={3}
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="Customer changed their mind and asked for the deposit back."
+            />
+            <p className="text-[11px] text-muted-foreground">
+              The reason, your name and the time are stored permanently against the booking and
+              cannot be edited afterwards.
+              {cancelling && cancelling.paid > 0
+                ? ` ${money(cancelling.paid)} has already been paid and must be refunded separately.`
+                : ""}
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelling(null)}>
+              Back
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={cancelReason.trim().length < 3 || cancelBusy}
+              onClick={async () => {
+                if (!cancelling) return;
+                setCancelBusy(true);
+                try {
+                  const res = await cancelBooking(cancelling.id, cancelReason.trim());
+                  if (!res.ok) {
+                    toast.error("Cancellation refused", { description: res.error });
+                    return;
+                  }
+                  toast.success(`${cancelling.ref} cancelled · stock released`);
+                  setCancelling(null);
+                } finally {
+                  setCancelBusy(false);
+                }
+              }}
+            >
+              {cancelBusy ? "Cancelling…" : "Cancel booking"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+
       <Dialog open={!!payFor} onOpenChange={(o) => !o && setPayFor(null)}>
         <DialogContent>
           <DialogHeader>
