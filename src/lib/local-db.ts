@@ -309,7 +309,22 @@ export type DirectConnectionParams = {
   timeout?: number;
 };
 
+/** Progress of an operator-triggered trading-history restore. */
+export type RestoreRun = {
+  running: boolean;
+  table: string | null;
+  index: number;
+  total: number;
+  restored: number;
+  skipped: number;
+  error?: string | null;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  tables?: Array<{ table: string; restored: number; skipped: number; error?: string | null }>;
+};
+
 export type LocalSyncStatus = {
+
   connected: boolean;
   error?: string;
   /** Structured reason from the shell, so the banner can be specific. */
@@ -326,6 +341,9 @@ export type LocalSyncStatus = {
   queue?: SyncQueueRow[];
   lastPushAt: string | null;
   lastPullAt: string | null;
+  lastRestoreAt?: string | null;
+  restore?: RestoreRun | null;
+
   server?: string | null;
   database?: string | null;
 };
@@ -424,6 +442,10 @@ export type PosBridge = {
   verifyWrite?: () => Promise<LocalWriteCheck>;
   push: () => Promise<{ ok: boolean; pushed: number; failed: number; error?: string }>;
   pull: () => Promise<{ ok: boolean; merged: number; error?: string }>;
+  /** Operator-triggered restore of this branch's trading history. */
+  restore?: (options?: { days?: number }) => Promise<RestoreRun & { ok: boolean; error?: string }>;
+  restoreStatus?: () => Promise<RestoreRun | null>;
+
   setSyncEnabled: (on: boolean) => Promise<void>;
   /** Live per-table counts on this till, for the server/shop comparison. */
   compareSummary?: (options?: { since?: string | null; tables?: string[] }) => Promise<{

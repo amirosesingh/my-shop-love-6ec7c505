@@ -1578,6 +1578,10 @@ function registerIpc() {
 
   ipcMain.handle("pos:push", () => worker.push());
   ipcMain.handle("pos:pull", () => worker.pull());
+  // Operator-triggered history restore; never runs on the sync timer.
+  ipcMain.handle("pos:restore", (_e, options) => worker.restore(options ?? {}));
+  ipcMain.handle("pos:restore-status", () => worker.restoreStatus());
+
   ipcMain.handle("pos:set-sync-enabled", (_e, on) => worker.setEnabled(on));
 
   /* ---- shop side of the server/shop data comparison ---- */

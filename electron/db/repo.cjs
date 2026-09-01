@@ -23,7 +23,14 @@ const TABLES = [
   // Sign-in visibility and drawer openings are written by the till too; they
   // must be on this list or every write is refused as an unknown table.
   "shift_sessions",
+  // Controlled shift closing: blind counts, state transitions, the computed
+  // reconciliation and any variance alert all belong to the trading record.
+  "shift_cash_counts",
+  "shift_close_events",
+  "shift_reconciliations",
+  "shift_variance_alerts",
   "drawer_events",
+
   "sales",
   "sale_items",
   "payment_transactions",
@@ -68,6 +75,39 @@ const SCOPED_PULL_TABLES = [
   { table: "bookings", storeColumns: ["store_id"] },
   { table: "booking_payments", parent: { table: "bookings", column: "booking_id" } },
 ];
+
+/**
+ * Transactional restore.
+ *
+ * The routine pull never brings trading history back down, so a wiped or
+ * replaced till starts with no sales, payments or shift records even though
+ * the cloud still holds them. Restore is an explicit, store-scoped and
+ * date-windowed download of exactly that history, in dependency order, so
+ * parents exist before their children. It never runs on the sync timer.
+ *
+ * `dateColumn` is the column the window filters on; children are fetched
+ * through their parent so their rows can never outlive the parent row.
+ */
+const RESTORE_TABLES = [
+  { table: "shifts", storeColumns: ["store_id"], dateColumn: "opened_at" },
+  { table: "shift_sessions", storeColumns: ["store_id"], dateColumn: "created_at" },
+  { table: "sales", storeColumns: ["store_id"], dateColumn: "created_at" },
+  { table: "sale_items", parent: { table: "sales", column: "sale_id" } },
+  { table: "payment_transactions", storeColumns: ["store_id"], dateColumn: "created_at" },
+  { table: "shift_cash_counts", storeColumns: ["store_id"], dateColumn: "created_at" },
+  { table: "shift_close_events", storeColumns: ["store_id"], dateColumn: "created_at" },
+  { table: "shift_reconciliations", storeColumns: ["store_id"], dateColumn: "created_at" },
+  { table: "shift_variance_alerts", storeColumns: ["store_id"], dateColumn: "created_at" },
+  { table: "drawer_events", storeColumns: ["store_id"], dateColumn: "created_at" },
+  { table: "stock_adjustments", storeColumns: ["store_id"], dateColumn: "created_at" },
+  { table: "item_activity_logs", storeColumns: ["store_id"], dateColumn: "created_at" },
+  { table: "held_orders", storeColumns: ["store_id"], dateColumn: "created_at" },
+  // audit_logs has no branch column centrally, so it cannot be restored
+  // store-scoped and is deliberately left out.
+
+];
+
+
 
 /** Branch and till this install acts as; scopes the sync watermarks. */
 let scope = { storeId: "", terminalId: "" };
@@ -677,6 +717,55 @@ async function mergeFromCloud(table, rows) {
 }
 
 /**
+ * Restore-safe merge.
+ *
+ * Restore replays history the cloud already holds, so it must never clobber a
+ * row this till has changed but not yet pushed. Any id that is still pending
+ * or errored locally is skipped and reported, leaving the local copy — and its
+ * place in the push queue — untouched.
+ */
+async function restoreMerge(table, rows) {
+  if (!rows.length) return { merged: 0, skipped: 0 };
+  await healOpsColumns([{ table, rows }]);
+  return withHeal(table, async () => {
+    const columns = await tableColumns(table).catch(() => new Set());
+    const ids = rows.map((r) => String(r.id)).filter(Boolean);
+    const held = new Set();
+    if (columns.has("sync_status") && ids.length) {
+      const pool = getPool();
+      // Chunked so a long restore window cannot exceed the parameter limit.
+      for (let i = 0; i < ids.length; i += 500) {
+        const slice = ids.slice(i, i + 500);
+        const req = pool.request();
+        slice.forEach((id, n) => req.input(`p${n}`, sql.NVarChar(80), id));
+        const list = slice.map((_, n) => `@p${n}`).join(",");
+        const res = await req.query(
+          `SELECT CAST([id] AS NVARCHAR(80)) AS id FROM [dbo].[${table}]
+             WHERE [sync_status] IN (N'pending', N'error', N'quarantined')
+               AND CAST([id] AS NVARCHAR(80)) IN (${list})`,
+        );
+        for (const row of res.recordset) held.add(String(row.id));
+      }
+    }
+    const usable = rows.filter((r) => !held.has(String(r.id)));
+    if (!usable.length) return { merged: 0, skipped: held.size };
+    const pool = getPool();
+    const tx = new sql.Transaction(pool);
+    await tx.begin();
+    try {
+      for (const row of usable) await upsertRow(tx, table, row, { markPending: false });
+      await tx.commit();
+      return { merged: usable.length, skipped: rows.length - usable.length };
+    } catch (err) {
+      await tx.rollback();
+      throw err;
+    }
+  });
+}
+
+
+
+/**
  * Shop-side half of the server/shop comparison.
  *
  * Counts are read live from the tables themselves — never from the sync
@@ -1095,6 +1184,8 @@ module.exports = {
   buildSetList,
   CATALOGUE_TABLES,
   SCOPED_PULL_TABLES,
+  RESTORE_TABLES,
+
   PRUNABLE_TABLES,
   SETTINGS_ID,
   setScope,
@@ -1114,6 +1205,8 @@ module.exports = {
   discardRow,
   queueRows,
   mergeFromCloud,
+  restoreMerge,
+
   stats,
   compareSummary,
   compareRows,
