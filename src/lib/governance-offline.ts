@@ -22,7 +22,9 @@ export type GovernanceTable =
   | "record_edits"
   | "authorization_requests"
   | "authorization_log"
-  | "member_verifications";
+  | "member_verifications"
+  // Every state change of a tracked record, kept locally when the line is down.
+  | "entity_status_history";
 
 const newId = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto

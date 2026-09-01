@@ -69,7 +69,7 @@ export async function recordTransition(t: StatusTransition): Promise<void> {
   const id = newId();
 
   try {
-    const creds = readCredentials();
+    const creds = await readCredentials();
     const res = await recordStatusHistory({
       data: {
         transitions: [
@@ -96,6 +96,7 @@ export async function recordTransition(t: StatusTransition): Promise<void> {
         ...(creds?.sessionToken ? { sessionToken: creds.sessionToken } : {}),
         ...(creds?.cashierToken ? { cashierToken: creds.cashierToken } : {}),
         ...(creds?.terminalToken ? { terminalToken: creds.terminalToken } : {}),
+        ...(creds?.accessToken ? { accessToken: creds.accessToken } : {}),
       },
     });
     if (res?.ok) return;
