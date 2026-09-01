@@ -48,6 +48,12 @@ import { stockAt, usePos } from "@/lib/pos-store";
 import { availableAt, planDeduction, subWarehouses } from "@/lib/locations";
 import { printTransferNote } from "@/lib/pos-print";
 import type { Transfer, TransferItem, TransferKind } from "@/lib/pos-types";
+import { TRANSFER_STATUS_LABELS } from "@/lib/pos-types";
+import {
+  TransferReasonDialog,
+  TransferStepDialog,
+  type TransferStep,
+} from "@/components/pos/TransferStepDialog";
 import { branchPolicy } from "@/lib/branch-policy";
 
 export const Route = createFileRoute("/transfers")({
@@ -76,11 +82,18 @@ export const Route = createFileRoute("/transfers")({
 type TransferSearch = { items?: string; kind?: TransferKind };
 
 const statusStyle: Record<string, string> = {
-  requested: "border-warning/50 text-warning",
-  in_transit: "border-primary/50 text-primary",
+  awaiting_approval: "border-warning/50 text-warning",
+  approved: "border-sky-500/50 text-sky-600 dark:text-sky-400",
+  dispatched: "border-primary/50 text-primary",
   received: "border-success/50 text-success",
   rejected: "border-destructive/50 text-destructive",
   cancelled: "border-destructive/50 text-destructive",
+};
+
+const fulfilmentLabel: Record<string, string> = {
+  full: "sent in full",
+  partial: "part sent",
+  none: "nothing sent",
 };
 
 function Transfers() {
@@ -92,6 +105,7 @@ function Transfers() {
     activeShift,
     createTransfer,
     approveTransfer,
+    dispatchTransfer,
     receiveTransfer,
     rejectTransfer,
     adjustStock,
@@ -115,6 +129,11 @@ function Transfers() {
     Boolean(otherStoreId) &&
     scopeBetween(currentStore, stores.find((s) => s.id === otherStoreId)) === "INTER_GROUP";
   const [note, setNote] = useState("");
+  /** Which note is mid-step, and which step it is. */
+  const [step, setStep] = useState<{ id: string; step: TransferStep } | null>(null);
+  const [reasonFor, setReasonFor] = useState<string | null>(null);
+  const stepTransfer = state.transfers.find((t) => t.id === step?.id) ?? null;
+  const reasonTransfer = state.transfers.find((t) => t.id === reasonFor) ?? null;
 
   const storeOf = (id: string) => stores.find((s) => s.id === id);
   const productOf = (id: string) => state.products.find((p) => p.id === id) ?? null;
@@ -243,9 +262,12 @@ function Transfers() {
       ),
     [mine, scopeTab, stores],
   );
-  const inbound = mine.filter((t) => t.toStoreId === currentStore.id && t.status === "in_transit");
+  const inbound = mine.filter((t) => t.toStoreId === currentStore.id && t.status === "dispatched");
   const toApprove = mine.filter(
-    (t) => t.fromStoreId === currentStore.id && t.status === "requested",
+    (t) => t.fromStoreId === currentStore.id && t.status === "awaiting_approval",
+  );
+  const toDispatch = mine.filter(
+    (t) => t.fromStoreId === currentStore.id && t.status === "approved",
   );
 
   function print(t: Transfer) {
@@ -297,18 +319,21 @@ function Transfers() {
       items: clean,
       note,
       createdBy: activeShift?.cashier ?? "Manager",
-      needsApproval: kind === "transfer" && requireApproval,
+      needsApproval: kind === "request" || requireApproval,
     });
-    if (t.status === "in_transit") print({ ...t });
     setOpen(false);
     setNote("");
     setItems([]);
     toast.success(
-      kind === "transfer"
-        ? requireApproval
-          ? `${t.ref} sent for approval · ${clean.length} item${clean.length > 1 ? "s" : ""}`
-          : `${t.ref} dispatched · ${clean.length} item${clean.length > 1 ? "s" : ""}`
-        : `${t.ref} requested from ${storeOf(otherStoreId)?.name}`,
+      t.status === "awaiting_approval"
+        ? `${t.ref} sent for approval · ${clean.length} item${clean.length > 1 ? "s" : ""}`
+        : `${t.ref} approved — dispatch it when the box is packed`,
+      {
+        description:
+          kind === "request"
+            ? `${storeOf(otherStoreId)?.name} will approve and send it.`
+            : undefined,
+      },
     );
   }
 
@@ -344,14 +369,16 @@ function Transfers() {
           </div>
         </header>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-4">
           <Metric label="Awaiting my approval" value={String(toApprove.length)} />
+          <Metric label="Approved · to send" value={String(toDispatch.length)} />
           <Metric label="Incoming in transit" value={String(inbound.length)} highlight />
           <Metric
             label="Completed"
             value={String(mine.filter((t) => t.status === "received").length)}
           />
         </div>
+
 
         <section className="rounded-lg border border-border bg-card">
           <div className="grid grid-cols-[minmax(0,1fr)] gap-2 px-5 py-3 sm:flex sm:items-center sm:justify-between">
@@ -392,14 +419,16 @@ function Transfers() {
             </TableHeader>
             <TableBody>
               {visible.map((t) => {
-                const showApprove =
-                  t.status === "requested" &&
-                  t.fromStoreId === currentStore.id &&
-                  canApprove;
+                const mineToSend = t.fromStoreId === currentStore.id;
+                const showApprove = t.status === "awaiting_approval" && mineToSend && canApprove;
+                const showDispatch = t.status === "approved" && mineToSend;
                 const canReceive =
-                  t.status === "in_transit" &&
+                  t.status === "dispatched" &&
                   t.toStoreId === currentStore.id &&
                   can("can_receive_transfer");
+                const stillOpen = ["awaiting_approval", "approved", "dispatched"].includes(
+                  t.status,
+                );
                 return (
                   <TableRow key={t.id}>
                     <TableCell className="numeric">
@@ -414,6 +443,16 @@ function Transfers() {
                           <div key={i.productId} className="text-sm">
                             {productOf(i.productId)?.name ?? "—"}
                             <span className="numeric text-muted-foreground"> × {i.qty}</span>
+                            {/* Every quantity the line picked up on its way. */}
+                            {(i.approvedQty !== undefined ||
+                              i.dispatchedQty !== undefined ||
+                              i.receivedQty !== undefined) && (
+                              <span className="numeric text-[11px] text-muted-foreground">
+                                {i.approvedQty !== undefined && ` · appr ${i.approvedQty}`}
+                                {i.dispatchedQty !== undefined && ` · sent ${i.dispatchedQty}`}
+                                {i.receivedQty !== undefined && ` · recv ${i.receivedQty}`}
+                              </span>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -435,8 +474,18 @@ function Transfers() {
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className={statusStyle[t.status]}>
-                        {t.status.replace("_", " ")}
+                        {TRANSFER_STATUS_LABELS[t.status]}
                       </Badge>
+                      {t.fulfilment && t.fulfilment !== "full" && (
+                        <div className="text-[10px] text-warning">
+                          {fulfilmentLabel[t.fulfilment]}
+                        </div>
+                      )}
+                      {(t.rejectedReason || t.cancelledReason) && (
+                        <div className="max-w-40 truncate text-[10px] text-muted-foreground">
+                          {t.rejectedReason ?? t.cancelledReason}
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
@@ -444,45 +493,41 @@ function Transfers() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => {
-                              approveTransfer(t.id);
-                              print(t);
-                              toast.success(`${t.ref} authorised and dispatched`);
-                            }}
+                            onClick={() => setStep({ id: t.id, step: "approve" })}
                           >
                             <Check className="size-4" /> Approve
                           </Button>
                         )}
-                        {t.status === "requested" && !showApprove && (
+                        {t.status === "awaiting_approval" && !showApprove && (
                           <span className="text-[11px] text-muted-foreground">
                             Waiting for approval
                           </span>
+                        )}
+                        {showDispatch && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setStep({ id: t.id, step: "dispatch" })}
+                          >
+                            <Send className="size-4" /> Dispatch
+                          </Button>
                         )}
                         {canReceive && (
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => {
-                              receiveTransfer(t.id);
-                              toast.success(`${t.ref} received into ${currentStore.name}`);
-                            }}
+                            onClick={() => setStep({ id: t.id, step: "receive" })}
                           >
                             <Truck className="size-4" /> Receive
                           </Button>
                         )}
-                        {(t.status === "requested" || t.status === "in_transit") && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => {
-                              rejectTransfer(t.id);
-                              toast.success(`${t.ref} cancelled`);
-                            }}
-                          >
+                        {stillOpen && (
+                          <Button size="sm" variant="ghost" onClick={() => setReasonFor(t.id)}>
                             <X className="size-4 text-destructive" />
                           </Button>
                         )}
                         <Button size="sm" variant="ghost" onClick={() => print(t)}>
+
                           <Printer className="size-4" />
                         </Button>
                       </div>
@@ -668,6 +713,62 @@ function Transfers() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Approve, dispatch and receive all take real quantities. */}
+      {step && stepTransfer && (
+        <TransferStepDialog
+          step={step.step}
+          transfer={stepTransfer}
+          nameOf={(id) => productOf(id)?.name ?? "Unknown item"}
+          onClose={() => setStep(null)}
+          onConfirm={(lines) => {
+            const t = stepTransfer;
+            if (step.step === "approve") {
+              approveTransfer(t.id, lines);
+              toast.success(`${t.ref} approved — ready to send`);
+            } else if (step.step === "dispatch") {
+              dispatchTransfer(t.id, lines);
+              print({
+                ...t,
+                items: t.items.map((i) => ({
+                  ...i,
+                  qty: lines.find((l) => l.productId === i.productId)?.qty ?? 0,
+                })),
+              });
+              const sent = lines.reduce((a, l) => a + l.qty, 0);
+              const asked = t.items.reduce((a, i) => a + i.qty, 0);
+              toast.success(
+                sent < asked ? `${t.ref} part sent · ${sent} of ${asked}` : `${t.ref} dispatched`,
+                {
+                  description:
+                    sent < asked ? "The note is closed on what was sent." : undefined,
+                },
+              );
+            } else {
+              receiveTransfer(t.id, lines);
+              toast.success(`${t.ref} received into ${currentStore.name}`);
+            }
+            setStep(null);
+          }}
+        />
+      )}
+
+      {reasonTransfer && (
+        <TransferReasonDialog
+          transfer={reasonTransfer}
+          cancelling={reasonTransfer.status === "dispatched"}
+          onClose={() => setReasonFor(null)}
+          onConfirm={(reason) => {
+            rejectTransfer(reasonTransfer.id, reason);
+            toast.success(
+              reasonTransfer.status === "dispatched"
+                ? `${reasonTransfer.ref} cancelled`
+                : `${reasonTransfer.ref} rejected`,
+            );
+            setReasonFor(null);
+          }}
+        />
+      )}
     </AppShell>
   );
 }

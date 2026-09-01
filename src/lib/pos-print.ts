@@ -15,7 +15,12 @@ import type {
   TaxSettings,
   Transfer,
 } from "./pos-types";
-import { bookingBalance, lineUnitDiscount, whatsappLink } from "./pos-types";
+import {
+  bookingBalance,
+  lineUnitDiscount,
+  whatsappLink,
+  TRANSFER_STATUS_LABELS,
+} from "./pos-types";
 import { defaultReceiptSettings } from "./pos-seed";
 import { roundingOf, showsRoundingLine } from "./rounding";
 import qrcode from "qrcode-generator";
@@ -986,7 +991,7 @@ function transferBody(
     <table>
       <tr><td>Reference</td><td class="r b">${esc(transfer.ref)}</td></tr>
       <tr><td>Date</td><td class="r">${new Date(transfer.createdAt).toLocaleString()}</td></tr>
-      <tr><td>Status</td><td class="r">${esc(transfer.status.replace("_", " ").toUpperCase())}</td></tr>
+      <tr><td>Status</td><td class="r">${esc((TRANSFER_STATUS_LABELS[transfer.status] ?? transfer.status).toUpperCase())}</td></tr>
       <tr><td>Raised by</td><td class="r">${esc(transfer.createdBy)}</td></tr>
     </table><hr>
     <table>

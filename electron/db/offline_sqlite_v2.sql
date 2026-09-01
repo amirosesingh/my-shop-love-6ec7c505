@@ -357,9 +357,20 @@ CREATE TABLE IF NOT EXISTS stock_transfers (
   kind          TEXT NOT NULL DEFAULT 'transfer',
   from_store_id TEXT NOT NULL,
   to_store_id   TEXT NOT NULL,
-  status        TEXT NOT NULL DEFAULT 'pending',
+  status        TEXT NOT NULL DEFAULT 'awaiting_approval',
   note          TEXT NOT NULL DEFAULT '',
   created_by    TEXT,
+  approved_by   TEXT,
+  approved_at   TEXT,
+  dispatched_by TEXT,
+  dispatched_at TEXT,
+  received_by   TEXT,
+  received_at   TEXT,
+  rejected_reason  TEXT,
+  rejected_by      TEXT,
+  cancelled_reason TEXT,
+  closed_at     TEXT,
+  fulfilment    TEXT,
   created_at    TEXT NOT NULL,
   updated_at    TEXT
 );
@@ -372,10 +383,12 @@ CREATE TABLE IF NOT EXISTS stock_transfer_items (
   barcode           TEXT,
   sku               TEXT,
   product_name      TEXT,
-  quantity          INTEGER NOT NULL DEFAULT 0,
-  quantity_received INTEGER NOT NULL DEFAULT 0,
-  unit_cost         REAL NOT NULL DEFAULT 0,
-  created_at        TEXT
+  quantity            INTEGER NOT NULL DEFAULT 0,
+  quantity_approved   INTEGER,
+  quantity_dispatched INTEGER,
+  quantity_received   INTEGER NOT NULL DEFAULT 0,
+  unit_cost           REAL NOT NULL DEFAULT 0,
+  created_at          TEXT
 );
 CREATE INDEX IF NOT EXISTS stock_transfer_items_transfer_idx ON stock_transfer_items (transfer_id);
 

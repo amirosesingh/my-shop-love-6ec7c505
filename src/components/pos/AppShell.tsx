@@ -278,11 +278,15 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Nothing can be sold, received or moved without somewhere to book it to.
   if (!stores.length && !location.pathname.startsWith("/stores")) return <LocationBootGuard />;
 
+  // Anything that needs a hand here: goods on their way in, or notes this
+  // branch still has to authorise or send.
   const inbound = (state.transfers ?? []).filter(
     (t) =>
-      (t.toStoreId === currentStore?.id && t.status === "in_transit") ||
-      (t.fromStoreId === currentStore?.id && t.status === "requested"),
+      (t.toStoreId === currentStore?.id && t.status === "dispatched") ||
+      (t.fromStoreId === currentStore?.id &&
+        (t.status === "awaiting_approval" || t.status === "approved")),
   ).length;
+
 
   // Receipt identity wins; the locally captured install name is the fallback.
   const companyName = state.settings.receipt.companyName?.trim() || branding.company;

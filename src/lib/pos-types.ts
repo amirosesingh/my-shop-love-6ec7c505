@@ -388,11 +388,40 @@ export type TradingHours = {
 };
 
 export type TransferKind = "transfer" | "request";
-export type TransferStatus = "requested" | "in_transit" | "received" | "rejected" | "cancelled";
+/**
+ * The life of a note. Approval is a real step now, and dispatch is the point
+ * where stock leaves the shelf and the request closes against what was sent.
+ */
+export type TransferStatus =
+  | "awaiting_approval"
+  | "approved"
+  | "dispatched"
+  | "received"
+  | "rejected"
+  | "cancelled";
+
+export const TRANSFER_STATUS_LABELS: Record<TransferStatus, string> = {
+  awaiting_approval: "awaiting approval",
+  approved: "approved",
+  dispatched: "in transit",
+  received: "received",
+  rejected: "rejected",
+  cancelled: "cancelled",
+};
+
+/** How much of the original ask actually left the sending branch. */
+export type TransferFulfilment = "full" | "partial" | "none";
 
 export type TransferItem = {
   productId: string;
+  /** what was asked for */
   qty: number;
+  /** what the approver allowed */
+  approvedQty?: number;
+  /** what physically left the sending branch */
+  dispatchedQty?: number;
+  /** what the receiving branch booked in */
+  receivedQty?: number;
 };
 
 export type Transfer = {
@@ -408,6 +437,18 @@ export type Transfer = {
   status: TransferStatus;
   note: string;
   createdBy: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  dispatchedBy?: string;
+  dispatchedAt?: string;
+  receivedBy?: string;
+  receivedAt?: string;
+  /** why it was turned down or called off — required for both */
+  rejectedReason?: string;
+  cancelledReason?: string;
+  /** set at dispatch: the request is closed from that moment */
+  closedAt?: string;
+  fulfilment?: TransferFulfilment;
   createdAt: string;
   updatedAt: string;
 };

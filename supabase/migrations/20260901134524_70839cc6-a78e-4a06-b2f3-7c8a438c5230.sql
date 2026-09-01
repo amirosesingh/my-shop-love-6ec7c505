@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public.stock_transfer_receive(uuid, text, boolean);
