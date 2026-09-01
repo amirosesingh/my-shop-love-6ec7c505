@@ -9,7 +9,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { localDb } from "@/lib/local-db";
+import { localDb, type RestoreCheck, type RestoreDrill } from "@/lib/local-db";
 import {
   recoveryVerdicts,
   RECOVERY_VERDICT_TEXT,
@@ -32,6 +32,24 @@ export function RecoverySection() {
     restore: string[];
   } | null>(null);
   const [loading, setLoading] = useState(!!bridge?.syncContract);
+  const [evidence, setEvidence] = useState<{
+    check: RestoreCheck | null;
+    drill: RestoreDrill | null;
+  } | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    if (!bridge?.restoreEvidence) return;
+    bridge
+      .restoreEvidence()
+      .then((res) => {
+        if (alive && res) setEvidence({ check: res.check ?? null, drill: res.drill ?? null });
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [bridge]);
 
   useEffect(() => {
     let alive = true;
@@ -66,6 +84,20 @@ export function RecoverySection() {
             : "Connect a till database to check this against the live sync loop."}
         </p>
       </div>
+
+      <p className="text-xs text-muted-foreground">
+        {evidence?.drill
+          ? evidence.drill.verdict === "pass"
+            ? `Proven: a wipe-and-restore drill passed on ${new Date(
+                evidence.drill.finishedAt ?? evidence.drill.startedAt ?? Date.now(),
+              ).toLocaleString()}.`
+            : "The last wipe-and-restore drill failed — see Sync for which table came back short."
+          : evidence?.check
+            ? evidence.check.verdict === "complete"
+              ? "The rebuild check matches head office, but no drill has been run yet."
+              : "The last rebuild check found tables that would come back short — see Sync."
+            : "Untested — run the rebuild check in Sync to turn this from a claim into evidence."}
+      </p>
 
       {loading ? (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
