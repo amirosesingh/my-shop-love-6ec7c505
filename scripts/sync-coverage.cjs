@@ -40,6 +40,9 @@ async function main() {
   const rows = coverage.buildCoverage(contract);
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
   fs.writeFileSync(OUT, coverage.formatCoverage(rows), "utf8");
+  const rulesOut = path.join(ROOT, "docs", "audit", "conflict-rules.md");
+  fs.writeFileSync(rulesOut, coverage.formatConflictRules(), "utf8");
+  console.log(`Wrote ${path.relative(ROOT, rulesOut)}.`);
 
   const bad = coverage.mismatches(rows);
   console.log(`Wrote ${path.relative(ROOT, OUT)} — ${rows.length} tables, ${bad.length} gap(s).`);
