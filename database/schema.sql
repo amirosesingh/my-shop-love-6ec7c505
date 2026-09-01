@@ -233,6 +233,57 @@ CREATE TABLE dbo.shifts (
 );
 GO
 
+/* ---- controlled shift closing: state, immutable counts and audit ---- */
+IF OBJECT_ID('dbo.shifts', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.shifts', 'state') IS NULL ALTER TABLE dbo.shifts ADD [state] NVARCHAR(40) DEFAULT N'ACTIVE';
+  IF COL_LENGTH('dbo.shifts', 'close_reason') IS NULL ALTER TABLE dbo.shifts ADD [close_reason] NVARCHAR(400);
+  IF COL_LENGTH('dbo.shifts', 'closing_started_at') IS NULL ALTER TABLE dbo.shifts ADD [closing_started_at] DATETIME2(3);
+  IF COL_LENGTH('dbo.shifts', 'closing_started_by') IS NULL ALTER TABLE dbo.shifts ADD [closing_started_by] NVARCHAR(200);
+  IF COL_LENGTH('dbo.shifts', 'final_counted_cash') IS NULL ALTER TABLE dbo.shifts ADD [final_counted_cash] DECIMAL(18,4);
+  IF COL_LENGTH('dbo.shifts', 'variance_status') IS NULL ALTER TABLE dbo.shifts ADD [variance_status] NVARCHAR(40);
+END
+GO
+
+IF OBJECT_ID('dbo.shift_cash_counts', 'U') IS NULL
+CREATE TABLE dbo.shift_cash_counts (
+  id                  UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+  shift_id            NVARCHAR(80)     NOT NULL,
+  store_id            NVARCHAR(60)     NULL,
+  terminal_id         NVARCHAR(120)    NULL,
+  kind                NVARCHAR(20)     NOT NULL DEFAULT N'ORIGINAL',
+  counted_cash        DECIMAL(18,4)    NOT NULL DEFAULT 0,
+  counted_card        DECIMAL(18,4)    NULL,
+  counted_digital     DECIMAL(18,4)    NULL,
+  reason              NVARCHAR(400)    NULL,
+  counted_by_name     NVARCHAR(200)    NULL,
+  counted_by_staff_id NVARCHAR(120)    NULL,
+  client_key          NVARCHAR(160)    NULL,
+  is_synced           BIT              NOT NULL DEFAULT 0,
+  sync_status         NVARCHAR(20)     NOT NULL DEFAULT N'pending',
+  created_at          DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at          DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+IF OBJECT_ID('dbo.shift_close_events', 'U') IS NULL
+CREATE TABLE dbo.shift_close_events (
+  id           UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+  shift_id     NVARCHAR(80)     NOT NULL,
+  store_id     NVARCHAR(60)     NULL,
+  terminal_id  NVARCHAR(120)    NULL,
+  event        NVARCHAR(60)     NOT NULL,
+  from_state   NVARCHAR(40)     NULL,
+  to_state     NVARCHAR(40)     NULL,
+  detail       NVARCHAR(MAX)    NULL,
+  actor_name   NVARCHAR(200)    NULL,
+  actor_staff_id NVARCHAR(120)  NULL,
+  is_synced    BIT              NOT NULL DEFAULT 0,
+  sync_status  NVARCHAR(20)     NOT NULL DEFAULT N'pending',
+  created_at   DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
 IF OBJECT_ID('dbo.bookings', 'U') IS NULL
 CREATE TABLE dbo.bookings (
   id             UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),

@@ -466,6 +466,12 @@ const rowToShift = (r: Row): Shift => ({
   varianceDigital: r.variance_digital == null ? null : Number(r.variance_digital),
   varianceTotal: r.variance_total == null ? null : Number(r.variance_total),
   overdue: Boolean(r.overdue),
+  state: (r.state as Shift["state"]) ?? (r.closed_at ? "CLOSED" : "ACTIVE"),
+  closeReason: r.close_reason ?? null,
+  closingStartedAt: r.closing_started_at ?? null,
+  closingStartedBy: r.closing_started_by ?? null,
+  finalCountedCash: r.final_counted_cash == null ? null : Number(r.final_counted_cash),
+  varianceStatus: r.variance_status ?? null,
 });
 
 const shiftToRow = (s: Shift): Row => ({

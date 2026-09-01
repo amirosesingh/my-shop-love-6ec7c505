@@ -134,6 +134,12 @@ export function useCheckout(deps: CheckoutDeps) {
       toast.error("Open a shift before taking a booking");
       return;
     }
+    // Once closing has started the drawer is being counted — nothing more
+    // may be added to this shift.
+    if (activeShift.state && activeShift.state !== "ACTIVE") {
+      toast.error("This shift is being closed — no further transactions can be taken.");
+      return;
+    }
     if (!racketMode && !lines.length) {
       toast.error("Please add at least one item to the cart before saving a pay-later booking.", {
         description: "Only racket / stringing jobs can be booked with an empty cart.",
@@ -335,6 +341,10 @@ export function useCheckout(deps: CheckoutDeps) {
 
     if (!activeShift) {
       toast.error("Open a shift before taking payment");
+      return;
+    }
+    if (activeShift.state && activeShift.state !== "ACTIVE") {
+      toast.error("This shift is being closed — no further transactions can be taken.");
       return;
     }
     const isRefund = totals.total < 0;

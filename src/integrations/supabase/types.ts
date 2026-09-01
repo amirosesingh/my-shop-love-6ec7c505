@@ -2537,6 +2537,190 @@ export type Database = {
         }
         Relationships: []
       }
+      shift_cash_counts: {
+        Row: {
+          client_key: string | null
+          counted_by_name: string | null
+          counted_by_staff_id: string | null
+          counted_by_user_id: string | null
+          counted_card: number | null
+          counted_cash: number
+          counted_digital: number | null
+          created_at: string
+          id: string
+          kind: string
+          reason: string | null
+          shift_id: string
+          store_id: string
+          terminal_id: string | null
+        }
+        Insert: {
+          client_key?: string | null
+          counted_by_name?: string | null
+          counted_by_staff_id?: string | null
+          counted_by_user_id?: string | null
+          counted_card?: number | null
+          counted_cash: number
+          counted_digital?: number | null
+          created_at?: string
+          id?: string
+          kind?: string
+          reason?: string | null
+          shift_id: string
+          store_id: string
+          terminal_id?: string | null
+        }
+        Update: {
+          client_key?: string | null
+          counted_by_name?: string | null
+          counted_by_staff_id?: string | null
+          counted_by_user_id?: string | null
+          counted_card?: number | null
+          counted_cash?: number
+          counted_digital?: number | null
+          created_at?: string
+          id?: string
+          kind?: string
+          reason?: string | null
+          shift_id?: string
+          store_id?: string
+          terminal_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shift_cash_counts_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shift_close_events: {
+        Row: {
+          actor_name: string | null
+          actor_staff_id: string | null
+          actor_user_id: string | null
+          created_at: string
+          detail: Json
+          event: string
+          from_state: string | null
+          id: string
+          shift_id: string
+          store_id: string
+          terminal_id: string | null
+          to_state: string | null
+        }
+        Insert: {
+          actor_name?: string | null
+          actor_staff_id?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          detail?: Json
+          event: string
+          from_state?: string | null
+          id?: string
+          shift_id: string
+          store_id: string
+          terminal_id?: string | null
+          to_state?: string | null
+        }
+        Update: {
+          actor_name?: string | null
+          actor_staff_id?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          detail?: Json
+          event?: string
+          from_state?: string | null
+          id?: string
+          shift_id?: string
+          store_id?: string
+          terminal_id?: string | null
+          to_state?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shift_close_events_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shift_reconciliations: {
+        Row: {
+          count_id: string | null
+          counted_card: number | null
+          counted_cash: number | null
+          counted_digital: number | null
+          created_at: string
+          expected_card: number
+          expected_cash: number
+          expected_digital: number
+          id: string
+          shift_id: string
+          store_id: string
+          variance_card: number | null
+          variance_cash: number | null
+          variance_digital: number | null
+          variance_status: string
+          variance_total: number | null
+        }
+        Insert: {
+          count_id?: string | null
+          counted_card?: number | null
+          counted_cash?: number | null
+          counted_digital?: number | null
+          created_at?: string
+          expected_card?: number
+          expected_cash?: number
+          expected_digital?: number
+          id?: string
+          shift_id: string
+          store_id: string
+          variance_card?: number | null
+          variance_cash?: number | null
+          variance_digital?: number | null
+          variance_status?: string
+          variance_total?: number | null
+        }
+        Update: {
+          count_id?: string | null
+          counted_card?: number | null
+          counted_cash?: number | null
+          counted_digital?: number | null
+          created_at?: string
+          expected_card?: number
+          expected_cash?: number
+          expected_digital?: number
+          id?: string
+          shift_id?: string
+          store_id?: string
+          variance_card?: number | null
+          variance_cash?: number | null
+          variance_digital?: number | null
+          variance_status?: string
+          variance_total?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shift_reconciliations_count_id_fkey"
+            columns: ["count_id"]
+            isOneToOne: false
+            referencedRelation: "shift_cash_counts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_reconciliations_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shift_sessions: {
         Row: {
           created_at: string
@@ -2585,13 +2769,88 @@ export type Database = {
         }
         Relationships: []
       }
+      shift_variance_alerts: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          attempts: number
+          created_at: string
+          delivery_status: string
+          id: string
+          last_attempt_at: string | null
+          last_error: string | null
+          message: string
+          reconciliation_id: string | null
+          severity: string
+          shift_id: string
+          store_id: string
+          updated_at: string
+          variance_status: string
+          variance_total: number
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          attempts?: number
+          created_at?: string
+          delivery_status?: string
+          id?: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          message: string
+          reconciliation_id?: string | null
+          severity?: string
+          shift_id: string
+          store_id: string
+          updated_at?: string
+          variance_status: string
+          variance_total: number
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          attempts?: number
+          created_at?: string
+          delivery_status?: string
+          id?: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          message?: string
+          reconciliation_id?: string | null
+          severity?: string
+          shift_id?: string
+          store_id?: string
+          updated_at?: string
+          variance_status?: string
+          variance_total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shift_variance_alerts_reconciliation_id_fkey"
+            columns: ["reconciliation_id"]
+            isOneToOne: false
+            referencedRelation: "shift_reconciliations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_variance_alerts_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shifts: {
         Row: {
+          close_reason: string | null
           closed_at: string | null
           closed_by_name: string | null
           closed_by_role: string | null
           closed_by_staff_id: string | null
           closing_float: number | null
+          closing_started_at: string | null
+          closing_started_by: string | null
           counted_card: number | null
           counted_cash: number | null
           counted_digital: number | null
@@ -2599,6 +2858,7 @@ export type Database = {
           expected_card: number | null
           expected_cash: number | null
           expected_digital: number | null
+          final_counted_cash: number | null
           id: string
           note: string
           opened_at: string
@@ -2608,6 +2868,7 @@ export type Database = {
           opening_float: number
           overdue: boolean
           row_version: number
+          state: string
           status: string
           store_id: string
           terminal_id: string | null
@@ -2617,14 +2878,18 @@ export type Database = {
           variance_card: number | null
           variance_cash: number | null
           variance_digital: number | null
+          variance_status: string | null
           variance_total: number | null
         }
         Insert: {
+          close_reason?: string | null
           closed_at?: string | null
           closed_by_name?: string | null
           closed_by_role?: string | null
           closed_by_staff_id?: string | null
           closing_float?: number | null
+          closing_started_at?: string | null
+          closing_started_by?: string | null
           counted_card?: number | null
           counted_cash?: number | null
           counted_digital?: number | null
@@ -2632,6 +2897,7 @@ export type Database = {
           expected_card?: number | null
           expected_cash?: number | null
           expected_digital?: number | null
+          final_counted_cash?: number | null
           id?: string
           note?: string
           opened_at?: string
@@ -2641,6 +2907,7 @@ export type Database = {
           opening_float?: number
           overdue?: boolean
           row_version?: number
+          state?: string
           status?: string
           store_id: string
           terminal_id?: string | null
@@ -2650,14 +2917,18 @@ export type Database = {
           variance_card?: number | null
           variance_cash?: number | null
           variance_digital?: number | null
+          variance_status?: string | null
           variance_total?: number | null
         }
         Update: {
+          close_reason?: string | null
           closed_at?: string | null
           closed_by_name?: string | null
           closed_by_role?: string | null
           closed_by_staff_id?: string | null
           closing_float?: number | null
+          closing_started_at?: string | null
+          closing_started_by?: string | null
           counted_card?: number | null
           counted_cash?: number | null
           counted_digital?: number | null
@@ -2665,6 +2936,7 @@ export type Database = {
           expected_card?: number | null
           expected_cash?: number | null
           expected_digital?: number | null
+          final_counted_cash?: number | null
           id?: string
           note?: string
           opened_at?: string
@@ -2674,6 +2946,7 @@ export type Database = {
           opening_float?: number
           overdue?: boolean
           row_version?: number
+          state?: string
           status?: string
           store_id?: string
           terminal_id?: string | null
@@ -2683,6 +2956,7 @@ export type Database = {
           variance_card?: number | null
           variance_cash?: number | null
           variance_digital?: number | null
+          variance_status?: string | null
           variance_total?: number | null
         }
         Relationships: []
@@ -3792,11 +4066,14 @@ export type Database = {
       shift_active_for_branch: {
         Args: { p_store_id: string }
         Returns: {
+          close_reason: string | null
           closed_at: string | null
           closed_by_name: string | null
           closed_by_role: string | null
           closed_by_staff_id: string | null
           closing_float: number | null
+          closing_started_at: string | null
+          closing_started_by: string | null
           counted_card: number | null
           counted_cash: number | null
           counted_digital: number | null
@@ -3804,6 +4081,7 @@ export type Database = {
           expected_card: number | null
           expected_cash: number | null
           expected_digital: number | null
+          final_counted_cash: number | null
           id: string
           note: string
           opened_at: string
@@ -3813,6 +4091,7 @@ export type Database = {
           opening_float: number
           overdue: boolean
           row_version: number
+          state: string
           status: string
           store_id: string
           terminal_id: string | null
@@ -3822,6 +4101,7 @@ export type Database = {
           variance_card: number | null
           variance_cash: number | null
           variance_digital: number | null
+          variance_status: string | null
           variance_total: number | null
         }
         SetofOptions: {
@@ -3830,6 +4110,48 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      shift_cash_count_submit: {
+        Args: {
+          p_card?: number
+          p_cash: number
+          p_client_key?: string
+          p_digital?: number
+          p_shift: string
+          p_terminal?: string
+        }
+        Returns: string
+      }
+      shift_close_start: {
+        Args: { p_reason: string; p_shift: string; p_terminal?: string }
+        Returns: string
+      }
+      shift_expected_totals: {
+        Args: { p_shift: string }
+        Returns: {
+          expected_card: number
+          expected_cash: number
+          expected_digital: number
+        }[]
+      }
+      shift_expected_view: {
+        Args: { p_shift: string }
+        Returns: {
+          expected_card: number
+          expected_cash: number
+          expected_digital: number
+        }[]
+      }
+      shift_log_event: {
+        Args: {
+          p_detail: Json
+          p_event: string
+          p_from: string
+          p_shift: string
+          p_terminal: string
+          p_to: string
+        }
+        Returns: undefined
       }
       shift_open: {
         Args: {
@@ -3844,11 +4166,14 @@ export type Database = {
           p_user_id?: string
         }
         Returns: {
+          close_reason: string | null
           closed_at: string | null
           closed_by_name: string | null
           closed_by_role: string | null
           closed_by_staff_id: string | null
           closing_float: number | null
+          closing_started_at: string | null
+          closing_started_by: string | null
           counted_card: number | null
           counted_cash: number | null
           counted_digital: number | null
@@ -3856,6 +4181,7 @@ export type Database = {
           expected_card: number | null
           expected_cash: number | null
           expected_digital: number | null
+          final_counted_cash: number | null
           id: string
           note: string
           opened_at: string
@@ -3865,6 +4191,7 @@ export type Database = {
           opening_float: number
           overdue: boolean
           row_version: number
+          state: string
           status: string
           store_id: string
           terminal_id: string | null
@@ -3874,6 +4201,7 @@ export type Database = {
           variance_card: number | null
           variance_cash: number | null
           variance_digital: number | null
+          variance_status: string | null
           variance_total: number | null
         }
         SetofOptions: {
@@ -3882,6 +4210,35 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      shift_reconcile_now: {
+        Args: {
+          p_card: number
+          p_cash: number
+          p_count_id: string
+          p_digital: number
+          p_shift: string
+        }
+        Returns: {
+          state: string
+          variance_status: string
+        }[]
+      }
+      shift_recount_submit: {
+        Args: {
+          p_card?: number
+          p_cash: number
+          p_digital?: number
+          p_reason: string
+          p_shift: string
+          p_terminal?: string
+        }
+        Returns: string
+      }
+      shift_state: { Args: { p_shift: string }; Returns: string }
+      shift_variance_approve: {
+        Args: { p_note?: string; p_shift: string }
+        Returns: string
       }
       staff_account_adopt_legacy: {
         Args: { p_username: string }
