@@ -705,8 +705,11 @@ function Purchasing() {
         storeId,
       };
 
-      if (wasDraft) await db.updateReceivingInvoice(invoice, draftLineRemovals);
-      else await db.commitReceivingInvoice(invoice);
+      // The hub is where the stock actually lands, so the movement rows are
+      // stamped with it and committed alongside the invoice.
+      if (wasDraft) await db.updateReceivingInvoice(invoice, draftLineRemovals, hubId);
+      else await db.commitReceivingInvoice(invoice, hubId);
+
 
       const movements = lines.map((l) => {
         const previousStock = stockAt(
