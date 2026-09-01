@@ -206,15 +206,24 @@ export function formatCoverage(rows: Coverage[]): string {
   const lines = [
     "# Sync coverage",
     "",
-    "Generated from the feature registry — do not edit by hand.",
-    "Run `node scripts/sync-coverage.cjs` after changing a feature or the sync contract.",
+    "Generated from the feature registry and the till's own sync lists —",
+    "do not edit by hand. Run `bun scripts/sync-coverage.cjs` after changing a",
+    "feature or the sync contract.",
     "",
-    "| Table | Pushed up | Pulled down | Restorable | Note |",
-    "| --- | --- | --- | --- | --- |",
+    "| Table | Kind | Intended | Pushed up | Pulled down | Restorable | Note |",
+    "| --- | --- | --- | --- | --- | --- | --- |",
     ...rows.map(
-      (r) => `| ${r.table} | ${tick(r.push)} | ${tick(r.pull)} | ${tick(r.restore)} | ${r.note ?? ""} |`,
+      (r) =>
+        `| ${r.table} | ${r.securityClass ?? "—"} | ${r.declared ?? "not decided"} | ${tick(r.push)} | ${tick(r.pull)} | ${tick(r.restore)} | ${r.note ?? ""} |`,
     ),
   ];
+  const bad = mismatches(rows);
+  lines.push("", "## Gaps between intent and reality", "");
+  lines.push(
+    bad.length
+      ? bad.map((r) => `- **${r.table}** — ${r.issues?.join(" ")}`).join("\n")
+      : "None — every table behaves the way its feature declared.",
+  );
   const gaps = uncovered(rows);
   lines.push("", "## Undecided tables", "");
   lines.push(
