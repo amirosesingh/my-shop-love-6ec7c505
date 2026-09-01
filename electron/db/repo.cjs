@@ -134,8 +134,6 @@ const RESTORE_TABLES = [
   { table: "audit_logs", storeColumns: ["store_id"], dateColumn: "created_at" },
 ];
 
-
-
 /** Branch and till this install acts as; scopes the sync watermarks. */
 let scope = { storeId: "", terminalId: "" };
 
@@ -866,7 +864,9 @@ async function restoreWhere(spec, request, { storeId, sinceIso }, depth = 0) {
  * rows" apart from "the same rows".
  */
 async function restoreFingerprint({ days = 90, storeId = scope.storeId } = {}) {
-  const sinceIso = new Date(Date.now() - Math.max(1, Number(days) || 90) * 86_400_000).toISOString();
+  const sinceIso = new Date(
+    Date.now() - Math.max(1, Number(days) || 90) * 86_400_000,
+  ).toISOString();
   const out = [];
   for (const spec of RESTORE_TABLES) {
     try {
@@ -906,7 +906,9 @@ async function restoreFingerprint({ days = 90, storeId = scope.storeId } = {}) {
 async function restoreSnapshot(table, { days = 90, storeId = scope.storeId } = {}) {
   const spec = restoreSpec(assertTable(table));
   if (!spec) return [];
-  const sinceIso = new Date(Date.now() - Math.max(1, Number(days) || 90) * 86_400_000).toISOString();
+  const sinceIso = new Date(
+    Date.now() - Math.max(1, Number(days) || 90) * 86_400_000,
+  ).toISOString();
   const request = getPool().request();
   const where = await restoreWhere(spec, request, { storeId, sinceIso });
   const res = await request.query(`SELECT * FROM dbo.[${table}] WHERE ${where};`);
@@ -922,7 +924,9 @@ async function restoreSnapshot(table, { days = 90, storeId = scope.storeId } = {
 async function restoreClear(table, { days = 90, storeId = scope.storeId } = {}) {
   const spec = restoreSpec(assertTable(table));
   if (!spec) return { removed: 0 };
-  const sinceIso = new Date(Date.now() - Math.max(1, Number(days) || 90) * 86_400_000).toISOString();
+  const sinceIso = new Date(
+    Date.now() - Math.max(1, Number(days) || 90) * 86_400_000,
+  ).toISOString();
   const pool = getPool();
   const tx = new sql.Transaction(pool);
   await tx.begin();
@@ -972,13 +976,14 @@ async function openShiftCount() {
       : columns.has("status")
         ? "LOWER([status]) = 'open'"
         : "1 = 0";
-    const res = await getPool().request().query(`SELECT COUNT(*) AS n FROM dbo.[shifts] WHERE ${where};`);
+    const res = await getPool()
+      .request()
+      .query(`SELECT COUNT(*) AS n FROM dbo.[shifts] WHERE ${where};`);
     return Number(res.recordset[0]?.n ?? 0);
   } catch {
     return 0;
   }
 }
-
 
 /**
  * Shop-side half of the server/shop comparison.
@@ -1162,10 +1167,8 @@ async function setWatermark(table, isoAt, { rowsPushed = 0, error = null, pushed
 
 async function setState(key, value) {
   return withHeal("sync_state", () =>
-    getPool()
-      .request()
-      .input("key", sql.NVarChar(60), key)
-      .input("value", sql.NVarChar(400), value).query(`
+    getPool().request().input("key", sql.NVarChar(60), key).input("value", sql.NVarChar(400), value)
+      .query(`
         MERGE dbo.sync_state AS t
         USING (SELECT @key AS [key], @value AS [value]) AS s ON t.[key] = s.[key]
         WHEN MATCHED THEN UPDATE SET t.[value] = s.[value], t.updated_at = SYSUTCDATETIME()
@@ -1303,9 +1306,7 @@ async function pendingSyncCount() {
   for (const table of PUSH_TABLES) {
     try {
       const res = await withHeal(table, () =>
-        getPool()
-          .request()
-          .query(`SELECT COUNT(*) AS n FROM dbo.[${table}] WHERE is_synced = 0;`),
+        getPool().request().query(`SELECT COUNT(*) AS n FROM dbo.[${table}] WHERE is_synced = 0;`),
       );
       const n = res.recordset[0]?.n ?? 0;
       total += n;

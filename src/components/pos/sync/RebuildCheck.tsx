@@ -102,7 +102,11 @@ export function RebuildCheck() {
         </div>
         <div className="flex items-center gap-2">
           <Button size="sm" variant="outline" disabled={checking} onClick={() => void runCheck()}>
-            {checking ? <Loader2 className="size-4 animate-spin" /> : <ClipboardCheck className="size-4" />}
+            {checking ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <ClipboardCheck className="size-4" />
+            )}
             {checking ? "Checking…" : "Rebuild check"}
           </Button>
           {bridge.restoreDrill ? (
@@ -113,7 +117,11 @@ export function RebuildCheck() {
               title={blockers.join(" ")}
               onClick={() => void runDrill()}
             >
-              {drilling ? <Loader2 className="size-4 animate-spin" /> : <ShieldAlert className="size-4" />}
+              {drilling ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <ShieldAlert className="size-4" />
+              )}
               {drilling ? "Running drill…" : "Wipe & restore drill"}
             </Button>
           ) : null}

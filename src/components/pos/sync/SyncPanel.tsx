@@ -7,16 +7,20 @@
  * cycle and leave two screens disagreeing.
  */
 import { useEffect, useState } from "react";
-import { CheckCircle2, CircleDashed, History, Loader2, RefreshCw, TriangleAlert, XCircle } from "lucide-react";
+import {
+  CheckCircle2,
+  CircleDashed,
+  History,
+  Loader2,
+  RefreshCw,
+  TriangleAlert,
+  XCircle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { runExclusive, syncBusy } from "@/lib/sync-engine";
-import {
-  subscribeSyncProgress,
-  syncProgress,
-  type TableSyncStatus,
-} from "@/lib/sync-progress";
+import { subscribeSyncProgress, syncProgress, type TableSyncStatus } from "@/lib/sync-progress";
 import { useSystemStatus } from "@/lib/system-status";
 import { localDb, type RestoreRun } from "@/lib/local-db";
 import { toast } from "sonner";
@@ -92,7 +96,6 @@ export function SyncPanel({ className }: { className?: string }) {
 
       <RebuildCheck />
 
-
       <div className="w-full overflow-x-auto rounded-md border border-border">
         <table className="w-full text-left text-xs">
           <thead className="bg-muted/60 text-muted-foreground">
@@ -118,7 +121,9 @@ export function SyncPanel({ className }: { className?: string }) {
                   <td className="px-3 py-2 font-medium">{row.table}</td>
                   <td className="px-3 py-2">
                     <span className={cn("inline-flex items-center gap-1.5", TONE[row.status])}>
-                      <Icon className={cn("size-3.5", row.status === "syncing" && "animate-spin")} />
+                      <Icon
+                        className={cn("size-3.5", row.status === "syncing" && "animate-spin")}
+                      />
                       {WORD[row.status]}
                     </span>
                   </td>
@@ -154,7 +159,9 @@ function RestoreHistoryButton({ disabled }: { disabled?: boolean }) {
   useEffect(() => {
     if (!busy || !bridge?.restoreStatus) return;
     const timer = window.setInterval(() => {
-      void bridge.restoreStatus!().then((next) => setRun(next ?? null)).catch(() => {});
+      void bridge.restoreStatus!()
+        .then((next) => setRun(next ?? null))
+        .catch(() => {});
     }, 1000);
     return () => window.clearInterval(timer);
   }, [busy, bridge]);
@@ -172,7 +179,9 @@ function RestoreHistoryButton({ disabled }: { disabled?: boolean }) {
       const res = await bridge.restore!({ days: 90 });
       setRun({ ...res, running: false });
       if (res.ok) {
-        toast.success(`Restored ${res.restored} rows${res.skipped ? ` — ${res.skipped} kept local` : ""}`);
+        toast.success(
+          `Restored ${res.restored} rows${res.skipped ? ` — ${res.skipped} kept local` : ""}`,
+        );
       } else {
         toast.error(res.error ?? "Restore failed");
       }
