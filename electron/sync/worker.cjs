@@ -638,4 +638,4 @@ async function status() {
   }
 }
 
-module.exports = { init, start, stop, setEnabled, push, pull, run, status };
+module.exports = { init, start, stop, setEnabled, push, pull, restore, restoreStatus, run, status };
