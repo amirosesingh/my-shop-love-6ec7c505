@@ -93,10 +93,12 @@ export const TABLE_INTENT: Record<
     restoreRequired: true,
     securityClass: "operational",
   },
-  stock_transfers: { syncDirection: "both", restoreRequired: true, securityClass: "operational" },
+  // Transfers involving this branch arrive on the routine scoped pull, so
+  // they do not need the explicit history restore either.
+  stock_transfers: { syncDirection: "both", restoreRequired: false, securityClass: "operational" },
   stock_transfer_items: {
     syncDirection: "both",
-    restoreRequired: true,
+    restoreRequired: false,
     securityClass: "operational",
   },
   activity_events: { syncDirection: "push", restoreRequired: true, securityClass: "governance" },
