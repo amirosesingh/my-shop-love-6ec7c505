@@ -102,7 +102,9 @@ const RESTORE_TABLES = [
   { table: "stock_adjustments", storeColumns: ["store_id"], dateColumn: "created_at" },
   { table: "item_activity_logs", storeColumns: ["store_id"], dateColumn: "created_at" },
   { table: "held_orders", storeColumns: ["store_id"], dateColumn: "created_at" },
-  { table: "audit_logs", storeColumns: ["store_id"], dateColumn: "created_at" },
+  // audit_logs has no branch column centrally, so it cannot be restored
+  // store-scoped and is deliberately left out.
+
 ];
 
 
