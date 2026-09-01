@@ -105,7 +105,9 @@ export const TABLE_INTENT: Record<
   product_categories: { syncDirection: "pull", restoreRequired: false, securityClass: "reference" },
   promotions: { syncDirection: "pull", restoreRequired: false, securityClass: "reference" },
   suppliers: { syncDirection: "pull", restoreRequired: false, securityClass: "reference" },
-  membership_tiers: { syncDirection: "cloud-only", restoreRequired: false, securityClass: "reference" },
+  // Downloaded with the rest of the catalogue so tier names and discounts
+  // still resolve at the till with no connection.
+  membership_tiers: { syncDirection: "pull", restoreRequired: false, securityClass: "reference" },
   coupon_campaigns: { syncDirection: "cloud-only", restoreRequired: false, securityClass: "reference" },
   coupon_events: { syncDirection: "cloud-only", restoreRequired: false, securityClass: "financial" },
   issued_vouchers: { syncDirection: "cloud-only", restoreRequired: false, securityClass: "financial" },
