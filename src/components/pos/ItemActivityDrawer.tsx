@@ -231,6 +231,11 @@ export function ItemActivityDrawer({
             ) : (
               <p className="text-muted-foreground">No movements recorded for this item yet.</p>
             )}
+            <p className="text-[11px] text-muted-foreground">
+              Goods received and branch transfers appear here from this release onwards; stock
+              taken in before that shows only as sales and adjustments.
+            </p>
+
           </div>
         )}
       </SheetContent>
