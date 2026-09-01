@@ -10,7 +10,7 @@ import {
   SEVERITY_LABEL,
   type LogicSeverity,
 } from "@/lib/logic-health";
-import { settingsDuplicates } from "@/lib/settings-groups";
+import { settingsCoverage, settingsDuplicates } from "@/lib/settings-groups";
 import {
   AREA_LABEL,
   formatScanResult,
@@ -39,6 +39,7 @@ const ICON: Record<LogicSeverity, typeof Info> = {
 export function LogicHealthPanel() {
   const report = useMemo(() => logicReport(), []);
   const duplicates = useMemo(() => settingsDuplicates(), []);
+  const coverage = useMemo(() => settingsCoverage(), []);
   const [query, setQuery] = useState("");
   const [only, setOnly] = useState<LogicSeverity | "all">("all");
   const [scan, setScan] = useState<ScanResult | null>(null);
@@ -178,6 +179,27 @@ export function LogicHealthPanel() {
             {duplicates.map((d) => (
               <li key={d.route}>
                 <code>{d.route}</code> appears under {d.groups.join(" and ")}.
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {coverage.uncovered.length === 0 && coverage.dangling.length === 0 ? (
+          <p className="rounded-md border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+            Every settings page is listed in the workspace, and every card leads to a page that
+            exists.
+          </p>
+        ) : (
+          <ul className="space-y-1 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
+            {coverage.uncovered.map((route) => (
+              <li key={`u-${route}`}>
+                <code>{route}</code> exists but is not listed in the settings workspace, so nobody
+                can find it by searching.
+              </li>
+            ))}
+            {coverage.dangling.map((route) => (
+              <li key={`d-${route}`}>
+                The workspace offers <code>{route}</code>, but that page no longer exists.
               </li>
             ))}
           </ul>
