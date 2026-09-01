@@ -13,6 +13,7 @@ import {
   confirmMemberVerification,
   startMemberVerification,
 } from "@/lib/verification.functions";
+import { looksOffline, parkGovernanceRow } from "@/lib/governance-offline";
 
 type Props = {
   open: boolean;
