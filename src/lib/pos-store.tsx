@@ -1298,6 +1298,15 @@ export function PosProvider({ children }: { children: ReactNode }) {
         held,
         moneyAction: action,
       });
+      trackTransition({
+        entity: "booking",
+        entityId: id,
+        from: current.status,
+        to: "cancelled",
+        reason: clean,
+        actorName: who,
+        metadata: { ref: current.ref, held, moneyAction: action },
+      });
       return { ok: true };
     },
     [user],
@@ -1420,6 +1429,16 @@ export function PosProvider({ children }: { children: ReactNode }) {
         customer: updated.customerName,
         ...(incidentNote ? { incident: incidentNote } : {}),
       });
+      trackTransition({
+        entity: "job_card",
+        entityId: id,
+        kind: "job_status",
+        from: current.jobStatus ?? "received",
+        to: status,
+        reason: incidentNote ?? null,
+        actorName: who,
+        metadata: { ref: updated.ref, customer: updated.customerName },
+      });
       return updated;
     },
     [],
@@ -1525,6 +1544,27 @@ export function PosProvider({ children }: { children: ReactNode }) {
         settled,
         total: updated.total,
       });
+      trackTransition({
+        entity: "booking",
+        entityId: id,
+        from: current.status,
+        to: "collected",
+        actorName: current.cashier,
+        relatedEntity: "sale",
+        relatedEntityId: sale.id ?? sale.receiptNo,
+        metadata: { ref: updated.ref, receiptNo: sale.receiptNo, settled, total: updated.total },
+      });
+      if (current.job && (current.jobStatus ?? "received") !== "collected") {
+        trackTransition({
+          entity: "job_card",
+          entityId: id,
+          kind: "job_status",
+          from: current.jobStatus ?? "received",
+          to: "collected",
+          actorName: current.cashier,
+          metadata: { ref: updated.ref, receiptNo: sale.receiptNo },
+        });
+      }
       return { booking: updated, sale };
     },
     [activeShift, recordSale],
