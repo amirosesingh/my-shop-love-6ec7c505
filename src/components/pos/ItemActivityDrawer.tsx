@@ -84,12 +84,29 @@ export function ItemActivityDrawer({
 
       if (!live) return;
       setSource(
-        [adjustments, transfers, meta, merges].some((r) => r.source === "local")
+        [adjustments, transfers, meta, merges, movements].some((r) => r.source === "local")
           ? "local"
           : "cloud",
       );
       const list: Movement[] = [
+        ...(movements.rows as LooseRow[]).map((r) => ({
+          id: `mov-${r.id}`,
+          at: text(r["created_at"]),
+          kind: MOVEMENT_LABELS[text(r["activity_type"])] ?? text(r["activity_type"]),
+          detail: [
+            r["reference"] ? text(r["reference"]) : "",
+            r["store_id"] ? text(r["store_id"]) : "",
+            r["stock_after"] != null ? `stock now ${Number(r["stock_after"])}` : "",
+            r["note"] ? text(r["note"]) : "",
+          ]
+            .filter(Boolean)
+            .join(" · "),
+          delta: Number(r["quantity_delta"] ?? 0),
+          impact: 0,
+          by: text(r["staff_name"]) || "—",
+        })),
         ...(adjustments.rows as LooseRow[]).map((r) => ({
+
           id: `adj-${r.id}`,
           at: text(r["created_at"]),
           kind: "Stock adjustment",
