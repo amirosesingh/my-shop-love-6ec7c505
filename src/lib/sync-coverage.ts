@@ -329,3 +329,109 @@ export function formatConflictRules(): string {
   ];
   return `${lines.join("\n")}\n`;
 }
+
+/* ------------------------------------------------------------------ */
+/* Recovery verdicts                                                   */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Recovery.
+ *
+ * One question, asked per feature: if this till's database were deleted
+ * tonight, what would a replacement terminal get back from head office? The
+ * answer is worked out from the same inputs as the coverage matrix, so it
+ * cannot drift from what the sync loop actually does.
+ *
+ * - `full`       — everything the feature needs comes back.
+ * - `partial`    — the records come back, part of their trail does not.
+ * - `none`       — nothing of this feature survives a wipe.
+ * - `not-needed` — read online by design; there is nothing to rebuild.
+ */
+export type RecoveryVerdict = "full" | "partial" | "none" | "not-needed";
+
+export const RECOVERY_VERDICT_TEXT: Record<RecoveryVerdict, string> = {
+  full: "Rebuilds completely",
+  partial: "Rebuilds in part",
+  none: "Does not rebuild",
+  "not-needed": "Read online — nothing to rebuild",
+};
+
+export type Recovery = {
+  feature: string;
+  name: string;
+  verdict: RecoveryVerdict;
+  /** Tables that come back, and how. */
+  recovered: string[];
+  /** Tables that would be lost, in plain words. */
+  losses: { table: string; what: string }[];
+  /** Tables that live centrally on purpose. */
+  central: string[];
+};
+
+/** The friendliest description we have of what a table holds. */
+function tableMeaning(table: string): string {
+  for (const feature of FEATURES) {
+    for (const op of feature.ops) if (op.table === table) return op.label;
+  }
+  return table;
+}
+
+/** Per-feature recovery, given what the till really pushes, pulls and restores. */
+export function recoveryVerdicts(contract: {
+  push: string[];
+  pull: string[];
+  restore: string[];
+}): Recovery[] {
+  const rows = new Map(buildCoverage(contract).map((r) => [r.table, r]));
+  return FEATURES.map((feature) => {
+    const tables = [
+      ...new Set(feature.ops.filter((o) => !o.table.startsWith("rpc:")).map((o) => o.table)),
+    ];
+    const recovered: string[] = [];
+    const central: string[] = [];
+    const losses: { table: string; what: string }[] = [];
+    for (const table of tables) {
+      const row = rows.get(table);
+      const declared = row?.declared ?? declaredIntent(table).syncDirection;
+      if (declared === "cloud-only" || (!row?.restore && !row?.pull && CLOUD_ONLY[table])) {
+        central.push(table);
+        continue;
+      }
+      if (row?.restore || row?.pull) recovered.push(table);
+      else losses.push({ table, what: tableMeaning(table) });
+    }
+    const verdict: RecoveryVerdict =
+      !recovered.length && !losses.length
+        ? "not-needed"
+        : losses.length === 0
+          ? "full"
+          : recovered.length === 0
+            ? "none"
+            : "partial";
+    return { feature: feature.id, name: feature.name, verdict, recovered, losses, central };
+  });
+}
+
+/** The recovery document, generated. */
+export function formatRecovery(rows: Recovery[]): string {
+  const full = rows.filter((r) => r.verdict === "full" || r.verdict === "not-needed").length;
+  const lines = [
+    "# Recovery after a wipe",
+    "",
+    "If a till's database is deleted, what does a replacement get back? Worked",
+    "out from the feature registry and the till's own sync lists — do not edit",
+    "by hand. Run `bun scripts/sync-coverage.cjs` after changing a feature.",
+    "",
+    `${full} of ${rows.length} features rebuild completely.`,
+    "",
+    "| Feature | Verdict | Comes back | Would be lost | Central by design |",
+    "| --- | --- | --- | --- | --- |",
+    ...rows.map(
+      (r) =>
+        `| ${r.name} | ${RECOVERY_VERDICT_TEXT[r.verdict]} | ${r.recovered.join(", ") || "—"} | ${
+          r.losses.map((l) => `${l.table} (${l.what})`).join("; ") || "—"
+        } | ${r.central.join(", ") || "—"} |`,
+    ),
+  ];
+  return `${lines.join("\n")}\n`;
+}
