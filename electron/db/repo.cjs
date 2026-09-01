@@ -717,6 +717,55 @@ async function mergeFromCloud(table, rows) {
 }
 
 /**
+ * Restore-safe merge.
+ *
+ * Restore replays history the cloud already holds, so it must never clobber a
+ * row this till has changed but not yet pushed. Any id that is still pending
+ * or errored locally is skipped and reported, leaving the local copy — and its
+ * place in the push queue — untouched.
+ */
+async function restoreMerge(table, rows) {
+  if (!rows.length) return { merged: 0, skipped: 0 };
+  await healOpsColumns([{ table, rows }]);
+  return withHeal(table, async () => {
+    const columns = await tableColumns(table).catch(() => new Set());
+    const ids = rows.map((r) => String(r.id)).filter(Boolean);
+    const held = new Set();
+    if (columns.has("sync_status") && ids.length) {
+      const pool = getPool();
+      // Chunked so a long restore window cannot exceed the parameter limit.
+      for (let i = 0; i < ids.length; i += 500) {
+        const slice = ids.slice(i, i + 500);
+        const req = pool.request();
+        slice.forEach((id, n) => req.input(`p${n}`, sql.NVarChar(80), id));
+        const list = slice.map((_, n) => `@p${n}`).join(",");
+        const res = await req.query(
+          `SELECT CAST([id] AS NVARCHAR(80)) AS id FROM [dbo].[${table}]
+             WHERE [sync_status] IN (N'pending', N'error', N'quarantined')
+               AND CAST([id] AS NVARCHAR(80)) IN (${list})`,
+        );
+        for (const row of res.recordset) held.add(String(row.id));
+      }
+    }
+    const usable = rows.filter((r) => !held.has(String(r.id)));
+    if (!usable.length) return { merged: 0, skipped: held.size };
+    const pool = getPool();
+    const tx = new sql.Transaction(pool);
+    await tx.begin();
+    try {
+      for (const row of usable) await upsertRow(tx, table, row, { markPending: false });
+      await tx.commit();
+      return { merged: usable.length, skipped: rows.length - usable.length };
+    } catch (err) {
+      await tx.rollback();
+      throw err;
+    }
+  });
+}
+
+
+
+/**
  * Shop-side half of the server/shop comparison.
  *
  * Counts are read live from the tables themselves — never from the sync
