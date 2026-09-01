@@ -54,6 +54,9 @@ const TABLES = [
   "authorization_requests",
   "authorization_log",
   "member_verifications",
+  // Every state change of every tracked record. Written here first so a
+  // change made with no connection still has a permanent history entry.
+  "entity_status_history",
 ];
 
 /** Cloud is authoritative for these; they are the only tables ever pulled. */
@@ -123,8 +126,12 @@ const RESTORE_TABLES = [
   { table: "authorization_requests", storeColumns: ["store_id"], dateColumn: "created_at" },
   { table: "authorization_log", storeColumns: ["store_id"], dateColumn: "created_at" },
   { table: "member_verifications", storeColumns: ["store_id"], dateColumn: "created_at" },
-  // audit_logs has no branch column centrally, so it cannot be restored
-  // store-scoped and is deliberately left out.
+  // The state history of everything this branch handled. Restored last so
+  // the records it describes are already back in place.
+  { table: "entity_status_history", storeColumns: ["store_id"], dateColumn: "occurred_at" },
+  // audit_logs now carries a branch column centrally, so a rebuilt till can
+  // recover the actions taken at this branch.
+  { table: "audit_logs", storeColumns: ["store_id"], dateColumn: "created_at" },
 ];
 
 

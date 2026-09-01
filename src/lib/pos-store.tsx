@@ -67,6 +67,7 @@ import { setActiveBranchSyncPolicy } from "./sync-policy";
 import { setPosFormats, setPosTimeZone } from "./time-zone";
 import { receiveTransferInDb, saveTransfer, setTransferStatus } from "./stock-transfers";
 import { commitBooking, deleteBookingRow, loadBookings, saveBookingQuietly } from "./bookings-db";
+import { trackTransition } from "./status-history";
 import {
   cancelBookingAuthoritative,
   collectBookingPayment,
@@ -835,6 +836,17 @@ export function PosProvider({ children }: { children: ReactNode }) {
           }
         }
       }
+      trackTransition({
+        entity: "shift",
+        entityId: shift.id,
+        from: null,
+        to: "OPEN",
+        actorName: shift.cashier,
+        actorRole: shift.openedByRole ?? null,
+        storeId: shift.storeId,
+        terminalId: shift.terminalId ?? null,
+        metadata: { openingFloat: shift.openingFloat },
+      });
       logger.log("sale_event", "Shift opened", "shifts", {
         cashier,
         openingFloat,
@@ -900,6 +912,18 @@ export function PosProvider({ children }: { children: ReactNode }) {
       justOpenedRef.current = null;
       setDbShift(null);
       setShiftChecked(true);
+      trackTransition({
+        entity: "shift",
+        entityId: closed.id,
+        from: "OPEN",
+        to: "CLOSED",
+        reason: note || null,
+        actorName: closed.closedBy ?? closed.cashier,
+        actorRole: closed.closedByRole ?? null,
+        storeId: closed.storeId,
+        terminalId: closed.terminalId ?? null,
+        metadata: { countedCash, openingFloat: closed.openingFloat, overdue: closed.overdue },
+      });
       logger.log("sale_event", "Shift closed", "shifts", {
         shiftId: closed.id,
         storeId: closed.storeId,
@@ -1298,6 +1322,15 @@ export function PosProvider({ children }: { children: ReactNode }) {
         held,
         moneyAction: action,
       });
+      trackTransition({
+        entity: "booking",
+        entityId: id,
+        from: current.status,
+        to: "cancelled",
+        reason: clean,
+        actorName: who,
+        metadata: { ref: current.ref, held, moneyAction: action },
+      });
       return { ok: true };
     },
     [user],
@@ -1420,6 +1453,16 @@ export function PosProvider({ children }: { children: ReactNode }) {
         customer: updated.customerName,
         ...(incidentNote ? { incident: incidentNote } : {}),
       });
+      trackTransition({
+        entity: "job_card",
+        entityId: id,
+        kind: "job_status",
+        from: current.jobStatus ?? "received",
+        to: status,
+        reason: incidentNote ?? null,
+        actorName: who,
+        metadata: { ref: updated.ref, customer: updated.customerName },
+      });
       return updated;
     },
     [],
@@ -1525,6 +1568,27 @@ export function PosProvider({ children }: { children: ReactNode }) {
         settled,
         total: updated.total,
       });
+      trackTransition({
+        entity: "booking",
+        entityId: id,
+        from: current.status,
+        to: "collected",
+        actorName: current.cashier,
+        relatedEntity: "sale",
+        relatedEntityId: sale.id ?? sale.receiptNo,
+        metadata: { ref: updated.ref, receiptNo: sale.receiptNo, settled, total: updated.total },
+      });
+      if (current.job && (current.jobStatus ?? "received") !== "collected") {
+        trackTransition({
+          entity: "job_card",
+          entityId: id,
+          kind: "job_status",
+          from: current.jobStatus ?? "received",
+          to: "collected",
+          actorName: current.cashier,
+          metadata: { ref: updated.ref, receiptNo: sale.receiptNo },
+        });
+      }
       return { booking: updated, sale };
     },
     [activeShift, recordSale],
@@ -2194,6 +2258,15 @@ export function PosProvider({ children }: { children: ReactNode }) {
       fromStoreId: transfer?.fromStoreId ?? null,
       toStoreId: transfer?.toStoreId ?? null,
     });
+    trackTransition({
+      entity: "stock_transfer",
+      entityId: id,
+      from: "requested",
+      to: "in_transit",
+      actorName: actorRef.current,
+      storeId: transfer?.fromStoreId ?? null,
+      metadata: { ref: transfer?.ref ?? null, toStoreId: transfer?.toStoreId ?? null },
+    });
   }, []);
 
   const receiveTransfer = useCallback((id: string) => {
@@ -2229,6 +2302,15 @@ export function PosProvider({ children }: { children: ReactNode }) {
       ref: transfer?.ref ?? null,
       fromStoreId: transfer?.fromStoreId ?? null,
       toStoreId: transfer?.toStoreId ?? null,
+    });
+    trackTransition({
+      entity: "stock_transfer",
+      entityId: id,
+      from: "in_transit",
+      to: "received",
+      actorName: actorRef.current,
+      storeId: transfer?.toStoreId ?? null,
+      metadata: { ref: transfer?.ref ?? null, fromStoreId: transfer?.fromStoreId ?? null },
     });
   }, []);
 
@@ -2280,6 +2362,15 @@ export function PosProvider({ children }: { children: ReactNode }) {
         toStoreId: transfer?.toStoreId ?? null,
       },
     );
+    trackTransition({
+      entity: "stock_transfer",
+      entityId: id,
+      from: transfer?.status ?? null,
+      to: transfer?.status === "in_transit" ? "cancelled" : "rejected",
+      actorName: actorRef.current,
+      storeId: transfer?.toStoreId ?? null,
+      metadata: { ref: transfer?.ref ?? null, fromStoreId: transfer?.fromStoreId ?? null },
+    });
   }, []);
 
   const reset = useCallback(() => setState(emptyState), []);

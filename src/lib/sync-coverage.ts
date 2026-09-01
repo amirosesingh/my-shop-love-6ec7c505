@@ -62,7 +62,7 @@ export const CLOUD_ONLY: Record<string, string> = {
   cashiers: "Legacy staff table, central only.",
   integration_settings: "Administered centrally.",
   sku_audit: "Central reporting table.",
-  audit_logs: "Kept on the till, but not branch-scoped centrally.",
+  
 };
 
 /**
@@ -102,7 +102,15 @@ export const TABLE_INTENT: Record<
     securityClass: "operational",
   },
   activity_events: { syncDirection: "push", restoreRequired: true, securityClass: "governance" },
-  audit_logs: { syncDirection: "push", restoreRequired: false, securityClass: "governance" },
+  // Now branch-stamped centrally, so a rebuilt till can recover its own trail.
+  audit_logs: { syncDirection: "push", restoreRequired: true, securityClass: "governance" },
+  // The state history of everything this branch handled. Append-only centrally
+  // and restorable, because a timeline that cannot be rebuilt is not a record.
+  entity_status_history: {
+    syncDirection: "push",
+    restoreRequired: true,
+    securityClass: "governance",
+  },
   members: { syncDirection: "both", restoreRequired: false, securityClass: "operational" },
   products: { syncDirection: "both", restoreRequired: false, securityClass: "reference" },
   product_barcodes: { syncDirection: "pull", restoreRequired: false, securityClass: "reference" },

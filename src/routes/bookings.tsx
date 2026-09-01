@@ -12,10 +12,12 @@ import {
   Undo2,
   Trash2,
   ScanLine,
+  History,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/pos/AppShell";
+import { StatusHistoryDialog } from "@/components/pos/StatusHistoryDialog";
 import { ActionButton } from "@/components/pos/ActionButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -138,6 +140,7 @@ function BookingsPage() {
   const [cancelMoney, setCancelMoney] = useState<"refunded" | "retained">("refunded");
   /** Handing money back on a booking, capped by the server at what was taken. */
   const [refundFor, setRefundFor] = useState<Booking | null>(null);
+  const [historyFor, setHistoryFor] = useState<Booking | null>(null);
   const [refundAmount, setRefundAmount] = useState("");
   const [refundMethod, setRefundMethod] = useState<PaymentMethod>("cash");
   const [refundReason, setRefundReason] = useState("");
@@ -625,6 +628,14 @@ function BookingsPage() {
                           size="sm"
                           variant="ghost"
                           layout="inline"
+                          label="History"
+                          icon={<History className="size-4" />}
+                          onClick={() => setHistoryFor(b)}
+                        />
+                        <ActionButton
+                          size="sm"
+                          variant="ghost"
+                          layout="inline"
                           label="Delete job"
                           icon={<Trash2 className="size-4" />}
                           className="text-destructive"
@@ -647,6 +658,16 @@ function BookingsPage() {
           </ul>
         )}
       </div>
+
+      {historyFor ? (
+        <StatusHistoryDialog
+          entity="booking"
+          entityId={historyFor.id}
+          title={historyFor.ref}
+          open
+          onOpenChange={(o) => !o && setHistoryFor(null)}
+        />
+      ) : null}
 
       <Dialog open={!!incidentFor} onOpenChange={(o) => !o && setIncidentFor(null)}>
         <DialogContent>
