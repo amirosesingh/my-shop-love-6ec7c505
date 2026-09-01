@@ -24,6 +24,16 @@ type Movement = {
 type LooseRow = Record<string, unknown>;
 const text = (v: unknown) => (v == null ? "" : String(v));
 
+/** Plain wording for the movement kinds written across the app. */
+const MOVEMENT_LABELS: Record<string, string> = {
+  sale: "Sold",
+  return: "Returned",
+  receive: "Goods received",
+  transfer_out: "Transferred out",
+  transfer_in: "Transferred in",
+};
+
+
 export function ItemActivityDrawer({
   product,
   onClose,
