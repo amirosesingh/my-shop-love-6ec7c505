@@ -1820,8 +1820,12 @@ export const db = {
    * Store a receiving invoice and its lines, and wait until they are safe
    * (cloud, local database or the durable outbox). Nothing on screen is
    * cleared until this resolves, so an invoice can no longer vanish.
+   *
+   * `movementStoreId` is the branch the stock actually lands in. Passing it
+   * writes the goods-received movement rows in the very same commit, so a
+   * received line can never change stock without leaving a history row.
    */
-  commitReceivingInvoice: (inv: ReceivingInvoice) =>
+  commitReceivingInvoice: (inv: ReceivingInvoice, movementStoreId?: string | null) =>
     commitOps("Saving receiving invoice", [
       { kind: "upsert", table: "purchase_orders", rows: [invoiceRow(inv)] },
       ...(inv.lines.length
@@ -1833,6 +1837,7 @@ export const db = {
             },
           ]
         : []),
+      ...receivingActivityOps(inv, movementStoreId),
     ]),
 
   /**
@@ -1840,7 +1845,11 @@ export const db = {
    * deleted by id; everything else is updated, so history and the invoice id
    * survive the edit.
    */
-  updateReceivingInvoice: (inv: ReceivingInvoice, removedLineIds: string[]) =>
+  updateReceivingInvoice: (
+    inv: ReceivingInvoice,
+    removedLineIds: string[],
+    movementStoreId?: string | null,
+  ) =>
     commitOps("Updating receiving invoice", [
       { kind: "upsert", table: "purchase_orders", rows: [invoiceRow(inv)] },
       ...(inv.lines.length
@@ -1857,7 +1866,9 @@ export const db = {
         table: "purchase_order_items",
         match: { id },
       })),
+      ...receivingActivityOps(inv, movementStoreId),
     ]),
+
 
   /**
    * Autosave an unfinished receiving order. Same rows as a finalized one, but
