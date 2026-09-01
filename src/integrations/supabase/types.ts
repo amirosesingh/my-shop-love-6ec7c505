@@ -343,12 +343,16 @@ export type Database = {
           amount: number
           booking_id: string
           cashier: string | null
+          change_given: number
           client_payment_id: string | null
           created_at: string
           id: string
+          kind: string
           method: string
           paid_at: string
           reference: string | null
+          refund_reason: string | null
+          refunds_payment_id: string | null
           reversed_at: string | null
           reversed_by: string | null
           row_version: number
@@ -358,12 +362,16 @@ export type Database = {
           amount?: number
           booking_id: string
           cashier?: string | null
+          change_given?: number
           client_payment_id?: string | null
           created_at?: string
           id?: string
+          kind?: string
           method?: string
           paid_at?: string
           reference?: string | null
+          refund_reason?: string | null
+          refunds_payment_id?: string | null
           reversed_at?: string | null
           reversed_by?: string | null
           row_version?: number
@@ -373,12 +381,16 @@ export type Database = {
           amount?: number
           booking_id?: string
           cashier?: string | null
+          change_given?: number
           client_payment_id?: string | null
           created_at?: string
           id?: string
+          kind?: string
           method?: string
           paid_at?: string
           reference?: string | null
+          refund_reason?: string | null
+          refunds_payment_id?: string | null
           reversed_at?: string | null
           reversed_by?: string | null
           row_version?: number
@@ -396,6 +408,7 @@ export type Database = {
       }
       bookings: {
         Row: {
+          cancel_money_action: string | null
           cancel_reason: string | null
           cancelled_at: string | null
           cancelled_by: string | null
@@ -450,6 +463,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cancel_money_action?: string | null
           cancel_reason?: string | null
           cancelled_at?: string | null
           cancelled_by?: string | null
@@ -504,6 +518,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cancel_money_action?: string | null
           cancel_reason?: string | null
           cancelled_at?: string | null
           cancelled_by?: string | null
@@ -3885,10 +3900,13 @@ export type Database = {
         Args: {
           _booking_id: string
           _cancelled_by?: string
+          _client_payment_id?: string
+          _money_action?: string
           _reason: string
           _terminal?: string
         }
         Returns: {
+          cancel_money_action: string | null
           cancel_reason: string | null
           cancelled_at: string | null
           cancelled_by: string | null
@@ -3960,6 +3978,28 @@ export type Database = {
           _reference?: string
         }
         Returns: {
+          change_due: number
+          duplicate: boolean
+          fully_paid: boolean
+          job_status: string
+          outstanding: number
+          settled_paid: number
+          status: string
+          total: number
+        }[]
+      }
+      booking_net_paid: { Args: { _booking_id: string }; Returns: number }
+      booking_refund: {
+        Args: {
+          _amount: number
+          _booking_id: string
+          _cashier?: string
+          _client_payment_id?: string
+          _method?: string
+          _reason?: string
+        }
+        Returns: {
+          change_due: number
           duplicate: boolean
           fully_paid: boolean
           job_status: string

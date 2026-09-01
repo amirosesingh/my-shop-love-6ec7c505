@@ -1758,6 +1758,10 @@ BEGIN
   IF COL_LENGTH('dbo.booking_payments', 'status') IS NULL ALTER TABLE dbo.booking_payments ADD [status] NVARCHAR(20) DEFAULT N'settled';
   IF COL_LENGTH('dbo.booking_payments', 'reference') IS NULL ALTER TABLE dbo.booking_payments ADD [reference] NVARCHAR(200);
   IF COL_LENGTH('dbo.booking_payments', 'client_payment_id') IS NULL ALTER TABLE dbo.booking_payments ADD [client_payment_id] NVARCHAR(120);
+  IF COL_LENGTH('dbo.booking_payments', 'kind') IS NULL ALTER TABLE dbo.booking_payments ADD [kind] NVARCHAR(20) DEFAULT N'payment';
+  IF COL_LENGTH('dbo.booking_payments', 'refund_reason') IS NULL ALTER TABLE dbo.booking_payments ADD [refund_reason] NVARCHAR(400);
+  IF COL_LENGTH('dbo.booking_payments', 'refunds_payment_id') IS NULL ALTER TABLE dbo.booking_payments ADD [refunds_payment_id] UNIQUEIDENTIFIER;
+  IF COL_LENGTH('dbo.booking_payments', 'change_given') IS NULL ALTER TABLE dbo.booking_payments ADD [change_given] DECIMAL(18,4) DEFAULT 0;
 END
 GO
 IF OBJECT_ID('dbo.bookings', 'U') IS NOT NULL
@@ -1813,6 +1817,7 @@ BEGIN
   IF COL_LENGTH('dbo.bookings', 'cancelled_by') IS NULL ALTER TABLE dbo.bookings ADD [cancelled_by] NVARCHAR(200);
   IF COL_LENGTH('dbo.bookings', 'cancelled_at') IS NULL ALTER TABLE dbo.bookings ADD [cancelled_at] DATETIME2(3);
   IF COL_LENGTH('dbo.bookings', 'cancelled_terminal') IS NULL ALTER TABLE dbo.bookings ADD [cancelled_terminal] NVARCHAR(120);
+  IF COL_LENGTH('dbo.bookings', 'cancel_money_action') IS NULL ALTER TABLE dbo.bookings ADD [cancel_money_action] NVARCHAR(20);
   IF COL_LENGTH('dbo.bookings', 'row_version') IS NULL ALTER TABLE dbo.bookings ADD [row_version] INT DEFAULT 1;
   IF COL_LENGTH('dbo.bookings', 'is_synced') IS NULL ALTER TABLE dbo.bookings ADD [is_synced] BIT DEFAULT 0;
   IF COL_LENGTH('dbo.bookings', 'sync_status') IS NULL ALTER TABLE dbo.bookings ADD [sync_status] NVARCHAR(40) DEFAULT N'pending';

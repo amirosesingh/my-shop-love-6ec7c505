@@ -453,6 +453,14 @@ export type BookingPayment = {
   reference?: string;
   /** repeat-proof id sent by the till so a retry cannot double-charge */
   clientPaymentId?: string;
+  /** money taken, or money handed back (stored as a negative amount) */
+  kind?: "payment" | "refund";
+  /** why the money was handed back */
+  refundReason?: string;
+  /** the payment this refund reverses, when it reverses just one */
+  refundsPaymentId?: string;
+  /** cash change handed back on an over-tender */
+  changeGiven?: number;
 };
 
 /** Where a racket sits in the stringing workflow. */
@@ -591,6 +599,8 @@ export type Booking = {
   cancelledBy?: string;
   cancelledAt?: string;
   cancelledTerminal?: string;
+  /** what happened to money already taken when the booking was cancelled */
+  cancelMoneyAction?: "refunded" | "retained" | "none";
 };
 
 /**
