@@ -7,7 +7,9 @@
  * used to be maintained by hand and drifted; this derives it, so a table added
  * to a feature with no sync decision shows up immediately.
  */
-import { FEATURES } from "./feature-schema";
+import { FEATURES, type SecurityClass, type SyncDirection } from "./feature-schema";
+
+export type { SecurityClass, SyncDirection };
 
 export type Coverage = {
   table: string;
@@ -19,6 +21,14 @@ export type Coverage = {
   restore: boolean;
   /** Why a table is deliberately not on the till. */
   note?: string;
+  /** What the feature registry says should happen. */
+  declared?: SyncDirection;
+  /** How sensitive the data is. */
+  securityClass?: SecurityClass;
+  /** Declared as needed after a rebuild. */
+  restoreRequired?: boolean;
+  /** Plain-language differences between intent and reality. */
+  issues?: string[];
 };
 
 /**
