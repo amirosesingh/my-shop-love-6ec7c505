@@ -172,15 +172,29 @@ export const FEATURES: FeatureDef[] = [
         source: "src/lib/stock-transfers.ts:123 (saveTransfer lines)",
         columns: [
           "transfer_id", "product_id", "barcode", "sku", "product_name", "quantity",
-          "quantity_received", "unit_cost",
+          "quantity_approved", "quantity_dispatched", "quantity_received", "unit_cost",
         ],
+      },
+      {
+        label: "Approval records the allowed quantity per line",
+        table: "rpc:stock_transfer_approve",
+        kind: "write",
+        source: "src/lib/stock-transfers.ts (approveTransferInDb)",
+        columns: ["p_transfer_id", "p_approved_by", "p_lines"],
+      },
+      {
+        label: "Dispatch takes stock out and closes the request on what was sent",
+        table: "rpc:stock_transfer_dispatch",
+        kind: "write",
+        source: "src/lib/stock-transfers.ts (dispatchTransferInDb)",
+        columns: ["p_transfer_id", "p_dispatched_by", "p_lines"],
       },
       {
         label: "Receiving moves stock in one transaction",
         table: "rpc:stock_transfer_receive",
         kind: "write",
-        source: "src/lib/stock-transfers.ts:172 (receiveTransferInDb)",
-        columns: ["p_transfer_id", "p_received_by"],
+        source: "src/lib/stock-transfers.ts (receiveTransferInDb)",
+        columns: ["p_transfer_id", "p_received_by", "p_lines"],
       },
       {
         label: "Manual stock adjustment",
