@@ -516,7 +516,7 @@ async function restore({ days = 90 } = {}) {
     running: true,
     table: null,
     index: 0,
-    total: specs.length,
+    total: specs.length + 1,
     restored: 0,
     skipped: 0,
     error: null,
