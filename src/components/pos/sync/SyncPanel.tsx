@@ -20,6 +20,7 @@ import {
 import { useSystemStatus } from "@/lib/system-status";
 import { localDb, type RestoreRun } from "@/lib/local-db";
 import { toast } from "sonner";
+import { RebuildCheck } from "./RebuildCheck";
 
 const ICON: Record<TableSyncStatus, typeof CheckCircle2> = {
   idle: CircleDashed,
@@ -88,6 +89,8 @@ export function SyncPanel({ className }: { className?: string }) {
       </div>
 
       <Progress value={busy ? run.progress : run.tables.length ? 100 : 0} className="h-1.5" />
+
+      <RebuildCheck />
 
 
       <div className="w-full overflow-x-auto rounded-md border border-border">
