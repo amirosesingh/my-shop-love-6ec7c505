@@ -465,7 +465,36 @@ export const FEATURES: FeatureDef[] = [
         source: "src/routes/audit.tsx",
         columns: [
           "id", "user_name", "action_category", "action_name", "target_module", "details",
-          "created_at",
+          "store_id", "created_at",
+        ],
+      },
+    ],
+  },
+  {
+    id: "status-history",
+    name: "Status history",
+    ops: [
+      {
+        label: "State change recorded",
+        table: "entity_status_history",
+        kind: "write",
+        source: "src/lib/status-history.ts (recordTransition)",
+        pk: "id",
+        columns: [
+          "entity_type", "entity_id", "status_kind", "previous_status", "new_status", "reason",
+          "actor_id", "actor_name", "actor_role", "store_id", "branch_id", "terminal_id",
+          "related_entity_type", "related_entity_id", "metadata", "client_event_id",
+          "occurred_at",
+        ],
+      },
+      {
+        label: "Timeline of one record",
+        table: "entity_status_history",
+        kind: "read",
+        source: "src/lib/status-history.server.ts (readStatusHistory)",
+        columns: [
+          "entity_type", "entity_id", "status_kind", "previous_status", "new_status", "reason",
+          "actor_name", "actor_role", "occurred_at",
         ],
       },
     ],
