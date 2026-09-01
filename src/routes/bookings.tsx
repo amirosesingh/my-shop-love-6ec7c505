@@ -625,6 +625,14 @@ function BookingsPage() {
                           size="sm"
                           variant="ghost"
                           layout="inline"
+                          label="History"
+                          icon={<History className="size-4" />}
+                          onClick={() => setHistoryFor(b)}
+                        />
+                        <ActionButton
+                          size="sm"
+                          variant="ghost"
+                          layout="inline"
                           label="Delete job"
                           icon={<Trash2 className="size-4" />}
                           className="text-destructive"
@@ -647,6 +655,16 @@ function BookingsPage() {
           </ul>
         )}
       </div>
+
+      {historyFor ? (
+        <StatusHistoryDialog
+          entity="booking"
+          entityId={historyFor.id}
+          title={historyFor.ref}
+          open
+          onOpenChange={(o) => !o && setHistoryFor(null)}
+        />
+      ) : null}
 
       <Dialog open={!!incidentFor} onOpenChange={(o) => !o && setIncidentFor(null)}>
         <DialogContent>
