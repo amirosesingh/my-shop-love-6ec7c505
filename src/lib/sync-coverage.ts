@@ -62,7 +62,7 @@ export const CLOUD_ONLY: Record<string, string> = {
   cashiers: "Legacy staff table, central only.",
   integration_settings: "Administered centrally.",
   sku_audit: "Central reporting table.",
-  audit_logs: "Kept on the till, but not branch-scoped centrally.",
+  
 };
 
 /**
