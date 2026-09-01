@@ -341,6 +341,9 @@ export type LocalSyncStatus = {
   queue?: SyncQueueRow[];
   lastPushAt: string | null;
   lastPullAt: string | null;
+  lastRestoreAt?: string | null;
+  restore?: RestoreRun | null;
+
   server?: string | null;
   database?: string | null;
 };
