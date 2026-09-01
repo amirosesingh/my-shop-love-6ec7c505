@@ -7,7 +7,7 @@
  * cycle and leave two screens disagreeing.
  */
 import { useEffect, useState } from "react";
-import { CheckCircle2, CircleDashed, Loader2, RefreshCw, TriangleAlert, XCircle } from "lucide-react";
+import { CheckCircle2, CircleDashed, History, Loader2, RefreshCw, TriangleAlert, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,8 @@ import {
   type TableSyncStatus,
 } from "@/lib/sync-progress";
 import { useSystemStatus } from "@/lib/system-status";
+import { localDb, type RestoreRun } from "@/lib/local-db";
+import { toast } from "sonner";
 
 const ICON: Record<TableSyncStatus, typeof CheckCircle2> = {
   idle: CircleDashed,
@@ -132,5 +134,62 @@ export function SyncPanel({ className }: { className?: string }) {
         </p>
       )}
     </section>
+  );
+}
+
+/**
+ * Trading history is push-only during normal sync, so a wiped or replaced till
+ * starts empty. This is the one place an operator can pull this branch's
+ * sales, payments and shift records back down. Rows still waiting to be pushed
+ * are never overwritten.
+ */
+function RestoreHistoryButton({ disabled }: { disabled?: boolean }) {
+  const bridge = localDb();
+  const [run, setRun] = useState<RestoreRun | null>(null);
+  const busy = Boolean(run?.running);
+
+  useEffect(() => {
+    if (!busy || !bridge?.restoreStatus) return;
+    const timer = window.setInterval(() => {
+      void bridge.restoreStatus!().then((next) => setRun(next ?? null)).catch(() => {});
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [busy, bridge]);
+
+  if (!bridge?.restore) return null;
+
+  const start = async () => {
+    const ok = window.confirm(
+      "Restore this branch's trading history from the cloud (last 90 days)?\n\n" +
+        "Anything this till has not pushed yet is left untouched.",
+    );
+    if (!ok) return;
+    setRun({ running: true, table: null, index: 0, total: 0, restored: 0, skipped: 0 });
+    try {
+      const res = await bridge.restore!({ days: 90 });
+      setRun({ ...res, running: false });
+      if (res.ok) {
+        toast.success(`Restored ${res.restored} rows${res.skipped ? ` — ${res.skipped} kept local` : ""}`);
+      } else {
+        toast.error(res.error ?? "Restore failed");
+      }
+    } catch (err) {
+      setRun(null);
+      toast.error(String((err as Error)?.message ?? err));
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      {busy && run && (
+        <span className="text-xs text-muted-foreground">
+          Restoring {run.table ?? ""} ({run.index}/{run.total}) — {run.restored} rows
+        </span>
+      )}
+      <Button size="sm" variant="outline" disabled={disabled || busy} onClick={() => void start()}>
+        <History className={cn("size-4", busy && "animate-pulse")} />
+        {busy ? "Restoring…" : "Restore history"}
+      </Button>
+    </div>
   );
 }
