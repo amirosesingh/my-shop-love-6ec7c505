@@ -620,6 +620,9 @@ async function status() {
       queue: await repo.queueRows(60),
       lastPushAt: await repo.getState("last_push_at"),
       lastPullAt: await repo.getState("last_pull_at"),
+      lastRestoreAt: await repo.getState("last_restore_at").catch(() => null),
+      restore: restoreStatus(),
+
     };
   } catch (err) {
     return {
