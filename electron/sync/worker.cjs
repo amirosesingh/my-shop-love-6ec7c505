@@ -939,6 +939,7 @@ async function status() {
       lastPullAt: await repo.getState("last_pull_at"),
       lastRestoreAt: await repo.getState("last_restore_at").catch(() => null),
       restore: restoreStatus(),
+      drill: drillStatus(),
 
     };
   } catch (err) {
@@ -955,4 +956,19 @@ async function status() {
   }
 }
 
-module.exports = { init, start, stop, setEnabled, push, pull, restore, restoreStatus, run, status };
+module.exports = {
+  init,
+  start,
+  stop,
+  setEnabled,
+  push,
+  pull,
+  restore,
+  restoreStatus,
+  verifyRestore,
+  restoreDrill,
+  drillStatus,
+  restoreEvidence,
+  run,
+  status,
+};
