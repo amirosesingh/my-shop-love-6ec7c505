@@ -32,6 +32,8 @@ import {
 import { money, usePos } from "@/lib/pos-store";
 import { useUserPermissions } from "@/lib/pos-permissions";
 import { useAuth } from "@/lib/pos-auth";
+import { readBookingBalance } from "@/lib/booking-collection";
+
 import {
   bookingBalance,
   racketSummary,
@@ -126,6 +128,18 @@ function BookingsPage() {
     null,
   );
   const [incidentNote, setIncidentNote] = useState("");
+  /** Cancelling always asks for a written reason, kept on the record for good. */
+  const [cancelling, setCancelling] = useState<Booking | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelBusy, setCancelBusy] = useState(false);
+  /**
+   * One id per open payment dialog: pressing the button twice, or retrying
+   * after a dropped connection, can never take the money a second time.
+   */
+  const [payToken, setPayToken] = useState("");
+  const [payBusy, setPayBusy] = useState(false);
+  /** What the central database says is still owed, refreshed on open. */
+  const [serverDue, setServerDue] = useState<number | null>(null);
 
   const bookings = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -168,11 +182,18 @@ function BookingsPage() {
   const memberOf = (b: Booking) => state.members.find((m) => m.id === b.memberId) ?? null;
   const today = new Date().toISOString().slice(0, 10);
 
-  function openPay(b: Booking, full: boolean) {
+  async function openPay(b: Booking, full: boolean) {
     setPayFor(b);
     setSettle(full);
     setAmount(bookingBalance(b).toFixed(2));
     setMethod("cash");
+    setPayToken(crypto.randomUUID());
+    setServerDue(null);
+    const check = await readBookingBalance(b.id);
+    if (check.ok) {
+      setServerDue(check.state.outstanding);
+      setAmount(check.state.outstanding.toFixed(2));
+    }
   }
 
   /** Look a job up by its printed claim tag, or by the booking reference. */
@@ -203,17 +224,22 @@ function BookingsPage() {
       setIncidentNote(b.incidentNote ?? "");
       return;
     }
-    if (s === "collected" && balance > 0) {
-      if (rules.blockCollectionWithBalance) {
-        toast.error(`Balance of ${money(balance)} must be settled before collection`, {
+    if (s === "collected") {
+      // Never trust the figure on screen: ask the database what is owed now.
+      const check = await readBookingBalance(b.id);
+      const due = check.ok ? check.state.outstanding : balance;
+      if (!check.ok)
+        toast.warning("Balance could not be verified", { description: check.error });
+      if (due > 0) {
+        toast.error(`Balance of ${money(due)} must be settled before collection`, {
           description: "Collect the balance to hand the racket over.",
         });
-        openPay(b, true);
+        void openPay(b, true);
         return;
       }
-      if (!(await requirePermission("can_collect_booking"))) return;
     }
-    setBookingJobStatus(b.id, s, user?.name || b.cashier || "Counter");
+    const moved = await setBookingJobStatus(b.id, s, user?.name || b.cashier || "Counter");
+    if (!moved) return;
     toast.success(`${b.ref} · ${JOB_STATUS_LABELS[s].toLowerCase()}`);
   }
 
@@ -221,31 +247,37 @@ function BookingsPage() {
     if (!payFor) return;
     if (!(await requirePermission("can_collect_booking"))) return;
     const value = r2(Number(amount || 0));
-    const balance = bookingBalance(payFor);
+    const balance = serverDue ?? bookingBalance(payFor);
     if (value <= 0) {
       toast.error("Enter an amount greater than zero");
       return;
     }
-    if (settle) {
-      if (value < balance) {
-        toast.error(`Collecting requires the full balance of ${money(balance)}`);
-        return;
+    const token = payToken || crypto.randomUUID();
+    setPayBusy(true);
+    try {
+      if (settle) {
+        if (value < balance) {
+          toast.error(`Collecting requires the full balance of ${money(balance)}`);
+          return;
+        }
+        const done = await collectBooking(payFor.id, value, method, token);
+        if (!done) return;
+        printSaleReceipt(done.sale, memberOf(payFor), "sale");
+        toast.success(`Booking ${done.booking.ref} collected · bill ${done.sale.receiptNo}`);
+      } else {
+        if (value > balance) {
+          toast.error("Part payment cannot exceed the outstanding balance");
+          return;
+        }
+        const updated = await addBookingPayment(payFor.id, value, method, payFor.cashier, token);
+        if (!updated) return;
+        printBookingPayment(updated, updated.payments[updated.payments.length - 1]);
+        toast.success(`${money(value)} received · balance ${money(bookingBalance(updated))}`);
       }
-      const done = await collectBooking(payFor.id, value, method);
-      if (!done) return;
-      printSaleReceipt(done.sale, memberOf(payFor), "sale");
-      toast.success(`Booking ${done.booking.ref} collected · bill ${done.sale.receiptNo}`);
-    } else {
-      if (value > balance) {
-        toast.error("Part payment cannot exceed the outstanding balance");
-        return;
-      }
-      const updated = await addBookingPayment(payFor.id, value, method, payFor.cashier);
-      if (!updated) return;
-      printBookingPayment(updated, updated.payments[updated.payments.length - 1]);
-      toast.success(`${money(value)} received · balance ${money(bookingBalance(updated))}`);
+      setPayFor(null);
+    } finally {
+      setPayBusy(false);
     }
-    setPayFor(null);
   }
 
   return (
@@ -442,6 +474,16 @@ function BookingsPage() {
                               Incident: {b.incidentNote}
                             </p>
                           )}
+                          {b.cancelReason && (
+                            <p className="mt-1 text-[11px] text-destructive">
+                              Cancelled: {b.cancelReason}
+                              {b.cancelledBy ? ` · ${b.cancelledBy}` : ""}
+                              {b.cancelledAt
+                                ? ` · ${new Date(b.cancelledAt).toLocaleString()}`
+                                : ""}
+                            </p>
+                          )}
+
                           {job?.notifyWhatsApp && (
                             <p className="mt-1 text-[11px] text-primary">
                               Customer wants a WhatsApp when it is ready.
@@ -512,14 +554,14 @@ function BookingsPage() {
                               layout="inline"
                               label="Part payment"
                               icon={<Banknote className="size-4" />}
-                              onClick={() => openPay(b, false)}
+                              onClick={() => void openPay(b, false)}
                             />
                             <ActionButton
                               size="sm"
                               layout="inline"
                               label={`Collect ${money(balance)}`}
                               icon={<Check className="size-4" />}
-                              onClick={() => openPay(b, true)}
+                              onClick={() => void openPay(b, true)}
                             />
                             <ActionButton
                               size="sm"
@@ -530,8 +572,8 @@ function BookingsPage() {
                               className="text-destructive"
                               onClick={async () => {
                                 if (!(await guardCancel())) return;
-                                cancelBooking(b.id, "Cancelled at counter");
-                                toast.success(`${b.ref} cancelled · stock released`);
+                                setCancelReason("");
+                                setCancelling(b);
                               }}
                             />
                           </>
@@ -596,12 +638,13 @@ function BookingsPage() {
                   return;
                 }
                 if (!(await requirePermission("can_cancel_booking"))) return;
-                setBookingJobStatus(
+                const moved = await setBookingJobStatus(
                   incidentFor.booking.id,
                   incidentFor.status,
                   user?.name || incidentFor.booking.cashier || "Counter",
                   note,
                 );
+                if (!moved) return;
                 toast.success(
                   `${incidentFor.booking.ref} · ${JOB_STATUS_LABELS[incidentFor.status].toLowerCase()}`,
                 );
@@ -613,6 +656,57 @@ function BookingsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!cancelling} onOpenChange={(o) => !o && setCancelling(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancel booking · {cancelling?.ref}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>Why is this booking being cancelled?</Label>
+            <Textarea
+              rows={3}
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="Customer changed their mind and asked for the deposit back."
+            />
+            <p className="text-[11px] text-muted-foreground">
+              The reason, your name and the time are stored permanently against the booking and
+              cannot be edited afterwards.
+              {cancelling && cancelling.paid > 0
+                ? ` ${money(cancelling.paid)} has already been paid and must be refunded separately.`
+                : ""}
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelling(null)}>
+              Back
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={cancelReason.trim().length < 3 || cancelBusy}
+              onClick={async () => {
+                if (!cancelling) return;
+                setCancelBusy(true);
+                try {
+                  const res = await cancelBooking(cancelling.id, cancelReason.trim());
+                  if (!res.ok) {
+                    toast.error("Cancellation refused", { description: res.error });
+                    return;
+                  }
+                  toast.success(`${cancelling.ref} cancelled · stock released`);
+                  setCancelling(null);
+                } finally {
+                  setCancelBusy(false);
+                }
+              }}
+            >
+              {cancelBusy ? "Cancelling…" : "Cancel booking"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
       <Dialog open={!!payFor} onOpenChange={(o) => !o && setPayFor(null)}>
         <DialogContent>
@@ -634,8 +728,15 @@ function BookingsPage() {
                 </div>
                 <div className="flex justify-between font-semibold">
                   <span>Balance due</span>
-                  <span className="numeric text-primary">{money(bookingBalance(payFor))}</span>
+                  <span className="numeric text-primary">
+                    {money(serverDue ?? bookingBalance(payFor))}
+                  </span>
                 </div>
+                <p className="pt-1 text-[11px] text-muted-foreground">
+                  {serverDue === null
+                    ? "Checking the balance with the central database…"
+                    : "Balance confirmed by the central database."}
+                </p>
               </div>
               <div className="space-y-1">
                 <Label>Amount received</Label>
@@ -675,8 +776,8 @@ function BookingsPage() {
             <Button variant="outline" onClick={() => setPayFor(null)}>
               Cancel
             </Button>
-            <Button onClick={() => void submitPayment()}>
-              {settle ? "Collect & print bill" : "Record payment"}
+            <Button disabled={payBusy || serverDue === null} onClick={() => void submitPayment()}>
+              {payBusy ? "Working…" : settle ? "Collect & print bill" : "Record payment"}
             </Button>
           </DialogFooter>
         </DialogContent>

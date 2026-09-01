@@ -58,6 +58,10 @@ const toRow = (b: Booking): Row => ({
   liability_accepted: !!b.liabilityAccepted,
   technician: b.technician ?? null,
   incident_note: b.incidentNote ?? null,
+  cancel_reason: b.cancelReason ?? null,
+  cancelled_by: b.cancelledBy ?? null,
+  cancelled_at: b.cancelledAt ?? null,
+  cancelled_terminal: b.cancelledTerminal ?? null,
 });
 
 const rowToBooking = (r: Row, payments: Row[]): Booking => ({
@@ -75,13 +79,19 @@ const rowToBooking = (r: Row, payments: Row[]): Booking => ({
   tax: Number(r.tax) || 0,
   total: Number(r.total) || 0,
   paid: Number(r.paid) || 0,
-  payments: payments.map((p) => ({
-    id: p.id,
-    amount: Number(p.amount) || 0,
-    method: p.method,
-    at: p.paid_at ?? p.created_at,
-    cashier: p.cashier ?? "",
-  })),
+  // Only settled tenders count as money received.
+  payments: payments
+    .filter((p) => (p.status ?? "settled") === "settled")
+    .map((p) => ({
+      id: p.id,
+      amount: Number(p.amount) || 0,
+      method: p.method,
+      at: p.paid_at ?? p.created_at,
+      cashier: p.cashier ?? "",
+      status: (p.status ?? "settled") as "settled" | "reversed" | "void",
+      reference: p.reference ?? undefined,
+      clientPaymentId: p.client_payment_id ?? undefined,
+    })),
   dueDate: r.due_date ?? "",
   memberId: r.member_id ?? null,
   customerName: r.customer_name ?? "",
@@ -104,6 +114,10 @@ const rowToBooking = (r: Row, payments: Row[]): Booking => ({
   liabilityAccepted: !!r.liability_accepted,
   technician: r.technician ?? undefined,
   incidentNote: r.incident_note ?? undefined,
+  cancelReason: r.cancel_reason ?? undefined,
+  cancelledBy: r.cancelled_by ?? undefined,
+  cancelledAt: r.cancelled_at ?? undefined,
+  cancelledTerminal: r.cancelled_terminal ?? undefined,
   job: {
     racketModel: r.racket_model ?? undefined,
     stringType: r.string_type ?? undefined,
@@ -126,6 +140,9 @@ const paymentRows = (b: Booking) =>
     method: p.method,
     cashier: p.cashier,
     paid_at: p.at,
+    status: p.status ?? "settled",
+    reference: p.reference ?? null,
+    client_payment_id: p.clientPaymentId ?? p.id,
   }));
 
 /** Write (or re-write) a booking and its payment history. */

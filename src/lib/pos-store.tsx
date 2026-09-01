@@ -68,6 +68,11 @@ import { setPosFormats, setPosTimeZone } from "./time-zone";
 import { receiveTransferInDb, saveTransfer, setTransferStatus } from "./stock-transfers";
 import { commitBooking, deleteBookingRow, loadBookings, saveBookingQuietly } from "./bookings-db";
 import {
+  cancelBookingAuthoritative,
+  collectBookingPayment,
+  readBookingBalance,
+} from "./booking-collection";
+import {
   clearSectionOverride,
   emptyBranchSettings,
   emptyScopeIds,
@@ -231,7 +236,7 @@ type Ctx = {
     status: JobStatus,
     who: string,
     incidentNote?: string,
-  ) => Booking | null;
+  ) => Promise<Booking | null>;
   /** Edit the technical specs of an existing racket job before payment. */
   updateBookingSpecs: (id: string, job: RacketJob) => Booking | null;
   addBookingPayment: (
@@ -239,13 +244,20 @@ type Ctx = {
     amount: number,
     method: PaymentMethod,
     cashier: string,
+    clientPaymentId?: string,
   ) => Promise<Booking | null>;
   collectBooking: (
     id: string,
     amount: number,
     method: PaymentMethod,
+    clientPaymentId?: string,
   ) => Promise<{ booking: Booking; sale: Sale } | null>;
-  cancelBooking: (id: string, reason: string) => void;
+  cancelBooking: (
+    id: string,
+    reason: string,
+    terminal?: string | null,
+  ) => Promise<{ ok: true } | { ok: false; error: string }>;
+
   deleteBooking: (id: string, reason: string) => Promise<void>;
   upsertProduct: (product: Product) => Promise<CommitTarget>;
   removeProduct: (id: string) => Promise<BlockedDelete[]>;
@@ -1146,7 +1158,13 @@ export function PosProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addBookingPayment = useCallback(
-    async (id: string, amount: number, method: PaymentMethod, cashier: string) => {
+    async (
+      id: string,
+      amount: number,
+      method: PaymentMethod,
+      cashier: string,
+      clientPaymentId?: string,
+    ) => {
       const current = stateRef.current.bookings.find((b) => b.id === id);
       if (!current || current.status !== "active" || amount <= 0) return null;
       const payment: BookingPayment = {
@@ -1156,50 +1174,101 @@ export function PosProvider({ children }: { children: ReactNode }) {
         at: new Date().toISOString(),
         cashier,
       };
-      const updated: Booking = {
-        ...current,
-        paid: r2(current.paid + payment.amount),
-        payments: [...current.payments, payment],
-      };
-      await commitBooking(updated);
-      setState((s) => ({
-        ...s,
-        bookings: s.bookings.map((b) => (b.id === id ? updated : b)),
-      }));
+      // The server records the tender and reports the settled total back; the
+      // till never adds money up on its own when the cloud is reachable.
+      const server = await collectBookingPayment({
+        bookingId: id,
+        amount: payment.amount,
+        method,
+        cashier,
+        clientPaymentId: clientPaymentId ?? payment.id,
+        complete: false,
+      });
+      let updated: Booking;
+      if (server.ok) {
+        updated = {
+          ...current,
+          paid: server.state.settledPaid,
+          payments: server.state.duplicate ? current.payments : [...current.payments, payment],
+        };
+        setState((s) => ({
+          ...s,
+          bookings: s.bookings.map((b) => (b.id === id ? updated : b)),
+        }));
+      } else {
+        // Offline: queue the payment exactly as the till always has.
+        updated = {
+          ...current,
+          paid: r2(current.paid + payment.amount),
+          payments: [...current.payments, payment],
+        };
+        await commitBooking(updated);
+        setState((s) => ({
+          ...s,
+          bookings: s.bookings.map((b) => (b.id === id ? updated : b)),
+        }));
+      }
       logger.log("sale_event", "Booking part payment", "bookings", {
         ref: updated.ref,
         amount: payment.amount,
         method,
         paid: updated.paid,
         balance: bookingBalance(updated),
+        authoritative: server.ok,
       });
       return updated;
     },
     [],
   );
 
-  const cancelBooking = useCallback((id: string, reason: string) => {
-    const current = stateRef.current.bookings.find((b) => b.id === id);
-    if (!current || current.status !== "active") return;
-    const cancelled: Booking = {
-      ...current,
-      status: "cancelled",
-      closedAt: new Date().toISOString(),
-      note: reason
-        ? `${current.note ? `${current.note} · ` : ""}Cancelled: ${reason}`
-        : current.note,
-    };
-    setState((s) => ({
-      ...s,
-      bookings: s.bookings.map((b) => (b.id === id ? cancelled : b)),
-    }));
-    saveBookingQuietly(cancelled);
-    logger.log("sale_event", "Booking cancelled", "bookings", {
-      ref: current.ref,
-      reason,
-      refundable: current.paid,
-    });
-  }, []);
+  /**
+   * Cancelling is a server call: the reason, who did it and when are stored
+   * permanently, and an empty reason is refused in the database.
+   */
+  const cancelBooking = useCallback(
+    async (
+      id: string,
+      reason: string,
+      terminal?: string | null,
+    ): Promise<{ ok: true } | { ok: false; error: string }> => {
+      const current = stateRef.current.bookings.find((b) => b.id === id);
+      if (!current) return { ok: false, error: "Booking not found." };
+      if (current.status !== "active") return { ok: false, error: "This booking is already closed." };
+      const clean = reason.trim();
+      if (clean.length < 3) return { ok: false, error: "A cancellation reason is required." };
+      const who = user?.name || current.cashier || "Counter";
+      const res = await cancelBookingAuthoritative({
+        bookingId: id,
+        reason: clean,
+        cancelledBy: who,
+        terminal: terminal ?? null,
+      });
+      if (!res.ok) return res;
+      const cancelled: Booking = {
+        ...current,
+        status: "cancelled",
+        closedAt: new Date().toISOString(),
+        cancelReason: clean,
+        cancelledBy: who,
+        cancelledAt: new Date().toISOString(),
+        ...(terminal ? { cancelledTerminal: terminal } : {}),
+      };
+      setState((s) => ({
+        ...s,
+        bookings: s.bookings.map((b) => (b.id === id ? cancelled : b)),
+      }));
+      logger.log("sale_event", "Booking cancelled", "bookings", {
+        ref: current.ref,
+        reason: clean,
+        by: who,
+        refundable: current.paid,
+      });
+      return { ok: true };
+    },
+    [user],
+
+  );
+
 
   /** Remove a booking / job card altogether, with the reason on the record. */
   const deleteBooking = useCallback(async (id: string, reason: string) => {
@@ -1218,11 +1287,27 @@ export function PosProvider({ children }: { children: ReactNode }) {
     await deleteBookingRow(id).catch(() => undefined);
   }, []);
 
-  /** Move a racket through received → strung → ready → collected. */
+  /**
+   * Move a racket through received → strung → ready → collected. Handing one
+   * over is only allowed once the server agrees nothing is owed.
+   */
   const setBookingJobStatus = useCallback(
-    (id: string, status: JobStatus, who: string, incidentNote?: string) => {
+    async (id: string, status: JobStatus, who: string, incidentNote?: string) => {
       const current = stateRef.current.bookings.find((b) => b.id === id);
       if (!current) return null;
+      if (status === "collected") {
+        const check = await readBookingBalance(id);
+        if (!check.ok) {
+          toast.error("Payment could not be verified", { description: check.error });
+          return null;
+        }
+        if (!check.state.fullyPaid) {
+          toast.error("A balance is still outstanding", {
+            description: `${money(check.state.outstanding)} must be collected first.`,
+          });
+          return null;
+        }
+      }
       const updated: Booking = {
         ...current,
         jobStatus: status,
@@ -1247,6 +1332,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+
   /** Rewrite the job card of a booking that has not been collected yet. */
   const updateBookingSpecs = useCallback((id: string, job: RacketJob) => {
     const current = stateRef.current.bookings.find((b) => b.id === id);
@@ -1262,12 +1348,43 @@ export function PosProvider({ children }: { children: ReactNode }) {
     return updated;
   }, []);
 
+  /**
+   * Hand a booking over. The server checks the outstanding amount, takes the
+   * final tender and closes the booking in one go; only then is a sale
+   * receipt written, so a booking can never be collected unpaid.
+   */
   const collectBooking = useCallback(
-    async (id: string, amount: number, method: PaymentMethod) => {
+    async (id: string, amount: number, method: PaymentMethod, clientPaymentId?: string) => {
       const current = stateRef.current.bookings.find((b) => b.id === id);
       if (!current || current.status !== "active") return null;
-      const balance = bookingBalance(current);
-      const settled = r2(Math.min(Math.max(amount, 0), balance));
+
+      const check = await readBookingBalance(id);
+      if (!check.ok) {
+        toast.error("Payment could not be verified", { description: check.error });
+        return null;
+      }
+      const outstanding = check.state.outstanding;
+      const settled = r2(Math.min(Math.max(amount, 0), outstanding));
+      if (outstanding > 0 && settled < outstanding) {
+        toast.error("A balance is still outstanding", {
+          description: `${money(outstanding)} must be collected before handover.`,
+        });
+        return null;
+      }
+
+      const server = await collectBookingPayment({
+        bookingId: id,
+        amount: settled,
+        method,
+        cashier: current.cashier,
+        clientPaymentId: clientPaymentId ?? crypto.randomUUID(),
+        complete: true,
+      });
+      if (!server.ok) {
+        toast.error("Collection refused", { description: server.error });
+        return null;
+      }
+
       const sale = await recordSale({
         storeId: current.storeId,
         shiftId: activeShift?.id ?? current.shiftId,
@@ -1277,7 +1394,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
         tax: current.tax,
         total: current.total,
         paid: current.total,
-        change: r2(Math.max(0, amount - balance)),
+        change: r2(Math.max(0, amount - outstanding)),
         method,
         memberId: current.memberId,
         pointsEarned: 0,
@@ -1285,7 +1402,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
         bookingRef: current.ref,
       });
       const finalPayment: BookingPayment = {
-        id: crypto.randomUUID(),
+        id: clientPaymentId ?? crypto.randomUUID(),
         amount: settled,
         method,
         at: new Date().toISOString(),
@@ -1293,15 +1410,18 @@ export function PosProvider({ children }: { children: ReactNode }) {
       };
       const updated: Booking = {
         ...current,
-        paid: r2(current.paid + settled),
-        payments: settled ? [...current.payments, finalPayment] : current.payments,
+        paid: server.state.settledPaid,
+        payments:
+          settled && !server.state.duplicate
+            ? [...current.payments, finalPayment]
+            : current.payments,
         status: "collected",
         closedAt: new Date().toISOString(),
         saleReceiptNo: sale.receiptNo,
         jobStatus: current.job ? "collected" : current.jobStatus,
         jobStatusAt: current.job ? new Date().toISOString() : current.jobStatusAt,
       };
-      await commitBooking(updated);
+      saveBookingQuietly(updated);
       setState((s) => ({
         ...s,
         bookings: s.bookings.map((b) => (b.id === id ? updated : b)),
@@ -1316,6 +1436,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     },
     [activeShift, recordSale],
   );
+
 
   const refundSale = useCallback((saleId: string) => {
     logger.log("sale_event", "Sale refunded", "receipts", {

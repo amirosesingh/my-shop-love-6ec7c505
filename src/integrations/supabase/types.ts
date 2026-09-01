@@ -343,31 +343,46 @@ export type Database = {
           amount: number
           booking_id: string
           cashier: string | null
+          client_payment_id: string | null
           created_at: string
           id: string
           method: string
           paid_at: string
+          reference: string | null
+          reversed_at: string | null
+          reversed_by: string | null
           row_version: number
+          status: string
         }
         Insert: {
           amount?: number
           booking_id: string
           cashier?: string | null
+          client_payment_id?: string | null
           created_at?: string
           id?: string
           method?: string
           paid_at?: string
+          reference?: string | null
+          reversed_at?: string | null
+          reversed_by?: string | null
           row_version?: number
+          status?: string
         }
         Update: {
           amount?: number
           booking_id?: string
           cashier?: string | null
+          client_payment_id?: string | null
           created_at?: string
           id?: string
           method?: string
           paid_at?: string
+          reference?: string | null
+          reversed_at?: string | null
+          reversed_by?: string | null
           row_version?: number
+          status?: string
         }
         Relationships: [
           {
@@ -381,6 +396,10 @@ export type Database = {
       }
       bookings: {
         Row: {
+          cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          cancelled_terminal: string | null
           cashier: string | null
           charges: Json
           closed_at: string | null
@@ -431,6 +450,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          cancelled_terminal?: string | null
           cashier?: string | null
           charges?: Json
           closed_at?: string | null
@@ -481,6 +504,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          cancelled_terminal?: string | null
           cashier?: string | null
           charges?: Json
           closed_at?: string | null
@@ -3840,6 +3867,106 @@ export type Database = {
           full_name: string
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
+        }[]
+      }
+      booking_balance_state: {
+        Args: { _booking_id: string }
+        Returns: {
+          booking_id: string
+          fully_paid: boolean
+          job_status: string
+          outstanding: number
+          settled_paid: number
+          status: string
+          total: number
+        }[]
+      }
+      booking_cancel: {
+        Args: {
+          _booking_id: string
+          _cancelled_by?: string
+          _reason: string
+          _terminal?: string
+        }
+        Returns: {
+          cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          cancelled_terminal: string | null
+          cashier: string | null
+          charges: Json
+          closed_at: string | null
+          created_at: string
+          customer_name: string
+          customer_phone: string
+          discount: number
+          dropped_off_at: string | null
+          due_date: string | null
+          grip_product_id: string | null
+          grommet_notes: string | null
+          id: string
+          incident_note: string | null
+          intake_note: string | null
+          job_notes: string | null
+          job_status: string
+          job_status_at: string | null
+          job_status_by: string | null
+          liability_accepted: boolean
+          lines: Json
+          member_id: string | null
+          note: string
+          notify_whatsapp: boolean
+          paid: number
+          payment_timing: string | null
+          promised_at: string | null
+          racket_model: string | null
+          ref: string
+          row_version: number
+          sale_receipt_no: string | null
+          service_fee: number
+          service_name: string | null
+          service_type_id: string | null
+          shift_id: string | null
+          status: string
+          store_id: string | null
+          string_origin: string | null
+          string_source_product_id: string | null
+          string_type: string | null
+          subtotal: number
+          tag_id: string | null
+          tax: number
+          technician: string | null
+          tension_cross: number | null
+          tension_main: number | null
+          tension_unit: string
+          total: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "bookings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      booking_collect: {
+        Args: {
+          _amount: number
+          _booking_id: string
+          _cashier?: string
+          _client_payment_id?: string
+          _complete?: boolean
+          _method: string
+          _reference?: string
+        }
+        Returns: {
+          duplicate: boolean
+          fully_paid: boolean
+          job_status: string
+          outstanding: number
+          settled_paid: number
+          status: string
+          total: number
         }[]
       }
       campaign_is_live: {

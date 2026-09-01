@@ -447,6 +447,12 @@ export type BookingPayment = {
   method: PaymentMethod;
   at: string;
   cashier: string;
+  /** settled money counts towards the balance; reversed / void never does */
+  status?: "settled" | "reversed" | "void";
+  /** voucher serial, card slip or transfer reference */
+  reference?: string;
+  /** repeat-proof id sent by the till so a retry cannot double-charge */
+  clientPaymentId?: string;
 };
 
 /** Where a racket sits in the stringing workflow. */
@@ -580,10 +586,23 @@ export type Booking = {
   technician?: string;
   /** why the job was marked damaged or cancelled */
   incidentNote?: string;
+  /** permanent cancellation record, written once by the server */
+  cancelReason?: string;
+  cancelledBy?: string;
+  cancelledAt?: string;
+  cancelledTerminal?: string;
 };
 
+/**
+ * Display-only balance. Never use this to decide whether a booking may be
+ * collected — the server owns that call (see `src/lib/booking-collection.ts`).
+ */
 export const bookingBalance = (b: Pick<Booking, "total" | "paid">) =>
   r2(Math.max(0, b.total - b.paid));
+
+/** Anything at or below this is treated as fully settled. */
+export const MONEY_TOLERANCE = 0.005;
+
 
 /* -------------------------- stock adjustments -------------------------- */
 
