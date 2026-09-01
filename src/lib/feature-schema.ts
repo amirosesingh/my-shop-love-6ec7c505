@@ -139,15 +139,17 @@ export const FEATURES: FeatureDef[] = [
         ],
       },
       {
-        label: "Item movement written per sold line",
+        label: "Item movement written per sold, received or transferred line",
         table: "item_activity_logs",
         kind: "write",
-        source: "src/lib/pos-db.ts:636 (saleActivityRows)",
+        source:
+          "src/lib/pos-db.ts (saleActivityRows, receivingActivityRows) + stock_transfer_dispatch / stock_transfer_receive",
         columns: [
           "product_id", "product_name", "store_id", "activity_type", "reference",
           "quantity_delta", "unit_cost", "staff_name", "note", "created_at",
         ],
       },
+
     ],
   },
   {
