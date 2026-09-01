@@ -9,6 +9,7 @@ import {
   Tag,
   Wrench,
   Banknote,
+  Undo2,
   Trash2,
   ScanLine,
 } from "lucide-react";
@@ -94,6 +95,7 @@ function BookingsPage() {
     addBookingPayment,
     collectBooking,
     cancelBooking,
+    refundBooking,
     deleteBooking,
     setBookingJobStatus,
   } = usePos();
@@ -132,6 +134,14 @@ function BookingsPage() {
   const [cancelling, setCancelling] = useState<Booking | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelBusy, setCancelBusy] = useState(false);
+  /** What happens to money already taken when a paid booking is cancelled. */
+  const [cancelMoney, setCancelMoney] = useState<"refunded" | "retained">("refunded");
+  /** Handing money back on a booking, capped by the server at what was taken. */
+  const [refundFor, setRefundFor] = useState<Booking | null>(null);
+  const [refundAmount, setRefundAmount] = useState("");
+  const [refundMethod, setRefundMethod] = useState<PaymentMethod>("cash");
+  const [refundReason, setRefundReason] = useState("");
+  const [refundBusy, setRefundBusy] = useState(false);
   /**
    * One id per open payment dialog: pressing the button twice, or retrying
    * after a dropped connection, can never take the money a second time.
@@ -263,13 +273,25 @@ function BookingsPage() {
         const done = await collectBooking(payFor.id, value, method, token);
         if (!done) return;
         printSaleReceipt(done.sale, memberOf(payFor), "sale");
-        toast.success(`Booking ${done.booking.ref} collected · bill ${done.sale.receiptNo}`);
+        const change = r2(done.sale.change ?? 0);
+        toast.success(`Booking ${done.booking.ref} collected · bill ${done.sale.receiptNo}`, {
+          description: change > 0 ? `Change due ${money(change)}` : undefined,
+        });
       } else {
-        if (value > balance) {
+        if (value > balance && method !== "cash") {
           toast.error("Part payment cannot exceed the outstanding balance");
           return;
         }
-        const updated = await addBookingPayment(payFor.id, value, method, payFor.cashier, token);
+        if (value > balance) {
+          toast.info(`Change due ${money(r2(value - balance))}`);
+        }
+        const updated = await addBookingPayment(
+          payFor.id,
+          Math.min(value, balance),
+          method,
+          payFor.cashier,
+          token,
+        );
         if (!updated) return;
         printBookingPayment(updated, updated.payments[updated.payments.length - 1]);
         toast.success(`${money(value)} received · balance ${money(bookingBalance(updated))}`);
@@ -481,6 +503,11 @@ function BookingsPage() {
                               {b.cancelledAt
                                 ? ` · ${new Date(b.cancelledAt).toLocaleString()}`
                                 : ""}
+                              {b.cancelMoneyAction === "refunded"
+                                ? " · money refunded"
+                                : b.cancelMoneyAction === "retained"
+                                  ? " · money kept"
+                                  : ""}
                             </p>
                           )}
 
@@ -578,6 +605,22 @@ function BookingsPage() {
                             />
                           </>
                         )}
+                        {b.paid > 0 && b.status !== "cancelled" && (
+                          <ActionButton
+                            size="sm"
+                            variant="outline"
+                            layout="inline"
+                            label="Refund"
+                            icon={<Undo2 className="size-4" />}
+                            onClick={async () => {
+                              if (!(await requirePermission("can_process_refund"))) return;
+                              setRefundFor(b);
+                              setRefundAmount(b.paid.toFixed(2));
+                              setRefundMethod("cash");
+                              setRefundReason("");
+                            }}
+                          />
+                        )}
                         <ActionButton
                           size="sm"
                           variant="ghost"
@@ -657,6 +700,85 @@ function BookingsPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={!!refundFor} onOpenChange={(o) => !o && setRefundFor(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Refund · {refundFor?.ref}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label>Amount to hand back</Label>
+              <Input
+                inputMode="decimal"
+                value={refundAmount}
+                onChange={(e) => setRefundAmount(e.target.value)}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                {money(refundFor?.paid ?? 0)} has been taken on this booking. The database refuses
+                anything above that.
+              </p>
+            </div>
+            <div className="space-y-1">
+              <Label>Refund method</Label>
+              <div className="flex flex-wrap gap-2">
+                {(["cash", "card", "qr", "transfer"] as PaymentMethod[]).map((m) => (
+                  <Button
+                    key={m}
+                    type="button"
+                    size="sm"
+                    variant={refundMethod === m ? "default" : "outline"}
+                    onClick={() => setRefundMethod(m)}
+                  >
+                    {m}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Why is the money going back?</Label>
+              <Textarea
+                rows={3}
+                value={refundReason}
+                onChange={(e) => setRefundReason(e.target.value)}
+                placeholder="Customer cancelled the string upgrade after paying the deposit."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRefundFor(null)}>
+              Back
+            </Button>
+            <Button
+              disabled={refundBusy || refundReason.trim().length < 3}
+              onClick={async () => {
+                if (!refundFor) return;
+                setRefundBusy(true);
+                try {
+                  const res = await refundBooking(
+                    refundFor.id,
+                    r2(Number(refundAmount || 0)),
+                    refundMethod,
+                    refundReason.trim(),
+                  );
+                  if (!res.ok) {
+                    toast.error("Refund refused", { description: res.error });
+                    return;
+                  }
+                  toast.success(
+                    `${money(r2(Number(refundAmount || 0)))} refunded · paid now ${money(res.booking.paid)}`,
+                  );
+                  setRefundFor(null);
+                } finally {
+                  setRefundBusy(false);
+                }
+              }}
+            >
+              {refundBusy ? "Refunding…" : "Refund"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!cancelling} onOpenChange={(o) => !o && setCancelling(null)}>
         <DialogContent>
           <DialogHeader>
@@ -673,10 +795,25 @@ function BookingsPage() {
             <p className="text-[11px] text-muted-foreground">
               The reason, your name and the time are stored permanently against the booking and
               cannot be edited afterwards.
-              {cancelling && cancelling.paid > 0
-                ? ` ${money(cancelling.paid)} has already been paid and must be refunded separately.`
-                : ""}
             </p>
+            {cancelling && cancelling.paid > 0 && (
+              <div className="space-y-2 rounded-md border border-border p-3">
+                <Label>{money(cancelling.paid)} has already been paid — what happens to it?</Label>
+                <div className="flex gap-2">
+                  {(["refunded", "retained"] as const).map((opt) => (
+                    <Button
+                      key={opt}
+                      type="button"
+                      size="sm"
+                      variant={cancelMoney === opt ? "default" : "outline"}
+                      onClick={() => setCancelMoney(opt)}
+                    >
+                      {opt === "refunded" ? "Refund the customer" : "Keep as a charge"}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCancelling(null)}>
@@ -689,12 +826,24 @@ function BookingsPage() {
                 if (!cancelling) return;
                 setCancelBusy(true);
                 try {
-                  const res = await cancelBooking(cancelling.id, cancelReason.trim());
+                  const res = await cancelBooking(
+                    cancelling.id,
+                    cancelReason.trim(),
+                    null,
+                    cancelling.paid > 0 ? cancelMoney : null,
+                  );
                   if (!res.ok) {
                     toast.error("Cancellation refused", { description: res.error });
                     return;
                   }
-                  toast.success(`${cancelling.ref} cancelled · stock released`);
+                  toast.success(`${cancelling.ref} cancelled · stock released`, {
+                    description:
+                      cancelling.paid > 0
+                        ? cancelMoney === "refunded"
+                          ? `${money(cancelling.paid)} refunded to the customer.`
+                          : `${money(cancelling.paid)} kept as a cancellation charge.`
+                        : undefined,
+                  });
                   setCancelling(null);
                 } finally {
                   setCancelBusy(false);
