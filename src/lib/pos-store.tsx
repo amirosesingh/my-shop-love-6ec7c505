@@ -2190,11 +2190,15 @@ export function PosProvider({ children }: { children: ReactNode }) {
   const createTransfer = useCallback((input: NewTransfer) => {
     const now = new Date().toISOString();
     const { needsApproval, ...rest } = input;
+    // Nothing moves at creation any more. The note either waits for a
+    // supervisor or is pre-approved, and stock only leaves at dispatch.
     const transfer: Transfer = {
       ...rest,
       id: crypto.randomUUID(),
       ref: "",
-      status: input.kind === "transfer" && !needsApproval ? "in_transit" : "requested",
+      status: needsApproval ? "awaiting_approval" : "approved",
+      approvedBy: needsApproval ? undefined : input.createdBy,
+      approvedAt: needsApproval ? undefined : now,
       createdAt: now,
       updatedAt: now,
     };
@@ -2213,20 +2217,8 @@ export function PosProvider({ children }: { children: ReactNode }) {
       transfer.ref = `${input.kind === "transfer" ? "TRF" : "REQ"}-${String(
         transferCounter,
       ).padStart(5, "0")}`;
-      // Goods only leave the source store once they are actually in transit.
-      const products =
-        transfer.status === "in_transit"
-          ? bumpItems(s.products, input.items, input.fromStoreId, -1)
-          : s.products;
-      return { ...s, transferCounter, products, transfers: [transfer, ...s.transfers] };
+      return { ...s, transferCounter, transfers: [transfer, ...s.transfers] };
     });
-    if (transfer.status === "in_transit") {
-      void db.upsertProducts(
-        bumpItems(stateRef.current.products, input.items, input.fromStoreId, -1).filter((p) =>
-          input.items.some((i) => i.productId === p.id),
-        ),
-      );
-    }
     void saveTransfer({
       transfer,
       from: stateRef.current.stores.find((x) => x.id === transfer.fromStoreId),
@@ -2236,152 +2228,261 @@ export function PosProvider({ children }: { children: ReactNode }) {
     return transfer;
   }, []);
 
-  const approveTransfer = useCallback((id: string) => {
-    {
-      const s = stateRef.current;
-      const t = s.transfers.find((x) => x.id === id);
-      if (t && t.status === "requested")
-        void db.upsertProducts(
-          bumpItems(s.products, t.items, t.fromStoreId, -1).filter((p) =>
-            t.items.some((i) => i.productId === p.id),
-          ),
-        );
-    }
-    setState((s) => {
-      const t = s.transfers.find((x) => x.id === id);
-      if (!t || t.status !== "requested") return s;
-      return {
-        ...s,
-        products: bumpItems(s.products, t.items, t.fromStoreId, -1),
-        transfers: s.transfers.map((x) =>
-          x.id === id ? { ...x, status: "in_transit", updatedAt: new Date().toISOString() } : x,
-        ),
-      };
+  /** Quantities for a step, defaulting to the previous step's numbers. */
+  const linesFor = (t: Transfer, given: LineQty[] | undefined, ceiling: (i: TransferItem) => number) =>
+    t.items.map((i) => {
+      const typed = given?.find((l) => l.productId === i.productId)?.qty;
+      const cap = ceiling(i);
+      return { productId: i.productId, qty: Math.max(0, Math.min(typed ?? cap, cap)) };
     });
-    void setTransferStatus(id, "in_transit", actorRef.current).catch((e: unknown) =>
-      dbError("Approving transfer", e),
-    );
-    const transfer = stateRef.current.transfers.find((x) => x.id === id);
+
+  /**
+   * Approve: only records how many of each line are allowed. No stock moves,
+   * because nothing has been picked yet.
+   */
+  const approveTransfer = useCallback((id: string, lines?: LineQty[]) => {
+    const before = stateRef.current.transfers.find((x) => x.id === id);
+    if (!before || before.status !== "awaiting_approval") return;
+    const allowed = linesFor(before, lines, (i) => i.qty);
+
+    setState((s) => ({
+      ...s,
+      transfers: s.transfers.map((x) =>
+        x.id === id
+          ? {
+              ...x,
+              status: "approved",
+              approvedBy: actorRef.current,
+              approvedAt: new Date().toISOString(),
+              items: x.items.map((i) => ({
+                ...i,
+                approvedQty: allowed.find((l) => l.productId === i.productId)?.qty ?? i.qty,
+              })),
+              updatedAt: new Date().toISOString(),
+            }
+          : x,
+      ),
+    }));
+
+    void approveTransferInDb(id, actorRef.current, allowed).then((r) => {
+      if (!r.success) dbError("Approving transfer", new Error(r.error ?? "Unknown error"));
+    });
     logger.log("inventory", "Stock transfer approved", "transfers", {
       transferId: id,
-      ref: transfer?.ref ?? null,
-      fromStoreId: transfer?.fromStoreId ?? null,
-      toStoreId: transfer?.toStoreId ?? null,
+      ref: before.ref,
+      fromStoreId: before.fromStoreId,
+      toStoreId: before.toStoreId,
+      quantity: allowed.reduce((a, l) => a + l.qty, 0),
     });
     trackTransition({
       entity: "stock_transfer",
       entityId: id,
-      from: "requested",
-      to: "in_transit",
+      from: "awaiting_approval",
+      to: "approved",
       actorName: actorRef.current,
-      storeId: transfer?.fromStoreId ?? null,
-      metadata: { ref: transfer?.ref ?? null, toStoreId: transfer?.toStoreId ?? null },
+      storeId: before.fromStoreId,
+      metadata: { ref: before.ref, toStoreId: before.toStoreId, lines: allowed },
     });
   }, []);
 
-  const receiveTransfer = useCallback((id: string) => {
-    {
-      const s = stateRef.current;
-      const t = s.transfers.find((x) => x.id === id);
-      if (t && t.status === "in_transit")
-        void db.upsertProducts(
-          bumpItems(s.products, t.items, t.toStoreId, 1).filter((p) =>
-            t.items.some((i) => i.productId === p.id),
-          ),
-        );
-    }
-    setState((s) => {
-      const t = s.transfers.find((x) => x.id === id);
-      if (!t || t.status !== "in_transit") return s;
-      return {
-        ...s,
-        products: bumpItems(s.products, t.items, t.toStoreId, 1),
-        transfers: s.transfers.map((x) =>
-          x.id === id ? { ...x, status: "received", updatedAt: new Date().toISOString() } : x,
+  /**
+   * Dispatch: the goods physically leave. Whatever was not sent is simply not
+   * sent — the note closes here rather than carrying a remainder forward.
+   */
+  const dispatchTransfer = useCallback((id: string, lines?: LineQty[]) => {
+    const s0 = stateRef.current;
+    const before = s0.transfers.find((x) => x.id === id);
+    if (!before || before.status !== "approved") return;
+    const sent = linesFor(before, lines, (i) => i.approvedQty ?? i.qty);
+    const moving = sent.filter((l) => l.qty > 0);
+    const asked = before.items.reduce((a, i) => a + i.qty, 0);
+    const total = sent.reduce((a, l) => a + l.qty, 0);
+    const fulfilment: Transfer["fulfilment"] =
+      total === 0 ? "none" : total >= asked ? "full" : "partial";
+    const now = new Date().toISOString();
+
+    if (moving.length)
+      void db.upsertProducts(
+        bumpItems(s0.products, moving, before.fromStoreId, -1).filter((p) =>
+          moving.some((i) => i.productId === p.id),
         ),
-      };
+      );
+
+    setState((s) => ({
+      ...s,
+      products: bumpItems(s.products, moving, before.fromStoreId, -1),
+      transfers: s.transfers.map((x) =>
+        x.id === id
+          ? {
+              ...x,
+              status: "dispatched",
+              dispatchedBy: actorRef.current,
+              dispatchedAt: now,
+              closedAt: now,
+              fulfilment,
+              items: x.items.map((i) => ({
+                ...i,
+                dispatchedQty: sent.find((l) => l.productId === i.productId)?.qty ?? 0,
+              })),
+              updatedAt: now,
+            }
+          : x,
+      ),
+    }));
+
+    void dispatchTransferInDb(id, actorRef.current, sent).then((r) => {
+      if (!r.success) dbError("Dispatching transfer", new Error(r.error ?? "Unknown error"));
     });
+    logger.log("inventory", "Stock transfer dispatched", "transfers", {
+      transferId: id,
+      ref: before.ref,
+      fromStoreId: before.fromStoreId,
+      toStoreId: before.toStoreId,
+      quantity: total,
+      fulfilment,
+    });
+    trackTransition({
+      entity: "stock_transfer",
+      entityId: id,
+      from: "approved",
+      to: "dispatched",
+      actorName: actorRef.current,
+      storeId: before.fromStoreId,
+      metadata: { ref: before.ref, toStoreId: before.toStoreId, fulfilment, lines: sent },
+    });
+  }, []);
+
+  const receiveTransfer = useCallback((id: string, lines?: LineQty[]) => {
+    const s0 = stateRef.current;
+    const before = s0.transfers.find((x) => x.id === id);
+    if (!before || before.status !== "dispatched") return;
+    const got = linesFor(before, lines, (i) => i.dispatchedQty ?? i.approvedQty ?? i.qty);
+    const arriving = got.filter((l) => l.qty > 0);
+    const now = new Date().toISOString();
+
+    if (arriving.length)
+      void db.upsertProducts(
+        bumpItems(s0.products, arriving, before.toStoreId, 1).filter((p) =>
+          arriving.some((i) => i.productId === p.id),
+        ),
+      );
+
+    setState((s) => ({
+      ...s,
+      products: bumpItems(s.products, arriving, before.toStoreId, 1),
+      transfers: s.transfers.map((x) =>
+        x.id === id
+          ? {
+              ...x,
+              status: "received",
+              receivedBy: actorRef.current,
+              receivedAt: now,
+              items: x.items.map((i) => ({
+                ...i,
+                receivedQty: got.find((l) => l.productId === i.productId)?.qty ?? 0,
+              })),
+              updatedAt: now,
+            }
+          : x,
+      ),
+    }));
+
     // Stock already left the sender at dispatch, so the database only books
     // the goods in — and re-maps them when the branches sit in different groups.
-    void receiveTransferInDb(id, actorRef.current).then((r) => {
+    void receiveTransferInDb(id, actorRef.current, got).then((r) => {
       if (!r.success) dbError("Receiving transfer", new Error(r.error ?? "Unknown error"));
     });
-    const transfer = stateRef.current.transfers.find((x) => x.id === id);
     logger.log("inventory", "Stock transfer received", "transfers", {
       transferId: id,
-      ref: transfer?.ref ?? null,
-      fromStoreId: transfer?.fromStoreId ?? null,
-      toStoreId: transfer?.toStoreId ?? null,
+      ref: before.ref,
+      fromStoreId: before.fromStoreId,
+      toStoreId: before.toStoreId,
+      quantity: got.reduce((a, l) => a + l.qty, 0),
+      short: got.reduce((a, l) => a + l.qty, 0) <
+        before.items.reduce((a, i) => a + (i.dispatchedQty ?? i.qty), 0),
     });
     trackTransition({
       entity: "stock_transfer",
       entityId: id,
-      from: "in_transit",
+      from: "dispatched",
       to: "received",
       actorName: actorRef.current,
-      storeId: transfer?.toStoreId ?? null,
-      metadata: { ref: transfer?.ref ?? null, fromStoreId: transfer?.fromStoreId ?? null },
+      storeId: before.toStoreId,
+      metadata: { ref: before.ref, fromStoreId: before.fromStoreId, lines: got },
     });
   }, []);
 
-  const rejectTransfer = useCallback((id: string) => {
-    const transfer = stateRef.current.transfers.find((x) => x.id === id);
-    {
-      const s = stateRef.current;
-      const t = s.transfers.find((x) => x.id === id);
-      if (t && t.status === "in_transit")
-        void db.upsertProducts(
-          bumpItems(s.products, t.items, t.fromStoreId, 1).filter((p) =>
-            t.items.some((i) => i.productId === p.id),
-          ),
-        );
-    }
-    setState((s) => {
-      const t = s.transfers.find((x) => x.id === id);
-      if (!t || (t.status !== "requested" && t.status !== "in_transit")) return s;
-      // If stock already left the source store, put it back.
-      const products =
-        t.status === "in_transit" ? bumpItems(s.products, t.items, t.fromStoreId, 1) : s.products;
-      void setTransferStatus(
-        id,
-        t.status === "in_transit" ? "cancelled" : "rejected",
-        actorRef.current,
-      ).catch((e: unknown) => dbError("Updating transfer", e));
-      return {
-        ...s,
-        products,
-        transfers: s.transfers.map((x) =>
-          x.id === id
-            ? {
-                ...x,
-                status: t.status === "in_transit" ? "cancelled" : "rejected",
-                updatedAt: new Date().toISOString(),
-              }
-            : x,
+  /**
+   * Turn the note down, or call it off after dispatch. Either way a reason is
+   * required, and goods already sent come back to the sending branch.
+   */
+  const rejectTransfer = useCallback((id: string, reason: string) => {
+    const s0 = stateRef.current;
+    const before = s0.transfers.find((x) => x.id === id);
+    if (!before) return;
+    if (!["awaiting_approval", "approved", "dispatched"].includes(before.status)) return;
+    const next: TransferStatus = before.status === "dispatched" ? "cancelled" : "rejected";
+    const returning =
+      before.status === "dispatched"
+        ? before.items
+            .map((i) => ({ productId: i.productId, qty: i.dispatchedQty ?? i.qty }))
+            .filter((l) => l.qty > 0)
+        : [];
+    const now = new Date().toISOString();
+
+    if (returning.length)
+      void db.upsertProducts(
+        bumpItems(s0.products, returning, before.fromStoreId, 1).filter((p) =>
+          returning.some((i) => i.productId === p.id),
         ),
-      };
-    });
+      );
+
+    setState((s) => ({
+      ...s,
+      products: returning.length
+        ? bumpItems(s.products, returning, before.fromStoreId, 1)
+        : s.products,
+      transfers: s.transfers.map((x) =>
+        x.id === id
+          ? {
+              ...x,
+              status: next,
+              ...(next === "rejected"
+                ? { rejectedReason: reason }
+                : { cancelledReason: reason }),
+              updatedAt: now,
+            }
+          : x,
+      ),
+    }));
+
+    void setTransferStatus(id, next, actorRef.current, reason).catch((e: unknown) =>
+      dbError("Updating transfer", e),
+    );
     logger.log(
       "inventory",
-      transfer?.status === "in_transit" ? "Stock transfer cancelled" : "Stock transfer rejected",
+      next === "cancelled" ? "Stock transfer cancelled" : "Stock transfer rejected",
       "transfers",
       {
         transferId: id,
-        ref: transfer?.ref ?? null,
-        fromStoreId: transfer?.fromStoreId ?? null,
-        toStoreId: transfer?.toStoreId ?? null,
+        ref: before.ref,
+        fromStoreId: before.fromStoreId,
+        toStoreId: before.toStoreId,
+        reason,
       },
     );
     trackTransition({
       entity: "stock_transfer",
       entityId: id,
-      from: transfer?.status ?? null,
-      to: transfer?.status === "in_transit" ? "cancelled" : "rejected",
+      from: before.status,
+      to: next,
+      reason,
       actorName: actorRef.current,
-      storeId: transfer?.toStoreId ?? null,
-      metadata: { ref: transfer?.ref ?? null, fromStoreId: transfer?.fromStoreId ?? null },
+      storeId: before.fromStoreId,
+      metadata: { ref: before.ref, toStoreId: before.toStoreId },
     });
   }, []);
+
 
   const reset = useCallback(() => setState(emptyState), []);
 
