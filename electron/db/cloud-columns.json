@@ -231,7 +231,8 @@
     "row_version",
     "is_verified",
     "verified_at",
-    "verified_channel"
+    "verified_channel",
+    "deleted_at"
   ],
   "membership_tiers": [
     "id",
@@ -240,7 +241,8 @@
     "points_multiplier",
     "created_at",
     "updated_at",
-    "row_version"
+    "row_version",
+    "deleted_at"
   ],
   "payment_transactions": [
     "id",
@@ -275,7 +277,8 @@
     "is_primary",
     "created_at",
     "updated_at",
-    "row_version"
+    "row_version",
+    "deleted_at"
   ],
   "product_categories": [
     "id",
@@ -285,7 +288,8 @@
     "created_at",
     "updated_at",
     "kind",
-    "row_version"
+    "row_version",
+    "deleted_at"
   ],
   "products": [
     "id",
@@ -315,7 +319,8 @@
     "brand",
     "product_group",
     "barcode_variants",
-    "row_version"
+    "row_version",
+    "deleted_at"
   ],
   "promotions": [
     "id",
@@ -332,7 +337,8 @@
     "end_date",
     "created_at",
     "updated_at",
-    "row_version"
+    "row_version",
+    "deleted_at"
   ],
   "purchase_order_items": [
     "id",
@@ -665,7 +671,8 @@
     "is_active",
     "archived_at",
     "is_primary_sub",
-    "receipt_prefix"
+    "receipt_prefix",
+    "deleted_at"
   ],
   "suppliers": [
     "id",
@@ -679,7 +686,8 @@
     "is_active",
     "created_at",
     "updated_at",
-    "row_version"
+    "row_version",
+    "deleted_at"
   ],
   "uom_units": [
     "id",
@@ -689,6 +697,7 @@
     "sort",
     "created_at",
     "updated_at",
-    "row_version"
+    "row_version",
+    "deleted_at"
   ]
 }
