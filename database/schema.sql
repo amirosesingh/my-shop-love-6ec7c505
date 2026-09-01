@@ -2414,6 +2414,8 @@ BEGIN
   IF COL_LENGTH('dbo.sales', 'coupon_scope') IS NULL ALTER TABLE dbo.sales ADD [coupon_scope] NVARCHAR(MAX);
   IF COL_LENGTH('dbo.sales', 'coupon_discount') IS NULL ALTER TABLE dbo.sales ADD [coupon_discount] DECIMAL(18,4) DEFAULT 0;
   IF COL_LENGTH('dbo.sales', 'payments') IS NULL ALTER TABLE dbo.sales ADD [payments] NVARCHAR(MAX) DEFAULT N'[]';
+  IF COL_LENGTH('dbo.sales', 'rounding_adjustment') IS NULL ALTER TABLE dbo.sales ADD [rounding_adjustment] DECIMAL(18,4) DEFAULT 0;
+  IF COL_LENGTH('dbo.sales', 'rounding_label') IS NULL ALTER TABLE dbo.sales ADD [rounding_label] NVARCHAR(120) NULL;
   IF COL_LENGTH('dbo.sales', 'client_transaction_id') IS NULL ALTER TABLE dbo.sales ADD [client_transaction_id] NVARCHAR(400);
   IF COL_LENGTH('dbo.sales', 'cashier_id') IS NULL ALTER TABLE dbo.sales ADD [cashier_id] NVARCHAR(400);
   IF COL_LENGTH('dbo.sales', 'created_by') IS NULL ALTER TABLE dbo.sales ADD [created_by] NVARCHAR(MAX);
