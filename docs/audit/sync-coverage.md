@@ -36,10 +36,7 @@ feature or the sync contract.
 
 ## Gaps between intent and reality
 
-- **booking_payments** — Needed after a rebuild, but is not restorable.
-- **bookings** — Needed after a rebuild, but is not restorable.
-- **stock_transfer_items** — Needed after a rebuild, but is not restorable.
-- **stock_transfers** — Needed after a rebuild, but is not restorable.
+None — every table behaves the way its feature declared.
 
 ## Undecided tables
 
