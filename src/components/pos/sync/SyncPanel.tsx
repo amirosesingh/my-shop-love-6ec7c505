@@ -76,13 +76,17 @@ export function SyncPanel({ className }: { className?: string }) {
           </p>
         </div>
         {/* The single sync trigger for the whole app. */}
-        <Button size="sm" disabled={busy} onClick={() => void runExclusive("manual")}>
-          <RefreshCw className={cn("size-4", busy && "animate-spin")} />
-          {busy ? "Syncing…" : "Sync now"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <RestoreHistoryButton disabled={busy} />
+          <Button size="sm" disabled={busy} onClick={() => void runExclusive("manual")}>
+            <RefreshCw className={cn("size-4", busy && "animate-spin")} />
+            {busy ? "Syncing…" : "Sync now"}
+          </Button>
+        </div>
       </div>
 
       <Progress value={busy ? run.progress : run.tables.length ? 100 : 0} className="h-1.5" />
+
 
       <div className="w-full overflow-x-auto rounded-md border border-border">
         <table className="w-full text-left text-xs">
