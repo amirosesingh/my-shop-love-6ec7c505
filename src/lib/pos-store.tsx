@@ -65,7 +65,14 @@ import { activeLocations, archiveBlockers } from "./locations";
 import { branchPolicy } from "./branch-policy";
 import { setActiveBranchSyncPolicy } from "./sync-policy";
 import { setPosFormats, setPosTimeZone } from "./time-zone";
-import { receiveTransferInDb, saveTransfer, setTransferStatus } from "./stock-transfers";
+import {
+  approveTransferInDb,
+  dispatchTransferInDb,
+  receiveTransferInDb,
+  saveTransfer,
+  setTransferStatus,
+  type LineQty,
+} from "./stock-transfers";
 import { commitBooking, deleteBookingRow, loadBookings, saveBookingQuietly } from "./bookings-db";
 import { trackTransition } from "./status-history";
 import {
@@ -309,9 +316,12 @@ type Ctx = {
   /** Lock a block so no branch can override it. */
   setSectionLocked: (section: SettingsSectionId, locked: boolean) => Promise<void>;
   createTransfer: (input: NewTransfer) => Transfer;
-  approveTransfer: (id: string) => void;
-  receiveTransfer: (id: string) => void;
-  rejectTransfer: (id: string) => void;
+  /** authorise the note, optionally cutting quantities back */
+  approveTransfer: (id: string, lines?: LineQty[]) => void;
+  /** send what is actually on the shelf — this closes the request */
+  dispatchTransfer: (id: string, lines?: LineQty[]) => void;
+  receiveTransfer: (id: string, lines?: LineQty[]) => void;
+  rejectTransfer: (id: string, reason: string) => void;
   reset: () => void;
 };
 
@@ -2445,6 +2455,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     updateSettings,
     createTransfer,
     approveTransfer,
+    dispatchTransfer,
     receiveTransfer,
     rejectTransfer,
     reset,
