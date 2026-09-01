@@ -419,14 +419,14 @@ function Transfers() {
             </TableHeader>
             <TableBody>
               {visible.map((t) => {
-                const showApprove =
-                  t.status === "requested" &&
-                  t.fromStoreId === currentStore.id &&
-                  canApprove;
+                const mineToSend = t.fromStoreId === currentStore.id;
+                const showApprove = t.status === "awaiting_approval" && mineToSend && canApprove;
+                const showDispatch = t.status === "approved" && mineToSend;
                 const canReceive =
-                  t.status === "in_transit" &&
+                  t.status === "dispatched" &&
                   t.toStoreId === currentStore.id &&
                   can("can_receive_transfer");
+                const open = ["awaiting_approval", "approved", "dispatched"].includes(t.status);
                 return (
                   <TableRow key={t.id}>
                     <TableCell className="numeric">
@@ -441,6 +441,16 @@ function Transfers() {
                           <div key={i.productId} className="text-sm">
                             {productOf(i.productId)?.name ?? "—"}
                             <span className="numeric text-muted-foreground"> × {i.qty}</span>
+                            {/* Every quantity the line picked up on its way. */}
+                            {(i.approvedQty !== undefined ||
+                              i.dispatchedQty !== undefined ||
+                              i.receivedQty !== undefined) && (
+                              <span className="numeric text-[11px] text-muted-foreground">
+                                {i.approvedQty !== undefined && ` · appr ${i.approvedQty}`}
+                                {i.dispatchedQty !== undefined && ` · sent ${i.dispatchedQty}`}
+                                {i.receivedQty !== undefined && ` · recv ${i.receivedQty}`}
+                              </span>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -462,8 +472,18 @@ function Transfers() {
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className={statusStyle[t.status]}>
-                        {t.status.replace("_", " ")}
+                        {TRANSFER_STATUS_LABELS[t.status]}
                       </Badge>
+                      {t.fulfilment && t.fulfilment !== "full" && (
+                        <div className="text-[10px] text-warning">
+                          {fulfilmentLabel[t.fulfilment]}
+                        </div>
+                      )}
+                      {(t.rejectedReason || t.cancelledReason) && (
+                        <div className="max-w-40 truncate text-[10px] text-muted-foreground">
+                          {t.rejectedReason ?? t.cancelledReason}
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
@@ -471,45 +491,41 @@ function Transfers() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => {
-                              approveTransfer(t.id);
-                              print(t);
-                              toast.success(`${t.ref} authorised and dispatched`);
-                            }}
+                            onClick={() => setStep({ id: t.id, step: "approve" })}
                           >
                             <Check className="size-4" /> Approve
                           </Button>
                         )}
-                        {t.status === "requested" && !showApprove && (
+                        {t.status === "awaiting_approval" && !showApprove && (
                           <span className="text-[11px] text-muted-foreground">
                             Waiting for approval
                           </span>
+                        )}
+                        {showDispatch && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setStep({ id: t.id, step: "dispatch" })}
+                          >
+                            <Send className="size-4" /> Dispatch
+                          </Button>
                         )}
                         {canReceive && (
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => {
-                              receiveTransfer(t.id);
-                              toast.success(`${t.ref} received into ${currentStore.name}`);
-                            }}
+                            onClick={() => setStep({ id: t.id, step: "receive" })}
                           >
                             <Truck className="size-4" /> Receive
                           </Button>
                         )}
-                        {(t.status === "requested" || t.status === "in_transit") && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => {
-                              rejectTransfer(t.id);
-                              toast.success(`${t.ref} cancelled`);
-                            }}
-                          >
+                        {open && (
+                          <Button size="sm" variant="ghost" onClick={() => setReasonFor(t.id)}>
                             <X className="size-4 text-destructive" />
                           </Button>
                         )}
                         <Button size="sm" variant="ghost" onClick={() => print(t)}>
+
                           <Printer className="size-4" />
                         </Button>
                       </div>
