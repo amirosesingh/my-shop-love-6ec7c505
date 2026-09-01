@@ -71,7 +71,17 @@ export function ItemActivityDrawer({
           orderBy: { column: "created_at", ascending: false },
           limit: 100,
         }),
+        // Sales, goods received and transfers all write here, so this is the
+        // one list that shows stock arriving as well as leaving.
+        ask("item_activity_logs", {
+          columns:
+            "id,created_at,activity_type,reference,quantity_delta,stock_before,stock_after,unit_cost,staff_name,note,store_id",
+          match: { product_id: product.id },
+          orderBy: { column: "created_at", ascending: false },
+          limit: 200,
+        }),
       ]);
+
       if (!live) return;
       setSource(
         [adjustments, transfers, meta, merges].some((r) => r.source === "local")
