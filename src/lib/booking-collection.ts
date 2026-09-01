@@ -17,6 +17,8 @@ export type BookingBalanceState = {
   jobStatus: string | null;
   /** the payment was already recorded (retry / another terminal) */
   duplicate?: boolean;
+  /** cash handed back when the customer over-tendered */
+  changeDue?: number;
 };
 
 export type BookingMoneyResult =
@@ -35,6 +37,7 @@ const toState = (row: Record<string, unknown>): BookingBalanceState => ({
   status: String(row["status"] ?? ""),
   jobStatus: (row["job_status"] as string) ?? null,
   duplicate: !!row["duplicate"],
+  changeDue: Number(row["change_due"] ?? 0),
 });
 
 /** What the server says is still owed on this booking, right now. */
@@ -89,12 +92,47 @@ export async function collectBookingPayment(input: {
   }
 }
 
+/**
+ * Hand money back. The server caps the refund at what was actually taken and
+ * writes a negative payment line, so the history is never rewritten.
+ */
+export async function refundBookingPayment(input: {
+  bookingId: string;
+  amount: number;
+  method: PaymentMethod;
+  reason: string;
+  cashier?: string | null;
+  clientPaymentId: string;
+}): Promise<BookingMoneyResult> {
+  try {
+    const res = await supabase.rpc("booking_refund" as never, {
+      _booking_id: input.bookingId,
+      _amount: input.amount,
+      _method: input.method,
+      _reason: input.reason,
+      _cashier: input.cashier ?? null,
+      _client_payment_id: input.clientPaymentId,
+    } as never);
+    if (res.error) return { ok: false, error: readable(message(res.error, "Refund refused.")) };
+    const row = (Array.isArray(res.data) ? res.data[0] : res.data) as
+      | Record<string, unknown>
+      | undefined;
+    if (!row) return { ok: false, error: "The server did not confirm the refund." };
+    return { ok: true, state: toState(row) };
+  } catch (e) {
+    return { ok: false, error: message(e, "The central database could not be reached.") };
+  }
+}
+
 /** Cancel a booking with a reason the server stores for good. */
 export async function cancelBookingAuthoritative(input: {
   bookingId: string;
   reason: string;
   cancelledBy?: string | null;
   terminal?: string | null;
+  /** what happens to money already taken — required once anything is held */
+  moneyAction?: "refunded" | "retained" | null;
+  clientPaymentId?: string | null;
 }): Promise<{ ok: true; row: Record<string, unknown> } | { ok: false; error: string }> {
   try {
     const res = await supabase.rpc("booking_cancel" as never, {
@@ -102,6 +140,8 @@ export async function cancelBookingAuthoritative(input: {
       _reason: input.reason,
       _cancelled_by: input.cancelledBy ?? null,
       _terminal: input.terminal ?? null,
+      _money_action: input.moneyAction ?? null,
+      _client_payment_id: input.clientPaymentId ?? null,
     } as never);
     if (res.error)
       return { ok: false, error: readable(message(res.error, "The cancellation was refused.")) };
@@ -128,6 +168,14 @@ export function readable(raw: string): string {
     return "That is more than the amount still outstanding — refresh and try again.";
   if (raw.includes("BOOKING_BALANCE_DUE"))
     return "A balance is still outstanding, so this booking cannot be marked collected.";
+  if (raw.includes("PERMISSION_DENIED_REFUND_BOOKING"))
+    return "You do not have permission to process refunds.";
+  if (raw.includes("REFUND_REASON_REQUIRED")) return "A refund reason is required.";
+  if (raw.includes("REFUND_AMOUNT_INVALID")) return "Enter a refund amount greater than zero.";
+  if (raw.includes("REFUND_EXCEEDS_PAID"))
+    return "That is more than has been taken on this booking.";
+  if (raw.includes("CANCEL_MONEY_DECISION_REQUIRED"))
+    return "Money is held on this booking — say whether it is refunded or retained.";
   if (raw.includes("BOOKING_NOT_FOUND")) return "This booking is not in the central database.";
   return raw;
 }
