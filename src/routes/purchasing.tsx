@@ -838,7 +838,10 @@ function Purchasing() {
         totalCost: cost,
         itemCount: editing.lines.length,
       };
-      await db.updateReceivingInvoice(next, removedLineIds);
+      // Corrections rewrite the same movement rows, so the item history shows
+      // the corrected quantity rather than the original plus a duplicate.
+      await db.updateReceivingInvoice(next, removedLineIds, next.storeId);
+
 
       // Deltas only: nothing is removed and re-added, so history stays intact.
       const deltas: Record<string, number> = {};
