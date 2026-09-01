@@ -1239,6 +1239,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       id: string,
       reason: string,
       terminal?: string | null,
+      moneyAction?: "refunded" | "retained" | null,
     ): Promise<{ ok: true } | { ok: false; error: string }> => {
       const current = stateRef.current.bookings.find((b) => b.id === id);
       if (!current) return { ok: false, error: "Booking not found." };
@@ -1251,8 +1252,28 @@ export function PosProvider({ children }: { children: ReactNode }) {
         reason: clean,
         cancelledBy: who,
         terminal: terminal ?? null,
+        moneyAction: moneyAction ?? null,
+        clientPaymentId: moneyAction === "refunded" ? `cancel-refund-${id}` : null,
       });
       if (!res.ok) return res;
+      const held = r2(current.paid);
+      const action: Booking["cancelMoneyAction"] =
+        held > 0 ? (moneyAction ?? "retained") : "none";
+      const refundLine: BookingPayment[] =
+        action === "refunded" && held > 0
+          ? [
+              {
+                id: `cancel-refund-${id}`,
+                amount: -held,
+                method: "cash",
+                at: new Date().toISOString(),
+                cashier: who,
+                kind: "refund",
+                refundReason: `Refunded on cancellation: ${clean}`,
+                clientPaymentId: `cancel-refund-${id}`,
+              },
+            ]
+          : [];
       const cancelled: Booking = {
         ...current,
         status: "cancelled",
@@ -1260,6 +1281,9 @@ export function PosProvider({ children }: { children: ReactNode }) {
         cancelReason: clean,
         cancelledBy: who,
         cancelledAt: new Date().toISOString(),
+        cancelMoneyAction: action,
+        paid: action === "refunded" ? 0 : current.paid,
+        payments: [...current.payments, ...refundLine],
         ...(terminal ? { cancelledTerminal: terminal } : {}),
       };
       setState((s) => ({
@@ -1270,13 +1294,72 @@ export function PosProvider({ children }: { children: ReactNode }) {
         ref: current.ref,
         reason: clean,
         by: who,
-        refundable: current.paid,
+        held,
+        moneyAction: action,
       });
       return { ok: true };
     },
     [user],
-
   );
+
+  /** Hand money back on a booking. The server owns the cap and the audit line. */
+  const refundBooking = useCallback(
+    async (
+      id: string,
+      amount: number,
+      method: PaymentMethod,
+      reason: string,
+    ): Promise<{ ok: true; booking: Booking } | { ok: false; error: string }> => {
+      const current = stateRef.current.bookings.find((b) => b.id === id);
+      if (!current) return { ok: false, error: "Booking not found." };
+      const value = r2(amount);
+      if (value <= 0) return { ok: false, error: "Enter a refund amount greater than zero." };
+      const clean = reason.trim();
+      if (clean.length < 3) return { ok: false, error: "A refund reason is required." };
+      const who = user?.name || current.cashier || "Counter";
+      const clientPaymentId = crypto.randomUUID();
+      const res = await refundBookingPayment({
+        bookingId: id,
+        amount: value,
+        method,
+        reason: clean,
+        cashier: who,
+        clientPaymentId,
+      });
+      if (!res.ok) return res;
+      const line: BookingPayment = {
+        id: clientPaymentId,
+        amount: -value,
+        method,
+        at: new Date().toISOString(),
+        cashier: who,
+        kind: "refund",
+        refundReason: clean,
+        clientPaymentId,
+      };
+      const updated: Booking = {
+        ...current,
+        paid: res.state.settledPaid,
+        payments: res.state.duplicate ? current.payments : [...current.payments, line],
+      };
+      setState((s) => ({
+        ...s,
+        bookings: s.bookings.map((b) => (b.id === id ? updated : b)),
+      }));
+      logger.log("sale_event", "Booking refunded", "bookings", {
+        ref: current.ref,
+        amount: value,
+        method,
+        reason: clean,
+        by: who,
+        paid: updated.paid,
+      });
+      return { ok: true, booking: updated };
+    },
+    [user],
+  );
+
+
 
 
   /** Remove a booking / job card altogether, with the reason on the record. */
