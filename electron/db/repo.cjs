@@ -39,13 +39,21 @@ const TABLES = [
   "purchase_order_items",
   "bookings",
   "booking_payments",
-  "transfers",
   "stock_transfers",
   "stock_transfer_items",
   "stock_adjustments",
   "stock_count_drafts",
   "held_orders",
   "audit_logs",
+  // Governance trail. These used to be written to the cloud only, so an
+  // action taken with no connection left no record anywhere; they are now
+  // stored on the till first and pushed like everything else.
+  "activity_events",
+  "record_edits",
+  "authorization_actions",
+  "authorization_requests",
+  "authorization_log",
+  "member_verifications",
 ];
 
 /** Cloud is authoritative for these; they are the only tables ever pulled. */
