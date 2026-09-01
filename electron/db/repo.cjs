@@ -1427,6 +1427,11 @@ module.exports = {
   mergeFromCloud,
   applyTombstones,
   restoreMerge,
+  restoreFingerprint,
+  restoreSnapshot,
+  restoreClear,
+  restoreReplace,
+  openShiftCount,
 
   stats,
   compareSummary,
