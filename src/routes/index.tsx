@@ -1154,8 +1154,6 @@ function Register() {
               visible("register.closeShift")
                 ? async () => {
                     if (!(await requirePermission("can_close_shift"))) return;
-                    setCountedCash("");
-                    setCloseNote("");
                     setCloseShiftOpen(true);
                   }
                 : undefined
