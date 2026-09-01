@@ -2235,6 +2235,15 @@ export function PosProvider({ children }: { children: ReactNode }) {
       fromStoreId: transfer?.fromStoreId ?? null,
       toStoreId: transfer?.toStoreId ?? null,
     });
+    trackTransition({
+      entity: "stock_transfer",
+      entityId: id,
+      from: "requested",
+      to: "in_transit",
+      actorName: actorRef.current,
+      storeId: transfer?.fromStoreId ?? null,
+      metadata: { ref: transfer?.ref ?? null, toStoreId: transfer?.toStoreId ?? null },
+    });
   }, []);
 
   const receiveTransfer = useCallback((id: string) => {
@@ -2270,6 +2279,15 @@ export function PosProvider({ children }: { children: ReactNode }) {
       ref: transfer?.ref ?? null,
       fromStoreId: transfer?.fromStoreId ?? null,
       toStoreId: transfer?.toStoreId ?? null,
+    });
+    trackTransition({
+      entity: "stock_transfer",
+      entityId: id,
+      from: "in_transit",
+      to: "received",
+      actorName: actorRef.current,
+      storeId: transfer?.toStoreId ?? null,
+      metadata: { ref: transfer?.ref ?? null, fromStoreId: transfer?.fromStoreId ?? null },
     });
   }, []);
 
