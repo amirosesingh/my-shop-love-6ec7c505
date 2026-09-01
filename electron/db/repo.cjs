@@ -76,6 +76,37 @@ const SCOPED_PULL_TABLES = [
   { table: "booking_payments", parent: { table: "bookings", column: "booking_id" } },
 ];
 
+/**
+ * Transactional restore.
+ *
+ * The routine pull never brings trading history back down, so a wiped or
+ * replaced till starts with no sales, payments or shift records even though
+ * the cloud still holds them. Restore is an explicit, store-scoped and
+ * date-windowed download of exactly that history, in dependency order, so
+ * parents exist before their children. It never runs on the sync timer.
+ *
+ * `dateColumn` is the column the window filters on; children are fetched
+ * through their parent so their rows can never outlive the parent row.
+ */
+const RESTORE_TABLES = [
+  { table: "shifts", storeColumns: ["store_id"], dateColumn: "opened_at" },
+  { table: "shift_sessions", storeColumns: ["store_id"], dateColumn: "created_at" },
+  { table: "sales", storeColumns: ["store_id"], dateColumn: "created_at" },
+  { table: "sale_items", parent: { table: "sales", column: "sale_id" } },
+  { table: "payment_transactions", storeColumns: ["store_id"], dateColumn: "created_at" },
+  { table: "shift_cash_counts", storeColumns: ["store_id"], dateColumn: "created_at" },
+  { table: "shift_close_events", storeColumns: ["store_id"], dateColumn: "created_at" },
+  { table: "shift_reconciliations", storeColumns: ["store_id"], dateColumn: "created_at" },
+  { table: "shift_variance_alerts", storeColumns: ["store_id"], dateColumn: "created_at" },
+  { table: "drawer_events", storeColumns: ["store_id"], dateColumn: "created_at" },
+  { table: "stock_adjustments", storeColumns: ["store_id"], dateColumn: "created_at" },
+  { table: "item_activity_logs", storeColumns: ["store_id"], dateColumn: "created_at" },
+  { table: "held_orders", storeColumns: ["store_id"], dateColumn: "created_at" },
+  { table: "audit_logs", storeColumns: ["store_id"], dateColumn: "created_at" },
+];
+
+
+
 /** Branch and till this install acts as; scopes the sync watermarks. */
 let scope = { storeId: "", terminalId: "" };
 
