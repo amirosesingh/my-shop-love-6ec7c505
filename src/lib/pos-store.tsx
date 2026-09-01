@@ -836,6 +836,17 @@ export function PosProvider({ children }: { children: ReactNode }) {
           }
         }
       }
+      trackTransition({
+        entity: "shift",
+        entityId: shift.id,
+        from: null,
+        to: "OPEN",
+        actorName: shift.cashier,
+        actorRole: shift.openedByRole ?? null,
+        storeId: shift.storeId,
+        terminalId: shift.terminalId ?? null,
+        metadata: { openingFloat: shift.openingFloat },
+      });
       logger.log("sale_event", "Shift opened", "shifts", {
         cashier,
         openingFloat,
