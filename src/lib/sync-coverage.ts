@@ -57,7 +57,7 @@ export const CLOUD_ONLY: Record<string, string> = {
   coupon_events: "Loyalty ledger is authoritative centrally.",
   issued_vouchers: "Loyalty ledger is authoritative centrally.",
   coupon_campaigns: "Campaign setup is administered centrally.",
-  membership_tiers: "Tier setup is administered centrally.",
+  
   pin_attempts: "Throttling state is central.",
   cashiers: "Legacy staff table, central only.",
   integration_settings: "Administered centrally.",
