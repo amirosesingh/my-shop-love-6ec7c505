@@ -323,6 +323,47 @@ export type RestoreRun = {
   tables?: Array<{ table: string; restored: number; skipped: number; error?: string | null }>;
 };
 
+/** The rebuild check: what the till holds against what head office holds. */
+export type RestoreCheck = {
+  ok: boolean;
+  at: string;
+  days: number;
+  since: string;
+  pending: number;
+  verdict: "complete" | "short";
+  short: string[];
+  tables: Array<{
+    table: string;
+    local: number;
+    central: number | null;
+    behind: number;
+    ahead: number;
+    error?: string | null;
+  }>;
+  error?: string;
+};
+
+/** A real wipe-and-restore drill, with the safety copy put back on failure. */
+export type RestoreDrill = {
+  running: boolean;
+  phase: string;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  days: number;
+  verdict: "pass" | "fail" | null;
+  rolledBack: boolean;
+  error?: string | null;
+  blockers?: string[];
+  tables: Array<{
+    table: string;
+    before: number;
+    after: number;
+    missing: number;
+    changed: boolean;
+    pass: boolean;
+  }>;
+};
+
 export type LocalSyncStatus = {
 
   connected: boolean;
@@ -343,6 +384,7 @@ export type LocalSyncStatus = {
   lastPullAt: string | null;
   lastRestoreAt?: string | null;
   restore?: RestoreRun | null;
+  drill?: RestoreDrill | null;
 
   server?: string | null;
   database?: string | null;
@@ -445,6 +487,17 @@ export type PosBridge = {
   /** Operator-triggered restore of this branch's trading history. */
   restore?: (options?: { days?: number }) => Promise<RestoreRun & { ok: boolean; error?: string }>;
   restoreStatus?: () => Promise<RestoreRun | null>;
+  /** Rebuild check — counts only, safe at any time. */
+  restoreVerify?: (options?: { days?: number }) => Promise<RestoreCheck>;
+  /** The drill: wipe this branch's history and restore it, copy kept. */
+  restoreDrill?: (options?: { days?: number }) => Promise<
+    RestoreDrill & { ok: boolean; error?: string; blockers?: string[] }
+  >;
+  restoreEvidence?: () => Promise<{
+    check: RestoreCheck | null;
+    drill: RestoreDrill | null;
+    blockers: string[];
+  }>;
   /** Which tables this till pushes, pulls and can restore. */
   syncContract?: () => Promise<{ push: string[]; pull: string[]; restore: string[] }>;
 
