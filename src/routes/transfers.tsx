@@ -48,6 +48,12 @@ import { stockAt, usePos } from "@/lib/pos-store";
 import { availableAt, planDeduction, subWarehouses } from "@/lib/locations";
 import { printTransferNote } from "@/lib/pos-print";
 import type { Transfer, TransferItem, TransferKind } from "@/lib/pos-types";
+import { TRANSFER_STATUS_LABELS } from "@/lib/pos-types";
+import {
+  TransferReasonDialog,
+  TransferStepDialog,
+  type TransferStep,
+} from "@/components/pos/TransferStepDialog";
 import { branchPolicy } from "@/lib/branch-policy";
 
 export const Route = createFileRoute("/transfers")({
@@ -76,11 +82,18 @@ export const Route = createFileRoute("/transfers")({
 type TransferSearch = { items?: string; kind?: TransferKind };
 
 const statusStyle: Record<string, string> = {
-  requested: "border-warning/50 text-warning",
-  in_transit: "border-primary/50 text-primary",
+  awaiting_approval: "border-warning/50 text-warning",
+  approved: "border-sky-500/50 text-sky-600 dark:text-sky-400",
+  dispatched: "border-primary/50 text-primary",
   received: "border-success/50 text-success",
   rejected: "border-destructive/50 text-destructive",
   cancelled: "border-destructive/50 text-destructive",
+};
+
+const fulfilmentLabel: Record<string, string> = {
+  full: "sent in full",
+  partial: "part sent",
+  none: "nothing sent",
 };
 
 function Transfers() {
@@ -92,6 +105,7 @@ function Transfers() {
     activeShift,
     createTransfer,
     approveTransfer,
+    dispatchTransfer,
     receiveTransfer,
     rejectTransfer,
     adjustStock,
@@ -115,6 +129,11 @@ function Transfers() {
     Boolean(otherStoreId) &&
     scopeBetween(currentStore, stores.find((s) => s.id === otherStoreId)) === "INTER_GROUP";
   const [note, setNote] = useState("");
+  /** Which note is mid-step, and which step it is. */
+  const [step, setStep] = useState<{ id: string; step: TransferStep } | null>(null);
+  const [reasonFor, setReasonFor] = useState<string | null>(null);
+  const stepTransfer = state.transfers.find((t) => t.id === step?.id) ?? null;
+  const reasonTransfer = state.transfers.find((t) => t.id === reasonFor) ?? null;
 
   const storeOf = (id: string) => stores.find((s) => s.id === id);
   const productOf = (id: string) => state.products.find((p) => p.id === id) ?? null;
@@ -243,9 +262,12 @@ function Transfers() {
       ),
     [mine, scopeTab, stores],
   );
-  const inbound = mine.filter((t) => t.toStoreId === currentStore.id && t.status === "in_transit");
+  const inbound = mine.filter((t) => t.toStoreId === currentStore.id && t.status === "dispatched");
   const toApprove = mine.filter(
-    (t) => t.fromStoreId === currentStore.id && t.status === "requested",
+    (t) => t.fromStoreId === currentStore.id && t.status === "awaiting_approval",
+  );
+  const toDispatch = mine.filter(
+    (t) => t.fromStoreId === currentStore.id && t.status === "approved",
   );
 
   function print(t: Transfer) {
@@ -297,18 +319,21 @@ function Transfers() {
       items: clean,
       note,
       createdBy: activeShift?.cashier ?? "Manager",
-      needsApproval: kind === "transfer" && requireApproval,
+      needsApproval: kind === "request" || requireApproval,
     });
-    if (t.status === "in_transit") print({ ...t });
     setOpen(false);
     setNote("");
     setItems([]);
     toast.success(
-      kind === "transfer"
-        ? requireApproval
-          ? `${t.ref} sent for approval · ${clean.length} item${clean.length > 1 ? "s" : ""}`
-          : `${t.ref} dispatched · ${clean.length} item${clean.length > 1 ? "s" : ""}`
-        : `${t.ref} requested from ${storeOf(otherStoreId)?.name}`,
+      t.status === "awaiting_approval"
+        ? `${t.ref} sent for approval · ${clean.length} item${clean.length > 1 ? "s" : ""}`
+        : `${t.ref} approved — dispatch it when the box is packed`,
+      {
+        description:
+          kind === "request"
+            ? `${storeOf(otherStoreId)?.name} will approve and send it.`
+            : undefined,
+      },
     );
   }
 
