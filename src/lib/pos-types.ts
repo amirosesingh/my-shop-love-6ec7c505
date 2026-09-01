@@ -447,6 +447,12 @@ export type BookingPayment = {
   method: PaymentMethod;
   at: string;
   cashier: string;
+  /** settled money counts towards the balance; reversed / void never does */
+  status?: "settled" | "reversed" | "void";
+  /** voucher serial, card slip or transfer reference */
+  reference?: string;
+  /** repeat-proof id sent by the till so a retry cannot double-charge */
+  clientPaymentId?: string;
 };
 
 /** Where a racket sits in the stringing workflow. */
