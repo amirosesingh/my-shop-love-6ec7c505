@@ -354,7 +354,27 @@ export type Shift = {
   varianceTotal?: number | null;
   /** set when the shift ran past the trading-day window */
   overdue?: boolean;
+  /** Server-owned closing state machine. */
+  state?: ShiftState;
+  /** Why the cashier started closing — required by the server. */
+  closeReason?: string | null;
+  closingStartedAt?: string | null;
+  closingStartedBy?: string | null;
+  /** Cash the server accepted as final for this shift. */
+  finalCountedCash?: number | null;
+  /** Server verdict: NO_VARIANCE / OVER / SHORT (managers only see amounts). */
+  varianceStatus?: string | null;
 };
+
+/** Lifecycle of a shift closure, owned by the database. */
+export type ShiftState =
+  | "ACTIVE"
+  | "CLOSING_STARTED"
+  | "CASH_COUNT_REQUIRED"
+  | "CASH_COUNT_SUBMITTED"
+  | "RECONCILIATION"
+  | "VARIANCE_REVIEW_REQUIRED"
+  | "CLOSED";
 
 /** Trading-day window used to flag shifts left open and drive reminders. */
 export type TradingHours = {
