@@ -25,19 +25,27 @@ export function scopeBetween(from: Store | undefined, to: Store | undefined): Tr
   return groupOf(from) === groupOf(to) ? "INTRA_GROUP" : "INTER_GROUP";
 }
 
-/** Database status names map 1:1 onto the app's transfer statuses. */
+/**
+ * Database status names, including the two older spellings a till upgraded
+ * mid-week may still be holding.
+ */
 const toStatus = (s: string): TransferStatus =>
-  s === "approved" || s === "in_transit"
-    ? "in_transit"
-    : s === "received"
-      ? "received"
-      : s === "rejected"
-        ? "rejected"
-        : s === "cancelled"
-          ? "cancelled"
-          : "requested";
+  s === "approved"
+    ? "approved"
+    : s === "in_transit" || s === "dispatched"
+      ? "dispatched"
+      : s === "received" || s === "completed"
+        ? "received"
+        : s === "rejected"
+          ? "rejected"
+          : s === "cancelled"
+            ? "cancelled"
+            : "awaiting_approval";
 
-const fromStatus = (s: TransferStatus): string => (s === "requested" ? "pending" : s);
+const fromStatus = (s: TransferStatus): string => s;
+
+const num = (v: unknown): number | undefined =>
+  v === null || v === undefined ? undefined : Number(v) || 0;
 
 export type StoredTransfer = Transfer & {
   scope: TransferScope;
@@ -51,10 +59,26 @@ const rowToTransfer = (r: Row, items: Row[]): StoredTransfer => ({
   kind: (r.kind as TransferKind) ?? "transfer",
   fromStoreId: r.from_store_id,
   toStoreId: r.to_store_id,
-  items: items.map((i) => ({ productId: i.product_id, qty: Number(i.quantity) || 0 })),
+  items: items.map((i) => ({
+    productId: i.product_id,
+    qty: Number(i.quantity) || 0,
+    approvedQty: num(i.quantity_approved),
+    dispatchedQty: num(i.quantity_dispatched),
+    receivedQty: num(i.quantity_received),
+  })),
   status: toStatus(r.status),
   note: r.note ?? "",
   createdBy: r.created_by ?? "",
+  approvedBy: r.approved_by ?? undefined,
+  approvedAt: r.approved_at ?? undefined,
+  dispatchedBy: r.dispatched_by ?? undefined,
+  dispatchedAt: r.dispatched_at ?? undefined,
+  receivedBy: r.received_by ?? undefined,
+  receivedAt: r.received_at ?? undefined,
+  rejectedReason: r.rejected_reason ?? undefined,
+  cancelledReason: r.cancelled_reason ?? undefined,
+  closedAt: r.closed_at ?? undefined,
+  fulfilment: r.fulfilment ?? undefined,
   createdAt: r.created_at,
   updatedAt: r.updated_at ?? r.created_at,
   scope: (r.transfer_scope as TransferScope) ?? "INTRA_GROUP",
@@ -130,6 +154,8 @@ export async function saveTransfer({ transfer, from, to, products }: SaveTransfe
       sku: p?.sku ?? null,
       product_name: p?.name ?? null,
       quantity: i.qty,
+      quantity_approved: i.approvedQty ?? null,
+      quantity_dispatched: i.dispatchedQty ?? null,
       unit_cost: p?.cost ?? 0,
     };
   });
@@ -142,7 +168,10 @@ export async function saveTransfer({ transfer, from, to, products }: SaveTransfe
   ]);
 }
 
-/** Approve / reject / cancel: a plain status change with an audit stamp. */
+/**
+ * Reject or cancel. Both need a reason, and the database refuses the write
+ * without one, so the caller must have collected it already.
+ */
 export async function setTransferStatus(
   id: string,
   status: TransferStatus,
@@ -150,14 +179,65 @@ export async function setTransferStatus(
   reason?: string,
 ) {
   const patch: Row = { status: fromStatus(status) };
-  if (status === "in_transit") {
-    patch.approved_by = who;
-    patch.approved_at = new Date().toISOString();
+  if (status === "rejected") {
+    patch.rejected_reason = reason ?? null;
+    patch.rejected_by = who;
   }
-  if (status === "rejected" || status === "cancelled") patch.rejected_reason = reason ?? null;
+  if (status === "cancelled") patch.cancelled_reason = reason ?? null;
   return commitOps("Updating transfer", [
     { kind: "update", table: "stock_transfers", values: patch, match: { id } },
   ]);
+}
+
+/** Quantities the approver or sender typed, keyed the way the RPCs expect. */
+export type LineQty = { productId: string; qty: number };
+const toLines = (lines: LineQty[] | undefined) =>
+  lines?.length ? lines.map((l) => ({ product_id: l.productId, qty: Math.max(0, l.qty) })) : null;
+
+type RpcResult = { success: boolean; error?: string };
+
+/**
+ * Approve: the database checks the note is still waiting, records the allowed
+ * quantity per line, and stamps who said yes.
+ */
+export async function approveTransferInDb(
+  id: string,
+  who: string,
+  lines?: LineQty[],
+): Promise<RpcResult> {
+  try {
+    const res = await sb.rpc("stock_transfer_approve", {
+      p_transfer_id: id,
+      p_approved_by: who,
+      p_lines: toLines(lines),
+    });
+    if (res.error) throw new Error(res.error.message);
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: describeError(e, "Approving the transfer") };
+  }
+}
+
+/**
+ * Dispatch: stock leaves the sending branch here, in one database transaction,
+ * and the note closes against whatever was actually sent.
+ */
+export async function dispatchTransferInDb(
+  id: string,
+  who: string,
+  lines?: LineQty[],
+): Promise<RpcResult> {
+  try {
+    const res = await sb.rpc("stock_transfer_dispatch", {
+      p_transfer_id: id,
+      p_dispatched_by: who,
+      p_lines: toLines(lines),
+    });
+    if (res.error) throw new Error(res.error.message);
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: describeError(e, "Dispatching the transfer") };
+  }
 }
 
 /**
@@ -171,9 +251,14 @@ export async function setTransferStatus(
 export async function receiveTransferInDb(
   id: string,
   who: string,
+  lines?: LineQty[],
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const res = await sb.rpc("stock_transfer_receive", { p_transfer_id: id, p_received_by: who });
+    const res = await sb.rpc("stock_transfer_receive", {
+      p_transfer_id: id,
+      p_received_by: who,
+      p_lines: toLines(lines),
+    });
     if (res.error) throw new Error(res.error.message);
     return { success: true };
   } catch (e) {
