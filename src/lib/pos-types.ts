@@ -304,6 +304,13 @@ export type Sale = {
   couponScope?: "bill" | "item";
   /** currency value the coupon took off */
   couponDiscount?: number;
+  /**
+   * Total rounding applied to this bill: rounded − unrounded. Negative when
+   * the customer paid less. Always stored, even when nothing is printed.
+   */
+  roundingAdjustment?: number;
+  /** Receipt label in force when the bill was raised, so reprints match. */
+  roundingLabel?: string;
   /** unused value left on a fixed-amount voucher after this bill */
   couponRemaining?: number;
   /** campaign the voucher belongs to, printed on the slip */
