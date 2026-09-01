@@ -575,6 +575,31 @@ async function restore({ days = 90 } = {}) {
       if (!spec.parent) parentIds.set(spec.table, collected.map((r) => r.id).filter(Boolean));
       restoreState.tables.push({ table: spec.table, restored, skipped, error: failure });
     }
+    // Configuration comes back too, otherwise a rebuilt till returns with
+    // default receipt branding, rounding and payment rules.
+    restoreState.table = "pos_settings";
+    notify();
+    try {
+      const { data: settings, error: settingsError } = await supabase
+        .from("pos_settings")
+        .select("*")
+        .maybeSingle();
+      if (settingsError) throw new Error(settingsError.message ?? String(settingsError));
+      if (settings) {
+        await repo.mergeFromCloud("pos_settings", [{ ...settings, id: repo.SETTINGS_ID }]);
+        restoreState.restored += 1;
+        restoreState.tables.push({ table: "pos_settings", restored: 1, skipped: 0 });
+      } else {
+        restoreState.tables.push({ table: "pos_settings", restored: 0, skipped: 0 });
+      }
+    } catch (err) {
+      restoreState.tables.push({
+        table: "pos_settings",
+        restored: 0,
+        skipped: 0,
+        error: String(err?.message ?? err),
+      });
+    }
     restoreState.running = false;
     restoreState.finishedAt = new Date().toISOString();
     await repo.setState("last_restore_at", restoreState.finishedAt).catch(() => {});
