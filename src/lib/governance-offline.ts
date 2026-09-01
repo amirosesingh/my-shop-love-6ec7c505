@@ -77,3 +77,27 @@ export async function withGovernanceFallback<T>(
     return { ok: park.parked, parked: park.parked, error: park.parked ? undefined : message };
   }
 }
+
+/**
+ * Does this failure look like the line being down rather than a refusal?
+ *
+ * A refusal ("that PIN is not allowed") must never be parked as if it had
+ * happened; only transport failures are. The check is deliberately generous —
+ * a parked governance row is harmless, a lost one is not.
+ */
+export function looksOffline(error: unknown): boolean {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return true;
+  const message = String((error as Error)?.message ?? error ?? "").toLowerCase();
+  return (
+    message.includes("fetch") ||
+    message.includes("network") ||
+    message.includes("timed out") ||
+    message.includes("timeout") ||
+    message.includes("offline") ||
+    message.includes("unreachable") ||
+    message.includes("econn") ||
+    message.includes("failed to load") ||
+    message.includes("service unavailable") ||
+    message.includes("gateway")
+  );
+}
