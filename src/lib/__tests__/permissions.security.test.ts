@@ -27,6 +27,9 @@ const CASHIER_ALLOWED: PermissionKey[] = [
   "can_close_drawer",
   "can_open_shift",
   "can_close_shift",
+  // Counting the drawer is part of closing; seeing the expected cash or the
+  // variance is deliberately NOT granted to a cashier.
+  "can_shift_cash_count",
   "can_process_sale",
   "can_hold_cart",
   "can_reprint_bill",
