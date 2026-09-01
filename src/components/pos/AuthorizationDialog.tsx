@@ -146,14 +146,16 @@ export function AuthorizationDialog({
         },
       });
       if (!res.ok) {
-        toast.error(res.error ?? "Authorisation failed");
+        if (looksOffline(res.error)) await parkRefusedPin(res.error ?? "");
+        else toast.error(res.error ?? "Authorisation failed");
         return;
       }
       if (res.warning) toast.warning(res.warning);
       toast.success(`Approved by ${res.authorizer.name}`);
       onFinish({ kind: "approved", grantToken: res.grantToken, by: res.authorizer.name });
     } catch (e) {
-      notifyError(e, "Authorisation failed");
+      if (looksOffline(e)) await parkRefusedPin(String((e as Error)?.message ?? e));
+      else notifyError(e, "Authorisation failed");
     } finally {
       setBusy(false);
     }
