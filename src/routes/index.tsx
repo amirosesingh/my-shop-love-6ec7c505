@@ -1563,6 +1563,12 @@ function Register() {
           value={money(totals.tax)}
         />
       )}
+      {showsRoundingLine(rounding.adjustment, state.settings.integrations.rounding) && (
+        <Row
+          label={roundingOf(state.settings.integrations.rounding).receiptLabel}
+          value={`-${money(Math.abs(rounding.adjustment))}`}
+        />
+      )}
       {promo.applied.length > 0 && (
         <div className="rounded-md border border-success/30 bg-success/5 px-2 py-2">
           <p className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-success">
