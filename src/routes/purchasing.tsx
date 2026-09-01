@@ -705,8 +705,11 @@ function Purchasing() {
         storeId,
       };
 
-      if (wasDraft) await db.updateReceivingInvoice(invoice, draftLineRemovals);
-      else await db.commitReceivingInvoice(invoice);
+      // The hub is where the stock actually lands, so the movement rows are
+      // stamped with it and committed alongside the invoice.
+      if (wasDraft) await db.updateReceivingInvoice(invoice, draftLineRemovals, hubId);
+      else await db.commitReceivingInvoice(invoice, hubId);
+
 
       const movements = lines.map((l) => {
         const previousStock = stockAt(
@@ -835,7 +838,10 @@ function Purchasing() {
         totalCost: cost,
         itemCount: editing.lines.length,
       };
-      await db.updateReceivingInvoice(next, removedLineIds);
+      // Corrections rewrite the same movement rows, so the item history shows
+      // the corrected quantity rather than the original plus a duplicate.
+      await db.updateReceivingInvoice(next, removedLineIds, next.storeId);
+
 
       // Deltas only: nothing is removed and re-added, so history stays intact.
       const deltas: Record<string, number> = {};

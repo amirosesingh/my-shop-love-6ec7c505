@@ -785,6 +785,42 @@ const saleActivityRows = (s: Sale) =>
       created_at: s.createdAt,
     }));
 
+/**
+ * One inventory-movement row per received line, so item history shows stock
+ * arriving as well as leaving. Ids are derived from the invoice, so re-posting
+ * a resumed draft or correcting an invoice rewrites the same rows instead of
+ * doubling them. Drafts and cancelled orders never touch stock, so they write
+ * nothing.
+ */
+const receivingActivityRows = (inv: ReceivingInvoice, storeId: string | null) =>
+  inv.lines
+    .filter((l) => l.productId && Math.round(l.qty) !== 0)
+    .map((l, index) => ({
+      id: stableChildId(inv.id, "4", index),
+      product_id: l.productId,
+      product_name: l.name,
+      sku: l.sku || null,
+      barcode: l.barcode || null,
+      store_id: storeId ?? inv.storeId,
+      activity_type: "receive",
+      reference: inv.reference || inv.invoiceNo,
+      quantity_delta: Math.round(l.qty),
+      unit_cost: l.cost ?? 0,
+      staff_name: inv.operator,
+      note: "",
+      created_at: inv.entryDate || inv.createdAt,
+    }));
+
+/** The movement rows for a receiving commit, or nothing for an unposted one. */
+const receivingActivityOps = (inv: ReceivingInvoice, storeId?: string | null) => {
+  if (inv.status !== "posted") return [];
+  const rows = receivingActivityRows(inv, storeId ?? inv.storeId);
+  return rows.length
+    ? [{ kind: "upsert" as const, table: "item_activity_logs", rows, onConflict: "id" }]
+    : [];
+};
+
+
 /** Stable UUID children: rebuilding a checkout after a restart reuses the same keys. */
 export function stableChildId(parentId: string, group: string, index: number): string {
   const hex = parentId.replace(/-/g, "").toLowerCase();
@@ -1820,8 +1856,12 @@ export const db = {
    * Store a receiving invoice and its lines, and wait until they are safe
    * (cloud, local database or the durable outbox). Nothing on screen is
    * cleared until this resolves, so an invoice can no longer vanish.
+   *
+   * `movementStoreId` is the branch the stock actually lands in. Passing it
+   * writes the goods-received movement rows in the very same commit, so a
+   * received line can never change stock without leaving a history row.
    */
-  commitReceivingInvoice: (inv: ReceivingInvoice) =>
+  commitReceivingInvoice: (inv: ReceivingInvoice, movementStoreId?: string | null) =>
     commitOps("Saving receiving invoice", [
       { kind: "upsert", table: "purchase_orders", rows: [invoiceRow(inv)] },
       ...(inv.lines.length
@@ -1833,6 +1873,7 @@ export const db = {
             },
           ]
         : []),
+      ...receivingActivityOps(inv, movementStoreId),
     ]),
 
   /**
@@ -1840,7 +1881,11 @@ export const db = {
    * deleted by id; everything else is updated, so history and the invoice id
    * survive the edit.
    */
-  updateReceivingInvoice: (inv: ReceivingInvoice, removedLineIds: string[]) =>
+  updateReceivingInvoice: (
+    inv: ReceivingInvoice,
+    removedLineIds: string[],
+    movementStoreId?: string | null,
+  ) =>
     commitOps("Updating receiving invoice", [
       { kind: "upsert", table: "purchase_orders", rows: [invoiceRow(inv)] },
       ...(inv.lines.length
@@ -1857,7 +1902,9 @@ export const db = {
         table: "purchase_order_items",
         match: { id },
       })),
+      ...receivingActivityOps(inv, movementStoreId),
     ]),
+
 
   /**
    * Autosave an unfinished receiving order. Same rows as a finalized one, but

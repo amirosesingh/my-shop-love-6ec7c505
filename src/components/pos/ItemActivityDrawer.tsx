@@ -24,6 +24,16 @@ type Movement = {
 type LooseRow = Record<string, unknown>;
 const text = (v: unknown) => (v == null ? "" : String(v));
 
+/** Plain wording for the movement kinds written across the app. */
+const MOVEMENT_LABELS: Record<string, string> = {
+  sale: "Sold",
+  return: "Returned",
+  receive: "Goods received",
+  transfer_out: "Transferred out",
+  transfer_in: "Transferred in",
+};
+
+
 export function ItemActivityDrawer({
   product,
   onClose,
@@ -51,7 +61,7 @@ export function ItemActivityDrawer({
           return { rows: [] as LooseRow[], source: "local" as ReadSource };
         }
       };
-      const [adjustments, transfers, meta, merges] = await Promise.all([
+      const [adjustments, transfers, meta, merges, movements] = await Promise.all([
         ask("stock_adjustments", {
           columns: "id,created_at,reason,note,delta,cost_impact,staff_name,store_id",
           match: { product_id: product.id },
@@ -71,15 +81,42 @@ export function ItemActivityDrawer({
           orderBy: { column: "created_at", ascending: false },
           limit: 100,
         }),
+        // Sales, goods received and transfers all write here, so this is the
+        // one list that shows stock arriving as well as leaving.
+        ask("item_activity_logs", {
+          columns:
+            "id,created_at,activity_type,reference,quantity_delta,stock_before,stock_after,unit_cost,staff_name,note,store_id",
+          match: { product_id: product.id },
+          orderBy: { column: "created_at", ascending: false },
+          limit: 200,
+        }),
       ]);
+
       if (!live) return;
       setSource(
-        [adjustments, transfers, meta, merges].some((r) => r.source === "local")
+        [adjustments, transfers, meta, merges, movements].some((r) => r.source === "local")
           ? "local"
           : "cloud",
       );
       const list: Movement[] = [
+        ...(movements.rows as LooseRow[]).map((r) => ({
+          id: `mov-${r.id}`,
+          at: text(r["created_at"]),
+          kind: MOVEMENT_LABELS[text(r["activity_type"])] ?? text(r["activity_type"]),
+          detail: [
+            r["reference"] ? text(r["reference"]) : "",
+            r["store_id"] ? text(r["store_id"]) : "",
+            r["stock_after"] != null ? `stock now ${Number(r["stock_after"])}` : "",
+            r["note"] ? text(r["note"]) : "",
+          ]
+            .filter(Boolean)
+            .join(" · "),
+          delta: Number(r["quantity_delta"] ?? 0),
+          impact: 0,
+          by: text(r["staff_name"]) || "—",
+        })),
         ...(adjustments.rows as LooseRow[]).map((r) => ({
+
           id: `adj-${r.id}`,
           at: text(r["created_at"]),
           kind: "Stock adjustment",
@@ -194,6 +231,11 @@ export function ItemActivityDrawer({
             ) : (
               <p className="text-muted-foreground">No movements recorded for this item yet.</p>
             )}
+            <p className="text-[11px] text-muted-foreground">
+              Goods received and branch transfers appear here from this release onwards; stock
+              taken in before that shows only as sales and adjustments.
+            </p>
+
           </div>
         )}
       </SheetContent>
