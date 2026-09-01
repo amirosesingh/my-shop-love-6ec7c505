@@ -1755,6 +1755,9 @@ BEGIN
   IF COL_LENGTH('dbo.booking_payments', 'sync_attempts') IS NULL ALTER TABLE dbo.booking_payments ADD [sync_attempts] INT DEFAULT 0;
   IF COL_LENGTH('dbo.booking_payments', 'last_error_at') IS NULL ALTER TABLE dbo.booking_payments ADD [last_error_at] DATETIME2(3);
   IF COL_LENGTH('dbo.booking_payments', 'client_transaction_id') IS NULL ALTER TABLE dbo.booking_payments ADD [client_transaction_id] NVARCHAR(120);
+  IF COL_LENGTH('dbo.booking_payments', 'status') IS NULL ALTER TABLE dbo.booking_payments ADD [status] NVARCHAR(20) DEFAULT N'settled';
+  IF COL_LENGTH('dbo.booking_payments', 'reference') IS NULL ALTER TABLE dbo.booking_payments ADD [reference] NVARCHAR(200);
+  IF COL_LENGTH('dbo.booking_payments', 'client_payment_id') IS NULL ALTER TABLE dbo.booking_payments ADD [client_payment_id] NVARCHAR(120);
 END
 GO
 IF OBJECT_ID('dbo.bookings', 'U') IS NOT NULL
@@ -1806,6 +1809,10 @@ BEGIN
   IF COL_LENGTH('dbo.bookings', 'technician') IS NULL ALTER TABLE dbo.bookings ADD [technician] NVARCHAR(MAX);
   IF COL_LENGTH('dbo.bookings', 'liability_accepted') IS NULL ALTER TABLE dbo.bookings ADD [liability_accepted] BIT DEFAULT 0;
   IF COL_LENGTH('dbo.bookings', 'incident_note') IS NULL ALTER TABLE dbo.bookings ADD [incident_note] NVARCHAR(MAX);
+  IF COL_LENGTH('dbo.bookings', 'cancel_reason') IS NULL ALTER TABLE dbo.bookings ADD [cancel_reason] NVARCHAR(400);
+  IF COL_LENGTH('dbo.bookings', 'cancelled_by') IS NULL ALTER TABLE dbo.bookings ADD [cancelled_by] NVARCHAR(200);
+  IF COL_LENGTH('dbo.bookings', 'cancelled_at') IS NULL ALTER TABLE dbo.bookings ADD [cancelled_at] DATETIME2(3);
+  IF COL_LENGTH('dbo.bookings', 'cancelled_terminal') IS NULL ALTER TABLE dbo.bookings ADD [cancelled_terminal] NVARCHAR(120);
   IF COL_LENGTH('dbo.bookings', 'row_version') IS NULL ALTER TABLE dbo.bookings ADD [row_version] INT DEFAULT 1;
   IF COL_LENGTH('dbo.bookings', 'is_synced') IS NULL ALTER TABLE dbo.bookings ADD [is_synced] BIT DEFAULT 0;
   IF COL_LENGTH('dbo.bookings', 'sync_status') IS NULL ALTER TABLE dbo.bookings ADD [sync_status] NVARCHAR(40) DEFAULT N'pending';
