@@ -408,7 +408,10 @@ CREATE TABLE dbo.stock_transfers (
   to_store_id NVARCHAR(60) NOT NULL, to_store_name NVARCHAR(200) NULL, to_group_id NVARCHAR(80) NULL,
   status NVARCHAR(30) NOT NULL DEFAULT N'pending', note NVARCHAR(400) NOT NULL DEFAULT N'',
   created_by NVARCHAR(120) NULL, approved_by NVARCHAR(120) NULL, approved_at DATETIME2(3) NULL,
+  dispatched_by NVARCHAR(120) NULL, dispatched_at DATETIME2(3) NULL,
   received_by NVARCHAR(120) NULL, received_at DATETIME2(3) NULL, rejected_reason NVARCHAR(400) NULL,
+  rejected_by NVARCHAR(120) NULL, cancelled_reason NVARCHAR(400) NULL,
+  closed_at DATETIME2(3) NULL, fulfilment NVARCHAR(20) NULL,
   is_synced BIT NOT NULL DEFAULT 0, sync_status NVARCHAR(20) NOT NULL DEFAULT N'pending',
   created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(), updated_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME()
 );
@@ -418,7 +421,8 @@ IF OBJECT_ID('dbo.stock_transfer_items', 'U') IS NULL
 CREATE TABLE dbo.stock_transfer_items (
   id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(), transfer_id UNIQUEIDENTIFIER NOT NULL,
   product_id UNIQUEIDENTIFIER NULL, barcode NVARCHAR(80) NULL, sku NVARCHAR(80) NULL,
-  product_name NVARCHAR(200) NULL, quantity INT NOT NULL DEFAULT 0, quantity_received INT NOT NULL DEFAULT 0,
+  product_name NVARCHAR(200) NULL, quantity INT NOT NULL DEFAULT 0,
+  quantity_approved INT NULL, quantity_dispatched INT NULL, quantity_received INT NOT NULL DEFAULT 0,
   unit_cost DECIMAL(18,4) NOT NULL DEFAULT 0, is_synced BIT NOT NULL DEFAULT 0,
   sync_status NVARCHAR(20) NOT NULL DEFAULT N'pending', created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
   updated_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME()
@@ -2775,6 +2779,8 @@ BEGIN
   IF COL_LENGTH('dbo.stock_transfer_items', 'sku') IS NULL ALTER TABLE dbo.stock_transfer_items ADD [sku] NVARCHAR(400);
   IF COL_LENGTH('dbo.stock_transfer_items', 'product_name') IS NULL ALTER TABLE dbo.stock_transfer_items ADD [product_name] NVARCHAR(400);
   IF COL_LENGTH('dbo.stock_transfer_items', 'quantity') IS NULL ALTER TABLE dbo.stock_transfer_items ADD [quantity] INT DEFAULT 0;
+  IF COL_LENGTH('dbo.stock_transfer_items', 'quantity_approved') IS NULL ALTER TABLE dbo.stock_transfer_items ADD [quantity_approved] INT;
+  IF COL_LENGTH('dbo.stock_transfer_items', 'quantity_dispatched') IS NULL ALTER TABLE dbo.stock_transfer_items ADD [quantity_dispatched] INT;
   IF COL_LENGTH('dbo.stock_transfer_items', 'quantity_received') IS NULL ALTER TABLE dbo.stock_transfer_items ADD [quantity_received] INT DEFAULT 0;
   IF COL_LENGTH('dbo.stock_transfer_items', 'unit_cost') IS NULL ALTER TABLE dbo.stock_transfer_items ADD [unit_cost] DECIMAL(18,4) DEFAULT 0;
   IF COL_LENGTH('dbo.stock_transfer_items', 'created_at') IS NULL ALTER TABLE dbo.stock_transfer_items ADD [created_at] DATETIME2(3) DEFAULT SYSUTCDATETIME();
@@ -2806,6 +2812,12 @@ BEGIN
   IF COL_LENGTH('dbo.stock_transfers', 'received_by') IS NULL ALTER TABLE dbo.stock_transfers ADD [received_by] NVARCHAR(MAX);
   IF COL_LENGTH('dbo.stock_transfers', 'received_at') IS NULL ALTER TABLE dbo.stock_transfers ADD [received_at] DATETIME2(3);
   IF COL_LENGTH('dbo.stock_transfers', 'rejected_reason') IS NULL ALTER TABLE dbo.stock_transfers ADD [rejected_reason] NVARCHAR(MAX);
+  IF COL_LENGTH('dbo.stock_transfers', 'rejected_by') IS NULL ALTER TABLE dbo.stock_transfers ADD [rejected_by] NVARCHAR(MAX);
+  IF COL_LENGTH('dbo.stock_transfers', 'cancelled_reason') IS NULL ALTER TABLE dbo.stock_transfers ADD [cancelled_reason] NVARCHAR(MAX);
+  IF COL_LENGTH('dbo.stock_transfers', 'dispatched_by') IS NULL ALTER TABLE dbo.stock_transfers ADD [dispatched_by] NVARCHAR(MAX);
+  IF COL_LENGTH('dbo.stock_transfers', 'dispatched_at') IS NULL ALTER TABLE dbo.stock_transfers ADD [dispatched_at] DATETIME2(3);
+  IF COL_LENGTH('dbo.stock_transfers', 'closed_at') IS NULL ALTER TABLE dbo.stock_transfers ADD [closed_at] DATETIME2(3);
+  IF COL_LENGTH('dbo.stock_transfers', 'fulfilment') IS NULL ALTER TABLE dbo.stock_transfers ADD [fulfilment] NVARCHAR(40);
   IF COL_LENGTH('dbo.stock_transfers', 'created_at') IS NULL ALTER TABLE dbo.stock_transfers ADD [created_at] DATETIME2(3) DEFAULT SYSUTCDATETIME();
   IF COL_LENGTH('dbo.stock_transfers', 'updated_at') IS NULL ALTER TABLE dbo.stock_transfers ADD [updated_at] DATETIME2(3) DEFAULT SYSUTCDATETIME();
   IF COL_LENGTH('dbo.stock_transfers', 'row_version') IS NULL ALTER TABLE dbo.stock_transfers ADD [row_version] INT DEFAULT 1;

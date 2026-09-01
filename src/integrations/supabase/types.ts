@@ -3349,6 +3349,8 @@ export type Database = {
           product_id: string | null
           product_name: string | null
           quantity: number
+          quantity_approved: number | null
+          quantity_dispatched: number | null
           quantity_received: number
           row_version: number
           sku: string | null
@@ -3362,6 +3364,8 @@ export type Database = {
           product_id?: string | null
           product_name?: string | null
           quantity?: number
+          quantity_approved?: number | null
+          quantity_dispatched?: number | null
           quantity_received?: number
           row_version?: number
           sku?: string | null
@@ -3375,6 +3379,8 @@ export type Database = {
           product_id?: string | null
           product_name?: string | null
           quantity?: number
+          quantity_approved?: number | null
+          quantity_dispatched?: number | null
           quantity_received?: number
           row_version?: number
           sku?: string | null
@@ -3402,17 +3408,23 @@ export type Database = {
         Row: {
           approved_at: string | null
           approved_by: string | null
+          cancelled_reason: string | null
+          closed_at: string | null
           created_at: string
           created_by: string | null
+          dispatched_at: string | null
+          dispatched_by: string | null
           from_group_id: string | null
           from_store_id: string
           from_store_name: string | null
+          fulfilment: string | null
           id: string
           kind: string
           note: string
           received_at: string | null
           received_by: string | null
           ref: string
+          rejected_by: string | null
           rejected_reason: string | null
           row_version: number
           status: string
@@ -3425,17 +3437,23 @@ export type Database = {
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
+          cancelled_reason?: string | null
+          closed_at?: string | null
           created_at?: string
           created_by?: string | null
+          dispatched_at?: string | null
+          dispatched_by?: string | null
           from_group_id?: string | null
           from_store_id: string
           from_store_name?: string | null
+          fulfilment?: string | null
           id?: string
           kind?: string
           note?: string
           received_at?: string | null
           received_by?: string | null
           ref: string
+          rejected_by?: string | null
           rejected_reason?: string | null
           row_version?: number
           status?: string
@@ -3448,17 +3466,23 @@ export type Database = {
         Update: {
           approved_at?: string | null
           approved_by?: string | null
+          cancelled_reason?: string | null
+          closed_at?: string | null
           created_at?: string
           created_by?: string | null
+          dispatched_at?: string | null
+          dispatched_by?: string | null
           from_group_id?: string | null
           from_store_id?: string
           from_store_name?: string | null
+          fulfilment?: string | null
           id?: string
           kind?: string
           note?: string
           received_at?: string | null
           received_by?: string | null
           ref?: string
+          rejected_by?: string | null
           rejected_reason?: string | null
           row_version?: number
           status?: string
@@ -4568,9 +4592,26 @@ export type Database = {
         Args: { _since?: string; _store_id: string }
         Returns: Json
       }
+      stock_transfer_approval_required: {
+        Args: { _store_id: string }
+        Returns: boolean
+      }
+      stock_transfer_approve: {
+        Args: { p_approved_by?: string; p_lines?: Json; p_transfer_id: string }
+        Returns: undefined
+      }
+      stock_transfer_dispatch: {
+        Args: {
+          p_dispatched_by?: string
+          p_lines?: Json
+          p_transfer_id: string
+        }
+        Returns: undefined
+      }
       stock_transfer_receive: {
         Args: {
           p_deduct_source?: boolean
+          p_lines?: Json
           p_received_by?: string
           p_transfer_id: string
         }
