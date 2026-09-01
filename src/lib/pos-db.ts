@@ -677,6 +677,12 @@ const saleToRow = (s: Sale): Row => ({
   coupon_promo_id: s.couponPromoId ?? null,
   coupon_scope: s.couponScope ?? null,
   coupon_discount: s.couponDiscount ?? 0,
+  ...(hasRoundingColumns
+    ? {
+        rounding_adjustment: s.roundingAdjustment ?? 0,
+        rounding_label: s.roundingLabel ?? null,
+      }
+    : {}),
   created_at: s.createdAt,
 });
 
