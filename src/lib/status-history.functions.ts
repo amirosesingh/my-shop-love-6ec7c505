@@ -75,7 +75,7 @@ export const recordStatusHistory = createServerFn({ method: "POST" })
       terminal_id: t.terminalId ?? null,
       related_entity_type: t.relatedEntityType ?? null,
       related_entity_id: t.relatedEntityId ?? null,
-      metadata: (t.metadata ?? {}) as Record<string, unknown>,
+      metadata: (t.metadata ?? {}) as Record<string, import("./status-history.server").Json>,
       client_event_id: t.clientEventId ?? null,
       occurred_at: t.occurredAt ?? now,
     }));

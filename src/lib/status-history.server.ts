@@ -11,6 +11,9 @@
  */
 import { serviceRest } from "./pos-relay.server";
 
+/** Anything that survives a JSON round trip, so history can cross the wire. */
+export type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
+
 export type StatusHistoryRecord = {
   entity_type: string;
   entity_id: string;
@@ -26,7 +29,7 @@ export type StatusHistoryRecord = {
   terminal_id: string | null;
   related_entity_type: string | null;
   related_entity_id: string | null;
-  metadata: Record<string, unknown>;
+  metadata: Record<string, Json>;
   client_event_id: string | null;
   occurred_at: string;
 };
