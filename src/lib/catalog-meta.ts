@@ -8,6 +8,7 @@
 import { useEffect, useState } from "react";
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import type { CatalogKind, ProductCategory, UomUnit } from "./pos-types";
+import { tombstone } from "./tombstones";
 
 /** Table names are shared with the POS project's generated types. */
 const supabase = supabaseExternal;
@@ -58,8 +59,8 @@ export const readUnits = () => {
 
 export async function loadCatalogMeta() {
   const [cats, units] = await Promise.all([
-    supabase.from("product_categories").select("*").order("sort"),
-    supabase.from("uom_units").select("*").order("sort"),
+    supabase.from("product_categories").select("*").is("deleted_at", null).order("sort"),
+    supabase.from("uom_units").select("*").is("deleted_at", null).order("sort"),
   ]);
   if (!cats.error && cats.data) {
     writeLocal(
@@ -114,7 +115,10 @@ export async function saveCategory(cat: Omit<ProductCategory, "id"> & { id?: str
 }
 
 export async function deleteCategory(id: string) {
-  const { error } = await supabase.from("product_categories").delete().eq("id", id);
+  const { error } = await supabase
+    .from("product_categories")
+    .update(tombstone())
+    .eq("id", id);
   if (error) throw error;
   writeLocal(
     CAT_KEY,
@@ -150,10 +154,10 @@ export async function saveUnit(unit: Omit<UomUnit, "id"> & { id?: string }) {
 
 export async function deleteUnit(id: string, code: string) {
   if (id.includes("-")) {
-    const { error } = await supabase.from("uom_units").delete().eq("id", id);
+    const { error } = await supabase.from("uom_units").update(tombstone()).eq("id", id);
     if (error) throw error;
   } else {
-    await supabase.from("uom_units").delete().eq("code", code);
+    await supabase.from("uom_units").update(tombstone()).eq("code", code);
   }
   writeLocal(
     UOM_KEY,

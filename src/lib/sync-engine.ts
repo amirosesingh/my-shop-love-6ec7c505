@@ -85,6 +85,7 @@ import { subscribeSyncConfig, syncConfig } from "./sync-config";
 import { noteVersions } from "./row-versions";
 import { recordConflict } from "./sync-conflicts";
 import {
+import { TOMBSTONE_TABLES } from "./tombstones";
   failOp,
   refuseOp,
   nextAttemptDue,
@@ -243,6 +244,14 @@ async function execute(op: SyncOp): Promise<QueryResult> {
       return q;
     }
     case "delete": {
+      // Reference tables are stamped, not erased: an absent row cannot travel
+      // down a delta pull, so every till would keep its stale copy forever.
+      if (TOMBSTONE_TABLES.has(op.table)) {
+        const stamp = new Date().toISOString();
+        let q = from(op.table).update({ deleted_at: stamp, updated_at: stamp });
+        for (const [k, v] of Object.entries(op.match)) q = q.eq(k, v);
+        return q;
+      }
       let q = from(op.table).delete();
       for (const [k, v] of Object.entries(op.match)) q = q.eq(k, v);
       return q;

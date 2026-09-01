@@ -842,7 +842,7 @@ export async function importSampleData() {
 export async function loadCloudState(): Promise<CloudSlice> {
   const { hydrateTerminalConfig } = await import("./terminal-tokens");
   await hydrateTerminalConfig();
-  const tiers = await supabase.from("membership_tiers").select("id, name");
+  const tiers = await supabase.from("membership_tiers").select("id, name").is("deleted_at", null);
   if (tiers.error) return loadLocalState(tiers.error);
   tierIdByName = {};
   tierNameById = {};
@@ -852,8 +852,8 @@ export async function loadCloudState(): Promise<CloudSlice> {
   }
 
   const [products, members, sales, promotions, settings, stores, shifts] = await Promise.all([
-    supabase.from("products").select("*").order("name"),
-    supabase.from("members").select("*").order("created_at"),
+    supabase.from("products").select("*").is("deleted_at", null).order("name"),
+    supabase.from("members").select("*").is("deleted_at", null).order("created_at"),
     (async () => {
       const read = () =>
         supabase
@@ -868,7 +868,7 @@ export async function loadCloudState(): Promise<CloudSlice> {
       }
       return first;
     })(),
-    supabase.from("promotions").select("*").order("created_at"),
+    supabase.from("promotions").select("*").is("deleted_at", null).order("created_at"),
     supabase.from("pos_settings").select("*").eq("id", 1).maybeSingle(),
     // The stores table only exists once supabase/schema.sql has been applied; a
     // missing table must not stop the till from loading. Supabase query
@@ -883,7 +883,7 @@ export async function loadCloudState(): Promise<CloudSlice> {
           const relayed = await relayStores();
           if (relayed.ok) return { data: (relayed.rows as Row[] | undefined) ?? [] };
         }
-        const direct = await supabase.from("stores").select("*").order("name");
+        const direct = await supabase.from("stores").select("*").is("deleted_at", null).order("name");
         if (!direct.error) return { data: (direct.data as Row[] | null) ?? [] };
         // Registered terminals and staff sessions can still recover through
         // the server relay when a direct RLS read is unavailable.

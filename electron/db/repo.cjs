@@ -1103,7 +1103,9 @@ async function createSale({
 async function getProducts() {
   return withHeal("products", async () => {
     const res = await getPool().request().query("SELECT * FROM dbo.products ORDER BY name ASC;");
-    return res.recordset.map((row) => parseJsonColumns("products", row));
+    return res.recordset
+      .filter((row) => !row.deleted_at)
+      .map((row) => parseJsonColumns("products", row));
   });
 }
 
@@ -1111,7 +1113,10 @@ async function rows(table) {
   assertTable(table);
   return withHeal(table, async () => {
     const result = await getPool().request().query(`SELECT * FROM dbo.[${table}];`);
-    return result.recordset.map((row) => parseJsonColumns(table, row));
+    // A row kept only because history points at it reads as gone.
+    return result.recordset
+      .filter((row) => !row.deleted_at)
+      .map((row) => parseJsonColumns(table, row));
   });
 }
 
