@@ -36,6 +36,7 @@ export type SettingsCategoryId =
   | "printing"
   | "business"
   | "payments"
+  | "bookings"
   | "data"
   | "diagnostics"
   | "access";
@@ -51,6 +52,11 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
   { id: "printing", label: "Printing & receipts", blurb: "The printer and everything printed on a slip." },
   { id: "business", label: "Business & pricing", blurb: "Who you are, what you charge, how codes run." },
   { id: "payments", label: "Payments & messaging", blurb: "How customers pay and how bills reach them." },
+  {
+    id: "bookings",
+    label: "Bookings & services",
+    blurb: "Job cards, deposits, turnaround and the slip the customer signs.",
+  },
   { id: "data", label: "Data & sync", blurb: "Keeping this till in step with the company." },
   { id: "diagnostics", label: "Diagnostics & health", blurb: "Scanners, alerts and support tools." },
   { id: "access", label: "Access & visibility", blurb: "What each role sees on the busiest screens." },
@@ -209,15 +215,6 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     to: "/settings/qr",
     panel: page(() => import("@/routes/settings.qr")),
   },
-  {
-    id: "booking-slip",
-    label: "Booking slip wording",
-    blurb: "Terms & conditions and the customer signature line.",
-    icon: ReceiptText,
-    category: "printing",
-    to: "/settings/booking-slip",
-    panel: page(() => import("@/routes/settings.booking-slip")),
-  },
 
   /* ---- Business & pricing --------------------------------------------- */
   {
@@ -268,6 +265,16 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     panel: page(() => import("@/routes/settings.numbering")),
   },
   {
+    id: "stock-numbering",
+    label: "Document numbering",
+    blurb: "Reference numbers for stock counts and goods received.",
+    icon: ListPlus,
+    category: "business",
+    to: "/settings/stock-numbering",
+    panel: page(() => import("@/routes/settings.stock-numbering")),
+    keywords: "stock count reference goods received prefix padding reset",
+  },
+  {
     id: "catalog",
     label: "Categories & units",
     blurb: "Category groups, sub-categories and units of measure.",
@@ -315,24 +322,6 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     panel: page(() => import("@/routes/settings.accounts")),
   },
   {
-    id: "services",
-    label: "Booking services & fees",
-    blurb: "Re-stringing, repairs and other jobs with their default fee.",
-    icon: CalendarClock,
-    category: "payments",
-    to: "/settings/services",
-    panel: page(() => import("@/routes/settings.services")),
-  },
-  {
-    id: "booking-rules",
-    label: "Booking rules & deposits",
-    blurb: "Deposits, turnaround, racket jobs and who may cancel.",
-    icon: CalendarClock,
-    category: "payments",
-    to: "/settings/booking-rules",
-    panel: page(() => import("@/routes/settings.booking-rules")),
-  },
-  {
     id: "whatsapp",
     label: "WhatsApp bills & integrations",
     blurb: "Send receipts over the WhatsApp Cloud API.",
@@ -340,6 +329,35 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     category: "payments",
     to: "/settings/whatsapp",
     panel: page(() => import("@/routes/settings.whatsapp")),
+  },
+
+  /* ---- Bookings & services --------------------------------------------- */
+  {
+    id: "booking-rules",
+    label: "Booking rules & deposits",
+    blurb: "Deposits, turnaround, racket jobs and who may cancel.",
+    icon: CalendarClock,
+    category: "bookings",
+    to: "/settings/booking-rules",
+    panel: page(() => import("@/routes/settings.booking-rules")),
+  },
+  {
+    id: "services",
+    label: "Booking services & fees",
+    blurb: "Re-stringing, repairs and other jobs with their default fee.",
+    icon: CalendarClock,
+    category: "bookings",
+    to: "/settings/services",
+    panel: page(() => import("@/routes/settings.services")),
+  },
+  {
+    id: "booking-slip",
+    label: "Booking slip wording",
+    blurb: "Terms & conditions and the customer signature line.",
+    icon: ReceiptText,
+    category: "bookings",
+    to: "/settings/booking-slip",
+    panel: page(() => import("@/routes/settings.booking-slip")),
   },
 
   /* ---- Data & sync ----------------------------------------------------- */
