@@ -548,12 +548,15 @@ const SALE_COLUMNS_BASE =
 let hasClientTxnColumn = true;
 /** Same story for the branch-name snapshot columns. */
 let hasStoreSnapshotColumns = true;
+/** …and for the total-rounding columns. */
+let hasRoundingColumns = true;
 
 const saleColumns = () =>
   [
     SALE_COLUMNS_BASE,
     hasStoreSnapshotColumns ? "store_name_snapshot, store_address_snapshot" : "",
     hasClientTxnColumn ? "client_transaction_id" : "",
+    hasRoundingColumns ? "rounding_adjustment, rounding_label" : "",
   ]
     .filter(Boolean)
     .join(", ");
@@ -561,7 +564,7 @@ const saleColumns = () =>
 /** True when a failure is "that column is not in this database (yet)". */
 export const isMissingTxnColumn = (message: string | undefined | null) =>
   !!message &&
-  /client_transaction_id|store_name_snapshot|store_address_snapshot/.test(message) &&
+  /client_transaction_id|store_name_snapshot|store_address_snapshot|rounding_adjustment|rounding_label/.test(message) &&
   /does not exist|schema cache/i.test(message);
 
 /**
