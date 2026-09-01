@@ -20,6 +20,7 @@ export type Database = {
           actor_name: string | null
           actor_role: string | null
           amount: number | null
+          branch_id: string | null
           client_event_id: string | null
           created_at: string
           entity_id: string | null
@@ -41,6 +42,7 @@ export type Database = {
           actor_name?: string | null
           actor_role?: string | null
           amount?: number | null
+          branch_id?: string | null
           client_event_id?: string | null
           created_at?: string
           entity_id?: string | null
@@ -62,6 +64,7 @@ export type Database = {
           actor_name?: string | null
           actor_role?: string | null
           amount?: number | null
+          branch_id?: string | null
           client_event_id?: string | null
           created_at?: string
           entity_id?: string | null
@@ -408,6 +411,7 @@ export type Database = {
       }
       bookings: {
         Row: {
+          booking_ref: string | null
           cancel_money_action: string | null
           cancel_reason: string | null
           cancelled_at: string | null
@@ -463,6 +467,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          booking_ref?: string | null
           cancel_money_action?: string | null
           cancel_reason?: string | null
           cancelled_at?: string | null
@@ -518,6 +523,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          booking_ref?: string | null
           cancel_money_action?: string | null
           cancel_reason?: string | null
           cancelled_at?: string | null
@@ -2216,6 +2222,7 @@ export type Database = {
       }
       sale_items: {
         Row: {
+          branch_id: string | null
           coupon_code: string | null
           coupon_discount: number
           created_at: string
@@ -2235,6 +2242,7 @@ export type Database = {
           unit_price: number
         }
         Insert: {
+          branch_id?: string | null
           coupon_code?: string | null
           coupon_discount?: number
           created_at?: string
@@ -2254,6 +2262,7 @@ export type Database = {
           unit_price?: number
         }
         Update: {
+          branch_id?: string | null
           coupon_code?: string | null
           coupon_discount?: number
           created_at?: string
@@ -2292,6 +2301,7 @@ export type Database = {
       sales: {
         Row: {
           bill_number: string
+          branch_id: string | null
           cashier_id: string | null
           cashier_name: string | null
           change_amount: number
@@ -2329,6 +2339,7 @@ export type Database = {
         }
         Insert: {
           bill_number: string
+          branch_id?: string | null
           cashier_id?: string | null
           cashier_name?: string | null
           change_amount?: number
@@ -2366,6 +2377,7 @@ export type Database = {
         }
         Update: {
           bill_number?: string
+          branch_id?: string | null
           cashier_id?: string | null
           cashier_name?: string | null
           change_amount?: number
@@ -3394,6 +3406,7 @@ export type Database = {
           name: string
           parent_id: string | null
           phone: string | null
+          receipt_prefix: string | null
           row_version: number
           updated_at: string
         }
@@ -3413,6 +3426,7 @@ export type Database = {
           name: string
           parent_id?: string | null
           phone?: string | null
+          receipt_prefix?: string | null
           row_version?: number
           updated_at?: string
         }
@@ -3432,6 +3446,7 @@ export type Database = {
           name?: string
           parent_id?: string | null
           phone?: string | null
+          receipt_prefix?: string | null
           row_version?: number
           updated_at?: string
         }
@@ -3906,6 +3921,7 @@ export type Database = {
           _terminal?: string
         }
         Returns: {
+          booking_ref: string | null
           cancel_money_action: string | null
           cancel_reason: string | null
           cancelled_at: string | null
