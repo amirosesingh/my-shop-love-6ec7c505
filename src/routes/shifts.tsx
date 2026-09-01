@@ -115,9 +115,7 @@ function Shifts() {
     activeShift.terminalId === hereId ||
     isAdmin ||
     isSupervisor;
-  const overdueNow = activeShift
-    ? isShiftOverdue(activeShift, state.settings.hours)
-    : false;
+  const overdueNow = activeShift ? isShiftOverdue(activeShift, state.settings.hours) : false;
 
   /* Mid-shift snapshot: supervisors always, cashiers only when switched on. */
   const mayPrintXReport = isAdmin || isSupervisor || rules.enable_cashier_x_report;
@@ -129,9 +127,7 @@ function Shifts() {
       <div className="space-y-6 p-6">
         <header className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold">
-              Shifts &amp; receipts · {currentStore.name}
-            </h1>
+            <h1 className="text-2xl font-semibold">Shifts &amp; receipts · {currentStore.name}</h1>
             <p className="text-sm text-muted-foreground">
               Drawer control, X / Z reports and full sales history
             </p>
@@ -182,10 +178,7 @@ function Shifts() {
             <div className="grid gap-4 md:grid-cols-4">
               <Metric label="Opened by" value={activeShift.cashier} />
               <Metric label="Serving now" value={user?.name || activeShift.cashier} />
-              <Metric
-                label="Opened"
-                value={new Date(activeShift.openedAt).toLocaleTimeString()}
-              />
+              <Metric label="Opened" value={new Date(activeShift.openedAt).toLocaleTimeString()} />
               <Metric label="Transactions" value={String(shiftSales.length)} />
               <Metric label="Terminal" value={activeShift.terminalName ?? "This PC"} />
               <Metric label="Running for" value={shiftDuration(activeShift)} />
@@ -197,8 +190,8 @@ function Shifts() {
               )}
               {!canCloseHere && (
                 <p className="md:col-span-4 rounded-md border border-border px-3 py-2 text-xs text-muted-foreground">
-                  This shift was opened on {activeShift.terminalName ?? "another terminal"}. Close it
-                  from that PC, or ask a manager or admin to close it.
+                  This shift was opened on {activeShift.terminalName ?? "another terminal"}. Close
+                  it from that PC, or ask a manager or admin to close it.
                 </p>
               )}
               <p className="md:col-span-4 text-xs text-muted-foreground">
@@ -285,7 +278,9 @@ function Shifts() {
           </h2>
           <Separator />
           {signIns.length === 0 ? (
-            <p className="px-5 py-4 text-sm text-muted-foreground">No sign-ins recorded yet today.</p>
+            <p className="px-5 py-4 text-sm text-muted-foreground">
+              No sign-ins recorded yet today.
+            </p>
           ) : (
             <Table>
               <TableHeader>
@@ -354,7 +349,9 @@ function Shifts() {
                         </Badge>
                       )}
                     </TableCell>
-                    <TableCell className="capitalize text-muted-foreground">{s.role ?? "—"}</TableCell>
+                    <TableCell className="capitalize text-muted-foreground">
+                      {s.role ?? "—"}
+                    </TableCell>
                     <TableCell className="text-muted-foreground">{s.terminalName ?? "—"}</TableCell>
                     <TableCell className="text-muted-foreground">
                       {new Date(s.signedInAt).toLocaleString()}
@@ -391,7 +388,10 @@ function Shifts() {
                     <TableCell className="numeric">
                       {s.receiptNo}
                       {s.refunded && (
-                        <Badge variant="outline" className="ml-2 border-destructive/50 text-destructive">
+                        <Badge
+                          variant="outline"
+                          className="ml-2 border-destructive/50 text-destructive"
+                        >
                           refunded
                         </Badge>
                       )}
@@ -495,9 +495,7 @@ function Shifts() {
                     )}
                   </TableCell>
                   <TableCell className="text-muted-foreground">{sh.closedBy ?? "—"}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {sh.terminalName ?? "—"}
-                  </TableCell>
+                  <TableCell className="text-muted-foreground">{sh.terminalName ?? "—"}</TableCell>
                   <TableCell className="numeric text-muted-foreground">
                     {shiftDuration(sh)}
                   </TableCell>

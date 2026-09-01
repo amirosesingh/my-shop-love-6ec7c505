@@ -24,8 +24,7 @@ async function callState(fn: string, args: Record<string, unknown>): Promise<Shi
     if (res.error) return fail(res.error, "The closing step was refused.");
     const value = Array.isArray(res.data) ? res.data[0] : res.data;
     const state = (typeof value === "string" ? value : (value as { state?: string })?.state) as
-      | ShiftState
-      | undefined;
+      ShiftState | undefined;
     if (!state) return { ok: false, error: "The server did not confirm the closing step." };
     return { ok: true, state };
   } catch (e) {

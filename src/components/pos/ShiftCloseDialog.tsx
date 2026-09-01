@@ -373,15 +373,7 @@ export function ShiftCloseDialog({
   );
 }
 
-function Row({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone?: "good" | "bad";
-}) {
+function Row({ label, value, tone }: { label: string; value: string; tone?: "good" | "bad" }) {
   return (
     <div className="flex justify-between py-0.5">
       <span className="text-muted-foreground">{label}</span>
