@@ -65,8 +65,8 @@ export function AuthorizationDialog({
   const [pin, setPin] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
-  const auth = useAuthOptional();
-  const me = auth?.user ?? null;
+  const session = useAuthOptional();
+  const me = session?.user ?? null;
 
   /**
    * The line is down. A PIN cannot be checked without the database, so the
