@@ -340,7 +340,17 @@ export function useCheckout(deps: CheckoutDeps) {
     if (!(await deps.requirePermission("can_process_sale"))) return;
     if (isRefund && !(await deps.requirePermission("can_process_refund"))) return;
     const splitting = tenders.length > 0;
-    const split = validateTenders(totals.total, tenders);
+    /**
+     * Total rounding: runs once, on the number `cartTotals` produced, and the
+     * rounded value is what the ticket is validated, charged and stored on.
+     */
+    const roundingCfg = state.settings.integrations.rounding;
+    const settleMethod = splitting
+      ? tenders.reduce((a, p) => (p.amount > a.amount ? p : a), tenders[0]!).method
+      : method;
+    const rounding = applyRounding(totals.total, roundingCfg, settleMethod);
+    const chargeTotal = rounding.total;
+    const split = validateTenders(chargeTotal, tenders);
     const splitPaid = split.paid;
     if (!isRefund && splitting && split.error) {
       toast.error(
