@@ -57,7 +57,7 @@ export const CLOUD_ONLY: Record<string, string> = {
   coupon_events: "Loyalty ledger is authoritative centrally.",
   issued_vouchers: "Loyalty ledger is authoritative centrally.",
   coupon_campaigns: "Campaign setup is administered centrally.",
-  membership_tiers: "Tier setup is administered centrally.",
+  
   pin_attempts: "Throttling state is central.",
   cashiers: "Legacy staff table, central only.",
   integration_settings: "Administered centrally.",
@@ -77,8 +77,10 @@ export const TABLE_INTENT: Record<
   sales: { syncDirection: "push", restoreRequired: true, securityClass: "financial" },
   sale_items: { syncDirection: "push", restoreRequired: true, securityClass: "financial" },
   payment_transactions: { syncDirection: "push", restoreRequired: true, securityClass: "financial" },
-  booking_payments: { syncDirection: "both", restoreRequired: true, securityClass: "financial" },
-  bookings: { syncDirection: "both", restoreRequired: true, securityClass: "operational" },
+  // Bookings and their payments come back on the routine branch-scoped pull,
+  // so a rebuilt till has them without an explicit history restore.
+  booking_payments: { syncDirection: "both", restoreRequired: false, securityClass: "financial" },
+  bookings: { syncDirection: "both", restoreRequired: false, securityClass: "operational" },
   shifts: { syncDirection: "push", restoreRequired: true, securityClass: "financial" },
   shift_sessions: { syncDirection: "push", restoreRequired: true, securityClass: "financial" },
   drawer_events: { syncDirection: "push", restoreRequired: true, securityClass: "financial" },
@@ -91,10 +93,12 @@ export const TABLE_INTENT: Record<
     restoreRequired: true,
     securityClass: "operational",
   },
-  stock_transfers: { syncDirection: "both", restoreRequired: true, securityClass: "operational" },
+  // Transfers involving this branch arrive on the routine scoped pull, so
+  // they do not need the explicit history restore either.
+  stock_transfers: { syncDirection: "both", restoreRequired: false, securityClass: "operational" },
   stock_transfer_items: {
     syncDirection: "both",
-    restoreRequired: true,
+    restoreRequired: false,
     securityClass: "operational",
   },
   activity_events: { syncDirection: "push", restoreRequired: true, securityClass: "governance" },
@@ -105,7 +109,9 @@ export const TABLE_INTENT: Record<
   product_categories: { syncDirection: "pull", restoreRequired: false, securityClass: "reference" },
   promotions: { syncDirection: "pull", restoreRequired: false, securityClass: "reference" },
   suppliers: { syncDirection: "pull", restoreRequired: false, securityClass: "reference" },
-  membership_tiers: { syncDirection: "cloud-only", restoreRequired: false, securityClass: "reference" },
+  // Downloaded with the rest of the catalogue so tier names and discounts
+  // still resolve at the till with no connection.
+  membership_tiers: { syncDirection: "pull", restoreRequired: false, securityClass: "reference" },
   coupon_campaigns: { syncDirection: "cloud-only", restoreRequired: false, securityClass: "reference" },
   coupon_events: { syncDirection: "cloud-only", restoreRequired: false, securityClass: "financial" },
   issued_vouchers: { syncDirection: "cloud-only", restoreRequired: false, securityClass: "financial" },
@@ -204,15 +210,24 @@ export function formatCoverage(rows: Coverage[]): string {
   const lines = [
     "# Sync coverage",
     "",
-    "Generated from the feature registry — do not edit by hand.",
-    "Run `node scripts/sync-coverage.cjs` after changing a feature or the sync contract.",
+    "Generated from the feature registry and the till's own sync lists —",
+    "do not edit by hand. Run `bun scripts/sync-coverage.cjs` after changing a",
+    "feature or the sync contract.",
     "",
-    "| Table | Pushed up | Pulled down | Restorable | Note |",
-    "| --- | --- | --- | --- | --- |",
+    "| Table | Kind | Intended | Pushed up | Pulled down | Restorable | Note |",
+    "| --- | --- | --- | --- | --- | --- | --- |",
     ...rows.map(
-      (r) => `| ${r.table} | ${tick(r.push)} | ${tick(r.pull)} | ${tick(r.restore)} | ${r.note ?? ""} |`,
+      (r) =>
+        `| ${r.table} | ${r.securityClass ?? "—"} | ${r.declared ?? "not decided"} | ${tick(r.push)} | ${tick(r.pull)} | ${tick(r.restore)} | ${r.note ?? ""} |`,
     ),
   ];
+  const bad = mismatches(rows);
+  lines.push("", "## Gaps between intent and reality", "");
+  lines.push(
+    bad.length
+      ? bad.map((r) => `- **${r.table}** — ${r.issues?.join(" ")}`).join("\n")
+      : "None — every table behaves the way its feature declared.",
+  );
   const gaps = uncovered(rows);
   lines.push("", "## Undecided tables", "");
   lines.push(

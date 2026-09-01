@@ -1,7 +1,29 @@
-# Phase 2 — prioritised remediation plan (proposal, not yet implemented)
+# Phase 2 — prioritised remediation plan (delivered)
 
 Derived from `feature-inventory.md`, `schema-comparison.md`,
-`sync-coverage.md`. Ordered by data-loss risk. Nothing here has been built.
+`sync-coverage.md`. Ordered by data-loss risk.
+
+Status: P0–P5 are built and shipped. What each item became:
+
+- **P0** — `RESTORE_TABLES` in `electron/db/repo.cjs` plus `restore()` in
+  `electron/sync/worker.cjs`: branch-scoped, date-windowed, insert-if-absent,
+  never overwriting a row still waiting to be sent. Now also covers purchase
+  orders, their lines and stock count drafts. Operators trigger it from the
+  Sync panel.
+- **P1** — local mirrors for `shift_reconciliations` and
+  `shift_variance_alerts`; cash counts and close events push and restore.
+- **P2** — governance tables are written to the till first and pushed like
+  everything else; `src/lib/governance-offline.ts` parks approvals, record
+  edits and member verifications when the connection is down.
+- **P3** — branch columns aligned centrally, local mirrors added, the legacy
+  `transfers` table retired from the sync loop.
+- **P4** — `pos_settings` is pulled on restore, so a rebuilt terminal returns
+  with its branding and trading rules.
+- **P5** — `src/lib/feature-schema.ts` carries `syncDirection`,
+  `securityClass` and `restoreRequired`; `src/lib/sync-coverage.ts` compares
+  that intent against the till's real sync lists; the matrix is shown in
+  Logic health and written to `sync-coverage.md` by
+  `bun scripts/sync-coverage.cjs`.
 
 ## P0 — Transactional restore (fixes the largest gap)
 
