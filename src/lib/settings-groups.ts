@@ -1,11 +1,18 @@
 /**
  * Unified settings groups.
  *
- * Settings used to be one page per topic, which meant four different places
- * touched "POS rules" and three touched receipts. Each domain now has a single
- * parent view with sub-tabs; the tabs are real routes so deep links, the
- * settings search and the browser back button all keep working.
+ * Settings used to be described twice — once by the card workspace and once by
+ * the sub-tab strips — and the two drifted: a page could be a tab with no card,
+ * unreachable from the workspace and invisible to search. Groups now hold only
+ * ordering: which areas belong together and in what order. Every label and
+ * blurb is resolved from `SETTINGS_CARDS`, so a tab and its card can no longer
+ * disagree.
+ *
+ * The tabs are still real routes, so deep links, settings search and the
+ * browser back button all keep working.
  */
+import { SETTINGS_CARDS, settingsCard } from "./settings-catalog";
+
 export type SettingsTab = {
   to: string;
   label: string;
@@ -26,112 +33,105 @@ export type SettingsGroup = {
   tabs: SettingsTab[];
 };
 
-export const SETTINGS_GROUPS: SettingsGroup[] = [
+/** A member of a group, named by the catalogue id it takes its wording from. */
+type GroupMember = { card: string; shared?: boolean };
+
+type GroupSpec = {
+  id: string;
+  label: string;
+  blurb: string;
+  members: GroupMember[];
+};
+
+const GROUP_SPECS: GroupSpec[] = [
   {
     id: "pos-rules",
     label: "POS rules",
     blurb: "Every transaction, register, tax and cashier policy in one place.",
-    tabs: [
-      { to: "/settings/rules", label: "Rules & enforcement", blurb: "Shift, discount, refund and terminal limits." },
-      { to: "/settings/tax", label: "Tax & pricing", blurb: "Global rate and inclusive or exclusive pricing." },
-      { to: "/settings/numbering", label: "Bill numbering", blurb: "Branch, till, date and running number." },
-      { to: "/settings/stock-numbering", label: "Stock numbering", blurb: "Reference numbers for stock count records." },
-      { to: "/settings/sku", label: "SKU numbering", blurb: "Automatic product codes, or manual entry." },
-
+    members: [
+      { card: "rules" },
+      { card: "tax" },
+      { card: "numbering" },
+      { card: "stock-numbering" },
+      { card: "sku" },
     ],
   },
   {
     id: "receipts",
     label: "Receipts & printing",
     blurb: "The printer itself and everything that prints on a slip.",
-    tabs: [
-      { to: "/settings/printer", label: "Printer", blurb: "Device, encoding, margins and drawer pin." },
-      { to: "/settings/elements", label: "Elements", blurb: "Paper size, logo, points, barcode, tax." },
-      { to: "/settings/type", label: "Typography", blurb: "Fonts, sizes and spacing." },
-      { to: "/settings/lines", label: "Extra lines", blurb: "Policy notes, promotions, opening hours." },
-      { to: "/settings/qr", label: "QR code", blurb: "Payload, size and placement." },
-      { to: "/settings/receipt-designer", label: "Designer", blurb: "Dynamic fields, logo and receipt CSS." },
-      { to: "/settings/booking-slip", label: "Booking slip", blurb: "Terms and the signature line.", shared: true },
+    members: [
+      { card: "printer" },
+      { card: "elements" },
+      { card: "type" },
+      { card: "lines" },
+      { card: "qr" },
+      { card: "receipt-designer" },
+      { card: "booking-slip", shared: true },
     ],
   },
   {
     id: "booking-rules",
     label: "Booking rules",
     blurb: "Scheduling, deposits, turnaround and cancellation in one place.",
-    tabs: [
-      { to: "/settings/booking-rules", label: "Rules & deposits", blurb: "Deposits, turnaround and who may cancel." },
-      { to: "/settings/services", label: "Services & fees", blurb: "Re-stringing, repairs and default fees." },
-      { to: "/settings/booking-slip", label: "Booking slip", blurb: "Terms and the signature line.", shared: true },
+    members: [
+      { card: "booking-rules" },
+      { card: "services" },
+      { card: "booking-slip", shared: true },
     ],
   },
   {
     id: "system",
     label: "System & general",
     blurb: "Connection health, data sync, security and code health.",
-    tabs: [
-      {
-        to: "/settings/system",
-        tab: "system",
-        label: "System status",
-        blurb: "Connections, recovery tools and domains.",
-      },
-      {
-        to: "/settings/system",
-        tab: "database-health",
-        label: "Database health",
-        blurb: "Table links, orphan records and read/write checks.",
-        shared: true,
-      },
-      {
-        to: "/settings/system",
-        tab: "logic-health",
-        label: "Logic health",
-        blurb: "Unfinished logic, dead actions and missing guards.",
-        shared: true,
-      },
-      {
-        to: "/settings/system",
-        tab: "security-alerts",
-        label: "Security alerts",
-        blurb: "Scan findings and posture checks.",
-        shared: true,
-      },
-      {
-        to: "/settings/database",
-        label: "Database connection",
-        blurb: "Cloud keys, this terminal's SQL Server and schema health.",
-        shared: true,
-      },
-      {
-        to: "/settings/sync",
-        label: "Sync",
-        blurb: "Table-by-table sync progress, queue and backups.",
-        shared: true,
-      },
-      {
-        to: "/settings/system",
-        tab: "data-sync",
-        label: "Data sync & audit",
-        blurb: "Live sync status and the audit ledger.",
-        shared: true,
-      },
-      {
-        to: "/settings/system",
-        tab: "data-comparison",
-        label: "Server vs. shop data",
-        blurb: "Record counts here against the company server.",
-        shared: true,
-      },
-      {
-        to: "/settings/system",
-        tab: "inheritance",
-        label: "Inheritance",
-        blurb: "Global, cluster and branch tiers.",
-        shared: true,
-      },
+    members: [
+      { card: "system" },
+      { card: "database-health", shared: true },
+      { card: "logic-health", shared: true },
+      { card: "security-alerts", shared: true },
+      { card: "database", shared: true },
+      { card: "sync", shared: true },
+      { card: "data-sync", shared: true },
+      { card: "data-comparison", shared: true },
+      { card: "inheritance", shared: true },
     ],
   },
 ];
+
+/** Split `/settings/system?tab=logic-health` into its route and its tab. */
+function splitTarget(to: string): { to: string; tab?: SystemTabId } {
+  const [path, query] = to.split("?");
+  const tab = query ? new URLSearchParams(query).get("tab") : null;
+  return tab && (SYSTEM_TAB_IDS as readonly string[]).includes(tab)
+    ? { to: path as string, tab: tab as SystemTabId }
+    : { to: path as string };
+}
+
+function buildGroups(): SettingsGroup[] {
+  return GROUP_SPECS.map((spec) => ({
+    id: spec.id,
+    label: spec.label,
+    blurb: spec.blurb,
+    tabs: spec.members.flatMap((member): SettingsTab[] => {
+      const card = settingsCard(member.card);
+      // A group can only name an area the catalogue describes, so a tab
+      // pointing at a page nobody owns simply cannot be built.
+      if (!card) return [];
+      const target = splitTarget(card.to);
+      return [
+        {
+          to: target.to,
+          ...(target.tab ? { tab: target.tab } : {}),
+          label: card.label,
+          blurb: card.blurb,
+          ...(member.shared ? { shared: true } : {}),
+        },
+      ];
+    }),
+  }));
+}
+
+export const SETTINGS_GROUPS: SettingsGroup[] = buildGroups();
 
 /** Tabs of the System & general hub, rendered in place rather than as routes. */
 export const SYSTEM_TAB_IDS = [
@@ -184,4 +184,44 @@ export function settingsDuplicates(): SettingsDuplicate[] {
   return [...seen.entries()]
     .filter(([, v]) => v.groups.length > 1 && !v.shared)
     .map(([route, v]) => ({ route, groups: v.groups }));
+}
+
+/**
+ * Every `/settings/*` page that exists, discovered from the route files at
+ * build time rather than kept by hand. Pages that only redirect somewhere else
+ * are excluded: they are old links kept alive, not areas needing a card.
+ */
+const SETTINGS_ROUTE_MODULES = import.meta.glob("/src/routes/settings.*.tsx", {
+  eager: true,
+  query: "?raw",
+  import: "default",
+}) as Record<string, string>;
+
+export type SettingsCoverage = {
+  /** A settings page with no card — unreachable from the workspace or search. */
+  uncovered: string[];
+  /** A card pointing at a page that no longer exists. */
+  dangling: string[];
+};
+
+/**
+ * The reverse of `settingsDuplicates`: pages nobody owns, and cards that lead
+ * nowhere. Shown in Logic health so a new settings page cannot be added to one
+ * registry only and quietly go missing.
+ */
+export function settingsCoverage(): SettingsCoverage {
+  const pages = new Set<string>();
+  for (const [file, source] of Object.entries(SETTINGS_ROUTE_MODULES)) {
+    const name = file.split("settings.")[1]?.replace(/\.tsx$/, "");
+    if (!name || name === "index") continue;
+    // Redirect-only shims exist purely to keep old links working.
+    if (/beforeLoad[\s\S]{0,200}redirect\(/.test(source)) continue;
+    pages.add(`/settings/${name}`);
+  }
+
+  const carded = new Set(SETTINGS_CARDS.map((c) => c.to.split("?")[0] as string));
+  return {
+    uncovered: [...pages].filter((p) => !carded.has(p)).sort(),
+    dangling: [...carded].filter((p) => p !== "/settings/system" && !pages.has(p)).sort(),
+  };
 }
