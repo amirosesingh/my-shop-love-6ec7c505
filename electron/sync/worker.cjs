@@ -68,16 +68,46 @@ function isCredentialError(err) {
   return CREDENTIAL_ERROR_RE.test(msg) || /\((401|403)\)/.test(msg);
 }
 
+/** Rows per request on every pull; the server caps a single read well below a
+ *  fortnight of catalogue edits, so both pull paths page instead of truncate. */
+const PULL_PAGE = 1000;
+
+/**
+ * Reads every page of a delta query.
+ *
+ * `build(column, from)` returns one page of the query. Ordering is by the
+ * timestamp then the id so a row can never be skipped or seen twice between
+ * pages. The loop stops on the first short page.
+ */
+async function pageAll(build, column) {
+  const rows = [];
+  for (let from = 0; ; from += PULL_PAGE) {
+    const res = await build(column, from);
+    if (res.error) return res;
+    const page = res.data ?? [];
+    rows.push(...page);
+    if (page.length < PULL_PAGE) break;
+  }
+  return { data: rows, error: null };
+}
+
 async function selectChangedSince(table, since) {
-  const ask = (column) => supabase.from(table).select("*").gt(column, since);
+  const ask = (column, from) =>
+    supabase
+      .from(table)
+      .select("*")
+      .gt(column, since)
+      .order(column, { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, from + PULL_PAGE - 1);
   const known = stampColumn.get(table);
-  if (known) return await ask(known);
-  let res = await ask("updated_at");
+  if (known) return await pageAll(ask, known);
+  let res = await pageAll(ask, "updated_at");
   if (!res.error) {
     stampColumn.set(table, "updated_at");
     return res;
   }
-  res = await ask("created_at");
+  res = await pageAll(ask, "created_at");
   if (!res.error) stampColumn.set(table, "created_at");
   return res;
 }
@@ -89,24 +119,41 @@ async function selectChangedSince(table, since) {
  */
 async function selectScoped(spec, since, storeId, parentIds) {
   const stamp = stampColumn.get(spec.table);
-  const build = (column) => {
+  const build = (column, from) => {
     let query = supabase.from(spec.table).select("*").gt(column, since);
     if (spec.storeColumns?.length === 1) query = query.eq(spec.storeColumns[0], storeId);
     else if (spec.storeColumns?.length) {
       query = query.or(spec.storeColumns.map((c) => `${c}.eq.${storeId}`).join(","));
     }
     if (spec.parent) query = query.in(spec.parent.column, parentIds ?? []);
-    return query;
+    return query
+      .order(column, { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, from + PULL_PAGE - 1);
   };
-  if (stamp) return await build(stamp);
-  let res = await build("updated_at");
+  if (stamp) return await pageAll(build, stamp);
+  let res = await pageAll(build, "updated_at");
   if (!res.error) {
     stampColumn.set(spec.table, "updated_at");
     return res;
   }
-  res = await build("created_at");
+  res = await pageAll(build, "created_at");
   if (!res.error) stampColumn.set(spec.table, "created_at");
   return res;
+}
+
+/**
+ * Merges a pulled page, then removes anything the cloud has marked deleted.
+ * The stamped row is merged first so the till has something to act on even if
+ * the removal is refused by a delete guard.
+ */
+async function mergeWithTombstones(table, rows) {
+  const merged = await repo.mergeFromCloud(table, rows);
+  const gone = rows.filter((row) => row?.deleted_at).map((row) => row.id).filter(Boolean);
+  if (gone.length && typeof repo.applyTombstones === "function") {
+    await repo.applyTombstones(table, gone).catch(() => {});
+  }
+  return merged;
 }
 
 /**
@@ -414,7 +461,7 @@ async function pull() {
       setPhase("idle");
       return { ok: false, merged, error: error.message };
     }
-    merged += await repo.mergeFromCloud(table, data ?? []);
+    merged += await mergeWithTombstones(table, data ?? []);
     // Watermark advances only after a clean merge.
     await repo.setWatermark(table, startedAt, { error: null }).catch(() => {});
   }
@@ -446,7 +493,7 @@ async function pull() {
     const rows = data ?? [];
     if (!spec.parent) parentIds.set(spec.table, rows.map((row) => row.id).filter(Boolean));
     try {
-      merged += await repo.mergeFromCloud(spec.table, rows);
+      merged += await mergeWithTombstones(spec.table, rows);
       await repo.setWatermark(spec.table, startedAt, { error: null }).catch(() => {});
     } catch (err) {
       await repo.setWatermark(spec.table, null, { error: String(err) }).catch(() => {});
