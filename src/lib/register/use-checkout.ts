@@ -355,19 +355,19 @@ export function useCheckout(deps: CheckoutDeps) {
     if (!isRefund && splitting && split.error) {
       toast.error(
         split.balance > 0
-          ? `Split tenders cover ${money(splitPaid)} of ${money(totals.total)} — ${split.error}`
+          ? `Split tenders cover ${money(splitPaid)} of ${money(chargeTotal)} — ${split.error}`
           : split.error,
       );
       return;
     }
     const paid = isRefund
-      ? totals.total
+      ? chargeTotal
       : splitting
         ? splitPaid
         : method === "cash"
           ? Number(tendered || 0)
-          : totals.total;
-    if (!isRefund && !splitting && method === "cash" && paid < totals.total) {
+          : chargeTotal;
+    if (!isRefund && !splitting && method === "cash" && paid < chargeTotal) {
       toast.error("Tendered amount is less than the total");
       return;
     }
@@ -383,7 +383,7 @@ export function useCheckout(deps: CheckoutDeps) {
       toast.error(`Enter the serial / reference number for ${activeMethodName}`);
       return;
     }
-    if (!isRefund && !splitting && method === "points" && (member?.points ?? 0) < totals.total * 100) {
+    if (!isRefund && !splitting && method === "points" && (member?.points ?? 0) < chargeTotal * 100) {
       toast.error("Not enough points on this member");
       return;
     }
@@ -393,7 +393,7 @@ export function useCheckout(deps: CheckoutDeps) {
           {
             id: crypto.randomUUID(),
             method,
-            amount: r2(Math.abs(totals.total)),
+            amount: r2(Math.abs(chargeTotal)),
             ...(method === "card" && bankName.trim() ? { bankName: bankName.trim() } : {}),
             ...(method === "bank_transfer" && transferRef.trim() ? { ref: transferRef.trim() } : {}),
             ...(needsTenderRef
@@ -420,14 +420,17 @@ export function useCheckout(deps: CheckoutDeps) {
         subtotal: totals.subtotal,
         discount: totals.discount,
         tax: totals.tax,
-        total: totals.total,
+        total: chargeTotal,
         paid,
-        change: r2(Math.max(0, paid - totals.total)),
+        change: r2(Math.max(0, paid - chargeTotal)),
         method: splitting ? headline : method,
         payments,
         memberId,
         pointsEarned,
         cashier: activeCashier,
+        // Always recorded for reconciliation, even when nothing is printed.
+        roundingAdjustment: rounding.adjustment,
+        ...(rounding.adjustment ? { roundingLabel: roundingOf(roundingCfg).receiptLabel } : {}),
         ...(method === "bank_transfer" ? { transferRef: transferRef.trim() } : {}),
         ...(exchangeRef ? { exchangeOfReceiptNo: exchangeRef, exchangeCredit: totals.credit } : {}),
         ...(coupon
