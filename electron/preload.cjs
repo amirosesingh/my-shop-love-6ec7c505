@@ -54,6 +54,8 @@ contextBridge.exposeInMainWorld("pos", {
   /** Operator-triggered restore of this branch's trading history. */
   restore: (options) => invoke("pos:restore", options),
   restoreStatus: () => invoke("pos:restore-status"),
+  /** Which tables this till pushes, pulls and can restore. */
+  syncContract: () => invoke("pos:sync-contract"),
 
   setSyncEnabled: (on) => invoke("pos:set-sync-enabled", on),
   /** Live per-table counts for the server/shop comparison page. */

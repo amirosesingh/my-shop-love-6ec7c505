@@ -445,6 +445,8 @@ export type PosBridge = {
   /** Operator-triggered restore of this branch's trading history. */
   restore?: (options?: { days?: number }) => Promise<RestoreRun & { ok: boolean; error?: string }>;
   restoreStatus?: () => Promise<RestoreRun | null>;
+  /** Which tables this till pushes, pulls and can restore. */
+  syncContract?: () => Promise<{ push: string[]; pull: string[]; restore: string[] }>;
 
   setSyncEnabled: (on: boolean) => Promise<void>;
   /** Live per-table counts on this till, for the server/shop comparison. */

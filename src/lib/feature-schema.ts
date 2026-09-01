@@ -21,6 +21,18 @@ import { trulyRequired } from "./schema-required";
 
 export type OpKind = "read" | "write";
 
+/**
+ * Where this data is meant to travel.
+ *
+ * `push` — made at the till, owed to head office. `pull` — owned centrally,
+ * needed at the till. `both` — either side may change it. `cloud-only` — the
+ * till reads it online and never keeps a copy.
+ */
+export type SyncDirection = "push" | "pull" | "both" | "cloud-only";
+
+/** How badly a loss of this data hurts, in plain terms. */
+export type SecurityClass = "financial" | "governance" | "operational" | "reference";
+
 export type FeatureOp = {
   /** What this call does, in shop language. */
   label: string;
@@ -34,6 +46,12 @@ export type FeatureOp = {
   source: string;
   /** Part of a larger payload — do not chase required fields on this one. */
   partial?: boolean;
+  /** Declared sync intent; checked against what the till actually does. */
+  syncDirection?: SyncDirection;
+  /** Must come back on a rebuilt terminal. */
+  restoreRequired?: boolean;
+  /** What kind of data this is, for the coverage report. */
+  securityClass?: SecurityClass;
 };
 
 export type FeatureDef = {

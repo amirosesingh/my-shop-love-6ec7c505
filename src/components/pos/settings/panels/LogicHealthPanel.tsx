@@ -19,6 +19,7 @@ import {
   type ScanResult,
   type ScanStep,
 } from "@/lib/health-scan";
+import { SyncCoverageSection } from "./SyncCoverageSection";
 
 const ORDER: LogicSeverity[] = ["critical", "warning", "info"];
 
@@ -181,6 +182,8 @@ export function LogicHealthPanel() {
           </ul>
         )}
       </section>
+
+      <SyncCoverageSection />
 
       <div className="overflow-x-auto rounded-md border border-border">
         <table className="w-full text-xs">

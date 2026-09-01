@@ -13,6 +13,7 @@ import {
   confirmMemberVerification,
   startMemberVerification,
 } from "@/lib/verification.functions";
+import { looksOffline, parkGovernanceRow } from "@/lib/governance-offline";
 
 type Props = {
   open: boolean;
@@ -57,7 +58,29 @@ export function OtpVerificationModal({
       },
     }).catch((e: unknown) => ({ ok: false as const, error: String(e) }));
     setBusy(false);
-    if (!res.ok) return toast.error(res.error ?? "Could not send the code");
+    if (!res.ok) {
+      // A code can only be delivered online, so the send is not retried on the
+      // till. The attempt itself is kept locally so the branch can show it was
+      // tried, and it travels up with the next sync.
+      if (looksOffline(res.error)) {
+        const parked = await parkGovernanceRow("member_verifications", {
+          member_id: member.id ?? null,
+          phone: member.phone ?? null,
+          email: member.email ?? null,
+          channel: "none",
+          otp_code: "",
+          attempts: 0,
+          status: "failed",
+          store_id: storeId ?? null,
+        });
+        return toast.error("No connection — the code could not be sent", {
+          description: parked.parked
+            ? "The attempt was recorded on this till and will sync later."
+            : "The attempt could not be recorded on this till either.",
+        });
+      }
+      return toast.error(res.error ?? "Could not send the code");
+    }
     setId(res.id);
     setChannel(res.channel);
     toast.success(`Code sent on ${CHANNEL_LABEL[res.channel] ?? res.channel}`);

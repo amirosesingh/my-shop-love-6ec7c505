@@ -1582,6 +1582,23 @@ function registerIpc() {
   ipcMain.handle("pos:restore", (_e, options) => worker.restore(options ?? {}));
   ipcMain.handle("pos:restore-status", () => worker.restoreStatus());
 
+  /**
+   * The sync contract, as the till actually runs it.
+   *
+   * The coverage screen compares what each feature says its data needs
+   * against these three lists, so a table that was added to a feature but
+   * never added to the sync loop shows up as a gap instead of being noticed
+   * after a wipe.
+   */
+  ipcMain.handle("pos:sync-contract", () => {
+    const name = (t) => (typeof t === "string" ? t : t?.table);
+    return {
+      push: repo.PUSH_TABLES.slice(),
+      pull: [...repo.CATALOGUE_TABLES, ...repo.SCOPED_PULL_TABLES.map(name)].filter(Boolean),
+      restore: repo.RESTORE_TABLES.map(name).filter(Boolean),
+    };
+  });
+
   ipcMain.handle("pos:set-sync-enabled", (_e, on) => worker.setEnabled(on));
 
   /* ---- shop side of the server/shop data comparison ---- */

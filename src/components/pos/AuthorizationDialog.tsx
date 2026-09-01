@@ -28,7 +28,14 @@ import {
   authorizeWithPin,
   submitAuthorizationRequest,
 } from "@/lib/authorization.functions";
+import { looksOffline, parkGovernanceRow } from "@/lib/governance-offline";
+import { useAuthOptional } from "@/lib/pos-auth";
 import type { AuthMode, AuthPayload } from "@/lib/authorization";
+
+const newId = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 export type AuthorizationPrompt = {
   actionKey: string;
@@ -58,6 +65,61 @@ export function AuthorizationDialog({
   const [pin, setPin] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const session = useAuthOptional();
+  const me = session?.user ?? null;
+
+  /**
+   * The line is down. A PIN cannot be checked without the database, so the
+   * action is refused — but the attempt is still written to this till's
+   * governance trail and pushed with the next sync.
+   */
+  async function parkRefusedPin(message: string) {
+    const parked = await parkGovernanceRow("authorization_log", {
+      id: newId(),
+      action_key: prompt?.actionKey ?? "",
+      mode_used: "pin",
+      requested_by: me?.staffId ?? null,
+      authorized_by: authorizerId.trim() || null,
+      store_id: prompt?.storeId ?? "",
+      terminal_id: prompt?.terminalId ?? "",
+      outcome: "denied",
+      detail: { reason: note.trim(), offline: true, error: message.slice(0, 200) },
+    });
+    toast.error("No connection — a PIN cannot be checked", {
+      description: parked.parked
+        ? "The attempt was recorded on this till and will sync later."
+        : "The attempt could not be recorded on this till either.",
+    });
+  }
+
+  /**
+   * Queue the approval request on the till instead of centrally. It carries
+   * the same id it will have in the cloud, so the approver sees one request,
+   * not two, once the line is back.
+   */
+  async function parkRequest(message: string) {
+    const id = newId();
+    const parked = await parkGovernanceRow("authorization_requests", {
+      id,
+      action_key: prompt?.actionKey ?? "",
+      requested_by: me?.staffId ?? "till",
+      requested_by_name: me?.name ?? "",
+      store_id: prompt?.storeId ?? "",
+      terminal_id: prompt?.terminalId ?? "",
+      reason: note.trim(),
+      payload: prompt?.payload ?? {},
+      status: "pending",
+      expires_at: new Date(Date.now() + 24 * 3600_000).toISOString(),
+    });
+    if (!parked.parked) {
+      toast.error(message || "Could not send the request");
+      return;
+    }
+    toast.success("Recorded on this till", {
+      description: "It will reach the approvals queue as soon as the line is back.",
+    });
+    onFinish({ kind: "submitted", requestId: id });
+  }
 
   useEffect(() => {
     if (!prompt) return;
@@ -84,14 +146,16 @@ export function AuthorizationDialog({
         },
       });
       if (!res.ok) {
-        toast.error(res.error ?? "Authorisation failed");
+        if (looksOffline(res.error)) await parkRefusedPin(res.error ?? "");
+        else toast.error(res.error ?? "Authorisation failed");
         return;
       }
       if (res.warning) toast.warning(res.warning);
       toast.success(`Approved by ${res.authorizer.name}`);
       onFinish({ kind: "approved", grantToken: res.grantToken, by: res.authorizer.name });
     } catch (e) {
-      notifyError(e, "Authorisation failed");
+      if (looksOffline(e)) await parkRefusedPin(String((e as Error)?.message ?? e));
+      else notifyError(e, "Authorisation failed");
     } finally {
       setBusy(false);
     }
@@ -113,7 +177,8 @@ export function AuthorizationDialog({
         },
       });
       if (!res.ok || !res.request) {
-        toast.error(res.error ?? "Could not send the request");
+        if (looksOffline(res.error)) await parkRequest(res.error ?? "");
+        else toast.error(res.error ?? "Could not send the request");
         return;
       }
       toast.success("Sent for approval", {
@@ -121,7 +186,8 @@ export function AuthorizationDialog({
       });
       onFinish({ kind: "submitted", requestId: res.request.id });
     } catch (e) {
-      notifyError(e, "Could not send the request");
+      if (looksOffline(e)) await parkRequest(String((e as Error)?.message ?? e));
+      else notifyError(e, "Could not send the request");
     } finally {
       setBusy(false);
     }
