@@ -718,8 +718,15 @@ function BookingsPage() {
                 </div>
                 <div className="flex justify-between font-semibold">
                   <span>Balance due</span>
-                  <span className="numeric text-primary">{money(bookingBalance(payFor))}</span>
+                  <span className="numeric text-primary">
+                    {money(serverDue ?? bookingBalance(payFor))}
+                  </span>
                 </div>
+                <p className="pt-1 text-[11px] text-muted-foreground">
+                  {serverDue === null
+                    ? "Checking the balance with the central database…"
+                    : "Balance confirmed by the central database."}
+                </p>
               </div>
               <div className="space-y-1">
                 <Label>Amount received</Label>
@@ -759,8 +766,8 @@ function BookingsPage() {
             <Button variant="outline" onClick={() => setPayFor(null)}>
               Cancel
             </Button>
-            <Button onClick={() => void submitPayment()}>
-              {settle ? "Collect & print bill" : "Record payment"}
+            <Button disabled={payBusy || serverDue === null} onClick={() => void submitPayment()}>
+              {payBusy ? "Working…" : settle ? "Collect & print bill" : "Record payment"}
             </Button>
           </DialogFooter>
         </DialogContent>
