@@ -713,6 +713,62 @@ function Transfers() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Approve, dispatch and receive all take real quantities. */}
+      {step && stepTransfer && (
+        <TransferStepDialog
+          step={step.step}
+          transfer={stepTransfer}
+          nameOf={(id) => productOf(id)?.name ?? "Unknown item"}
+          onClose={() => setStep(null)}
+          onConfirm={(lines) => {
+            const t = stepTransfer;
+            if (step.step === "approve") {
+              approveTransfer(t.id, lines);
+              toast.success(`${t.ref} approved — ready to send`);
+            } else if (step.step === "dispatch") {
+              dispatchTransfer(t.id, lines);
+              print({
+                ...t,
+                items: t.items.map((i) => ({
+                  ...i,
+                  qty: lines.find((l) => l.productId === i.productId)?.qty ?? 0,
+                })),
+              });
+              const sent = lines.reduce((a, l) => a + l.qty, 0);
+              const asked = t.items.reduce((a, i) => a + i.qty, 0);
+              toast.success(
+                sent < asked ? `${t.ref} part sent · ${sent} of ${asked}` : `${t.ref} dispatched`,
+                {
+                  description:
+                    sent < asked ? "The note is closed on what was sent." : undefined,
+                },
+              );
+            } else {
+              receiveTransfer(t.id, lines);
+              toast.success(`${t.ref} received into ${currentStore.name}`);
+            }
+            setStep(null);
+          }}
+        />
+      )}
+
+      {reasonTransfer && (
+        <TransferReasonDialog
+          transfer={reasonTransfer}
+          cancelling={reasonTransfer.status === "dispatched"}
+          onClose={() => setReasonFor(null)}
+          onConfirm={(reason) => {
+            rejectTransfer(reasonTransfer.id, reason);
+            toast.success(
+              reasonTransfer.status === "dispatched"
+                ? `${reasonTransfer.ref} cancelled`
+                : `${reasonTransfer.ref} rejected`,
+            );
+            setReasonFor(null);
+          }}
+        />
+      )}
     </AppShell>
   );
 }
