@@ -639,6 +639,8 @@ const rowToSale = (r: Row): Sale => ({
   couponPromoId: r.coupon_promo_id ?? undefined,
   couponScope: (r.coupon_scope ?? undefined) as Sale["couponScope"],
   couponDiscount: num(r.coupon_discount) || undefined,
+  roundingAdjustment: num(r.rounding_adjustment) || undefined,
+  roundingLabel: r.rounding_label ?? undefined,
 });
 
 const saleToRow = (s: Sale): Row => ({
