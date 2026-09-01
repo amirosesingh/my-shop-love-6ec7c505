@@ -744,6 +744,37 @@ async function mergeFromCloud(table, rows) {
 }
 
 /**
+ * Tombstones.
+ *
+ * A row deleted centrally arrives stamped rather than absent, because an
+ * absence cannot travel down a delta pull. The stamped row is already merged
+ * by the time we get here; this removes the local copy outright where that is
+ * safe. Where it is not — a product that appears on a past bill, which the
+ * delete guard refuses on purpose — the stamped row simply stays, and every
+ * read filters it out, so the till behaves as if it were gone without losing
+ * the history that points at it.
+ */
+async function applyTombstones(table, ids) {
+  if (!ids.length) return { removed: 0, kept: 0 };
+  const pool = getPool();
+  let removed = 0;
+  let kept = 0;
+  for (const id of ids) {
+    const tx = new sql.Transaction(pool);
+    await tx.begin();
+    try {
+      await deleteRows(tx, table, { id });
+      await tx.commit();
+      removed += 1;
+    } catch {
+      await tx.rollback().catch(() => {});
+      kept += 1; // still readable as deleted; history keeps its reference
+    }
+  }
+  return { removed, kept };
+}
+
+/**
  * Restore-safe merge.
  *
  * Restore replays history the cloud already holds, so it must never clobber a
@@ -1232,6 +1263,7 @@ module.exports = {
   discardRow,
   queueRows,
   mergeFromCloud,
+  applyTombstones,
   restoreMerge,
 
   stats,
