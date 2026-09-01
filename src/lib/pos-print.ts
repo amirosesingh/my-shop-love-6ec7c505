@@ -15,7 +15,12 @@ import type {
   TaxSettings,
   Transfer,
 } from "./pos-types";
-import { bookingBalance, lineUnitDiscount, whatsappLink } from "./pos-types";
+import {
+  bookingBalance,
+  lineUnitDiscount,
+  whatsappLink,
+  TRANSFER_STATUS_LABELS,
+} from "./pos-types";
 import { defaultReceiptSettings } from "./pos-seed";
 import { roundingOf, showsRoundingLine } from "./rounding";
 import qrcode from "qrcode-generator";
