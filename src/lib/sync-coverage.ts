@@ -245,3 +245,87 @@ export function formatCoverage(rows: Coverage[]): string {
   );
   return `${lines.join("\n")}\n`;
 }
+
+/**
+ * Conflict rules.
+ *
+ * When the same record is changed in two places, something has to give. The
+ * rule is decided per table and written down, so nobody has to guess at three
+ * in the morning why a price came back or why a count did not.
+ *
+ * - `cloud-wins`   — head office is authoritative; the till's copy is replaced.
+ * - `till-wins`    — the terminal owns the record while it is trading.
+ * - `append-only`  — nothing is overwritten; both versions live side by side.
+ * - `immutable`    — once written the row never changes anywhere.
+ */
+export type ConflictRule = "cloud-wins" | "till-wins" | "append-only" | "immutable";
+
+export const CONFLICT_RULE_TEXT: Record<ConflictRule, string> = {
+  "cloud-wins": "Head office wins. The till replaces its copy on the next pull.",
+  "till-wins": "The till wins while it holds the record; head office accepts what it sends.",
+  "append-only": "Nothing is overwritten — each entry is kept in its own right.",
+  immutable: "Written once and never changed; a correction is a new record.",
+};
+
+/** Rules that are not implied by the table's kind. */
+const CONFLICT_OVERRIDE: Record<string, ConflictRule> = {
+  // A branch edits its own members (points, phone) between syncs, but head
+  // office owns the record overall, so the newer stamp decides — recorded as
+  // cloud-wins because that is what the merge does on a tie.
+  members: "cloud-wins",
+  // Stock lives in both places: the till moves it by selling, head office by
+  // receiving. Deltas are applied, never overwritten.
+  products: "cloud-wins",
+  bookings: "cloud-wins",
+  booking_payments: "append-only",
+  stock_transfers: "cloud-wins",
+  stock_transfer_items: "cloud-wins",
+  stock_adjustments: "append-only",
+  held_orders: "till-wins",
+};
+
+/** The rule for one table, from the override list or its declared kind. */
+export function conflictRule(table: string): ConflictRule {
+  const override = CONFLICT_OVERRIDE[table];
+  if (override) return override;
+  const intent = declaredIntent(table);
+  if (intent.securityClass === "financial") return "immutable";
+  if (intent.securityClass === "governance") return "append-only";
+  if (intent.syncDirection === "push") return "immutable";
+  return "cloud-wins";
+}
+
+/** Every table a feature touches, with its rule — for docs and the dashboard. */
+export function conflictRules(): { table: string; rule: ConflictRule; why: string }[] {
+  return registryTables().map((table) => ({
+    table,
+    rule: conflictRule(table),
+    why: CONFLICT_RULE_TEXT[conflictRule(table)],
+  }));
+}
+
+/** The conflict-rules document, generated. */
+export function formatConflictRules(): string {
+  const rows = conflictRules();
+  const lines = [
+    "# Conflict rules",
+    "",
+    "What happens when the same record is changed centrally and at a till.",
+    "Generated from the feature registry — do not edit by hand. Run",
+    "`bun scripts/sync-coverage.cjs` after changing a feature.",
+    "",
+    "| Table | Rule | What that means |",
+    "| --- | --- | --- |",
+    ...rows.map((r) => `| ${r.table} | ${r.rule} | ${r.why} |`),
+    "",
+    "## Deletions",
+    "",
+    "Reference records (products, categories, barcodes, units, suppliers,",
+    "promotions, membership tiers, locations, members) are never erased",
+    "centrally: they are stamped with a deletion time. The stamp travels down",
+    "the next sync and the till removes its own copy. Where local history still",
+    "points at the record — a product on a past bill — the stamped row stays put",
+    "and simply reads as gone. Transactional history is never deleted at all.",
+  ];
+  return `${lines.join("\n")}\n`;
+}
