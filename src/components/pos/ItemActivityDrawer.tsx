@@ -51,7 +51,7 @@ export function ItemActivityDrawer({
           return { rows: [] as LooseRow[], source: "local" as ReadSource };
         }
       };
-      const [adjustments, transfers, meta, merges] = await Promise.all([
+      const [adjustments, transfers, meta, merges, movements] = await Promise.all([
         ask("stock_adjustments", {
           columns: "id,created_at,reason,note,delta,cost_impact,staff_name,store_id",
           match: { product_id: product.id },
