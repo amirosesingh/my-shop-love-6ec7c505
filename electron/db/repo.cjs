@@ -54,6 +54,9 @@ const TABLES = [
   "authorization_requests",
   "authorization_log",
   "member_verifications",
+  // Every state change of every tracked record. Written here first so a
+  // change made with no connection still has a permanent history entry.
+  "entity_status_history",
 ];
 
 /** Cloud is authoritative for these; they are the only tables ever pulled. */
