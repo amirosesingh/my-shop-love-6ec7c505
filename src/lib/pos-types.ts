@@ -580,10 +580,23 @@ export type Booking = {
   technician?: string;
   /** why the job was marked damaged or cancelled */
   incidentNote?: string;
+  /** permanent cancellation record, written once by the server */
+  cancelReason?: string;
+  cancelledBy?: string;
+  cancelledAt?: string;
+  cancelledTerminal?: string;
 };
 
+/**
+ * Display-only balance. Never use this to decide whether a booking may be
+ * collected — the server owns that call (see `src/lib/booking-collection.ts`).
+ */
 export const bookingBalance = (b: Pick<Booking, "total" | "paid">) =>
   r2(Math.max(0, b.total - b.paid));
+
+/** Anything at or below this is treated as fully settled. */
+export const MONEY_TOLERANCE = 0.005;
+
 
 /* -------------------------- stock adjustments -------------------------- */
 
