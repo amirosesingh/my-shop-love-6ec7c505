@@ -231,7 +231,7 @@ type Ctx = {
     status: JobStatus,
     who: string,
     incidentNote?: string,
-  ) => Booking | null;
+  ) => Promise<Booking | null>;
   /** Edit the technical specs of an existing racket job before payment. */
   updateBookingSpecs: (id: string, job: RacketJob) => Booking | null;
   addBookingPayment: (
@@ -239,13 +239,20 @@ type Ctx = {
     amount: number,
     method: PaymentMethod,
     cashier: string,
+    clientPaymentId?: string,
   ) => Promise<Booking | null>;
   collectBooking: (
     id: string,
     amount: number,
     method: PaymentMethod,
+    clientPaymentId?: string,
   ) => Promise<{ booking: Booking; sale: Sale } | null>;
-  cancelBooking: (id: string, reason: string) => void;
+  cancelBooking: (
+    id: string,
+    reason: string,
+    terminal?: string | null,
+  ) => Promise<{ ok: true } | { ok: false; error: string }>;
+
   deleteBooking: (id: string, reason: string) => Promise<void>;
   upsertProduct: (product: Product) => Promise<CommitTarget>;
   removeProduct: (id: string) => Promise<BlockedDelete[]>;
