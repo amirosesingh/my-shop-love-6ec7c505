@@ -12,6 +12,7 @@ import {
   Undo2,
   Trash2,
   ScanLine,
+  History,
 } from "lucide-react";
 import { toast } from "sonner";
 
