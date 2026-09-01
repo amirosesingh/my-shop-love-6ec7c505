@@ -9,13 +9,27 @@
 import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { localDb } from "@/lib/local-db";
-import { buildCoverage, mismatches, type Coverage } from "@/lib/sync-coverage";
+import {
+  buildCoverage,
+  conflictRule,
+  CONFLICT_RULE_TEXT,
+  mismatches,
+  type Coverage,
+} from "@/lib/sync-coverage";
 
 const DIRECTION_LABEL: Record<string, string> = {
   push: "Sent to head office",
   pull: "Received from head office",
   both: "Kept in step both ways",
   "cloud-only": "Lives centrally only",
+};
+
+/** Plain wording for the written conflict rule of each table. */
+const RULE_LABEL: Record<string, string> = {
+  "cloud-wins": "Head office wins",
+  "till-wins": "Till wins",
+  "append-only": "Both kept",
+  immutable: "Never changes",
 };
 
 const CLASS_LABEL: Record<string, string> = {
@@ -90,6 +104,7 @@ export function SyncCoverageSection() {
                 <th className="px-3 py-2 font-medium">Sent up</th>
                 <th className="px-3 py-2 font-medium">Brought down</th>
                 <th className="px-3 py-2 font-medium">Recoverable</th>
+                <th className="px-3 py-2 font-medium">If both change</th>
                 <th className="px-3 py-2 font-medium">Notes</th>
               </tr>
             </thead>
@@ -112,6 +127,12 @@ export function SyncCoverageSection() {
                     {r.restoreRequired && !r.restore && contract ? (
                       <span className="ml-1 text-destructive">required</span>
                     ) : null}
+                  </td>
+                  <td
+                    className="px-3 py-2 whitespace-nowrap text-muted-foreground"
+                    title={CONFLICT_RULE_TEXT[conflictRule(r.table)]}
+                  >
+                    {RULE_LABEL[conflictRule(r.table)]}
                   </td>
                   <td className="px-3 py-2 text-muted-foreground">
                     {contract && r.issues?.length ? (
