@@ -70,6 +70,7 @@ import { commitBooking, deleteBookingRow, loadBookings, saveBookingQuietly } fro
 import {
   cancelBookingAuthoritative,
   collectBookingPayment,
+  refundBookingPayment,
   readBookingBalance,
 } from "./booking-collection";
 import {
@@ -2331,6 +2332,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     addBookingPayment,
     collectBooking,
     cancelBooking,
+    refundBooking,
     deleteBooking,
     setBookingJobStatus,
     updateBookingSpecs,
