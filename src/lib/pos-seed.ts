@@ -99,6 +99,14 @@ export const defaultIntegrations: AppSettings["integrations"] = {
   categoryMap: {},
   branches: {},
   productOwners: {},
+  rounding: {
+    enabled: false,
+    unit: 0.05,
+    direction: "nearest",
+    appliesTo: "all",
+    showOnReceipt: true,
+    receiptLabel: "Extra Discount",
+  },
 };
 
 export const defaultSettings: AppSettings = {
