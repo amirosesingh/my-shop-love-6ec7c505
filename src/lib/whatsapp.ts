@@ -46,6 +46,9 @@ export function buildSaleMessage(
     `Subtotal: ${cash(sale.subtotal)}`,
     ...(sale.discount ? [`Discount: -${cash(sale.discount)}`] : []),
     ...(sale.tax ? [`Tax: ${cash(sale.tax)}`] : []),
+    ...((sale.roundingAdjustment ?? 0) < 0
+      ? [`${sale.roundingLabel || "Extra Discount"}: -${cash(Math.abs(sale.roundingAdjustment ?? 0))}`]
+      : []),
     `*Total: ${cash(sale.total)}*`,
     `Paid by ${PAYMENT_LABELS[sale.method]}${sale.change ? ` · change ${cash(sale.change)}` : ""}`,
     ...(sale.transferRef ? [`Transfer ref: ${sale.transferRef}`] : []),

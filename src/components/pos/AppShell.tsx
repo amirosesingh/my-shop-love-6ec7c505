@@ -233,7 +233,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [currentStore]);
 
   useEffect(() => {
-    setPrintSettings(state.settings.receipt, state.settings.tax);
+    setPrintSettings(state.settings.receipt, state.settings.tax, state.settings.integrations.rounding);
   }, [state.settings]);
 
   // The liability wording lives with the booking rules but is printed by the
