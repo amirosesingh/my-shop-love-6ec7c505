@@ -23,7 +23,14 @@ const TABLES = [
   // Sign-in visibility and drawer openings are written by the till too; they
   // must be on this list or every write is refused as an unknown table.
   "shift_sessions",
+  // Controlled shift closing: blind counts, state transitions, the computed
+  // reconciliation and any variance alert all belong to the trading record.
+  "shift_cash_counts",
+  "shift_close_events",
+  "shift_reconciliations",
+  "shift_variance_alerts",
   "drawer_events",
+
   "sales",
   "sale_items",
   "payment_transactions",
