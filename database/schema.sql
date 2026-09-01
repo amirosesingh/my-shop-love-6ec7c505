@@ -284,6 +284,63 @@ CREATE TABLE dbo.shift_close_events (
 );
 GO
 
+/* Offline close: a count taken with no connection is kept here until the
+   central routine has recomputed the authoritative variance. */
+IF OBJECT_ID('dbo.shift_cash_counts', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.shift_cash_counts', 'reconcile_state') IS NULL
+    ALTER TABLE dbo.shift_cash_counts ADD [reconcile_state] NVARCHAR(20) NOT NULL DEFAULT N'pending';
+END
+GO
+
+IF OBJECT_ID('dbo.shift_reconciliations', 'U') IS NULL
+CREATE TABLE dbo.shift_reconciliations (
+  id                UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+  shift_id          NVARCHAR(80)     NOT NULL,
+  store_id          NVARCHAR(60)     NULL,
+  count_id          NVARCHAR(80)     NULL,
+  expected_cash     DECIMAL(18,4)    NOT NULL DEFAULT 0,
+  expected_card     DECIMAL(18,4)    NULL,
+  expected_digital  DECIMAL(18,4)    NULL,
+  counted_cash      DECIMAL(18,4)    NOT NULL DEFAULT 0,
+  counted_card      DECIMAL(18,4)    NULL,
+  counted_digital   DECIMAL(18,4)    NULL,
+  variance_cash     DECIMAL(18,4)    NOT NULL DEFAULT 0,
+  variance_card     DECIMAL(18,4)    NULL,
+  variance_digital  DECIMAL(18,4)    NULL,
+  variance_total    DECIMAL(18,4)    NOT NULL DEFAULT 0,
+  variance_status   NVARCHAR(40)     NULL,
+  is_synced         BIT              NOT NULL DEFAULT 0,
+  sync_status       NVARCHAR(20)     NOT NULL DEFAULT N'pending',
+  created_at        DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+IF OBJECT_ID('dbo.shift_variance_alerts', 'U') IS NULL
+CREATE TABLE dbo.shift_variance_alerts (
+  id                 UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+  shift_id           NVARCHAR(80)     NOT NULL,
+  store_id           NVARCHAR(60)     NULL,
+  reconciliation_id  NVARCHAR(80)     NULL,
+  variance_total     DECIMAL(18,4)    NOT NULL DEFAULT 0,
+  variance_status    NVARCHAR(40)     NULL,
+  severity           NVARCHAR(40)     NULL,
+  message            NVARCHAR(MAX)    NULL,
+  delivery_status    NVARCHAR(40)     NULL,
+  attempts           INT              NOT NULL DEFAULT 0,
+  last_error         NVARCHAR(MAX)    NULL,
+  last_attempt_at    DATETIME2(3)     NULL,
+  acknowledged_at    DATETIME2(3)     NULL,
+  acknowledged_by    NVARCHAR(200)    NULL,
+  is_synced          BIT              NOT NULL DEFAULT 0,
+  sync_status        NVARCHAR(20)     NOT NULL DEFAULT N'pending',
+  created_at         DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at         DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+
+
 IF OBJECT_ID('dbo.bookings', 'U') IS NULL
 CREATE TABLE dbo.bookings (
   id             UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
