@@ -1,4 +1,26 @@
 {
+  "activity_events": [
+    "id",
+    "event_type",
+    "severity",
+    "title",
+    "message",
+    "actor_id",
+    "actor_name",
+    "actor_role",
+    "terminal_id",
+    "terminal_name",
+    "store_id",
+    "entity_type",
+    "entity_id",
+    "amount",
+    "meta",
+    "whatsapp_status",
+    "whatsapp_error",
+    "client_event_id",
+    "created_at",
+    "branch_id"
+  ],
   "audit_logs": [
     "id",
     "user_name",
@@ -68,7 +90,9 @@
     "cashier",
     "paid_at",
     "created_at",
-    "row_version"
+    "row_version",
+    "reversed_at",
+    "reversed_by"
   ],
   "bookings": [
     "id",
@@ -118,7 +142,8 @@
     "technician",
     "liability_accepted",
     "incident_note",
-    "row_version"
+    "row_version",
+    "booking_ref"
   ],
   "drawer_events": [
     "id",
@@ -174,6 +199,21 @@
     "note",
     "created_at",
     "row_version"
+  ],
+  "member_verifications": [
+    "id",
+    "member_id",
+    "phone",
+    "email",
+    "channel",
+    "otp_code",
+    "attempts",
+    "status",
+    "sent_by",
+    "store_id",
+    "expires_at",
+    "verified_at",
+    "created_at"
   ],
   "members": [
     "id",
@@ -367,7 +407,8 @@
     "coupon_code",
     "coupon_discount",
     "unit_cost",
-    "row_version"
+    "row_version",
+    "branch_id"
   ],
   "sales": [
     "id",
@@ -402,7 +443,8 @@
     "updated_by",
     "row_version",
     "store_name_snapshot",
-    "store_address_snapshot"
+    "store_address_snapshot",
+    "branch_id"
   ],
   "shift_cash_counts": [
     "id",
@@ -417,7 +459,8 @@
     "counted_by_name",
     "counted_by_staff_id",
     "client_key",
-    "created_at"
+    "created_at",
+    "counted_by_user_id"
   ],
   "shift_close_events": [
     "id",
@@ -430,7 +473,8 @@
     "detail",
     "actor_name",
     "actor_staff_id",
-    "created_at"
+    "created_at",
+    "actor_user_id"
   ],
   "shift_reconciliations": [
     "id",
@@ -612,7 +656,8 @@
     "floor_label",
     "is_active",
     "archived_at",
-    "is_primary_sub"
+    "is_primary_sub",
+    "receipt_prefix"
   ],
   "suppliers": [
     "id",

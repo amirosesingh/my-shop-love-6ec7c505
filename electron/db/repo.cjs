@@ -39,13 +39,21 @@ const TABLES = [
   "purchase_order_items",
   "bookings",
   "booking_payments",
-  "transfers",
   "stock_transfers",
   "stock_transfer_items",
   "stock_adjustments",
   "stock_count_drafts",
   "held_orders",
   "audit_logs",
+  // Governance trail. These used to be written to the cloud only, so an
+  // action taken with no connection left no record anywhere; they are now
+  // stored on the till first and pushed like everything else.
+  "activity_events",
+  "record_edits",
+  "authorization_actions",
+  "authorization_requests",
+  "authorization_log",
+  "member_verifications",
 ];
 
 /** Cloud is authoritative for these; they are the only tables ever pulled. */
@@ -102,9 +110,15 @@ const RESTORE_TABLES = [
   { table: "stock_adjustments", storeColumns: ["store_id"], dateColumn: "created_at" },
   { table: "item_activity_logs", storeColumns: ["store_id"], dateColumn: "created_at" },
   { table: "held_orders", storeColumns: ["store_id"], dateColumn: "created_at" },
+  // Governance trail: who approved what, which posted records were edited,
+  // and which members were verified at this branch.
+  { table: "activity_events", storeColumns: ["store_id"], dateColumn: "created_at" },
+  { table: "record_edits", storeColumns: ["store_id"], dateColumn: "created_at" },
+  { table: "authorization_requests", storeColumns: ["store_id"], dateColumn: "created_at" },
+  { table: "authorization_log", storeColumns: ["store_id"], dateColumn: "created_at" },
+  { table: "member_verifications", storeColumns: ["store_id"], dateColumn: "created_at" },
   // audit_logs has no branch column centrally, so it cannot be restored
   // store-scoped and is deliberately left out.
-
 ];
 
 
@@ -134,7 +148,7 @@ const PRUNABLE_TABLES = [
   "bookings",
   "stock_transfer_items",
   "stock_transfers",
-  "transfers",
+  "activity_events",
   "stock_adjustments",
   "audit_logs",
 ];

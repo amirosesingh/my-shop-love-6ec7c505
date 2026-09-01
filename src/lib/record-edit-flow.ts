@@ -177,11 +177,51 @@ export async function saveRecordEditHistory(input: {
         ...(input.note ? { note: input.note } : {}),
       },
     });
-    if (!res.ok) {
-      toast.warning("The change was saved, but its history entry could not be written.");
-    }
+    if (res.ok) return;
   } catch {
-    toast.warning("The change was saved, but its history entry could not be written.");
+    /* falls through to the local trail below */
+  }
+  // The central database could not take it: keep the entry on this till so
+  // the change is never invisible, and let the sync worker push it later.
+  if (await parkRecordEdit(input)) {
+    toast.info("Saved. Its history entry will reach head office when the line is back.");
+    return;
+  }
+  toast.warning("The change was saved, but its history entry could not be written.");
+}
+
+/** Store one edit history entry in the till's own database. */
+async function parkRecordEdit(input: {
+  kind: RecordKind;
+  recordId: string;
+  reference?: string;
+  storeId?: string | null;
+  actionKey: string;
+  grant?: EditGrant | null;
+  before: unknown;
+  after: unknown;
+  stockDeltas?: Record<string, number>;
+  note?: string;
+}): Promise<boolean> {
+  try {
+    const { parkGovernanceRow } = await import("@/lib/governance-offline");
+    const res = await parkGovernanceRow("record_edits", {
+      record_type: input.kind,
+      record_id: input.recordId,
+      reference: input.reference ?? null,
+      store_id: input.storeId ?? "",
+      action_key: input.actionKey,
+      request_id: input.grant?.requestId ?? null,
+      authorized_by: input.grant?.authorizedBy ?? null,
+      mode_used: input.grant?.modeUsed ?? null,
+      before_value: input.before ?? {},
+      after_value: input.after ?? {},
+      stock_deltas: input.stockDeltas ?? {},
+      note: input.note ?? null,
+    });
+    return res.parked;
+  } catch {
+    return false;
   }
 }
 

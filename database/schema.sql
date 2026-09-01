@@ -3378,3 +3378,46 @@ BEGIN
   IF COL_LENGTH('dbo.purchase_orders', 'pending_edit_at') IS NULL ALTER TABLE dbo.purchase_orders ADD [pending_edit_at] DATETIME2(3) NULL;
 END
 GO
+
+/* ------------------------------------------------------------------ */
+/* Schema alignment — fields the central database already has that the */
+/* till was missing, so a pulled or restored row keeps its meaning.    */
+/* ------------------------------------------------------------------ */
+IF OBJECT_ID('dbo.booking_payments', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.booking_payments', 'reversed_at') IS NULL ALTER TABLE dbo.booking_payments ADD [reversed_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.booking_payments', 'reversed_by') IS NULL ALTER TABLE dbo.booking_payments ADD [reversed_by] NVARCHAR(120) NULL;
+END
+GO
+IF OBJECT_ID('dbo.shift_cash_counts', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.shift_cash_counts', 'counted_by_user_id') IS NULL ALTER TABLE dbo.shift_cash_counts ADD [counted_by_user_id] NVARCHAR(120) NULL;
+END
+GO
+IF OBJECT_ID('dbo.shift_close_events', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.shift_close_events', 'actor_user_id') IS NULL ALTER TABLE dbo.shift_close_events ADD [actor_user_id] NVARCHAR(120) NULL;
+END
+GO
+
+/* Governance trail written offline: an event raised, an edit recorded or an
+   approval decided with no connection is kept here and pushed on reconnect. */
+IF OBJECT_ID('dbo.activity_events', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.activity_events', 'branch_id') IS NULL ALTER TABLE dbo.activity_events ADD [branch_id] NVARCHAR(60) NULL;
+  IF COL_LENGTH('dbo.activity_events', 'is_synced') IS NULL ALTER TABLE dbo.activity_events ADD [is_synced] BIT NOT NULL DEFAULT 0;
+  IF COL_LENGTH('dbo.activity_events', 'sync_status') IS NULL ALTER TABLE dbo.activity_events ADD [sync_status] NVARCHAR(40) NOT NULL DEFAULT N'pending';
+  IF COL_LENGTH('dbo.activity_events', 'sync_attempts') IS NULL ALTER TABLE dbo.activity_events ADD [sync_attempts] INT NOT NULL DEFAULT 0;
+  IF COL_LENGTH('dbo.activity_events', 'last_error_at') IS NULL ALTER TABLE dbo.activity_events ADD [last_error_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.activity_events', 'client_transaction_id') IS NULL ALTER TABLE dbo.activity_events ADD [client_transaction_id] NVARCHAR(120) NULL;
+END
+GO
+IF OBJECT_ID('dbo.member_verifications', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.member_verifications', 'is_synced') IS NULL ALTER TABLE dbo.member_verifications ADD [is_synced] BIT NOT NULL DEFAULT 0;
+  IF COL_LENGTH('dbo.member_verifications', 'sync_status') IS NULL ALTER TABLE dbo.member_verifications ADD [sync_status] NVARCHAR(40) NOT NULL DEFAULT N'pending';
+  IF COL_LENGTH('dbo.member_verifications', 'sync_attempts') IS NULL ALTER TABLE dbo.member_verifications ADD [sync_attempts] INT NOT NULL DEFAULT 0;
+  IF COL_LENGTH('dbo.member_verifications', 'last_error_at') IS NULL ALTER TABLE dbo.member_verifications ADD [last_error_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.member_verifications', 'client_transaction_id') IS NULL ALTER TABLE dbo.member_verifications ADD [client_transaction_id] NVARCHAR(120) NULL;
+END
+GO

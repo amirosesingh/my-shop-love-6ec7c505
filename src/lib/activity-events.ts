@@ -148,6 +148,38 @@ async function send(entry: Queued): Promise<boolean> {
   }
 }
 
+/**
+ * Keep the event on this till when the cloud cannot be reached.
+ *
+ * The browser queue survives a reload but not a wipe, so on a terminal with
+ * its own database the event is written there instead and pushed by the sync
+ * worker like a sale. Returns true when the row is safely stored.
+ */
+async function park(entry: Queued): Promise<boolean> {
+  const { parkGovernanceRow } = await import("./governance-offline");
+  const res = await parkGovernanceRow("activity_events", {
+    id: entry.clientEventId,
+    client_event_id: entry.clientEventId,
+    event_type: entry.type,
+    severity: entry.severity ?? "info",
+    title: entry.title,
+    message: entry.message ?? "",
+    actor_id: entry.actorId ?? null,
+    actor_name: entry.actorName ?? null,
+    actor_role: entry.actorRole ?? null,
+    terminal_id: entry.terminalId ?? null,
+    terminal_name: entry.terminalName ?? null,
+    store_id: entry.storeId ?? null,
+    entity_type: entry.entityType ?? null,
+    entity_id: entry.entityId ?? null,
+    amount: entry.amount ?? null,
+    meta: entry.meta ?? {},
+    whatsapp_status: "skipped",
+    created_at: entry.createdAt,
+  });
+  return res.parked;
+}
+
 /** Retry anything that could not reach the cloud earlier. */
 export async function flushActivityQueue(): Promise<void> {
   const rows = readQueue();
@@ -172,6 +204,9 @@ export function recordActivity(input: ActivityEventInput): void {
       void flushActivityQueue();
       return;
     }
+    // Offline: the till's own database keeps it if there is one, otherwise
+    // the browser queue holds it until the line is back.
+    if (await park(entry)) return;
     writeQueue([...readQueue(), entry]);
   })();
 }

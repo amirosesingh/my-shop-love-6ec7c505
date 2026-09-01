@@ -1,0 +1,79 @@
+/**
+ * Governance trail when the line is down.
+ *
+ * Approvals, edits to posted records, member verifications and activity
+ * events used to be written straight to the central database, so an action
+ * taken with no connection left no record anywhere. These helpers park the
+ * row in the till's own database instead; the sync worker pushes it with
+ * everything else once the line is back.
+ *
+ * Every helper is best-effort and never throws: governance must never block
+ * the person doing the work, and a till without a local database (web or
+ * Android) simply reports that nothing could be parked.
+ */
+import { localDb } from "./local-db";
+import type { SyncOp } from "./sync-outbox";
+
+export type ParkResult = { parked: boolean; reason?: string };
+
+/** Tables that carry the offline governance trail. */
+export type GovernanceTable =
+  | "activity_events"
+  | "record_edits"
+  | "authorization_requests"
+  | "authorization_log"
+  | "member_verifications";
+
+const newId = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+/**
+ * Write one governance row to the till's database, flagged as owed to the
+ * cloud. The id is generated here so a later retry of the same action cannot
+ * create a second copy centrally: the id is the key on both sides.
+ */
+export async function parkGovernanceRow(
+  table: GovernanceTable,
+  row: Record<string, unknown>,
+): Promise<ParkResult> {
+  const bridge = localDb();
+  if (!bridge) return { parked: false, reason: "No local database on this device" };
+  const payload = {
+    id: row["id"] ?? newId(),
+    created_at: row["created_at"] ?? new Date().toISOString(),
+    ...row,
+    is_synced: 0,
+    sync_status: "pending",
+  };
+  const op: SyncOp = { kind: "upsert", table, rows: [payload], onConflict: "id" };
+  try {
+    const res = await bridge.write(`Recording ${table.replace(/_/g, " ")}`, op);
+    return res?.ok ? { parked: true } : { parked: false, reason: res?.error ?? "Local write failed" };
+  } catch (error) {
+    return { parked: false, reason: String((error as Error)?.message ?? error) };
+  }
+}
+
+/**
+ * Run a governance write against the cloud and, if that cannot be reached,
+ * keep the same record locally so the trail survives the outage.
+ *
+ * `buildRow` shapes the central row; it is only called when the cloud attempt
+ * failed, so the online path costs nothing extra.
+ */
+export async function withGovernanceFallback<T>(
+  table: GovernanceTable,
+  attempt: () => Promise<T>,
+  buildRow: () => Record<string, unknown>,
+): Promise<{ ok: boolean; result?: T; parked: boolean; error?: string }> {
+  try {
+    const result = await attempt();
+    return { ok: true, result, parked: false };
+  } catch (error) {
+    const message = String((error as Error)?.message ?? error);
+    const park = await parkGovernanceRow(table, buildRow());
+    return { ok: park.parked, parked: park.parked, error: park.parked ? undefined : message };
+  }
+}
