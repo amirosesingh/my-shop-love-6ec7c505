@@ -63,37 +63,11 @@ down, never pushed, which is correct — head office owns it.
 The question for each: *if this till's database is deleted tonight, can a
 replacement rebuild it from the cloud?*
 
-| Feature | Verdict | What is missing |
-| --- | --- | --- |
-| Sales, line items, discounts, tax | PASS | — |
-| Payments and split tenders | PASS | — |
-| Refunds and voids | PASS | carried on the sale record |
-| Customers / members | PASS | pulled every cycle |
-| Bookings and their payments | PASS | pulled branch-scoped |
-| Record jobs / pay later | PARTIAL | balances and payments recover, but only the *latest* job status does — the sequence of who moved it and when is lost |
-| Cancellations | PARTIAL | reason, actor and time recover; earlier statuses do not |
-| Products and categories | PASS | pulled |
-| Inventory quantity | PASS | held centrally |
-| Inventory movement history | PARTIAL | adjustments and item activity recover; purchase receipts and transfer receipts leave no movement row |
-| Stock counts | PASS | drafts restorable |
-| Stock transfers | PASS | pulled branch-scoped both directions |
-| **Stock requests** | **FAIL** | the feature does not exist |
-| Purchasing | PASS | orders and lines restorable |
-| Suppliers | PASS | pulled |
-| Shifts, cash counts, variances | PASS | — |
-| Approvals and record edits | PASS | — |
-| **Status transitions, all entities** | **FAIL** | no history table exists |
-| Business events | PARTIAL | events recover as text, not as queryable state changes |
-| Till audit log | FAIL | `audit_logs` has no branch column centrally, so it cannot be restored store-scoped |
-| Coupons and vouchers | PASS by design | central-only; the till reads them online |
-| Settings and branding | PASS | `pos_settings` pulled on restore |
+This is no longer maintained by hand. The verdicts are derived from the feature
+registry and the till's own sync lists, written to
+[`recovery.md`](./recovery.md) by `bun scripts/sync-coverage.cjs`, and shown in
+Logic Health under "If this till had to be rebuilt".
 
-Six items are not PASS. Three of them — status history, stock requests and
-tombstones — are the substance of Stages 2, 3 and 4. The other three are small:
-inventory movement rows for receipts, a branch column on `audit_logs`, and
-queryable state on business events.
-
----
 
 ## 4. Field-level sync classification
 
