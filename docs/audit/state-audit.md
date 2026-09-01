@@ -133,9 +133,25 @@ active faults, and merging trails mid-audit risks losing history.
 
 ---
 
-## 6. What happens next
+## 6. Stage 2 — delivered
 
-Stage 2 — status history table and queryable business events.
+- `entity_status_history` created centrally: append-only (updates and deletes
+  are refused by trigger), branch-scoped read policy, staff-append policy,
+  duplicate-proof on `client_event_id`.
+- Mirrored on the till in `database/schema.sql`, added to the push list and to
+  the restore list, so a transition recorded with no connection survives both
+  the outage and a terminal rebuild.
+- `activity_events` gained `previous_state` and `new_state`; `audit_logs`
+  gained `store_id`, which makes the till's audit trail restorable — it is now
+  on the restore list, closing one of the six recovery failures.
+- Transitions are now recorded at every state change the till owns: shift
+  opened and closed, booking cancelled and collected, job card moved between
+  received / strung / ready / collected, transfer approved, received, rejected
+  and cancelled.
+- A read-only History dialog on each booking shows the timeline.
+
+## 7. What happens next
+
 Stage 3 — stock requests, end to end.
 Stage 4 — tombstones, paging, written conflict rules.
 Stage 5 — per-feature recovery verdicts in Logic Health.
