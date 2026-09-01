@@ -54,6 +54,11 @@ contextBridge.exposeInMainWorld("pos", {
   /** Operator-triggered restore of this branch's trading history. */
   restore: (options) => invoke("pos:restore", options),
   restoreStatus: () => invoke("pos:restore-status"),
+  /** Rebuild check — would this till come back? Counts only, changes nothing. */
+  restoreVerify: (options) => invoke("pos:restore-verify", options),
+  /** The drill: wipe this branch's history and restore it, with a copy kept. */
+  restoreDrill: (options) => invoke("pos:restore-drill", options),
+  restoreEvidence: () => invoke("pos:restore-evidence"),
   /** Which tables this till pushes, pulls and can restore. */
   syncContract: () => invoke("pos:sync-contract"),
 

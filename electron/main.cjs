@@ -1581,6 +1581,11 @@ function registerIpc() {
   // Operator-triggered history restore; never runs on the sync timer.
   ipcMain.handle("pos:restore", (_e, options) => worker.restore(options ?? {}));
   ipcMain.handle("pos:restore-status", () => worker.restoreStatus());
+  // Rebuild check: counts only, safe at any time.
+  ipcMain.handle("pos:restore-verify", (_e, options) => worker.verifyRestore(options ?? {}));
+  // The drill: a real wipe and restore, guarded and reversible.
+  ipcMain.handle("pos:restore-drill", (_e, options) => worker.restoreDrill(options ?? {}));
+  ipcMain.handle("pos:restore-evidence", () => worker.restoreEvidence());
 
   /**
    * The sync contract, as the till actually runs it.

@@ -149,7 +149,10 @@ async function selectScoped(spec, since, storeId, parentIds) {
  */
 async function mergeWithTombstones(table, rows) {
   const merged = await repo.mergeFromCloud(table, rows);
-  const gone = rows.filter((row) => row?.deleted_at).map((row) => row.id).filter(Boolean);
+  const gone = rows
+    .filter((row) => row?.deleted_at)
+    .map((row) => row.id)
+    .filter(Boolean);
   if (gone.length && typeof repo.applyTombstones === "function") {
     await repo.applyTombstones(table, gone).catch(() => {});
   }
@@ -233,7 +236,17 @@ async function applyStockDeltas(rows) {
   return failure ? { error: failure, refused: [] } : null;
 }
 
-function init({ url, key, accessToken, sessionToken, cashierToken, terminalToken, branchId, relayUrl: relay, onChange }) {
+function init({
+  url,
+  key,
+  accessToken,
+  sessionToken,
+  cashierToken,
+  terminalToken,
+  branchId,
+  relayUrl: relay,
+  onChange,
+}) {
   supabase = createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
     global: accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : undefined,
@@ -255,7 +268,10 @@ async function cloudUpsert(table, rows) {
   if (relayUrl && (bearer || credentials.cashierToken || credentials.terminalToken)) {
     const response = await fetch(relayUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}) },
+      headers: {
+        "Content-Type": "application/json",
+        ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
+      },
       body: JSON.stringify({
         sessionToken: credentials.sessionToken,
         cashierToken: credentials.cashierToken,
@@ -265,7 +281,11 @@ async function cloudUpsert(table, rows) {
     });
     const body = await response.json().catch(() => null);
     if (!response.ok || !body?.ok || body.results?.some((result) => !result.ok)) {
-      throw new Error(body?.error || body?.results?.find((result) => !result.ok)?.error || `Sync relay failed (${response.status})`);
+      throw new Error(
+        body?.error ||
+          body?.results?.find((result) => !result.ok)?.error ||
+          `Sync relay failed (${response.status})`,
+      );
     }
     return;
   }
@@ -335,7 +355,8 @@ async function push() {
         credentialsInvalid = true;
         await repo
           .setWatermark(table, null, {
-            error: "Cloud credentials rejected — update them in Settings → Database & Cloud Connection.",
+            error:
+              "Cloud credentials rejected — update them in Settings → Database & Cloud Connection.",
           })
           .catch(() => {});
         setPhase("idle");
@@ -345,8 +366,7 @@ async function push() {
       failed += ids.length;
       if (UNSUPPORTED_RELAY_TABLE_RE.test(String(error.message ?? ""))) {
         cloudMissing.set(table, Date.now() + CLOUD_MISSING_RETRY_MS);
-        const message =
-          `This app version cannot relay "${table}". Update the POS/central app, then use Retry all parked rows. (${error.message})`;
+        const message = `This app version cannot relay "${table}". Update the POS/central app, then use Retry all parked rows. (${error.message})`;
         await repo.markFailed(table, ids, message, 2_147_483_647).catch(() => {});
         await repo.setWatermark(table, null, { error: message }).catch(() => {});
         notify();
@@ -375,9 +395,7 @@ async function push() {
       // The attempt counter lives in the database: a parked row stays parked
       // across restarts until someone retries it from the Sync Hub.
       await repo.markFailed(table, ids, error.message, MAX_ATTEMPTS);
-      await repo
-        .setWatermark(table, null, { error: error.message })
-        .catch(() => {});
+      await repo.setWatermark(table, null, { error: error.message }).catch(() => {});
       notify();
       continue;
     }
@@ -444,7 +462,8 @@ async function pull() {
         credentialsInvalid = true;
         await repo
           .setWatermark(table, null, {
-            error: "Cloud credentials rejected — update them in Settings → Database & Cloud Connection.",
+            error:
+              "Cloud credentials rejected — update them in Settings → Database & Cloud Connection.",
           })
           .catch(() => {});
         setPhase("idle");
@@ -533,7 +552,10 @@ function restoreStatus() {
 
 /** One page-by-page read of a restore table, store-scoped and date-windowed. */
 async function readRestorePage(spec, storeId, sinceIso, parentIds, from) {
-  let query = supabase.from(spec.table).select("*").range(from, from + RESTORE_PAGE - 1);
+  let query = supabase
+    .from(spec.table)
+    .select("*")
+    .range(from, from + RESTORE_PAGE - 1);
   if (spec.storeColumns?.length === 1) query = query.eq(spec.storeColumns[0], storeId);
   else if (spec.storeColumns?.length) {
     query = query.or(spec.storeColumns.map((c) => `${c}.eq.${storeId}`).join(","));
@@ -555,10 +577,15 @@ async function restore({ days = 90 } = {}) {
   if (restoreState?.running) return { ok: false, error: "A restore is already running" };
   const storeId = credentials.branchId ? String(credentials.branchId) : "";
   if (!storeId) {
-    return { ok: false, error: "This till is not pinned to a branch — set the branch before restoring." };
+    return {
+      ok: false,
+      error: "This till is not pinned to a branch — set the branch before restoring.",
+    };
   }
   const specs = repo.RESTORE_TABLES ?? [];
-  const sinceIso = new Date(Date.now() - Math.max(1, Number(days) || 90) * 86_400_000).toISOString();
+  const sinceIso = new Date(
+    Date.now() - Math.max(1, Number(days) || 90) * 86_400_000,
+  ).toISOString();
   restoreState = {
     running: true,
     table: null,
@@ -593,7 +620,9 @@ async function restore({ days = 90 } = {}) {
       const collected = [];
       // Children are fetched per chunk of parents so the `in` list stays sane.
       const parentChunks = spec.parent
-        ? Array.from({ length: Math.ceil(ids.length / 200) }, (_, n) => ids.slice(n * 200, n * 200 + 200))
+        ? Array.from({ length: Math.ceil(ids.length / 200) }, (_, n) =>
+            ids.slice(n * 200, n * 200 + 200),
+          )
         : [null];
       let failure = null;
       for (const chunk of parentChunks) {
@@ -661,7 +690,256 @@ async function restore({ days = 90 } = {}) {
   }
 }
 
+/* ------------------------------------------------------------------ *
+ * Rebuild check and the wipe-and-restore drill.
+ * ------------------------------------------------------------------ */
 
+/** Ids of a parent table inside the restore window, for counting its children. */
+async function centralParentIds(spec, storeId, sinceIso) {
+  const ids = [];
+  let from = 0;
+  for (;;) {
+    let query = supabase
+      .from(spec.table)
+      .select("id")
+      .range(from, from + RESTORE_PAGE - 1);
+    if (spec.storeColumns?.length === 1) query = query.eq(spec.storeColumns[0], storeId);
+    else if (spec.storeColumns?.length) {
+      query = query.or(spec.storeColumns.map((c) => `${c}.eq.${storeId}`).join(","));
+    }
+    if (spec.dateColumn && sinceIso) query = query.gte(spec.dateColumn, sinceIso);
+    const { data, error } = await query;
+    if (error) throw new Error(error.message ?? String(error));
+    const rows = data ?? [];
+    ids.push(...rows.map((r) => r.id).filter(Boolean));
+    if (rows.length < RESTORE_PAGE) break;
+    from += RESTORE_PAGE;
+  }
+  return ids;
+}
+
+/** How many rows head office holds for this branch, in the same window. */
+async function centralCount(spec, storeId, sinceIso, parentIds) {
+  if (spec.parent) {
+    const ids = parentIds.get(spec.parent.table) ?? [];
+    if (!ids.length) return 0;
+    let total = 0;
+    for (let i = 0; i < ids.length; i += 200) {
+      const { count, error } = await supabase
+        .from(spec.table)
+        .select("id", { count: "exact", head: true })
+        .in(spec.parent.column, ids.slice(i, i + 200));
+      if (error) throw new Error(error.message ?? String(error));
+      total += count ?? 0;
+    }
+    return total;
+  }
+  let query = supabase.from(spec.table).select("id", { count: "exact", head: true });
+  if (spec.storeColumns?.length === 1) query = query.eq(spec.storeColumns[0], storeId);
+  else if (spec.storeColumns?.length) {
+    query = query.or(spec.storeColumns.map((c) => `${c}.eq.${storeId}`).join(","));
+  }
+  if (spec.dateColumn && sinceIso) query = query.gte(spec.dateColumn, sinceIso);
+  const { count, error } = await query;
+  if (error) throw new Error(error.message ?? String(error));
+  return count ?? 0;
+}
+
+/**
+ * The rebuild check.
+ *
+ * Nothing is written and nothing is deleted: this only counts what the till
+ * holds against what head office holds, table by table, over the same branch
+ * and the same window the restore would use. "Behind" means a rebuild would
+ * come back short; "ahead" simply means work is still waiting in the queue.
+ */
+async function verifyRestore({ days = 90 } = {}) {
+  if (!supabase) return { ok: false, error: "Cloud client not ready" };
+  const storeId = credentials.branchId ? String(credentials.branchId) : "";
+  if (!storeId) {
+    return { ok: false, error: "This till is not pinned to a branch — set the branch first." };
+  }
+  const specs = repo.RESTORE_TABLES ?? [];
+  const sinceIso = new Date(
+    Date.now() - Math.max(1, Number(days) || 90) * 86_400_000,
+  ).toISOString();
+  const local = await repo.restoreFingerprint({ days, storeId });
+  const localByTable = new Map(local.tables.map((t) => [t.table, t]));
+  const parentIds = new Map();
+  const tables = [];
+  for (const spec of specs) {
+    const mine = localByTable.get(spec.table) ?? { count: 0 };
+    let central = null;
+    let error = null;
+    try {
+      const needsIds = specs.some((s) => s.parent?.table === spec.table);
+      if (needsIds && !spec.parent) {
+        parentIds.set(spec.table, await centralParentIds(spec, storeId, sinceIso));
+      }
+      central = await centralCount(spec, storeId, sinceIso, parentIds);
+    } catch (err) {
+      error = String(err?.message ?? err);
+    }
+    tables.push({
+      table: spec.table,
+      local: mine.count ?? 0,
+      central,
+      behind: central === null ? 0 : Math.max(0, central - (mine.count ?? 0)),
+      ahead: central === null ? 0 : Math.max(0, (mine.count ?? 0) - central),
+      error,
+    });
+  }
+  const pending = await repo.pendingSyncCount().catch(() => ({ total: 0 }));
+  const short = tables.filter((t) => t.behind > 0);
+  const result = {
+    ok: true,
+    at: new Date().toISOString(),
+    days,
+    since: sinceIso,
+    pending: pending.total ?? 0,
+    tables,
+    short: short.map((t) => t.table),
+    verdict: short.length ? "short" : "complete",
+  };
+  await repo.setState("last_restore_check", JSON.stringify(result)).catch(() => {});
+  notify();
+  return result;
+}
+
+/** Why a drill cannot run right now, in the operator's words. */
+async function drillBlockers() {
+  const blockers = [];
+  if (!supabase) blockers.push("The cloud connection is not set up.");
+  else if (!(await reachable())) blockers.push("Head office cannot be reached from this till.");
+  if (!credentials.branchId) blockers.push("This till is not pinned to a branch.");
+  const pending = await repo.pendingSyncCount().catch(() => ({ total: 0 }));
+  if ((pending.total ?? 0) > 0) {
+    blockers.push(`${pending.total} record(s) still waiting to reach head office.`);
+  }
+  const open = await repo.openShiftCount().catch(() => 0);
+  if (open > 0) blockers.push("A shift is still open — close it before running the drill.");
+  if (restoreState?.running) blockers.push("A restore is already running.");
+  return blockers;
+}
+
+let drillState = null;
+
+function drillStatus() {
+  return drillState;
+}
+
+/**
+ * The drill: actually wipe this branch's history and restore it.
+ *
+ * A copy is taken first. The window is cleared, the ordinary restore runs, and
+ * the result is compared row for row against the copy. Anything short and the
+ * copy goes straight back, so a failed drill costs nothing but time.
+ */
+async function restoreDrill({ days = 90 } = {}) {
+  if (drillState?.running) return { ok: false, error: "A drill is already running" };
+  const blockers = await drillBlockers();
+  if (blockers.length) return { ok: false, error: blockers.join(" "), blockers };
+
+  const storeId = String(credentials.branchId);
+  const specs = repo.RESTORE_TABLES ?? [];
+  drillState = {
+    running: true,
+    phase: "copying",
+    startedAt: new Date().toISOString(),
+    finishedAt: null,
+    days,
+    tables: [],
+    rolledBack: false,
+    verdict: null,
+    error: null,
+  };
+  notify();
+
+  const before = await repo.restoreFingerprint({ days, storeId });
+  const beforeByTable = new Map(before.tables.map((t) => [t.table, t]));
+  const copies = new Map();
+  try {
+    for (const spec of specs) {
+      copies.set(spec.table, await repo.restoreSnapshot(spec.table, { days, storeId }));
+    }
+
+    drillState.phase = "clearing";
+    notify();
+    // Children first, so a parent is never removed out from under its lines.
+    for (const spec of [...specs].reverse()) {
+      await repo.restoreClear(spec.table, { days, storeId });
+    }
+
+    drillState.phase = "restoring";
+    notify();
+    const run = await restore({ days });
+    if (!run.ok) throw new Error(run.error ?? "The restore did not finish");
+
+    drillState.phase = "checking";
+    notify();
+    const after = await repo.restoreFingerprint({ days, storeId });
+    const afterByTable = new Map(after.tables.map((t) => [t.table, t]));
+    let lost = 0;
+    for (const spec of specs) {
+      const was = beforeByTable.get(spec.table) ?? { count: 0, checksum: 0 };
+      const now = afterByTable.get(spec.table) ?? { count: 0, checksum: 0 };
+      const missing = Math.max(0, (was.count ?? 0) - (now.count ?? 0));
+      const changed = (was.checksum ?? 0) !== (now.checksum ?? 0);
+      if (missing) lost += missing;
+      drillState.tables.push({
+        table: spec.table,
+        before: was.count ?? 0,
+        after: now.count ?? 0,
+        missing,
+        changed,
+        pass: missing === 0,
+      });
+    }
+    drillState.verdict = lost === 0 ? "pass" : "fail";
+
+    if (lost > 0) {
+      drillState.phase = "putting the copy back";
+      notify();
+      for (const spec of specs) {
+        await repo.restoreReplace(spec.table, copies.get(spec.table) ?? []).catch(() => {});
+      }
+      drillState.rolledBack = true;
+    }
+  } catch (err) {
+    drillState.error = String(err?.message ?? err);
+    drillState.verdict = "fail";
+    drillState.phase = "putting the copy back";
+    notify();
+    for (const spec of specs) {
+      await repo.restoreReplace(spec.table, copies.get(spec.table) ?? []).catch(() => {});
+    }
+    drillState.rolledBack = true;
+  }
+
+  drillState.running = false;
+  drillState.phase = "done";
+  drillState.finishedAt = new Date().toISOString();
+  await repo.setState("last_restore_drill", JSON.stringify(drillState)).catch(() => {});
+  notify();
+  return { ok: drillState.verdict === "pass", ...drillState };
+}
+
+/** The last check and drill results, as stored on the till. */
+async function restoreEvidence() {
+  const read = async (key) => {
+    try {
+      const raw = await repo.getState(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  };
+  return {
+    check: await read("last_restore_check"),
+    drill: await read("last_restore_drill"),
+    blockers: await drillBlockers().catch(() => []),
+  };
+}
 
 async function run() {
   if (running || !enabled || !supabase) return;
@@ -694,7 +972,7 @@ async function status() {
       lastPullAt: await repo.getState("last_pull_at"),
       lastRestoreAt: await repo.getState("last_restore_at").catch(() => null),
       restore: restoreStatus(),
-
+      drill: drillStatus(),
     };
   } catch (err) {
     return {
@@ -710,4 +988,19 @@ async function status() {
   }
 }
 
-module.exports = { init, start, stop, setEnabled, push, pull, restore, restoreStatus, run, status };
+module.exports = {
+  init,
+  start,
+  stop,
+  setEnabled,
+  push,
+  pull,
+  restore,
+  restoreStatus,
+  verifyRestore,
+  restoreDrill,
+  drillStatus,
+  restoreEvidence,
+  run,
+  status,
+};

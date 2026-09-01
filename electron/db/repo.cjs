@@ -134,8 +134,6 @@ const RESTORE_TABLES = [
   { table: "audit_logs", storeColumns: ["store_id"], dateColumn: "created_at" },
 ];
 
-
-
 /** Branch and till this install acts as; scopes the sync watermarks. */
 let scope = { storeId: "", terminalId: "" };
 
@@ -821,7 +819,171 @@ async function restoreMerge(table, rows) {
   });
 }
 
+/* ================= rebuild check and wipe-and-restore drill ================= */
 
+/** The restore spec for one table, so scoping is worked out the same way twice. */
+function restoreSpec(table) {
+  return RESTORE_TABLES.find((s) => s.table === table) ?? null;
+}
+
+/**
+ * The same window and branch filter the restore itself uses, as SQL.
+ *
+ * A child table has no branch column of its own, so it is scoped through the
+ * parent row it belongs to — exactly how restore fetches it.
+ */
+async function restoreWhere(spec, request, { storeId, sinceIso }, depth = 0) {
+  const columns = await tableColumns(spec.table).catch(() => new Set());
+  const clauses = [];
+  const p = (name) => `${name}_${depth}`;
+  const scoped = (spec.storeColumns ?? []).filter((c) => columns.has(c.toLowerCase()));
+  if (scoped.length && storeId) {
+    bind(request, p("scope"), String(storeId));
+    clauses.push(`(${scoped.map((c) => `[${c}] = @${p("scope")}`).join(" OR ")})`);
+  }
+  if (spec.dateColumn && sinceIso && columns.has(spec.dateColumn.toLowerCase())) {
+    request.input(p("since"), sql.DateTime2, new Date(sinceIso));
+    clauses.push(`[${spec.dateColumn}] >= @${p("since")}`);
+  }
+  if (spec.parent) {
+    const parent = restoreSpec(spec.parent.table);
+    const inner = parent
+      ? await restoreWhere(parent, request, { storeId, sinceIso }, depth + 1)
+      : "1 = 1";
+    clauses.push(
+      `[${spec.parent.column}] IN (SELECT [id] FROM dbo.[${spec.parent.table}] WHERE ${inner})`,
+    );
+  }
+  return clauses.length ? clauses.join(" AND ") : "1 = 1";
+}
+
+/**
+ * What this till holds, per restorable table, inside the restore window.
+ *
+ * A checksum sits next to the count so a drill can tell "the same number of
+ * rows" apart from "the same rows".
+ */
+async function restoreFingerprint({ days = 90, storeId = scope.storeId } = {}) {
+  const sinceIso = new Date(
+    Date.now() - Math.max(1, Number(days) || 90) * 86_400_000,
+  ).toISOString();
+  const out = [];
+  for (const spec of RESTORE_TABLES) {
+    try {
+      const columns = await tableColumns(spec.table).catch(() => new Set());
+      if (!columns.size) {
+        out.push({ table: spec.table, count: 0, checksum: 0, missing: true });
+        continue;
+      }
+      const request = getPool().request();
+      const where = await restoreWhere(spec, request, { storeId, sinceIso });
+      const res = await request.query(`
+        SELECT COUNT(*) AS n,
+               ISNULL(CHECKSUM_AGG(BINARY_CHECKSUM(CAST([id] AS NVARCHAR(64)))), 0) AS sum
+          FROM dbo.[${spec.table}] WHERE ${where};
+      `);
+      const row = res.recordset[0] ?? {};
+      out.push({
+        table: spec.table,
+        count: Number(row.n ?? 0),
+        checksum: Number(row.sum ?? 0),
+        missing: false,
+      });
+    } catch (err) {
+      out.push({
+        table: spec.table,
+        count: 0,
+        checksum: 0,
+        missing: false,
+        error: String(err?.message ?? err),
+      });
+    }
+  }
+  return { since: sinceIso, tables: out };
+}
+
+/** Every row of one restorable table inside the window — the drill's safety copy. */
+async function restoreSnapshot(table, { days = 90, storeId = scope.storeId } = {}) {
+  const spec = restoreSpec(assertTable(table));
+  if (!spec) return [];
+  const sinceIso = new Date(
+    Date.now() - Math.max(1, Number(days) || 90) * 86_400_000,
+  ).toISOString();
+  const request = getPool().request();
+  const where = await restoreWhere(spec, request, { storeId, sinceIso });
+  const res = await request.query(`SELECT * FROM dbo.[${table}] WHERE ${where};`);
+  return res.recordset ?? [];
+}
+
+/**
+ * Clear one restorable table for the drill.
+ *
+ * Scoped exactly like the copy that was just taken, so nothing outside the
+ * window — and nothing belonging to another branch — is ever touched.
+ */
+async function restoreClear(table, { days = 90, storeId = scope.storeId } = {}) {
+  const spec = restoreSpec(assertTable(table));
+  if (!spec) return { removed: 0 };
+  const sinceIso = new Date(
+    Date.now() - Math.max(1, Number(days) || 90) * 86_400_000,
+  ).toISOString();
+  const pool = getPool();
+  const tx = new sql.Transaction(pool);
+  await tx.begin();
+  try {
+    const request = new sql.Request(tx);
+    const where = await restoreWhere(spec, request, { storeId, sinceIso });
+    const res = await request.query(`DELETE FROM dbo.[${table}] WHERE ${where};`);
+    await tx.commit();
+    return { removed: res.rowsAffected?.[0] ?? 0 };
+  } catch (err) {
+    await tx.rollback().catch(() => {});
+    throw err;
+  }
+}
+
+/** Put a safety copy back after a failed drill. */
+async function restoreReplace(table, rows) {
+  if (!rows?.length) return { written: 0 };
+  return withHeal(table, async () => {
+    const pool = getPool();
+    let written = 0;
+    for (let i = 0; i < rows.length; i += 200) {
+      const tx = new sql.Transaction(pool);
+      await tx.begin();
+      try {
+        for (const row of rows.slice(i, i + 200)) {
+          await upsertRow(tx, table, row, { markPending: false });
+          written += 1;
+        }
+        await tx.commit();
+      } catch (err) {
+        await tx.rollback().catch(() => {});
+        throw err;
+      }
+    }
+    return { written };
+  });
+}
+
+/** Shifts still open at this till — a drill must never run mid-trade. */
+async function openShiftCount() {
+  try {
+    const columns = await tableColumns("shifts").catch(() => new Set());
+    if (!columns.size) return 0;
+    const where = columns.has("closed_at")
+      ? "[closed_at] IS NULL"
+      : columns.has("status")
+        ? "LOWER([status]) = 'open'"
+        : "1 = 0";
+    const res = await getPool()
+      .request()
+      .query(`SELECT COUNT(*) AS n FROM dbo.[shifts] WHERE ${where};`);
+    return Number(res.recordset[0]?.n ?? 0);
+  } catch {
+    return 0;
+  }
+}
 
 /**
  * Shop-side half of the server/shop comparison.
@@ -1005,10 +1167,8 @@ async function setWatermark(table, isoAt, { rowsPushed = 0, error = null, pushed
 
 async function setState(key, value) {
   return withHeal("sync_state", () =>
-    getPool()
-      .request()
-      .input("key", sql.NVarChar(60), key)
-      .input("value", sql.NVarChar(400), value).query(`
+    getPool().request().input("key", sql.NVarChar(60), key).input("value", sql.NVarChar(400), value)
+      .query(`
         MERGE dbo.sync_state AS t
         USING (SELECT @key AS [key], @value AS [value]) AS s ON t.[key] = s.[key]
         WHEN MATCHED THEN UPDATE SET t.[value] = s.[value], t.updated_at = SYSUTCDATETIME()
@@ -1146,9 +1306,7 @@ async function pendingSyncCount() {
   for (const table of PUSH_TABLES) {
     try {
       const res = await withHeal(table, () =>
-        getPool()
-          .request()
-          .query(`SELECT COUNT(*) AS n FROM dbo.[${table}] WHERE is_synced = 0;`),
+        getPool().request().query(`SELECT COUNT(*) AS n FROM dbo.[${table}] WHERE is_synced = 0;`),
       );
       const n = res.recordset[0]?.n ?? 0;
       total += n;
@@ -1270,6 +1428,11 @@ module.exports = {
   mergeFromCloud,
   applyTombstones,
   restoreMerge,
+  restoreFingerprint,
+  restoreSnapshot,
+  restoreClear,
+  restoreReplace,
+  openShiftCount,
 
   stats,
   compareSummary,
