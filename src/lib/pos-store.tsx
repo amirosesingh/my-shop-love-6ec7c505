@@ -901,6 +901,18 @@ export function PosProvider({ children }: { children: ReactNode }) {
       justOpenedRef.current = null;
       setDbShift(null);
       setShiftChecked(true);
+      trackTransition({
+        entity: "shift",
+        entityId: closed.id,
+        from: "OPEN",
+        to: "CLOSED",
+        reason: note || null,
+        actorName: closed.closedBy ?? closed.cashier,
+        actorRole: closed.closedByRole ?? null,
+        storeId: closed.storeId,
+        terminalId: closed.terminalId ?? null,
+        metadata: { countedCash, openingFloat: closed.openingFloat, overdue: closed.overdue },
+      });
       logger.log("sale_event", "Shift closed", "shifts", {
         shiftId: closed.id,
         storeId: closed.storeId,
@@ -2339,6 +2351,15 @@ export function PosProvider({ children }: { children: ReactNode }) {
         toStoreId: transfer?.toStoreId ?? null,
       },
     );
+    trackTransition({
+      entity: "stock_transfer",
+      entityId: id,
+      from: transfer?.status ?? null,
+      to: transfer?.status === "in_transit" ? "cancelled" : "rejected",
+      actorName: actorRef.current,
+      storeId: transfer?.toStoreId ?? null,
+      metadata: { ref: transfer?.ref ?? null, fromStoreId: transfer?.fromStoreId ?? null },
+    });
   }, []);
 
   const reset = useCallback(() => setState(emptyState), []);
