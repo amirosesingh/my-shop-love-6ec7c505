@@ -590,6 +590,10 @@ const forgetTxnColumn = (message?: string | null) => {
     if (hasStoreSnapshotColumns) announceDrift("store_name_snapshot/store_address_snapshot");
     hasStoreSnapshotColumns = false;
   }
+  if (!message || /rounding_(adjustment|label)/.test(message)) {
+    if (hasRoundingColumns) announceDrift("rounding_adjustment/rounding_label");
+    hasRoundingColumns = false;
+  }
 };
 
 const rowToSale = (r: Row): Sale => ({
