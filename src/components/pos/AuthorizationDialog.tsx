@@ -28,7 +28,14 @@ import {
   authorizeWithPin,
   submitAuthorizationRequest,
 } from "@/lib/authorization.functions";
+import { looksOffline, parkGovernanceRow } from "@/lib/governance-offline";
+import { useAuthOptional } from "@/lib/pos-auth";
 import type { AuthMode, AuthPayload } from "@/lib/authorization";
+
+const newId = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 export type AuthorizationPrompt = {
   actionKey: string;
