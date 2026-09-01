@@ -142,7 +142,7 @@ const PRUNABLE_TABLES = [
   "bookings",
   "stock_transfer_items",
   "stock_transfers",
-  "transfers",
+  "activity_events",
   "stock_adjustments",
   "audit_logs",
 ];
