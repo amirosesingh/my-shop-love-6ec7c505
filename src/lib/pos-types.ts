@@ -599,6 +599,8 @@ export type Booking = {
   cancelledBy?: string;
   cancelledAt?: string;
   cancelledTerminal?: string;
+  /** what happened to money already taken when the booking was cancelled */
+  cancelMoneyAction?: "refunded" | "retained" | "none";
 };
 
 /**
