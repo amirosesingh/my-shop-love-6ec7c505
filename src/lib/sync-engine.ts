@@ -84,8 +84,8 @@ import {
 import { subscribeSyncConfig, syncConfig } from "./sync-config";
 import { noteVersions } from "./row-versions";
 import { recordConflict } from "./sync-conflicts";
-import {
 import { TOMBSTONE_TABLES } from "./tombstones";
+import {
   failOp,
   refuseOp,
   nextAttemptDue,
