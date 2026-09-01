@@ -62,6 +62,7 @@ const toRow = (b: Booking): Row => ({
   cancelled_by: b.cancelledBy ?? null,
   cancelled_at: b.cancelledAt ?? null,
   cancelled_terminal: b.cancelledTerminal ?? null,
+  cancel_money_action: b.cancelMoneyAction ?? null,
 });
 
 const rowToBooking = (r: Row, payments: Row[]): Booking => ({
@@ -91,6 +92,10 @@ const rowToBooking = (r: Row, payments: Row[]): Booking => ({
       status: (p.status ?? "settled") as "settled" | "reversed" | "void",
       reference: p.reference ?? undefined,
       clientPaymentId: p.client_payment_id ?? undefined,
+      kind: ((p.kind as "payment" | "refund") ?? (Number(p.amount) < 0 ? "refund" : "payment")),
+      refundReason: p.refund_reason ?? undefined,
+      refundsPaymentId: p.refunds_payment_id ?? undefined,
+      changeGiven: Number(p.change_given) || 0,
     })),
   dueDate: r.due_date ?? "",
   memberId: r.member_id ?? null,
@@ -118,6 +123,7 @@ const rowToBooking = (r: Row, payments: Row[]): Booking => ({
   cancelledBy: r.cancelled_by ?? undefined,
   cancelledAt: r.cancelled_at ?? undefined,
   cancelledTerminal: r.cancelled_terminal ?? undefined,
+  cancelMoneyAction: (r.cancel_money_action as Booking["cancelMoneyAction"]) ?? undefined,
   job: {
     racketModel: r.racket_model ?? undefined,
     stringType: r.string_type ?? undefined,
@@ -143,6 +149,10 @@ const paymentRows = (b: Booking) =>
     status: p.status ?? "settled",
     reference: p.reference ?? null,
     client_payment_id: p.clientPaymentId ?? p.id,
+    kind: p.kind ?? (p.amount < 0 ? "refund" : "payment"),
+    refund_reason: p.refundReason ?? null,
+    refunds_payment_id: p.refundsPaymentId ?? null,
+    change_given: p.changeGiven ?? 0,
   }));
 
 /** Write (or re-write) a booking and its payment history. */
