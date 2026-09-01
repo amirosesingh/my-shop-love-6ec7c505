@@ -1275,6 +1275,7 @@ export type Database = {
           address: string | null
           created_at: string
           date_of_birth: string | null
+          deleted_at: string | null
           email: string | null
           full_name: string
           id: string
@@ -1293,6 +1294,7 @@ export type Database = {
           address?: string | null
           created_at?: string
           date_of_birth?: string | null
+          deleted_at?: string | null
           email?: string | null
           full_name: string
           id?: string
@@ -1311,6 +1313,7 @@ export type Database = {
           address?: string | null
           created_at?: string
           date_of_birth?: string | null
+          deleted_at?: string | null
           email?: string | null
           full_name?: string
           id?: string
@@ -1338,6 +1341,7 @@ export type Database = {
       membership_tiers: {
         Row: {
           created_at: string
+          deleted_at: string | null
           discount_percentage: number
           id: string
           name: string
@@ -1347,6 +1351,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          deleted_at?: string | null
           discount_percentage?: number
           id?: string
           name: string
@@ -1356,6 +1361,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          deleted_at?: string | null
           discount_percentage?: number
           id?: string
           name?: string
@@ -1847,6 +1853,7 @@ export type Database = {
         Row: {
           barcode: string
           created_at: string
+          deleted_at: string | null
           id: string
           is_primary: boolean
           label: string | null
@@ -1858,6 +1865,7 @@ export type Database = {
         Insert: {
           barcode: string
           created_at?: string
+          deleted_at?: string | null
           id?: string
           is_primary?: boolean
           label?: string | null
@@ -1869,6 +1877,7 @@ export type Database = {
         Update: {
           barcode?: string
           created_at?: string
+          deleted_at?: string | null
           id?: string
           is_primary?: boolean
           label?: string | null
@@ -1890,6 +1899,7 @@ export type Database = {
       product_categories: {
         Row: {
           created_at: string
+          deleted_at: string | null
           id: string
           kind: string
           name: string
@@ -1900,6 +1910,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          deleted_at?: string | null
           id?: string
           kind?: string
           name: string
@@ -1910,6 +1921,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          deleted_at?: string | null
           id?: string
           kind?: string
           name?: string
@@ -1939,6 +1951,7 @@ export type Database = {
           cost_price: number
           created_at: string
           custom_points: number | null
+          deleted_at: string | null
           ecom_price: number | null
           ecom_visible: boolean
           id: string
@@ -1969,6 +1982,7 @@ export type Database = {
           cost_price?: number
           created_at?: string
           custom_points?: number | null
+          deleted_at?: string | null
           ecom_price?: number | null
           ecom_visible?: boolean
           id?: string
@@ -1999,6 +2013,7 @@ export type Database = {
           cost_price?: number
           created_at?: string
           custom_points?: number | null
+          deleted_at?: string | null
           ecom_price?: number | null
           ecom_visible?: boolean
           id?: string
@@ -2024,6 +2039,7 @@ export type Database = {
       promotions: {
         Row: {
           created_at: string
+          deleted_at: string | null
           discount_amount: number
           discount_percent: number
           end_date: string | null
@@ -2041,6 +2057,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          deleted_at?: string | null
           discount_amount?: number
           discount_percent?: number
           end_date?: string | null
@@ -2058,6 +2075,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          deleted_at?: string | null
           discount_amount?: number
           discount_percent?: number
           end_date?: string | null
@@ -3501,6 +3519,7 @@ export type Database = {
           building_name: string | null
           code: string
           created_at: string
+          deleted_at: string | null
           floor_label: string | null
           group_id: string | null
           id: string
@@ -3521,6 +3540,7 @@ export type Database = {
           building_name?: string | null
           code: string
           created_at?: string
+          deleted_at?: string | null
           floor_label?: string | null
           group_id?: string | null
           id: string
@@ -3541,6 +3561,7 @@ export type Database = {
           building_name?: string | null
           code?: string
           created_at?: string
+          deleted_at?: string | null
           floor_label?: string | null
           group_id?: string | null
           id?: string
@@ -3570,6 +3591,7 @@ export type Database = {
           address: string | null
           contact_name: string | null
           created_at: string
+          deleted_at: string | null
           email: string | null
           id: string
           is_active: boolean
@@ -3584,6 +3606,7 @@ export type Database = {
           address?: string | null
           contact_name?: string | null
           created_at?: string
+          deleted_at?: string | null
           email?: string | null
           id?: string
           is_active?: boolean
@@ -3598,6 +3621,7 @@ export type Database = {
           address?: string | null
           contact_name?: string | null
           created_at?: string
+          deleted_at?: string | null
           email?: string | null
           id?: string
           is_active?: boolean
@@ -3815,6 +3839,7 @@ export type Database = {
           allow_decimal: boolean
           code: string
           created_at: string
+          deleted_at: string | null
           id: string
           name: string
           row_version: number
@@ -3825,6 +3850,7 @@ export type Database = {
           allow_decimal?: boolean
           code: string
           created_at?: string
+          deleted_at?: string | null
           id?: string
           name: string
           row_version?: number
@@ -3835,6 +3861,7 @@ export type Database = {
           allow_decimal?: boolean
           code?: string
           created_at?: string
+          deleted_at?: string | null
           id?: string
           name?: string
           row_version?: number
