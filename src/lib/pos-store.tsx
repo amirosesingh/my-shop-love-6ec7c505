@@ -1153,7 +1153,13 @@ export function PosProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addBookingPayment = useCallback(
-    async (id: string, amount: number, method: PaymentMethod, cashier: string) => {
+    async (
+      id: string,
+      amount: number,
+      method: PaymentMethod,
+      cashier: string,
+      clientPaymentId?: string,
+    ) => {
       const current = stateRef.current.bookings.find((b) => b.id === id);
       if (!current || current.status !== "active" || amount <= 0) return null;
       const payment: BookingPayment = {
@@ -1163,50 +1169,100 @@ export function PosProvider({ children }: { children: ReactNode }) {
         at: new Date().toISOString(),
         cashier,
       };
-      const updated: Booking = {
-        ...current,
-        paid: r2(current.paid + payment.amount),
-        payments: [...current.payments, payment],
-      };
-      await commitBooking(updated);
-      setState((s) => ({
-        ...s,
-        bookings: s.bookings.map((b) => (b.id === id ? updated : b)),
-      }));
+      // The server records the tender and reports the settled total back; the
+      // till never adds money up on its own when the cloud is reachable.
+      const server = await collectBookingPayment({
+        bookingId: id,
+        amount: payment.amount,
+        method,
+        cashier,
+        clientPaymentId: clientPaymentId ?? payment.id,
+        complete: false,
+      });
+      let updated: Booking;
+      if (server.ok) {
+        updated = {
+          ...current,
+          paid: server.state.settledPaid,
+          payments: server.state.duplicate ? current.payments : [...current.payments, payment],
+        };
+        setState((s) => ({
+          ...s,
+          bookings: s.bookings.map((b) => (b.id === id ? updated : b)),
+        }));
+      } else {
+        // Offline: queue the payment exactly as the till always has.
+        updated = {
+          ...current,
+          paid: r2(current.paid + payment.amount),
+          payments: [...current.payments, payment],
+        };
+        await commitBooking(updated);
+        setState((s) => ({
+          ...s,
+          bookings: s.bookings.map((b) => (b.id === id ? updated : b)),
+        }));
+      }
       logger.log("sale_event", "Booking part payment", "bookings", {
         ref: updated.ref,
         amount: payment.amount,
         method,
         paid: updated.paid,
         balance: bookingBalance(updated),
+        authoritative: server.ok,
       });
       return updated;
     },
     [],
   );
 
-  const cancelBooking = useCallback((id: string, reason: string) => {
-    const current = stateRef.current.bookings.find((b) => b.id === id);
-    if (!current || current.status !== "active") return;
-    const cancelled: Booking = {
-      ...current,
-      status: "cancelled",
-      closedAt: new Date().toISOString(),
-      note: reason
-        ? `${current.note ? `${current.note} · ` : ""}Cancelled: ${reason}`
-        : current.note,
-    };
-    setState((s) => ({
-      ...s,
-      bookings: s.bookings.map((b) => (b.id === id ? cancelled : b)),
-    }));
-    saveBookingQuietly(cancelled);
-    logger.log("sale_event", "Booking cancelled", "bookings", {
-      ref: current.ref,
-      reason,
-      refundable: current.paid,
-    });
-  }, []);
+  /**
+   * Cancelling is a server call: the reason, who did it and when are stored
+   * permanently, and an empty reason is refused in the database.
+   */
+  const cancelBooking = useCallback(
+    async (
+      id: string,
+      reason: string,
+      terminal?: string | null,
+    ): Promise<{ ok: true } | { ok: false; error: string }> => {
+      const current = stateRef.current.bookings.find((b) => b.id === id);
+      if (!current) return { ok: false, error: "Booking not found." };
+      if (current.status !== "active") return { ok: false, error: "This booking is already closed." };
+      const clean = reason.trim();
+      if (clean.length < 3) return { ok: false, error: "A cancellation reason is required." };
+      const who = authRef.current?.name || current.cashier || "Counter";
+      const res = await cancelBookingAuthoritative({
+        bookingId: id,
+        reason: clean,
+        cancelledBy: who,
+        terminal: terminal ?? null,
+      });
+      if (!res.ok) return res;
+      const cancelled: Booking = {
+        ...current,
+        status: "cancelled",
+        closedAt: new Date().toISOString(),
+        cancelReason: clean,
+        cancelledBy: who,
+        cancelledAt: new Date().toISOString(),
+        ...(terminal ? { cancelledTerminal: terminal } : {}),
+      };
+      setState((s) => ({
+        ...s,
+        bookings: s.bookings.map((b) => (b.id === id ? cancelled : b)),
+      }));
+      logger.log("sale_event", "Booking cancelled", "bookings", {
+        ref: current.ref,
+        reason: clean,
+        by: who,
+        refundable: current.paid,
+      });
+      return { ok: true };
+    },
+    [],
+  );
+
 
   /** Remove a booking / job card altogether, with the reason on the record. */
   const deleteBooking = useCallback(async (id: string, reason: string) => {
