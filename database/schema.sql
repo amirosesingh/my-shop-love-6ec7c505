@@ -3492,3 +3492,27 @@ BEGIN
   IF COL_LENGTH('dbo.audit_logs', 'store_id') IS NULL ALTER TABLE dbo.audit_logs ADD [store_id] NVARCHAR(80) NULL;
 END
 GO
+
+/* Tombstones.
+   A deletion has to travel like any other change, so head office never removes
+   a catalogue or member row outright — it stamps deleted_at. The till mirrors
+   the stamp, drops its own copy on the next pull, and every read filters the
+   stamped rows out in the meantime. */
+IF OBJECT_ID('dbo.products', 'U') IS NOT NULL AND COL_LENGTH('dbo.products', 'deleted_at') IS NULL ALTER TABLE dbo.products ADD [deleted_at] DATETIME2(3) NULL;
+GO
+IF OBJECT_ID('dbo.product_categories', 'U') IS NOT NULL AND COL_LENGTH('dbo.product_categories', 'deleted_at') IS NULL ALTER TABLE dbo.product_categories ADD [deleted_at] DATETIME2(3) NULL;
+GO
+IF OBJECT_ID('dbo.product_barcodes', 'U') IS NOT NULL AND COL_LENGTH('dbo.product_barcodes', 'deleted_at') IS NULL ALTER TABLE dbo.product_barcodes ADD [deleted_at] DATETIME2(3) NULL;
+GO
+IF OBJECT_ID('dbo.uom_units', 'U') IS NOT NULL AND COL_LENGTH('dbo.uom_units', 'deleted_at') IS NULL ALTER TABLE dbo.uom_units ADD [deleted_at] DATETIME2(3) NULL;
+GO
+IF OBJECT_ID('dbo.suppliers', 'U') IS NOT NULL AND COL_LENGTH('dbo.suppliers', 'deleted_at') IS NULL ALTER TABLE dbo.suppliers ADD [deleted_at] DATETIME2(3) NULL;
+GO
+IF OBJECT_ID('dbo.promotions', 'U') IS NOT NULL AND COL_LENGTH('dbo.promotions', 'deleted_at') IS NULL ALTER TABLE dbo.promotions ADD [deleted_at] DATETIME2(3) NULL;
+GO
+IF OBJECT_ID('dbo.membership_tiers', 'U') IS NOT NULL AND COL_LENGTH('dbo.membership_tiers', 'deleted_at') IS NULL ALTER TABLE dbo.membership_tiers ADD [deleted_at] DATETIME2(3) NULL;
+GO
+IF OBJECT_ID('dbo.stores', 'U') IS NOT NULL AND COL_LENGTH('dbo.stores', 'deleted_at') IS NULL ALTER TABLE dbo.stores ADD [deleted_at] DATETIME2(3) NULL;
+GO
+IF OBJECT_ID('dbo.members', 'U') IS NOT NULL AND COL_LENGTH('dbo.members', 'deleted_at') IS NULL ALTER TABLE dbo.members ADD [deleted_at] DATETIME2(3) NULL;
+GO

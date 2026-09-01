@@ -7,12 +7,13 @@ feature or the sync contract.
 | Table | Kind | Intended | Pushed up | Pulled down | Restorable | Note |
 | --- | --- | --- | --- | --- | --- | --- |
 | activity_events | governance | push | yes | — | yes |  |
-| audit_logs | governance | push | yes | — | — | Kept on the till, but not branch-scoped centrally. |
+| audit_logs | governance | push | yes | — | yes |  |
 | booking_payments | financial | both | yes | yes | — |  |
 | bookings | operational | both | yes | yes | — |  |
 | coupon_campaigns | reference | cloud-only | — | — | — | Campaign setup is administered centrally. |
 | coupon_events | financial | cloud-only | — | — | — | Loyalty ledger is authoritative centrally. |
 | drawer_events | financial | push | yes | — | yes |  |
+| entity_status_history | governance | push | — | — | yes |  |
 | held_orders | operational | push | yes | — | yes |  |
 | issued_vouchers | financial | cloud-only | — | — | — | Loyalty ledger is authoritative centrally. |
 | item_activity_logs | governance | push | yes | — | yes |  |
@@ -36,7 +37,7 @@ feature or the sync contract.
 
 ## Gaps between intent and reality
 
-None — every table behaves the way its feature declared.
+- **entity_status_history** — Should travel up to head office, but is never pushed.
 
 ## Undecided tables
 

@@ -119,6 +119,18 @@ function columnsOf(table) {
  * the watermark table are rebuilt in place when their old shape is detected;
  * everything else is a plain ADD COLUMN.
  */
+const TOMBSTONE_TABLES = [
+  "products",
+  "product_categories",
+  "product_barcodes",
+  "uom_units",
+  "suppliers",
+  "promotions",
+  "membership_tiers",
+  "stores",
+  "members",
+];
+
 function migrate() {
   // 1. Sync bookkeeping on every mirror table.
   for (const table of SYNCED_TABLES) {
@@ -160,6 +172,15 @@ function migrate() {
   if (activity.size) {
     if (!activity.has("staff_id")) db.exec("ALTER TABLE item_activity_logs ADD COLUMN staff_id TEXT");
     if (!activity.has("role")) db.exec("ALTER TABLE item_activity_logs ADD COLUMN role TEXT");
+  }
+
+  // Tombstones: head office stamps a deletion rather than erasing the row, so
+  // the till can learn about it on the next pull and drop its own copy.
+  for (const table of TOMBSTONE_TABLES) {
+    if (!columnsOf(table).size) continue;
+    if (!columnsOf(table).has("deleted_at")) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN deleted_at TEXT`);
+    }
   }
 
   // 3. Queue: DELETE actions, dead letters and persistent retry state.

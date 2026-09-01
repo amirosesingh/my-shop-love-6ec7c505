@@ -75,7 +75,7 @@ export function cachedSuppliers(): Supplier[] {
 
 /** Central list, newest first. Falls back to the offline cache. */
 export async function loadSuppliers(): Promise<Supplier[]> {
-  const res = await sb.from("suppliers").select("*").order("name");
+  const res = await sb.from("suppliers").select("*").is("deleted_at", null).order("name");
   if (res.error) return cachedSuppliers();
   const list = ((res.data as Row[] | null) ?? []).map(toSupplier);
   cache(list);

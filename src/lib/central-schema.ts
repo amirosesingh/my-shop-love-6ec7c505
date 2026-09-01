@@ -66,6 +66,7 @@ export const CENTRAL_SCHEMA: CentralTableSchema[] = [
       { name: "is_active", pgType: "boolean" },
       { name: "archived_at", pgType: "timestamptz" },
       { name: "is_primary_sub", pgType: "boolean" },
+      { name: "deleted_at", pgType: "timestamptz" },
     ],
   },
   {
@@ -80,6 +81,7 @@ export const CENTRAL_SCHEMA: CentralTableSchema[] = [
       { name: "created_at", pgType: "timestamptz" },
       { name: "updated_at", pgType: "timestamptz" },
       { name: "row_version", pgType: "integer" },
+      { name: "deleted_at", pgType: "timestamptz" },
     ],
   },
   {
@@ -115,6 +117,7 @@ export const CENTRAL_SCHEMA: CentralTableSchema[] = [
       { name: "product_group", pgType: "text" },
       { name: "barcode_variants", pgType: "jsonb" },
       { name: "row_version", pgType: "integer" },
+      { name: "deleted_at", pgType: "timestamptz" },
     ],
   },
   {
@@ -131,6 +134,7 @@ export const CENTRAL_SCHEMA: CentralTableSchema[] = [
       { name: "created_at", pgType: "timestamptz" },
       { name: "updated_at", pgType: "timestamptz" },
       { name: "row_version", pgType: "integer" },
+      { name: "deleted_at", pgType: "timestamptz" },
     ],
   },
   {
@@ -146,6 +150,7 @@ export const CENTRAL_SCHEMA: CentralTableSchema[] = [
       { name: "updated_at", pgType: "timestamptz" },
       { name: "kind", pgType: "text" },
       { name: "row_version", pgType: "integer" },
+      { name: "deleted_at", pgType: "timestamptz" },
     ],
   },
   {
@@ -161,6 +166,7 @@ export const CENTRAL_SCHEMA: CentralTableSchema[] = [
       { name: "created_at", pgType: "timestamptz" },
       { name: "updated_at", pgType: "timestamptz" },
       { name: "row_version", pgType: "integer" },
+      { name: "deleted_at", pgType: "timestamptz" },
     ],
   },
   {
@@ -184,6 +190,7 @@ export const CENTRAL_SCHEMA: CentralTableSchema[] = [
       { name: "is_verified", pgType: "boolean" },
       { name: "verified_at", pgType: "timestamptz" },
       { name: "verified_channel", pgType: "text" },
+      { name: "deleted_at", pgType: "timestamptz" },
     ],
   },
   {
@@ -206,6 +213,7 @@ export const CENTRAL_SCHEMA: CentralTableSchema[] = [
       { name: "created_at", pgType: "timestamptz" },
       { name: "updated_at", pgType: "timestamptz" },
       { name: "row_version", pgType: "integer" },
+      { name: "deleted_at", pgType: "timestamptz" },
     ],
   },
   {
@@ -225,6 +233,7 @@ export const CENTRAL_SCHEMA: CentralTableSchema[] = [
       { name: "created_at", pgType: "timestamptz" },
       { name: "updated_at", pgType: "timestamptz" },
       { name: "row_version", pgType: "integer" },
+      { name: "deleted_at", pgType: "timestamptz" },
     ],
   },
   {
