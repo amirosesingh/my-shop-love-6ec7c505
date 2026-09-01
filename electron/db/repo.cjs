@@ -1184,6 +1184,8 @@ module.exports = {
   buildSetList,
   CATALOGUE_TABLES,
   SCOPED_PULL_TABLES,
+  RESTORE_TABLES,
+
   PRUNABLE_TABLES,
   SETTINGS_ID,
   setScope,
