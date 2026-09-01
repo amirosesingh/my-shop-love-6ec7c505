@@ -160,11 +160,6 @@ function Register() {
     return res.ok ? (res.grantToken ?? "") : null;
   };
   const [closeShiftOpen, setCloseShiftOpen] = useState(false);
-  const [countedCash, setCountedCash] = useState("");
-  const [closing, setClosing] = useState(false);
-  const [closeNote, setCloseNote] = useState("");
-  /** Visibility flags and derived figures for the closing screen. */
-  const closeView = closeScreenView(rules, activeShift, state.sales);
   /** Leaving the dialog never closes the shift and never prints anything. */
   function abandonShiftClose() {
     setCloseShiftOpen(false);
