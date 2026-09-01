@@ -304,6 +304,13 @@ export type Sale = {
   couponScope?: "bill" | "item";
   /** currency value the coupon took off */
   couponDiscount?: number;
+  /**
+   * Total rounding applied to this bill: rounded − unrounded. Negative when
+   * the customer paid less. Always stored, even when nothing is printed.
+   */
+  roundingAdjustment?: number;
+  /** Receipt label in force when the bill was raised, so reprints match. */
+  roundingLabel?: string;
   /** unused value left on a fixed-amount voucher after this bill */
   couponRemaining?: number;
   /** campaign the voucher belongs to, printed on the slip */
@@ -826,6 +833,23 @@ export type IntegrationSettings = {
   stockNumbering?: import("./stock-ref").StockNumberingSettings;
   /** How goods-received (purchasing) reference numbers are built. */
   receivingNumbering?: import("./stock-ref").StockNumberingSettings;
+  /** Cash-rounding of the final bill total. */
+  rounding?: RoundingSettings;
+};
+
+/** How the final bill total is rounded at the till. */
+export type RoundingSettings = {
+  /** Master switch — everything else is ignored when off. */
+  enabled: boolean;
+  /** Smallest currency step the total may land on: 1, 0.5, 0.1, 0.05, 0.01. */
+  unit: number;
+  direction: "nearest" | "up" | "down";
+  /** Round every tender, or only cash bills. */
+  appliesTo: "all" | "cash";
+  /** Print a customer-facing line when the customer paid less. */
+  showOnReceipt: boolean;
+  /** Wording of that line, e.g. "Extra Discount". */
+  receiptLabel: string;
 };
 
 

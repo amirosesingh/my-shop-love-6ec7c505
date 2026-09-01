@@ -548,12 +548,15 @@ const SALE_COLUMNS_BASE =
 let hasClientTxnColumn = true;
 /** Same story for the branch-name snapshot columns. */
 let hasStoreSnapshotColumns = true;
+/** …and for the total-rounding columns. */
+let hasRoundingColumns = true;
 
 const saleColumns = () =>
   [
     SALE_COLUMNS_BASE,
     hasStoreSnapshotColumns ? "store_name_snapshot, store_address_snapshot" : "",
     hasClientTxnColumn ? "client_transaction_id" : "",
+    hasRoundingColumns ? "rounding_adjustment, rounding_label" : "",
   ]
     .filter(Boolean)
     .join(", ");
@@ -561,7 +564,7 @@ const saleColumns = () =>
 /** True when a failure is "that column is not in this database (yet)". */
 export const isMissingTxnColumn = (message: string | undefined | null) =>
   !!message &&
-  /client_transaction_id|store_name_snapshot|store_address_snapshot/.test(message) &&
+  /client_transaction_id|store_name_snapshot|store_address_snapshot|rounding_adjustment|rounding_label/.test(message) &&
   /does not exist|schema cache/i.test(message);
 
 /**
@@ -586,6 +589,10 @@ const forgetTxnColumn = (message?: string | null) => {
   if (!message || /store_(name|address)_snapshot/.test(message)) {
     if (hasStoreSnapshotColumns) announceDrift("store_name_snapshot/store_address_snapshot");
     hasStoreSnapshotColumns = false;
+  }
+  if (!message || /rounding_(adjustment|label)/.test(message)) {
+    if (hasRoundingColumns) announceDrift("rounding_adjustment/rounding_label");
+    hasRoundingColumns = false;
   }
 };
 
@@ -632,6 +639,8 @@ const rowToSale = (r: Row): Sale => ({
   couponPromoId: r.coupon_promo_id ?? undefined,
   couponScope: (r.coupon_scope ?? undefined) as Sale["couponScope"],
   couponDiscount: num(r.coupon_discount) || undefined,
+  roundingAdjustment: num(r.rounding_adjustment) || undefined,
+  roundingLabel: r.rounding_label ?? undefined,
 });
 
 const saleToRow = (s: Sale): Row => ({
@@ -668,6 +677,12 @@ const saleToRow = (s: Sale): Row => ({
   coupon_promo_id: s.couponPromoId ?? null,
   coupon_scope: s.couponScope ?? null,
   coupon_discount: s.couponDiscount ?? 0,
+  ...(hasRoundingColumns
+    ? {
+        rounding_adjustment: s.roundingAdjustment ?? 0,
+        rounding_label: s.roundingLabel ?? null,
+      }
+    : {}),
   created_at: s.createdAt,
 });
 

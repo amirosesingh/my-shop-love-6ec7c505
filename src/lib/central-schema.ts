@@ -333,6 +333,8 @@ export const CENTRAL_SCHEMA: CentralTableSchema[] = [
       { name: "coupon_promo_id", pgType: "text" },
       { name: "coupon_scope", pgType: "text" },
       { name: "coupon_discount", pgType: "numeric(18,4)" },
+      { name: "rounding_adjustment", pgType: "numeric(18,4)" },
+      { name: "rounding_label", pgType: "text" },
       { name: "payments", pgType: "jsonb" },
       { name: "client_transaction_id", pgType: "text", classification: "required" as const },
       { name: "cashier_id", pgType: "text" },

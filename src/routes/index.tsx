@@ -4,6 +4,7 @@ import { useCart } from "@/lib/register/use-cart";
 import { useTender } from "@/lib/register/use-tender";
 import { isoDaysFromNow, useBookingIntake } from "@/lib/register/use-booking-intake";
 import { useCheckout } from "@/lib/register/use-checkout";
+import { applyRounding, roundingOf, showsRoundingLine } from "@/lib/rounding";
 import { usePromotions } from "@/lib/register/use-promotions";
 import { useExchange } from "@/lib/register/use-exchange";
 import { useRegisterHeldOrders } from "@/lib/register/use-held-orders";
@@ -483,8 +484,12 @@ function Register() {
     }
     if (!focId && hasFoc) setLines((ls) => ls.filter((l) => !l.foc));
   }, [focId, hasFoc, state.promotions, state.products]);
-  const balanceDue = totals.total >= 0 ? totals.total : 0;
-  const refundDue = totals.total < 0 ? r2(-totals.total) : 0;
+  // Total rounding: display and tender validation use the same rounded figure
+  // the checkout charges and stores.
+  const rounding = applyRounding(totals.total, state.settings.integrations.rounding, method);
+  const roundedTotal = rounding.total;
+  const balanceDue = roundedTotal >= 0 ? roundedTotal : 0;
+  const refundDue = roundedTotal < 0 ? r2(-roundedTotal) : 0;
 
   const {
     couponOpen,
@@ -1556,6 +1561,12 @@ function Register() {
         <Row
           label={taxSettings.mode === "inclusive" ? `Tax ${taxSettings.rate}% (included)` : `Tax ${taxSettings.rate}%`}
           value={money(totals.tax)}
+        />
+      )}
+      {showsRoundingLine(rounding.adjustment, state.settings.integrations.rounding) && (
+        <Row
+          label={roundingOf(state.settings.integrations.rounding).receiptLabel}
+          value={`-${money(Math.abs(rounding.adjustment))}`}
         />
       )}
       {promo.applied.length > 0 && (

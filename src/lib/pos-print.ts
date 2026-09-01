@@ -1,4 +1,5 @@
 import type {
+  RoundingSettings,
   Member,
   Booking,
   BookingPayment,
@@ -16,6 +17,7 @@ import type {
 } from "./pos-types";
 import { bookingBalance, lineUnitDiscount, whatsappLink } from "./pos-types";
 import { defaultReceiptSettings } from "./pos-seed";
+import { roundingOf, showsRoundingLine } from "./rounding";
 import qrcode from "qrcode-generator";
 import { toast } from "sonner";
 import {
@@ -51,6 +53,8 @@ export function setPrintStore(store: Store | null) {
 let globalReceiptCfg: ReceiptSettings = defaultReceiptSettings;
 let receiptCfg: ReceiptSettings = defaultReceiptSettings;
 let taxCfg: TaxSettings = { enabled: true, rate: 5, mode: "exclusive" };
+/** Total-rounding rules, so the slip knows whether to show the courtesy line. */
+let roundingCfg: RoundingSettings = roundingOf(undefined);
 
 /** Merge the global receipt profile with any branch-level overrides. */
 export function resolveReceiptCfg(
@@ -64,10 +68,15 @@ export function resolveReceiptCfg(
   return { ...receipt, ...clean };
 }
 
-export function setPrintSettings(receipt: ReceiptSettings, tax: TaxSettings) {
+export function setPrintSettings(
+  receipt: ReceiptSettings,
+  tax: TaxSettings,
+  rounding?: Partial<RoundingSettings>,
+) {
   globalReceiptCfg = receipt;
   receiptCfg = resolveReceiptCfg(receipt, activeBranch);
   taxCfg = tax;
+  roundingCfg = roundingOf(rounding);
 }
 
 /**
@@ -457,6 +466,13 @@ function saleBody(sale: Sale, member: Member | null, kind: ReceiptKind) {
         // carries none.
         receiptCfg.showTax && taxCfg.enabled && sale.tax
           ? `<tr><td>Tax ${taxCfg.rate}%${taxCfg.mode === "inclusive" ? " incl." : ""}</td><td class="r">${fmt(sign * sale.tax)}</td></tr>`
+          : ""
+      }
+      ${
+        // Courtesy rounding line: only when the customer paid LESS and the
+        // merchant chose to show it. A round-up applies silently.
+        showsRoundingLine(sale.roundingAdjustment, roundingCfg)
+          ? `<tr><td>${esc(sale.roundingLabel || roundingCfg.receiptLabel)}</td><td class="r">-${fmt(Math.abs(sale.roundingAdjustment ?? 0))}</td></tr>`
           : ""
       }
       <tr class="b big"><td>TOTAL</td><td class="r">${fmt(sign * sale.total)}</td></tr>
