@@ -98,6 +98,19 @@ const GROUP_SPECS: GroupSpec[] = [
   },
 ];
 
+/** Tabs of the System & general hub, rendered in place rather than as routes. */
+export const SYSTEM_TAB_IDS = [
+  "system",
+  "database-health",
+  "logic-health",
+  "security-alerts",
+  "data-sync",
+  "data-comparison",
+  "inheritance",
+] as const;
+
+export type SystemTabId = (typeof SYSTEM_TAB_IDS)[number];
+
 /** Split `/settings/system?tab=logic-health` into its route and its tab. */
 function splitTarget(to: string): { to: string; tab?: SystemTabId } {
   const [path, query] = to.split("?");
@@ -132,19 +145,6 @@ function buildGroups(): SettingsGroup[] {
 }
 
 export const SETTINGS_GROUPS: SettingsGroup[] = buildGroups();
-
-/** Tabs of the System & general hub, rendered in place rather than as routes. */
-export const SYSTEM_TAB_IDS = [
-  "system",
-  "database-health",
-  "logic-health",
-  "security-alerts",
-  "data-sync",
-  "data-comparison",
-  "inheritance",
-] as const;
-
-export type SystemTabId = (typeof SYSTEM_TAB_IDS)[number];
 
 /** Heading and blurb for the panel currently mounted in the hub. */
 export function systemTab(id: SystemTabId): { label: string; blurb: string } {
@@ -187,15 +187,25 @@ export function settingsDuplicates(): SettingsDuplicate[] {
 }
 
 /**
- * Every `/settings/*` page that exists, discovered from the route files at
- * build time rather than kept by hand. Pages that only redirect somewhere else
- * are excluded: they are old links kept alive, not areas needing a card.
+ * Every `/settings/*` page that exists, discovered from the route files rather
+ * than kept by hand.
  */
-const SETTINGS_ROUTE_MODULES = import.meta.glob("/src/routes/settings.*.tsx", {
-  eager: true,
-  query: "?raw",
-  import: "default",
-}) as Record<string, string>;
+const SETTINGS_ROUTE_FILES = Object.keys(
+  import.meta.glob("/src/routes/settings.*.tsx"),
+);
+
+/**
+ * Pages that only forward somewhere else. They are old links kept alive, not
+ * areas needing a card, so they are not expected to appear in the workspace.
+ */
+const LEGACY_REDIRECTS = new Set([
+  "/settings/data-sync",
+  "/settings/diagnostics",
+  "/settings/inheritance",
+  "/settings/logic-health",
+  "/settings/security-alerts",
+  "/settings/visibility",
+]);
 
 export type SettingsCoverage = {
   /** A settings page with no card — unreachable from the workspace or search. */
@@ -211,17 +221,17 @@ export type SettingsCoverage = {
  */
 export function settingsCoverage(): SettingsCoverage {
   const pages = new Set<string>();
-  for (const [file, source] of Object.entries(SETTINGS_ROUTE_MODULES)) {
+  for (const file of SETTINGS_ROUTE_FILES) {
     const name = file.split("settings.")[1]?.replace(/\.tsx$/, "");
     if (!name || name === "index") continue;
-    // Redirect-only shims exist purely to keep old links working.
-    if (/beforeLoad[\s\S]{0,200}redirect\(/.test(source)) continue;
-    pages.add(`/settings/${name}`);
+    const route = `/settings/${name}`;
+    if (LEGACY_REDIRECTS.has(route)) continue;
+    pages.add(route);
   }
 
   const carded = new Set(SETTINGS_CARDS.map((c) => c.to.split("?")[0] as string));
   return {
     uncovered: [...pages].filter((p) => !carded.has(p)).sort(),
-    dangling: [...carded].filter((p) => p !== "/settings/system" && !pages.has(p)).sort(),
+    dangling: [...carded].filter((p) => !pages.has(p)).sort(),
   };
 }
