@@ -1205,6 +1205,8 @@ module.exports = {
   discardRow,
   queueRows,
   mergeFromCloud,
+  restoreMerge,
+
   stats,
   compareSummary,
   compareRows,
