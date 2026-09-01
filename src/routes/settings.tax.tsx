@@ -30,7 +30,97 @@ function TaxSettingsPage() {
       <SettingsTabs current="/settings/tax" />
 
       <TaxForm />
+      <RoundingForm />
     </SettingsFrame>
+  );
+}
+
+/** Billing & totals — cash rounding of the final bill total. */
+function RoundingForm() {
+  const { state, updateSettings } = usePos();
+  const integrations = state.settings.integrations;
+  const rounding = roundingOf(integrations.rounding);
+  const patch = (p: Partial<typeof rounding>) =>
+    updateSettings({ integrations: { ...integrations, rounding: { ...rounding, ...p } } });
+
+  return (
+    <section className="mt-6 space-y-4 rounded-lg border border-border p-4">
+      <div>
+        <h2 className="text-sm font-semibold">Billing &amp; totals</h2>
+        <p className="text-[11px] text-muted-foreground">
+          Rounding applies to the final total only — after discounts, coupons and tax. Line items are never changed.
+        </p>
+      </div>
+
+      <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+        <div>
+          <p className="text-sm font-medium">Enable total rounding</p>
+          <p className="text-[11px] text-muted-foreground">Round the amount the customer pays</p>
+        </div>
+        <Switch
+          checked={rounding.enabled}
+          aria-label="Enable total rounding"
+          onCheckedChange={(v) => patch({ enabled: v })}
+        />
+      </div>
+
+      {rounding.enabled && (
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Rounding unit</Label>
+            <ThemedSelect
+              value={String(rounding.unit)}
+              onChange={(v) => patch({ unit: Number(v) })}
+              options={ROUNDING_UNITS.map((u) => ({ value: String(u), label: u.toFixed(2) }))}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Rounding direction</Label>
+            <ThemedSelect
+              value={rounding.direction}
+              onChange={(v) => patch({ direction: v as typeof rounding.direction })}
+              options={[
+                { value: "nearest", label: "Nearest" },
+                { value: "up", label: "Round Up" },
+                { value: "down", label: "Round Down" },
+              ]}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Applies to</Label>
+            <ThemedSelect
+              value={rounding.appliesTo}
+              onChange={(v) => patch({ appliesTo: v as typeof rounding.appliesTo })}
+              options={[
+                { value: "all", label: "All payments" },
+                { value: "cash", label: "Cash only" },
+              ]}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Receipt label</Label>
+            <Input
+              value={rounding.receiptLabel}
+              placeholder="Extra Discount"
+              onChange={(e) => patch({ receiptLabel: e.target.value })}
+            />
+          </div>
+          <div className="flex items-center justify-between rounded-md border border-border px-3 py-2 md:col-span-2">
+            <div>
+              <p className="text-sm font-medium">Show rounding on receipt</p>
+              <p className="text-[11px] text-muted-foreground">
+                Printed only when rounding lowers the bill. A round-up is always applied silently.
+              </p>
+            </div>
+            <Switch
+              checked={rounding.showOnReceipt}
+              aria-label="Show rounding on receipt"
+              onCheckedChange={(v) => patch({ showOnReceipt: v })}
+            />
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 
