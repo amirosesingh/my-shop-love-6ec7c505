@@ -66,10 +66,6 @@ function Shifts() {
   const { authorize } = useManagerGate();
   const [cashier, setCashier] = useState(user?.name ?? "Cashier");
   const [float, setFloat] = useState("150");
-  const [counted, setCounted] = useState("");
-  const [countedCard, setCountedCard] = useState("");
-  const [countedDigital, setCountedDigital] = useState("");
-  const [note, setNote] = useState("");
   const [closeOpen, setCloseOpen] = useState(false);
   const [signIns, setSignIns] = useState<SignInEntry[]>([]);
   const [sessions, setSessions] = useState<ShiftSession[]>([]);
@@ -125,27 +121,6 @@ function Shifts() {
 
   /* Mid-shift snapshot: supervisors always, cashiers only when switched on. */
   const mayPrintXReport = isAdmin || isSupervisor || rules.enable_cashier_x_report;
-  // What the closing screen may reveal, and the derived figures.
-  const closeView = closeScreenView(rules, activeShift, storeSales);
-  const countedValue = parseAmount(counted);
-  const varianceNow = (countedValue ?? 0) - closeView.expected;
-
-  /** Leaving the dialog never closes the shift and never prints anything. */
-  function abandonClose() {
-    setCloseOpen(false);
-    if (activeShift) {
-      logSystemAction({
-        actorName: user?.name ?? activeShift.cashier,
-        actorRole: user?.role ?? null,
-        actionType: "SHIFT_CLOSE_CANCELLED",
-        entityAffected: "shifts",
-        entityId: activeShift.id,
-        storeId: currentStore.id,
-        note: "Closing screen dismissed — shift left open, nothing printed.",
-      });
-    }
-  }
-
   const storeIndex = stores.findIndex((s) => s.id === currentStore.id);
   const storeLabel = `Store ${storeIndex + 1}`;
 
