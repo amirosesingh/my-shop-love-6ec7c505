@@ -29,6 +29,8 @@ export type Database = {
           id: string
           message: string
           meta: Json
+          new_state: string | null
+          previous_state: string | null
           severity: string
           store_id: string | null
           terminal_id: string | null
@@ -51,6 +53,8 @@ export type Database = {
           id?: string
           message?: string
           meta?: Json
+          new_state?: string | null
+          previous_state?: string | null
           severity?: string
           store_id?: string | null
           terminal_id?: string | null
@@ -73,6 +77,8 @@ export type Database = {
           id?: string
           message?: string
           meta?: Json
+          new_state?: string | null
+          previous_state?: string | null
           severity?: string
           store_id?: string | null
           terminal_id?: string | null
@@ -157,6 +163,7 @@ export type Database = {
           details: Json | null
           entity: string | null
           id: string
+          store_id: string | null
           target_module: string | null
           user_id: string | null
           user_name: string | null
@@ -171,6 +178,7 @@ export type Database = {
           details?: Json | null
           entity?: string | null
           id?: string
+          store_id?: string | null
           target_module?: string | null
           user_id?: string | null
           user_name?: string | null
@@ -185,6 +193,7 @@ export type Database = {
           details?: Json | null
           entity?: string | null
           id?: string
+          store_id?: string | null
           target_module?: string | null
           user_id?: string | null
           user_name?: string | null
@@ -879,6 +888,78 @@ export type Database = {
           staff_name?: string | null
           store_id?: string | null
           terminal_id?: string | null
+        }
+        Relationships: []
+      }
+      entity_status_history: {
+        Row: {
+          actor_id: string | null
+          actor_name: string | null
+          actor_role: string | null
+          branch_id: string | null
+          client_event_id: string | null
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          metadata: Json
+          new_status: string
+          occurred_at: string
+          previous_status: string | null
+          reason: string | null
+          related_entity_id: string | null
+          related_entity_type: string | null
+          row_version: number
+          status_kind: string
+          store_id: string | null
+          terminal_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_name?: string | null
+          actor_role?: string | null
+          branch_id?: string | null
+          client_event_id?: string | null
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          metadata?: Json
+          new_status: string
+          occurred_at?: string
+          previous_status?: string | null
+          reason?: string | null
+          related_entity_id?: string | null
+          related_entity_type?: string | null
+          row_version?: number
+          status_kind?: string
+          store_id?: string | null
+          terminal_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          actor_id?: string | null
+          actor_name?: string | null
+          actor_role?: string | null
+          branch_id?: string | null
+          client_event_id?: string | null
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          metadata?: Json
+          new_status?: string
+          occurred_at?: string
+          previous_status?: string | null
+          reason?: string | null
+          related_entity_id?: string | null
+          related_entity_type?: string | null
+          row_version?: number
+          status_kind?: string
+          store_id?: string | null
+          terminal_id?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
