@@ -13,6 +13,11 @@ export const PERMISSION_GROUPS = [
       "can_open_shift",
       "can_close_shift",
       "can_bypass_shift_lock",
+      "can_shift_cash_count",
+      "can_shift_expected_cash_view",
+      "can_shift_variance_view",
+      "can_shift_variance_approve",
+      "can_shift_cash_recount",
     ],
   },
   {
@@ -105,6 +110,11 @@ export type PermissionKey =
   | "can_open_shift"
   | "can_close_shift"
   | "can_bypass_shift_lock"
+  | "can_shift_cash_count"
+  | "can_shift_expected_cash_view"
+  | "can_shift_variance_view"
+  | "can_shift_variance_approve"
+  | "can_shift_cash_recount"
   | "can_delete_line"
   | "can_reduce_qty"
   | "can_discount_bill"
@@ -158,6 +168,11 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   can_open_shift: "Open a shift",
   can_close_shift: "Close a shift / run Z-report",
   can_bypass_shift_lock: "Use the terminal without an open shift",
+  can_shift_cash_count: "Submit the closing cash count",
+  can_shift_expected_cash_view: "See expected cash for a shift",
+  can_shift_variance_view: "See shift over/short variance",
+  can_shift_variance_approve: "Approve a shift variance and finalise the close",
+  can_shift_cash_recount: "Authorise and submit a drawer recount",
   can_delete_line: "Delete a line from the cart",
   can_reduce_qty: "Reduce an item quantity",
   can_discount_bill: "Apply a bill-level discount",
@@ -224,6 +239,7 @@ export const CASHIER_PERMISSIONS: StaffPermissions = build([
   "can_close_drawer",
   "can_open_shift",
   "can_close_shift",
+  "can_shift_cash_count",
   "can_process_sale",
   "can_hold_cart",
   "can_reprint_bill",
@@ -469,6 +485,11 @@ export const PERMISSION_TAGS: Record<
       "can_open_shift",
       "can_close_shift",
       "can_bypass_shift_lock",
+      "can_shift_cash_count",
+      "can_shift_expected_cash_view",
+      "can_shift_variance_view",
+      "can_shift_variance_approve",
+      "can_shift_cash_recount",
       "can_delete_line",
       "can_reduce_qty",
       "can_discount_bill",
