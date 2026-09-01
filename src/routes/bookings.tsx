@@ -474,6 +474,16 @@ function BookingsPage() {
                               Incident: {b.incidentNote}
                             </p>
                           )}
+                          {b.cancelReason && (
+                            <p className="mt-1 text-[11px] text-destructive">
+                              Cancelled: {b.cancelReason}
+                              {b.cancelledBy ? ` · ${b.cancelledBy}` : ""}
+                              {b.cancelledAt
+                                ? ` · ${new Date(b.cancelledAt).toLocaleString()}`
+                                : ""}
+                            </p>
+                          )}
+
                           {job?.notifyWhatsApp && (
                             <p className="mt-1 text-[11px] text-primary">
                               Customer wants a WhatsApp when it is ready.
