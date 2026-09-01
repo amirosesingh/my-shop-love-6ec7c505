@@ -4,6 +4,9 @@ import { SettingsFrame, useSettingsCtx } from "@/components/pos/settings/Setting
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { ThemedSelect } from "@/components/pos/ThemedSelect";
+import { usePos } from "@/lib/pos-store";
+import { ROUNDING_UNITS, roundingOf } from "@/lib/rounding";
 import type { TaxMode } from "@/lib/pos-types";
 
 export const Route = createFileRoute("/settings/tax")({
