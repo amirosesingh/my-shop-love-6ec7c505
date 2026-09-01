@@ -1287,11 +1287,27 @@ export function PosProvider({ children }: { children: ReactNode }) {
     await deleteBookingRow(id).catch(() => undefined);
   }, []);
 
-  /** Move a racket through received → strung → ready → collected. */
+  /**
+   * Move a racket through received → strung → ready → collected. Handing one
+   * over is only allowed once the server agrees nothing is owed.
+   */
   const setBookingJobStatus = useCallback(
-    (id: string, status: JobStatus, who: string, incidentNote?: string) => {
+    async (id: string, status: JobStatus, who: string, incidentNote?: string) => {
       const current = stateRef.current.bookings.find((b) => b.id === id);
       if (!current) return null;
+      if (status === "collected") {
+        const check = await readBookingBalance(id);
+        if (!check.ok) {
+          toast.error("Payment could not be verified", { description: check.error });
+          return null;
+        }
+        if (!check.state.fullyPaid) {
+          toast.error("A balance is still outstanding", {
+            description: `${money(check.state.outstanding)} must be collected first.`,
+          });
+          return null;
+        }
+      }
       const updated: Booking = {
         ...current,
         jobStatus: status,
@@ -1315,6 +1331,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     },
     [],
   );
+
 
   /** Rewrite the job card of a booking that has not been collected yet. */
   const updateBookingSpecs = useCallback((id: string, job: RacketJob) => {
