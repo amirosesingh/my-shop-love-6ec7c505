@@ -426,7 +426,9 @@ function Transfers() {
                   t.status === "dispatched" &&
                   t.toStoreId === currentStore.id &&
                   can("can_receive_transfer");
-                const open = ["awaiting_approval", "approved", "dispatched"].includes(t.status);
+                const stillOpen = ["awaiting_approval", "approved", "dispatched"].includes(
+                  t.status,
+                );
                 return (
                   <TableRow key={t.id}>
                     <TableCell className="numeric">
@@ -519,7 +521,7 @@ function Transfers() {
                             <Truck className="size-4" /> Receive
                           </Button>
                         )}
-                        {open && (
+                        {stillOpen && (
                           <Button size="sm" variant="ghost" onClick={() => setReasonFor(t.id)}>
                             <X className="size-4 text-destructive" />
                           </Button>
