@@ -182,6 +182,8 @@ export function LogicHealthPanel() {
         )}
       </section>
 
+      <SyncCoverageSection />
+
       <div className="overflow-x-auto rounded-md border border-border">
         <table className="w-full text-xs">
           <thead className="bg-muted/50">
