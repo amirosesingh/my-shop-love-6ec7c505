@@ -129,6 +129,8 @@ active faults, and merging trails mid-audit risks losing history.
 Stage 3 — stock requests, end to end.
 Stage 4 — tombstones, paging, written conflict rules.
 Stage 5 — per-feature recovery verdicts in Logic Health.
-Stage 6 — the wipe-and-restore test.
+Stage 6 — the wipe-and-restore test. **Delivered:** a rebuild check and a
+guarded, reversible drill on the till; see
+[`restore-test.md`](./restore-test.md).
 Stage 7 — settings restructure.
 Stage 8 — security sweep and final report.
