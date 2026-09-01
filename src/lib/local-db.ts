@@ -309,7 +309,22 @@ export type DirectConnectionParams = {
   timeout?: number;
 };
 
+/** Progress of an operator-triggered trading-history restore. */
+export type RestoreRun = {
+  running: boolean;
+  table: string | null;
+  index: number;
+  total: number;
+  restored: number;
+  skipped: number;
+  error?: string | null;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  tables?: Array<{ table: string; restored: number; skipped: number; error?: string | null }>;
+};
+
 export type LocalSyncStatus = {
+
   connected: boolean;
   error?: string;
   /** Structured reason from the shell, so the banner can be specific. */
