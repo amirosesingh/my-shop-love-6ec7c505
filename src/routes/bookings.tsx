@@ -32,6 +32,8 @@ import {
 import { money, usePos } from "@/lib/pos-store";
 import { useUserPermissions } from "@/lib/pos-permissions";
 import { useAuth } from "@/lib/pos-auth";
+import { readBookingBalance } from "@/lib/booking-collection";
+
 import {
   bookingBalance,
   racketSummary,
