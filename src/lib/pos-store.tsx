@@ -67,6 +67,7 @@ import { setActiveBranchSyncPolicy } from "./sync-policy";
 import { setPosFormats, setPosTimeZone } from "./time-zone";
 import { receiveTransferInDb, saveTransfer, setTransferStatus } from "./stock-transfers";
 import { commitBooking, deleteBookingRow, loadBookings, saveBookingQuietly } from "./bookings-db";
+import { trackTransition } from "./status-history";
 import {
   cancelBookingAuthoritative,
   collectBookingPayment,
