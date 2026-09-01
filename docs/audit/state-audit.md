@@ -135,4 +135,24 @@ guarded, reversible drill on the till; see
 Stage 7 — settings restructure. **Delivered:** groups derived from the card
 catalogue, document numbering given a card, bookings given their own category,
 and a coverage check in Logic health.
-Stage 8 — security sweep and final report.
+Stage 8 — inventory ledger, security sweep and final report. **Delivered:**
+
+- **Inventory movement is now complete.** `item_activity_logs` used to record
+  sales only. Goods received now write one movement row per line
+  (`receivingActivityRows` in `src/lib/pos-db.ts`, committed atomically with the
+  invoice and keyed off the invoice so a resumed draft or a correction rewrites
+  the same rows instead of doubling them). Branch transfers write
+  `transfer_out` on dispatch and `transfer_in` on receive inside the
+  `stock_transfer_dispatch` / `stock_transfer_receive` functions, with
+  `stock_before` and `stock_after` captured in the same statement as the stock
+  change.
+- The item history drawer reads the ledger directly, so an item now shows stock
+  arriving as well as leaving, with plain wording for each movement kind.
+- **Security sweep.** Public API routes all authenticate before touching a
+  record (till token, signed body, or relay caller verification); the relay
+  allow-list scopes `item_activity_logs` by `store_id` like every other
+  branch-owned table; barcode lookups are no longer readable by signed-out
+  visitors. The remaining linter warnings are the `SECURITY DEFINER` functions
+  the permission model is built on, and the realtime feeds, which stay
+  RLS-gated.
+
