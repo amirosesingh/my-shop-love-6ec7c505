@@ -3421,3 +3421,62 @@ BEGIN
   IF COL_LENGTH('dbo.member_verifications', 'client_transaction_id') IS NULL ALTER TABLE dbo.member_verifications ADD [client_transaction_id] NVARCHAR(120) NULL;
 END
 GO
+
+/* ------------------------------------------------------------------ */
+/* Status history — every state change of every tracked record.        */
+/* Written on the till first so a change made with no connection is    */
+/* never lost, then pushed like any other trading record.              */
+/* ------------------------------------------------------------------ */
+IF OBJECT_ID('dbo.entity_status_history', 'U') IS NULL
+CREATE TABLE dbo.entity_status_history (
+  id                  UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+  entity_type         NVARCHAR(80)     NOT NULL,
+  entity_id           NVARCHAR(120)    NOT NULL,
+  status_kind         NVARCHAR(60)     NOT NULL DEFAULT N'status',
+  previous_status     NVARCHAR(80)     NULL,
+  new_status          NVARCHAR(80)     NOT NULL,
+  reason              NVARCHAR(600)    NULL,
+  actor_id            NVARCHAR(120)    NULL,
+  actor_name          NVARCHAR(200)    NULL,
+  actor_role          NVARCHAR(60)     NULL,
+  store_id            NVARCHAR(80)     NULL,
+  branch_id           NVARCHAR(60)     NULL,
+  terminal_id         NVARCHAR(120)    NULL,
+  related_entity_type NVARCHAR(80)     NULL,
+  related_entity_id   NVARCHAR(120)    NULL,
+  metadata            NVARCHAR(MAX)    NOT NULL DEFAULT N'{}',
+  client_event_id     NVARCHAR(120)    NULL,
+  occurred_at         DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  is_synced           BIT              NOT NULL DEFAULT 0,
+  sync_status         NVARCHAR(40)     NOT NULL DEFAULT N'pending',
+  sync_attempts       INT              NOT NULL DEFAULT 0,
+  last_error_at       DATETIME2(3)     NULL,
+  created_at          DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at          DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+IF OBJECT_ID('dbo.entity_status_history', 'U') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.indexes
+                   WHERE name = 'entity_status_history_entity_idx'
+                     AND object_id = OBJECT_ID('dbo.entity_status_history'))
+CREATE INDEX entity_status_history_entity_idx
+  ON dbo.entity_status_history (entity_type, entity_id, occurred_at DESC);
+GO
+
+/* Business events now say which record changed and how, not just a
+   sentence of text, so history can be queried instead of read. */
+IF OBJECT_ID('dbo.activity_events', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.activity_events', 'entity_type') IS NULL ALTER TABLE dbo.activity_events ADD [entity_type] NVARCHAR(80) NULL;
+  IF COL_LENGTH('dbo.activity_events', 'entity_id') IS NULL ALTER TABLE dbo.activity_events ADD [entity_id] NVARCHAR(120) NULL;
+  IF COL_LENGTH('dbo.activity_events', 'previous_state') IS NULL ALTER TABLE dbo.activity_events ADD [previous_state] NVARCHAR(80) NULL;
+  IF COL_LENGTH('dbo.activity_events', 'new_state') IS NULL ALTER TABLE dbo.activity_events ADD [new_state] NVARCHAR(80) NULL;
+END
+GO
+
+/* A branch column so a rebuilt till can recover its own audit trail. */
+IF OBJECT_ID('dbo.audit_logs', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.audit_logs', 'store_id') IS NULL ALTER TABLE dbo.audit_logs ADD [store_id] NVARCHAR(80) NULL;
+END
+GO
