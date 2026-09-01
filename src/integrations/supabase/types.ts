@@ -2273,6 +2273,8 @@ export type Database = {
           payments: Json
           points_earned: number
           points_redeemed: number
+          rounding_adjustment: number
+          rounding_label: string | null
           row_version: number
           shift_id: string | null
           store_address_snapshot: string | null
@@ -2308,6 +2310,8 @@ export type Database = {
           payments?: Json
           points_earned?: number
           points_redeemed?: number
+          rounding_adjustment?: number
+          rounding_label?: string | null
           row_version?: number
           shift_id?: string | null
           store_address_snapshot?: string | null
@@ -2343,6 +2347,8 @@ export type Database = {
           payments?: Json
           points_earned?: number
           points_redeemed?: number
+          rounding_adjustment?: number
+          rounding_label?: string | null
           row_version?: number
           shift_id?: string | null
           store_address_snapshot?: string | null
