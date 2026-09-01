@@ -77,8 +77,10 @@ export const TABLE_INTENT: Record<
   sales: { syncDirection: "push", restoreRequired: true, securityClass: "financial" },
   sale_items: { syncDirection: "push", restoreRequired: true, securityClass: "financial" },
   payment_transactions: { syncDirection: "push", restoreRequired: true, securityClass: "financial" },
-  booking_payments: { syncDirection: "both", restoreRequired: true, securityClass: "financial" },
-  bookings: { syncDirection: "both", restoreRequired: true, securityClass: "operational" },
+  // Bookings and their payments come back on the routine branch-scoped pull,
+  // so a rebuilt till has them without an explicit history restore.
+  booking_payments: { syncDirection: "both", restoreRequired: false, securityClass: "financial" },
+  bookings: { syncDirection: "both", restoreRequired: false, securityClass: "operational" },
   shifts: { syncDirection: "push", restoreRequired: true, securityClass: "financial" },
   shift_sessions: { syncDirection: "push", restoreRequired: true, securityClass: "financial" },
   drawer_events: { syncDirection: "push", restoreRequired: true, securityClass: "financial" },
