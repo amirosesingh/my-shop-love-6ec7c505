@@ -125,9 +125,11 @@ contextBridge.exposeInMainWorld("pos", {
   verifyStaffPin: (username, pin) => invoke("staff:verify-pin", username, pin),
   rememberStaffPin: (username, pin) => invoke("staff:remember-pin", username, pin),
   forgetStaffPin: (username) => invoke("staff:forget-pin", username),
-  /* keys the bundled app server needs to reach the central database */
+  /* presence check only — no privileged key is kept on this machine */
   serverKeyStatus: () => invoke("server-keys:status"),
-  setServerServiceKey: (value) => invoke("server-keys:set", value),
+  /* address of the hosted backend this device talks to (non-secret) */
+  backendUrl: () => invoke("backend:get"),
+  setBackendUrl: (value) => invoke("backend:set", value),
   /* tenant cloud credentials sealed in the OS vault (DPAPI) */
   cloudKeyStatus: () => invoke("cloud:status"),
   bootstrapCloudCredentials: () => invoke("cloud:bootstrap"),
