@@ -25,11 +25,13 @@ const TEXT_LIKE = new Set([
  * (the config resolver looks them up at runtime on the web deployment), so
  * matching names would be a false alarm.
  */
-const FORBIDDEN = [
-  // Supabase publishable / anon / legacy JWT key material.
-  "sb_publishable_",
-  "sb_secret_",
-  "SUPABASE_SERVICE_ROLE_KEY=",
+const FORBIDDEN_PATTERNS = [
+  // Real Supabase key material (the bare prefixes also appear in library
+  // validation code and in UI placeholders, so a key body is required).
+  /sb_publishable_[A-Za-z0-9_-]{16,}/,
+  /sb_secret_[A-Za-z0-9_-]{16,}/,
+  // A legacy service-role JWT.
+  /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}/,
 ];
 
 /** Actual values from this checkout's web environment, when it has one. */
@@ -77,7 +79,11 @@ function scan(target, needles) {
     if (size > 250 * 1024 * 1024) continue;
     const text = fs.readFileSync(file, binary ? "latin1" : "utf8");
     for (const needle of needles) {
-      if (text.includes(needle)) hits.push({ file, needle });
+      if (text.includes(needle)) hits.push({ file, needle: "a web configuration value" });
+    }
+    for (const pattern of FORBIDDEN_PATTERNS) {
+      const m = pattern.exec(text);
+      if (m) hits.push({ file, needle: `key material matching ${pattern}` });
     }
   }
   return hits;
@@ -89,7 +95,7 @@ function main() {
     console.log("verify-no-web-config: nothing to scan.");
     return;
   }
-  const needles = [...FORBIDDEN, ...tenantValues()];
+  const needles = tenantValues();
   const hits = targets.flatMap((t) => scan(t, needles));
   if (hits.length > 0) {
     console.error("Web configuration leaked into a device artifact:\n");
