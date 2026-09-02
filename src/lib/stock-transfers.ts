@@ -250,18 +250,16 @@ export async function dispatchTransferInDb(
 }
 
 /**
- * Receiving is the only step that touches stock, so the database does it in
- * one transaction: out of the sender, into the receiver, re-mapped across
- * clusters where needed.
+ * Arrival only. The box is here; nothing has been counted and no stock has
+ * moved onto the destination shelf yet.
  *
- * Never throws: a failure leaves the note untouched and reports why, so stock
- * is never half-moved on the screen while the database refused the write.
+ * Never throws: a failure leaves the note untouched and reports why.
  */
 export async function receiveTransferInDb(
   id: string,
   who: string,
   lines?: LineQty[],
-): Promise<{ success: boolean; error?: string }> {
+): Promise<RpcResult> {
   try {
     const res = await sb.rpc("stock_transfer_receive", {
       p_transfer_id: id,
@@ -274,3 +272,30 @@ export async function receiveTransferInDb(
     return { success: false, error: describeError(e, "Receiving the transfer") };
   }
 }
+
+/**
+ * Physical verification — the only step that puts stock on the destination
+ * shelf. The database locks the note, refuses anything already posted, credits
+ * the counted quantity and writes the movement, all in one transaction, so a
+ * double-click or a retry can never add the delivery twice.
+ */
+export async function verifyTransferInDb(
+  id: string,
+  who: string,
+  lines: LineQty[],
+  reason?: string,
+): Promise<RpcResult> {
+  try {
+    const res = await sb.rpc("stock_transfer_verify", {
+      p_transfer_id: id,
+      p_verified_by: who,
+      p_lines: toLines(lines),
+      p_reason: reason?.trim() || null,
+    });
+    if (res.error) throw new Error(res.error.message);
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: describeError(e, "Verifying the delivery") };
+  }
+}
+
