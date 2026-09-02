@@ -295,6 +295,11 @@ export function AppShell({ children }: { children: ReactNode }) {
     return (
       <>
         <CloudSetupGate />
+        {startup.offlineGrace && (
+          <div className="bg-warning/15 px-3 py-1.5 text-center text-xs text-warning">
+            Offline mode — this terminal is registered and keeps working locally.
+          </div>
+        )}
         <TerminalLogin />
       </>
     );
