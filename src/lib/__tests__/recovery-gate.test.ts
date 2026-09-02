@@ -23,7 +23,7 @@ describe("emergency access path matching", () => {
 
 describe("recovery is never blocked by connection gates", () => {
   const gate = read("src/platforms/mobile/components/OfflineGate.tsx");
-  const boot = read("src/components/pos/NativeBoot.tsx");
+  const boot = read("src/platforms/mobile/components/NativeBoot.tsx");
 
   it("the connection gate steps aside on the recovery screen", () => {
     expect(gate).toMatch(/isRecoveryPath/);
