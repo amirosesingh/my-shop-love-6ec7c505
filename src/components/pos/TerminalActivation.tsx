@@ -38,7 +38,16 @@ const qrDataUrl = (value: string) => {
   return qr.createDataURL(4, 8);
 };
 
-function Frame({ children }: { children: React.ReactNode }) {
+function Frame({ children, bare }: { children: React.ReactNode; bare?: boolean }) {
+  // "bare" drops the full-screen shell so the same activation form can sit
+  // inside the Emergency Access hub as one card among several.
+  if (bare) {
+    return (
+      <div className="rounded-xl border border-slate-700/70 bg-slate-900/80 p-4 text-slate-100">
+        {children}
+      </div>
+    );
+  }
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#0f172a] p-6 text-slate-100">
       <div className="w-full max-w-lg rounded-2xl border border-slate-700/70 bg-slate-900/80 p-6 shadow-[0_0_60px_-15px_rgba(56,189,248,0.45)]">
@@ -48,7 +57,14 @@ function Frame({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function TerminalActivation({ onActivated }: { onActivated: (c: TerminalConfig) => void }) {
+export function TerminalActivation({
+  onActivated,
+  embedded = false,
+}: {
+  onActivated: (c: TerminalConfig) => void;
+  /** Render as a plain card (Emergency Access hub) instead of a full screen. */
+  embedded?: boolean;
+}) {
   const branding = useBranding();
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
