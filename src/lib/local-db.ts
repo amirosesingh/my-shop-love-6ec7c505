@@ -455,6 +455,23 @@ export type PosBridge = {
     warnings?: string[];
     error?: string;
   }>;
+  /** Deep read-only inventory: nullability, defaults, keys, indexes, triggers. */
+  schemaInventory?: () => Promise<{
+    ok: boolean;
+    connected?: boolean;
+    tables?: Record<
+      string,
+      {
+        columns: Record<string, { type: string | null; nullable: boolean; default: string | null }>;
+        primaryKey: string[];
+        foreignKeys: string[];
+        constraints: string[];
+        indexes: string[];
+        triggers: string[];
+      }
+    >;
+    error?: string;
+  }>;
   /** Repair only the selected tables. Guarded batches — never drops data. */
   applySchemaTables?: (tables: string[]) => Promise<{
     ok: boolean;

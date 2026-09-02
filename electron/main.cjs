@@ -1089,6 +1089,13 @@ function registerIpc() {
       return { ok: false, ...pool.describeSqlError(err) };
     }
   });
+  ipcMain.handle("pos:schema-inventory", async () => {
+    try {
+      return await pool.schemaInventory();
+    } catch (err) {
+      return { ok: false, ...pool.describeSqlError(err) };
+    }
+  });
   ipcMain.handle("pos:apply-schema-tables", async (_e, tables) => {
     try {
       return await pool.applySchemaTables(tables);
