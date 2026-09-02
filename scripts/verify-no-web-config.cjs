@@ -18,17 +18,18 @@ const TEXT_LIKE = new Set([
   ".yml", ".yaml", ".xml", ".ts",
 ]);
 
-/** Literal strings that must never appear inside a device artifact. */
+/**
+ * Literal strings that must never appear inside a device artifact.
+ *
+ * Only VALUES are listed. Env variable NAMES legitimately appear in the bundle
+ * (the config resolver looks them up at runtime on the web deployment), so
+ * matching names would be a false alarm.
+ */
 const FORBIDDEN = [
-  // Build-time env names: their presence means a static read was inlined.
-  "VITE_POS_SUPABASE_URL",
-  "VITE_POS_SUPABASE_ANON_KEY",
-  "VITE_SUPABASE_PUBLISHABLE_KEY",
-  "VITE_SUPABASE_ANON_KEY",
-  "VITE_POS_SERVER_URL",
-  // Any Supabase publishable/anon key material.
+  // Supabase publishable / anon / legacy JWT key material.
   "sb_publishable_",
-  "SUPABASE_SERVICE_ROLE",
+  "sb_secret_",
+  "SUPABASE_SERVICE_ROLE_KEY=",
 ];
 
 /** Actual values from this checkout's web environment, when it has one. */
