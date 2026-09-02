@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from "vitest";
-import { billPrefix, dayStamp, nextBillNumber } from "@/lib/bill-number";
+import { billPrefix, dayStamp, reserveBillNumber } from "@/lib/bill-number";
 
 const store = new Map<string, string>();
 (globalThis as { localStorage?: unknown }).localStorage = {
@@ -12,22 +12,22 @@ const store = new Map<string, string>();
 beforeEach(() => store.clear());
 
 describe("bill numbers", () => {
-  it("uses the configured branch, till and padding", () => {
-    const n = nextBillNumber("B1", [], { branchCode: "B101", terminalNo: "3", padding: 5 });
+  it("uses the configured branch, till and padding", async () => {
+    const n = await reserveBillNumber("B1", [], { branchCode: "B101", terminalNo: "3", padding: 5 });
     expect(n).toMatch(/^B101-[A-Z]{2}03-\d{8}-00001$/);
   });
 
-  it("keeps counting up within the same day", () => {
+  it("keeps counting up within the same day", async () => {
     const cfg = { branchCode: "B1", terminalNo: "01" };
-    const a = nextBillNumber("B1", [], cfg);
-    const b = nextBillNumber("B1", [a], cfg);
+    const a = await reserveBillNumber("B1", [], cfg);
+    const b = await reserveBillNumber("B1", [a], cfg);
     expect(Number(b.split("-").pop())).toBe(Number(a.split("-").pop()) + 1);
   });
 
-  it("seeds from the highest existing number of the day", () => {
+  it("seeds from the highest existing number of the day", async () => {
     const cfg = { branchCode: "B1", terminalNo: "01" };
     const prefix = billPrefix("B1", new Date(), cfg);
-    const next = nextBillNumber("B1", [`${prefix}-0042`], cfg);
+    const next = await reserveBillNumber("B1", [`${prefix}-0042`], cfg);
     expect(next).toBe(`${prefix}-0043`);
   });
 
@@ -49,10 +49,9 @@ describe("bill number reservation failures", () => {
       removeItem: () => {},
       clear: () => {},
     };
-    const { nextBillNumber: next, reserveBillNumber, BillNumberReservationError } = await import(
+    const { reserveBillNumber, BillNumberReservationError } = await import(
       "@/lib/bill-number"
     );
-    expect(() => next("B1", [], { branchCode: "B101" })).toThrow(BillNumberReservationError);
     await expect(reserveBillNumber("B1", [], { branchCode: "B101" })).rejects.toBeInstanceOf(
       BillNumberReservationError,
     );
@@ -64,5 +63,15 @@ describe("bill number reservation failures", () => {
     const a = await reserveBillNumber("B1", [], { branchCode: "B101", padding: 4 });
     const b = await reserveBillNumber("B1", [], { branchCode: "B101", padding: 4 });
     expect(a).not.toEqual(b);
+  });
+
+
+  it("never hands the same number to two concurrent callers", async () => {
+    const { reserveBillNumber } = await import("@/lib/bill-number");
+    const cfg = { branchCode: "B1", terminalNo: "01" };
+    const numbers = await Promise.all(
+      Array.from({ length: 5 }, () => reserveBillNumber("B1", [], cfg)),
+    );
+    expect(new Set(numbers).size).toBe(numbers.length);
   });
 });

@@ -704,6 +704,15 @@ let cycleQueued = false;
 
 async function runCycle() {
   await drainOutbox();
+  // Stock movements the central routine refused are parked, not lost. Retry
+  // the ones that are due on every cycle so a transient refusal heals itself
+  // instead of waiting for someone to press the button in Sync & Backup.
+  try {
+    const { retryAllUnappliedStock } = await import("./stock-recovery");
+    await retryAllUnappliedStock();
+  } catch {
+    /* the parked rows stay visible in Sync & Backup for a manual retry */
+  }
   await pullDelta();
   await pushLocalPending();
   await pullIntoLocal();

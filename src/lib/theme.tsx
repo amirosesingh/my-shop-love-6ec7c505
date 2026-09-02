@@ -51,7 +51,13 @@ const systemDark = () =>
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<ThemeChoice>("system");
-  const [prefersDark, setPrefersDark] = useState(true);
+  // Seed from what the boot script already wrote on <html>, so the first
+  // client render matches the server markup instead of flipping the palette.
+  const [prefersDark, setPrefersDark] = useState(() =>
+    typeof document === "undefined"
+      ? true
+      : document.documentElement.classList.contains("dark"),
+  );
 
   useEffect(() => {
     const stored = readStoredTheme();

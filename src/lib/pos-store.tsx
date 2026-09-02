@@ -78,6 +78,7 @@ import {
   type LineQty,
   type RpcResult,
 } from "./stock-transfers";
+import { computeTax } from "@/lib/tax";
 import { commitBooking, deleteBookingRow, loadBookings, saveBookingQuietly } from "./bookings-db";
 import { trackTransition } from "./status-history";
 import {
@@ -2723,18 +2724,7 @@ export function cartTotals(
   let taxAmount: number;
   let total: number;
   if (tax) {
-    const rate = tax.enabled ? (tax.rate || 0) / 100 : 0;
-    if (!tax.enabled) {
-      taxAmount = 0;
-      total = net;
-    } else if (tax.mode === "inclusive") {
-      // prices already carry the tax — pull it back out for reporting
-      taxAmount = r2(net - net / (1 + rate));
-      total = net;
-    } else {
-      taxAmount = r2(net * rate);
-      total = r2(net + taxAmount);
-    }
+    ({ tax: taxAmount, total } = computeTax(net, tax));
   } else {
     taxAmount = r2(
       lines.reduce((a, l) => a + (l.price - lineUnitDiscount(l)) * l.qty * l.taxRate * ratio, 0),
