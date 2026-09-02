@@ -230,3 +230,24 @@ but two surfaces to keep in step.
   `pin_length` is no longer published.
 
 Covered by `src/lib/__tests__/tenant-neutral.security.test.ts`.
+
+## Fixed in 1.3.87
+
+- **C3** — checkout now checks `db.saleAttemptExists` before claiming nothing
+  was stored, so a committed sale is never reported as a failed payment.
+- **H2** — `/api/public/health-metadata` requires a staff account; bare
+  terminal or cashier identity gets 403.
+- **H3** — one canonical service-key name (`POS_SUPABASE_SERVICE_ROLE_KEY`);
+  the retired names now fail loudly instead of being silently accepted.
+- **H4** — `<html suppressHydrationWarning>` plus a client theme seed read from
+  the class the boot script wrote: no hydration mismatch.
+- **H5** — Sync & Backup reads `isCloudConnected()` instead of `navigator.onLine`.
+- **H6 / L1** — `reserveBillNumber` is serialised behind a mutex and the unsafe
+  `nextBillNumber` export is gone.
+- **H7 / H8** — `LoginScreen`, `SecurityAlertBell` and `ManagerOverrideDialog`
+  deleted, along with the unused `signUp` plumbing in `pos-auth`.
+- **M5** — "saved on this terminal" only for genuine connection errors.
+- **M6** — one `computeTax()` (`src/lib/tax.ts`) used by the cart, booking
+  intake and the receipt preview.
+- **M8** — `sync-alias.test.ts` asserts both sync routes share one handler.
+- **M9** — refused stock deltas are retried automatically on every sync cycle.
