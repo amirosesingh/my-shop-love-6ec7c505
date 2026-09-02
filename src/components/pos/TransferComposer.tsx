@@ -210,13 +210,18 @@ export function TransferComposer({
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
         <div className="space-y-6">
-          <Panel title="Add products" description="Search by name, barcode or SKU.">
+          <Panel title="Add products" description="Scan a barcode, or search by name / SKU.">
             <ProductPicker
               products={state.products}
               storeId={sourceStoreId || currentStore.id}
               storeCode={stores.find((s) => s.id === sourceStoreId)?.code}
-              onPick={(p) => addItem(p.id)}
+              destinationStoreId={kind === "transfer" ? otherStoreId : currentStore.id}
+              destinationStoreCode={
+                kind === "transfer" ? otherStore?.code : currentStore.code
+              }
+              onPick={(p, qty) => addItem(p.id, qty)}
             />
+
             <div className="flex flex-wrap items-center gap-2 pt-3">
               <Button asChild variant="outline" size="sm">
                 <label className="cursor-pointer">
