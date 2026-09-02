@@ -22,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { isTerminalApp } from "@/lib/native";
 import { cloudKeyStatus, subscribeCloudKeys } from "@/lib/secure-cloud-config";
+import { isCloudConnected } from "@/lib/registration-status";
 
 export function CloudSetupGate() {
   const navigate = useNavigate();
@@ -33,7 +34,9 @@ export function CloudSetupGate() {
     const check = async () => {
       try {
         const status = await cloudKeyStatus();
-        if (!status.configured) setOpen(true);
+        // Prompting for cloud keys with no connection is misleading: the
+        // device cannot verify them anyway, and it trades locally regardless.
+        if (!status.configured && isCloudConnected()) setOpen(true);
       } catch {
         /* a storage hiccup must never block the till from opening */
       }
@@ -41,7 +44,9 @@ export function CloudSetupGate() {
     void check();
 
     // The desktop shell announces the missing keys as soon as the window shows.
-    const offShell = window.pos?.onCloudSetupRequired?.(() => setOpen(true));
+    const offShell = window.pos?.onCloudSetupRequired?.(() => {
+      if (isCloudConnected()) setOpen(true);
+    });
     // Saving keys anywhere in the app closes the prompt immediately.
     const offKeys = subscribeCloudKeys(() => {
       void cloudKeyStatus()

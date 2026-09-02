@@ -15,6 +15,8 @@ import { Link, useLocation } from "@tanstack/react-router";
 import { TerminalLogin } from "@/components/pos/TerminalLogin";
 import { TerminalActivation, TerminalRevokedScreen } from "@/components/pos/TerminalActivation";
 import { clearRevocation, useRevocationCheck } from "@/lib/use-revocation-check";
+import { useStartupGate } from "@/lib/registration-status";
+import { ConnectDatabaseScreen } from "@/components/pos/ConnectDatabaseScreen";
 import { useAutoLock } from "@/lib/auto-lock";
 import { SidebarNav, useSidebarCollapsed } from "@/components/pos/SidebarNav";
 import {
@@ -149,6 +151,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const branding = useBranding();
   // Windows tills must be registered to a location before they can be used.
   const terminal = useRevocationCheck();
+  // Registration and connectivity are read separately: a dead link must never
+  // look like a failed activation.
+  const startup = useStartupGate();
   const location = useLocation();
   const { visibleRoute } = useVisibility();
 
@@ -266,7 +271,25 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Desktop tills and Android terminals both have to register before use.
   if (isDesktop() || isNative()) {
     if (terminal.revoked) return <TerminalRevokedScreen onReactivate={clearRevocation} />;
-    if (!terminal.config) return <TerminalActivation onActivated={() => clearRevocation()} />;
+    if (!terminal.config) {
+      // Step 1 — no usable database connection yet: ask for the URL and key.
+      if (startup.cloudConfigured === false || !startup.cloudConnected)
+        return (
+          <ConnectDatabaseScreen
+            cloudConfigured={Boolean(startup.cloudConfigured)}
+            onRetry={startup.refresh}
+          />
+        );
+      // Step 2 — connection is fine, the terminal itself is not registered.
+      return (
+        <TerminalActivation
+          onActivated={() => {
+            clearRevocation();
+            startup.refresh();
+          }}
+        />
+      );
+    }
   }
   if (!user)
     return (
