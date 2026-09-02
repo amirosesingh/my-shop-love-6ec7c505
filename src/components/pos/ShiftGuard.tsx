@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { shiftDuration } from "@/lib/shift-hours";
-import { parsePositiveAmount } from "@/lib/amount";
+import { parsePositiveAmount } from "@/core/pricing/amount";
 import { permissionMessage } from "@/components/pos/PermissionGate";
 import { notifyError } from "@/lib/notify";
 import { commitLabel } from "@/lib/pos-db";

@@ -6,7 +6,7 @@
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { getTerminalAccount } from "./terminal-account.functions";
 import { getDeviceSecret, setDeviceSecret } from "./device-secrets";
-import { readTerminalConfig } from "./terminal-tokens";
+import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 
 type Account = { email: string; password: string };
 

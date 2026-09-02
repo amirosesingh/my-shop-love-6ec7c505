@@ -11,7 +11,7 @@ import {
   connectivity,
   subscribeConnectivity,
   type Connectivity,
-} from "./connection-health";
+} from "@/core/activation/connection-health";
 import { hasLocalDb, localDb, type LocalSyncStatus } from "./local-db";
 import { subscribeSyncState, syncState } from "./sync-status";
 import { conflictCount, isOnlineSyncEnabled, pendingCount, subscribeOutbox } from "./sync-outbox";

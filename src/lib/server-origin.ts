@@ -11,7 +11,7 @@
  * is configured per device (`backend-config.ts`, Recovery settings) or baked
  * in with `VITE_POS_SERVER_URL`. Web keeps using relative URLs.
  */
-import { isElectron, isNative } from "./native";
+import { isElectron, isNative } from "@/platforms/mobile/native";
 
 function configured(): string {
   const fromBuild = (import.meta.env["VITE_POS_SERVER_URL"] as string | undefined) ?? "";

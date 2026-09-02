@@ -18,7 +18,7 @@ vi.mock("@/lib/local-db", () => ({
   localDb: () => (bridge.present ? { status: async () => ({ connected: bridge.connected }) } : null),
 }));
 
-import { checkHealth, resetHealthCache } from "@/lib/connection-health";
+import { checkHealth, resetHealthCache } from "@/core/activation/connection-health";
 import { connectivityWarningAllowed, isConnectivityMessage } from "@/lib/notification-guard";
 
 describe("connection health", () => {

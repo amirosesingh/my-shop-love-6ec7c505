@@ -51,7 +51,7 @@ import type { CloudSlice, CommitTarget } from "./pos-db";
 import { clearSnapshot, readSnapshot, writeSnapshot } from "./offline-snapshot";
 import { isOnlineOnly } from "./live-mode";
 import { useAuth } from "@/lib/pos-auth";
-import { readTerminalConfig } from "./terminal-tokens";
+import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 import { reserveBillNumber } from "./bill-number";
 import { loadCashierToken, loadSessionToken } from "./pos-credentials";
 import {
@@ -78,7 +78,7 @@ import {
   type LineQty,
   type RpcResult,
 } from "./stock-transfers";
-import { computeTax } from "@/lib/tax";
+import { computeTax } from "@/core/pricing/tax";
 import { commitBooking, deleteBookingRow, loadBookings, saveBookingQuietly } from "./bookings-db";
 import { trackTransition } from "./status-history";
 import {

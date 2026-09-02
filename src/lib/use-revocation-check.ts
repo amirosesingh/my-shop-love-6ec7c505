@@ -19,8 +19,8 @@ import {
   stampHeartbeat,
   subscribeTerminalConfig,
   type TerminalConfig,
-} from "./terminal-tokens";
-import { clearActivationRecord, writeActivationRecord } from "./activation-record";
+} from "@/core/activation/terminal-tokens";
+import { clearActivationRecord, writeActivationRecord } from "@/core/activation/activation-record";
 
 const CHECK_MS = 5 * 60 * 1000;
 const BLOCK_KEY = "pos.terminal.revoked";

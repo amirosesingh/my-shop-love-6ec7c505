@@ -9,7 +9,7 @@ import {
   dismissAndroidUpdate,
   isAndroidUpdateDismissed,
   useAndroidUpdates,
-} from "../../lib/android-updates";
+} from "@/platforms/mobile/android-updates";
 
 export function AndroidUpdateBanner() {
   const { state, available, install, installDownloaded } = useAndroidUpdates();

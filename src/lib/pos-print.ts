@@ -22,7 +22,7 @@ import {
   TRANSFER_STATUS_LABELS,
 } from "./pos-types";
 import { defaultReceiptSettings } from "./pos-seed";
-import { roundingOf, showsRoundingLine } from "./rounding";
+import { roundingOf, showsRoundingLine } from "@/core/pricing/rounding";
 import qrcode from "qrcode-generator";
 import { toast } from "sonner";
 import {

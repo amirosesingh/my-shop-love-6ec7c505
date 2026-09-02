@@ -10,7 +10,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { isTicketDirty, useWindowControls } from "@/lib/desktop-window";
+import { isTicketDirty, useWindowControls } from "@/platforms/windows/desktop-window";
 
 const btn =
   "app-no-drag inline-flex h-[34px] w-11 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground";

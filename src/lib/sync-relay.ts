@@ -8,7 +8,7 @@
  */
 import { authHeaders, cashierTokenSync, readCredentials } from "./pos-credentials";
 import { serverUrl } from "./server-origin";
-import { readTerminalConfig } from "./terminal-tokens";
+import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 import type { SyncOp } from "./sync-outbox";
 
 const credentials = readCredentials;

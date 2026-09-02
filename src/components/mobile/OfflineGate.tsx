@@ -19,7 +19,7 @@ import {
   startConnectivityMonitor,
   subscribeConnectivity,
   type Connectivity,
-} from "../../lib/connection-health";
+} from "@/core/activation/connection-health";
 import { syncConfig } from "../../lib/sync-config";
 
 export function OfflineGate({ children }: { children: ReactNode }) {

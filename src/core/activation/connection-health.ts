@@ -10,7 +10,7 @@
  */
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { localDb } from "./local-db";
-import { hydrateTerminalConfig } from "./terminal-tokens";
+import { hydrateTerminalConfig } from "@/core/activation/terminal-tokens";
 
 export type HealthReport = {
   /** Central database answered in time. */

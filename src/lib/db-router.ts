@@ -16,7 +16,7 @@
  */
 import { commitOps, commitLabel, type CommitTarget } from "./pos-db";
 import { AllTargetsFailed, isCloudDirect, isConnectionError } from "./db-mode";
-import { checkHealth } from "./connection-health";
+import { checkHealth } from "@/core/activation/connection-health";
 import {
   routedQuery,
   routedQueryWithSource,

@@ -17,7 +17,7 @@ import {
   subscribeConnectivity,
   type Connectivity,
   type HealthReport,
-} from "@/lib/connection-health";
+} from "@/core/activation/connection-health";
 import { syncConfig } from "@/lib/sync-config";
 import { subscribeSyncState, syncState } from "@/lib/sync-status";
 import { CloudStateIcon } from "@/components/pos/status/SystemStatus";

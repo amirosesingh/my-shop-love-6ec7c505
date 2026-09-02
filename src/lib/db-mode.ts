@@ -10,7 +10,7 @@
  * the till returns to online working the moment the internet is back.
  */
 import { isOnlineOnly } from "./live-mode";
-import { isElectron } from "./native";
+import { isElectron } from "@/platforms/mobile/native";
 
 export type DatabaseMode = "online" | "local";
 

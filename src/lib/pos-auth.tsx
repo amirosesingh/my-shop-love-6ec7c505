@@ -882,7 +882,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let alive = true;
     const read = async () => {
-      const { hydrateTerminalConfig, readTerminalConfig } = await import("@/lib/terminal-tokens");
+      const { hydrateTerminalConfig, readTerminalConfig } = await import("@/core/activation/terminal-tokens");
       const config = readTerminalConfig() ?? (await hydrateTerminalConfig());
       if (!alive) return;
       // Persist the terminal's branch so every sign-in on this device inherits

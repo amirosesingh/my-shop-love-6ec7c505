@@ -10,7 +10,7 @@
  * while the terminal actually knows one.
  */
 import { readBranch } from "./local-db";
-import { readTerminalConfig } from "./terminal-tokens";
+import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 
 const clean = (v: string | null | undefined) => (v ?? "").trim() || null;
 

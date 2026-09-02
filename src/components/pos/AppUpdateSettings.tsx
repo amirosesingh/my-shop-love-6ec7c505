@@ -3,9 +3,9 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { APP_VERSION, useAppUpdates } from "@/lib/app-updates";
-import { useAndroidUpdates } from "@/lib/android-updates";
-import { isAndroid, isNative } from "@/lib/native";
-import { checkWebBundle } from "@/lib/web-bundle-updates";
+import { useAndroidUpdates } from "@/platforms/mobile/android-updates";
+import { isAndroid, isNative } from "@/platforms/mobile/native";
+import { checkWebBundle } from "@/platforms/mobile/web-bundle-updates";
 import { MANIFEST_URL } from "@/lib/update-manifest";
 
 /* ── One UI style tiles ──────────────────────────────────────────────── */

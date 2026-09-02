@@ -18,7 +18,7 @@ import {
   isEncryptedV1,
 } from "./terminal-crypto";
 import { clearDeviceSecret, getDeviceSecret, setDeviceSecret } from "./device-secrets";
-import { recordActivationAttempt } from "./terminal-activation-log";
+import { recordActivationAttempt } from "@/core/activation/terminal-activation-log";
 
 import {
   clearTerminalSupabaseOverride,
@@ -113,7 +113,7 @@ function applyTenantOverride(config: TerminalConfig | null): void {
   resetExternalClient();
   // A probe made for the previous tenant must never make the newly activated
   // tenant look offline for the cache window.
-  void import("./connection-health").then(({ resetHealthCache }) => resetHealthCache());
+  void import("@/core/activation/connection-health").then(({ resetHealthCache }) => resetHealthCache());
 }
 
 export type TokenLocation = {

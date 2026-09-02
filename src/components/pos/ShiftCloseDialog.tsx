@@ -26,9 +26,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { money, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
-import { parseAmount, parsePositiveAmount } from "@/lib/amount";
+import { parseAmount, parsePositiveAmount } from "@/core/pricing/amount";
 import { openCashDrawer, printShiftReport } from "@/lib/pos-print";
-import { readTerminalConfig } from "@/lib/terminal-tokens";
+import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 import { localTerminalId } from "@/lib/shift-hours";
 import {
   approveVariance,

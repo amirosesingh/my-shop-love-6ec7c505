@@ -6,7 +6,7 @@
  * Electron writes through the existing device-settings IPC (so the layout
  * survives a browser cache wipe) and mirrors to localStorage for instant paint.
  */
-import { isElectron } from "./native";
+import { isElectron } from "@/platforms/mobile/native";
 import { readLocalSetting, writeLocalSetting } from "./local-db";
 
 export type PlatformTarget = "web" | "electron";

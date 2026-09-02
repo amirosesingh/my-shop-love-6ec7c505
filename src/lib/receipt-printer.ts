@@ -6,7 +6,7 @@
  * neither exists, so callers fall back to the classic hidden-iframe print.
  */
 
-import { isNative } from "./native";
+import { isNative } from "@/platforms/mobile/native";
 import type { SlipEncoding, SlipLineEnding } from "./escpos";
 
 const PRINTER_KEY = "pos-receipt-printer-v1";

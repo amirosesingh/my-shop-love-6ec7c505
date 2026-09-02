@@ -24,7 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { money, usePos } from "@/lib/pos-store";
-import { readTerminalConfig } from "@/lib/terminal-tokens";
+import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 import { isShiftOverdue, localTerminalId, shiftDuration } from "@/lib/shift-hours";
 import { useAuth } from "@/lib/pos-auth";
 import { useUserPermissions } from "@/lib/pos-permissions";
@@ -34,7 +34,7 @@ import { localShiftSessions, mergeSessions } from "@/lib/shift-sessions";
 import { commitLabel, loadShiftSessions } from "@/lib/pos-db";
 import { notifyError } from "@/lib/notify";
 import type { ShiftSession } from "@/lib/pos-types";
-import { parseAmount, parsePositiveAmount } from "@/lib/amount";
+import { parseAmount, parsePositiveAmount } from "@/core/pricing/amount";
 import { getPosCallerAuth } from "@/lib/pos-caller-auth";
 import { assertShiftClosable } from "@/lib/pos-rules.functions";
 import { usePosRules } from "@/lib/pos-rules.tsx";

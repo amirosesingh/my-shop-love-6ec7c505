@@ -11,7 +11,7 @@
  * access.
  */
 import { clearDeviceSecret, deviceHmac, getDeviceSecret, setDeviceSecret } from "./device-secrets";
-import { readTerminalConfig } from "./terminal-tokens";
+import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 
 const RECORD = "activation.record.v1";
 const GRACE_KEY = "pos.activation.graceDays";

@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { CloudConnectionPanel } from "@/components/pos/settings/panels/CloudConnectionPanel";
 import { LocalDatabaseSettings } from "@/components/pos/LocalDatabaseSettings";
 import { ConnectionCheck } from "@/components/pos/ConnectionCheck";
-import { heartbeat } from "@/lib/connection-health";
+import { heartbeat } from "@/core/activation/connection-health";
 import { isOnlineOnly } from "@/lib/live-mode";
 import { useSystemStatus } from "@/lib/system-status";
 import {

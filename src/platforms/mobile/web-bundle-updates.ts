@@ -11,8 +11,8 @@
  * the app is not inside Capacitor.
  */
 import { APP_VERSION } from "./app-updates";
-import { isNative } from "./native";
-import { firstReachableUrl, httpGetBase64, httpGetJson } from "./native-http";
+import { isNative } from "@/platforms/mobile/native";
+import { firstReachableUrl, httpGetBase64, httpGetJson } from "@/platforms/mobile/native-http";
 import { fetchManifest, withTimeout } from "./update-manifest";
 
 const BASE = "https://updatecms.luckycharmsdnbhd.com/pos-app";

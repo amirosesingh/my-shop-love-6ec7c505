@@ -14,7 +14,7 @@ import { databaseModeLabel, effectiveDatabaseMode, isFailingOver } from "./db-mo
 import { hasLocalSqlEngine } from "./local-db";
 import { isOnlineOnly } from "./live-mode";
 import { conflictCount, isOnline, lastSyncedAt, pendingCount } from "./sync-outbox";
-import { readTerminalConfig } from "./terminal-tokens";
+import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 import { APP_VERSION } from "@/version";
 
 export type TelemetryRow = {

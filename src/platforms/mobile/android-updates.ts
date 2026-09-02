@@ -8,13 +8,13 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { APP_VERSION } from "./app-updates";
-import { isNative, isAndroid } from "./native";
+import { isNative, isAndroid } from "@/platforms/mobile/native";
 import {
   describeNetworkError,
   firstReachableUrl,
   httpGetBase64,
   httpGetJson,
-} from "./native-http";
+} from "@/platforms/mobile/native-http";
 import { compareVersions, fetchManifest, resolvePlatformTarget, withTimeout } from "./update-manifest";
 
 const BASE = "https://updatecms.luckycharmsdnbhd.com/pos-app";

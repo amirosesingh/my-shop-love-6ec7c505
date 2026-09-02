@@ -878,7 +878,7 @@ export async function importSampleData() {
 
 /** Load every cloud-backed slice of the POS state. */
 export async function loadCloudState(): Promise<CloudSlice> {
-  const { hydrateTerminalConfig } = await import("./terminal-tokens");
+  const { hydrateTerminalConfig } = await import("@/core/activation/terminal-tokens");
   await hydrateTerminalConfig();
   const tiers = await supabase.from("membership_tiers").select("id, name").is("deleted_at", null);
   if (tiers.error) return loadLocalState(tiers.error);
@@ -1496,7 +1496,7 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
   if (!ops.length) return noteCommitTarget("cloud");
   // A packaged or browser till may carry an encrypted tenant override. Never
   // let an early write resolve the client against the build-time tenant first.
-  const { hydrateTerminalConfig } = await import("./terminal-tokens");
+  const { hydrateTerminalConfig } = await import("@/core/activation/terminal-tokens");
   await hydrateTerminalConfig();
 
   // Stock never travels centrally as an absolute figure: the movement rows go

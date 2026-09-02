@@ -151,7 +151,7 @@ export async function listTerminalStaff(storeId: string | null): Promise<Termina
     // data, so the endpoint only answers a registered terminal.
     const { serverOrigin, posFetch } = await import("./server-origin");
     if (serverOrigin()) {
-      const { readTerminalConfig } = await import("./terminal-tokens");
+      const { readTerminalConfig } = await import("@/core/activation/terminal-tokens");
       const terminalToken = readTerminalConfig()?.tokenId ?? "";
       const res = await posFetch("/api/public/terminal-staff", {
         method: "POST",

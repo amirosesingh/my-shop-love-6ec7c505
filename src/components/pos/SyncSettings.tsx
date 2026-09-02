@@ -25,8 +25,8 @@ import {
 } from "@/lib/sync-outbox";
 import type { QueueView } from "@/lib/sync-outbox";
 import { isOnlineOnly } from "@/lib/live-mode";
-import { isCloudConnected } from "@/lib/registration-status";
-import { subscribeConnectivity } from "@/lib/connection-health";
+import { isCloudConnected } from "@/core/activation/registration-status";
+import { subscribeConnectivity } from "@/core/activation/connection-health";
 
 /** Offline-first controls: sync toggle, outbox inspector and SQL backup. */
 export function SyncSettings() {

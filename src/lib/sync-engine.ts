@@ -80,7 +80,7 @@ import {
   startConnectivityMonitor,
   subscribeConnectivity,
   type Connectivity,
-} from "./connection-health";
+} from "@/core/activation/connection-health";
 import { subscribeSyncConfig, syncConfig } from "./sync-config";
 import { noteVersions } from "./row-versions";
 import { recordConflict } from "./sync-conflicts";

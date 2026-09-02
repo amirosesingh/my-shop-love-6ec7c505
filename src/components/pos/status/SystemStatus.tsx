@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { useSystemStatus, type StatusTone } from "@/lib/system-status";
-import { heartbeat } from "@/lib/connection-health";
+import { heartbeat } from "@/core/activation/connection-health";
 import { drainOutbox } from "@/lib/sync-engine";
 
 const TONE_TEXT: Record<StatusTone, string> = {

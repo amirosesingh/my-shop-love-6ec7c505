@@ -24,13 +24,13 @@ import { CloudConnectionPanel } from "@/components/pos/settings/panels/CloudConn
 import { LocalDatabaseSettings } from "@/components/pos/LocalDatabaseSettings";
 import { ReceiptPrinterSettings } from "@/components/pos/ReceiptPrinterSettings";
 import { TerminalActivation } from "@/components/pos/TerminalActivation";
-import { isElectron, isTerminalApp } from "@/lib/native";
-import { readTerminalConfig } from "@/lib/terminal-tokens";
+import { isElectron, isTerminalApp } from "@/platforms/mobile/native";
+import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 import { backendUrl } from "@/lib/backend-config";
 import { cloudKeyStatus, subscribeCloudKeys } from "@/lib/secure-cloud-config";
 import { boundBranchName } from "@/lib/active-branch";
-import { emergencyMode, useStartupGate } from "@/lib/registration-status";
-import { graceDays, setGraceDays } from "@/lib/activation-record";
+import { emergencyMode, useStartupGate } from "@/core/activation/registration-status";
+import { graceDays, setGraceDays } from "@/core/activation/activation-record";
 
 type Health = "ok" | "todo" | "info";
 

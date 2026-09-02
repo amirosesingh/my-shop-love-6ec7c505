@@ -15,7 +15,7 @@ import { Link, useLocation } from "@tanstack/react-router";
 import { TerminalLogin } from "@/components/pos/TerminalLogin";
 import { TerminalActivation, TerminalRevokedScreen } from "@/components/pos/TerminalActivation";
 import { clearRevocation, useRevocationCheck } from "@/lib/use-revocation-check";
-import { useStartupGate } from "@/lib/registration-status";
+import { useStartupGate } from "@/core/activation/registration-status";
 import { ConnectDatabaseScreen } from "@/components/pos/ConnectDatabaseScreen";
 import { useAutoLock } from "@/lib/auto-lock";
 import { SidebarNav, useSidebarCollapsed } from "@/components/pos/SidebarNav";
@@ -55,7 +55,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useUiScale } from "@/lib/use-ui-scale";
 import { useBranding, isDesktop } from "@/lib/branding";
-import { isNative } from "@/lib/native";
+import { isNative } from "@/platforms/mobile/native";
 import { setBranchId } from "@/lib/activity-journal";
 import { soleBranchId } from "@/lib/active-branch";
 import { flushWhatsAppQueue } from "@/lib/whatsapp";

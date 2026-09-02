@@ -12,7 +12,7 @@
  * After any change the in-memory tenant override is refreshed so the next
  * cloud call picks the new credentials up without an app restart.
  */
-import { isElectron, isNative, isTerminalApp } from "./native";
+import { isElectron, isNative, isTerminalApp } from "@/platforms/mobile/native";
 import {
   setTerminalSupabaseOverride,
   clearTerminalSupabaseOverride,

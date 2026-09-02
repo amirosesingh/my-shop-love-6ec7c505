@@ -12,7 +12,7 @@
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { effectiveDatabaseMode, isConnectionError } from "./db-mode";
 import { readSnapshot } from "./offline-snapshot";
-import { lastHealth } from "./connection-health";
+import { lastHealth } from "@/core/activation/connection-health";
 import { noteVersions } from "./row-versions";
 import type { Row } from "./sync-outbox";
 
