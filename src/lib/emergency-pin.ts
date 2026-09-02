@@ -16,6 +16,17 @@
 import { isElectron, isNative } from "./native";
 
 const ANDROID_SECRET_KEY = "pos.emergency.secret";
+
+/** The slice of the desktop bridge this module needs. */
+type EmergencyBridge = {
+  verifyEmergencyPin?: (pin: string) => Promise<{ ok: boolean }>;
+  emergencyFingerprint?: () => Promise<{ ok: boolean; fingerprint?: string }>;
+};
+
+const bridge = (): EmergencyBridge | null =>
+  typeof window === "undefined"
+    ? null
+    : ((window as unknown as { pos?: EmergencyBridge }).pos ?? null);
 /** Minutes of clock drift accepted either side of the current minute. */
 export const PIN_DRIFT_MINUTES = 3;
 
