@@ -85,15 +85,17 @@ export function OfflineGate({ children }: { children: ReactNode }) {
           <RefreshCw className={`h-4 w-4 ${checking ? "animate-spin" : ""}`} aria-hidden />
           {checking ? "Checking…" : "Try again"}
         </button>
-        {/* The way back in when the address itself is what is wrong. This
-            screen never calls the backend it is repairing. */}
-        <a
-          href="/recovery"
+        {/* The way back in when the address itself is what is wrong. Router
+            navigation, never a page load: a hard load would restart the shell
+            and put this gate straight back in front of the repair screen. */}
+        <Link
+          to="/recovery"
           className="inline-flex items-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground"
         >
           <LifeBuoy className="h-4 w-4" aria-hidden />
           Emergency access
-        </a>
+        </Link>
+
       </div>
     </div>
   );
