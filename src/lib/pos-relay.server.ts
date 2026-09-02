@@ -119,6 +119,8 @@ export async function runRelayRead(read: RelayRead): Promise<{
   row?: Record<string, unknown> | null;
   rows?: Record<string, unknown>[];
   error?: string;
+  inventoryMode?: "deep" | "legacy";
+  inventoryWarning?: string;
 }> {
   if (read.kind === "cloudSchema") {
     // The PostgREST root document lists every exposed table with its columns
@@ -159,9 +161,35 @@ export async function runRelayRead(read: RelayRead): Promise<{
       method: "POST",
       body: "{}",
     });
-    if (!res.ok) return { ok: false, error: `HTTP ${res.status}: ${(await res.text()).slice(0, 300)}` };
+    if (!res.ok) {
+      const text = (await res.text()).slice(0, 400);
+      const deepError = `HTTP ${res.status}: ${text}`;
+      const helperMissing =
+        res.status === 404 && (text.includes("PGRST202") || text.includes("schema_inventory_deep"));
+      if (!helperMissing) return { ok: false, error: deepError };
+
+      const legacy = await serviceRest("rpc/schema_inventory", {
+        method: "POST",
+        body: "{}",
+      });
+      if (!legacy.ok) {
+        return {
+          ok: false,
+          error: `${deepError}; compatibility helper failed with HTTP ${legacy.status}: ${(
+            await legacy.text()
+          ).slice(0, 240)}`,
+        };
+      }
+      const payload = (await legacy.json()) as Record<string, unknown> | null;
+      return {
+        ok: true,
+        row: payload ?? {},
+        inventoryMode: "legacy",
+        inventoryWarning: deepError,
+      };
+    }
     const payload = (await res.json()) as Record<string, unknown> | null;
-    return { ok: true, row: payload ?? {} };
+    return { ok: true, row: payload ?? {}, inventoryMode: "deep" };
   }
 
   if (read.kind === "cloudProbe") {
