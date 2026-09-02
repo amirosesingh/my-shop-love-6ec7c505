@@ -462,6 +462,9 @@ export async function listTerminalStaff(storeId: string | null) {
     fullName: String(r["full_name"] ?? r["user_id"] ?? ""),
     roleSlug: String(r["role_slug"] ?? "cashier"),
     storeId: (r["store_id"] as string | null) ?? null,
-    pinLength: Number(r["pin_length"] ?? 6) || 6,
+    // PIN length is deliberately not published: it is the search space for a
+    // guessing run. The keypad accepts up to its own maximum instead.
+    pinLength: 0,
   }));
 }
+
