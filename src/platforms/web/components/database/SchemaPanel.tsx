@@ -44,7 +44,7 @@ import {
   probeCentralTables,
   type CentralProbeRow,
 } from "@/lib/central-schema.functions";
-import centralPushColumns from "../../../../electron/db/cloud-columns.json";
+import centralPushColumns from "../../../../../electron/db/cloud-columns.json";
 import { CENTRAL_SCHEMA, CENTRAL_SCHEMA_VERSION } from "@/lib/central-schema";
 import {
   actualFromRows,
