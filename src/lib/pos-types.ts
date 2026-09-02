@@ -459,6 +459,13 @@ export type Transfer = {
   dispatchedAt?: string;
   receivedBy?: string;
   receivedAt?: string;
+  /** who physically counted the delivery, and when */
+  verifiedBy?: string;
+  verifiedAt?: string;
+  /** the moment the verified quantities went onto the destination shelf */
+  postedAt?: string;
+  /** required when the count came up short */
+  discrepancyReason?: string;
   /** why it was turned down or called off — required for both */
   rejectedReason?: string;
   cancelledReason?: string;
