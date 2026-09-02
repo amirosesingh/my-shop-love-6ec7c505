@@ -1,4 +1,6 @@
 /**
+ * @vitest-environment jsdom
+ *
  * Registration must be decidable offline, must expire, must reject tampering,
  * and must stay entirely out of the local trading path.
  */
