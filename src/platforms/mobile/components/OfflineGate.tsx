@@ -11,8 +11,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import { CloudOff, LifeBuoy, RefreshCw } from "lucide-react";
 import { Link, useRouterState } from "@tanstack/react-router";
 
-import { isOnlineOnly } from "../../lib/live-mode";
-import { isRecoveryPath, onRecoveryScreen } from "../../lib/recovery-route";
+import { isOnlineOnly } from "@/lib/live-mode";
+import { isRecoveryPath, onRecoveryScreen } from "@/lib/recovery-route";
 import {
   connectivity,
   heartbeat,
@@ -20,7 +20,7 @@ import {
   subscribeConnectivity,
   type Connectivity,
 } from "@/core/activation/connection-health";
-import { syncConfig } from "../../lib/sync-config";
+import { syncConfig } from "@/lib/sync-config";
 
 export function OfflineGate({ children }: { children: ReactNode }) {
   const live = isOnlineOnly();

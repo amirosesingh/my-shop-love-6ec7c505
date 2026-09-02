@@ -9,12 +9,12 @@
 import { useEffect, useState } from "react";
 
 import { isNative } from "@/platform-config/platform";
-import { onRecoveryScreen } from "../../lib/recovery-route";
+import { onRecoveryScreen } from "@/lib/recovery-route";
 import { hydrateNativeStorage } from "@/platforms/mobile/mobile-storage";
-import { hydrateBackendUrl } from "../../lib/backend-config";
+import { hydrateBackendUrl } from "@/lib/backend-config";
 import { hydrateTerminalConfig } from "@/core/activation/terminal-tokens";
 import { applyPendingWebBundle, startWebBundleChecks } from "@/platforms/mobile/web-bundle-updates";
-import { TillLoader } from "./TillLoader";
+import { TillLoader } from "@/platforms/web/components/pos/TillLoader";
 
 export function NativeBoot({ children }: { children: React.ReactNode }) {
   // Emergency access must open even when start-up work would stall on a dead
