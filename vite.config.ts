@@ -93,6 +93,15 @@ export default defineConfig({
         },
       }
     : {}),
+  ...(isTerminalBuild
+    ? {
+        vite: {
+          // No .env file in this repository is visible to a device build.
+          envDir: "scripts/no-env",
+          define: blankWebEnv,
+        },
+      }
+    : {}),
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
