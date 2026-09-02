@@ -3450,6 +3450,7 @@ export type Database = {
           rejected_by: string | null
           rejected_reason: string | null
           row_version: number
+          source_request_id: string | null
           status: string
           to_group_id: string | null
           to_store_id: string
@@ -3483,6 +3484,7 @@ export type Database = {
           rejected_by?: string | null
           rejected_reason?: string | null
           row_version?: number
+          source_request_id?: string | null
           status?: string
           to_group_id?: string | null
           to_store_id: string
@@ -3516,6 +3518,7 @@ export type Database = {
           rejected_by?: string | null
           rejected_reason?: string | null
           row_version?: number
+          source_request_id?: string | null
           status?: string
           to_group_id?: string | null
           to_store_id?: string
@@ -3525,7 +3528,15 @@ export type Database = {
           verified_at?: string | null
           verified_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "stock_transfers_source_request_id_fkey"
+            columns: ["source_request_id"]
+            isOneToOne: false
+            referencedRelation: "stock_transfers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       stores: {
         Row: {

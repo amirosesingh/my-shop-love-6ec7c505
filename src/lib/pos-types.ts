@@ -468,6 +468,8 @@ export type Transfer = {
   /** why it was turned down or called off — required for both */
   rejectedReason?: string;
   cancelledReason?: string;
+  /** the request this transfer was raised to fulfil, when there is one */
+  sourceRequestId?: string;
   /** set at dispatch: the request is closed from that moment */
   closedAt?: string;
   fulfilment?: TransferFulfilment;
