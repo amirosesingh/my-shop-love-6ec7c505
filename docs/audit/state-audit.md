@@ -125,11 +125,17 @@ active faults, and merging trails mid-audit risks losing history.
   and cancelled.
 - A read-only History dialog on each booking shows the timeline.
 
-## 7. What happens next
+## 7. Closing statement — every stage delivered
 
-Stage 3 — stock requests, end to end.
-Stage 4 — tombstones, paging, written conflict rules.
-Stage 5 — per-feature recovery verdicts in Logic Health.
+Stage 3 — stock requests, end to end. **Delivered** as the request-to-receipt
+lifecycle on transfers.
+Stage 4 — tombstones, paging and written conflict rules. **Delivered:** stamped
+deletions travel down and are applied at the till, both pull paths page in
+1000-row batches, and the rules are published in
+[`conflict-rules.md`](./conflict-rules.md).
+Stage 5 — per-feature recovery verdicts in Logic Health. **Delivered:** derived
+verdicts, also written to [`recovery.md`](./recovery.md) — 11 of 11 features
+rebuild completely.
 Stage 6 — the wipe-and-restore test. **Delivered:** a rebuild check and a
 guarded, reversible drill on the till; see
 [`restore-test.md`](./restore-test.md).
@@ -137,6 +143,7 @@ Stage 7 — settings restructure. **Delivered:** groups derived from the card
 catalogue, document numbering given a card, bookings given their own category,
 and a coverage check in Logic health.
 Stage 8 — inventory ledger, security sweep and final report. **Delivered:**
+
 
 - **Inventory movement is now complete.** `item_activity_logs` used to record
   sales only. Goods received now write one movement row per line
