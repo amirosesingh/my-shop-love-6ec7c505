@@ -52,6 +52,20 @@ for (const dir of ["dist-desktop", "release"]) {
 run("node", ["scripts/bump-version.cjs", "--write"]);
 run("vite", ["build"]);
 
+// Electron loads dist-desktop/server/index.mjs. Some toolchain versions ignore
+// the configured output directory and write to dist/, which would package an
+// app with no server entry — normalise it here.
+const desktopOut = path.join(root, "dist-desktop");
+const genericOut = path.join(root, "dist");
+if (!fs.existsSync(desktopOut) && fs.existsSync(genericOut)) {
+  console.log("› moving dist/ into dist-desktop/ for packaging");
+  fs.renameSync(genericOut, desktopOut);
+}
+if (!fs.existsSync(path.join(desktopOut, "server", "index.mjs"))) {
+  console.error("Desktop build produced no dist-desktop/server/index.mjs — aborting.");
+  process.exit(1);
+}
+
 console.log("› checking the desktop bundle carries no web configuration");
 run("node", ["scripts/verify-no-web-config.cjs", "dist-desktop"]);
 
