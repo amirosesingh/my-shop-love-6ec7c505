@@ -11,6 +11,15 @@
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { localDb } from "@/core/local-db/local-db";
 import { hydrateTerminalConfig } from "@/core/activation/terminal-tokens";
+import { hasSupabaseConfig } from "@/lib/external-supabase-config";
+
+/**
+ * Why the central database is or is not usable right now.
+ *
+ * `verified` is the only value that proves the saved URL *and* key answer:
+ * a device that is merely "online" can still be pointing at nothing.
+ */
+export type CloudVerdict = "verified" | "unreachable" | "rejected" | "unconfigured";
 
 export type HealthReport = {
   /** Central database answered in time. */
@@ -51,11 +60,39 @@ function withTimeout(work: Promise<boolean>, ms: number): Promise<boolean> {
   });
 }
 
-async function probeCloud(): Promise<boolean> {
-  if (typeof navigator !== "undefined" && navigator.onLine === false) return false;
+let verdict: CloudVerdict = "unreachable";
+
+/** The last verdict on the central database, without running a new probe. */
+export const cloudVerdict = (): CloudVerdict => verdict;
+
+async function probeCloudVerdict(): Promise<CloudVerdict> {
   await hydrateTerminalConfig();
-  const { error } = await supabaseExternal.from("public_flags").select("key").limit(1);
-  return !error;
+  if (!hasSupabaseConfig()) return "unconfigured";
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return "unreachable";
+  try {
+    const { error } = await supabaseExternal.from("public_flags").select("key").limit(1);
+    if (!error) return "verified";
+    const msg = error.message ?? "";
+    // A rejected key is a configuration fault, not a network fault: saying
+    // "offline" here is what let a wrong key look like a working connection.
+    if (/invalid api ?key|jwt|unauthorized|not authorized|permission|401|403/i.test(msg))
+      return "rejected";
+    // Key accepted, schema not deployed yet — the connection itself is good.
+    if (/does not exist|relation/i.test(msg)) return "verified";
+    return "unreachable";
+  } catch {
+    return "unreachable";
+  }
+}
+
+async function probeCloud(): Promise<boolean> {
+  verdict = await probeCloudVerdict();
+  return verdict === "verified";
+}
+
+/** A probe that timed out never leaves a stale "verified" behind. */
+function settleVerdict(cloud: boolean) {
+  if (!cloud && verdict === "verified") verdict = "unreachable";
 }
 
 async function probeLocal(): Promise<boolean> {
@@ -84,6 +121,7 @@ export function checkHealth(force = false): Promise<HealthReport> {
       withTimeout(probeCloud(), CLOUD_TIMEOUT),
       withTimeout(probeLocal(), LOCAL_TIMEOUT),
     ]);
+    settleVerdict(cloud);
     const report: HealthReport = { cloud, local, anyOnline: cloud || local, at: Date.now() };
     cached = report;
     inflight = null;
@@ -110,6 +148,7 @@ export function subscribeHealth(listener: Listener) {
 export function resetHealthCache() {
   cached = null;
   inflight = null;
+  verdict = "unreachable";
 }
 
 /* ------------------------------------------------------------------ */
@@ -190,6 +229,7 @@ export async function heartbeat(): Promise<Connectivity> {
   const cloud = resolvedOnce
     ? await withTimeout(probeCloud(), CLOUD_TIMEOUT)
     : await probeDefinitive();
+  settleVerdict(cloud);
   const local = await withTimeout(probeLocal(), LOCAL_TIMEOUT);
   cached = { cloud, local, anyOnline: cloud || local, at: Date.now() };
   for (const l of listeners) l(cached);
