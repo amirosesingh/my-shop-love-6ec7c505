@@ -11,7 +11,12 @@ on:
     branches: [main]
     tags: ["v*"]
     paths:
-      - "src/**"
+      - "src/core/**"
+      - "src/platform-config/**"
+      - "src/platforms/mobile/**"
+      - "src/lib/**"
+      - "src/components/**"
+      - "src/routes/**"
       - "scripts/mobile-build.cjs"
       - "scripts/android-permissions.cjs"
       - "scripts/android-release.cjs"

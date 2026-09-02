@@ -8,7 +8,7 @@
  */
 import { toast } from "sonner";
 import { guardNotification, isConnectivityMessage } from "./notification-guard";
-import { anyDatabaseReachable } from "./connection-health";
+import { anyDatabaseReachable } from "@/core/activation/connection-health";
 
 export type NotifyKind = "success" | "info" | "warning" | "error";
 

@@ -9,8 +9,8 @@
  * Every write path uses this so a record can never be saved without a branch
  * while the terminal actually knows one.
  */
-import { readBranch } from "./local-db";
-import { readTerminalConfig } from "./terminal-tokens";
+import { readBranch } from "@/core/local-db/local-db";
+import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 
 const clean = (v: string | null | undefined) => (v ?? "").trim() || null;
 

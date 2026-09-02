@@ -26,11 +26,11 @@ import {
   encodePairingRequest,
   getPairingRequest,
   type TerminalConfig,
-} from "@/lib/terminal-tokens";
+} from "@/core/activation/terminal-tokens";
 import { clearRevocation } from "@/lib/use-revocation-check";
-import { writeActivationRecord } from "@/lib/activation-record";
-import { isCloudConnected } from "@/lib/registration-status";
-import { subscribeConnectivity } from "@/lib/connection-health";
+import { writeActivationRecord } from "@/core/activation/activation-record";
+import { isCloudConnected } from "@/core/activation/registration-status";
+import { subscribeConnectivity } from "@/core/activation/connection-health";
 import { CameraScanner } from "@/components/pos/CameraScanner";
 import { useBranding } from "@/lib/branding";
 

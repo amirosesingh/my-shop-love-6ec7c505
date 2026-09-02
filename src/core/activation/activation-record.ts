@@ -10,8 +10,8 @@
  * fields, so hand-editing local storage invalidates it rather than granting
  * access.
  */
-import { clearDeviceSecret, deviceHmac, getDeviceSecret, setDeviceSecret } from "./device-secrets";
-import { readTerminalConfig } from "./terminal-tokens";
+import { clearDeviceSecret, deviceHmac, getDeviceSecret, setDeviceSecret } from "@/lib/device-secrets";
+import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 
 const RECORD = "activation.record.v1";
 const GRACE_KEY = "pos.activation.graceDays";

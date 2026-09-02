@@ -125,7 +125,7 @@ export async function readCredentials(): Promise<PosCredentials> {
   }
   let terminalToken: string | undefined;
   try {
-    const { readTerminalConfig } = await import("./terminal-tokens");
+    const { readTerminalConfig } = await import("@/core/activation/terminal-tokens");
     terminalToken = readTerminalConfig()?.tokenId ?? undefined;
   } catch {
     /* no till registered */

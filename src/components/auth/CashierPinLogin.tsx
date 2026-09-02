@@ -72,7 +72,7 @@ export function CashierPinLogin({
       // own database, so a cut-off branch still sees who can sign in.
       if (!rows.length) {
         try {
-          const { localStaffRoster } = await import("@/lib/local-staff");
+          const { localStaffRoster } = await import("@/core/local-db/local-staff");
           rows = (await localStaffRoster(branch)).map((r) => ({
             username: r.username,
             fullName: r.fullName,

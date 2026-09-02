@@ -8,15 +8,15 @@
  */
 import { useEffect, useState } from "react";
 
-import { connectivity, lastHealth, subscribeConnectivity, checkHealth } from "./connection-health";
-import { cloudKeyStatus, subscribeCloudKeys } from "./secure-cloud-config";
+import { connectivity, lastHealth, subscribeConnectivity, checkHealth } from "@/core/activation/connection-health";
+import { cloudKeyStatus, subscribeCloudKeys } from "@/lib/secure-cloud-config";
 import {
   graceValid,
   isRegistered,
   readActivationRecord,
   type ActivationRecord,
   type RegistrationState,
-} from "./activation-record";
+} from "@/core/activation/activation-record";
 
 export type { RegistrationState };
 

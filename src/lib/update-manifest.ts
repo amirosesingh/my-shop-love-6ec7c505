@@ -18,8 +18,8 @@
  * Every read is bounded by a 7 second timeout so an unreachable folder can
  * never leave the UI stuck on "Checking for updates…".
  */
-import { httpGetJson } from "./native-http";
-import { isAndroid, isElectron, isNative } from "./native";
+import { httpGetJson } from "@/platforms/mobile/native-http";
+import { isAndroid, isElectron, isNative } from "@/platform-config/platform";
 
 const ENV_BASE =
   (typeof import.meta !== "undefined" &&

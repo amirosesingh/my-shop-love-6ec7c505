@@ -13,7 +13,7 @@
  * A few minutes of clock drift either side are accepted so a slightly wrong
  * device clock never locks a terminal out of its own recovery screen.
  */
-import { isElectron, isNative } from "./native";
+import { isElectron, isNative } from "@/platform-config/platform";
 
 const ANDROID_SECRET_KEY = "pos.emergency.secret";
 

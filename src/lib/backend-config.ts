@@ -12,7 +12,7 @@
  * and it is applied to `window.__POS_SERVER_URL__`, which `server-origin.ts`
  * reads. The web build ignores all of this and keeps using relative URLs.
  */
-import { isElectron, isTerminalApp } from "./native";
+import { isElectron, isTerminalApp } from "@/platform-config/platform";
 
 const STORAGE_KEY = "pos.backend.url";
 

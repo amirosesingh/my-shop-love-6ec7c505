@@ -6,7 +6,7 @@
  * the Windows till keep their offline-first behaviour untouched — every caller
  * of `isLiveOnly()` falls through to the existing path when it returns false.
  */
-import { isElectron, isNative } from "./native";
+import { isElectron, isNative } from "@/platform-config/platform";
 
 export function isLiveOnly(): boolean {
   return isNative();

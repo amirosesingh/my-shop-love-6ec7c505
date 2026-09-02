@@ -9,8 +9,8 @@
  * driver in the Electron main process); this module only asks the bridge.
  */
 import { supabaseExternal } from "@/integrations/supabase/external-client";
-import { localDb } from "./local-db";
-import { hydrateTerminalConfig } from "./terminal-tokens";
+import { localDb } from "@/core/local-db/local-db";
+import { hydrateTerminalConfig } from "@/core/activation/terminal-tokens";
 
 export type HealthReport = {
   /** Central database answered in time. */

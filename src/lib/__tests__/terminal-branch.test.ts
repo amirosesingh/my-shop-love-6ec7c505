@@ -11,8 +11,8 @@ const store = new Map<string, string>();
   },
 };
 
-vi.mock("../terminal-tokens", () => ({ readTerminalConfig: () => null }));
-vi.mock("../local-db", () => ({ readBranch: () => ({ branchId: null, branchName: null }) }));
+vi.mock("@/core/activation/terminal-tokens", () => ({ readTerminalConfig: () => null }));
+vi.mock("@/core/local-db/local-db", () => ({ readBranch: () => ({ branchId: null, branchName: null }) }));
 
 import { activeBranchId, bindTerminalBranch, setKnownBranches } from "../active-branch";
 import { describeError } from "../notify";

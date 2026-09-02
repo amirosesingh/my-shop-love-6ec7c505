@@ -20,7 +20,7 @@ import type { useBookingIntake } from "@/lib/register/use-booking-intake";
 import { cartTotals, money, usePos } from "@/lib/pos-store";
 import { db } from "@/lib/pos-db";
 
-import { applyRounding, roundingOf } from "@/lib/rounding";
+import { applyRounding, roundingOf } from "@/core/pricing/rounding";
 import { applyCombo, intakeTotals, newJobTag } from "@/lib/booking-charges";
 import { bookingRulesOf, lineUnitDiscount, paymentsLabel, r2, validateTenders } from "@/lib/pos-types";
 import type { Store, CartLine, Payment, PaymentMethod, Sale, Booking, Member } from "@/lib/pos-types";

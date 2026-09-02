@@ -24,10 +24,10 @@ import {
   setGraceDays,
   writeActivationRecord,
   type ActivationRecord,
-} from "../activation-record";
-import { emergencyMode } from "../registration-status";
+} from "@/core/activation/activation-record";
+import { emergencyMode } from "@/core/activation/registration-status";
 
-vi.mock("../terminal-tokens", () => ({ readTerminalConfig: () => null }));
+vi.mock("@/core/activation/terminal-tokens", () => ({ readTerminalConfig: () => null }));
 
 const DAY = 24 * 60 * 60 * 1000;
 

@@ -13,7 +13,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CloudConnectionPanel } from "@/components/pos/settings/panels/CloudConnectionPanel";
 import { BackendAddressPanel } from "@/components/pos/settings/panels/BackendAddressPanel";
-import { checkCloudConnected } from "@/lib/registration-status";
+import { checkCloudConnected } from "@/core/activation/registration-status";
 
 export function ConnectDatabaseScreen({
   cloudConfigured,

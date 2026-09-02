@@ -20,9 +20,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { isTerminalApp } from "@/lib/native";
+import { isTerminalApp } from "@/platform-config/platform";
 import { cloudKeyStatus, subscribeCloudKeys } from "@/lib/secure-cloud-config";
-import { isCloudConnected } from "@/lib/registration-status";
+import { isCloudConnected } from "@/core/activation/registration-status";
 
 export function CloudSetupGate() {
   const navigate = useNavigate();

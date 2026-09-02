@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { DatabaseZap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { unreachableMessage } from "@/lib/db-mode";
+import { unreachableMessage } from "@/core/local-db/db-mode";
 import { CLEAR_EVENT } from "@/lib/notification-guard";
 
 /**

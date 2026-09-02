@@ -8,7 +8,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { localDb } from "@/lib/local-db";
+import { localDb } from "@/core/local-db/local-db";
 import {
   buildCoverage,
   conflictRule,

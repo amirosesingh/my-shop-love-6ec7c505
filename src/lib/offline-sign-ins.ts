@@ -7,7 +7,7 @@
  * is an upsert onto the same row rather than a duplicate.
  */
 import { enqueue } from "./sync-outbox";
-import { readTerminalConfig } from "./terminal-tokens";
+import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 
 /** Stable UUID-shaped id from a stable string. No dependency, no randomness. */
 async function deterministicId(seed: string): Promise<string> {

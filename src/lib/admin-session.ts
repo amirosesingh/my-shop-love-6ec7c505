@@ -6,7 +6,7 @@
  * than a silent failure or a queued write that would never be safe to replay.
  */
 import { supabaseExternal } from "@/integrations/supabase/external-client";
-import { isConnectionError } from "./db-mode";
+import { isConnectionError } from "@/core/local-db/db-mode";
 
 /** Wording used whenever a central-only change cannot be attempted. */
 export const ADMIN_SIGN_IN_MESSAGE = "Sign in with an admin account to change this.";

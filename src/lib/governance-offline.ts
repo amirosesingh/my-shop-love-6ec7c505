@@ -11,7 +11,7 @@
  * the person doing the work, and a till without a local database (web or
  * Android) simply reports that nothing could be parked.
  */
-import { localDb } from "./local-db";
+import { localDb } from "@/core/local-db/local-db";
 import type { SyncOp } from "./sync-outbox";
 
 export type ParkResult = { parked: boolean; reason?: string };

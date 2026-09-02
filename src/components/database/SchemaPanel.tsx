@@ -37,7 +37,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { localDb } from "@/lib/local-db";
+import { localDb } from "@/core/local-db/local-db";
 import { sqlAdmin } from "@/lib/sql-admin";
 import {
   fetchCentralSchema,

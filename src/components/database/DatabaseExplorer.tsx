@@ -24,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { scanLocalInstances } from "@/lib/local-db";
+import { scanLocalInstances } from "@/core/local-db/local-db";
 import {
   checkReadOnly,
   hasSqlAdmin,

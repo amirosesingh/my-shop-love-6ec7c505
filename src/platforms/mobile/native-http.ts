@@ -7,7 +7,7 @@
  * performs the request outside the webview, where CORS does not apply, so
  * every update-feed read and download goes through here.
  */
-import { isElectron, isNative } from "./native";
+import { isElectron, isNative } from "@/platform-config/platform";
 
 /**
  * Warn the operator once per session when the native network bridge cannot

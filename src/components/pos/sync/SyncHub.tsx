@@ -24,7 +24,7 @@ import { Link } from "@tanstack/react-router";
 import { useSystemStatus } from "@/lib/system-status";
 import { usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
-import { databaseModeLabel } from "@/lib/db-mode";
+import { databaseModeLabel } from "@/core/local-db/db-mode";
 import { drainOutbox, runExclusive, syncBusy } from "@/lib/sync-engine";
 import { lastSuccessfulPull, syncState } from "@/lib/sync-status";
 import {
@@ -36,7 +36,7 @@ import {
   type SyncAuditRow,
 } from "@/lib/sync-audit";
 import { discardOp, queueView, retryOp, type QueueView } from "@/lib/sync-outbox";
-import { localDb, type SyncQueueRow } from "@/lib/local-db";
+import { localDb, type SyncQueueRow } from "@/core/local-db/local-db";
 import {
   dismissConflict,
   listConflicts,

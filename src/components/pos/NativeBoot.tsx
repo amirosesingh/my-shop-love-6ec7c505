@@ -8,12 +8,12 @@
  */
 import { useEffect, useState } from "react";
 
-import { isNative } from "../../lib/native";
+import { isNative } from "@/platform-config/platform";
 import { onRecoveryScreen } from "../../lib/recovery-route";
-import { hydrateNativeStorage } from "../../lib/mobile-storage";
+import { hydrateNativeStorage } from "@/platforms/mobile/mobile-storage";
 import { hydrateBackendUrl } from "../../lib/backend-config";
-import { hydrateTerminalConfig } from "../../lib/terminal-tokens";
-import { applyPendingWebBundle, startWebBundleChecks } from "../../lib/web-bundle-updates";
+import { hydrateTerminalConfig } from "@/core/activation/terminal-tokens";
+import { applyPendingWebBundle, startWebBundleChecks } from "@/platforms/mobile/web-bundle-updates";
 import { TillLoader } from "./TillLoader";
 
 export function NativeBoot({ children }: { children: React.ReactNode }) {

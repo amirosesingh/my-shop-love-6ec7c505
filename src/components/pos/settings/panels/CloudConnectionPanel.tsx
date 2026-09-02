@@ -18,7 +18,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { isTerminalApp } from "@/lib/native";
+import { isTerminalApp } from "@/platform-config/platform";
 import {
   cloudKeyStatus,
   removeCloudCredentials,

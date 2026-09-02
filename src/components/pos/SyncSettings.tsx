@@ -3,14 +3,14 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { usePos } from "@/lib/pos-store";
-import { downloadSqlBackup } from "@/lib/backup-sql";
+import { downloadSqlBackup } from "@/core/local-db/backup-sql";
 import { drainOutbox } from "@/lib/sync-engine";
 import { SyncBehaviourSettings } from "@/components/pos/SyncBehaviourSettings";
 import { SyncLogViewer } from "@/components/SyncLogViewer";
 import { logSync } from "@/lib/sync-log";
 import { describeError, showNotification } from "@/lib/notify";
-import { localDb } from "@/lib/local-db";
-import { databaseModeLabel, effectiveDatabaseMode, subscribeDatabaseMode } from "@/lib/db-mode";
+import { localDb } from "@/core/local-db/local-db";
+import { databaseModeLabel, effectiveDatabaseMode, subscribeDatabaseMode } from "@/core/local-db/db-mode";
 import {
   discardQuarantined,
   discardOp,
@@ -25,8 +25,8 @@ import {
 } from "@/lib/sync-outbox";
 import type { QueueView } from "@/lib/sync-outbox";
 import { isOnlineOnly } from "@/lib/live-mode";
-import { isCloudConnected } from "@/lib/registration-status";
-import { subscribeConnectivity } from "@/lib/connection-health";
+import { isCloudConnected } from "@/core/activation/registration-status";
+import { subscribeConnectivity } from "@/core/activation/connection-health";
 
 /** Offline-first controls: sync toggle, outbox inspector and SQL backup. */
 export function SyncSettings() {

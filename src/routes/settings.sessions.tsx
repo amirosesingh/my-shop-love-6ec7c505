@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { adminAccessToken } from "@/lib/admin-session";
 import { listDeviceSessions, revokeDeviceSessions } from "@/lib/user-sessions.functions";
-import { isConnectionError } from "@/lib/db-mode";
+import { isConnectionError } from "@/core/local-db/db-mode";
 
 type Row = {
   id: string;

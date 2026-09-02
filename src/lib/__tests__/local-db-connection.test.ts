@@ -23,7 +23,7 @@ import {
   deriveLocalDbState,
   verifyLocalWrite,
   withIpcTimeout,
-} from "../local-db";
+} from "@/core/local-db/local-db";
 import { createRunGuard } from "../run-token";
 
 const stubShell = (connect: (...a: unknown[]) => Promise<unknown>) => {

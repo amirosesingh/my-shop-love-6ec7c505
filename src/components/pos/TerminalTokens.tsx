@@ -53,9 +53,9 @@ import {
   decodePairingRequest,
   readTerminalConfig,
   type TerminalToken,
-} from "@/lib/terminal-tokens";
+} from "@/core/activation/terminal-tokens";
 import { CameraScanner } from "@/components/pos/CameraScanner";
-import { fetchTokenStatus } from "@/lib/terminal-tokens";
+import { fetchTokenStatus } from "@/core/activation/terminal-tokens";
 import { ACTIVATION_TTL_MS } from "@/lib/terminal-crypto";
 
 const qrDataUrl = (value: string) => {

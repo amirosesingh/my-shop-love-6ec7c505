@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/table";
 import { TablePagination, usePagination } from "@/components/pos/TablePagination";
 import { money, usePos } from "@/lib/pos-store";
-import { lineCost, lineRevenue } from "@/lib/profit";
+import { lineCost, lineRevenue } from "@/core/pricing/profit";
 import { ReportHeader, StatCard, defaultRange, downloadCsv, inRange } from "@/components/pos/report-kit";
 
 export const Route = createFileRoute("/reports/business")({

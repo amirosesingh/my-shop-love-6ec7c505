@@ -2,7 +2,7 @@ import { toast } from "sonner";
 import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
 import { defaultSettings, sampleState } from "./pos-seed";
 import { drainOutbox, runOpLive } from "./sync-engine";
-import { localDb } from "./local-db";
+import { localDb } from "@/core/local-db/local-db";
 import { routedQuery } from "./db-query";
 import { readSnapshot } from "./offline-snapshot";
 import { enqueue, type SyncOp } from "./sync-outbox";
@@ -13,7 +13,7 @@ import {
   noteConnectionLost,
   noteConnectionRestored,
   setCloudDirect,
-} from "./db-mode";
+} from "@/core/local-db/db-mode";
 import { notifyError, showNotification } from "./notify";
 import { logSync } from "./sync-log";
 import { recordDiagnostic, reasonCode } from "./diagnostics";
@@ -878,7 +878,7 @@ export async function importSampleData() {
 
 /** Load every cloud-backed slice of the POS state. */
 export async function loadCloudState(): Promise<CloudSlice> {
-  const { hydrateTerminalConfig } = await import("./terminal-tokens");
+  const { hydrateTerminalConfig } = await import("@/core/activation/terminal-tokens");
   await hydrateTerminalConfig();
   const tiers = await supabase.from("membership_tiers").select("id, name").is("deleted_at", null);
   if (tiers.error) return loadLocalState(tiers.error);
@@ -1496,7 +1496,7 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
   if (!ops.length) return noteCommitTarget("cloud");
   // A packaged or browser till may carry an encrypted tenant override. Never
   // let an early write resolve the client against the build-time tenant first.
-  const { hydrateTerminalConfig } = await import("./terminal-tokens");
+  const { hydrateTerminalConfig } = await import("@/core/activation/terminal-tokens");
   await hydrateTerminalConfig();
 
   // Stock never travels centrally as an absolute figure: the movement rows go

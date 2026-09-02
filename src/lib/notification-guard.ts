@@ -9,7 +9,7 @@
  * Real failures (permission, validation, duplicate keys) are not connectivity
  * messages, so they are never suppressed.
  */
-import { anyDatabaseReachable } from "./connection-health";
+import { anyDatabaseReachable } from "@/core/activation/connection-health";
 
 /** Event fired when a stale connectivity banner should disappear. */
 export const CLEAR_EVENT = "pos:db-warning-clear";

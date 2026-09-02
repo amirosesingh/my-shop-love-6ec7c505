@@ -10,10 +10,10 @@
  * Nothing here runs on web or Electron: every entry point returns early when
  * the app is not inside Capacitor.
  */
-import { APP_VERSION } from "./app-updates";
-import { isNative } from "./native";
-import { firstReachableUrl, httpGetBase64, httpGetJson } from "./native-http";
-import { fetchManifest, withTimeout } from "./update-manifest";
+import { APP_VERSION } from "@/lib/app-updates";
+import { isNative } from "@/platform-config/platform";
+import { firstReachableUrl, httpGetBase64, httpGetJson } from "@/platforms/mobile/native-http";
+import { fetchManifest, withTimeout } from "@/lib/update-manifest";
 
 const BASE = "https://updatecms.luckycharmsdnbhd.com/pos-app";
 /** Current layout first, legacy path second, for phones on older releases. */

@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { supabaseExternal } from "@/integrations/supabase/external-client";
-import { readTerminalConfig } from "@/lib/terminal-tokens";
+import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 import { ensureTerminalSession } from "@/lib/terminal-session";
 import { probeRelay, syncHealth } from "@/lib/sync-relay";
 import { isDesktop } from "@/lib/branding";
-import { isNative } from "@/lib/native";
+import { isNative } from "@/platform-config/platform";
 
 type Check = { label: string; ok: boolean; warn?: boolean; detail: string };
 

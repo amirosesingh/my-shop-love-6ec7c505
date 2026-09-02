@@ -25,7 +25,7 @@ import {
   noteConnectionRestored,
   preferredDatabaseMode,
   setPreferredDatabaseMode,
-} from "../db-mode";
+} from "@/core/local-db/db-mode";
 
 describe("database mode", () => {
   beforeEach(() => {

@@ -7,7 +7,7 @@
  * service key is server-only and lives in `pos-relay.server.ts`.
  */
 
-import { isTerminalApp } from "./native";
+import { isTerminalApp } from "@/platform-config/platform";
 
 type Source = { url: string; key: string };
 

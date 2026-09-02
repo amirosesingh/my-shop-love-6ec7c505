@@ -10,11 +10,11 @@ import { supabaseExternal as supabase } from "@/integrations/supabase/external-c
 import { terminalId } from "./activity-journal";
 import { activeBranchId, activeBranchName } from "./active-branch";
 import { isMissingSchema } from "./schema-guard";
-import { databaseModeLabel, effectiveDatabaseMode, isFailingOver } from "./db-mode";
-import { hasLocalSqlEngine } from "./local-db";
+import { databaseModeLabel, effectiveDatabaseMode, isFailingOver } from "@/core/local-db/db-mode";
+import { hasLocalSqlEngine } from "@/core/local-db/local-db";
 import { isOnlineOnly } from "./live-mode";
 import { conflictCount, isOnline, lastSyncedAt, pendingCount } from "./sync-outbox";
-import { readTerminalConfig } from "./terminal-tokens";
+import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 import { APP_VERSION } from "@/version";
 
 export type TelemetryRow = {

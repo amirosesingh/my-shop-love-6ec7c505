@@ -7,7 +7,7 @@
  */
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { CameraOff, Loader2 } from "lucide-react";
-import { ensureCameraPermission, isNativeApp, scanOnceNative } from "@/lib/camera";
+import { ensureCameraPermission, isNativeApp, scanOnceNative } from "@/platforms/mobile/camera";
 
 export function CameraScanner({
   onScan,

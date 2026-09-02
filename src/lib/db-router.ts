@@ -15,8 +15,8 @@
  * connection is down, the cloud otherwise.
  */
 import { commitOps, commitLabel, type CommitTarget } from "./pos-db";
-import { AllTargetsFailed, isCloudDirect, isConnectionError } from "./db-mode";
-import { checkHealth } from "./connection-health";
+import { AllTargetsFailed, isCloudDirect, isConnectionError } from "@/core/local-db/db-mode";
+import { checkHealth } from "@/core/activation/connection-health";
 import {
   routedQuery,
   routedQueryWithSource,

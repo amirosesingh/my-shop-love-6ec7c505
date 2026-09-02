@@ -8,7 +8,7 @@
  * physical count never borrows a receipt number. The reference is minted once,
  * the moment a draft row is first written, and never regenerated afterwards.
  */
-import { readLocalSetting, writeLocalSetting } from "./local-db";
+import { readLocalSetting, writeLocalSetting } from "@/core/local-db/local-db";
 
 export type StockNumberReset = "never" | "yearly" | "monthly";
 

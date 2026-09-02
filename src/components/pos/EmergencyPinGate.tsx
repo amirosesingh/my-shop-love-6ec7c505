@@ -10,7 +10,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Delete, LifeBuoy, Lock } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { isTerminalApp } from "@/lib/native";
+import { isTerminalApp } from "@/platform-config/platform";
 import {
   emergencyFingerprint,
   emergencyPinAvailable,

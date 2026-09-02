@@ -17,7 +17,7 @@ import {
   SystemAlertsButton,
 } from "@/components/pos/StatusCluster";
 import { ActivityBell } from "@/components/pos/ActivityBell";
-import { databaseModeLabel, effectiveDatabaseMode, subscribeDatabaseMode } from "@/lib/db-mode";
+import { databaseModeLabel, effectiveDatabaseMode, subscribeDatabaseMode } from "@/core/local-db/db-mode";
 import { subscribeOutbox } from "@/lib/sync-outbox";
 import { subscribeSyncState } from "@/lib/sync-status";
 import { Link } from "@tanstack/react-router";

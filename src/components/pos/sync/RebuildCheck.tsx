@@ -11,7 +11,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ClipboardCheck, Loader2, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { localDb, type RestoreCheck, type RestoreDrill } from "@/lib/local-db";
+import { localDb, type RestoreCheck, type RestoreDrill } from "@/core/local-db/local-db";
 
 const when = (iso?: string | null) => (iso ? new Date(iso).toLocaleString() : "—");
 

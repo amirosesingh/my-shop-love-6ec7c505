@@ -11,14 +11,14 @@ vi.mock("@/lib/sync-engine", () => ({
   runOpLive: (...a: unknown[]) => live(...a),
   drainOutbox: async () => {},
 }));
-vi.mock("@/lib/local-db", () => ({
+vi.mock("@/core/local-db/local-db", () => ({
   localDb: () => ({ write: (...a: unknown[]) => localWrite(...a) }),
   electronDb: () => ({ createSale: (...a: unknown[]) => legacyCreateSale(...a) }),
   readBranch: () => ({ branchId: null, branchName: null }),
 }));
 
 import { commitOps, db } from "@/lib/pos-db";
-import { setPreferredDatabaseMode } from "@/lib/db-mode";
+import { setPreferredDatabaseMode } from "@/core/local-db/db-mode";
 
 const ops = [{ kind: "insert", table: "sales", rows: [{ id: "s1" }] }] as never;
 

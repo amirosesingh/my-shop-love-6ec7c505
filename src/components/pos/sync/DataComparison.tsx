@@ -36,7 +36,7 @@ import {
   type RowDiff,
 } from "@/lib/data-compare";
 import { getPosCallerAuth } from "@/lib/pos-caller-auth";
-import { localDb } from "@/lib/local-db";
+import { localDb } from "@/core/local-db/local-db";
 
 const VERDICT_TONE: Record<CompareVerdict, string> = {
   matched: "border-emerald-500/40 text-emerald-600 dark:text-emerald-400",

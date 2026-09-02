@@ -11,11 +11,11 @@ import {
   connectivity,
   subscribeConnectivity,
   type Connectivity,
-} from "./connection-health";
-import { hasLocalDb, localDb, type LocalSyncStatus } from "./local-db";
+} from "@/core/activation/connection-health";
+import { hasLocalDb, localDb, type LocalSyncStatus } from "@/core/local-db/local-db";
 import { subscribeSyncState, syncState } from "./sync-status";
 import { conflictCount, isOnlineSyncEnabled, pendingCount, subscribeOutbox } from "./sync-outbox";
-import { databaseModeLabel } from "./db-mode";
+import { databaseModeLabel } from "@/core/local-db/db-mode";
 
 export type StatusTone = "connecting" | "ok" | "busy" | "offline" | "error";
 
