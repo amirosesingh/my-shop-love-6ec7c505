@@ -87,12 +87,23 @@ async function main() {
     server.kill("SIGKILL");
   }
 
+  // The APK must carry no tenant identity. The render server may have had a
+  // project address and key in its own environment; strip anything it printed
+  // into the page so the phone starts blank and is provisioned per device.
+  html = html.replace(/<script[^>]*>[^<]*__POS_CONFIG__[^<]*<\/script>/g, "");
+  if (html.includes("__POS_CONFIG__")) {
+    throw new Error(
+      "The rendered shell still carries cloud configuration. The APK must ship no tenant identity.",
+    );
+  }
+
   fs.rmSync(out, { recursive: true, force: true });
   copyDir(clientDir, out);
   fs.writeFileSync(path.join(out, "index.html"), html, "utf8");
   // Android's local server falls back to index.html for unknown paths, but a
   // copy under 200.html keeps other hosts (and manual testing) happy too.
   fs.writeFileSync(path.join(out, "200.html"), html, "utf8");
+
 
   console.log(`✓ phone bundle ready in ${path.relative(root, out)}`);
 }
