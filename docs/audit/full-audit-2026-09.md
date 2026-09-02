@@ -208,3 +208,25 @@ but two surfaces to keep in step.
 2. C2, H1, M1 as one hardening pass (PIN brute force, both surfaces)
 3. C3, H5, H6, M5 as one checkout/connectivity-honesty pass
 4. H4 (hydration), H7/H8 (dead code), then the Medium list
+
+---
+
+## Fixed in 1.3.86
+
+- **C1** — the hardcoded project address and publishable key are gone from
+  `src/lib/external-supabase-config.ts`. The web deployment now names its own
+  project through `VITE_POS_SUPABASE_URL` / `VITE_POS_SUPABASE_ANON_KEY`
+  (tried before any platform-injected `SUPABASE_*`), and
+  `scripts/mobile-build.cjs` strips `window.__POS_CONFIG__` from the rendered
+  shell and fails the build if any remains — an APK ships no tenant identity.
+- **C2** — `/api/public/cashier-login` now runs through the same
+  `pin-throttle.server` helpers as manager PINs, keyed by both the account and
+  the caller's address, returning 429 with the minutes left while locked.
+- **H1** — the recovery PIN has an attempt limit with exponential backoff, in
+  the Electron main process (`electron/emergency-pin.cjs`) and on Android
+  (`src/lib/emergency-pin.ts`).
+- **M1** — `/api/public/terminal-staff` requires the activation token of a
+  registered, unrevoked terminal and lists only that terminal's branch;
+  `pin_length` is no longer published.
+
+Covered by `src/lib/__tests__/tenant-neutral.security.test.ts`.
