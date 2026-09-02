@@ -39,14 +39,47 @@ export async function handleCashierLogin(request: Request): Promise<Response> {
       { status: 503 },
     );
 
+  // Brute-force brake. The keypad limit lives in the browser and proves
+  // nothing; this counts failures centrally, keyed by the account being
+  // guessed and by the caller's address, so a scripted run locks out.
+  const { throttleStatus, throttleFail, throttleReset, minutesLeft } = await import(
+    "@/lib/pin-throttle.server"
+  );
+  const ip =
+    request.headers.get("cf-connecting-ip") ??
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    "unknown";
+  const userKey = `cashier:${parsed.data.username.trim().toLowerCase()}`;
+  const ipKey = `cashier-ip:${ip}`;
+  for (const key of [userKey, ipKey]) {
+    const state = await throttleStatus(key);
+    if (state.locked)
+      return Response.json(
+        {
+          ok: false,
+          code: "locked",
+          error: `Too many wrong PINs. Try again in ${minutesLeft(state)} minutes.`,
+        },
+        { status: 429 },
+      );
+  }
+
   const { cashierLoginServer } = await import("@/lib/cashier-login.server");
   try {
     const result = await cashierLoginServer(parsed.data);
+    if (result.ok) {
+      await throttleReset(userKey);
+      await throttleReset(ipKey);
+    } else {
+      await throttleFail(userKey);
+      await throttleFail(ipKey);
+    }
     return Response.json(result, { status: result.ok ? 200 : 401 });
   } catch (e) {
     return Response.json({ ok: false, error: (e as Error).message }, { status: 500 });
   }
 }
+
 
 export const Route = createFileRoute("/api/public/cashier-login")({
   server: { handlers: { POST: async ({ request }) => handleCashierLogin(request) } },
