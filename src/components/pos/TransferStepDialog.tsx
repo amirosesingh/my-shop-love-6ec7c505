@@ -84,14 +84,12 @@ export function TransferStepDialog({
   }, [transfer, step]);
 
   const copy = COPY[step];
-  const total = useMemo(
-    () => Object.values(qty).reduce((a, n) => a + (Number(n) || 0), 0),
-    [qty],
-  );
-  const asked = transfer?.items.reduce(
-    (a, i) => a + (step === "verify" ? (i.dispatchedQty ?? i.qty) : i.qty),
-    0,
-  ) ?? 0;
+  const total = useMemo(() => Object.values(qty).reduce((a, n) => a + (Number(n) || 0), 0), [qty]);
+  const asked =
+    transfer?.items.reduce(
+      (a, i) => a + (step === "verify" ? (i.dispatchedQty ?? i.qty) : i.qty),
+      0,
+    ) ?? 0;
   const short = transfer ? total < asked : false;
   const needsReason = step === "verify" && short && !reason.trim();
 
@@ -118,37 +116,37 @@ export function TransferStepDialog({
                 </div>
               ))
             : transfer.items.map((i) => {
-            const cap = ceilingFor(step, i);
-            return (
-              <div key={i.productId} className="flex items-center gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm">{nameOf(i.productId)}</div>
-                  <div className="numeric text-[11px] text-muted-foreground">
-                    asked {i.qty}
-                    {i.approvedQty !== undefined && ` · approved ${i.approvedQty}`}
-                    {i.dispatchedQty !== undefined && ` · sent ${i.dispatchedQty}`}
+                const cap = ceilingFor(step, i);
+                return (
+                  <div key={i.productId} className="flex items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm">{nameOf(i.productId)}</div>
+                      <div className="numeric text-[11px] text-muted-foreground">
+                        asked {i.qty}
+                        {i.approvedQty !== undefined && ` · approved ${i.approvedQty}`}
+                        {i.dispatchedQty !== undefined && ` · sent ${i.dispatchedQty}`}
+                      </div>
+                    </div>
+                    <div className="w-24">
+                      <Label className="sr-only">{copy.column}</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={cap}
+                        className="numeric text-right"
+                        value={qty[i.productId] ?? 0}
+                        onChange={(e) =>
+                          setQty((prev) => ({
+                            ...prev,
+                            [i.productId]: Math.max(
+                              0,
+                              Math.min(cap, Math.floor(Number(e.target.value) || 0)),
+                            ),
+                          }))
+                        }
+                      />
+                    </div>
                   </div>
-                </div>
-                <div className="w-24">
-                  <Label className="sr-only">{copy.column}</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={cap}
-                    className="numeric text-right"
-                    value={qty[i.productId] ?? 0}
-                    onChange={(e) =>
-                      setQty((prev) => ({
-                        ...prev,
-                        [i.productId]: Math.max(
-                          0,
-                          Math.min(cap, Math.floor(Number(e.target.value) || 0)),
-                        ),
-                      }))
-                    }
-                  />
-                </div>
-              </div>
                 );
               })}
         </div>

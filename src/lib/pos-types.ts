@@ -317,7 +317,6 @@ export type Sale = {
   couponName?: string;
 };
 
-
 export type Shift = {
   id: string;
   storeId: string;
@@ -528,13 +527,7 @@ export type BookingPayment = {
 };
 
 /** Where a racket sits in the stringing workflow. */
-export type JobStatus =
-  | "received"
-  | "strung"
-  | "ready"
-  | "collected"
-  | "damaged"
-  | "cancelled";
+export type JobStatus = "received" | "strung" | "ready" | "collected" | "damaged" | "cancelled";
 
 export const JOB_STATUS_LABELS: Record<JobStatus, string> = {
   received: "Received",
@@ -677,16 +670,10 @@ export const bookingBalance = (b: Pick<Booking, "total" | "paid">) =>
 /** Anything at or below this is treated as fully settled. */
 export const MONEY_TOLERANCE = 0.005;
 
-
 /* -------------------------- stock adjustments -------------------------- */
 
 export type StockAdjustmentReason =
-  | "stock_count"
-  | "damage"
-  | "theft"
-  | "expiry"
-  | "correction"
-  | "received_off_po";
+  "stock_count" | "damage" | "theft" | "expiry" | "correction" | "received_off_po";
 
 export const STOCK_ADJUSTMENT_REASONS: { value: StockAdjustmentReason; label: string }[] = [
   { value: "stock_count", label: "Stock count / calibration" },
@@ -859,7 +846,6 @@ export type ReceiptSettings = {
   bookingSlip: BookingSlipSettings;
 };
 
-
 /** Fields a single branch may override on top of the global receipt profile. */
 export type ReceiptOverride = Partial<
   Pick<
@@ -964,7 +950,6 @@ export type RoundingSettings = {
   /** Wording of that line, e.g. "Extra Discount". */
   receiptLabel: string;
 };
-
 
 /** Receipt numbering: [BRANCH]-[PLATFORM][TERMINAL]-[YYYYMMDD]-[SEQUENCE]. */
 export type BillNumberingSettings = {

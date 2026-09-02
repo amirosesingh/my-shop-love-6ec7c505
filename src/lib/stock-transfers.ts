@@ -110,10 +110,13 @@ export async function loadTransfers(): Promise<StoredTransfer[]> {
     const lines = await sb
       .from("stock_transfer_items")
       .select("*")
-      .in("transfer_id", rows.map((r) => r.id));
+      .in(
+        "transfer_id",
+        rows.map((r) => r.id),
+      );
     if (lines.error) throw new Error(lines.error.message);
     const byTransfer = new Map<string, Row[]>();
-    for (const l of ((lines.data as Row[] | null) ?? [])) {
+    for (const l of (lines.data as Row[] | null) ?? []) {
       const list = byTransfer.get(l.transfer_id) ?? [];
       list.push(l);
       byTransfer.set(l.transfer_id, list);
@@ -298,4 +301,3 @@ export async function verifyTransferInDb(
     return { success: false, error: describeError(e, "Verifying the delivery") };
   }
 }
-

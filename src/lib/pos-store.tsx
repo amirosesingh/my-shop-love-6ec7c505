@@ -34,7 +34,6 @@ import type {
   TransferItem,
   TransferKind,
   TransferStatus,
-
 } from "./pos-types";
 import { bookingBalance, lineUnitDiscount, r2, type DiscountType } from "./pos-types";
 import { logger } from "./audit-log";
@@ -279,7 +278,6 @@ type Ctx = {
     method: PaymentMethod,
     reason: string,
   ) => Promise<{ ok: true; booking: Booking } | { ok: false; error: string }>;
-
 
   deleteBooking: (id: string, reason: string) => Promise<void>;
   upsertProduct: (product: Product) => Promise<CommitTarget>;
@@ -1286,7 +1284,8 @@ export function PosProvider({ children }: { children: ReactNode }) {
     ): Promise<{ ok: true } | { ok: false; error: string }> => {
       const current = stateRef.current.bookings.find((b) => b.id === id);
       if (!current) return { ok: false, error: "Booking not found." };
-      if (current.status !== "active") return { ok: false, error: "This booking is already closed." };
+      if (current.status !== "active")
+        return { ok: false, error: "This booking is already closed." };
       const clean = reason.trim();
       if (clean.length < 3) return { ok: false, error: "A cancellation reason is required." };
       const who = user?.name || current.cashier || "Counter";
@@ -1300,8 +1299,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       });
       if (!res.ok) return res;
       const held = r2(current.paid);
-      const action: Booking["cancelMoneyAction"] =
-        held > 0 ? (moneyAction ?? "retained") : "none";
+      const action: Booking["cancelMoneyAction"] = held > 0 ? (moneyAction ?? "retained") : "none";
       const refundLine: BookingPayment[] =
         action === "refunded" && held > 0
           ? [
@@ -1411,9 +1409,6 @@ export function PosProvider({ children }: { children: ReactNode }) {
     [user],
   );
 
-
-
-
   /** Remove a booking / job card altogether, with the reason on the record. */
   const deleteBooking = useCallback(async (id: string, reason: string) => {
     const current = stateRef.current.bookings.find((b) => b.id === id);
@@ -1485,7 +1480,6 @@ export function PosProvider({ children }: { children: ReactNode }) {
     },
     [],
   );
-
 
   /** Rewrite the job card of a booking that has not been collected yet. */
   const updateBookingSpecs = useCallback((id: string, job: RacketJob) => {
@@ -1611,7 +1605,6 @@ export function PosProvider({ children }: { children: ReactNode }) {
     },
     [activeShift, recordSale],
   );
-
 
   const refundSale = useCallback((saleId: string) => {
     logger.log("sale_event", "Sale refunded", "receipts", {
@@ -2237,7 +2230,11 @@ export function PosProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /** Quantities for a step, defaulting to the previous step's numbers. */
-  const linesFor = (t: Transfer, given: LineQty[] | undefined, ceiling: (i: TransferItem) => number) =>
+  const linesFor = (
+    t: Transfer,
+    given: LineQty[] | undefined,
+    ceiling: (i: TransferItem) => number,
+  ) =>
     t.items.map((i) => {
       const typed = given?.find((l) => l.productId === i.productId)?.qty;
       const cap = ceiling(i);
@@ -2519,9 +2516,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
           ? {
               ...x,
               status: next,
-              ...(next === "rejected"
-                ? { rejectedReason: reason }
-                : { cancelledReason: reason }),
+              ...(next === "rejected" ? { rejectedReason: reason } : { cancelledReason: reason }),
               updatedAt: now,
             }
           : x,
@@ -2554,7 +2549,6 @@ export function PosProvider({ children }: { children: ReactNode }) {
       metadata: { ref: before.ref, toStoreId: before.toStoreId },
     });
   }, []);
-
 
   const reset = useCallback(() => setState(emptyState), []);
 

@@ -76,7 +76,8 @@ export const Route = createFileRoute("/transfers")({
   component: Transfers,
   validateSearch: (search: Record<string, unknown>): TransferSearch => ({
     items: typeof search.items === "string" ? search.items : undefined,
-    kind: search.kind === "request" ? "request" : search.kind === "transfer" ? "transfer" : undefined,
+    kind:
+      search.kind === "request" ? "request" : search.kind === "transfer" ? "transfer" : undefined,
   }),
 });
 
@@ -130,7 +131,10 @@ function Transfers() {
   // A move between clusters re-maps the item into the receiving catalogue.
   const crossGroup =
     Boolean(otherStoreId) &&
-    scopeBetween(currentStore, stores.find((s) => s.id === otherStoreId)) === "INTER_GROUP";
+    scopeBetween(
+      currentStore,
+      stores.find((s) => s.id === otherStoreId),
+    ) === "INTER_GROUP";
   const [note, setNote] = useState("");
   /** Which note is mid-step, and which step it is. */
   const [step, setStep] = useState<{ id: string; step: TransferStep } | null>(null);
@@ -385,7 +389,6 @@ function Transfers() {
           />
         </div>
 
-
         <section className="rounded-lg border border-border bg-card">
           <div className="grid grid-cols-[minmax(0,1fr)] gap-2 px-5 py-3 sm:flex sm:items-center sm:justify-between">
             <h2 className="truncate text-sm font-semibold">Transfer log</h2>
@@ -554,7 +557,6 @@ function Transfers() {
                           </Button>
                         )}
                         <Button size="sm" variant="ghost" onClick={() => print(t)}>
-
                           <Printer className="size-4" />
                         </Button>
                       </div>
@@ -703,10 +705,10 @@ function Transfers() {
                   Inter-group transfer
                 </p>
                 <p className="mt-1 text-muted-foreground">
-                  {currentStore.name} ({groupOf(currentStore)}) and{" "}
-                  {storeOf(otherStoreId)?.name} ({groupOf(storeOf(otherStoreId))}) sit in different
-                  clusters. On arrival each line is matched into the receiving cluster's own
-                  catalogue by barcode, so stock stays isolated per group.
+                  {currentStore.name} ({groupOf(currentStore)}) and {storeOf(otherStoreId)?.name} (
+                  {groupOf(storeOf(otherStoreId))}) sit in different clusters. On arrival each line
+                  is matched into the receiving cluster's own catalogue by barcode, so stock stays
+                  isolated per group.
                 </p>
               </div>
             )}
@@ -756,8 +758,7 @@ function Transfers() {
               toast.success(
                 sent < asked ? `${t.ref} part sent · ${sent} of ${asked}` : `${t.ref} dispatched`,
                 {
-                  description:
-                    sent < asked ? "The note is closed on what was sent." : undefined,
+                  description: sent < asked ? "The note is closed on what was sent." : undefined,
                 },
               );
             } else if (step.step === "receive") {
@@ -779,9 +780,7 @@ function Transfers() {
                     : `${t.ref} verified into ${currentStore.name}`,
                   {
                     description:
-                      counted < sent
-                        ? "Only the counted quantity went on the shelf."
-                        : undefined,
+                      counted < sent ? "Only the counted quantity went on the shelf." : undefined,
                   },
                 );
               });
