@@ -49,12 +49,12 @@ describe("deep central drift", () => {
   });
 
   it("reports exactly the real gaps and nothing else", () => {
-    const broken = structuredClone(healthy) as typeof healthy;
+    const broken = JSON.parse(JSON.stringify(healthy)) as Record<string, any>;
     broken.sales.rls = false;
     broken.sales.policies = [];
     broken.sales.indexes = ["sales_pkey"];
     broken.sales.columns.total = { type: "numeric", nullable: true, default: null };
-    delete (broken.sales.constraints as Record<string, unknown>)["sales_total_nonneg"];
+    delete broken.sales.constraints["sales_total_nonneg"];
 
     const found = computeDeepDrift(inventoryFromPayload(broken), schema);
     const categories = found.map((f) => f.category).sort();
