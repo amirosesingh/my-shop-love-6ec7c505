@@ -35,8 +35,9 @@ export const Route = createFileRoute("/api/public/terminal-staff")({
           );
         try {
           const { verifyRelayCaller } = await import("@/lib/pos-relay.server");
-          const caller = await verifyRelayCaller({ terminalToken: token });
-          if (!caller || caller.label !== token)
+          // Throws when the token proves nothing (unknown, revoked, retired).
+          const caller = await verifyRelayCaller({ terminalToken: token }).catch(() => null);
+          if (!caller || caller.kind !== "terminal")
             return Response.json(
               { ok: false, error: "This terminal is not registered", staff: [] },
               { status: 401 },
@@ -46,6 +47,7 @@ export const Route = createFileRoute("/api/public/terminal-staff")({
           const storeId = caller.storeId ?? parsed.data.storeId ?? null;
           const staff = await mod.listTerminalStaff(storeId);
           return Response.json({ ok: true, staff });
+
         } catch (e) {
           return Response.json(
             { ok: false, error: (e as Error).message, staff: [] },
