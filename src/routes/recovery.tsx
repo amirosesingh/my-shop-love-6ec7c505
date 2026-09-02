@@ -15,7 +15,9 @@ import { LifeBuoy, ArrowLeft, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BackendAddressPanel } from "@/components/pos/settings/panels/BackendAddressPanel";
 import { CloudConnectionPanel } from "@/components/pos/settings/panels/CloudConnectionPanel";
+import { EmergencyPinGate } from "@/components/pos/EmergencyPinGate";
 import { heartbeat } from "@/lib/connection-health";
+
 
 export const Route = createFileRoute("/recovery")({
   head: () => ({
@@ -39,10 +41,19 @@ export const Route = createFileRoute("/recovery")({
 });
 
 function RecoveryPage() {
+  return (
+    <EmergencyPinGate>
+      <RecoverySettings />
+    </EmergencyPinGate>
+  );
+}
+
+function RecoverySettings() {
   const navigate = useNavigate();
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-4 bg-background p-6">
+
       <header className="space-y-1">
         <h1 className="flex items-center gap-2 text-lg font-semibold text-foreground">
           <LifeBuoy className="size-5 text-warning" />

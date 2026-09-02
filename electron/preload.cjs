@@ -132,6 +132,9 @@ contextBridge.exposeInMainWorld("pos", {
   /* address of the hosted backend this device talks to (non-secret) */
   backendUrl: () => invoke("backend:get"),
   setBackendUrl: (value) => invoke("backend:set", value),
+  /* emergency access recovery PIN — verified in the main process */
+  verifyEmergencyPin: (pin) => invoke("emergency:verify-pin", pin),
+  emergencyFingerprint: () => invoke("emergency:fingerprint"),
   /* tenant cloud credentials sealed in the OS vault (DPAPI) */
   cloudKeyStatus: () => invoke("cloud:status"),
   bootstrapCloudCredentials: () => invoke("cloud:bootstrap"),

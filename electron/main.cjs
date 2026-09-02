@@ -24,6 +24,7 @@ const diagnostics = require("./diagnostics.cjs");
 const serverKeys = require("./server-keys.cjs");
 const staffAuth = require("./staff-auth.cjs");
 const cloudCredentials = require("./cloud-credentials.cjs");
+const emergencyPin = require("./emergency-pin.cjs");
 
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
 const DEBUG = process.env.POS_DEBUG === "1";
@@ -1472,7 +1473,15 @@ function registerIpc() {
     return { ok: true, url: next };
   });
 
+  /* ------------- emergency access PIN (secret never leaves here) ------------- */
+  ipcMain.handle("emergency:verify-pin", (_e, pin) => emergencyPin.verifyPin(pin));
+  ipcMain.handle("emergency:fingerprint", () => ({
+    ok: true,
+    fingerprint: emergencyPin.fingerprint(),
+  }));
+
   /* ------------- tenant cloud credentials (OS-sealed store) ------------- */
+
   ipcMain.handle("cloud:status", () => ({ ok: true, ...cloudCredentials.status() }));
   // Boot-time read so the renderer can point its own client at the tenant.
   // The key crosses the bridge only into this device's renderer, never to disk.
