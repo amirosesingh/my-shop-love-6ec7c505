@@ -57,7 +57,7 @@ export async function backendUrl(): Promise<string> {
       /* storage unavailable — fall through to the build value */
     }
   }
-  return baked();
+  return "";
 }
 
 /** Read the saved address and make it the one every app-server call uses. */
@@ -87,8 +87,8 @@ export async function saveBackendUrl(value: string): Promise<BackendSaveResult> 
       return { ok: false, error: (e as Error).message };
     }
   }
-  apply(next || baked());
-  return { ok: true, url: next || baked() };
+  apply(next);
+  return { ok: true, url: next };
 }
 
 /**
