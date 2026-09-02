@@ -19,6 +19,37 @@ const isMobile = Boolean(process.env["MOBILE_BUILD"]);
  */
 const isCloudflare = Boolean(process.env["CLOUDFLARE_BUILD"]);
 
+/**
+ * Android and Windows are shipped artifacts handed to other shops, so no web
+ * deployment value may end up inside them. Two guards, both build-time:
+ *
+ *  1. `envDir` points at an empty folder, so Vite loads none of the repo's
+ *     .env / .env.production / .env.local files.
+ *  2. every web configuration name is defined as `undefined`, so a static
+ *     `import.meta.env.VITE_...` read inlines to nothing even if the CI runner
+ *     happens to export the value.
+ *
+ * The browser/Cloudflare build is untouched and keeps its own environment.
+ */
+export const WEB_ONLY_ENV_NAMES = [
+  "VITE_SUPABASE_URL",
+  "VITE_SUPABASE_ANON_KEY",
+  "VITE_SUPABASE_PUBLISHABLE_KEY",
+  "VITE_SUPABASE_PROJECT_ID",
+  "VITE_POS_SUPABASE_URL",
+  "VITE_POS_SUPABASE_ANON_KEY",
+  "VITE_POS_SUPABASE_PUBLISHABLE_KEY",
+  "VITE_SUPABASE_EXTERNAL_URL",
+  "VITE_SUPABASE_EXTERNAL_PUBLISHABLE_KEY",
+  "VITE_POS_SERVER_URL",
+] as const;
+
+const isTerminalBuild = isMobile || isDesktop;
+
+const blankWebEnv = Object.fromEntries(
+  WEB_ONLY_ENV_NAMES.map((name) => [`import.meta.env.${name}`, "undefined"]),
+);
+
 export default defineConfig({
   ...(isCloudflare
     ? {
