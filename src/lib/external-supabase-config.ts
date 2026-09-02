@@ -12,16 +12,12 @@ import { isTerminalApp } from "./native";
 type Source = { url: string; key: string };
 
 /**
- * The POS tenant this build belongs to. These are public values (the anon /
- * publishable key is designed to be shipped in client code), and they are the
- * primary source so the app never drifts onto a different project just
- * because the hosting platform injected its own SUPABASE_* variables.
- * An activated terminal's own tenant still overrides this.
+ * No tenant is baked into the build. A shipped APK, installer or web bundle
+ * carries no project address and no key: the web deployment supplies them
+ * through its own environment, and a terminal gets them from its activation
+ * or from Settings → Database & Cloud Connection on that device.
  */
-const POS_PROJECT: Source = {
-  url: "https://qhrufhtbeguxydenzfey.supabase.co",
-  key: "sb_publishable_QwVvttLzDle_xTwP3L7Dyg_A6XM-cC-",
-};
+
 
 const clean = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
 
