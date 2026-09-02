@@ -15,7 +15,8 @@ import { Link, useLocation } from "@tanstack/react-router";
 import { TerminalLogin } from "@/platforms/web/components/pos/TerminalLogin";
 import { TerminalActivation, TerminalRevokedScreen } from "@/platforms/web/components/pos/TerminalActivation";
 import { clearRevocation, useRevocationCheck } from "@/lib/use-revocation-check";
-import { useStartupGate } from "@/core/activation/registration-status";
+import { useStartupGate, startupDecision } from "@/core/activation/registration-status";
+import { hasFeature } from "@/platform-config/features";
 import { ConnectDatabaseScreen } from "@/platforms/web/components/pos/ConnectDatabaseScreen";
 import { useAutoLock } from "@/lib/auto-lock";
 import { SidebarNav, useSidebarCollapsed } from "@/platforms/web/components/pos/SidebarNav";
@@ -271,16 +272,25 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Desktop tills and Android terminals both have to register before use.
   if (isDesktop() || isNative()) {
     if (terminal.revoked) return <TerminalRevokedScreen onReactivate={clearRevocation} />;
-    if (!terminal.config) {
-      // Step 1 — no usable database connection yet: ask for the URL and key.
-      if (startup.cloudConfigured === false || !startup.cloudConnected)
-        return (
-          <ConnectDatabaseScreen
-            cloudConfigured={Boolean(startup.cloudConfigured)}
-            onRetry={startup.refresh}
-          />
-        );
-      // Step 2 — connection is fine, the terminal itself is not registered.
+    // A stored activation is not a licence to sign in: the connection has to
+    // be proven every launch, unless this platform may trade offline.
+    const decision = startupDecision({
+      registration: startup.registration,
+      verdict: startup.verdict,
+      activated: Boolean(terminal.config),
+      graceOpen: startup.offlineGrace || startup.cloudConnected,
+      offlineCapable: hasFeature("offlineFirst"),
+    });
+    // Step 1 — no usable database connection: ask for the URL and key.
+    if (decision === "connect-database" || decision === "offline-blocked")
+      return (
+        <ConnectDatabaseScreen
+          cloudConfigured={startup.verdict !== "unconfigured"}
+          onRetry={startup.refresh}
+        />
+      );
+    // Step 2 — connection is proven, the terminal itself is not registered.
+    if (decision === "activate")
       return (
         <TerminalActivation
           onActivated={() => {
@@ -289,7 +299,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           }}
         />
       );
-    }
   }
   if (!user)
     return (

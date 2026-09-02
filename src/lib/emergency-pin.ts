@@ -14,6 +14,7 @@
  * device clock never locks a terminal out of its own recovery screen.
  */
 import { isWindowsShell, isMobileShell } from "@/platform-config/features";
+import { verifyFallbackPin } from "@/lib/emergency-fallback-pin";
 
 const ANDROID_SECRET_KEY = "pos.emergency.secret";
 
@@ -130,8 +131,10 @@ async function androidSecret(): Promise<string | null> {
 
 /** True when this device can check a recovery code at all. */
 export async function emergencyPinAvailable(): Promise<boolean> {
-  if (isWindowsShell()) return Boolean(bridge()?.verifyEmergencyPin);
-  if (isMobileShell()) return (await androidSecret()) !== null;
+  // The clock-only fallback code needs nothing stored, so a terminal can
+  // always be opened even when its secure store is unavailable.
+  if (isWindowsShell()) return true;
+  if (isMobileShell()) return true;
   return false;
 }
 
@@ -151,6 +154,15 @@ export const emergencyLockSeconds = (): number =>
 export async function verifyEmergencyPin(pin: string): Promise<boolean> {
   const code = String(pin ?? "").trim();
   if (!/^\d{6}$/.test(code)) return false;
+  // Either code opens the gate: the device code, or the clock-only fallback.
+  if (isWindowsShell() || isMobileShell()) {
+    if (isMobileShell() && guesses.until > Date.now()) return false;
+    if (await verifyFallbackPin(code)) {
+      guesses.count = 0;
+      guesses.until = 0;
+      return true;
+    }
+  }
   const desktop = bridge();
   if (isWindowsShell() && desktop?.verifyEmergencyPin) {
     try {

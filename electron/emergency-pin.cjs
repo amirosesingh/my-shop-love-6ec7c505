@@ -14,6 +14,10 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const { app, safeStorage } = require("electron");
 
+/** Product-wide salt for the clock-only fallback code. Keep in step with
+ *  src/lib/emergency-fallback-pin.ts and scripts/emergency-pin.cjs. */
+const FALLBACK_PIN_SALT = "northwind-pos-emergency-v1";
+
 const sealedPath = () => path.join(app.getPath("userData"), "emergency-secret.bin");
 const plainPath = () => path.join(app.getPath("userData"), "emergency-secret.json");
 
@@ -129,8 +133,17 @@ function verifyPin(pin, drift = 3) {
     };
   };
   if (!/^\d{6}$/.test(code)) return fail();
-  const secret = ensureSecret();
   const now = Date.now();
+  // The clock-only fallback code (see src/lib/emergency-fallback-pin.ts)
+  // opens the gate too, so support can read a code out without the secret.
+  for (let i = -drift; i <= drift; i += 1) {
+    if (equal(code, pinForSlot(FALLBACK_PIN_SALT, slotAt(new Date(now + i * 60_000))))) {
+      attempts.count = 0;
+      attempts.until = 0;
+      return { ok: true };
+    }
+  }
+  const secret = ensureSecret();
   for (let i = -drift; i <= drift; i += 1) {
     if (equal(code, pinForSlot(secret, slotAt(new Date(now + i * 60_000))))) {
       attempts.count = 0;
@@ -150,4 +163,4 @@ function fingerprint() {
   return crypto.createHash("sha256").update(ensureSecret()).digest("hex").slice(0, 8).toUpperCase();
 }
 
-module.exports = { ensureSecret, verifyPin, pinForSlot, slotAt, fingerprint };
+module.exports = { ensureSecret, verifyPin, pinForSlot, slotAt, fingerprint, FALLBACK_PIN_SALT };
