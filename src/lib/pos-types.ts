@@ -389,14 +389,18 @@ export type TradingHours = {
 
 export type TransferKind = "transfer" | "request";
 /**
- * The life of a note. Approval is a real step now, and dispatch is the point
- * where stock leaves the shelf and the request closes against what was sent.
+ * The life of a note. Approval is a real step, dispatch is where stock leaves
+ * the shelf, and arrival and posting are deliberately two different things:
+ * "received" only means the box is here, "completed" means somebody counted
+ * it and the stock went on the destination shelf.
  */
 export type TransferStatus =
   | "awaiting_approval"
   | "approved"
   | "dispatched"
   | "received"
+  | "completed"
+  | "completed_with_discrepancy"
   | "rejected"
   | "cancelled";
 
@@ -404,10 +408,20 @@ export const TRANSFER_STATUS_LABELS: Record<TransferStatus, string> = {
   awaiting_approval: "awaiting approval",
   approved: "approved",
   dispatched: "in transit",
-  received: "received",
+  received: "arrived · awaiting check",
+  completed: "completed",
+  completed_with_discrepancy: "completed · short",
   rejected: "rejected",
   cancelled: "cancelled",
 };
+
+/** Statuses where nothing more can happen to the note. */
+export const TRANSFER_CLOSED_STATUSES: TransferStatus[] = [
+  "completed",
+  "completed_with_discrepancy",
+  "rejected",
+  "cancelled",
+];
 
 /** How much of the original ask actually left the sending branch. */
 export type TransferFulfilment = "full" | "partial" | "none";
@@ -420,8 +434,10 @@ export type TransferItem = {
   approvedQty?: number;
   /** what physically left the sending branch */
   dispatchedQty?: number;
-  /** what the receiving branch booked in */
+  /** what the destination said arrived, before anyone counted it */
   receivedQty?: number;
+  /** what was physically counted — the only number that moves stock */
+  verifiedQty?: number;
 };
 
 export type Transfer = {
