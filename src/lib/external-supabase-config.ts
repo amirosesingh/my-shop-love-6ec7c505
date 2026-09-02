@@ -105,14 +105,19 @@ function bags(): Record<string, unknown>[] {
 
 /** Name pairs tried in order; the first pair with BOTH halves present wins. */
 const PAIRS: [string, string][] = [
+  // The shop's own project, named explicitly so a hosting platform's injected
+  // SUPABASE_* values can never take over the POS.
+  ["VITE_POS_SUPABASE_URL", "VITE_POS_SUPABASE_ANON_KEY"],
+  ["POS_SUPABASE_URL", "POS_SUPABASE_PUBLISHABLE_KEY"],
+  ["POS_SUPABASE_URL", "POS_SUPABASE_ANON_KEY"],
   ["VITE_SUPABASE_URL", "VITE_SUPABASE_ANON_KEY"],
   ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY"],
   ["SUPABASE_URL", "SUPABASE_ANON_KEY"],
-  ["POS_SUPABASE_URL", "POS_SUPABASE_PUBLISHABLE_KEY"],
   // Rename bridge for older deployments. No values are baked in.
   ["VITE_SUPABASE_EXTERNAL_URL", "VITE_SUPABASE_EXTERNAL_PUBLISHABLE_KEY"],
   ["SUPABASE_EXTERNAL_URL", "SUPABASE_EXTERNAL_PUBLISHABLE_KEY"],
 ];
+
 
 export class SupabaseConfigError extends Error {
   constructor() {
