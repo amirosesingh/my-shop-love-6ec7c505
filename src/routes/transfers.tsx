@@ -4,7 +4,6 @@ import {
   ArrowLeftRight,
   Check,
   FileSpreadsheet,
-  Plus,
   Printer,
   ClipboardCheck,
   Send,
@@ -127,7 +126,6 @@ function Transfers() {
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<TransferKind>("transfer");
   const [items, setItems] = useState<TransferItem[]>([]);
-  const [pickId, setPickId] = useState(state.products[0]?.id ?? "");
   const [otherStoreId, setOtherStoreId] = useState(others[0]?.id ?? "");
   // A move between clusters re-maps the item into the receiving catalogue.
   const crossGroup =
