@@ -24,6 +24,7 @@ const diagnostics = require("./diagnostics.cjs");
 const serverKeys = require("./server-keys.cjs");
 const staffAuth = require("./staff-auth.cjs");
 const cloudCredentials = require("./cloud-credentials.cjs");
+const emergencyPin = require("./emergency-pin.cjs");
 
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
 const DEBUG = process.env.POS_DEBUG === "1";
