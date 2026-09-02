@@ -2355,24 +2355,18 @@ export function PosProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const receiveTransfer = useCallback((id: string, lines?: LineQty[]) => {
+  /**
+   * Arrival. The delivery is at the destination but nobody has opened it, so
+   * no stock moves here — that happens at verification.
+   */
+  const receiveTransfer = useCallback((id: string) => {
     const s0 = stateRef.current;
     const before = s0.transfers.find((x) => x.id === id);
     if (!before || before.status !== "dispatched") return;
-    const got = linesFor(before, lines, (i) => i.dispatchedQty ?? i.approvedQty ?? i.qty);
-    const arriving = got.filter((l) => l.qty > 0);
     const now = new Date().toISOString();
-
-    if (arriving.length)
-      void db.upsertProducts(
-        bumpItems(s0.products, arriving, before.toStoreId, 1).filter((p) =>
-          arriving.some((i) => i.productId === p.id),
-        ),
-      );
 
     setState((s) => ({
       ...s,
-      products: bumpItems(s.products, arriving, before.toStoreId, 1),
       transfers: s.transfers.map((x) =>
         x.id === id
           ? {
@@ -2380,29 +2374,20 @@ export function PosProvider({ children }: { children: ReactNode }) {
               status: "received",
               receivedBy: actorRef.current,
               receivedAt: now,
-              items: x.items.map((i) => ({
-                ...i,
-                receivedQty: got.find((l) => l.productId === i.productId)?.qty ?? 0,
-              })),
               updatedAt: now,
             }
           : x,
       ),
     }));
 
-    // Stock already left the sender at dispatch, so the database only books
-    // the goods in — and re-maps them when the branches sit in different groups.
-    void receiveTransferInDb(id, actorRef.current, got).then((r) => {
+    void receiveTransferInDb(id, actorRef.current).then((r) => {
       if (!r.success) dbError("Receiving transfer", new Error(r.error ?? "Unknown error"));
     });
-    logger.log("inventory", "Stock transfer received", "transfers", {
+    logger.log("inventory", "Stock transfer arrived", "transfers", {
       transferId: id,
       ref: before.ref,
       fromStoreId: before.fromStoreId,
       toStoreId: before.toStoreId,
-      quantity: got.reduce((a, l) => a + l.qty, 0),
-      short: got.reduce((a, l) => a + l.qty, 0) <
-        before.items.reduce((a, i) => a + (i.dispatchedQty ?? i.qty), 0),
     });
     trackTransition({
       entity: "stock_transfer",
@@ -2411,9 +2396,88 @@ export function PosProvider({ children }: { children: ReactNode }) {
       to: "received",
       actorName: actorRef.current,
       storeId: before.toStoreId,
-      metadata: { ref: before.ref, fromStoreId: before.fromStoreId, lines: got },
+      metadata: { ref: before.ref, fromStoreId: before.fromStoreId },
     });
   }, []);
+
+  /**
+   * Physical verification. The counted quantity — and only that — goes onto
+   * the destination shelf. The cloud call is the authority: if it refuses
+   * (already posted, permission, connection), nothing is left half-moved
+   * because the local mirror is only written once the database agrees.
+   */
+  const verifyTransfer = useCallback(
+    async (id: string, lines: LineQty[], reason?: string): Promise<RpcResult> => {
+      const s0 = stateRef.current;
+      const before = s0.transfers.find((x) => x.id === id);
+      if (!before) return { success: false, error: "That transfer no longer exists." };
+      if (before.status !== "received")
+        return { success: false, error: "This delivery has already been checked in." };
+
+      const counted = linesFor(before, lines, (i) => i.dispatchedQty ?? i.approvedQty ?? i.qty);
+      const sent = before.items.reduce((a, i) => a + (i.dispatchedQty ?? i.qty), 0);
+      const total = counted.reduce((a, l) => a + l.qty, 0);
+      const short = total < sent;
+      if (short && !reason?.trim())
+        return { success: false, error: "A short delivery needs a reason." };
+
+      const res = await verifyTransferInDb(id, actorRef.current, counted, reason);
+      if (!res.success) return res;
+
+      const arriving = counted.filter((l) => l.qty > 0);
+      const now = new Date().toISOString();
+      const status: TransferStatus = short ? "completed_with_discrepancy" : "completed";
+
+      if (arriving.length)
+        void db.upsertProducts(
+          bumpItems(stateRef.current.products, arriving, before.toStoreId, 1).filter((p) =>
+            arriving.some((i) => i.productId === p.id),
+          ),
+        );
+
+      setState((s) => ({
+        ...s,
+        products: bumpItems(s.products, arriving, before.toStoreId, 1),
+        transfers: s.transfers.map((x) =>
+          x.id === id
+            ? {
+                ...x,
+                status,
+                verifiedBy: actorRef.current,
+                verifiedAt: now,
+                postedAt: now,
+                discrepancyReason: short ? reason?.trim() : x.discrepancyReason,
+                items: x.items.map((i) => {
+                  const qty = counted.find((l) => l.productId === i.productId)?.qty ?? 0;
+                  return { ...i, receivedQty: qty, verifiedQty: qty };
+                }),
+                updatedAt: now,
+              }
+            : x,
+        ),
+      }));
+
+      logger.log("inventory", "Stock transfer verified", "transfers", {
+        transferId: id,
+        ref: before.ref,
+        fromStoreId: before.fromStoreId,
+        toStoreId: before.toStoreId,
+        quantity: total,
+        short,
+      });
+      trackTransition({
+        entity: "stock_transfer",
+        entityId: id,
+        from: "received",
+        to: status,
+        actorName: actorRef.current,
+        storeId: before.toStoreId,
+        metadata: { ref: before.ref, fromStoreId: before.fromStoreId, lines: counted, reason },
+      });
+      return { success: true };
+    },
+    [],
+  );
 
   /**
    * Turn the note down, or call it off after dispatch. Either way a reason is
