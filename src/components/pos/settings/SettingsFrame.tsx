@@ -40,6 +40,7 @@ import type {
   Sale,
 } from "@/lib/pos-types";
 import type { SettingsSectionId } from "@/lib/settings-sections";
+import { computeTax } from "@/lib/tax";
 
 type Ctx = {
   effective: ReceiptSettings;

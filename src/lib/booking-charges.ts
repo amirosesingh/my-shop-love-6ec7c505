@@ -9,6 +9,7 @@ import {
   type IntakeCharge,
   type TaxSettings,
 } from "./pos-types";
+import { computeTax } from "@/lib/tax";
 
 export type ComboOutcome = {
   /** charges with the combo applied to the labour line */

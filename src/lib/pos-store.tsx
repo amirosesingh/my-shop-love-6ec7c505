@@ -78,6 +78,7 @@ import {
   type LineQty,
   type RpcResult,
 } from "./stock-transfers";
+import { computeTax } from "@/lib/tax";
 import { commitBooking, deleteBookingRow, loadBookings, saveBookingQuietly } from "./bookings-db";
 import { trackTransition } from "./status-history";
 import {
