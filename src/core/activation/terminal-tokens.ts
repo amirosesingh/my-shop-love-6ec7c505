@@ -16,15 +16,15 @@ import {
   decryptActivationV1,
   encryptActivationV1,
   isEncryptedV1,
-} from "./terminal-crypto";
-import { clearDeviceSecret, getDeviceSecret, setDeviceSecret } from "./device-secrets";
+} from "@/lib/terminal-crypto";
+import { clearDeviceSecret, getDeviceSecret, setDeviceSecret } from "@/lib/device-secrets";
 import { recordActivationAttempt } from "@/core/activation/terminal-activation-log";
 
 import {
   clearTerminalSupabaseOverride,
   setTerminalSupabaseOverride,
   supabaseConfig,
-} from "./external-supabase-config";
+} from "@/lib/external-supabase-config";
 
 export type TokenStatus = "active" | "used" | "revoked";
 
@@ -138,7 +138,7 @@ export async function ensureLocations(locations: TokenLocation[]): Promise<void>
     address: l.address || null,
     phone: l.phone || null,
   }));
-  const { canRelay, relayOp } = await import("./sync-relay");
+  const { canRelay, relayOp } = await import("@/lib/sync-relay");
   if (canRelay()) {
     const relayed = await relayOp({ kind: "upsert", table: "stores", rows, onConflict: "id" });
     if (!relayed.ok) throw new Error(relayed.error ?? "Could not save branch locations");
@@ -733,7 +733,7 @@ export async function activateTerminal(code: string): Promise<TerminalConfig> {
   });
   // Give this till its own machine account so its writes are accepted by the
   // central database even when a cashier signs in with a PIN.
-  void import("./terminal-session").then((m) => m.provisionTerminalAccount(config.tokenId)).catch(() => null);
+  void import("@/lib/terminal-session").then((m) => m.provisionTerminalAccount(config.tokenId)).catch(() => null);
   return config;
 }
 
@@ -870,6 +870,6 @@ export async function activateWithTokenId(tokenId: string): Promise<TerminalConf
   writeTerminalConfig(config);
   clearPairingRequest();
   await rpc("terminal_token_heartbeat", { p_token_id: tokenId, p_activate: true });
-  void import("./terminal-session").then((m) => m.provisionTerminalAccount(tokenId)).catch(() => null);
+  void import("@/lib/terminal-session").then((m) => m.provisionTerminalAccount(tokenId)).catch(() => null);
   return config;
 }

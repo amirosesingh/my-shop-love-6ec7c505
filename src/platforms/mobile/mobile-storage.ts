@@ -11,7 +11,7 @@
  * when the app is not running inside Capacitor.
  */
 import { isNative } from "@/platforms/mobile/native";
-import { isPersistentKey } from "./live-mode";
+import { isPersistentKey } from "@/lib/live-mode";
 
 const PREFIX = "pos.";
 

@@ -7,7 +7,7 @@
  * the local activity trail so nothing is lost when the network drops.
  */
 import { APP_VERSION } from "@/version";
-import { logger } from "./audit-log";
+import { logger } from "@/lib/audit-log";
 import { isAndroid, isElectron, isNative } from "@/platforms/mobile/native";
 
 export type ActivationOutcome =

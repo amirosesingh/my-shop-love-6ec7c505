@@ -60,13 +60,13 @@ describe("connection state", () => {
   });
 
   it("starts as connecting and never claims offline before the first check", async () => {
-    const mod = await import("../connection-health");
+    const mod = await import("@/core/activation/connection-health");
     mod.resetConnectivity();
     expect(mod.connectivity()).toBe("connecting");
   });
 
   it("stays on connecting for at least the minimum so the screen cannot flash", async () => {
-    const mod = await import("../connection-health");
+    const mod = await import("@/core/activation/connection-health");
     expect(mod.MIN_CONNECTING_MS).toBeGreaterThanOrEqual(1000);
   });
 });

@@ -7,7 +7,7 @@
  * Android's installer. Nothing here runs on web or Electron.
  */
 import { useCallback, useEffect, useState } from "react";
-import { APP_VERSION } from "./app-updates";
+import { APP_VERSION } from "@/lib/app-updates";
 import { isNative, isAndroid } from "@/platforms/mobile/native";
 import {
   describeNetworkError,
@@ -15,7 +15,7 @@ import {
   httpGetBase64,
   httpGetJson,
 } from "@/platforms/mobile/native-http";
-import { compareVersions, fetchManifest, resolvePlatformTarget, withTimeout } from "./update-manifest";
+import { compareVersions, fetchManifest, resolvePlatformTarget, withTimeout } from "@/lib/update-manifest";
 
 const BASE = "https://updatecms.luckycharmsdnbhd.com/pos-app";
 /** Current layout first, legacy path second, for phones on older releases. */

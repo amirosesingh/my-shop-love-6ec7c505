@@ -5,7 +5,7 @@
  * tax. Line items and tax are never touched: `cartTotals()` stays the single
  * calculation path and this runs on the number it produces.
  */
-import type { PaymentMethod, RoundingSettings } from "./pos-types";
+import type { PaymentMethod, RoundingSettings } from "@/lib/pos-types";
 
 export const ROUNDING_UNITS = [1, 0.5, 0.1, 0.05, 0.01] as const;
 
