@@ -39,10 +39,19 @@ export const Route = createFileRoute("/recovery")({
 });
 
 function RecoveryPage() {
+  return (
+    <EmergencyPinGate>
+      <RecoverySettings />
+    </EmergencyPinGate>
+  );
+}
+
+function RecoverySettings() {
   const navigate = useNavigate();
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-4 bg-background p-6">
+
       <header className="space-y-1">
         <h1 className="flex items-center gap-2 text-lg font-semibold text-foreground">
           <LifeBuoy className="size-5 text-warning" />
