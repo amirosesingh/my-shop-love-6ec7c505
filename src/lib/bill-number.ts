@@ -209,43 +209,43 @@ const computeNext = (
 };
 
 /**
- * Next bill number for this branch/device/day. `existing` is any list of
- * receipt numbers the till already knows about, used to recover the counter.
- * Throws when the counter cannot be recorded on the device — a number that was
- * not reserved must never reach a receipt.
+ * Serialises compute-and-write for this device. Without it two concurrent
+ * callers can read the same sequence before either writes it back, which on a
+ * fully offline till (no unique index to catch it) mints a duplicate bill.
  */
-export function nextBillNumber(
-  branchCode: string,
-  existing: Iterable<string> = [],
-  config: BillNumberConfig = {},
-): string {
-  const { prefix, seq, pad, store } = computeNext(branchCode, existing, config);
-  writeSeq(store);
-  void writeSeqDurable(store);
-  return `${prefix}-${String(seq).padStart(pad, "0")}`;
-}
+let reservationChain: Promise<unknown> = Promise.resolve();
+const serialise = <T>(task: () => Promise<T>): Promise<T> => {
+  const run = reservationChain.then(task, task);
+  reservationChain = run.catch(() => undefined);
+  return run;
+};
 
 /**
- * Same number, but the durable reservation in the branch database is awaited.
- * Use this on the checkout path: if neither the device nor the branch database
- * could hold the counter, it rejects instead of risking a duplicate bill.
+ * Next bill number for this branch/device/day, with the durable reservation in
+ * the branch database awaited. `existing` is any list of receipt numbers the
+ * till already knows about, used to recover the counter. If neither the device
+ * nor the branch database could hold the counter it rejects, instead of
+ * risking a duplicate bill.
  */
 export async function reserveBillNumber(
   branchCode: string,
   existing: Iterable<string> = [],
   config: BillNumberConfig = {},
 ): Promise<string> {
-  const { prefix, seq, pad, store } = computeNext(branchCode, existing, config);
-  const onDevice = writeSeq(store);
-  const durable = await writeSeqDurable(store);
-  if (!onDevice && !durable) {
-    throw new BillNumberReservationError(
-      "The bill counter could not be reserved anywhere, so this bill number may already be in use.",
-    );
-  }
+  return serialise(async () => {
+    const { prefix, seq, pad, store } = computeNext(branchCode, existing, config);
+    const onDevice = writeSeq(store);
+    const durable = await writeSeqDurable(store);
+    if (!onDevice && !durable) {
+      throw new BillNumberReservationError(
+        "The bill counter could not be reserved anywhere, so this bill number may already be in use.",
+      );
+    }
 
-  return `${prefix}-${String(seq).padStart(pad, "0")}`;
+    return `${prefix}-${String(seq).padStart(pad, "0")}`;
+  });
 }
+
 
 
 /** A checkout attempt id: retries of the same attempt reuse it, so no double bill. */
