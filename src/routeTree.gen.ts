@@ -56,6 +56,7 @@ import { Route as ReportsPaymentsRouteImport } from './routes/reports.payments'
 import { Route as ReportsSalesRouteImport } from './routes/reports.sales'
 import { Route as ReportsStockRouteImport } from './routes/reports.stock'
 import { Route as ReportsVoidsRouteImport } from './routes/reports.voids'
+import { Route as RequestsIndexRouteImport } from './routes/requests.index'
 import { Route as RequestsIdRouteImport } from './routes/requests.$id'
 import { Route as RequestsNewRouteImport } from './routes/requests.new'
 import { Route as SettingsIndexRouteImport } from './routes/settings.index'
@@ -346,6 +347,11 @@ const ReportsStockRoute = ReportsStockRouteImport.update({
 const ReportsVoidsRoute = ReportsVoidsRouteImport.update({
   id: '/reports/voids',
   path: '/reports/voids',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RequestsIndexRoute = RequestsIndexRouteImport.update({
+  id: '/requests/',
+  path: '/requests/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RequestsIdRoute = RequestsIdRouteImport.update({
@@ -723,6 +729,7 @@ export interface FileRoutesByFullPath {
   '/transfers/$id': typeof TransfersIdRoute
   '/transfers/new': typeof TransfersNewRoute
   '/reports/': typeof ReportsIndexRoute
+  '/requests/': typeof RequestsIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/transfers/': typeof TransfersIndexRoute
   '/api/public/cashier-login': typeof ApiPublicCashierLoginRoute
@@ -828,6 +835,7 @@ export interface FileRoutesByTo {
   '/transfers/$id': typeof TransfersIdRoute
   '/transfers/new': typeof TransfersNewRoute
   '/reports': typeof ReportsIndexRoute
+  '/requests': typeof RequestsIndexRoute
   '/settings': typeof SettingsIndexRoute
   '/transfers': typeof TransfersIndexRoute
   '/api/public/cashier-login': typeof ApiPublicCashierLoginRoute
@@ -934,6 +942,7 @@ export interface FileRoutesById {
   '/transfers/$id': typeof TransfersIdRoute
   '/transfers/new': typeof TransfersNewRoute
   '/reports/': typeof ReportsIndexRoute
+  '/requests/': typeof RequestsIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/transfers/': typeof TransfersIndexRoute
   '/api/public/cashier-login': typeof ApiPublicCashierLoginRoute
@@ -1041,6 +1050,7 @@ export interface FileRouteTypes {
     | '/transfers/$id'
     | '/transfers/new'
     | '/reports/'
+    | '/requests/'
     | '/settings/'
     | '/transfers/'
     | '/api/public/cashier-login'
@@ -1146,6 +1156,7 @@ export interface FileRouteTypes {
     | '/transfers/$id'
     | '/transfers/new'
     | '/reports'
+    | '/requests'
     | '/settings'
     | '/transfers'
     | '/api/public/cashier-login'
@@ -1251,6 +1262,7 @@ export interface FileRouteTypes {
     | '/transfers/$id'
     | '/transfers/new'
     | '/reports/'
+    | '/requests/'
     | '/settings/'
     | '/transfers/'
     | '/api/public/cashier-login'
@@ -1357,6 +1369,7 @@ export interface RootRouteChildren {
   TransfersIdRoute: typeof TransfersIdRoute
   TransfersNewRoute: typeof TransfersNewRoute
   ReportsIndexRoute: typeof ReportsIndexRoute
+  RequestsIndexRoute: typeof RequestsIndexRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
   TransfersIndexRoute: typeof TransfersIndexRoute
   ApiPublicCashierLoginRoute: typeof ApiPublicCashierLoginRoute
@@ -1697,6 +1710,13 @@ declare module '@tanstack/react-router' {
       path: '/reports/voids'
       fullPath: '/reports/voids'
       preLoaderRoute: typeof ReportsVoidsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/requests/': {
+      id: '/requests/'
+      path: '/requests'
+      fullPath: '/requests/'
+      preLoaderRoute: typeof RequestsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/requests/$id': {
@@ -2201,6 +2221,7 @@ const rootRouteChildren: RootRouteChildren = {
   TransfersIdRoute: TransfersIdRoute,
   TransfersNewRoute: TransfersNewRoute,
   ReportsIndexRoute: ReportsIndexRoute,
+  RequestsIndexRoute: RequestsIndexRoute,
   SettingsIndexRoute: SettingsIndexRoute,
   TransfersIndexRoute: TransfersIndexRoute,
   ApiPublicCashierLoginRoute: ApiPublicCashierLoginRoute,
