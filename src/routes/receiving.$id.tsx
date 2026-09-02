@@ -63,7 +63,28 @@ function ReceivingWorkspace() {
   const { transfer, live, loading } = useTransferRecord(id);
   const [counts, setCounts] = useState<Record<string, string>>({});
   const [reason, setReason] = useState("");
+  const [scan, setScan] = useState("");
   const [busy, setBusy] = useState(false);
+
+  /** Scanner wedge: an exact code on the note bumps that line's count by one. */
+  function countByScan(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const code = scan.trim();
+    if (!code) return;
+    const hit = exactCodeMatch(state.products, code);
+    const listed = hit && transfer?.items.some((i) => i.productId === hit.id) ? hit : null;
+    if (!listed) {
+      toast.error("That code is not on this delivery note");
+      return;
+    }
+    setCounts((prev) => ({
+      ...prev,
+      [listed.id]: String(Math.max(0, Math.floor(Number(prev[listed.id] ?? 0) || 0)) + 1),
+    }));
+    setScan("");
+  }
+
 
   // Start blank so the count is a real count, not a rubber stamp.
   useEffect(() => {
