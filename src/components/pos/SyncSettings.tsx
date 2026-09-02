@@ -14,7 +14,6 @@ import { databaseModeLabel, effectiveDatabaseMode, subscribeDatabaseMode } from 
 import {
   discardQuarantined,
   discardOp,
-  isOnline,
   isOnlineSyncEnabled,
   lastSyncedAt,
   listQueue,
