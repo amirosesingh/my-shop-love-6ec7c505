@@ -26,21 +26,25 @@ export function scopeBetween(from: Store | undefined, to: Store | undefined): Tr
 }
 
 /**
- * Database status names, including the two older spellings a till upgraded
- * mid-week may still be holding.
+ * Database status names, including the older spellings a till upgraded
+ * mid-week may still be holding. "in_transit" was an old name for dispatched.
  */
 const toStatus = (s: string): TransferStatus =>
   s === "approved"
     ? "approved"
     : s === "in_transit" || s === "dispatched"
       ? "dispatched"
-      : s === "received" || s === "completed"
+      : s === "received"
         ? "received"
-        : s === "rejected"
-          ? "rejected"
-          : s === "cancelled"
-            ? "cancelled"
-            : "awaiting_approval";
+        : s === "completed" || s === "verified"
+          ? "completed"
+          : s === "completed_with_discrepancy"
+            ? "completed_with_discrepancy"
+            : s === "rejected"
+              ? "rejected"
+              : s === "cancelled"
+                ? "cancelled"
+                : "awaiting_approval";
 
 const fromStatus = (s: TransferStatus): string => s;
 
