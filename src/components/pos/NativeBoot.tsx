@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 
 import { isNative } from "../../lib/native";
 import { hydrateNativeStorage } from "../../lib/mobile-storage";
+import { hydrateBackendUrl } from "../../lib/backend-config";
 import { hydrateTerminalConfig } from "../../lib/terminal-tokens";
 import { applyPendingWebBundle, startWebBundleChecks } from "../../lib/web-bundle-updates";
 import { TillLoader } from "./TillLoader";
@@ -20,7 +21,10 @@ export function NativeBoot({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (ready) return;
     let cancelled = false;
-    void hydrateNativeStorage()
+    // The backend address must be in place before anything tries to sign in.
+    void hydrateBackendUrl()
+      .catch(() => "")
+      .then(() => hydrateNativeStorage())
       // The activation is sealed on the device; unseal it before anything can
       // decide the terminal is not registered.
       .then(() => hydrateTerminalConfig())
