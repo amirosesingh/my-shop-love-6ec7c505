@@ -96,19 +96,51 @@ const equal = (a, b) => {
 };
 
 /**
+ * Guessing brake. A live code is only six digits, so the window is small
+ * enough to script through; after a handful of wrong codes the gate closes
+ * for a growing pause, held in memory (a restart of the app is itself a
+ * deliberate act at the machine).
+ */
+const attempts = { count: 0, until: 0 };
+const lockMs = (n) => Math.min(15 * 60_000, 30_000 * 2 ** Math.max(0, n - 5));
+
+/**
  * Check a code against the current minute and `drift` minutes either side, so
  * a slightly wrong device clock does not lock the terminal out of recovery.
  */
 function verifyPin(pin, drift = 3) {
+  const now0 = Date.now();
+  if (attempts.until > now0) {
+    return {
+      ok: false,
+      locked: true,
+      retryInSeconds: Math.ceil((attempts.until - now0) / 1000),
+    };
+  }
   const code = String(pin ?? "").trim();
-  if (!/^\d{6}$/.test(code)) return { ok: false };
+  const fail = () => {
+    attempts.count += 1;
+    if (attempts.count >= 5) attempts.until = Date.now() + lockMs(attempts.count);
+    return {
+      ok: false,
+      ...(attempts.until > Date.now()
+        ? { locked: true, retryInSeconds: Math.ceil((attempts.until - Date.now()) / 1000) }
+        : {}),
+    };
+  };
+  if (!/^\d{6}$/.test(code)) return fail();
   const secret = ensureSecret();
   const now = Date.now();
   for (let i = -drift; i <= drift; i += 1) {
-    if (equal(code, pinForSlot(secret, slotAt(new Date(now + i * 60_000))))) return { ok: true };
+    if (equal(code, pinForSlot(secret, slotAt(new Date(now + i * 60_000))))) {
+      attempts.count = 0;
+      attempts.until = 0;
+      return { ok: true };
+    }
   }
-  return { ok: false };
+  return fail();
 }
+
 
 /**
  * A short, non-secret fingerprint of the device secret. Support reads this off

@@ -135,6 +135,18 @@ export async function emergencyPinAvailable(): Promise<boolean> {
   return false;
 }
 
+/**
+ * Guessing brake for the phone. Windows enforces its own in the main process;
+ * on Android the check happens here, so the pause lives here too — a screen
+ * that is reloaded still faces it because the module stays loaded with the app.
+ */
+const guesses = { count: 0, until: 0 };
+const lockMs = (n: number) => Math.min(15 * 60_000, 30_000 * 2 ** Math.max(0, n - 5));
+
+/** Seconds left on the local guessing lock, 0 when open. */
+export const emergencyLockSeconds = (): number =>
+  Math.max(0, Math.ceil((guesses.until - Date.now()) / 1000));
+
 /** Verify a typed code on this device. Never stores or logs the code. */
 export async function verifyEmergencyPin(pin: string): Promise<boolean> {
   const code = String(pin ?? "").trim();
@@ -149,12 +161,22 @@ export async function verifyEmergencyPin(pin: string): Promise<boolean> {
     }
   }
   if (isNative()) {
+    if (guesses.until > Date.now()) return false;
     const secret = await androidSecret();
     if (!secret) return false;
-    return verifyPinWithSecret(secret, code);
+    const ok = await verifyPinWithSecret(secret, code);
+    if (ok) {
+      guesses.count = 0;
+      guesses.until = 0;
+      return true;
+    }
+    guesses.count += 1;
+    if (guesses.count >= 5) guesses.until = Date.now() + lockMs(guesses.count);
+    return false;
   }
   return false;
 }
+
 
 /** Short non-secret fingerprint support uses to pick the right device secret. */
 export async function emergencyFingerprint(): Promise<string> {

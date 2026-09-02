@@ -12,16 +12,12 @@ import { isTerminalApp } from "./native";
 type Source = { url: string; key: string };
 
 /**
- * The POS tenant this build belongs to. These are public values (the anon /
- * publishable key is designed to be shipped in client code), and they are the
- * primary source so the app never drifts onto a different project just
- * because the hosting platform injected its own SUPABASE_* variables.
- * An activated terminal's own tenant still overrides this.
+ * No tenant is baked into the build. A shipped APK, installer or web bundle
+ * carries no project address and no key: the web deployment supplies them
+ * through its own environment, and a terminal gets them from its activation
+ * or from Settings → Database & Cloud Connection on that device.
  */
-const POS_PROJECT: Source = {
-  url: "https://qhrufhtbeguxydenzfey.supabase.co",
-  key: "sb_publishable_QwVvttLzDle_xTwP3L7Dyg_A6XM-cC-",
-};
+
 
 const clean = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
 
@@ -86,10 +82,15 @@ function bags(): Record<string, unknown>[] {
   // so a dynamic lookup finds nothing — these static reads are the only way
   // the browser bundle can carry build-time values.
   out.push({
+    // The POS-specific pair comes first everywhere: a hosting platform can
+    // inject its own SUPABASE_* values, and the shop's own project must win.
+    VITE_POS_SUPABASE_URL: import.meta.env.VITE_POS_SUPABASE_URL,
+    VITE_POS_SUPABASE_ANON_KEY: import.meta.env.VITE_POS_SUPABASE_ANON_KEY,
     VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
     VITE_SUPABASE_ANON_KEY:
       import.meta.env.VITE_SUPABASE_ANON_KEY ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
   });
+
   try {
     if (import.meta.env) out.push(import.meta.env as unknown as Record<string, unknown>);
   } catch {
@@ -104,14 +105,19 @@ function bags(): Record<string, unknown>[] {
 
 /** Name pairs tried in order; the first pair with BOTH halves present wins. */
 const PAIRS: [string, string][] = [
+  // The shop's own project, named explicitly so a hosting platform's injected
+  // SUPABASE_* values can never take over the POS.
+  ["VITE_POS_SUPABASE_URL", "VITE_POS_SUPABASE_ANON_KEY"],
+  ["POS_SUPABASE_URL", "POS_SUPABASE_PUBLISHABLE_KEY"],
+  ["POS_SUPABASE_URL", "POS_SUPABASE_ANON_KEY"],
   ["VITE_SUPABASE_URL", "VITE_SUPABASE_ANON_KEY"],
   ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY"],
   ["SUPABASE_URL", "SUPABASE_ANON_KEY"],
-  ["POS_SUPABASE_URL", "POS_SUPABASE_PUBLISHABLE_KEY"],
   // Rename bridge for older deployments. No values are baked in.
   ["VITE_SUPABASE_EXTERNAL_URL", "VITE_SUPABASE_EXTERNAL_PUBLISHABLE_KEY"],
   ["SUPABASE_EXTERNAL_URL", "SUPABASE_EXTERNAL_PUBLISHABLE_KEY"],
 ];
+
 
 export class SupabaseConfigError extends Error {
   constructor() {
@@ -140,10 +146,6 @@ export function supabaseConfig(): Source {
   // (applied above as the terminal override). Bundle-baked and environment
   // values belong to the web deployment and are deliberately invisible here.
   if (isTerminalApp()) throw new SupabaseConfigError();
-  if (POS_PROJECT.url && POS_PROJECT.key) {
-    cached = POS_PROJECT;
-    return cached;
-  }
   for (const bag of bags()) {
     for (const [urlName, keyName] of PAIRS) {
       const found = fromEnv(bag, urlName, keyName);

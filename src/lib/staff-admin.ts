@@ -147,16 +147,20 @@ export async function listTerminalStaff(storeId: string | null): Promise<Termina
   };
   try {
     // Android talks to the hosted POS directly; a server function would be
-    // answered by the phone's own static file server.
+    // answered by the phone's own static file server. The roster is staff
+    // data, so the endpoint only answers a registered terminal.
     const { serverOrigin, posFetch } = await import("./server-origin");
     if (serverOrigin()) {
+      const { readTerminalConfig } = await import("./terminal-tokens");
+      const terminalToken = readTerminalConfig()?.tokenId ?? "";
       const res = await posFetch("/api/public/terminal-staff", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ storeId }),
+        body: JSON.stringify({ storeId, terminalToken }),
       });
       return mirror(rows(await res.json().catch(() => null)));
     }
+
     return mirror(rows(await listTerminalStaffAccounts({ data: { storeId } })));
   } catch {
     // A till must still be able to sign in by typing a username.
