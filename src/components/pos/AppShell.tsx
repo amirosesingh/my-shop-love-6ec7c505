@@ -96,6 +96,8 @@ const ROUTE_PERMISSIONS: Record<string, PermissionFlag> = {
   "/all-shops": "can_view_inventory",
   "/purchasing": "can_receive_purchase_order",
   "/transfers": "can_create_transfer",
+  "/requests": "can_create_transfer",
+  "/receiving": "can_receive_transfer",
   "/bookings": "can_manage_bookings",
   "/members": "can_add_member",
   "/stock-operations": "can_adjust_stock",

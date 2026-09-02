@@ -86,6 +86,7 @@ const rowToTransfer = (r: Row, items: Row[]): StoredTransfer => ({
   discrepancyReason: r.discrepancy_reason ?? undefined,
   rejectedReason: r.rejected_reason ?? undefined,
   cancelledReason: r.cancelled_reason ?? undefined,
+  sourceRequestId: r.source_request_id ?? undefined,
   closedAt: r.closed_at ?? undefined,
   fulfilment: r.fulfilment ?? undefined,
   createdAt: r.created_at,
@@ -130,6 +131,22 @@ export async function loadTransfers(): Promise<StoredTransfer[]> {
   }
 }
 
+/** One note by id, for a deep link into a page the till has not cached. */
+export async function loadTransfer(id: string): Promise<StoredTransfer | null> {
+  try {
+    const head = await sb.from("stock_transfers").select("*").eq("id", id).maybeSingle();
+    if (head.error) throw new Error(head.error.message);
+    const row = head.data as Row | null;
+    if (!row) return null;
+    const lines = await sb.from("stock_transfer_items").select("*").eq("transfer_id", id);
+    if (lines.error) throw new Error(lines.error.message);
+    return rowToTransfer(row, ((lines.data as Row[] | null) ?? []) as Row[]);
+  } catch (e) {
+    console.error("[transfers] loadTransfer failed", e);
+    return null;
+  }
+}
+
 export type SaveTransferInput = {
   transfer: Transfer;
   from: Store | undefined;
@@ -154,6 +171,7 @@ export async function saveTransfer({ transfer, from, to, products }: SaveTransfe
     to_store_name: to?.name ?? null,
     to_group_id: groupOf(to),
     status: fromStatus(transfer.status),
+    source_request_id: transfer.sourceRequestId ?? null,
     note: transfer.note ?? "",
     created_by: transfer.createdBy || null,
   };
@@ -198,6 +216,25 @@ export async function setTransferStatus(
   if (status === "cancelled") patch.cancelled_reason = reason ?? null;
   return commitOps("Updating transfer", [
     { kind: "update", table: "stock_transfers", values: patch, match: { id } },
+  ]);
+}
+
+/**
+ * Close a request once the transfer raised against it has been sent. The
+ * request keeps its original quantities; only its status and fulfilment
+ * figure change, so "requested 8 / fulfilled 5" stays readable forever.
+ */
+export async function closeRequestInDb(
+  id: string,
+  fulfilment: NonNullable<Transfer["fulfilment"]>,
+) {
+  return commitOps("Closing request", [
+    {
+      kind: "update",
+      table: "stock_transfers",
+      values: { status: "completed", fulfilment, closed_at: new Date().toISOString() },
+      match: { id },
+    },
   ]);
 }
 

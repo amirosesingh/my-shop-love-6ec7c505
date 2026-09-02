@@ -36,24 +36,60 @@ const when = (iso: string) => {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
 };
 
-export function StatusHistoryDialog({
+/**
+ * The history itself, without any chrome, so a full-page workspace can show
+ * it inline while the dialog keeps using it too.
+ */
+export function StatusHistoryList({
   entity,
   entityId,
-  title,
-  open,
-  onOpenChange,
+  active = true,
 }: {
   entity: HistoryEntity;
   entityId: string;
-  title: string;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  active?: boolean;
 }) {
+  const { entries, error } = useStatusHistory(entity, entityId, active);
+  if (entries === null)
+    return <p className="py-6 text-center text-sm text-muted-foreground">Reading history…</p>;
+  if (!entries.length)
+    return (
+      <p className="py-6 text-center text-sm text-muted-foreground">
+        {error ?? "No changes have been recorded for this record yet."}
+      </p>
+    );
+  return (
+    <ol className="max-h-96 space-y-3 overflow-y-auto pr-1">
+      {entries.map((e, i) => (
+        <li
+          key={`${e.occurred_at}-${i}`}
+          className="rounded-md border border-border bg-card p-3 text-sm"
+        >
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <span className="font-medium">
+              {pretty(e.previous_status)} → {pretty(e.new_status)}
+            </span>
+            <span className="text-xs text-muted-foreground">{when(e.occurred_at)}</span>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {e.status_kind !== "status" ? `${pretty(e.status_kind)} · ` : ""}
+            {e.actor_name ?? "Unknown"}
+            {e.actor_role ? ` (${e.actor_role})` : ""}
+          </p>
+          {e.reason ? <p className="mt-2">{e.reason}</p> : null}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/** Reads the audit trail for one record once it is on screen. */
+function useStatusHistory(entity: HistoryEntity, entityId: string, active: boolean) {
   const [entries, setEntries] = useState<Entry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!active) return;
     let live = true;
     setEntries(null);
     setError(null);
@@ -86,8 +122,24 @@ export function StatusHistoryDialog({
     return () => {
       live = false;
     };
-  }, [open, entity, entityId]);
+  }, [active, entity, entityId]);
 
+  return { entries, error };
+}
+
+export function StatusHistoryDialog({
+  entity,
+  entityId,
+  title,
+  open,
+  onOpenChange,
+}: {
+  entity: HistoryEntity;
+  entityId: string;
+  title: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
@@ -101,35 +153,8 @@ export function StatusHistoryDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {entries === null ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">Reading history…</p>
-        ) : entries.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">
-            {error ?? "No changes have been recorded for this record yet."}
-          </p>
-        ) : (
-          <ol className="max-h-96 space-y-3 overflow-y-auto pr-1">
-            {entries.map((e, i) => (
-              <li
-                key={`${e.occurred_at}-${i}`}
-                className="rounded-md border border-border bg-card p-3 text-sm"
-              >
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <span className="font-medium">
-                    {pretty(e.previous_status)} → {pretty(e.new_status)}
-                  </span>
-                  <span className="text-xs text-muted-foreground">{when(e.occurred_at)}</span>
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {e.status_kind !== "status" ? `${pretty(e.status_kind)} · ` : ""}
-                  {e.actor_name ?? "Unknown"}
-                  {e.actor_role ? ` (${e.actor_role})` : ""}
-                </p>
-                {e.reason ? <p className="mt-2">{e.reason}</p> : null}
-              </li>
-            ))}
-          </ol>
-        )}
+        <StatusHistoryList entity={entity} entityId={entityId} active={open} />
+
       </DialogContent>
     </Dialog>
   );

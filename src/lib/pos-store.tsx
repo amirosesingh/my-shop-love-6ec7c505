@@ -71,6 +71,7 @@ import {
   approveTransferInDb,
   dispatchTransferInDb,
   receiveTransferInDb,
+  closeRequestInDb,
   verifyTransferInDb,
   saveTransfer,
   setTransferStatus,
@@ -144,6 +145,8 @@ type NewTransfer = {
   items: { productId: string; qty: number }[];
   note: string;
   createdBy: string;
+  /** the request this transfer fulfils, when it was raised from one */
+  sourceRequestId?: string;
   /** hold the note as "requested" until somebody authorises it */
   needsApproval?: boolean;
 };
@@ -2188,6 +2191,9 @@ export function PosProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  /** Lets approveTransfer raise the fulfilling transfer without a cycle. */
+  const createTransferRef = useRef<((input: NewTransfer) => Transfer) | null>(null);
+
   const createTransfer = useCallback((input: NewTransfer) => {
     const now = new Date().toISOString();
     const { needsApproval, ...rest } = input;
@@ -2228,6 +2234,8 @@ export function PosProvider({ children }: { children: ReactNode }) {
     }).catch((e: unknown) => dbError("Saving transfer", e as Error));
     return transfer;
   }, []);
+
+  createTransferRef.current = createTransfer;
 
   /** Quantities for a step, defaulting to the previous step's numbers. */
   const linesFor = (
@@ -2272,6 +2280,24 @@ export function PosProvider({ children }: { children: ReactNode }) {
     void approveTransferInDb(id, actorRef.current, allowed).then((r) => {
       if (!r.success) dbError("Approving transfer", new Error(r.error ?? "Unknown error"));
     });
+
+    // A request is paperwork; the goods move on a transfer of its own. The
+    // two rows stay joined by sourceRequestId so either page can reach the
+    // other, and the request keeps its original quantities untouched.
+    if (before.kind === "request") {
+      const lines = allowed.filter((l) => l.qty > 0);
+      if (lines.length)
+        createTransferRef.current?.({
+          kind: "transfer",
+          fromStoreId: before.fromStoreId,
+          toStoreId: before.toStoreId,
+          items: lines,
+          note: before.note ? `${before.note} · against ${before.ref}` : `Against ${before.ref}`,
+          createdBy: actorRef.current,
+          sourceRequestId: before.id,
+          needsApproval: false,
+        });
+    }
     logger.log("inventory", "Stock transfer approved", "transfers", {
       transferId: id,
       ref: before.ref,
@@ -2338,6 +2364,32 @@ export function PosProvider({ children }: { children: ReactNode }) {
     void dispatchTransferInDb(id, actorRef.current, sent).then((r) => {
       if (!r.success) dbError("Dispatching transfer", new Error(r.error ?? "Unknown error"));
     });
+
+    // The request behind this transfer closes on what was actually sent.
+    if (before.sourceRequestId) {
+      const requestId = before.sourceRequestId;
+      const request = s0.transfers.find((x) => x.id === requestId);
+      const requested = request?.items.reduce((a, i) => a + i.qty, 0) ?? asked;
+      const requestFulfilment: Transfer["fulfilment"] =
+        total === 0 ? "none" : total >= requested ? "full" : "partial";
+      setState((s) => ({
+        ...s,
+        transfers: s.transfers.map((x) =>
+          x.id === requestId
+            ? {
+                ...x,
+                status: "completed",
+                closedAt: now,
+                fulfilment: requestFulfilment,
+                updatedAt: now,
+              }
+            : x,
+        ),
+      }));
+      void closeRequestInDb(requestId, requestFulfilment ?? "partial").catch((e: unknown) =>
+        dbError("Closing request", e as Error),
+      );
+    }
     logger.log("inventory", "Stock transfer dispatched", "transfers", {
       transferId: id,
       ref: before.ref,

@@ -34,7 +34,6 @@ import { Route as StaffRouteImport } from './routes/staff'
 import { Route as StockOperationsRouteImport } from './routes/stock-operations'
 import { Route as StoresRouteImport } from './routes/stores'
 import { Route as SuppliersRouteImport } from './routes/suppliers'
-import { Route as TransfersRouteImport } from './routes/transfers'
 import { Route as VerificationsRouteImport } from './routes/verifications'
 import { Route as ApiCashierLoginRouteImport } from './routes/api/cashier-login'
 import { Route as ApiSettingsRouteImport } from './routes/api/settings'
@@ -42,6 +41,7 @@ import { Route as CTokenSlugRouteImport } from './routes/c.$tokenSlug'
 import { Route as ClaimCampaignSlugRouteImport } from './routes/claim.$campaignSlug'
 import { Route as PosGeneralBookingRouteImport } from './routes/pos.general-booking'
 import { Route as PosRacketServiceRouteImport } from './routes/pos.racket-service'
+import { Route as ReceivingIdRouteImport } from './routes/receiving.$id'
 import { Route as ReportsIndexRouteImport } from './routes/reports.index'
 import { Route as ReportsActivityRouteImport } from './routes/reports.activity'
 import { Route as ReportsAnalyticsRouteImport } from './routes/reports.analytics'
@@ -55,6 +55,8 @@ import { Route as ReportsPaymentsRouteImport } from './routes/reports.payments'
 import { Route as ReportsSalesRouteImport } from './routes/reports.sales'
 import { Route as ReportsStockRouteImport } from './routes/reports.stock'
 import { Route as ReportsVoidsRouteImport } from './routes/reports.voids'
+import { Route as RequestsIdRouteImport } from './routes/requests.$id'
+import { Route as RequestsNewRouteImport } from './routes/requests.new'
 import { Route as SettingsIndexRouteImport } from './routes/settings.index'
 import { Route as SettingsAccessRouteImport } from './routes/settings.access'
 import { Route as SettingsAccountsRouteImport } from './routes/settings.accounts'
@@ -97,6 +99,9 @@ import { Route as SettingsTypeRouteImport } from './routes/settings.type'
 import { Route as SettingsUpdatesRouteImport } from './routes/settings.updates'
 import { Route as SettingsVisibilityRouteImport } from './routes/settings.visibility'
 import { Route as SettingsWhatsappRouteImport } from './routes/settings.whatsapp'
+import { Route as TransfersIndexRouteImport } from './routes/transfers.index'
+import { Route as TransfersIdRouteImport } from './routes/transfers.$id'
+import { Route as TransfersNewRouteImport } from './routes/transfers.new'
 import { Route as ApiPublicCashierLoginRouteImport } from './routes/api/public/cashier-login'
 import { Route as ApiPublicHealthMetadataRouteImport } from './routes/api/public/health-metadata'
 import { Route as ApiPublicSecurityAlertsRouteImport } from './routes/api/public/security-alerts'
@@ -232,11 +237,6 @@ const SuppliersRoute = SuppliersRouteImport.update({
   path: '/suppliers',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TransfersRoute = TransfersRouteImport.update({
-  id: '/transfers',
-  path: '/transfers',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const VerificationsRoute = VerificationsRouteImport.update({
   id: '/verifications',
   path: '/verifications',
@@ -270,6 +270,11 @@ const PosGeneralBookingRoute = PosGeneralBookingRouteImport.update({
 const PosRacketServiceRoute = PosRacketServiceRouteImport.update({
   id: '/pos/racket-service',
   path: '/pos/racket-service',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReceivingIdRoute = ReceivingIdRouteImport.update({
+  id: '/receiving/$id',
+  path: '/receiving/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReportsIndexRoute = ReportsIndexRouteImport.update({
@@ -335,6 +340,16 @@ const ReportsStockRoute = ReportsStockRouteImport.update({
 const ReportsVoidsRoute = ReportsVoidsRouteImport.update({
   id: '/reports/voids',
   path: '/reports/voids',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RequestsIdRoute = RequestsIdRouteImport.update({
+  id: '/requests/$id',
+  path: '/requests/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RequestsNewRoute = RequestsNewRouteImport.update({
+  id: '/requests/new',
+  path: '/requests/new',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsIndexRoute = SettingsIndexRouteImport.update({
@@ -548,6 +563,21 @@ const SettingsWhatsappRoute = SettingsWhatsappRouteImport.update({
   path: '/settings/whatsapp',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TransfersIndexRoute = TransfersIndexRouteImport.update({
+  id: '/transfers/',
+  path: '/transfers/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TransfersIdRoute = TransfersIdRouteImport.update({
+  id: '/transfers/$id',
+  path: '/transfers/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TransfersNewRoute = TransfersNewRouteImport.update({
+  id: '/transfers/new',
+  path: '/transfers/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicCashierLoginRoute = ApiPublicCashierLoginRouteImport.update({
   id: '/api/public/cashier-login',
   path: '/api/public/cashier-login',
@@ -620,7 +650,6 @@ export interface FileRoutesByFullPath {
   '/stock-operations': typeof StockOperationsRoute
   '/stores': typeof StoresRoute
   '/suppliers': typeof SuppliersRoute
-  '/transfers': typeof TransfersRoute
   '/verifications': typeof VerificationsRoute
   '/api/cashier-login': typeof ApiCashierLoginRoute
   '/api/settings': typeof ApiSettingsRouteWithChildren
@@ -628,6 +657,7 @@ export interface FileRoutesByFullPath {
   '/claim/$campaignSlug': typeof ClaimCampaignSlugRoute
   '/pos/general-booking': typeof PosGeneralBookingRoute
   '/pos/racket-service': typeof PosRacketServiceRoute
+  '/receiving/$id': typeof ReceivingIdRoute
   '/reports/activity': typeof ReportsActivityRoute
   '/reports/analytics': typeof ReportsAnalyticsRoute
   '/reports/business': typeof ReportsBusinessRoute
@@ -640,6 +670,8 @@ export interface FileRoutesByFullPath {
   '/reports/sales': typeof ReportsSalesRoute
   '/reports/stock': typeof ReportsStockRoute
   '/reports/voids': typeof ReportsVoidsRoute
+  '/requests/$id': typeof RequestsIdRoute
+  '/requests/new': typeof RequestsNewRoute
   '/settings/access': typeof SettingsAccessRoute
   '/settings/accounts': typeof SettingsAccountsRoute
   '/settings/booking-rules': typeof SettingsBookingRulesRoute
@@ -681,8 +713,11 @@ export interface FileRoutesByFullPath {
   '/settings/updates': typeof SettingsUpdatesRoute
   '/settings/visibility': typeof SettingsVisibilityRoute
   '/settings/whatsapp': typeof SettingsWhatsappRoute
+  '/transfers/$id': typeof TransfersIdRoute
+  '/transfers/new': typeof TransfersNewRoute
   '/reports/': typeof ReportsIndexRoute
   '/settings/': typeof SettingsIndexRoute
+  '/transfers/': typeof TransfersIndexRoute
   '/api/public/cashier-login': typeof ApiPublicCashierLoginRoute
   '/api/public/health-metadata': typeof ApiPublicHealthMetadataRoute
   '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
@@ -719,7 +754,6 @@ export interface FileRoutesByTo {
   '/stock-operations': typeof StockOperationsRoute
   '/stores': typeof StoresRoute
   '/suppliers': typeof SuppliersRoute
-  '/transfers': typeof TransfersRoute
   '/verifications': typeof VerificationsRoute
   '/api/cashier-login': typeof ApiCashierLoginRoute
   '/api/settings': typeof ApiSettingsRouteWithChildren
@@ -727,6 +761,7 @@ export interface FileRoutesByTo {
   '/claim/$campaignSlug': typeof ClaimCampaignSlugRoute
   '/pos/general-booking': typeof PosGeneralBookingRoute
   '/pos/racket-service': typeof PosRacketServiceRoute
+  '/receiving/$id': typeof ReceivingIdRoute
   '/reports/activity': typeof ReportsActivityRoute
   '/reports/analytics': typeof ReportsAnalyticsRoute
   '/reports/business': typeof ReportsBusinessRoute
@@ -739,6 +774,8 @@ export interface FileRoutesByTo {
   '/reports/sales': typeof ReportsSalesRoute
   '/reports/stock': typeof ReportsStockRoute
   '/reports/voids': typeof ReportsVoidsRoute
+  '/requests/$id': typeof RequestsIdRoute
+  '/requests/new': typeof RequestsNewRoute
   '/settings/access': typeof SettingsAccessRoute
   '/settings/accounts': typeof SettingsAccountsRoute
   '/settings/booking-rules': typeof SettingsBookingRulesRoute
@@ -780,8 +817,11 @@ export interface FileRoutesByTo {
   '/settings/updates': typeof SettingsUpdatesRoute
   '/settings/visibility': typeof SettingsVisibilityRoute
   '/settings/whatsapp': typeof SettingsWhatsappRoute
+  '/transfers/$id': typeof TransfersIdRoute
+  '/transfers/new': typeof TransfersNewRoute
   '/reports': typeof ReportsIndexRoute
   '/settings': typeof SettingsIndexRoute
+  '/transfers': typeof TransfersIndexRoute
   '/api/public/cashier-login': typeof ApiPublicCashierLoginRoute
   '/api/public/health-metadata': typeof ApiPublicHealthMetadataRoute
   '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
@@ -819,7 +859,6 @@ export interface FileRoutesById {
   '/stock-operations': typeof StockOperationsRoute
   '/stores': typeof StoresRoute
   '/suppliers': typeof SuppliersRoute
-  '/transfers': typeof TransfersRoute
   '/verifications': typeof VerificationsRoute
   '/api/cashier-login': typeof ApiCashierLoginRoute
   '/api/settings': typeof ApiSettingsRouteWithChildren
@@ -827,6 +866,7 @@ export interface FileRoutesById {
   '/claim/$campaignSlug': typeof ClaimCampaignSlugRoute
   '/pos/general-booking': typeof PosGeneralBookingRoute
   '/pos/racket-service': typeof PosRacketServiceRoute
+  '/receiving/$id': typeof ReceivingIdRoute
   '/reports/activity': typeof ReportsActivityRoute
   '/reports/analytics': typeof ReportsAnalyticsRoute
   '/reports/business': typeof ReportsBusinessRoute
@@ -839,6 +879,8 @@ export interface FileRoutesById {
   '/reports/sales': typeof ReportsSalesRoute
   '/reports/stock': typeof ReportsStockRoute
   '/reports/voids': typeof ReportsVoidsRoute
+  '/requests/$id': typeof RequestsIdRoute
+  '/requests/new': typeof RequestsNewRoute
   '/settings/access': typeof SettingsAccessRoute
   '/settings/accounts': typeof SettingsAccountsRoute
   '/settings/booking-rules': typeof SettingsBookingRulesRoute
@@ -880,8 +922,11 @@ export interface FileRoutesById {
   '/settings/updates': typeof SettingsUpdatesRoute
   '/settings/visibility': typeof SettingsVisibilityRoute
   '/settings/whatsapp': typeof SettingsWhatsappRoute
+  '/transfers/$id': typeof TransfersIdRoute
+  '/transfers/new': typeof TransfersNewRoute
   '/reports/': typeof ReportsIndexRoute
   '/settings/': typeof SettingsIndexRoute
+  '/transfers/': typeof TransfersIndexRoute
   '/api/public/cashier-login': typeof ApiPublicCashierLoginRoute
   '/api/public/health-metadata': typeof ApiPublicHealthMetadataRoute
   '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
@@ -920,7 +965,6 @@ export interface FileRouteTypes {
     | '/stock-operations'
     | '/stores'
     | '/suppliers'
-    | '/transfers'
     | '/verifications'
     | '/api/cashier-login'
     | '/api/settings'
@@ -928,6 +972,7 @@ export interface FileRouteTypes {
     | '/claim/$campaignSlug'
     | '/pos/general-booking'
     | '/pos/racket-service'
+    | '/receiving/$id'
     | '/reports/activity'
     | '/reports/analytics'
     | '/reports/business'
@@ -940,6 +985,8 @@ export interface FileRouteTypes {
     | '/reports/sales'
     | '/reports/stock'
     | '/reports/voids'
+    | '/requests/$id'
+    | '/requests/new'
     | '/settings/access'
     | '/settings/accounts'
     | '/settings/booking-rules'
@@ -981,8 +1028,11 @@ export interface FileRouteTypes {
     | '/settings/updates'
     | '/settings/visibility'
     | '/settings/whatsapp'
+    | '/transfers/$id'
+    | '/transfers/new'
     | '/reports/'
     | '/settings/'
+    | '/transfers/'
     | '/api/public/cashier-login'
     | '/api/public/health-metadata'
     | '/api/public/security-alerts'
@@ -1019,7 +1069,6 @@ export interface FileRouteTypes {
     | '/stock-operations'
     | '/stores'
     | '/suppliers'
-    | '/transfers'
     | '/verifications'
     | '/api/cashier-login'
     | '/api/settings'
@@ -1027,6 +1076,7 @@ export interface FileRouteTypes {
     | '/claim/$campaignSlug'
     | '/pos/general-booking'
     | '/pos/racket-service'
+    | '/receiving/$id'
     | '/reports/activity'
     | '/reports/analytics'
     | '/reports/business'
@@ -1039,6 +1089,8 @@ export interface FileRouteTypes {
     | '/reports/sales'
     | '/reports/stock'
     | '/reports/voids'
+    | '/requests/$id'
+    | '/requests/new'
     | '/settings/access'
     | '/settings/accounts'
     | '/settings/booking-rules'
@@ -1080,8 +1132,11 @@ export interface FileRouteTypes {
     | '/settings/updates'
     | '/settings/visibility'
     | '/settings/whatsapp'
+    | '/transfers/$id'
+    | '/transfers/new'
     | '/reports'
     | '/settings'
+    | '/transfers'
     | '/api/public/cashier-login'
     | '/api/public/health-metadata'
     | '/api/public/security-alerts'
@@ -1118,7 +1173,6 @@ export interface FileRouteTypes {
     | '/stock-operations'
     | '/stores'
     | '/suppliers'
-    | '/transfers'
     | '/verifications'
     | '/api/cashier-login'
     | '/api/settings'
@@ -1126,6 +1180,7 @@ export interface FileRouteTypes {
     | '/claim/$campaignSlug'
     | '/pos/general-booking'
     | '/pos/racket-service'
+    | '/receiving/$id'
     | '/reports/activity'
     | '/reports/analytics'
     | '/reports/business'
@@ -1138,6 +1193,8 @@ export interface FileRouteTypes {
     | '/reports/sales'
     | '/reports/stock'
     | '/reports/voids'
+    | '/requests/$id'
+    | '/requests/new'
     | '/settings/access'
     | '/settings/accounts'
     | '/settings/booking-rules'
@@ -1179,8 +1236,11 @@ export interface FileRouteTypes {
     | '/settings/updates'
     | '/settings/visibility'
     | '/settings/whatsapp'
+    | '/transfers/$id'
+    | '/transfers/new'
     | '/reports/'
     | '/settings/'
+    | '/transfers/'
     | '/api/public/cashier-login'
     | '/api/public/health-metadata'
     | '/api/public/security-alerts'
@@ -1218,7 +1278,6 @@ export interface RootRouteChildren {
   StockOperationsRoute: typeof StockOperationsRoute
   StoresRoute: typeof StoresRoute
   SuppliersRoute: typeof SuppliersRoute
-  TransfersRoute: typeof TransfersRoute
   VerificationsRoute: typeof VerificationsRoute
   ApiCashierLoginRoute: typeof ApiCashierLoginRoute
   ApiSettingsRoute: typeof ApiSettingsRouteWithChildren
@@ -1226,6 +1285,7 @@ export interface RootRouteChildren {
   ClaimCampaignSlugRoute: typeof ClaimCampaignSlugRoute
   PosGeneralBookingRoute: typeof PosGeneralBookingRoute
   PosRacketServiceRoute: typeof PosRacketServiceRoute
+  ReceivingIdRoute: typeof ReceivingIdRoute
   ReportsActivityRoute: typeof ReportsActivityRoute
   ReportsAnalyticsRoute: typeof ReportsAnalyticsRoute
   ReportsBusinessRoute: typeof ReportsBusinessRoute
@@ -1238,6 +1298,8 @@ export interface RootRouteChildren {
   ReportsSalesRoute: typeof ReportsSalesRoute
   ReportsStockRoute: typeof ReportsStockRoute
   ReportsVoidsRoute: typeof ReportsVoidsRoute
+  RequestsIdRoute: typeof RequestsIdRoute
+  RequestsNewRoute: typeof RequestsNewRoute
   SettingsAccessRoute: typeof SettingsAccessRoute
   SettingsAccountsRoute: typeof SettingsAccountsRoute
   SettingsBookingRulesRoute: typeof SettingsBookingRulesRoute
@@ -1279,8 +1341,11 @@ export interface RootRouteChildren {
   SettingsUpdatesRoute: typeof SettingsUpdatesRoute
   SettingsVisibilityRoute: typeof SettingsVisibilityRoute
   SettingsWhatsappRoute: typeof SettingsWhatsappRoute
+  TransfersIdRoute: typeof TransfersIdRoute
+  TransfersNewRoute: typeof TransfersNewRoute
   ReportsIndexRoute: typeof ReportsIndexRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
+  TransfersIndexRoute: typeof TransfersIndexRoute
   ApiPublicCashierLoginRoute: typeof ApiPublicCashierLoginRoute
   ApiPublicHealthMetadataRoute: typeof ApiPublicHealthMetadataRoute
   ApiPublicSecurityAlertsRoute: typeof ApiPublicSecurityAlertsRoute
@@ -1467,13 +1532,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SuppliersRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/transfers': {
-      id: '/transfers'
-      path: '/transfers'
-      fullPath: '/transfers'
-      preLoaderRoute: typeof TransfersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/verifications': {
       id: '/verifications'
       path: '/verifications'
@@ -1521,6 +1579,13 @@ declare module '@tanstack/react-router' {
       path: '/pos/racket-service'
       fullPath: '/pos/racket-service'
       preLoaderRoute: typeof PosRacketServiceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/receiving/$id': {
+      id: '/receiving/$id'
+      path: '/receiving/$id'
+      fullPath: '/receiving/$id'
+      preLoaderRoute: typeof ReceivingIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reports/': {
@@ -1612,6 +1677,20 @@ declare module '@tanstack/react-router' {
       path: '/reports/voids'
       fullPath: '/reports/voids'
       preLoaderRoute: typeof ReportsVoidsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/requests/$id': {
+      id: '/requests/$id'
+      path: '/requests/$id'
+      fullPath: '/requests/$id'
+      preLoaderRoute: typeof RequestsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/requests/new': {
+      id: '/requests/new'
+      path: '/requests/new'
+      fullPath: '/requests/new'
+      preLoaderRoute: typeof RequestsNewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings/': {
@@ -1908,6 +1987,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsWhatsappRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/transfers/': {
+      id: '/transfers/'
+      path: '/transfers'
+      fullPath: '/transfers/'
+      preLoaderRoute: typeof TransfersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/transfers/$id': {
+      id: '/transfers/$id'
+      path: '/transfers/$id'
+      fullPath: '/transfers/$id'
+      preLoaderRoute: typeof TransfersIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/transfers/new': {
+      id: '/transfers/new'
+      path: '/transfers/new'
+      fullPath: '/transfers/new'
+      preLoaderRoute: typeof TransfersNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/cashier-login': {
       id: '/api/public/cashier-login'
       path: '/api/public/cashier-login'
@@ -2014,7 +2114,6 @@ const rootRouteChildren: RootRouteChildren = {
   StockOperationsRoute: StockOperationsRoute,
   StoresRoute: StoresRoute,
   SuppliersRoute: SuppliersRoute,
-  TransfersRoute: TransfersRoute,
   VerificationsRoute: VerificationsRoute,
   ApiCashierLoginRoute: ApiCashierLoginRoute,
   ApiSettingsRoute: ApiSettingsRouteWithChildren,
@@ -2022,6 +2121,7 @@ const rootRouteChildren: RootRouteChildren = {
   ClaimCampaignSlugRoute: ClaimCampaignSlugRoute,
   PosGeneralBookingRoute: PosGeneralBookingRoute,
   PosRacketServiceRoute: PosRacketServiceRoute,
+  ReceivingIdRoute: ReceivingIdRoute,
   ReportsActivityRoute: ReportsActivityRoute,
   ReportsAnalyticsRoute: ReportsAnalyticsRoute,
   ReportsBusinessRoute: ReportsBusinessRoute,
@@ -2034,6 +2134,8 @@ const rootRouteChildren: RootRouteChildren = {
   ReportsSalesRoute: ReportsSalesRoute,
   ReportsStockRoute: ReportsStockRoute,
   ReportsVoidsRoute: ReportsVoidsRoute,
+  RequestsIdRoute: RequestsIdRoute,
+  RequestsNewRoute: RequestsNewRoute,
   SettingsAccessRoute: SettingsAccessRoute,
   SettingsAccountsRoute: SettingsAccountsRoute,
   SettingsBookingRulesRoute: SettingsBookingRulesRoute,
@@ -2075,8 +2177,11 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsUpdatesRoute: SettingsUpdatesRoute,
   SettingsVisibilityRoute: SettingsVisibilityRoute,
   SettingsWhatsappRoute: SettingsWhatsappRoute,
+  TransfersIdRoute: TransfersIdRoute,
+  TransfersNewRoute: TransfersNewRoute,
   ReportsIndexRoute: ReportsIndexRoute,
   SettingsIndexRoute: SettingsIndexRoute,
+  TransfersIndexRoute: TransfersIndexRoute,
   ApiPublicCashierLoginRoute: ApiPublicCashierLoginRoute,
   ApiPublicHealthMetadataRoute: ApiPublicHealthMetadataRoute,
   ApiPublicSecurityAlertsRoute: ApiPublicSecurityAlertsRoute,
