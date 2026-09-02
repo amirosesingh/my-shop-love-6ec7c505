@@ -3370,6 +3370,7 @@ export type Database = {
           quantity_approved: number | null
           quantity_dispatched: number | null
           quantity_received: number
+          quantity_verified: number | null
           row_version: number
           sku: string | null
           transfer_id: string
@@ -3385,6 +3386,7 @@ export type Database = {
           quantity_approved?: number | null
           quantity_dispatched?: number | null
           quantity_received?: number
+          quantity_verified?: number | null
           row_version?: number
           sku?: string | null
           transfer_id: string
@@ -3400,6 +3402,7 @@ export type Database = {
           quantity_approved?: number | null
           quantity_dispatched?: number | null
           quantity_received?: number
+          quantity_verified?: number | null
           row_version?: number
           sku?: string | null
           transfer_id?: string
@@ -3430,6 +3433,7 @@ export type Database = {
           closed_at: string | null
           created_at: string
           created_by: string | null
+          discrepancy_reason: string | null
           dispatched_at: string | null
           dispatched_by: string | null
           from_group_id: string | null
@@ -3439,6 +3443,7 @@ export type Database = {
           id: string
           kind: string
           note: string
+          posted_at: string | null
           received_at: string | null
           received_by: string | null
           ref: string
@@ -3451,6 +3456,8 @@ export type Database = {
           to_store_name: string | null
           transfer_scope: string
           updated_at: string
+          verified_at: string | null
+          verified_by: string | null
         }
         Insert: {
           approved_at?: string | null
@@ -3459,6 +3466,7 @@ export type Database = {
           closed_at?: string | null
           created_at?: string
           created_by?: string | null
+          discrepancy_reason?: string | null
           dispatched_at?: string | null
           dispatched_by?: string | null
           from_group_id?: string | null
@@ -3468,6 +3476,7 @@ export type Database = {
           id?: string
           kind?: string
           note?: string
+          posted_at?: string | null
           received_at?: string | null
           received_by?: string | null
           ref: string
@@ -3480,6 +3489,8 @@ export type Database = {
           to_store_name?: string | null
           transfer_scope?: string
           updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
         }
         Update: {
           approved_at?: string | null
@@ -3488,6 +3499,7 @@ export type Database = {
           closed_at?: string | null
           created_at?: string
           created_by?: string | null
+          discrepancy_reason?: string | null
           dispatched_at?: string | null
           dispatched_by?: string | null
           from_group_id?: string | null
@@ -3497,6 +3509,7 @@ export type Database = {
           id?: string
           kind?: string
           note?: string
+          posted_at?: string | null
           received_at?: string | null
           received_by?: string | null
           ref?: string
@@ -3509,6 +3522,8 @@ export type Database = {
           to_store_name?: string | null
           transfer_scope?: string
           updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
         }
         Relationships: []
       }
@@ -4641,6 +4656,15 @@ export type Database = {
           p_lines?: Json
           p_received_by?: string
           p_transfer_id: string
+        }
+        Returns: undefined
+      }
+      stock_transfer_verify: {
+        Args: {
+          p_lines?: Json
+          p_reason?: string
+          p_transfer_id: string
+          p_verified_by?: string
         }
         Returns: undefined
       }

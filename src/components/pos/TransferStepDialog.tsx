@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import type { Transfer } from "@/lib/pos-types";
 
-export type TransferStep = "approve" | "dispatch" | "receive";
+export type TransferStep = "approve" | "dispatch" | "receive" | "verify";
 
 const COPY: Record<TransferStep, { title: string; blurb: string; column: string; cta: string }> = {
   approve: {
@@ -35,10 +35,18 @@ const COPY: Record<TransferStep, { title: string; blurb: string; column: string;
     cta: "Dispatch",
   },
   receive: {
-    title: "Receive transfer",
-    blurb: "Count what arrived. Anything missing is recorded against the note.",
-    column: "Received",
-    cta: "Receive",
+    title: "Confirm arrival",
+    blurb:
+      "Mark the delivery as arrived. Nothing goes on the shelf until somebody physically counts it.",
+    column: "Arrived",
+    cta: "Confirm arrival",
+  },
+  verify: {
+    title: "Verify delivery",
+    blurb:
+      "Count the box line by line. These are the quantities that go onto the shelf, so a short count needs a reason.",
+    column: "Counted",
+    cta: "Verify & post",
   },
 };
 
@@ -50,6 +58,9 @@ const ceilingFor = (step: TransferStep, i: Transfer["items"][number]) =>
       ? (i.approvedQty ?? i.qty)
       : (i.dispatchedQty ?? i.approvedQty ?? i.qty);
 
+/** Arrival is a yes/no step — the counting happens at verification. */
+const isConfirmOnly = (step: TransferStep) => step === "receive";
+
 export function TransferStepDialog({
   step,
   transfer,
@@ -60,23 +71,27 @@ export function TransferStepDialog({
   step: TransferStep;
   transfer: Transfer | null;
   nameOf: (productId: string) => string;
-  onConfirm: (lines: { productId: string; qty: number }[]) => void;
+  onConfirm: (lines: { productId: string; qty: number }[], reason?: string) => void;
   onClose: () => void;
 }) {
   const [qty, setQty] = useState<Record<string, number>>({});
+  const [reason, setReason] = useState("");
 
   useEffect(() => {
     if (!transfer) return;
     setQty(Object.fromEntries(transfer.items.map((i) => [i.productId, ceilingFor(step, i)])));
+    setReason("");
   }, [transfer, step]);
 
   const copy = COPY[step];
-  const total = useMemo(
-    () => Object.values(qty).reduce((a, n) => a + (Number(n) || 0), 0),
-    [qty],
-  );
-  const asked = transfer?.items.reduce((a, i) => a + i.qty, 0) ?? 0;
+  const total = useMemo(() => Object.values(qty).reduce((a, n) => a + (Number(n) || 0), 0), [qty]);
+  const asked =
+    transfer?.items.reduce(
+      (a, i) => a + (step === "verify" ? (i.dispatchedQty ?? i.qty) : i.qty),
+      0,
+    ) ?? 0;
   const short = transfer ? total < asked : false;
+  const needsReason = step === "verify" && short && !reason.trim();
 
   if (!transfer) return null;
 
@@ -91,46 +106,70 @@ export function TransferStepDialog({
         <p className="text-sm text-muted-foreground">{copy.blurb}</p>
         <Separator />
         <div className="max-h-72 space-y-2 overflow-y-auto">
-          {transfer.items.map((i) => {
-            const cap = ceilingFor(step, i);
-            return (
-              <div key={i.productId} className="flex items-center gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm">{nameOf(i.productId)}</div>
-                  <div className="numeric text-[11px] text-muted-foreground">
-                    asked {i.qty}
-                    {i.approvedQty !== undefined && ` · approved ${i.approvedQty}`}
-                    {i.dispatchedQty !== undefined && ` · sent ${i.dispatchedQty}`}
+          {isConfirmOnly(step)
+            ? transfer.items.map((i) => (
+                <div key={i.productId} className="flex items-center justify-between gap-3">
+                  <span className="truncate text-sm">{nameOf(i.productId)}</span>
+                  <span className="numeric text-sm text-muted-foreground">
+                    sent {i.dispatchedQty ?? i.qty}
+                  </span>
+                </div>
+              ))
+            : transfer.items.map((i) => {
+                const cap = ceilingFor(step, i);
+                return (
+                  <div key={i.productId} className="flex items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm">{nameOf(i.productId)}</div>
+                      <div className="numeric text-[11px] text-muted-foreground">
+                        asked {i.qty}
+                        {i.approvedQty !== undefined && ` · approved ${i.approvedQty}`}
+                        {i.dispatchedQty !== undefined && ` · sent ${i.dispatchedQty}`}
+                      </div>
+                    </div>
+                    <div className="w-24">
+                      <Label className="sr-only">{copy.column}</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={cap}
+                        className="numeric text-right"
+                        value={qty[i.productId] ?? 0}
+                        onChange={(e) =>
+                          setQty((prev) => ({
+                            ...prev,
+                            [i.productId]: Math.max(
+                              0,
+                              Math.min(cap, Math.floor(Number(e.target.value) || 0)),
+                            ),
+                          }))
+                        }
+                      />
+                    </div>
                   </div>
-                </div>
-                <div className="w-24">
-                  <Label className="sr-only">{copy.column}</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={cap}
-                    className="numeric text-right"
-                    value={qty[i.productId] ?? 0}
-                    onChange={(e) =>
-                      setQty((prev) => ({
-                        ...prev,
-                        [i.productId]: Math.max(
-                          0,
-                          Math.min(cap, Math.floor(Number(e.target.value) || 0)),
-                        ),
-                      }))
-                    }
-                  />
-                </div>
-              </div>
-            );
-          })}
+                );
+              })}
         </div>
+        {step === "verify" && (
+          <div className="space-y-1">
+            <Label htmlFor="transfer-discrepancy">
+              Reason for the difference {short ? "(required)" : "(optional)"}
+            </Label>
+            <Input
+              id="transfer-discrepancy"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Two units damaged in transit"
+            />
+          </div>
+        )}
         {short && (
           <p className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
             {step === "dispatch"
               ? "This is a part send. The note will close on this quantity — the shortfall is not carried forward."
-              : "This is less than was asked for. The difference is recorded on the note."}
+              : step === "verify"
+                ? "The count is short of what was dispatched. Only the counted quantity goes on the shelf; the difference is flagged as missing in transit."
+                : "This is less than was asked for. The difference is recorded on the note."}
           </p>
         )}
         <DialogFooter>
@@ -138,16 +177,24 @@ export function TransferStepDialog({
             Cancel
           </Button>
           <Button
+            disabled={needsReason}
             onClick={() =>
               onConfirm(
                 transfer.items.map((i) => ({
                   productId: i.productId,
                   qty: Math.max(0, Math.min(ceilingFor(step, i), qty[i.productId] ?? 0)),
                 })),
+                reason.trim() || undefined,
               )
             }
           >
-            {copy.cta} · <span className="numeric">{total}</span>
+            {copy.cta}
+            {!isConfirmOnly(step) && (
+              <>
+                {" · "}
+                <span className="numeric">{total}</span>
+              </>
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

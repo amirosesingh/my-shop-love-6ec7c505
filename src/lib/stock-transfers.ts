@@ -26,21 +26,25 @@ export function scopeBetween(from: Store | undefined, to: Store | undefined): Tr
 }
 
 /**
- * Database status names, including the two older spellings a till upgraded
- * mid-week may still be holding.
+ * Database status names, including the older spellings a till upgraded
+ * mid-week may still be holding. "in_transit" was an old name for dispatched.
  */
 const toStatus = (s: string): TransferStatus =>
   s === "approved"
     ? "approved"
     : s === "in_transit" || s === "dispatched"
       ? "dispatched"
-      : s === "received" || s === "completed"
+      : s === "received"
         ? "received"
-        : s === "rejected"
-          ? "rejected"
-          : s === "cancelled"
-            ? "cancelled"
-            : "awaiting_approval";
+        : s === "completed" || s === "verified"
+          ? "completed"
+          : s === "completed_with_discrepancy"
+            ? "completed_with_discrepancy"
+            : s === "rejected"
+              ? "rejected"
+              : s === "cancelled"
+                ? "cancelled"
+                : "awaiting_approval";
 
 const fromStatus = (s: TransferStatus): string => s;
 
@@ -65,6 +69,7 @@ const rowToTransfer = (r: Row, items: Row[]): StoredTransfer => ({
     approvedQty: num(i.quantity_approved),
     dispatchedQty: num(i.quantity_dispatched),
     receivedQty: num(i.quantity_received),
+    verifiedQty: num(i.quantity_verified),
   })),
   status: toStatus(r.status),
   note: r.note ?? "",
@@ -75,6 +80,10 @@ const rowToTransfer = (r: Row, items: Row[]): StoredTransfer => ({
   dispatchedAt: r.dispatched_at ?? undefined,
   receivedBy: r.received_by ?? undefined,
   receivedAt: r.received_at ?? undefined,
+  verifiedBy: r.verified_by ?? undefined,
+  verifiedAt: r.verified_at ?? undefined,
+  postedAt: r.posted_at ?? undefined,
+  discrepancyReason: r.discrepancy_reason ?? undefined,
   rejectedReason: r.rejected_reason ?? undefined,
   cancelledReason: r.cancelled_reason ?? undefined,
   closedAt: r.closed_at ?? undefined,
@@ -101,10 +110,13 @@ export async function loadTransfers(): Promise<StoredTransfer[]> {
     const lines = await sb
       .from("stock_transfer_items")
       .select("*")
-      .in("transfer_id", rows.map((r) => r.id));
+      .in(
+        "transfer_id",
+        rows.map((r) => r.id),
+      );
     if (lines.error) throw new Error(lines.error.message);
     const byTransfer = new Map<string, Row[]>();
-    for (const l of ((lines.data as Row[] | null) ?? [])) {
+    for (const l of (lines.data as Row[] | null) ?? []) {
       const list = byTransfer.get(l.transfer_id) ?? [];
       list.push(l);
       byTransfer.set(l.transfer_id, list);
@@ -194,7 +206,7 @@ export type LineQty = { productId: string; qty: number };
 const toLines = (lines: LineQty[] | undefined) =>
   lines?.length ? lines.map((l) => ({ product_id: l.productId, qty: Math.max(0, l.qty) })) : null;
 
-type RpcResult = { success: boolean; error?: string };
+export type RpcResult = { success: boolean; error?: string };
 
 /**
  * Approve: the database checks the note is still waiting, records the allowed
@@ -241,18 +253,16 @@ export async function dispatchTransferInDb(
 }
 
 /**
- * Receiving is the only step that touches stock, so the database does it in
- * one transaction: out of the sender, into the receiver, re-mapped across
- * clusters where needed.
+ * Arrival only. The box is here; nothing has been counted and no stock has
+ * moved onto the destination shelf yet.
  *
- * Never throws: a failure leaves the note untouched and reports why, so stock
- * is never half-moved on the screen while the database refused the write.
+ * Never throws: a failure leaves the note untouched and reports why.
  */
 export async function receiveTransferInDb(
   id: string,
   who: string,
   lines?: LineQty[],
-): Promise<{ success: boolean; error?: string }> {
+): Promise<RpcResult> {
   try {
     const res = await sb.rpc("stock_transfer_receive", {
       p_transfer_id: id,
@@ -263,5 +273,31 @@ export async function receiveTransferInDb(
     return { success: true };
   } catch (e) {
     return { success: false, error: describeError(e, "Receiving the transfer") };
+  }
+}
+
+/**
+ * Physical verification — the only step that puts stock on the destination
+ * shelf. The database locks the note, refuses anything already posted, credits
+ * the counted quantity and writes the movement, all in one transaction, so a
+ * double-click or a retry can never add the delivery twice.
+ */
+export async function verifyTransferInDb(
+  id: string,
+  who: string,
+  lines: LineQty[],
+  reason?: string,
+): Promise<RpcResult> {
+  try {
+    const res = await sb.rpc("stock_transfer_verify", {
+      p_transfer_id: id,
+      p_verified_by: who,
+      p_lines: toLines(lines),
+      p_reason: reason?.trim() || null,
+    });
+    if (res.error) throw new Error(res.error.message);
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: describeError(e, "Verifying the delivery") };
   }
 }

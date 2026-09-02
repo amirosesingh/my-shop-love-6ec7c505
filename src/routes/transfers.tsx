@@ -4,8 +4,8 @@ import {
   ArrowLeftRight,
   Check,
   FileSpreadsheet,
-  Plus,
   Printer,
+  ClipboardCheck,
   Send,
   Trash2,
   Truck,
@@ -36,6 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ProductPicker } from "@/components/pos/ProductPicker";
 import {
   Table,
   TableBody,
@@ -75,7 +76,8 @@ export const Route = createFileRoute("/transfers")({
   component: Transfers,
   validateSearch: (search: Record<string, unknown>): TransferSearch => ({
     items: typeof search.items === "string" ? search.items : undefined,
-    kind: search.kind === "request" ? "request" : search.kind === "transfer" ? "transfer" : undefined,
+    kind:
+      search.kind === "request" ? "request" : search.kind === "transfer" ? "transfer" : undefined,
   }),
 });
 
@@ -85,7 +87,9 @@ const statusStyle: Record<string, string> = {
   awaiting_approval: "border-warning/50 text-warning",
   approved: "border-sky-500/50 text-sky-600 dark:text-sky-400",
   dispatched: "border-primary/50 text-primary",
-  received: "border-success/50 text-success",
+  received: "border-sky-500/50 text-sky-600 dark:text-sky-400",
+  completed: "border-success/50 text-success",
+  completed_with_discrepancy: "border-warning/50 text-warning",
   rejected: "border-destructive/50 text-destructive",
   cancelled: "border-destructive/50 text-destructive",
 };
@@ -107,6 +111,7 @@ function Transfers() {
     approveTransfer,
     dispatchTransfer,
     receiveTransfer,
+    verifyTransfer,
     rejectTransfer,
     adjustStock,
   } = usePos();
@@ -122,12 +127,14 @@ function Transfers() {
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<TransferKind>("transfer");
   const [items, setItems] = useState<TransferItem[]>([]);
-  const [pickId, setPickId] = useState(state.products[0]?.id ?? "");
   const [otherStoreId, setOtherStoreId] = useState(others[0]?.id ?? "");
   // A move between clusters re-maps the item into the receiving catalogue.
   const crossGroup =
     Boolean(otherStoreId) &&
-    scopeBetween(currentStore, stores.find((s) => s.id === otherStoreId)) === "INTER_GROUP";
+    scopeBetween(
+      currentStore,
+      stores.find((s) => s.id === otherStoreId),
+    ) === "INTER_GROUP";
   const [note, setNote] = useState("");
   /** Which note is mid-step, and which step it is. */
   const [step, setStep] = useState<{ id: string; step: TransferStep } | null>(null);
@@ -263,6 +270,8 @@ function Transfers() {
     [mine, scopeTab, stores],
   );
   const inbound = mine.filter((t) => t.toStoreId === currentStore.id && t.status === "dispatched");
+  /** Arrived but not yet counted — stock is not on the shelf until it is. */
+  const toVerify = mine.filter((t) => t.toStoreId === currentStore.id && t.status === "received");
   const toApprove = mine.filter(
     (t) => t.fromStoreId === currentStore.id && t.status === "awaiting_approval",
   );
@@ -374,11 +383,11 @@ function Transfers() {
           <Metric label="Approved · to send" value={String(toDispatch.length)} />
           <Metric label="Incoming in transit" value={String(inbound.length)} highlight />
           <Metric
-            label="Completed"
-            value={String(mine.filter((t) => t.status === "received").length)}
+            label="Arrived · to check"
+            value={String(toVerify.length)}
+            highlight={toVerify.length > 0}
           />
         </div>
-
 
         <section className="rounded-lg border border-border bg-card">
           <div className="grid grid-cols-[minmax(0,1fr)] gap-2 px-5 py-3 sm:flex sm:items-center sm:justify-between">
@@ -426,6 +435,10 @@ function Transfers() {
                   t.status === "dispatched" &&
                   t.toStoreId === currentStore.id &&
                   can("can_receive_transfer");
+                const canVerify =
+                  t.status === "received" &&
+                  t.toStoreId === currentStore.id &&
+                  can("can_receive_transfer");
                 const stillOpen = ["awaiting_approval", "approved", "dispatched"].includes(
                   t.status,
                 );
@@ -446,11 +459,14 @@ function Transfers() {
                             {/* Every quantity the line picked up on its way. */}
                             {(i.approvedQty !== undefined ||
                               i.dispatchedQty !== undefined ||
-                              i.receivedQty !== undefined) && (
+                              i.receivedQty !== undefined ||
+                              i.verifiedQty !== undefined) && (
                               <span className="numeric text-[11px] text-muted-foreground">
                                 {i.approvedQty !== undefined && ` · appr ${i.approvedQty}`}
                                 {i.dispatchedQty !== undefined && ` · sent ${i.dispatchedQty}`}
-                                {i.receivedQty !== undefined && ` · recv ${i.receivedQty}`}
+                                {i.verifiedQty !== undefined
+                                  ? ` · counted ${i.verifiedQty}`
+                                  : i.receivedQty !== undefined && ` · recv ${i.receivedQty}`}
                               </span>
                             )}
                           </div>
@@ -481,9 +497,9 @@ function Transfers() {
                           {fulfilmentLabel[t.fulfilment]}
                         </div>
                       )}
-                      {(t.rejectedReason || t.cancelledReason) && (
+                      {(t.rejectedReason || t.cancelledReason || t.discrepancyReason) && (
                         <div className="max-w-40 truncate text-[10px] text-muted-foreground">
-                          {t.rejectedReason ?? t.cancelledReason}
+                          {t.rejectedReason ?? t.cancelledReason ?? t.discrepancyReason}
                         </div>
                       )}
                     </TableCell>
@@ -521,13 +537,26 @@ function Transfers() {
                             <Truck className="size-4" /> Receive
                           </Button>
                         )}
+                        {canVerify && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setStep({ id: t.id, step: "verify" })}
+                          >
+                            <ClipboardCheck className="size-4" /> Verify
+                          </Button>
+                        )}
+                        {t.status === "received" && !canVerify && (
+                          <span className="text-[11px] text-muted-foreground">
+                            Awaiting physical check
+                          </span>
+                        )}
                         {stillOpen && (
                           <Button size="sm" variant="ghost" onClick={() => setReasonFor(t.id)}>
                             <X className="size-4 text-destructive" />
                           </Button>
                         )}
                         <Button size="sm" variant="ghost" onClick={() => print(t)}>
-
                           <Printer className="size-4" />
                         </Button>
                       </div>
@@ -557,23 +586,12 @@ function Transfers() {
           <div className="space-y-3">
             <div className="space-y-1">
               <Label>Add products</Label>
-              <div className="flex gap-2">
-                <Select value={pickId} onValueChange={setPickId}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Select product" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {state.products.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name} — {stockAt(p, currentStore.id)} at {currentStore.code}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button variant="outline" onClick={() => addItem(pickId)}>
-                  <Plus className="size-4" /> Add
-                </Button>
-              </div>
+              <ProductPicker
+                products={state.products}
+                storeId={currentStore.id}
+                storeCode={currentStore.code}
+                onPick={(p) => addItem(p.id)}
+              />
               <div className="flex flex-wrap items-center gap-2 pt-1">
                 <Button asChild variant="outline" size="sm">
                   <label className="cursor-pointer">
@@ -687,10 +705,10 @@ function Transfers() {
                   Inter-group transfer
                 </p>
                 <p className="mt-1 text-muted-foreground">
-                  {currentStore.name} ({groupOf(currentStore)}) and{" "}
-                  {storeOf(otherStoreId)?.name} ({groupOf(storeOf(otherStoreId))}) sit in different
-                  clusters. On arrival each line is matched into the receiving cluster's own
-                  catalogue by barcode, so stock stays isolated per group.
+                  {currentStore.name} ({groupOf(currentStore)}) and {storeOf(otherStoreId)?.name} (
+                  {groupOf(storeOf(otherStoreId))}) sit in different clusters. On arrival each line
+                  is matched into the receiving cluster's own catalogue by barcode, so stock stays
+                  isolated per group.
                 </p>
               </div>
             )}
@@ -721,7 +739,7 @@ function Transfers() {
           transfer={stepTransfer}
           nameOf={(id) => productOf(id)?.name ?? "Unknown item"}
           onClose={() => setStep(null)}
-          onConfirm={(lines) => {
+          onConfirm={(lines, reason) => {
             const t = stepTransfer;
             if (step.step === "approve") {
               approveTransfer(t.id, lines);
@@ -740,13 +758,32 @@ function Transfers() {
               toast.success(
                 sent < asked ? `${t.ref} part sent · ${sent} of ${asked}` : `${t.ref} dispatched`,
                 {
-                  description:
-                    sent < asked ? "The note is closed on what was sent." : undefined,
+                  description: sent < asked ? "The note is closed on what was sent." : undefined,
                 },
               );
+            } else if (step.step === "receive") {
+              receiveTransfer(t.id);
+              toast.success(`${t.ref} marked as arrived`, {
+                description: "Count it in to put the stock on the shelf.",
+              });
             } else {
-              receiveTransfer(t.id, lines);
-              toast.success(`${t.ref} received into ${currentStore.name}`);
+              const counted = lines.reduce((a, l) => a + l.qty, 0);
+              const sent = t.items.reduce((a, i) => a + (i.dispatchedQty ?? i.qty), 0);
+              void verifyTransfer(t.id, lines, reason).then((r) => {
+                if (!r.success) {
+                  toast.error(r.error ?? "Could not verify this delivery");
+                  return;
+                }
+                toast.success(
+                  counted < sent
+                    ? `${t.ref} verified short · ${counted} of ${sent}`
+                    : `${t.ref} verified into ${currentStore.name}`,
+                  {
+                    description:
+                      counted < sent ? "Only the counted quantity went on the shelf." : undefined,
+                  },
+                );
+              });
             }
             setStep(null);
           }}
