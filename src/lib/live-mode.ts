@@ -6,7 +6,7 @@
  * the Windows till keep their offline-first behaviour untouched — every caller
  * of `isLiveOnly()` falls through to the existing path when it returns false.
  */
-import { isWindowsShell, isMobileShell } from "@/platform-config/features";
+import { hasFeature, isMobileShell } from "@/platform-config/features";
 
 export function isLiveOnly(): boolean {
   return isMobileShell();
@@ -19,7 +19,7 @@ export function isLiveOnly(): boolean {
  * switch. Only the Windows desktop shell works offline.
  */
 export function isOnlineOnly(): boolean {
-  return !isWindowsShell();
+  return !hasFeature("offlineFirst");
 }
 
 /** Storage keys the phone is still allowed to keep (interface preferences). */
