@@ -44,7 +44,7 @@ import {
   removeStoredConnection,
   type LocalDbConfig,
   type LocalDbTestResult,
-} from "@/lib/local-db";
+} from "@/core/local-db/local-db";
 import { DESKTOP_ONLY, sqlAdmin, type SqlAdminFailure, type SqlDatabase } from "@/lib/sql-admin";
 import { createRunGuard } from "@/lib/run-token";
 import { DriverInstallPanel } from "@/components/database/DriverInstallPanel";

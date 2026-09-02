@@ -14,7 +14,7 @@ vi.mock("@/integrations/supabase/external-client", () => ({
 
 const bridge: { connected: boolean; present: boolean } = { connected: false, present: false };
 
-vi.mock("@/lib/local-db", () => ({
+vi.mock("@/core/local-db/local-db", () => ({
   localDb: () => (bridge.present ? { status: async () => ({ connected: bridge.connected }) } : null),
 }));
 

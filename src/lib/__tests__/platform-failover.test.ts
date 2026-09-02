@@ -20,13 +20,13 @@ describe("platform wording for a total failure", () => {
 
   it("names both databases on the Windows till", async () => {
     vi.doMock("@/platform-config/platform", () => ({ isNative: () => false, isElectron: () => true }));
-    const { unreachableMessage } = await import("@/lib/db-mode");
+    const { unreachableMessage } = await import("@/core/local-db/db-mode");
     expect(unreachableMessage()).toMatch(/local database server or online database/);
   });
 
   it("names the server relay on the phone and in a browser", async () => {
     vi.doMock("@/platform-config/platform", () => ({ isNative: () => true, isElectron: () => false }));
-    const { unreachableMessage } = await import("@/lib/db-mode");
+    const { unreachableMessage } = await import("@/core/local-db/db-mode");
     expect(unreachableMessage()).toMatch(/Central server relay is offline/);
   });
 });

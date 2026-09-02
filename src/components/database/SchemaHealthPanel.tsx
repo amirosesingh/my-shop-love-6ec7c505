@@ -28,8 +28,8 @@ import {
   DEEP_INVENTORY_INSTALLER_FILENAME,
   DEEP_INVENTORY_INSTALLER_SQL,
 } from "@/lib/deep-inventory-sql";
-import { computeLocalDeepDrift, parseLocalExpectations } from "@/lib/local-drift";
-import { hasLocalDb, localDb } from "@/lib/local-db";
+import { computeLocalDeepDrift, parseLocalExpectations } from "@/core/local-db/local-drift";
+import { hasLocalDb, localDb } from "@/core/local-db/local-db";
 import {
   downloadMigration,
   generateMigration,

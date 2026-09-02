@@ -9,7 +9,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { localDb, type RestoreCheck, type RestoreDrill } from "@/lib/local-db";
+import { localDb, type RestoreCheck, type RestoreDrill } from "@/core/local-db/local-db";
 import {
   recoveryVerdicts,
   RECOVERY_VERDICT_TEXT,

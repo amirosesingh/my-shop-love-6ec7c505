@@ -21,7 +21,7 @@ import {
   preferredDatabaseMode,
   setPreferredDatabaseMode,
   subscribeDatabaseMode,
-} from "@/lib/db-mode";
+} from "@/core/local-db/db-mode";
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (

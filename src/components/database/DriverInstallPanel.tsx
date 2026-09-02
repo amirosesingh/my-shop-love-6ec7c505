@@ -20,7 +20,7 @@ import {
   type DriverCatalogEntry,
   type DriverInstallResult,
   type DriverProgress,
-} from "@/lib/driver-install";
+} from "@/core/local-db/driver-install";
 
 export function DriverInstallPanel({ onInstalled }: { onInstalled?: () => void }) {
   const [entries, setEntries] = useState<DriverCatalogEntry[]>([]);

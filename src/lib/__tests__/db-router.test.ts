@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from "vitest";
-import { AllTargetsFailed, isCloudDirect, setCloudDirect, databaseModeLabel } from "@/lib/db-mode";
+import { AllTargetsFailed, isCloudDirect, setCloudDirect, databaseModeLabel } from "@/core/local-db/db-mode";
 import { dbProxy, dbRouter } from "@/lib/db-router";
 
 describe("dbRouter", () => {

@@ -6,7 +6,7 @@
  * process. In a plain browser the bridge is absent and callers fall back to the
  * localStorage outbox, so the web build behaves exactly as before.
  */
-import type { SyncOp } from "./sync-outbox";
+import type { SyncOp } from "@/lib/sync-outbox";
 
 export type LocalDbConfig = {
   server: string;

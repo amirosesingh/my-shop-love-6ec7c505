@@ -24,7 +24,7 @@ import {
   type LocalConnectionAudit,
   type LocalDbConfig,
   type LocalSyncStatus,
-} from "@/lib/local-db";
+} from "@/core/local-db/local-db";
 import { SqlConnectionModal } from "@/components/database/SqlConnectionModal";
 import { SchemaPanel } from "@/components/database/SchemaPanel";
 

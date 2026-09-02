@@ -2,7 +2,7 @@ import { toast } from "sonner";
 import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
 import { defaultSettings, sampleState } from "./pos-seed";
 import { drainOutbox, runOpLive } from "./sync-engine";
-import { localDb } from "./local-db";
+import { localDb } from "@/core/local-db/local-db";
 import { routedQuery } from "./db-query";
 import { readSnapshot } from "./offline-snapshot";
 import { enqueue, type SyncOp } from "./sync-outbox";
@@ -13,7 +13,7 @@ import {
   noteConnectionLost,
   noteConnectionRestored,
   setCloudDirect,
-} from "./db-mode";
+} from "@/core/local-db/db-mode";
 import { notifyError, showNotification } from "./notify";
 import { logSync } from "./sync-log";
 import { recordDiagnostic, reasonCode } from "./diagnostics";

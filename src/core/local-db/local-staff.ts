@@ -8,7 +8,7 @@
  * On the web build the bridge is absent and every call is a no-op, so the
  * existing browser-storage cache remains the fallback.
  */
-import { localDb, type LocalStaffRow } from "./local-db";
+import { localDb, type LocalStaffRow } from "@/core/local-db/local-db";
 
 export type LocalStaffLogin = {
   id: string;

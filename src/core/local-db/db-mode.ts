@@ -9,7 +9,7 @@
  * local on its own. The stored preference is never changed by a failover, so
  * the till returns to online working the moment the internet is back.
  */
-import { isOnlineOnly } from "./live-mode";
+import { isOnlineOnly } from "@/lib/live-mode";
 import { isElectron } from "@/platform-config/platform";
 
 export type DatabaseMode = "online" | "local";

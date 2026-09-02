@@ -11,7 +11,7 @@ import {
   noteConnectionLost,
   noteConnectionRestored,
   subscribeDatabaseMode,
-} from "./db-mode";
+} from "@/core/local-db/db-mode";
 import {
   lastSuccessfulPull,
   setLastSuccessfulPull,
@@ -74,7 +74,7 @@ async function mirrorCloudState(state: unknown) {
   }
 }
 import { loadCloudState } from "./pos-db";
-import { localDb } from "./local-db";
+import { localDb } from "@/core/local-db/local-db";
 import {
   checkHealth,
   startConnectivityMonitor,
@@ -761,7 +761,7 @@ const LIVE_TABLES = [
 async function refreshStaffMirror(): Promise<void> {
   const { data, error } = await supabaseExternal.rpc("list_app_users");
   if (error) throw new Error(error.message);
-  const { cacheStaffRoster } = await import("./local-staff");
+  const { cacheStaffRoster } = await import("@/core/local-db/local-staff");
   await cacheStaffRoster((data ?? []) as Record<string, unknown>[]);
 }
 

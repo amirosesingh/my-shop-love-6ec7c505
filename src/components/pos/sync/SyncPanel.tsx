@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 import { runExclusive, syncBusy } from "@/lib/sync-engine";
 import { subscribeSyncProgress, syncProgress, type TableSyncStatus } from "@/lib/sync-progress";
 import { useSystemStatus } from "@/lib/system-status";
-import { localDb, type RestoreRun } from "@/lib/local-db";
+import { localDb, type RestoreRun } from "@/core/local-db/local-db";
 import { toast } from "sonner";
 import { RebuildCheck } from "./RebuildCheck";
 

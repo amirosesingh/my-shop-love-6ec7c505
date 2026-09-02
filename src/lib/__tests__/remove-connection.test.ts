@@ -3,7 +3,7 @@ import {
   deriveLocalDbState,
   reconnectLocalDatabase,
   removeStoredConnection,
-} from "@/lib/local-db";
+} from "@/core/local-db/local-db";
 
 /**
  * Removing a saved connection has to be a real removal: the credentials go,

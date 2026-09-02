@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { electronDb, readBranch, writeBranch } from "@/lib/local-db";
+import { electronDb, readBranch, writeBranch } from "@/core/local-db/local-db";
 
 export function BranchSettings() {
   const [branchId, setBranchId] = useState("");

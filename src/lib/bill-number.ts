@@ -12,7 +12,7 @@
  */
 import { isElectron, isNative } from "@/platform-config/platform";
 import { readTerminalConfig } from "@/core/activation/terminal-tokens";
-import { readLocalSetting, writeLocalSetting } from "./local-db";
+import { readLocalSetting, writeLocalSetting } from "@/core/local-db/local-db";
 
 export type Platform = "PC" | "MB" | "WB";
 

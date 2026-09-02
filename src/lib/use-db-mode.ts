@@ -14,7 +14,7 @@ import {
   setPreferredDatabaseMode,
   subscribeDatabaseMode,
   type DatabaseMode,
-} from "./db-mode";
+} from "@/core/local-db/db-mode";
 
 export type DatabaseModeView = {
   /** What the operator chose. */

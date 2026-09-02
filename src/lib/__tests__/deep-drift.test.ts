@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { computeDeepDrift, computeLegacyDeepDrift, inventoryFromPayload } from "../deep-drift";
 import { classifyCentralInventoryError } from "../central-inventory.functions";
-import { computeLocalDeepDrift, parseLocalExpectations } from "../local-drift";
+import { computeLocalDeepDrift, parseLocalExpectations } from "@/core/local-db/local-drift";
 import type { CentralTableSchema } from "../central-schema";
 import { buildCloudSql, buildLocalSql, type SchemaGap } from "../schema-health";
 

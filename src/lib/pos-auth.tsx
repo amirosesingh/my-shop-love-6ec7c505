@@ -504,7 +504,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let signedInOffline = false;
     if (!verified && unreachable) {
       // Tier 1: the till's own local SQL database.
-      const { verifyLocalPin } = await import("@/lib/local-staff");
+      const { verifyLocalPin } = await import("@/core/local-db/local-staff");
       const local = await verifyLocalPin(code, pin);
       if (local.ok) {
         signedInOffline = true;
@@ -555,7 +555,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // The PIN is only in hand at this moment: keep a verifier and the
       // profile in the local database so the next outage is survivable.
       try {
-        const { cacheStaffRoster, rememberLocalPin } = await import("@/lib/local-staff");
+        const { cacheStaffRoster, rememberLocalPin } = await import("@/core/local-db/local-staff");
         await cacheStaffRoster([
           {
             id: account.id,
@@ -593,7 +593,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // The branch is in place before the register mounts, so nothing renders
     // against an unresolved branch.
     try {
-      const { writeBranch } = await import("@/lib/local-db");
+      const { writeBranch } = await import("@/core/local-db/local-db");
       if (next.storeId)
         writeBranch({ branchId: next.storeId, branchName: activeBranchName(null) });
     } catch {

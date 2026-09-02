@@ -128,7 +128,7 @@ export async function listTerminalStaff(storeId: string | null): Promise<Termina
   const mirror = async (staff: TerminalStaff[]) => {
     if (!staff.length) return staff;
     try {
-      const { cacheStaffRoster } = await import("./local-staff");
+      const { cacheStaffRoster } = await import("@/core/local-db/local-staff");
       await cacheStaffRoster(
         staff.map((s) => ({
           id: s.username,

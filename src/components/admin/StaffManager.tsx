@@ -26,7 +26,7 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { ADMIN_OFFLINE_MESSAGE } from "@/lib/admin-session";
-import { isConnectionError } from "@/lib/db-mode";
+import { isConnectionError } from "@/core/local-db/db-mode";
 import { notifyError } from "@/lib/notify";
 import {
   PERMISSION_GROUPS,

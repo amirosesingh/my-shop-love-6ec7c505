@@ -10,7 +10,7 @@
  * the write path (and creating an import cycle with `pos-db`).
  */
 import { supabaseExternal } from "@/integrations/supabase/external-client";
-import { effectiveDatabaseMode, isConnectionError } from "./db-mode";
+import { effectiveDatabaseMode, isConnectionError } from "@/core/local-db/db-mode";
 import { readSnapshot } from "./offline-snapshot";
 import { lastHealth } from "@/core/activation/connection-health";
 import { noteVersions } from "./row-versions";

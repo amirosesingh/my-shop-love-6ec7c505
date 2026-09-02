@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { drainOutbox } from "@/lib/sync-engine";
 import { isOnline, lastSyncedAt, listQueue, subscribeOutbox } from "@/lib/sync-outbox";
-import { electronDb, readBranch } from "@/lib/local-db";
+import { electronDb, readBranch } from "@/core/local-db/local-db";
 import {
   clearSyncLog,
   listSyncLog,

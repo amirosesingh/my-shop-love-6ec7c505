@@ -15,7 +15,7 @@ vi.mock("@/lib/sync-engine", () => ({
   runOpLive: (...a: unknown[]) => live(...a),
   drainOutbox: async () => {},
 }));
-vi.mock("@/lib/local-db", () => ({
+vi.mock("@/core/local-db/local-db", () => ({
   localDb: () => ({ write: (...a: unknown[]) => localWrite(...a) }),
   electronDb: () => null,
   readBranch: () => ({ branchId: null, branchName: null }),
@@ -29,7 +29,7 @@ vi.mock("@/integrations/supabase/external-client", () => ({
 }));
 
 import { db } from "@/lib/pos-db";
-import { setPreferredDatabaseMode } from "@/lib/db-mode";
+import { setPreferredDatabaseMode } from "@/core/local-db/db-mode";
 import type { Sale } from "@/lib/pos-types";
 
 const sale = (over: Partial<Sale> = {}): Sale =>
