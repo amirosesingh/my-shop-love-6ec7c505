@@ -50,8 +50,9 @@ type Row = Record<string, any>;
 export function dbError(context: string, error: unknown) {
   console.error(`[db] ${context}:`, error);
   // Offline is a normal state for a till: the change is already stored here
-  // and will sync later. Say so rather than failing silently.
-  if (typeof navigator !== "undefined" && !navigator.onLine) {
+  // and will sync later. Only claim that when the failure really is a
+  // connection failure — validation and permission refusals never sync.
+  if (typeof navigator !== "undefined" && !navigator.onLine && isConnectionError(error)) {
     showNotification(
       `${context} saved on this terminal — it will sync when the connection is back.`,
       "info",
@@ -60,6 +61,7 @@ export function dbError(context: string, error: unknown) {
   }
   notifyError(error, context);
 }
+
 
 const num = (v: unknown, fallback = 0) => (v == null ? fallback : Number(v));
 
