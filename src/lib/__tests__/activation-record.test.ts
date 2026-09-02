@@ -1,11 +1,20 @@
 /**
- * @vitest-environment jsdom
- *
- * Registration must be decidable offline, must expire, must reject tampering,
+ *  * Registration must be decidable offline, must expire, must reject tampering,
  * and must stay entirely out of the local trading path.
  */
 import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+// The record layer is browser-side; a tiny localStorage stand-in is enough.
+const store = new Map<string, string>();
+(globalThis as unknown as { window: unknown }).window = {
+  localStorage: {
+    getItem: (k: string) => store.get(k) ?? null,
+    setItem: (k: string, v: string) => void store.set(k, String(v)),
+    removeItem: (k: string) => void store.delete(k),
+    clear: () => store.clear(),
+  },
+};
 
 import {
   clearActivationRecord,
