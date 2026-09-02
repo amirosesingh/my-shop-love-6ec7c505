@@ -575,17 +575,14 @@ export type PosBridge = {
   rememberStaffPin?: (username: string, pin: string) => Promise<{ ok: boolean }>;
   forgetStaffPin?: (username: string) => Promise<{ ok: boolean }>;
 
-  /* ---- keys the bundled app server needs ---- */
-  serverKeyStatus?: () => Promise<{
-    ok: boolean;
-    hasServiceKey: boolean;
-    serviceKeyHint: string;
-    hasSigningKey: boolean;
-    fromEnvironment: boolean;
-  }>;
-  setServerServiceKey?: (
+  /* ---- the bundled app server holds no privileged key: presence only ---- */
+  serverKeyStatus?: () => Promise<{ ok: boolean; hasSigningKey: boolean }>;
+
+  /* ---- address of the hosted backend this device talks to ---- */
+  backendUrl?: () => Promise<{ ok: boolean; url?: string }>;
+  setBackendUrl?: (
     value: string,
-  ) => Promise<{ ok: boolean; error?: string; hasServiceKey?: boolean; serviceKeyHint?: string }>;
+  ) => Promise<{ ok: boolean; url?: string; error?: string }>;
 
   /* ---- tenant cloud credentials sealed in the OS vault ---- */
   cloudKeyStatus?: () => Promise<{

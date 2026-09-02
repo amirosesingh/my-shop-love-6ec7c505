@@ -2,14 +2,16 @@
  * Where this build should send app-server calls.
  *
  * The Android APK serves the whole app from a local origin inside the phone,
- * so a relative request to `/api/...` or to a server function never reaches a
- * real server — the local static server answers with the app shell instead,
- * and the caller ends up parsing HTML. Bake the hosted POS address into the
- * APK (`VITE_POS_SERVER_URL`) and every such call is sent there.
+ * so a relative request to `/api/...` never reaches a real server — the local
+ * static server answers with the app shell instead. The Windows till has the
+ * same problem in reverse: its bundled local server used to answer privileged
+ * calls itself, which meant keeping a privileged key on a shop counter.
  *
- * Web and Electron builds keep using relative URLs, so nothing changes there.
+ * Both therefore send app-server calls to the hosted backend, whose address
+ * is configured per device (`backend-config.ts`, Recovery settings) or baked
+ * in with `VITE_POS_SERVER_URL`. Web keeps using relative URLs.
  */
-import { isNative } from "./native";
+import { isElectron, isNative } from "./native";
 
 function configured(): string {
   const fromBuild = (import.meta.env["VITE_POS_SERVER_URL"] as string | undefined) ?? "";
@@ -23,13 +25,13 @@ function configured(): string {
 /** Absolute origin for app-server calls, or "" when relative URLs are right. */
 export function serverOrigin(): string {
   if (typeof window === "undefined") return "";
-  if (!isNative()) return "";
+  if (!isNative() && !isElectron()) return "";
   return configured();
 }
 
-/** True when the phone has no server to talk to for app-server endpoints. */
+/** True when a terminal app has no server to talk to for app-server endpoints. */
 export function serverUnreachableOnDevice(): boolean {
-  return isNative() && !configured();
+  return (isNative() || isElectron()) && !configured();
 }
 
 /** Resolve an app path against the origin this shell should use. */

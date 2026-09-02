@@ -172,6 +172,9 @@ async function startAppServer() {
   if (!fs.existsSync(serverEntry)) {
     throw new Error(`Desktop build missing (${serverEntry}). Run: npm run desktop:build`);
   }
+  // Older builds sealed a central service key on this machine. It is no longer
+  // used or accepted, so it is erased the first time this build starts.
+  serverKeys.purgeLegacyServiceKey();
   const port = await choosePort();
   // ELECTRON_RUN_AS_NODE makes the bundled Electron binary behave as plain
   // Node, so the packaged app needs no separate Node.js install.
@@ -1442,21 +1445,24 @@ function registerIpc() {
   }));
 
   /* ---------------------- app server keys ---------------------- */
+  // Presence only. No privileged credential is stored on this machine any
+  // more; privileged work is answered by the hosted backend.
   ipcMain.handle("server-keys:status", () => ({ ok: true, ...serverKeys.status() }));
-  ipcMain.handle("server-keys:set", async (_e, value) => {
-    const saved = serverKeys.setServiceKey(value);
-    if (saved.ok === false) return saved;
-    // The running server captured the old environment, so it is restarted to
-    // pick the new key up. The windows keep their origin because the port is
-    // reserved for this app.
-    try {
-      stopAppServer();
-      baseUrl = DEV_URL || (await startAppServer());
-      for (const win of BrowserWindow.getAllWindows()) win.webContents.reload();
-    } catch (err) {
-      return fail(err);
-    }
-    return { ok: true, ...serverKeys.status() };
+
+  /* ------- backend address this device talks to (non-secret) ------- */
+  ipcMain.handle("backend:get", () => ({
+    ok: true,
+    url: String(configStore.get("backendUrl") ?? "").trim(),
+  }));
+  ipcMain.handle("backend:set", (_e, value) => {
+    const next = String(value ?? "")
+      .trim()
+      .replace(/\/+$/, "");
+    if (next && !/^https?:\/\/.+/i.test(next))
+      return { ok: false, error: "Enter a full address starting with https://" };
+    const saved = configStore.set("backendUrl", next || null);
+    if (saved && saved.ok === false) return saved;
+    return { ok: true, url: next };
   });
 
   /* ------------- tenant cloud credentials (OS-sealed store) ------------- */

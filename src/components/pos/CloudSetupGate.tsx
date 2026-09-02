@@ -9,7 +9,7 @@
  */
 import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { CloudOff, Settings } from "lucide-react";
+import { CloudOff, LifeBuoy, Settings } from "lucide-react";
 
 import {
   Dialog,
@@ -76,6 +76,16 @@ export function CloudSetupGate() {
         <DialogFooter className="gap-2 sm:justify-between">
           <Button variant="outline" onClick={() => setOpen(false)}>
             Continue Offline
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setOpen(false);
+              void navigate({ to: "/recovery" });
+            }}
+          >
+            <LifeBuoy className="size-4" />
+            Emergency access
           </Button>
           <Button
             onClick={() => {

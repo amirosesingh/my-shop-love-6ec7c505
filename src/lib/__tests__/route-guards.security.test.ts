@@ -16,6 +16,12 @@ const PUBLIC_ROUTES = new Set([
   "join.tsx",
   "claim.$campaignSlug.tsx",
   "c.$tokenSlug.tsx",
+  // Emergency access: the connection-repair screen a till or phone opens when
+  // it cannot reach the backend. It must not sit behind the shell, because the
+  // shell needs the very connection this screen exists to fix. It carries only
+  // the (non-secret) backend address and central database URL + publishable
+  // key, and reads no business data.
+  "recovery.tsx",
 ]);
 
 /**
