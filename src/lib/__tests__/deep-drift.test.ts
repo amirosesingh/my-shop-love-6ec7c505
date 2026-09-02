@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { computeDeepDrift, inventoryFromPayload } from "../deep-drift";
+import { computeDeepDrift, computeLegacyDeepDrift, inventoryFromPayload } from "../deep-drift";
+import { classifyCentralInventoryError } from "../central-inventory.functions";
 import { computeLocalDeepDrift, parseLocalExpectations } from "../local-drift";
 import type { CentralTableSchema } from "../central-schema";
 import { buildCloudSql, buildLocalSql, type SchemaGap } from "../schema-health";
@@ -73,6 +74,43 @@ describe("deep central drift", () => {
   it("ignores tables the definition does not claim", () => {
     const extra = { ...healthy, legacy_thing: { rls: false, columns: {}, indexes: [] } };
     expect(computeDeepDrift(inventoryFromPayload(extra), schema)).toEqual([]);
+  });
+});
+
+describe("mixed-version central inventory", () => {
+  it("uses only facts the legacy helper can prove", () => {
+    const found = computeLegacyDeepDrift(
+      {
+        tables: [
+          {
+            table: "sales",
+            rls: false,
+            policies: 0,
+            indexes: 0,
+            columns: [
+              { name: "id", notnull: true, has_default: false },
+              { name: "total", notnull: false, has_default: false },
+            ],
+            foreign_keys: [],
+          },
+        ],
+      },
+      schema,
+    );
+    expect(found.map((finding) => finding.category).sort()).toEqual([
+      "default",
+      "index",
+      "nullability",
+      "policy",
+      "security",
+    ]);
+    expect(found.some((finding) => finding.detail.includes("sales_total_nonneg"))).toBe(false);
+  });
+
+  it("distinguishes missing, forbidden and unavailable helpers", () => {
+    expect(classifyCentralInventoryError('HTTP 404: {"code":"PGRST202"}')).toBe("not_installed");
+    expect(classifyCentralInventoryError("HTTP 403: permission denied")).toBe("not_permitted");
+    expect(classifyCentralInventoryError("Network error")).toBe("unavailable");
   });
 });
 

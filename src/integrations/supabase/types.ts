@@ -4340,6 +4340,7 @@ export type Database = {
       }
       product_delete_guard: { Args: { _product_id: string }; Returns: Json }
       schema_inventory: { Args: never; Returns: Json }
+      schema_inventory_deep: { Args: never; Returns: Json }
       security_report_findings: {
         Args: { _deployment_ref: string; _findings: Json; _source: string }
         Returns: Json

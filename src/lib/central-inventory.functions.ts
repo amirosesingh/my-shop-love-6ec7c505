@@ -7,8 +7,25 @@
 import { createServerFn } from "@tanstack/react-start";
 
 export type CentralInventoryResult =
-  | { ok: true; /** JSON payload — deserialised by the caller. */ inventoryJson: string }
-  | { ok: false; error: string };
+  | {
+      ok: true;
+      /** JSON payload — deserialised by the caller. */
+      inventoryJson: string;
+      mode: "deep" | "legacy";
+      warning?: string;
+    }
+  | { ok: false; error: string; reason: CentralInventoryFailure };
+
+export type CentralInventoryFailure = "not_installed" | "not_permitted" | "unavailable";
+
+export function classifyCentralInventoryError(error: string): CentralInventoryFailure {
+  const value = error.toLowerCase();
+  if (value.includes("pgrst202") || value.includes("schema_inventory_deep")) {
+    return "not_installed";
+  }
+  if (/http (401|403)|permission denied|42501/.test(value)) return "not_permitted";
+  return "unavailable";
+}
 
 export const fetchCentralInventory = createServerFn({ method: "GET" }).handler(
   async (): Promise<CentralInventoryResult> => {
@@ -18,6 +35,7 @@ export const fetchCentralInventory = createServerFn({ method: "GET" }).handler(
         ok: false,
         error:
           "The central database service key is not configured — open System status and save it first.",
+        reason: "unavailable",
       };
     }
     const res = await runRelayRead({ kind: "cloudInventory" });
@@ -27,8 +45,14 @@ export const fetchCentralInventory = createServerFn({ method: "GET" }).handler(
         error:
           res.error ??
           "The deep inventory helper is not installed in the central database (schema_inventory_deep).",
+        reason: classifyCentralInventoryError(res.error ?? "schema_inventory_deep is not installed"),
       };
     }
-    return { ok: true, inventoryJson: JSON.stringify(res.row ?? {}) };
+    return {
+      ok: true,
+      inventoryJson: JSON.stringify(res.row ?? {}),
+      mode: res.inventoryMode ?? "deep",
+      ...(res.inventoryWarning ? { warning: res.inventoryWarning } : {}),
+    };
   },
 );

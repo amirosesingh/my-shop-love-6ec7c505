@@ -59,6 +59,15 @@ export type InventoryTable = {
 /** table (lowercase) → inventory. */
 export type DeepInventory = Record<string, InventoryTable>;
 
+type LegacyInventoryTable = {
+  table?: string;
+  rls?: boolean;
+  policies?: number;
+  indexes?: number;
+  columns?: { name?: string; notnull?: boolean; has_default?: boolean }[];
+  foreign_keys?: { name?: string; definition?: string }[];
+};
+
 /** Normalise the raw jsonb payload into lowercase keys. */
 export function inventoryFromPayload(payload: unknown): DeepInventory {
   const out: DeepInventory = {};
@@ -261,6 +270,99 @@ export function computeDeepDrift(
           `-- No policy is generated automatically: who may read or write this`,
           `-- table is a business decision. Add it in the central project.`,
         ],
+      });
+    }
+  }
+  return findings;
+}
+
+/** Compare only facts the previous `schema_inventory()` response can prove. */
+export function computeLegacyDeepDrift(
+  payload: unknown,
+  schema: CentralTableSchema[] = CENTRAL_SCHEMA,
+): DeepFinding[] {
+  if (!payload || typeof payload !== "object") return [];
+  const rows = (payload as { tables?: unknown }).tables;
+  if (!Array.isArray(rows)) return [];
+  const actual = new Map<string, LegacyInventoryTable>();
+  for (const value of rows) {
+    if (!value || typeof value !== "object") continue;
+    const row = value as LegacyInventoryTable;
+    if (typeof row.table === "string") actual.set(row.table.toLowerCase(), row);
+  }
+
+  const findings: DeepFinding[] = [];
+  for (const spec of schema) {
+    const row = actual.get(spec.table.toLowerCase());
+    if (!row) continue;
+    const table = `public.${q(spec.table)}`;
+    const columns = new Map(
+      (Array.isArray(row.columns) ? row.columns : [])
+        .filter((column) => typeof column.name === "string")
+        .map((column) => [String(column.name).toLowerCase(), column]),
+    );
+    for (const column of spec.columns) {
+      const found = columns.get(column.name.toLowerCase());
+      if (!found) continue;
+      if (expectsNotNull(column) && found.notnull !== true) {
+        findings.push({
+          table: spec.table,
+          category: "nullability",
+          detail: `${column.name} should never be empty`,
+          statements: [`alter table ${table} alter column ${q(column.name)} set not null;`],
+        });
+      }
+      const expected = expectedDefault(column);
+      if (expected && found.has_default !== true) {
+        findings.push({
+          table: spec.table,
+          category: "default",
+          detail: `${column.name} is missing its default (${expected})`,
+          statements: [`alter table ${table} alter column ${q(column.name)} set default ${expected};`],
+        });
+      }
+    }
+    if (spec.rowSecurity !== false && row.rls !== true) {
+      findings.push({
+        table: spec.table,
+        category: "security",
+        detail: "row-level security is switched off",
+        statements: [`alter table ${table} enable row level security;`],
+      });
+    }
+    if (spec.rowSecurity !== false && row.policies === 0) {
+      findings.push({
+        table: spec.table,
+        category: "policy",
+        detail: "no access policy at all — the table is unreachable through the API",
+        statements: ["-- Add an access policy appropriate to this table's business rules."],
+      });
+    }
+    if (row.indexes === 0) {
+      for (const index of spec.indexes ?? []) {
+        if (!index.always) continue;
+        findings.push({
+          table: spec.table,
+          category: "index",
+          detail: `index ${index.name} is missing`,
+          statements: [index.sql],
+        });
+      }
+    }
+    const foreignKeys = new Set(
+      (Array.isArray(row.foreign_keys) ? row.foreign_keys : []).map((key) =>
+        String(key.name ?? "").toLowerCase(),
+      ),
+    );
+    for (const constraint of spec.constraints ?? []) {
+      if (!/^foreign\s+key/i.test(constraint.definition) || foreignKeys.has(constraint.name.toLowerCase())) {
+        continue;
+      }
+      findings.push({
+        table: spec.table,
+        category: "constraint",
+        detail: `foreign key ${constraint.name} is missing`,
+        statements: [`alter table ${table} add constraint ${q(constraint.name)} ${constraint.definition};`],
       });
     }
   }
