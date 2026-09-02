@@ -41,7 +41,7 @@ export function ProductPicker({
 }) {
   const [term, setTerm] = useState("");
   const [rows, setRows] = useState<Product[]>(() => searchLocal(products, "", limit));
-  const [qty, setQty] = useState<Record<string, string>>({});
+  
   const inputRef = useRef<HTMLInputElement>(null);
 
   /* Debounced, capped catalogue query with a local fallback. */
