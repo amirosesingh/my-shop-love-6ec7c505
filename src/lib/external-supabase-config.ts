@@ -136,10 +136,6 @@ export function supabaseConfig(): Source {
   // (applied above as the terminal override). Bundle-baked and environment
   // values belong to the web deployment and are deliberately invisible here.
   if (isTerminalApp()) throw new SupabaseConfigError();
-  if (POS_PROJECT.url && POS_PROJECT.key) {
-    cached = POS_PROJECT;
-    return cached;
-  }
   for (const bag of bags()) {
     for (const [urlName, keyName] of PAIRS) {
       const found = fromEnv(bag, urlName, keyName);
