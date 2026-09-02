@@ -27,7 +27,7 @@ import { WindowControls } from "@/platforms/windows/components/WindowControls";
 
 
 import { ActivityBell } from "@/platforms/web/components/pos/ActivityBell";
-import { MobileStatusSheet } from "@/platforms/mobile/components/MobileStatusSheet";
+import { MobileStatusSheet } from "@/platforms/web/components/pos/MobileStatusSheet";
 import { ShiftGuard } from "@/platforms/web/components/pos/ShiftGuard";
 import { PermissionDenied } from "@/platforms/web/components/pos/PermissionGate";
 import { useVisibility } from "@/lib/ui-visibility";
@@ -66,7 +66,7 @@ import { supabaseConfig } from "@/lib/external-supabase-config";
 import { initCloudConfigFromShell } from "@/lib/secure-cloud-config";
 import { CloudSetupGate } from "@/platforms/web/components/pos/CloudSetupGate";
 import { readCredentials } from "@/lib/pos-credentials";
-import { TillLoader } from "@/platforms/web/components/pos/TillLoader";
+import { TillLoader } from "@/components/shared/TillLoader";
 import { LocationBootGuard } from "@/platforms/web/components/pos/LocationBootGuard";
 
 /** Permission required to open each screen. Keys are path prefixes, so child

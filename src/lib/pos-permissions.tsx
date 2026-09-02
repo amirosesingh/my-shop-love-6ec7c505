@@ -12,7 +12,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { Loader2, ShieldAlert } from "lucide-react";
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { Button } from "@/components/ui/button";
-import { TillLoader } from "@/platforms/web/components/pos/TillLoader";
+import { TillLoader } from "@/components/shared/TillLoader";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
