@@ -15,7 +15,9 @@ import { LifeBuoy, ArrowLeft, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BackendAddressPanel } from "@/components/pos/settings/panels/BackendAddressPanel";
 import { CloudConnectionPanel } from "@/components/pos/settings/panels/CloudConnectionPanel";
+import { EmergencyPinGate } from "@/components/pos/EmergencyPinGate";
 import { heartbeat } from "@/lib/connection-health";
+
 
 export const Route = createFileRoute("/recovery")({
   head: () => ({
