@@ -9,8 +9,10 @@
  */
 import { useEffect, useState, type ReactNode } from "react";
 import { CloudOff, LifeBuoy, RefreshCw } from "lucide-react";
+import { Link, useRouterState } from "@tanstack/react-router";
 
 import { isOnlineOnly } from "../../lib/live-mode";
+import { isRecoveryPath, onRecoveryScreen } from "../../lib/recovery-route";
 import {
   connectivity,
   heartbeat,
@@ -22,10 +24,15 @@ import { syncConfig } from "../../lib/sync-config";
 
 export function OfflineGate({ children }: { children: ReactNode }) {
   const live = isOnlineOnly();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  // Emergency access repairs the connection this gate is waiting for, so it
+  // must never be gated — on any platform, including a cold deep link.
+  const recovery = isRecoveryPath(pathname) || onRecoveryScreen();
   const [state, setState] = useState<Connectivity>(connectivity());
   const [checking, setChecking] = useState(false);
 
   useEffect(() => {
+    if (recovery) return;
     // Safe on every platform: the monitor only ever starts once.
     const stop = startConnectivityMonitor(syncConfig().heartbeatMs);
     setState(connectivity());
@@ -34,9 +41,10 @@ export function OfflineGate({ children }: { children: ReactNode }) {
       off();
       stop();
     };
-  }, []);
+  }, [recovery]);
 
-  if (!live) return <>{children}</>;
+  if (!live || recovery) return <>{children}</>;
+
 
   // Still checking: the cloud icon alone, nothing else on screen.
   if (state === "connecting")
