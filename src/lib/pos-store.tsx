@@ -335,7 +335,17 @@ type Ctx = {
   reset: () => void;
 };
 
-const PosContext = createContext<Ctx | null>(null);
+/**
+ * One context object per browser session, not per module evaluation. A hot
+ * reload (or any second copy of this module in the graph) would otherwise mint
+ * a fresh context, so the provider and the consumer would look at different
+ * objects and the till would blank with "usePos must be used inside
+ * PosProvider" even though the provider is mounted.
+ */
+const contextRegistry = globalThis as typeof globalThis & {
+  __posContext?: React.Context<Ctx | null>;
+};
+const PosContext = (contextRegistry.__posContext ??= createContext<Ctx | null>(null));
 
 /** Merge a cloud (or cached snapshot) slice into local state. */
 function applyCloud(s: PosState, cloud: CloudSlice): PosState {
