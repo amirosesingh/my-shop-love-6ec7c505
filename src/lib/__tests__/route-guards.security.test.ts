@@ -3,8 +3,8 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const ROUTES_DIR = join(process.cwd(), "src/routes");
-const APP_SHELL = readFileSync(join(process.cwd(), "src/components/pos/AppShell.tsx"), "utf8");
-const NAV = readFileSync(join(process.cwd(), "src/components/pos/nav-config.ts"), "utf8");
+const APP_SHELL = readFileSync(join(process.cwd(), "src/platforms/web/components/pos/AppShell.tsx"), "utf8");
+const NAV = readFileSync(join(process.cwd(), "src/platforms/web/components/pos/nav-config.ts"), "utf8");
 
 const routeFiles = readdirSync(ROUTES_DIR).filter((f) => f.endsWith(".tsx") && !f.startsWith("__"));
 
