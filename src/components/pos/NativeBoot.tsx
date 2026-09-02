@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 
 import { isNative } from "../../lib/native";
+import { onRecoveryScreen } from "../../lib/recovery-route";
 import { hydrateNativeStorage } from "../../lib/mobile-storage";
 import { hydrateBackendUrl } from "../../lib/backend-config";
 import { hydrateTerminalConfig } from "../../lib/terminal-tokens";
@@ -16,7 +17,11 @@ import { applyPendingWebBundle, startWebBundleChecks } from "../../lib/web-bundl
 import { TillLoader } from "./TillLoader";
 
 export function NativeBoot({ children }: { children: React.ReactNode }) {
-  const [ready, setReady] = useState(false);
+  // Emergency access must open even when start-up work would stall on a dead
+  // backend: the repair screen needs none of it.
+  const [recovery] = useState(() => onRecoveryScreen());
+  const [ready, setReady] = useState(recovery);
+
 
   useEffect(() => {
     if (ready) return;
@@ -44,9 +49,10 @@ export function NativeBoot({ children }: { children: React.ReactNode }) {
 
   // Background check for a newer web bundle once the app is up.
   useEffect(() => {
-    if (!ready || !isNative()) return;
+    if (!ready || recovery || !isNative()) return;
     return startWebBundleChecks();
-  }, [ready]);
+  }, [ready, recovery]);
+
 
   // The splash reports what the till is actually loading against: green for the
   // central database, amber for this device's own copy, blue while syncing.

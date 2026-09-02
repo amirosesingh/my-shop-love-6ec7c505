@@ -9,8 +9,10 @@
  */
 import { useEffect, useState, type ReactNode } from "react";
 import { CloudOff, LifeBuoy, RefreshCw } from "lucide-react";
+import { Link, useRouterState } from "@tanstack/react-router";
 
 import { isOnlineOnly } from "../../lib/live-mode";
+import { isRecoveryPath, onRecoveryScreen } from "../../lib/recovery-route";
 import {
   connectivity,
   heartbeat,
@@ -22,10 +24,15 @@ import { syncConfig } from "../../lib/sync-config";
 
 export function OfflineGate({ children }: { children: ReactNode }) {
   const live = isOnlineOnly();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  // Emergency access repairs the connection this gate is waiting for, so it
+  // must never be gated — on any platform, including a cold deep link.
+  const recovery = isRecoveryPath(pathname) || onRecoveryScreen();
   const [state, setState] = useState<Connectivity>(connectivity());
   const [checking, setChecking] = useState(false);
 
   useEffect(() => {
+    if (recovery) return;
     // Safe on every platform: the monitor only ever starts once.
     const stop = startConnectivityMonitor(syncConfig().heartbeatMs);
     setState(connectivity());
@@ -34,9 +41,10 @@ export function OfflineGate({ children }: { children: ReactNode }) {
       off();
       stop();
     };
-  }, []);
+  }, [recovery]);
 
-  if (!live) return <>{children}</>;
+  if (!live || recovery) return <>{children}</>;
+
 
   // Still checking: the cloud icon alone, nothing else on screen.
   if (state === "connecting")
@@ -77,15 +85,17 @@ export function OfflineGate({ children }: { children: ReactNode }) {
           <RefreshCw className={`h-4 w-4 ${checking ? "animate-spin" : ""}`} aria-hidden />
           {checking ? "Checking…" : "Try again"}
         </button>
-        {/* The way back in when the address itself is what is wrong. This
-            screen never calls the backend it is repairing. */}
-        <a
-          href="/recovery"
+        {/* The way back in when the address itself is what is wrong. Router
+            navigation, never a page load: a hard load would restart the shell
+            and put this gate straight back in front of the repair screen. */}
+        <Link
+          to="/recovery"
           className="inline-flex items-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground"
         >
           <LifeBuoy className="h-4 w-4" aria-hidden />
           Emergency access
-        </a>
+        </Link>
+
       </div>
     </div>
   );
