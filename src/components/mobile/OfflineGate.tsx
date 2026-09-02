@@ -8,7 +8,7 @@
  * till never renders the gate: `isOnlineOnly()` is false there.
  */
 import { useEffect, useState, type ReactNode } from "react";
-import { CloudOff, RefreshCw } from "lucide-react";
+import { CloudOff, LifeBuoy, RefreshCw } from "lucide-react";
 
 import { isOnlineOnly } from "../../lib/live-mode";
 import {

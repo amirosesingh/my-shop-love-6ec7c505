@@ -3,7 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
 import { SettingsTabs } from "@/components/pos/settings/SettingsTabs";
 import { SystemStatusPanel } from "@/components/pos/settings/panels/SystemStatusPanel";
-import { ServerKeysPanel } from "@/components/pos/settings/panels/ServerKeysPanel";
+import { BackendAddressPanel } from "@/components/pos/settings/panels/BackendAddressPanel";
 import { CloudConnectionPanel } from "@/components/pos/settings/panels/CloudConnectionPanel";
 import { DatabaseHealthPanel } from "@/components/pos/settings/panels/DatabaseHealthPanel";
 import { LogicHealthPanel } from "@/components/pos/settings/panels/LogicHealthPanel";
@@ -57,7 +57,7 @@ function SystemSettingsPage() {
         {tab === "system" && (
           <div className="space-y-4">
             <CloudConnectionPanel />
-            <ServerKeysPanel />
+            <BackendAddressPanel />
             <SystemStatusPanel />
           </div>
         )}
