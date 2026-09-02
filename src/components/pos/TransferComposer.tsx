@@ -208,7 +208,7 @@ export function TransferComposer({
         <Fact label="Lines · units" value={`${items.length} · ${totalUnits}`} />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,620px)_minmax(0,1fr)]">
         <div className="space-y-6">
           <Panel title="Add products" description="Scan a barcode, or search by name / SKU.">
             <ProductPicker
