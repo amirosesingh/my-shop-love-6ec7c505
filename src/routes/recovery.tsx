@@ -13,10 +13,11 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { LifeBuoy, ArrowLeft, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { BackendAddressPanel } from "@/components/pos/settings/panels/BackendAddressPanel";
-import { CloudConnectionPanel } from "@/components/pos/settings/panels/CloudConnectionPanel";
+import { RecoveryHub } from "@/components/pos/RecoveryHub";
 import { EmergencyPinGate } from "@/components/pos/EmergencyPinGate";
 import { heartbeat } from "@/lib/connection-health";
+import { APP_VERSION } from "@/version";
+
 
 
 export const Route = createFileRoute("/recovery")({
