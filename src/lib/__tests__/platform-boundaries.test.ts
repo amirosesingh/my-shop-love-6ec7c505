@@ -62,4 +62,12 @@ describe("platform folder boundaries", () => {
     }
     expect(bad).toEqual([]);
   });
+
+  it("raw shell detection stays inside platform-config and the platform folders", () => {
+    const allowed = [join(root, "platform-config"), join(root, "platforms")];
+    const offenders = walk(root)
+      .filter((f) => !allowed.some((a) => f.startsWith(a)) && !f.includes("__tests__"))
+      .filter((f) => /\bisElectron\b|\bisNative\b/.test(readFileSync(f, "utf8")));
+    expect(offenders).toEqual([]);
+  });
 });
