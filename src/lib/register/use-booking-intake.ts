@@ -8,7 +8,7 @@
  * behaves exactly as before.
  */
 import { useState } from "react";
-import type { BookingPaymentTiming, IntakeCharge, PaymentMethod } from "@/lib/pos-types";
+import type { BookingPaymentTiming, IntakeCharge, PaymentMethod } from "@/core/types/pos-types";
 
 /** A date this many days out, as `YYYY-MM-DD`. */
 export const isoDaysFromNow = (days: number) =>

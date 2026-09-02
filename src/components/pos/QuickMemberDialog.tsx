@@ -19,7 +19,7 @@ import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { OtpVerificationModal } from "@/components/pos/OtpVerificationModal";
 import { usePos } from "@/lib/pos-store";
 import { useVerificationGateway } from "@/lib/verification-gateway";
-import type { Member } from "@/lib/pos-types";
+import type { Member } from "@/core/types/pos-types";
 
 const looksNumeric = (v: string) => /^[\d+\s-]+$/.test(v.trim());
 

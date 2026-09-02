@@ -9,7 +9,7 @@ import {
   type DisplaySnapshot,
 } from "@/lib/customer-display";
 import { qrSvg } from "@/lib/pos-print";
-import { resolvePaymentQr, whatsappLink } from "@/lib/pos-types";
+import { resolvePaymentQr, whatsappLink } from "@/core/types/pos-types";
 
 export const Route = createFileRoute("/display")({
   head: () => ({

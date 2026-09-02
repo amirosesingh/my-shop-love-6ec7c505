@@ -41,7 +41,7 @@ import { DbConnectionModal } from "@/components/pos/DbConnectionModal";
 import { UpdateHeaderButton } from "@/components/pos/UpdateHeaderButton";
 import type { NavItem } from "@/components/pos/nav-config";
 import { setPrintStore, setPrintSettings, setServiceTerms } from "@/lib/pos-print";
-import { bookingRulesOf } from "@/lib/pos-types";
+import { bookingRulesOf } from "@/core/types/pos-types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";

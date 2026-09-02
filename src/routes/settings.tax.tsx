@@ -7,7 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { usePos } from "@/lib/pos-store";
 import { ROUNDING_UNITS, roundingOf } from "@/core/pricing/rounding";
-import type { TaxMode } from "@/lib/pos-types";
+import type { TaxMode } from "@/core/types/pos-types";
 
 export const Route = createFileRoute("/settings/tax")({
   head: () => ({

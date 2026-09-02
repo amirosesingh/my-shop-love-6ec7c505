@@ -9,7 +9,7 @@
  */
 import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
 import { rowToProduct } from "@/core/api/pos-db";
-import type { Product } from "./pos-types";
+import type { Product } from "@/core/types/pos-types";
 
 export type CatalogSearch = {
   products: Product[];

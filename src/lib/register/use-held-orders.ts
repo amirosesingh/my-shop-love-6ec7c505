@@ -9,7 +9,7 @@
 import { toast } from "sonner";
 import { addHeldOrder, removeHeldOrder, useHeldOrders, type HeldOrder } from "@/lib/held-orders";
 import { TICKET_ACTIONS, logTicketEvent } from "@/lib/ticket-audit";
-import type { CartLine, DiscountType } from "@/lib/pos-types";
+import type { CartLine, DiscountType } from "@/core/types/pos-types";
 import type { CartCoupon } from "@/lib/register/use-cart";
 
 type HeldOrdersDeps = {

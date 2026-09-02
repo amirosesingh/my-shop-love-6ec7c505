@@ -7,7 +7,7 @@
  */
 import { useEffect, useState } from "react";
 import { supabaseExternal } from "@/integrations/supabase/external-client";
-import type { CatalogKind, ProductCategory, UomUnit } from "./pos-types";
+import type { CatalogKind, ProductCategory, UomUnit } from "@/core/types/pos-types";
 import { tombstone } from "./tombstones";
 
 /** Table names are shared with the POS project's generated types. */

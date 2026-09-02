@@ -8,7 +8,7 @@
  * keeps working without a connection.
  */
 import { db } from "@/core/api/pos-db";
-import type { ShiftSession } from "./pos-types";
+import type { ShiftSession } from "@/core/types/pos-types";
 
 const KEY = "pos-shift-sessions-v1";
 

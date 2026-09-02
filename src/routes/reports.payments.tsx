@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/table";
 import { TablePagination, usePagination } from "@/components/pos/TablePagination";
 import { money, usePos } from "@/lib/pos-store";
-import { PAYMENT_LABELS, paymentsLabel, type Payment, type Sale } from "@/lib/pos-types";
+import { PAYMENT_LABELS, paymentsLabel, type Payment, type Sale } from "@/core/types/pos-types";
 import {
   ReportHeader,
   StatCard,

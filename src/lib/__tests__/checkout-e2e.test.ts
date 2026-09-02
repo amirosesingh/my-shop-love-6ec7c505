@@ -30,7 +30,7 @@ vi.mock("@/integrations/supabase/external-client", () => ({
 
 import { db } from "@/core/api/pos-db";
 import { setPreferredDatabaseMode } from "@/core/local-db/db-mode";
-import type { Sale } from "@/lib/pos-types";
+import type { Sale } from "@/core/types/pos-types";
 
 const sale = (over: Partial<Sale> = {}): Sale =>
   ({

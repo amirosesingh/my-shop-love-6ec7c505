@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/select";
 import { usePos } from "@/lib/pos-store";
 import { TIME_ZONES, effectiveTimeZone, formatDateTime } from "@/lib/time-zone";
-import type { DateFormat, TimeFormat } from "@/lib/pos-types";
+import type { DateFormat, TimeFormat } from "@/core/types/pos-types";
 
 /** Countries the shop is likely to trade in, with a sensible default zone. */
 const COUNTRIES: { code: string; name: string; zone: string }[] = [

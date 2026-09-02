@@ -14,10 +14,10 @@
  *             to spot required fields the till never sends.
  */
 import { supabaseExternal } from "@/integrations/supabase/external-client";
-import { supabaseConfig } from "./external-supabase-config";
-import { explainError } from "./db-health";
+import { supabaseConfig } from "@/lib/external-supabase-config";
+import { explainError } from "@/lib/db-health";
 import { relayTableShapes } from "@/core/api/health-relay";
-import { trulyRequired } from "./schema-required";
+import { trulyRequired } from "@/lib/schema-required";
 
 export type OpKind = "read" | "write";
 

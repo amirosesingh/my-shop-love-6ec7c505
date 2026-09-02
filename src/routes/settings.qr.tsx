@@ -5,7 +5,7 @@ import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import type { ReceiptCustomLine } from "@/lib/pos-types";
+import type { ReceiptCustomLine } from "@/core/types/pos-types";
 
 export const Route = createFileRoute("/settings/qr")({
   head: () => ({

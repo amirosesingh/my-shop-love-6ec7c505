@@ -81,7 +81,7 @@ import { logger } from "@/lib/audit-log";
 import { logSystemAction } from "@/lib/system-audit";
 import { activeBranchId } from "@/lib/active-branch";
 import { cachedSuppliers, loadSuppliers, type Supplier } from "@/lib/suppliers";
-import type { Product } from "@/lib/pos-types";
+import type { Product } from "@/core/types/pos-types";
 
 export const Route = createFileRoute("/purchasing")({
   head: () => ({

@@ -17,7 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { money, usePos } from "@/lib/pos-store";
-import type { Member } from "@/lib/pos-types";
+import type { Member } from "@/core/types/pos-types";
 import { printMemberStatement } from "@/lib/pos-print";
 import { MemberHistoryDialog } from "@/components/pos/MemberHistoryDialog";
 import { OtpVerificationModal } from "@/components/pos/OtpVerificationModal";

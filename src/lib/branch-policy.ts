@@ -5,7 +5,7 @@
  * may be cut off from the group entirely. The switches live in the shared
  * integration settings so every terminal of that branch agrees on them.
  */
-import { defaultBranchPolicy, type AppSettings, type BranchPolicy } from "./pos-types";
+import { defaultBranchPolicy, type AppSettings, type BranchPolicy } from "@/core/types/pos-types";
 
 export type BranchPolicyKey = keyof BranchPolicy;
 

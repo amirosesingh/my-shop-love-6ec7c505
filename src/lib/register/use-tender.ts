@@ -8,9 +8,9 @@
  * unchanged, so the till pays exactly as before.
  */
 import { useState } from "react";
-import { methodLabel } from "@/lib/pos-types";
-import { activePaymentTypes, usePaymentTypes } from "@/lib/payment-types";
-import type { Payment, PaymentMethod } from "@/lib/pos-types";
+import { methodLabel } from "@/core/types/pos-types";
+import { activePaymentTypes, usePaymentTypes } from "@/core/types/payment-types";
+import type { Payment, PaymentMethod } from "@/core/types/pos-types";
 
 type TenderDeps = {
   /** Nothing rung up means nothing to charge. */

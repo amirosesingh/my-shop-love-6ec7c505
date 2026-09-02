@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { ScanBar } from "@/components/pos/ScanBar";
-import { lineUnitDiscount, r2, type CartLine } from "@/lib/pos-types";
+import { lineUnitDiscount, r2, type CartLine } from "@/core/types/pos-types";
 
 /**
  * The goods being reserved on a standard "book & pay later" booking.

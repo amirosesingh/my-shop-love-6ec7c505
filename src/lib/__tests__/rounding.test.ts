@@ -5,7 +5,7 @@
 import { describe, expect, it } from "vitest";
 
 import { applyRounding, roundTotal, roundingOf, showsRoundingLine } from "@/core/pricing/rounding";
-import type { RoundingSettings } from "../pos-types";
+import type { RoundingSettings } from "@/core/types/pos-types";
 
 const cfg = (over: Partial<RoundingSettings> = {}): RoundingSettings =>
   roundingOf({ enabled: true, unit: 0.05, direction: "nearest", appliesTo: "all", ...over });

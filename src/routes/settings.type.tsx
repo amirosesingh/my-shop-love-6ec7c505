@@ -5,7 +5,7 @@ import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import type { FontFamilyKey, ReceiptSettings } from "@/lib/pos-types";
+import type { FontFamilyKey, ReceiptSettings } from "@/core/types/pos-types";
 
 const FONT_SCOPES: { key: keyof ReceiptSettings["fonts"]; label: string }[] = [
   { key: "header", label: "Header" },

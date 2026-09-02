@@ -9,8 +9,8 @@ import {
   validateTenders,
   type Payment,
   type PaymentMethod,
-} from "@/lib/pos-types";
-import { activePaymentTypes, usePaymentTypes } from "@/lib/payment-types";
+} from "@/core/types/pos-types";
+import { activePaymentTypes, usePaymentTypes } from "@/core/types/payment-types";
 import { usePos } from "@/lib/pos-store";
 import { notifyError } from "@/lib/notify";
 

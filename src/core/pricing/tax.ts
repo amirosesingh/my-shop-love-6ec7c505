@@ -1,4 +1,4 @@
-import { r2, type TaxSettings } from "@/lib/pos-types";
+import { r2, type TaxSettings } from "@/core/types/pos-types";
 
 export type TaxResult = { tax: number; total: number };
 

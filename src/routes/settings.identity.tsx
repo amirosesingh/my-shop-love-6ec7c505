@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useEffect, useState } from "react";
 import { readBranding, useBranding, writeBranding } from "@/lib/branding";
-import type { ReceiptOverride, ReceiptSettings } from "@/lib/pos-types";
+import type { ReceiptOverride, ReceiptSettings } from "@/core/types/pos-types";
 
 const IDENTITY_FIELDS: { key: keyof ReceiptOverride; label: string; placeholder: string }[] = [
   { key: "companyName", label: "Company name", placeholder: "NORTHWIND & CO." },

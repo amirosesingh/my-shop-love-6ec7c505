@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { defaultReceiptSettings } from "@/lib/pos-seed";
-import type { BookingSlipSettings } from "@/lib/pos-types";
+import type { BookingSlipSettings } from "@/core/types/pos-types";
 
 export const Route = createFileRoute("/settings/booking-slip")({
   head: () => ({

@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/table";
 import { usePos, stockAt } from "@/lib/pos-store";
 import { loadTransfer } from "@/lib/stock-transfers";
-import { TRANSFER_STATUS_LABELS, type Transfer } from "@/lib/pos-types";
+import { TRANSFER_STATUS_LABELS, type Transfer } from "@/core/types/pos-types";
 
 export const statusStyle: Record<string, string> = {
   awaiting_approval: "border-warning/50 text-warning",

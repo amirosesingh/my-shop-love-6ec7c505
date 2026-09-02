@@ -8,7 +8,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseExternal } from "@/integrations/supabase/external-client";
-import type { Store, Transfer, TransferItem, TransferKind, TransferStatus } from "./pos-types";
+import type { Store, Transfer, TransferItem, TransferKind, TransferStatus } from "@/core/types/pos-types";
 import { commitOps } from "@/core/api/pos-db";
 import { describeError } from "./notify";
 

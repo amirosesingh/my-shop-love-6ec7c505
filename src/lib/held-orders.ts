@@ -8,7 +8,7 @@
  */
 import { useEffect, useState } from "react";
 
-import type { CartLine } from "./pos-types";
+import type { CartLine } from "@/core/types/pos-types";
 import { db } from "@/core/api/pos-db";
 
 export type HeldOrder = {

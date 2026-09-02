@@ -5,7 +5,7 @@ import { SettingsFrame, useSettingsCtx } from "@/components/pos/settings/Setting
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { ReceiptCustomLine } from "@/lib/pos-types";
+import type { ReceiptCustomLine } from "@/core/types/pos-types";
 
 export const Route = createFileRoute("/settings/lines")({
   head: () => ({

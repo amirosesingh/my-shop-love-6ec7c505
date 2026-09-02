@@ -20,7 +20,7 @@ import {
 import { money, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
 import { isLive } from "@/lib/pos-promotions";
-import type { DiscountType, MemberTier, PromoType, Promotion } from "@/lib/pos-types";
+import type { DiscountType, MemberTier, PromoType, Promotion } from "@/core/types/pos-types";
 
 export const Route = createFileRoute("/promotions")({
   head: () => ({

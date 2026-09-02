@@ -7,7 +7,7 @@
  * System & Settings -> Shift alerts.
  */
 import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
-import type { Sale, Shift } from "./pos-types";
+import type { Sale, Shift } from "@/core/types/pos-types";
 import { getPosCallerAuth } from "./pos-caller-auth";
 import { sendWhatsAppBill } from "./whatsapp.functions";
 

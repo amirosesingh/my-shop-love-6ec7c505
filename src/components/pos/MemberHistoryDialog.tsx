@@ -8,8 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { money, usePos } from "@/lib/pos-store";
-import type { Member, Sale } from "@/lib/pos-types";
-import { lineUnitDiscount, r2 } from "@/lib/pos-types";
+import type { Member, Sale } from "@/core/types/pos-types";
+import { lineUnitDiscount, r2 } from "@/core/types/pos-types";
 import { printSaleReceipt, saleReceiptPreview } from "@/lib/pos-print";
 
 export function MemberHistoryDialog({

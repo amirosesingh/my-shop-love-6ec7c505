@@ -20,7 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { usePos } from "@/lib/pos-store";
-import { TRANSFER_STATUS_LABELS } from "@/lib/pos-types";
+import { TRANSFER_STATUS_LABELS } from "@/core/types/pos-types";
 
 export const Route = createFileRoute("/requests/")({
   head: () => ({

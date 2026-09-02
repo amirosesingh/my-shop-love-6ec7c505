@@ -8,7 +8,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseExternal } from "@/integrations/supabase/external-client";
-import { r2 } from "./pos-types";
+import { r2 } from "@/core/types/pos-types";
 import { keyset, nextCursor, PAGE_SIZE, type Cursor, type Page } from "./keyset";
 import { describeError } from "./notify";
 

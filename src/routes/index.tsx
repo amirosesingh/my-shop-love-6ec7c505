@@ -71,7 +71,7 @@ import { reserveBillNumber } from "@/lib/bill-number";
 import { useAuth } from "@/lib/pos-auth";
 import { productVisibleAt } from "@/lib/branch-policy";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
-import { BOOKING_TIMING_LABELS, bookingRulesOf, type BookingPaymentTiming } from "@/lib/pos-types";
+import { BOOKING_TIMING_LABELS, bookingRulesOf, type BookingPaymentTiming } from "@/core/types/pos-types";
 import { useUserPermissions } from "@/lib/pos-permissions";
 import { useVisibility } from "@/lib/ui-visibility";
 import { useUiScale } from "@/lib/use-ui-scale";
@@ -80,12 +80,12 @@ import {
   loadMemberVouchers,
   scopeLabel,
 } from "@/lib/coupons";
-import type { Booking, CartLine, DiscountType, IntakeCharge, PaymentMethod, Sale } from "@/lib/pos-types";
+import type { Booking, CartLine, DiscountType, IntakeCharge, PaymentMethod, Sale } from "@/core/types/pos-types";
 import { applyCombo, intakeTotals, newJobTag } from "@/lib/booking-charges";
-import type { Payment } from "@/lib/pos-types";
+import type { Payment } from "@/core/types/pos-types";
 import { TenderSplit } from "@/components/pos/TenderSplit";
-import { lineUnitDiscount, methodLabel, paymentsLabel, paymentsTotal, PAYMENT_LABELS, r2, validateTenders } from "@/lib/pos-types";
-import { activePaymentTypes, tenderIcon, usePaymentTypes } from "@/lib/payment-types";
+import { lineUnitDiscount, methodLabel, paymentsLabel, paymentsTotal, PAYMENT_LABELS, r2, validateTenders } from "@/core/types/pos-types";
+import { activePaymentTypes, tenderIcon, usePaymentTypes } from "@/core/types/payment-types";
 import { NO_SALE_REASON_MAX, NO_SALE_REASON_MIN, recordNoSale } from "@/lib/drawer-events";
 
 import { logger } from "@/lib/audit-log";

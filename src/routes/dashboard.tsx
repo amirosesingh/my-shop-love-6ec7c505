@@ -26,7 +26,7 @@ import {
 import { money, usePos } from "@/lib/pos-store";
 import { useDrawerEvents } from "@/lib/drawer-events";
 import { hourlyProfit, profitOf } from "@/core/pricing/profit";
-import { paymentsLabel } from "@/lib/pos-types";
+import { paymentsLabel } from "@/core/types/pos-types";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({

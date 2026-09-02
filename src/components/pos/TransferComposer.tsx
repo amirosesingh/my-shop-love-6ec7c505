@@ -35,7 +35,7 @@ import { stockAt, usePos } from "@/lib/pos-store";
 import { availableAt, planDeduction, subWarehouses } from "@/lib/locations";
 import { branchPolicy } from "@/lib/branch-policy";
 import { groupOf, scopeBetween } from "@/lib/stock-transfers";
-import type { TransferItem, TransferKind } from "@/lib/pos-types";
+import type { TransferItem, TransferKind } from "@/core/types/pos-types";
 
 export type ComposerResult = {
   otherStoreId: string;

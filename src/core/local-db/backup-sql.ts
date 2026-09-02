@@ -1,4 +1,4 @@
-import type { PosState } from "@/lib/pos-types";
+import type { PosState } from "@/core/types/pos-types";
 
 /** Quote a JS value as a Postgres literal. */
 const lit = (v: unknown): string => {

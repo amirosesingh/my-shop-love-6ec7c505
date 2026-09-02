@@ -12,7 +12,7 @@ import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { useEffect, useState } from "react";
 import * as Icons from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { describeError } from "./notify";
+import { describeError } from "@/lib/notify";
 
 const sb = supabaseExternal as unknown as SupabaseClient;
 const CACHE_KEY = "pos.payment-types.v1";

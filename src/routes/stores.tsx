@@ -18,7 +18,7 @@ import { usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
 import { ConfirmSwitch } from "@/components/pos/ConfirmSwitch";
 import { BRANCH_POLICY_COPY, branchPolicy, type BranchPolicyKey } from "@/lib/branch-policy";
-import type { BranchPolicy, Store } from "@/lib/pos-types";
+import type { BranchPolicy, Store } from "@/core/types/pos-types";
 import {
   isActiveLocation,
   locationPath,

@@ -38,7 +38,7 @@ import {
   submitRecount,
   type ShiftReconciliation,
 } from "@/lib/shift-closing";
-import type { ShiftState } from "@/lib/pos-types";
+import type { ShiftState } from "@/core/types/pos-types";
 
 type Step = "reason" | "count" | "review" | "done";
 

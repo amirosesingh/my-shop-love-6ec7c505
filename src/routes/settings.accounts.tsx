@@ -19,7 +19,7 @@ import {
   PAYMENT_ACCOUNT_LABELS,
   type PaymentAccount,
   type PaymentAccountType,
-} from "@/lib/pos-types";
+} from "@/core/types/pos-types";
 
 export const Route = createFileRoute("/settings/accounts")({
   head: () => ({

@@ -59,7 +59,7 @@ import {
 import { checkCodeAvailable } from "@/lib/product-lookup";
 
 import { ItemActivityDrawer } from "@/components/pos/ItemActivityDrawer";
-import type { Product } from "@/lib/pos-types";
+import type { Product } from "@/core/types/pos-types";
 import { nextSku, peekSku, readSkuSettings } from "@/lib/sku";
 
 export const Route = createFileRoute("/inventory")({

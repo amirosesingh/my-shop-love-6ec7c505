@@ -20,7 +20,7 @@ import {
   useUnits,
 } from "@/lib/catalog-meta";
 import { usePos } from "@/lib/pos-store";
-import type { CatalogKind, ProductCategory } from "@/lib/pos-types";
+import type { CatalogKind, ProductCategory } from "@/core/types/pos-types";
 
 export const Route = createFileRoute("/settings/catalog")({
   head: () => ({

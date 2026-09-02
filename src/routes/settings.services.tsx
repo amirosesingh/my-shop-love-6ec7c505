@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { usePos } from "@/lib/pos-store";
-import type { BookingServiceType } from "@/lib/pos-types";
+import type { BookingServiceType } from "@/core/types/pos-types";
 
 export const Route = createFileRoute("/settings/services")({
   head: () => ({

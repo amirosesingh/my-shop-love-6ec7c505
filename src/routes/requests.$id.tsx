@@ -26,7 +26,7 @@ import { useTransferRecord } from "@/components/pos/TransferWorkspace";
 import { usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
 import { groupOf } from "@/lib/stock-transfers";
-import { TRANSFER_STATUS_LABELS } from "@/lib/pos-types";
+import { TRANSFER_STATUS_LABELS } from "@/core/types/pos-types";
 
 export const Route = createFileRoute("/requests/$id")({
   head: () => ({

@@ -11,7 +11,7 @@ import {
   formatFeatureSchemaReport,
   runFeatureSchemaAudit,
   type FeatureSchemaReport as Report,
-} from "@/lib/feature-schema";
+} from "@/core/types/feature-schema";
 
 export function FeatureSchemaReport() {
   const [report, setReport] = useState<Report | null>(null);

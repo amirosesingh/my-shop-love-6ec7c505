@@ -931,9 +931,9 @@ export type IntegrationSettings = {
   /** How receipt numbers are built on this branch's tills. */
   billNumbering?: BillNumberingSettings;
   /** How Stock Operations reference numbers are built. */
-  stockNumbering?: import("./stock-ref").StockNumberingSettings;
+  stockNumbering?: import("@/lib/stock-ref").StockNumberingSettings;
   /** How goods-received (purchasing) reference numbers are built. */
-  receivingNumbering?: import("./stock-ref").StockNumberingSettings;
+  receivingNumbering?: import("@/lib/stock-ref").StockNumberingSettings;
   /** Cash-rounding of the final bill total. */
   rounding?: RoundingSettings;
 };

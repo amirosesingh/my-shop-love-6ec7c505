@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { money, stockAt } from "@/lib/pos-store";
 import { nextSku, readSkuSettings } from "@/lib/sku";
-import type { Product } from "@/lib/pos-types";
+import type { Product } from "@/core/types/pos-types";
 
 type Field = "all" | "barcode" | "name" | "category" | "code";
 

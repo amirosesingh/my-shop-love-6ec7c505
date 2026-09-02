@@ -14,7 +14,7 @@ import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { Label } from "@/components/ui/label";
 import { money, stockAt, usePos } from "@/lib/pos-store";
 import type { BlockedDelete } from "@/lib/product-delete";
-import type { Product } from "@/lib/pos-types";
+import type { Product } from "@/core/types/pos-types";
 import { findMergeBlocks, type MergeBlock } from "@/lib/merge-guard";
 import { useHeldOrders } from "@/lib/held-orders";
 

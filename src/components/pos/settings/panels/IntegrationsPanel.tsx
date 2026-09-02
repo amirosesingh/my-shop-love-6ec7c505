@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { usePos } from "@/lib/pos-store";
 import { defaultWhatsApp } from "@/lib/pos-seed";
-import type { WhatsAppSettings } from "@/lib/pos-types";
+import type { WhatsAppSettings } from "@/core/types/pos-types";
 
 type Fields = {
   whatsapp: WhatsAppSettings;

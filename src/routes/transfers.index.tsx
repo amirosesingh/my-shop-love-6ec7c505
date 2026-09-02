@@ -23,8 +23,8 @@ import {
 } from "@/components/ui/table";
 import { usePos } from "@/lib/pos-store";
 import { printTransferNote } from "@/lib/pos-print";
-import type { Transfer, TransferKind } from "@/lib/pos-types";
-import { TRANSFER_STATUS_LABELS } from "@/lib/pos-types";
+import type { Transfer, TransferKind } from "@/core/types/pos-types";
+import { TRANSFER_STATUS_LABELS } from "@/core/types/pos-types";
 import { fulfilmentLabel, statusStyle } from "@/components/pos/TransferWorkspace";
 
 type TransferSearch = { items?: string; kind?: TransferKind };

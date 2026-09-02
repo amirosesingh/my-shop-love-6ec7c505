@@ -13,7 +13,7 @@ import { availableAt, stockAt } from "@/lib/pos-store";
 import { clearCartDraft } from "@/lib/cart-draft";
 import { logger } from "@/lib/audit-log";
 import { TICKET_ACTIONS, logTicketEvent } from "@/lib/ticket-audit";
-import type { Booking, CartLine, DiscountType, Product, Store } from "@/lib/pos-types";
+import type { Booking, CartLine, DiscountType, Product, Store } from "@/core/types/pos-types";
 
 /** A coupon or voucher applied to the open ticket. */
 export type CartCoupon = {

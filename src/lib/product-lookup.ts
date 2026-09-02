@@ -6,7 +6,7 @@
  * primary one. Scanning any of them — or the SKU — resolves to the same
  * product.
  */
-import type { Product } from "./pos-types";
+import type { Product } from "@/core/types/pos-types";
 import { dbProxy } from "@/core/api/db-router";
 
 export const normaliseCode = (code: string) => code.trim().toLowerCase();

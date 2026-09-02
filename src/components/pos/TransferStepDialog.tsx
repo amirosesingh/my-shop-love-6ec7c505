@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import type { Transfer } from "@/lib/pos-types";
+import type { Transfer } from "@/core/types/pos-types";
 
 export type TransferStep = "approve" | "dispatch" | "receive" | "verify";
 

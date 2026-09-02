@@ -28,7 +28,7 @@ import {
   saleReceiptPreview,
   shiftReportPreview,
 } from "@/lib/pos-print";
-import type { PaymentMethod, Sale } from "@/lib/pos-types";
+import type { PaymentMethod, Sale } from "@/core/types/pos-types";
 import { loadSalesPage } from "@/core/api/pos-db";
 import type { Cursor } from "@/lib/keyset";
 

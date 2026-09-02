@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { dbRouter, type ReadSource } from "@/core/api/db-router";
 import { OfflineDataNotice } from "@/components/pos/OfflineDataNotice";
 import { money } from "@/lib/pos-store";
-import type { Product } from "@/lib/pos-types";
+import type { Product } from "@/core/types/pos-types";
 
 type Movement = {
   id: string;

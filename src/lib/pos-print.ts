@@ -14,13 +14,13 @@ import type {
   Store,
   TaxSettings,
   Transfer,
-} from "./pos-types";
+} from "@/core/types/pos-types";
 import {
   bookingBalance,
   lineUnitDiscount,
   whatsappLink,
   TRANSFER_STATUS_LABELS,
-} from "./pos-types";
+} from "@/core/types/pos-types";
 import { defaultReceiptSettings } from "./pos-seed";
 import { roundingOf, showsRoundingLine } from "@/core/pricing/rounding";
 import qrcode from "qrcode-generator";

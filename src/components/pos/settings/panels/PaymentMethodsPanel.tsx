@@ -22,7 +22,7 @@ import {
   paymentCodeFrom,
   savePaymentType,
   type PaymentType,
-} from "@/lib/payment-types";
+} from "@/core/types/payment-types";
 
 export function PaymentMethodsPanel() {
   const [rows, setRows] = useState<PaymentType[]>([]);

@@ -7,7 +7,7 @@
  * again at close time.
  */
 import type { PosRules } from "./pos-rules";
-import type { Sale, Shift } from "./pos-types";
+import type { Sale, Shift } from "@/core/types/pos-types";
 
 export type TenderTotal = { method: string; label: string; count: number; value: number };
 

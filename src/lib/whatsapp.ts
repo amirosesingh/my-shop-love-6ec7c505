@@ -12,7 +12,7 @@ import {
   type Member,
   type Sale,
   type WhatsAppSettings,
-} from "./pos-types";
+} from "@/core/types/pos-types";
 
 const cash = (n: number) =>
   n.toLocaleString(undefined, { style: "currency", currency: "USD" });

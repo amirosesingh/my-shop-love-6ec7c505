@@ -22,8 +22,8 @@ import { db } from "@/core/api/pos-db";
 
 import { applyRounding, roundingOf } from "@/core/pricing/rounding";
 import { applyCombo, intakeTotals, newJobTag } from "@/lib/booking-charges";
-import { bookingRulesOf, lineUnitDiscount, paymentsLabel, r2, validateTenders } from "@/lib/pos-types";
-import type { Store, CartLine, Payment, PaymentMethod, Sale, Booking, Member } from "@/lib/pos-types";
+import { bookingRulesOf, lineUnitDiscount, paymentsLabel, r2, validateTenders } from "@/core/types/pos-types";
+import type { Store, CartLine, Payment, PaymentMethod, Sale, Booking, Member } from "@/core/types/pos-types";
 import type { CartCoupon } from "@/lib/register/use-cart";
 import type { NewBooking } from "@/lib/pos-store";
 

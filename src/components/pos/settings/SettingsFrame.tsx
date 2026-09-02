@@ -32,13 +32,13 @@ import {
   setPreviewReceiptCfg,
   setPrintSettings,
 } from "@/lib/pos-print";
-import { defaultPaymentQr } from "@/lib/pos-types";
+import { defaultPaymentQr } from "@/core/types/pos-types";
 import type {
   FontStyleSettings,
   ReceiptOverride,
   ReceiptSettings,
   Sale,
-} from "@/lib/pos-types";
+} from "@/core/types/pos-types";
 import type { SettingsSectionId } from "@/lib/settings-sections";
 import { computeTax } from "@/core/pricing/tax";
 

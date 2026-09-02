@@ -12,7 +12,7 @@ import {
   runFeatureSchemaAudit,
   formatFeatureSchemaReport,
   type FeatureSchemaReport,
-} from "./feature-schema";
+} from "@/core/types/feature-schema";
 import { logicReport, type LogicSeverity } from "./logic-health";
 
 export type ScanArea = "code" | "schema" | "relations" | "readwrite";

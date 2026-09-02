@@ -6,7 +6,7 @@
  * itself and refuses to hand a booking over while anything is still owed.
  */
 import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
-import { MONEY_TOLERANCE, type PaymentMethod } from "./pos-types";
+import { MONEY_TOLERANCE, type PaymentMethod } from "@/core/types/pos-types";
 
 export type BookingBalanceState = {
   total: number;

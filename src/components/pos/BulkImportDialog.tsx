@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/table";
 import { money, stockAt, usePos } from "@/lib/pos-store";
 import { resolveByBarcode } from "@/lib/product-lookup";
-import type { Product } from "@/lib/pos-types";
+import type { Product } from "@/core/types/pos-types";
 
 export type ImportRow = {
   barcode: string;

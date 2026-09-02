@@ -5,7 +5,7 @@ import { Building2, Globe, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import type { SettingScope } from "@/lib/settings-scope";
-import type { Store } from "@/lib/pos-types";
+import type { Store } from "@/core/types/pos-types";
 
 export type ScopeChoice = { scope: SettingScope; scopeId: string };
 

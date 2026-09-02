@@ -24,7 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { BOOKING_TIMING_LABELS, bookingRulesOf } from "@/lib/pos-types";
+import { BOOKING_TIMING_LABELS, bookingRulesOf } from "@/core/types/pos-types";
 import {
   Dialog,
   DialogContent,
@@ -46,7 +46,7 @@ import {
   type Booking,
   type JobStatus,
   type PaymentMethod,
-} from "@/lib/pos-types";
+} from "@/core/types/pos-types";
 import {
   printBookingPayment,
   printBookingSlip,

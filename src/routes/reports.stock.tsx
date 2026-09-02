@@ -17,7 +17,7 @@ import {
 import { TablePagination, usePagination } from "@/components/pos/TablePagination";
 import { money, usePos } from "@/lib/pos-store";
 import { useAuditLogs } from "@/lib/audit-log";
-import { STOCK_ADJUSTMENT_REASONS } from "@/lib/pos-types";
+import { STOCK_ADJUSTMENT_REASONS } from "@/core/types/pos-types";
 import {
   ReportHeader,
   StatCard,

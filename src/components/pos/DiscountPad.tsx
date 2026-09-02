@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { DiscountType } from "@/lib/pos-types";
+import type { DiscountType } from "@/core/types/pos-types";
 
 const PRESETS = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50];
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0"];

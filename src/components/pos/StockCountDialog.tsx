@@ -42,7 +42,7 @@ import { money, stockAt, usePos } from "@/lib/pos-store";
 import { resolveByBarcode } from "@/lib/product-lookup";
 import { nextStockRef } from "@/lib/stock-ref";
 import { saveRecordEditHistory, type EditGrant } from "@/lib/record-edit-flow";
-import { STOCK_ADJUSTMENT_REASONS, type StockAdjustmentReason } from "@/lib/pos-types";
+import { STOCK_ADJUSTMENT_REASONS, type StockAdjustmentReason } from "@/core/types/pos-types";
 
 export type CountRow = {
   productId: string;

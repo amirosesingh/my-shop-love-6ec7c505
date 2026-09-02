@@ -37,7 +37,7 @@ import type {
   PaymentMethod,
   PromoType,
   TaxMode,
-} from "@/lib/pos-types";
+} from "@/core/types/pos-types";
 
 /** Slices of app state that live in the cloud database. */
 export type CloudSlice = Pick<

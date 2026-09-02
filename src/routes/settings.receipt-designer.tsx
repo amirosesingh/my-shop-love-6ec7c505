@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/pos-auth";
 import { RECEIPT_FIELDS, fieldTag, type ReceiptFieldToken } from "@/lib/receipt-template";
 import { receiptCssWarnings } from "@/lib/receipt-css";
-import type { ReceiptCustomLine } from "@/lib/pos-types";
+import type { ReceiptCustomLine } from "@/core/types/pos-types";
 
 export const Route = createFileRoute("/settings/receipt-designer")({
   head: () => ({

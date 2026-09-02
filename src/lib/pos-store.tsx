@@ -34,8 +34,8 @@ import type {
   TransferItem,
   TransferKind,
   TransferStatus,
-} from "./pos-types";
-import { bookingBalance, lineUnitDiscount, r2, type DiscountType } from "./pos-types";
+} from "@/core/types/pos-types";
+import { bookingBalance, lineUnitDiscount, r2, type DiscountType } from "@/core/types/pos-types";
 import { logger } from "./audit-log";
 import { toast } from "sonner";
 import {

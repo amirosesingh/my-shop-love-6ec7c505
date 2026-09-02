@@ -8,8 +8,8 @@ import type {
   Store,
   TradingHours,
   WhatsAppSettings,
-} from "./pos-types";
-import { defaultPaymentQr } from "./pos-types";
+} from "@/core/types/pos-types";
+import { defaultPaymentQr } from "@/core/types/pos-types";
 
 export const defaultPaymentDetails: PaymentDetails = {
   accountName: "",
