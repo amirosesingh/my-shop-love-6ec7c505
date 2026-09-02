@@ -68,14 +68,25 @@ export function OfflineGate({ children }: { children: ReactNode }) {
         This app works with live data from your central system. It will continue automatically as
         soon as the connection is back.
       </p>
-      <button
-        onClick={retry}
-        disabled={checking}
-        className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
-      >
-        <RefreshCw className={`h-4 w-4 ${checking ? "animate-spin" : ""}`} aria-hidden />
-        {checking ? "Checking…" : "Try again"}
-      </button>
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        <button
+          onClick={retry}
+          disabled={checking}
+          className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
+        >
+          <RefreshCw className={`h-4 w-4 ${checking ? "animate-spin" : ""}`} aria-hidden />
+          {checking ? "Checking…" : "Try again"}
+        </button>
+        {/* The way back in when the address itself is what is wrong. This
+            screen never calls the backend it is repairing. */}
+        <a
+          href="/recovery"
+          className="inline-flex items-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground"
+        >
+          <LifeBuoy className="h-4 w-4" aria-hidden />
+          Emergency access
+        </a>
+      </div>
     </div>
   );
 }
