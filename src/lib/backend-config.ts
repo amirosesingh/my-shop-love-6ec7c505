@@ -54,7 +54,7 @@ export async function backendUrl(): Promise<string> {
       const saved = clean(window.localStorage.getItem(STORAGE_KEY));
       if (saved) return saved;
     } catch {
-      /* storage unavailable — fall through to the build value */
+      /* storage unavailable — the device has no address */
     }
   }
   return "";
