@@ -36,10 +36,11 @@ function apply(url: string): void {
   (window as unknown as { __POS_SERVER_URL__?: string }).__POS_SERVER_URL__ = url;
 }
 
-/** The build-time default, used when the device has nothing saved. */
-function baked(): string {
-  return clean(import.meta.env["VITE_POS_SERVER_URL"] as string | undefined);
-}
+/**
+ * There is no build-time default on purpose. A shipped APK or installer must
+ * carry no address belonging to another deployment, so when the device has
+ * nothing saved the address stays empty and the operator is asked for it.
+ */
 
 /** The address this device is configured to use, "" when it has none. */
 export async function backendUrl(): Promise<string> {
@@ -53,10 +54,10 @@ export async function backendUrl(): Promise<string> {
       const saved = clean(window.localStorage.getItem(STORAGE_KEY));
       if (saved) return saved;
     } catch {
-      /* storage unavailable — fall through to the build value */
+      /* storage unavailable — the device has no address */
     }
   }
-  return baked();
+  return "";
 }
 
 /** Read the saved address and make it the one every app-server call uses. */
@@ -86,8 +87,8 @@ export async function saveBackendUrl(value: string): Promise<BackendSaveResult> 
       return { ok: false, error: (e as Error).message };
     }
   }
-  apply(next || baked());
-  return { ok: true, url: next || baked() };
+  apply(next);
+  return { ok: true, url: next };
 }
 
 /**

@@ -50,7 +50,41 @@ function copyDir(from, to) {
   }
 }
 
+/**
+ * Names that belong to the web deployment. They are removed from the build's
+ * own environment so a CI runner variable cannot reach the phone bundle, on
+ * top of the empty `envDir` and the `undefined` defines in vite.config.ts.
+ */
+const WEB_ONLY_ENV_NAMES = [
+  "VITE_SUPABASE_URL",
+  "VITE_SUPABASE_ANON_KEY",
+  "VITE_SUPABASE_PUBLISHABLE_KEY",
+  "VITE_SUPABASE_PROJECT_ID",
+  "VITE_POS_SUPABASE_URL",
+  "VITE_POS_SUPABASE_ANON_KEY",
+  "VITE_POS_SUPABASE_PUBLISHABLE_KEY",
+  "VITE_SUPABASE_EXTERNAL_URL",
+  "VITE_SUPABASE_EXTERNAL_PUBLISHABLE_KEY",
+  "VITE_POS_SERVER_URL",
+];
+
+function scrubWebEnv() {
+  for (const name of WEB_ONLY_ENV_NAMES) delete process.env[name];
+}
+
+function cleanOutputs() {
+  for (const dir of ["dist", out, path.join(root, "android", "app", "build")]) {
+    fs.rmSync(path.isAbsolute(dir) ? dir : path.join(root, dir), {
+      recursive: true,
+      force: true,
+    });
+  }
+}
+
 async function main() {
+  scrubWebEnv();
+  console.log("› clearing stale build output");
+  cleanOutputs();
   console.log("› building the phone bundle");
   run("npx", ["vite", "build"], { MOBILE_BUILD: "1" });
 
@@ -104,6 +138,12 @@ async function main() {
   // copy under 200.html keeps other hosts (and manual testing) happy too.
   fs.writeFileSync(path.join(out, "200.html"), html, "utf8");
 
+
+  console.log("› checking the bundle carries no web configuration");
+  run(process.execPath, [
+    path.join(root, "scripts", "verify-no-web-config.cjs"),
+    out,
+  ]);
 
   console.log(`✓ phone bundle ready in ${path.relative(root, out)}`);
 }

@@ -65,10 +65,18 @@ jobs:
             echo "release_id=$tag-$short"
           } >> "$GITHUB_OUTPUT"
 
+      # POS_UPDATE_URL is the update feed address, not tenant configuration.
+      # No web environment (Supabase URL/key, backend URL) is provided to this
+      # job: the till is told where to connect during activation or in
+      # Settings -> Database & Cloud Connection.
       - name: Build Electron installer
         env:
           POS_UPDATE_URL: ${{ vars.POS_UPDATE_URL }}
         run: npm run desktop:release
+
+      - name: Verify the installer carries no web configuration
+        shell: bash
+        run: node scripts/verify-no-web-config.cjs release/win-unpacked/resources dist-desktop
 
       - name: Write release manifest
         shell: bash

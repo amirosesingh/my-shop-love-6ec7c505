@@ -72,12 +72,12 @@ jobs:
             echo "release_id=$tag-$short"
           } >> "$GITHUB_OUTPUT"
 
+      # No web environment is provided to this job on purpose: the APK is
+      # handed to other shops and must carry no project address, key or
+      # backend URL. The phone is told where to connect during activation or
+      # in Settings -> Database & Cloud Connection.
       - name: Build the offline app bundle
         if: ${{ !inputs.app_url }}
-        env:
-          # Where the phone should send server calls (sign-in, sync relay).
-          # Set the POS_SERVER_URL repository variable to your POS address.
-          VITE_POS_SERVER_URL: ${{ vars.POS_SERVER_URL }}
         run: npm run mobile:build
 
       - name: Add Android platform
@@ -127,6 +127,13 @@ jobs:
           ANDROID_KEYSTORE_FILE: ${{ github.workspace }}/android/release.keystore
         run: |
           ./gradlew assembleRelease --stacktrace
+
+      - name: Verify the APK carries no web configuration
+        run: |
+          node scripts/verify-no-web-config.cjs \
+            capacitor-shell \
+            android/app/build/outputs/apk/release
+
 
       - name: Stage the APK and the web bundle
         run: |
