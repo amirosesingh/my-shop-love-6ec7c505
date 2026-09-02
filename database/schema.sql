@@ -2785,6 +2785,7 @@ BEGIN
   IF COL_LENGTH('dbo.stock_transfer_items', 'quantity_approved') IS NULL ALTER TABLE dbo.stock_transfer_items ADD [quantity_approved] INT;
   IF COL_LENGTH('dbo.stock_transfer_items', 'quantity_dispatched') IS NULL ALTER TABLE dbo.stock_transfer_items ADD [quantity_dispatched] INT;
   IF COL_LENGTH('dbo.stock_transfer_items', 'quantity_received') IS NULL ALTER TABLE dbo.stock_transfer_items ADD [quantity_received] INT DEFAULT 0;
+  IF COL_LENGTH('dbo.stock_transfer_items', 'quantity_verified') IS NULL ALTER TABLE dbo.stock_transfer_items ADD [quantity_verified] INT;
   IF COL_LENGTH('dbo.stock_transfer_items', 'unit_cost') IS NULL ALTER TABLE dbo.stock_transfer_items ADD [unit_cost] DECIMAL(18,4) DEFAULT 0;
   IF COL_LENGTH('dbo.stock_transfer_items', 'created_at') IS NULL ALTER TABLE dbo.stock_transfer_items ADD [created_at] DATETIME2(3) DEFAULT SYSUTCDATETIME();
   IF COL_LENGTH('dbo.stock_transfer_items', 'row_version') IS NULL ALTER TABLE dbo.stock_transfer_items ADD [row_version] INT DEFAULT 1;

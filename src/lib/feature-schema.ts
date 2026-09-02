@@ -165,6 +165,7 @@ export const FEATURES: FeatureDef[] = [
           "ref", "kind", "transfer_scope", "from_store_id", "from_store_name", "from_group_id",
           "to_store_id", "to_store_name", "to_group_id", "status", "note", "created_by",
           "approved_by", "approved_at", "received_by", "received_at", "rejected_reason",
+          "verified_by", "verified_at", "posted_at", "discrepancy_reason",
         ],
       },
       {
@@ -174,7 +175,8 @@ export const FEATURES: FeatureDef[] = [
         source: "src/lib/stock-transfers.ts:123 (saveTransfer lines)",
         columns: [
           "transfer_id", "product_id", "barcode", "sku", "product_name", "quantity",
-          "quantity_approved", "quantity_dispatched", "quantity_received", "unit_cost",
+          "quantity_approved", "quantity_dispatched", "quantity_received", "quantity_verified",
+          "unit_cost",
         ],
       },
       {
@@ -192,11 +194,18 @@ export const FEATURES: FeatureDef[] = [
         columns: ["p_transfer_id", "p_dispatched_by", "p_lines"],
       },
       {
-        label: "Receiving moves stock in one transaction",
+        label: "Arrival is recorded without moving stock",
         table: "rpc:stock_transfer_receive",
         kind: "write",
         source: "src/lib/stock-transfers.ts (receiveTransferInDb)",
         columns: ["p_transfer_id", "p_received_by", "p_lines"],
+      },
+      {
+        label: "Physical verification posts the counted quantity to the shelf",
+        table: "rpc:stock_transfer_verify",
+        kind: "write",
+        source: "src/lib/stock-transfers.ts (verifyTransferInDb)",
+        columns: ["p_transfer_id", "p_verified_by", "p_lines", "p_reason"],
       },
       {
         label: "Manual stock adjustment",
