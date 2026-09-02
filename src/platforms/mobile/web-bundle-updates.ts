@@ -11,7 +11,7 @@
  * the app is not inside Capacitor.
  */
 import { APP_VERSION } from "@/lib/app-updates";
-import { isNative } from "@/platforms/mobile/native";
+import { isNative } from "@/platform-config/platform";
 import { firstReachableUrl, httpGetBase64, httpGetJson } from "@/platforms/mobile/native-http";
 import { fetchManifest, withTimeout } from "@/lib/update-manifest";
 

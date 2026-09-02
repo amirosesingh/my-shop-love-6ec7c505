@@ -8,7 +8,7 @@
  */
 import { useEffect, useState } from "react";
 
-import { isNative } from "@/platforms/mobile/native";
+import { isNative } from "@/platform-config/platform";
 import { onRecoveryScreen } from "../../lib/recovery-route";
 import { hydrateNativeStorage } from "@/platforms/mobile/mobile-storage";
 import { hydrateBackendUrl } from "../../lib/backend-config";

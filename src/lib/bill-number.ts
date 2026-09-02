@@ -10,7 +10,7 @@
  * registered the device. Because every part is device specific, two tills in
  * the same branch can never produce the same number, even offline.
  */
-import { isElectron, isNative } from "@/platforms/mobile/native";
+import { isElectron, isNative } from "@/platform-config/platform";
 import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 import { readLocalSetting, writeLocalSetting } from "./local-db";
 

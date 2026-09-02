@@ -24,7 +24,7 @@ import { CloudConnectionPanel } from "@/components/pos/settings/panels/CloudConn
 import { LocalDatabaseSettings } from "@/components/pos/LocalDatabaseSettings";
 import { ReceiptPrinterSettings } from "@/components/pos/ReceiptPrinterSettings";
 import { TerminalActivation } from "@/components/pos/TerminalActivation";
-import { isElectron, isTerminalApp } from "@/platforms/mobile/native";
+import { isElectron, isTerminalApp } from "@/platform-config/platform";
 import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 import { backendUrl } from "@/lib/backend-config";
 import { cloudKeyStatus, subscribeCloudKeys } from "@/lib/secure-cloud-config";

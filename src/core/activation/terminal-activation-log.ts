@@ -8,7 +8,7 @@
  */
 import { APP_VERSION } from "@/version";
 import { logger } from "@/lib/audit-log";
-import { isAndroid, isElectron, isNative } from "@/platforms/mobile/native";
+import { isAndroid, isElectron, isNative } from "@/platform-config/platform";
 
 export type ActivationOutcome =
   | "succeeded"

@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CameraScanner } from "@/components/pos/CameraScanner";
 import { isNativeApp, scanOnceNative } from "@/platforms/mobile/camera";
-import { isNative } from "@/platforms/mobile/native";
+import { isNative } from "@/platform-config/platform";
 
 /** True when the user is typing into a real field, so we must not steal keys. */
 function typingInField(target: EventTarget | null) {

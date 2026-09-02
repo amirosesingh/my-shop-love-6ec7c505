@@ -8,7 +8,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { APP_VERSION } from "@/lib/app-updates";
-import { isNative, isAndroid } from "@/platforms/mobile/native";
+import { isNative, isAndroid } from "@/platform-config/platform";
 import {
   describeNetworkError,
   firstReachableUrl,

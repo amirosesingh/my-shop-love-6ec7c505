@@ -22,7 +22,7 @@ import { ErrorNotifier } from "../components/pos/ErrorNotifier";
 import { AuditTracker } from "../components/pos/AuditTracker";
 import { TelemetryAgent } from "../components/pos/TelemetryAgent";
 import { TerminalActivation } from "@/components/pos/TerminalActivation";
-import { isTerminalApp } from "@/platforms/mobile/native";
+import { isTerminalApp } from "@/platform-config/platform";
 import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 import { FirstRunSetup } from "../components/pos/FirstRunSetup";
 import { ThemeProvider, themeBootScript } from "../lib/theme";

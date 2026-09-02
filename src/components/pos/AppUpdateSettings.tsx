@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { APP_VERSION, useAppUpdates } from "@/lib/app-updates";
 import { useAndroidUpdates } from "@/platforms/mobile/android-updates";
-import { isAndroid, isNative } from "@/platforms/mobile/native";
+import { isAndroid, isNative } from "@/platform-config/platform";
 import { checkWebBundle } from "@/platforms/mobile/web-bundle-updates";
 import { MANIFEST_URL } from "@/lib/update-manifest";
 

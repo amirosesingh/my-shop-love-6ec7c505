@@ -19,7 +19,7 @@
  * never leave the UI stuck on "Checking for updates…".
  */
 import { httpGetJson } from "@/platforms/mobile/native-http";
-import { isAndroid, isElectron, isNative } from "@/platforms/mobile/native";
+import { isAndroid, isElectron, isNative } from "@/platform-config/platform";
 
 const ENV_BASE =
   (typeof import.meta !== "undefined" &&

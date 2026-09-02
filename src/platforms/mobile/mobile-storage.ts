@@ -10,7 +10,7 @@
  * Web and Electron are untouched: `hydrateNativeStorage()` returns immediately
  * when the app is not running inside Capacitor.
  */
-import { isNative } from "@/platforms/mobile/native";
+import { isNative } from "@/platform-config/platform";
 import { isPersistentKey } from "@/lib/live-mode";
 
 const PREFIX = "pos.";

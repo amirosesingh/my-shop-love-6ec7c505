@@ -55,7 +55,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useUiScale } from "@/lib/use-ui-scale";
 import { useBranding, isDesktop } from "@/lib/branding";
-import { isNative } from "@/platforms/mobile/native";
+import { isNative } from "@/platform-config/platform";
 import { setBranchId } from "@/lib/activity-journal";
 import { soleBranchId } from "@/lib/active-branch";
 import { flushWhatsAppQueue } from "@/lib/whatsapp";

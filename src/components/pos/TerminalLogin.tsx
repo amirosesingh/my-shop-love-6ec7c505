@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useBranding } from "@/lib/branding";
-import { isTerminalApp } from "@/platforms/mobile/native";
+import { isTerminalApp } from "@/platform-config/platform";
 import { CashierPinLogin } from "@/components/auth/CashierPinLogin";
 import { isExternalEmail, usernameFromAddress } from "@/lib/internal-domains";
 

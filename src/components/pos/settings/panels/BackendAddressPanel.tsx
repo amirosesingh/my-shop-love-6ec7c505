@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { isTerminalApp } from "@/platforms/mobile/native";
+import { isTerminalApp } from "@/platform-config/platform";
 import { backendUrl, saveBackendUrl, testBackendUrl } from "@/lib/backend-config";
 
 export function BackendAddressPanel() {

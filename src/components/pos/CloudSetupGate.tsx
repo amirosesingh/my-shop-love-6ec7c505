@@ -20,7 +20,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { isTerminalApp } from "@/platforms/mobile/native";
+import { isTerminalApp } from "@/platform-config/platform";
 import { cloudKeyStatus, subscribeCloudKeys } from "@/lib/secure-cloud-config";
 import { isCloudConnected } from "@/core/activation/registration-status";
 
