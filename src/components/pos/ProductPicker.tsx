@@ -64,11 +64,9 @@ export function ProductPicker({
   }, [term, products, limit]);
 
   const showBranch = Boolean(destinationStoreId);
-  const qtyOf = (id: string) => Math.max(1, Math.round(Number(qty[id] ?? 1) || 1));
 
-  function add(product: Product, amount = qtyOf(product.id)) {
+  function add(product: Product, amount = 1) {
     onPick(product, amount);
-    setQty((q) => ({ ...q, [product.id]: "" }));
   }
 
   /** Scanner / Enter: an exact code adds immediately and clears the box. */
@@ -84,7 +82,7 @@ export function ProductPicker({
     inputRef.current?.focus();
   }
 
-  const columns = useMemo(() => (showBranch ? 6 : 5), [showBranch]);
+  const columns = useMemo(() => (showBranch ? 4 : 3), [showBranch]);
 
   return (
     <div className="space-y-2">
@@ -101,58 +99,40 @@ export function ProductPicker({
         />
       </div>
 
-      <div className="max-h-60 overflow-y-auto rounded-md border border-border">
+      <div className="max-h-72 overflow-y-auto rounded-md border border-border">
         <table className="w-full text-xs">
           <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur">
             <tr className="text-left text-[11px] uppercase tracking-wide text-muted-foreground">
               <th className="px-2 py-1.5 font-medium">Barcode</th>
               <th className="px-2 py-1.5 font-medium">Item</th>
-              {showBranch && <th className="px-2 py-1.5 font-medium">Branch</th>}
-              <th className="px-2 py-1.5 text-right font-medium">Available</th>
-              <th className="px-2 py-1.5 text-right font-medium">Qty</th>
-              <th className="px-2 py-1.5" />
+              <th className="px-2 py-1.5 text-right font-medium">
+                Current branch{storeCode ? ` · ${storeCode}` : ""}
+              </th>
+              {showBranch && (
+                <th className="px-2 py-1.5 text-right font-medium">
+                  Available{destinationStoreCode ? ` · ${destinationStoreCode}` : ""}
+                </th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {rows.map((p) => (
-              <tr key={p.id} className="align-middle">
-                <td className="numeric max-w-[8rem] truncate px-2 py-1.5 text-muted-foreground">
+              <tr
+                key={p.id}
+                onDoubleClick={() => add(p, 1)}
+                title="Double-click to add this item"
+                className="cursor-pointer align-middle transition-colors hover:bg-muted/60"
+              >
+                <td className="numeric truncate px-2 py-1.5 text-muted-foreground">
                   {p.barcode || p.sku || "—"}
                 </td>
-                <td className="max-w-[12rem] truncate px-2 py-1.5">{p.name}</td>
+                <td className="px-2 py-1.5">{p.name}</td>
+                <td className="numeric px-2 py-1.5 text-right">{stockAt(p, storeId)}</td>
                 {showBranch && (
-                  <td className="numeric px-2 py-1.5 text-muted-foreground">
-                    {destinationStoreCode ?? "—"}
-                    {destinationStoreId ? ` · ${stockAt(p, destinationStoreId)}` : ""}
+                  <td className="numeric px-2 py-1.5 text-right text-muted-foreground">
+                    {destinationStoreId ? stockAt(p, destinationStoreId) : "—"}
                   </td>
                 )}
-                <td className="numeric px-2 py-1.5 text-right">
-                  {stockAt(p, storeId)}
-                  {storeCode ? (
-                    <span className="ml-1 text-[10px] text-muted-foreground">{storeCode}</span>
-                  ) : null}
-                </td>
-                <td className="px-2 py-1.5 text-right">
-                  <Input
-                    value={qty[p.id] ?? ""}
-                    onChange={(e) => setQty((q) => ({ ...q, [p.id]: e.target.value }))}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        add(p);
-                      }
-                    }}
-                    inputMode="numeric"
-                    placeholder="1"
-                    className="h-7 w-14 px-1 text-right text-xs"
-                    aria-label={`Quantity for ${p.name}`}
-                  />
-                </td>
-                <td className="px-2 py-1.5 text-right">
-                  <Button size="sm" variant="secondary" className="h-7 px-2" onClick={() => add(p)}>
-                    Add
-                  </Button>
-                </td>
               </tr>
             ))}
             {!rows.length && (
@@ -165,6 +145,9 @@ export function ProductPicker({
           </tbody>
         </table>
       </div>
+      <p className="text-[11px] text-muted-foreground">
+        Double-click a row to add it. Set the quantity in the list.
+      </p>
     </div>
   );
 }
