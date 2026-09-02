@@ -8,7 +8,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { CheckCircle2, Cloud, Database, Download, Loader2, RefreshCw } from "lucide-react";
+import { CheckCircle2, Cloud, Copy, Database, Download, Loader2, RefreshCw } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,9 +20,14 @@ import { CENTRAL_SCHEMA_BY_TABLE } from "@/lib/central-schema";
 import {
   columnTypes,
   computeDeepDrift,
+  computeLegacyDeepDrift,
   inventoryFromPayload,
   DEEP_CATEGORY_LABEL,
 } from "@/lib/deep-drift";
+import {
+  DEEP_INVENTORY_INSTALLER_FILENAME,
+  DEEP_INVENTORY_INSTALLER_SQL,
+} from "@/lib/deep-inventory-sql";
 import { computeLocalDeepDrift, parseLocalExpectations } from "@/lib/local-drift";
 import { hasLocalDb, localDb } from "@/lib/local-db";
 import {
@@ -38,6 +43,7 @@ import {
 } from "@/lib/schema-health";
 
 type Reach = "unknown" | "ok" | "unreachable";
+type ReducedCheck = { reason: "not_installed" | "not_permitted" | "unavailable"; detail: string };
 
 export function SchemaHealthPanel() {
   const [gaps, setGaps] = useState<SchemaGap[]>([]);
@@ -47,7 +53,7 @@ export function SchemaHealthPanel() {
   const [busy, setBusy] = useState(false);
   const [scannedAt, setScannedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [reduced, setReduced] = useState<string | null>(null);
+  const [reduced, setReduced] = useState<ReducedCheck | null>(null);
 
   useEffect(() => setFiles(loadMigrations()), []);
 
@@ -75,7 +81,7 @@ export function SchemaHealthPanel() {
         }
         try {
           const deep = await fetchCentralInventory();
-          if (deep.ok) {
+          if (deep.ok && deep.mode === "deep") {
             setReduced(null);
             const inventory = inventoryFromPayload(
               JSON.parse(deep.inventoryJson) as Record<string, unknown>,
@@ -91,13 +97,27 @@ export function SchemaHealthPanel() {
                 statements: finding.statements,
               });
             }
+          } else if (deep.ok) {
+            setReduced({ reason: "not_installed", detail: deep.warning ?? "Deep helper unavailable" });
+            for (const finding of computeLegacyDeepDrift(JSON.parse(deep.inventoryJson))) {
+              found.push({
+                environment: "cloud",
+                table: finding.table,
+                columns: [],
+                missingTable: false,
+                category: finding.category,
+                detail: finding.detail,
+                statements: finding.statements,
+              });
+            }
           } else {
-            setReduced(deep.error);
+            setReduced({ reason: deep.reason, detail: deep.error });
           }
         } catch (err) {
-          setReduced(
-            err instanceof Error ? err.message : "The deep inventory could not be read.",
-          );
+          setReduced({
+            reason: "unavailable",
+            detail: err instanceof Error ? err.message : "The deep inventory could not be read.",
+          });
         }
       } else {
         setCloudReach("unreachable");
@@ -171,6 +191,21 @@ export function SchemaHealthPanel() {
     toast.success(`${file.filename} downloaded`);
   };
 
+  const copyInstaller = async () => {
+    await navigator.clipboard.writeText(DEEP_INVENTORY_INSTALLER_SQL);
+    toast.success("Deep inventory installer copied");
+  };
+
+  const downloadInstaller = () => {
+    const url = URL.createObjectURL(new Blob([DEEP_INVENTORY_INSTALLER_SQL], { type: "text/sql" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = DEEP_INVENTORY_INSTALLER_FILENAME;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    toast.success(`${DEEP_INVENTORY_INSTALLER_FILENAME} downloaded`);
+  };
+
   return (
     <div className="w-full space-y-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -190,13 +225,37 @@ export function SchemaHealthPanel() {
       )}
 
       {reduced && (
-        <p className="rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-xs text-muted-foreground">
-          Reduced check: only tables and columns were compared centrally. Keys, indexes,
-          triggers, row security and policies were not checked because the deep inventory
-          helper is unavailable ({reduced}). Install it with
-          <code className="mx-1">schema_inventory_deep</code>from the central SQL scripts, then
-          run the check again.
-        </p>
+        <section className="rounded-md border border-warning/40 bg-warning/5 px-3 py-3 text-xs text-muted-foreground">
+          <p className="font-medium text-foreground">
+            {reduced.reason === "not_installed"
+              ? "Central database upgrade required"
+              : reduced.reason === "not_permitted"
+                ? "Deep inventory helper is not permitted"
+                : "Full central check is temporarily unavailable"}
+          </p>
+          <p className="mt-1">
+            {reduced.reason === "not_installed"
+              ? "The older compatibility helper was used where possible, but this result is partial. Install the current read-only helper to check exact keys, indexes, triggers, row security and policies."
+              : "Only the metadata the central database allowed was checked. This result must not be treated as all clear."}
+          </p>
+          <ol className="mt-2 list-decimal space-y-0.5 pl-4">
+            <li>Copy or download the installer below.</li>
+            <li>Run it once in the central database SQL editor.</li>
+            <li>Return here and press Run health check.</li>
+          </ol>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={() => void copyInstaller()}>
+              <Copy className="size-4" /> Copy/update helper SQL
+            </Button>
+            <Button size="sm" variant="outline" onClick={downloadInstaller}>
+              <Download className="size-4" /> Download .sql
+            </Button>
+          </div>
+          <details className="mt-2">
+            <summary className="cursor-pointer">Technical detail</summary>
+            <code className="mt-1 block break-all">{reduced.detail}</code>
+          </details>
+        </section>
       )}
 
       <EnvironmentCard
