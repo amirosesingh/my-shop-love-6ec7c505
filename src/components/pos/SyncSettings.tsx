@@ -26,6 +26,8 @@ import {
 } from "@/lib/sync-outbox";
 import type { QueueView } from "@/lib/sync-outbox";
 import { isOnlineOnly } from "@/lib/live-mode";
+import { isCloudConnected } from "@/lib/registration-status";
+import { subscribeConnectivity } from "@/lib/connection-health";
 
 /** Offline-first controls: sync toggle, outbox inspector and SQL backup. */
 export function SyncSettings() {
@@ -35,9 +37,11 @@ export function SyncSettings() {
   useEffect(() => {
     const off = subscribeOutbox(bump);
     const offMode = subscribeDatabaseMode(bump);
+    const offNet = subscribeConnectivity(bump);
     return () => {
       off();
       offMode();
+      offNet();
     };
   }, []);
 
@@ -60,7 +64,7 @@ export function SyncSettings() {
           </p>
         </div>
         <div className="grid gap-2 rounded-md border border-border px-3 py-2 text-sm sm:grid-cols-2">
-          <Stat label="Connection" value={isOnline() ? "Live" : "No connection"} />
+          <Stat label="Connection" value={isCloudConnected() ? "Live" : "No connection"} />
           <Stat label="Writing to" value="Central database" />
         </div>
         <SyncBehaviourSettings />
@@ -99,7 +103,7 @@ export function SyncSettings() {
       </div>
 
       <div className="grid gap-2 rounded-md border border-border px-3 py-2 text-sm sm:grid-cols-3">
-        <Stat label="Connection" value={isOnline() ? "Online" : "Offline"} />
+        <Stat label="Connection" value={isCloudConnected() ? "Online" : "Offline"} />
         <Stat label="Queued changes" value={String(queue.length)} />
         <Stat label="Last synced" value={last ? new Date(last).toLocaleString() : "Never"} />
       </div>
