@@ -28,6 +28,9 @@ import {
   type TerminalConfig,
 } from "@/lib/terminal-tokens";
 import { clearRevocation } from "@/lib/use-revocation-check";
+import { writeActivationRecord } from "@/lib/activation-record";
+import { isCloudConnected } from "@/lib/registration-status";
+import { subscribeConnectivity } from "@/lib/connection-health";
 import { CameraScanner } from "@/components/pos/CameraScanner";
 import { useBranding } from "@/lib/branding";
 
@@ -65,6 +68,10 @@ export function TerminalActivation({
   /** Render as a plain card (Emergency Access hub) instead of a full screen. */
   embedded?: boolean;
 }) {
+  // Pairing is a cloud round-trip: offline it must stay quiet instead of
+  // reporting a verification failure every three seconds.
+  const [online, setOnline] = useState(() => isCloudConnected());
+  useEffect(() => subscribeConnectivity(() => setOnline(isCloudConnected())), []);
   const branding = useBranding();
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
@@ -89,6 +96,7 @@ export function TerminalActivation({
       try {
         const config = await activateTerminal(trimmed);
         clearRevocation();
+        await writeActivationRecord({ tokenId: config.tokenId }).catch(() => {});
         onActivated(config);
       } catch (e) {
         setError(
@@ -104,13 +112,14 @@ export function TerminalActivation({
   // While the operator waits, keep asking whether an administrator approved
   // the pairing request from their phone. Approval activates the till itself.
   useEffect(() => {
-    if (!pairing) return;
+    if (!pairing || !online) return;
     let stopped = false;
     const tick = async () => {
       try {
         const config = await activateWithTokenId(pairing.tokenId);
         if (config && !stopped) {
           clearRevocation();
+          await writeActivationRecord({ tokenId: config.tokenId }).catch(() => {});
           onActivated(config);
         }
       } catch (e) {
@@ -123,7 +132,7 @@ export function TerminalActivation({
       stopped = true;
       window.clearInterval(timer);
     };
-  }, [pairing, onActivated]);
+  }, [pairing, onActivated, online]);
 
   return (
     <Frame bare={embedded}>
@@ -247,7 +256,13 @@ export function TerminalActivation({
                   {pairing ? `${pairing.tokenId.slice(0, 8)}…` : "Preparing…"}
                 </p>
                 <p className="mt-2 flex items-center gap-1">
-                  <Loader2 className="size-3 animate-spin" /> Waiting for approval…
+                  {online ? (
+                    <>
+                      <Loader2 className="size-3 animate-spin" /> Waiting for approval…
+                    </>
+                  ) : (
+                    <>Waiting for a connection…</>
+                  )}
                 </p>
               </div>
             </div>
@@ -255,7 +270,14 @@ export function TerminalActivation({
         )}
       </div>
 
-      {error && (
+      {!online && (
+        <div className="mt-3 rounded-lg border border-slate-700 bg-slate-950/50 p-3 text-sm text-slate-400">
+          No connection to the central database right now. Activation needs one — this screen will
+          pick up automatically as soon as the link is back.
+        </div>
+      )}
+
+      {error && online && (
         <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">
           <ShieldAlert className="mt-0.5 size-4 shrink-0" />
           <span>{error}</span>
