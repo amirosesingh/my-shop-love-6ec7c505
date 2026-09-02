@@ -2,6 +2,7 @@ import {
   ArrowLeftRight,
   Boxes,
   Building2,
+  ClipboardCheck,
   Landmark,
   ListPlus,
   MessageCircle,
