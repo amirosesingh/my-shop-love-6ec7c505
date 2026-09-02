@@ -49,9 +49,10 @@ export function NativeBoot({ children }: { children: React.ReactNode }) {
 
   // Background check for a newer web bundle once the app is up.
   useEffect(() => {
-    if (!ready || !isNative()) return;
+    if (!ready || recovery || !isNative()) return;
     return startWebBundleChecks();
-  }, [ready]);
+  }, [ready, recovery]);
+
 
   // The splash reports what the till is actually loading against: green for the
   // central database, amber for this device's own copy, blue while syncing.
