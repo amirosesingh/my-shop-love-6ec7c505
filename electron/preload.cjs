@@ -32,6 +32,8 @@ contextBridge.exposeInMainWorld("pos", {
   applySchema: () => invoke("pos:apply-schema"),
   /** Per-table schema manager: live comparison against the connected database. */
   schemaStatus: () => invoke("pos:schema-status"),
+  /** Deep read-only inventory: nullability, keys, constraints, indexes, triggers. */
+  schemaInventory: () => invoke("pos:schema-inventory"),
   /** Repair only the selected tables (guarded batches, never drops data). */
   applySchemaTables: (tables) => invoke("pos:apply-schema-tables", tables),
   /** Runnable SQL script for the chosen tables (empty array = full file). */

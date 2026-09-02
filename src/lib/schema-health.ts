@@ -13,10 +13,19 @@ export type SchemaEnvironment = "cloud" | "local";
 export type SchemaGap = {
   environment: SchemaEnvironment;
   table: string;
-  /** Empty when the whole table is missing. */
+  /** Empty when the whole table is missing, or for a non-column finding. */
   columns: string[];
   missingTable: boolean;
+  /** What kind of gap this is. Absent means a plain missing column. */
+  category?: string;
+  /** Human sentence for the panel. */
+  detail?: string;
+  /** Ready-to-run guarded statements for non-column findings. */
+  statements?: string[];
+  /** Real column types, keyed by column name, so the repair file is typed. */
+  types?: Record<string, string>;
 };
+
 
 export type MigrationFile = {
   id: string;
@@ -35,7 +44,10 @@ const KEY = "pos.schema.migrations";
 
 /** Stable signature for one gap, comparable across scans. */
 export const gapKey = (gap: SchemaGap): string =>
-  `${gap.environment}:${gap.table}:${gap.missingTable ? "*" : [...gap.columns].sort().join(",")}`;
+  `${gap.environment}:${gap.table}:${gap.category ?? "column"}:${
+    gap.missingTable ? "*" : (gap.detail ?? [...gap.columns].sort().join(","))
+  }`;
+
 
 export function loadMigrations(): MigrationFile[] {
   if (typeof window === "undefined") return [];
@@ -105,13 +117,19 @@ export function buildCloudSql(gaps: SchemaGap[], filename: string, at = new Date
       );
       continue;
     }
+    if (gap.statements?.length) {
+      lines.push(`-- ${gap.table}: ${gap.detail ?? gap.category ?? "repair"}`, ...gap.statements, ``);
+      continue;
+    }
     for (const column of gap.columns) {
+      const type = gap.types?.[column] ?? "text";
       lines.push(
-        `alter table public.${pgIdent(gap.table)} add column if not exists ${pgIdent(column)} text;`,
+        `alter table public.${pgIdent(gap.table)} add column if not exists ${pgIdent(column)} ${type};`,
       );
     }
     lines.push(``);
   }
+
   lines.push(
     `insert into public.schema_migrations (filename) values ('${filename}')`,
     `  on conflict (filename) do nothing;`,
@@ -144,14 +162,20 @@ export function buildLocalSql(gaps: SchemaGap[], filename: string, at = new Date
       );
       continue;
     }
+    if (gap.statements?.length) {
+      lines.push(`-- ${gap.table}: ${gap.detail ?? gap.category ?? "repair"}`, ...gap.statements, ``);
+      continue;
+    }
     for (const column of gap.columns) {
+      const type = gap.types?.[column] ?? "NVARCHAR(MAX)";
       lines.push(
         `IF COL_LENGTH('dbo.${gap.table}', '${column}') IS NULL`,
-        `  ALTER TABLE dbo.${tsqlIdent(gap.table)} ADD ${tsqlIdent(column)} NVARCHAR(MAX) NULL;`,
+        `  ALTER TABLE dbo.${tsqlIdent(gap.table)} ADD ${tsqlIdent(column)} ${type} NULL;`,
       );
     }
     lines.push(``);
   }
+
   lines.push(
     `IF NOT EXISTS (SELECT 1 FROM dbo.schema_migrations WHERE filename = '${filename}')`,
     `  INSERT INTO dbo.schema_migrations (filename) VALUES ('${filename}');`,

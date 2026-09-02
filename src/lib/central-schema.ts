@@ -33,6 +33,29 @@ export type CentralIndexSpec = {
   sql: string;
   /** Only emitted when one of these columns had to be repaired. */
   dependsOnColumns: string[];
+  /** When true the index is expected to exist at all times, not only after a repair. */
+  always?: boolean;
+};
+
+/** A constraint the central database must carry (unique / check / foreign key). */
+export type CentralConstraintSpec = {
+  name: string;
+  /** Body only — "unique (a, b)" or "check (qty >= 0)" or "foreign key ...". */
+  definition: string;
+};
+
+/** A row-security policy the central database must carry. */
+export type CentralPolicySpec = {
+  name: string;
+  /** Full idempotent CREATE POLICY statement. */
+  sql: string;
+};
+
+/** A trigger the central database must carry. */
+export type CentralTriggerSpec = {
+  name: string;
+  /** Full idempotent CREATE TRIGGER statement. */
+  sql: string;
 };
 
 export type CentralTableSchema = {
@@ -41,7 +64,16 @@ export type CentralTableSchema = {
   primaryKey: string;
   columns: CentralColumnSpec[];
   indexes?: CentralIndexSpec[];
+  constraints?: CentralConstraintSpec[];
+  triggers?: CentralTriggerSpec[];
+  policies?: CentralPolicySpec[];
+  /**
+   * Whether row-level security must be enabled. Central tables hold business
+   * data reachable through the Data API, so the default is yes.
+   */
+  rowSecurity?: boolean;
 };
+
 
 export const CENTRAL_SCHEMA: CentralTableSchema[] = [
   {

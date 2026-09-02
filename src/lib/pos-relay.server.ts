@@ -31,7 +31,9 @@ export type RelayRead =
   | { kind: "activeShift"; storeId: string }
   | { kind: "stores" }
   | { kind: "cloudSchema" }
+  | { kind: "cloudInventory" }
   | { kind: "cloudProbe"; table: string };
+
 
 /**
  * Only operational tables may be written through the relay. `stores` is
@@ -148,6 +150,20 @@ export async function runRelayRead(read: RelayRead): Promise<{
     }
     return { ok: true, rows };
   }
+  if (read.kind === "cloudInventory") {
+    // Deep, read-only inventory: nullability, defaults, keys, constraints,
+    // indexes, triggers, row security and policies. Only available when the
+    // central project carries the schema_inventory_deep helper; the caller
+    // falls back to the shallow description document when it does not.
+    const res = await serviceRest("rpc/schema_inventory_deep", {
+      method: "POST",
+      body: "{}",
+    });
+    if (!res.ok) return { ok: false, error: `HTTP ${res.status}: ${(await res.text()).slice(0, 300)}` };
+    const payload = (await res.json()) as Record<string, unknown> | null;
+    return { ok: true, row: payload ?? {} };
+  }
+
   if (read.kind === "cloudProbe") {
     // One cheap probe per table: answers "can the central database serve this
     // table right now?" with the exact PostgREST error when it cannot — the

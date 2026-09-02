@@ -1048,6 +1048,81 @@ async function schemaStatus() {
 }
 
 /**
+ * Deep, read-only inventory of the local SQL Server database: columns with
+ * nullability and default, primary keys, foreign keys, unique/check
+ * constraints, indexes and triggers. Nothing is modified.
+ */
+async function schemaInventory() {
+  if (!pool) return { ok: true, connected: false, tables: {} };
+  const q = async (sql) => (await pool.request().query(sql)).recordset;
+  const tables = {};
+  const bucket = (name) => {
+    const key = String(name).toLowerCase();
+    if (!tables[key]) {
+      tables[key] = {
+        columns: {},
+        primaryKey: [],
+        foreignKeys: [],
+        constraints: [],
+        indexes: [],
+        triggers: [],
+      };
+    }
+    return tables[key];
+  };
+
+  for (const r of await q(
+    `SELECT t.name AS tbl, c.name AS col, TYPE_NAME(c.user_type_id) AS typ,
+            c.is_nullable AS nullable, dc.definition AS dflt
+       FROM sys.tables t
+       JOIN sys.columns c ON c.object_id = t.object_id
+       LEFT JOIN sys.default_constraints dc ON dc.parent_object_id = t.object_id
+            AND dc.parent_column_id = c.column_id
+      WHERE SCHEMA_NAME(t.schema_id) = N'dbo'`,
+  )) {
+    bucket(r.tbl).columns[String(r.col).toLowerCase()] = {
+      type: r.typ ?? null,
+      nullable: r.nullable === true || r.nullable === 1,
+      default: r.dflt ?? null,
+    };
+  }
+  for (const r of await q(
+    `SELECT t.name AS tbl, i.name AS idx, i.is_primary_key AS pk, i.is_unique AS uq
+       FROM sys.indexes i JOIN sys.tables t ON t.object_id = i.object_id
+      WHERE SCHEMA_NAME(t.schema_id) = N'dbo' AND i.name IS NOT NULL`,
+  )) {
+    const b = bucket(r.tbl);
+    b.indexes.push(String(r.idx).toLowerCase());
+    if (r.pk === true || r.pk === 1) b.primaryKey.push(String(r.idx).toLowerCase());
+    if (r.uq === true || r.uq === 1) b.constraints.push(String(r.idx).toLowerCase());
+  }
+  for (const r of await q(
+    `SELECT t.name AS tbl, fk.name AS nm FROM sys.foreign_keys fk
+       JOIN sys.tables t ON t.object_id = fk.parent_object_id
+      WHERE SCHEMA_NAME(t.schema_id) = N'dbo'`,
+  )) {
+    bucket(r.tbl).foreignKeys.push(String(r.nm).toLowerCase());
+  }
+  for (const r of await q(
+    `SELECT t.name AS tbl, cc.name AS nm FROM sys.check_constraints cc
+       JOIN sys.tables t ON t.object_id = cc.parent_object_id
+      WHERE SCHEMA_NAME(t.schema_id) = N'dbo'`,
+  )) {
+    bucket(r.tbl).constraints.push(String(r.nm).toLowerCase());
+  }
+  for (const r of await q(
+    `SELECT t.name AS tbl, tr.name AS nm FROM sys.triggers tr
+       JOIN sys.tables t ON t.object_id = tr.parent_id
+      WHERE SCHEMA_NAME(t.schema_id) = N'dbo'`,
+  )) {
+    bucket(r.tbl).triggers.push(String(r.nm).toLowerCase());
+  }
+  return { ok: true, connected: true, tables };
+}
+
+
+
+/**
  * Applies only the batches that belong to the selected tables, plus the
  * shared engine batches (sync columns, retry bookkeeping). Every statement
  * is guarded, so re-running never drops or rewrites existing objects. A
@@ -1435,6 +1510,7 @@ module.exports = {
   readSchema,
   schemaFile,
   schemaStatus,
+  schemaInventory,
   schemaTableSql,
   schemaTableBatches,
   parseSchemaManifest,

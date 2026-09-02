@@ -14,7 +14,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fetchCentralSchema } from "@/lib/central-schema.functions";
+import { fetchCentralInventory } from "@/lib/central-inventory.functions";
 import { actualFromRows, computeCentralDrift } from "@/lib/central-drift";
+import { CENTRAL_SCHEMA_BY_TABLE } from "@/lib/central-schema";
+import {
+  columnTypes,
+  computeDeepDrift,
+  inventoryFromPayload,
+  DEEP_CATEGORY_LABEL,
+} from "@/lib/deep-drift";
+import { computeLocalDeepDrift, parseLocalExpectations } from "@/lib/local-drift";
 import { hasLocalDb, localDb } from "@/lib/local-db";
 import {
   downloadMigration,
@@ -38,6 +47,7 @@ export function SchemaHealthPanel() {
   const [busy, setBusy] = useState(false);
   const [scannedAt, setScannedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reduced, setReduced] = useState<string | null>(null);
 
   useEffect(() => setFiles(loadMigrations()), []);
 
@@ -53,13 +63,41 @@ export function SchemaHealthPanel() {
         for (const row of computeCentralDrift(actualFromRows(res.rows))) {
           const columns = row.missingColumns.map((c) => c.name);
           if (row.missingTable || columns.length) {
+            const spec = CENTRAL_SCHEMA_BY_TABLE.get(row.table);
             found.push({
               environment: "cloud",
               table: row.table,
               columns,
               missingTable: row.missingTable,
+              types: spec ? columnTypes(spec) : undefined,
             });
           }
+        }
+        try {
+          const deep = await fetchCentralInventory();
+          if (deep.ok) {
+            setReduced(null);
+            const inventory = inventoryFromPayload(
+              JSON.parse(deep.inventoryJson) as Record<string, unknown>,
+            );
+            for (const finding of computeDeepDrift(inventory)) {
+              found.push({
+                environment: "cloud",
+                table: finding.table,
+                columns: [],
+                missingTable: false,
+                category: finding.category,
+                detail: finding.detail,
+                statements: finding.statements,
+              });
+            }
+          } else {
+            setReduced(deep.error);
+          }
+        } catch (err) {
+          setReduced(
+            err instanceof Error ? err.message : "The deep inventory could not be read.",
+          );
         }
       } else {
         setCloudReach("unreachable");
@@ -85,6 +123,25 @@ export function SchemaHealthPanel() {
               columns: table.missingColumns,
               missingTable: false,
             });
+          }
+        }
+        if (bridge.schemaInventory && res.text) {
+          const inv = await bridge.schemaInventory();
+          if (inv.ok && inv.tables) {
+            for (const finding of computeLocalDeepDrift(
+              parseLocalExpectations(res.text),
+              inv.tables,
+            )) {
+              found.push({
+                environment: "local",
+                table: finding.table,
+                columns: [],
+                missingTable: false,
+                category: finding.category,
+                detail: finding.detail,
+                statements: finding.statements,
+              });
+            }
           }
         }
       } catch {
@@ -129,6 +186,16 @@ export function SchemaHealthPanel() {
       {error && (
         <p className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
           {error}
+        </p>
+      )}
+
+      {reduced && (
+        <p className="rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-xs text-muted-foreground">
+          Reduced check: only tables and columns were compared centrally. Keys, indexes,
+          triggers, row security and policies were not checked because the deep inventory
+          helper is unavailable ({reduced}). Install it with
+          <code className="mx-1">schema_inventory_deep</code>from the central SQL scripts, then
+          run the check again.
         </p>
       )}
 
@@ -268,16 +335,28 @@ function EnvironmentCard({
           </p>
         ) : (
           <>
-            <ul className="space-y-1 text-xs">
-              {gaps.map((gap) => (
-                <li key={`${gap.table}-${gap.columns.join(",")}`} className="flex flex-wrap gap-2">
-                  <span className="font-medium">{gap.table}</span>
-                  <span className="text-muted-foreground">
-                    {gap.missingTable ? "table missing" : `missing: ${gap.columns.join(", ")}`}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            {groupByCategory(gaps).map(([category, rows]) => (
+              <div key={category} className="space-y-1">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  {category} ({rows.length})
+                </p>
+                <ul className="space-y-1 text-xs">
+                  {rows.map((gap, i) => (
+                    <li
+                      key={`${gap.table}-${gap.detail ?? gap.columns.join(",")}-${i}`}
+                      className="flex flex-wrap gap-2"
+                    >
+                      <span className="font-medium">{gap.table}</span>
+                      <span className="text-muted-foreground">
+                        {gap.missingTable
+                          ? "table missing"
+                          : (gap.detail ?? `missing: ${gap.columns.join(", ")}`)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
             <div className="flex flex-wrap items-center gap-2">
               <Button size="sm" variant="outline" onClick={onGenerate}>
                 <Download className="size-4" /> Generate migration file
@@ -288,5 +367,33 @@ function EnvironmentCard({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/** Findings grouped under a plain-language heading, in a stable order. */
+function groupByCategory(gaps: SchemaGap[]): [string, SchemaGap[]][] {
+  const order = [
+    "Missing tables",
+    "Missing columns",
+    "Nullability",
+    "Defaults",
+    "Keys",
+    "Constraints",
+    "Indexes",
+    "Triggers",
+    "Row security",
+    "Policies",
+  ];
+  const groups = new Map<string, SchemaGap[]>();
+  for (const gap of gaps) {
+    const label = gap.missingTable
+      ? "Missing tables"
+      : (DEEP_CATEGORY_LABEL[
+          (gap.category ?? "column") as keyof typeof DEEP_CATEGORY_LABEL
+        ] ?? "Missing columns");
+    groups.set(label, [...(groups.get(label) ?? []), gap]);
+  }
+  return [...groups.entries()].sort(
+    (a, b) => order.indexOf(a[0]) - order.indexOf(b[0]),
   );
 }
