@@ -130,7 +130,7 @@ async function androidSecret(): Promise<string | null> {
 
 /** True when this device can check a recovery code at all. */
 export async function emergencyPinAvailable(): Promise<boolean> {
-  if (isElectron()) return Boolean(window.pos?.verifyEmergencyPin);
+  if (isElectron()) return Boolean(bridge()?.verifyEmergencyPin);
   if (isNative()) return (await androidSecret()) !== null;
   return false;
 }
@@ -139,9 +139,10 @@ export async function emergencyPinAvailable(): Promise<boolean> {
 export async function verifyEmergencyPin(pin: string): Promise<boolean> {
   const code = String(pin ?? "").trim();
   if (!/^\d{6}$/.test(code)) return false;
-  if (isElectron() && window.pos?.verifyEmergencyPin) {
+  const desktop = bridge();
+  if (isElectron() && desktop?.verifyEmergencyPin) {
     try {
-      const res = await window.pos.verifyEmergencyPin(code);
+      const res = await desktop.verifyEmergencyPin(code);
       return Boolean(res?.ok);
     } catch {
       return false;
@@ -157,9 +158,10 @@ export async function verifyEmergencyPin(pin: string): Promise<boolean> {
 
 /** Short non-secret fingerprint support uses to pick the right device secret. */
 export async function emergencyFingerprint(): Promise<string> {
-  if (isElectron() && window.pos?.emergencyFingerprint) {
+  const desktop = bridge();
+  if (isElectron() && desktop?.emergencyFingerprint) {
     try {
-      const res = await window.pos.emergencyFingerprint();
+      const res = await desktop.emergencyFingerprint();
       return res?.fingerprint ?? "";
     } catch {
       return "";
