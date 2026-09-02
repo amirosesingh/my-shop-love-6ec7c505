@@ -61,6 +61,18 @@ async function handle({ request }: { request: Request }) {
       { status: 401 },
     );
   }
+  // The full table and column inventory is administrative information: bare
+  // terminal identity or a cashier PIN session is not enough to read it.
+  if (caller.kind !== "staff" && !caller.staffUserId) {
+    return Response.json(
+      {
+        ok: false,
+        error: "Database checks are limited to staff accounts — sign in as a manager to run them.",
+      },
+      { status: 403 },
+    );
+  }
+
 
   try {
     if (body.action === "relations") {
