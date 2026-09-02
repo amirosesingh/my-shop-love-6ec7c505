@@ -76,13 +76,15 @@ export function TransferComposer({
   const sourceLevels = subWarehouses(allStores, currentStore.id);
   const crossGroup = Boolean(otherStoreId) && scopeBetween(currentStore, otherStore) === "INTER_GROUP";
 
-  function addItem(productId: string) {
+  function addItem(productId: string, amount = 1) {
+    const add = Math.max(1, Math.round(amount) || 1);
     setItems((prev) =>
       prev.some((i) => i.productId === productId)
-        ? prev.map((i) => (i.productId === productId ? { ...i, qty: i.qty + 1 } : i))
-        : [...prev, { productId, qty: 1 }],
+        ? prev.map((i) => (i.productId === productId ? { ...i, qty: i.qty + add } : i))
+        : [...prev, { productId, qty: add }],
     );
   }
+
 
   async function importSheet(file: File) {
     try {
