@@ -88,3 +88,13 @@ export function features(): PlatformFeatures {
 export function hasFeature(name: keyof PlatformFeatures): boolean {
   return features()[name];
 }
+
+/**
+ * Shell identity for the handful of modules that must pick a bridge
+ * (OS keystore, printer, updater) rather than a capability. These are the only
+ * sanctioned readers of the raw detection primitives, so shared code never
+ * calls `isElectron()` / `isNative()` itself.
+ */
+export const isWindowsShell = (): boolean => currentPlatform() === "windows";
+export const isMobileShell = (): boolean => currentPlatform() === "mobile";
+export const isWebShell = (): boolean => currentPlatform() === "web";

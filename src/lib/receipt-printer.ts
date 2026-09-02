@@ -6,7 +6,7 @@
  * neither exists, so callers fall back to the classic hidden-iframe print.
  */
 
-import { isNative } from "@/platform-config/platform";
+import { isMobileShell } from "@/platform-config/features";
 import type { SlipEncoding, SlipLineEnding } from "./escpos";
 
 const PRINTER_KEY = "pos-receipt-printer-v1";
@@ -213,12 +213,12 @@ export async function rawPulse(bytes: number[]): Promise<PulseResult> {
  * phone build has neither, so the buttons are shown as unavailable there.
  */
 export function canPrintReceipts(): boolean {
-  return !isNative();
+  return !isMobileShell();
 }
 
 /** A cash drawer only opens through a printer, so it follows the same rule. */
 export function canOpenDrawer(): boolean {
-  return printBridge() !== null || !isNative();
+  return printBridge() !== null || !isMobileShell();
 }
 
 /** ESC/POS drawer kick bytes for the configured connector pin. */

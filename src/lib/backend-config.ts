@@ -12,7 +12,8 @@
  * and it is applied to `window.__POS_SERVER_URL__`, which `server-origin.ts`
  * reads. The web build ignores all of this and keeps using relative URLs.
  */
-import { isElectron, isTerminalApp } from "@/platform-config/platform";
+import { isTerminalApp } from "@/platform-config/platform";
+import { isWindowsShell } from "@/platform-config/features";
 
 const STORAGE_KEY = "pos.backend.url";
 
@@ -43,7 +44,7 @@ function baked(): string {
 /** The address this device is configured to use, "" when it has none. */
 export async function backendUrl(): Promise<string> {
   if (typeof window === "undefined") return "";
-  if (isElectron()) {
+  if (isWindowsShell()) {
     const res = await bridge()?.backendUrl?.().catch(() => undefined);
     const saved = clean(res?.url);
     if (saved) return saved;
@@ -72,7 +73,7 @@ export async function saveBackendUrl(value: string): Promise<BackendSaveResult> 
   const next = clean(value);
   if (next && !/^https?:\/\/.+/i.test(next))
     return { ok: false, error: "Enter a full address starting with https://" };
-  if (isElectron()) {
+  if (isWindowsShell()) {
     const res = await bridge()
       ?.setBackendUrl?.(next)
       .catch((e: unknown) => ({ ok: false, error: (e as Error).message }));

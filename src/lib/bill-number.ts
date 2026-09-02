@@ -10,7 +10,7 @@
  * registered the device. Because every part is device specific, two tills in
  * the same branch can never produce the same number, even offline.
  */
-import { isElectron, isNative } from "@/platform-config/platform";
+import { isWindowsShell, isMobileShell } from "@/platform-config/features";
 import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 import { readLocalSetting, writeLocalSetting } from "@/core/local-db/local-db";
 
@@ -35,8 +35,8 @@ const TERMINAL_NO_KEY = "pos.bill.terminalNo";
 
 /** Which shell this register runs in. */
 export function currentPlatform(): Platform {
-  if (isElectron()) return "PC";
-  if (isNative()) return "MB";
+  if (isWindowsShell()) return "PC";
+  if (isMobileShell()) return "MB";
   return "WB";
 }
 

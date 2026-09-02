@@ -12,7 +12,8 @@
  * After any change the in-memory tenant override is refreshed so the next
  * cloud call picks the new credentials up without an app restart.
  */
-import { isElectron, isNative, isTerminalApp } from "@/platform-config/platform";
+import { isTerminalApp } from "@/platform-config/platform";
+import { isWindowsShell, isMobileShell } from "@/platform-config/features";
 import {
   setTerminalSupabaseOverride,
   clearTerminalSupabaseOverride,
@@ -86,7 +87,7 @@ async function androidRead(): Promise<{ url: string; key: string } | null> {
 const mask = (key: string) => (key.length > 10 ? `${key.slice(0, 6)}…${key.slice(-4)}` : "••••");
 
 export async function cloudKeyStatus(): Promise<CloudKeyStatus> {
-  if (isElectron() && window.pos?.cloudKeyStatus) {
+  if (isWindowsShell() && window.pos?.cloudKeyStatus) {
     const res = await window.pos.cloudKeyStatus();
     return {
       configured: Boolean(res.configured),
@@ -96,7 +97,7 @@ export async function cloudKeyStatus(): Promise<CloudKeyStatus> {
       source: "electron",
     };
   }
-  if (isNative()) {
+  if (isMobileShell()) {
     const saved = await androidRead();
     return {
       configured: Boolean(saved),
@@ -153,7 +154,7 @@ export async function saveCloudCredentials(
 ): Promise<{ ok: boolean; error?: string; encrypted?: boolean }> {
   const cleanUrl = url.trim().replace(/\/+$/, "");
   const cleanKey = key.trim();
-  if (isElectron() && window.pos?.setCloudCredentials) {
+  if (isWindowsShell() && window.pos?.setCloudCredentials) {
     const res = await window.pos.setCloudCredentials({ url: cleanUrl, key: cleanKey });
     if (!res.ok) return { ok: false, error: res.error ?? "Could not save the credentials." };
     setTerminalSupabaseOverride(cleanUrl, cleanKey);
@@ -162,7 +163,7 @@ export async function saveCloudCredentials(
     afterCredentialsSaved();
     return { ok: true, encrypted: res.encrypted };
   }
-  if (isNative()) {
+  if (isMobileShell()) {
     try {
       const loaded = await androidStore();
       if (!loaded) return { ok: false, error: "Secure storage is unavailable on this device." };
@@ -183,7 +184,7 @@ export async function saveCloudCredentials(
 
 /** Forget the saved pair — the till keeps trading locally, cloud sync stops. */
 export async function removeCloudCredentials(): Promise<{ ok: boolean; error?: string }> {
-  if (isElectron() && window.pos?.removeCloudCredentials) {
+  if (isWindowsShell() && window.pos?.removeCloudCredentials) {
     const res = await window.pos.removeCloudCredentials();
     if (!res.ok) return { ok: false, error: res.error ?? "Could not remove the credentials." };
     clearTerminalSupabaseOverride();
@@ -192,7 +193,7 @@ export async function removeCloudCredentials(): Promise<{ ok: boolean; error?: s
     setSyncState({ cloudConfigured: false });
     return { ok: true };
   }
-  if (isNative()) {
+  if (isMobileShell()) {
     try {
       const loaded = await androidStore();
       if (!loaded) return { ok: false, error: "Secure storage is unavailable on this device." };
@@ -218,7 +219,7 @@ export async function removeCloudCredentials(): Promise<{ ok: boolean; error?: s
  */
 export async function initCloudConfigFromShell(): Promise<CloudKeyStatus> {
   if (!isTerminalApp()) return cloudKeyStatus();
-  if (isElectron() && window.pos?.bootstrapCloudCredentials) {
+  if (isWindowsShell() && window.pos?.bootstrapCloudCredentials) {
     // The main process owns the key; ask it for the live pair through the
     // dedicated bootstrap channel so the renderer can configure its client.
     const res = await window.pos.bootstrapCloudCredentials();

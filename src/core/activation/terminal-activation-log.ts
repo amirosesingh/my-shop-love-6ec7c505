@@ -8,7 +8,8 @@
  */
 import { APP_VERSION } from "@/version";
 import { logger } from "@/lib/audit-log";
-import { isAndroid, isElectron, isNative } from "@/platform-config/platform";
+import { isAndroid } from "@/platform-config/platform";
+import { isWindowsShell, isMobileShell } from "@/platform-config/features";
 
 export type ActivationOutcome =
   | "succeeded"
@@ -29,9 +30,9 @@ const OUTCOME_LABEL: Record<ActivationOutcome, string> = {
 
 /** Which shell attempted the activation. */
 export function activationPlatform(): string {
-  if (isElectron()) return "windows-desktop";
+  if (isWindowsShell()) return "windows-desktop";
   if (isAndroid()) return "android";
-  if (isNative()) return "mobile";
+  if (isMobileShell()) return "mobile";
   return "browser";
 }
 
