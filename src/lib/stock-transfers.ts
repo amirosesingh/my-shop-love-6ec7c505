@@ -8,8 +8,8 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseExternal } from "@/integrations/supabase/external-client";
-import type { Store, Transfer, TransferItem, TransferKind, TransferStatus } from "./pos-types";
-import { commitOps } from "./pos-db";
+import type { Store, Transfer, TransferItem, TransferKind, TransferStatus } from "@/core/types/pos-types";
+import { commitOps } from "@/core/api/pos-db";
 import { describeError } from "./notify";
 
 const sb = supabaseExternal as unknown as SupabaseClient;

@@ -7,7 +7,7 @@
  * used to be maintained by hand and drifted; this derives it, so a table added
  * to a feature with no sync decision shows up immediately.
  */
-import { FEATURES, type SecurityClass, type SyncDirection } from "./feature-schema";
+import { FEATURES, type SecurityClass, type SyncDirection } from "@/core/types/feature-schema";
 
 export type { SecurityClass, SyncDirection };
 

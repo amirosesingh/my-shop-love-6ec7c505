@@ -1,12 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SettingsTabs } from "@/components/pos/settings/SettingsTabs";
-import { SettingsFrame, useSettingsCtx } from "@/components/pos/settings/SettingsFrame";
+import { SettingsTabs } from "@/platforms/web/components/pos/settings/SettingsTabs";
+import { SettingsFrame, useSettingsCtx } from "@/platforms/web/components/pos/settings/SettingsFrame";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { defaultReceiptSettings } from "@/lib/pos-seed";
-import type { BookingSlipSettings } from "@/lib/pos-types";
+import type { BookingSlipSettings } from "@/core/types/pos-types";
 
 export const Route = createFileRoute("/settings/booking-slip")({
   head: () => ({

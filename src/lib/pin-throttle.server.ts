@@ -6,7 +6,7 @@
  * counts failures in the central database, so a manager ID being guessed from
  * any device is locked out everywhere after a handful of wrong PINs.
  */
-import { serviceRest } from "./pos-relay.server";
+import { serviceRest } from "@/core/api/pos-relay.server";
 
 export type ThrottleState = { locked: boolean; lockedUntil: string | null; attempts: number };
 

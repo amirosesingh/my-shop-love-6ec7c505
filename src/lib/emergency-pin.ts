@@ -13,7 +13,7 @@
  * A few minutes of clock drift either side are accepted so a slightly wrong
  * device clock never locks a terminal out of its own recovery screen.
  */
-import { isElectron, isNative } from "@/platform-config/platform";
+import { isWindowsShell, isMobileShell } from "@/platform-config/features";
 
 const ANDROID_SECRET_KEY = "pos.emergency.secret";
 
@@ -130,8 +130,8 @@ async function androidSecret(): Promise<string | null> {
 
 /** True when this device can check a recovery code at all. */
 export async function emergencyPinAvailable(): Promise<boolean> {
-  if (isElectron()) return Boolean(bridge()?.verifyEmergencyPin);
-  if (isNative()) return (await androidSecret()) !== null;
+  if (isWindowsShell()) return Boolean(bridge()?.verifyEmergencyPin);
+  if (isMobileShell()) return (await androidSecret()) !== null;
   return false;
 }
 
@@ -152,7 +152,7 @@ export async function verifyEmergencyPin(pin: string): Promise<boolean> {
   const code = String(pin ?? "").trim();
   if (!/^\d{6}$/.test(code)) return false;
   const desktop = bridge();
-  if (isElectron() && desktop?.verifyEmergencyPin) {
+  if (isWindowsShell() && desktop?.verifyEmergencyPin) {
     try {
       const res = await desktop.verifyEmergencyPin(code);
       return Boolean(res?.ok);
@@ -160,7 +160,7 @@ export async function verifyEmergencyPin(pin: string): Promise<boolean> {
       return false;
     }
   }
-  if (isNative()) {
+  if (isMobileShell()) {
     if (guesses.until > Date.now()) return false;
     const secret = await androidSecret();
     if (!secret) return false;
@@ -181,7 +181,7 @@ export async function verifyEmergencyPin(pin: string): Promise<boolean> {
 /** Short non-secret fingerprint support uses to pick the right device secret. */
 export async function emergencyFingerprint(): Promise<string> {
   const desktop = bridge();
-  if (isElectron() && desktop?.emergencyFingerprint) {
+  if (isWindowsShell() && desktop?.emergencyFingerprint) {
     try {
       const res = await desktop.emergencyFingerprint();
       return res?.fingerprint ?? "";
@@ -189,7 +189,7 @@ export async function emergencyFingerprint(): Promise<string> {
       return "";
     }
   }
-  if (isNative()) {
+  if (isMobileShell()) {
     const secret = await androidSecret();
     if (!secret) return "";
     const digest = new Uint8Array(

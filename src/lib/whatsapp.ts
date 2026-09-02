@@ -1,7 +1,7 @@
 import { logger } from "./audit-log";
 import { sendWhatsAppBill } from "./whatsapp.functions";
 import { listQueuedMessages, queueMessage, resolveMessage } from "./whatsapp-queue";
-import { db } from "./pos-db";
+import { db } from "@/core/api/pos-db";
 import { getPosCallerAuth } from "./pos-caller-auth";
 import {
   PAYMENT_LABELS,
@@ -12,7 +12,7 @@ import {
   type Member,
   type Sale,
   type WhatsAppSettings,
-} from "./pos-types";
+} from "@/core/types/pos-types";
 
 const cash = (n: number) =>
   n.toLocaleString(undefined, { style: "currency", currency: "USD" });

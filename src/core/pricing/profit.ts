@@ -7,8 +7,8 @@
  * the buying price changes. Exchange credits (negative quantity) subtract from
  * both takings and cost; free-of-charge lines earn nothing but still cost.
  */
-import type { CartLine, Product, Sale } from "@/lib/pos-types";
-import { lineUnitDiscount, r2 } from "@/lib/pos-types";
+import type { CartLine, Product, Sale } from "@/core/types/pos-types";
+import { lineUnitDiscount, r2 } from "@/core/types/pos-types";
 
 export type ProfitTotals = {
   /** Takings excluding tax. */

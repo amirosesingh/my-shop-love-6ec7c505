@@ -1,0 +1,103 @@
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { supabaseExternal } from "@/integrations/supabase/external-client";
+import { readTerminalConfig } from "@/core/activation/terminal-tokens";
+import { ensureTerminalSession } from "@/lib/terminal-session";
+import { probeRelay, syncHealth } from "@/core/api/sync-relay";
+import { isDesktop } from "@/lib/branding";
+import { isNative } from "@/platform-config/platform";
+
+type Check = { label: string; ok: boolean; warn?: boolean; detail: string };
+
+/** Tells staff, in plain words, whether this till can save to the cloud. */
+export function ConnectionCheck() {
+  const [checks, setChecks] = useState<Check[] | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const run = async () => {
+    setBusy(true);
+    const results: Check[] = [];
+
+    const config = readTerminalConfig();
+    // In a plain browser (admins and supervisors sign in with email) no till is
+    // meant to be registered, so this is information, not a fault.
+    const tillExpected = isDesktop() || isNative();
+    results.push({
+      label: "Terminal registered",
+      ok: !!config || !tillExpected,
+      detail: config
+        ? config.locationName || config.locationId
+        : tillExpected
+          ? "This till is not activated yet"
+          : "Browser session — no till registered (not required here)",
+    });
+
+    const signedIn = await ensureTerminalSession();
+    const session = (await supabaseExternal.auth.getSession()).data.session;
+    results.push({
+      label: "Signed in to the central database",
+      ok: signedIn || !!session,
+      detail:
+        session?.user?.email ??
+        (signedIn ? "Signed in" : "Not signed in — sign in with your staff account"),
+    });
+
+    const relay = await probeRelay();
+    // A missing key is a server setup task, not a fault with this till, so it
+    // reads as a warning with a clear instruction instead of a red failure.
+    const keyMissing = relay.code === "NO_SERVICE_KEY";
+    results.push({
+      label: "Server backup route",
+      ok: relay.ok,
+      warn: keyMissing,
+      detail: relay.ok ? "Writes can go through the server" : (relay.error ?? "Unavailable"),
+    });
+
+    // Say which server answered and whether it holds the central database key,
+    // so a setup problem is not mistaken for a problem with this till.
+    const health = await syncHealth();
+    results.push({
+      label: "Server setup",
+      ok: !!health?.serviceKey,
+      warn: !health?.serviceKey,
+      detail: !health
+        ? "Could not reach the setup check on this server"
+        : health.serviceKey
+          ? `Key present on ${health.host}`
+          : `Key missing on ${health.host} — an administrator needs to re-save it`,
+    });
+
+    setChecks(results);
+    setBusy(false);
+  };
+
+  return (
+    <div className="space-y-2 rounded-md border border-border px-3 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <p className="text-sm">Saving to the central database</p>
+          <p className="text-xs text-muted-foreground">
+            Checks that shifts, sales and sign-ins from this till are accepted by the server.
+          </p>
+        </div>
+        <Button size="sm" variant="outline" disabled={busy} onClick={() => void run()}>
+          {busy ? "Checking…" : "Run check"}
+        </Button>
+      </div>
+      {checks && (
+        <ul className="space-y-1 text-xs">
+          {checks.map((c) => (
+            <li
+              key={c.label}
+              className={
+                c.ok ? "text-muted-foreground" : c.warn ? "text-amber-600" : "text-destructive"
+              }
+            >
+              {c.ok ? "✓" : c.warn ? "!" : "✕"} {c.label} — {c.detail}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}

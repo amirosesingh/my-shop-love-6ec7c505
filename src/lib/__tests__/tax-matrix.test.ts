@@ -5,7 +5,7 @@
 import { describe, expect, it } from "vitest";
 
 import { cartTotals } from "../pos-store";
-import type { CartLine } from "../pos-types";
+import type { CartLine } from "@/core/types/pos-types";
 
 const line = (over: Partial<CartLine> = {}): CartLine => ({
   productId: "p1",

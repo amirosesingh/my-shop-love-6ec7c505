@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SettingsFrame, useSettingsCtx } from "@/components/pos/settings/SettingsFrame";
-import { WhatsAppFields } from "@/components/pos/settings/panels/IntegrationsPanel";
+import { SettingsFrame, useSettingsCtx } from "@/platforms/web/components/pos/settings/SettingsFrame";
+import { WhatsAppFields } from "@/platforms/web/components/pos/settings/panels/IntegrationsPanel";
 
 export const Route = createFileRoute("/settings/whatsapp")({
   head: () => ({

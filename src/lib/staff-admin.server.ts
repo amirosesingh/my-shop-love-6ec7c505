@@ -7,7 +7,7 @@
  * the till holds a normal verified session instead of a home-made token.
  */
 import { supabaseConfig } from "./external-supabase-config";
-import { serviceRest, serviceKey } from "./pos-relay.server";
+import { serviceRest, serviceKey } from "@/core/api/pos-relay.server";
 
 export const INTERNAL_EMAIL_DOMAIN = "pos-internal.local";
 

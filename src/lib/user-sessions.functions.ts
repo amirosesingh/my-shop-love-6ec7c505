@@ -40,7 +40,7 @@ const startSchema = z.object({
 export const startDeviceSession = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => startSchema.parse(input))
   .handler(async ({ data }) => {
-    const { verifyRelayCaller } = await import("./pos-relay.server");
+    const { verifyRelayCaller } = await import("@/core/api/pos-relay.server");
     const { startSession } = await import("./session-guard.server");
     try {
       await verifyRelayCaller({
@@ -100,7 +100,7 @@ export const listDeviceSessions = createServerFn({ method: "POST" })
     z.object({ accessToken: z.string().max(4000) }).parse(input),
   )
   .handler(async ({ data }) => {
-    const { serviceRest } = await import("./pos-relay.server");
+    const { serviceRest } = await import("@/core/api/pos-relay.server");
     try {
       await assertSupervisor(data.accessToken);
     } catch (e) {
@@ -130,7 +130,7 @@ export const revokeDeviceSessions = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data }) => {
-    const { serviceRest } = await import("./pos-relay.server");
+    const { serviceRest } = await import("@/core/api/pos-relay.server");
     const { revokeSessionsFor } = await import("./session-guard.server");
     try {
       await assertSupervisor(data.accessToken);

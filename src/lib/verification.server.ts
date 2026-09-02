@@ -6,7 +6,7 @@
  * hash, so nothing readable is ever kept in the database.
  */
 import { createHash, randomInt } from "node:crypto";
-import { serviceRest } from "./pos-relay.server";
+import { serviceRest } from "@/core/api/pos-relay.server";
 import { readSecureSetting } from "./secure-settings.server";
 
 export type VerifyChannel = "email" | "sms" | "whatsapp";

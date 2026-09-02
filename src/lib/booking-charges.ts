@@ -8,7 +8,7 @@ import {
   type IntakeCategoryMap,
   type IntakeCharge,
   type TaxSettings,
-} from "./pos-types";
+} from "@/core/types/pos-types";
 import { computeTax } from "@/core/pricing/tax";
 
 export type ComboOutcome = {

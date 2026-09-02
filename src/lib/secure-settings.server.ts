@@ -82,7 +82,7 @@ export async function verifyPosStaff(accessToken: string): Promise<{
  * the POS service key. The key and the plaintext never leave the server.
  */
 async function posRest(path: string, init: RequestInit & { prefer?: string } = {}) {
-  const { serviceRest } = await import("./pos-relay.server");
+  const { serviceRest } = await import("@/core/api/pos-relay.server");
   return serviceRest(path, init);
 }
 

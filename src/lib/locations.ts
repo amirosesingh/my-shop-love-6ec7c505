@@ -1,4 +1,4 @@
-import type { LocationType, Product, Store } from "@/lib/pos-types";
+import type { LocationType, Product, Store } from "@/core/types/pos-types";
 
 /**
  * Location model helpers.

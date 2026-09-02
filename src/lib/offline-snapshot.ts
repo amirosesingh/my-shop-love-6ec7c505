@@ -5,7 +5,7 @@
  * it back on start-up, so a Windows till with no connection opens straight
  * into a working register instead of waiting on a request that cannot finish.
  */
-import type { CloudSlice } from "./pos-db";
+import type { CloudSlice } from "@/core/api/pos-db";
 import { isOnlineOnly } from "./live-mode";
 
 const KEY = "pos.offline.snapshot.v1";

@@ -22,7 +22,7 @@ import {
   AuthorizationDialog,
   type AuthorizationPrompt,
   type PromptOutcome,
-} from "@/components/pos/AuthorizationDialog";
+} from "@/platforms/web/components/pos/AuthorizationDialog";
 import { useAuthOptional } from "@/lib/pos-auth";
 import { usePosRules } from "@/lib/pos-rules.tsx";
 import { GATE_RULE_KEY } from "@/lib/pos-rules";

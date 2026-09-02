@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { RELAY_TABLES } from "../pos-relay.server";
+import { RELAY_TABLES } from "@/core/api/pos-relay.server";
 
 describe("relay table registration", () => {
   it.each(["payment_transactions", "item_activity_logs"])(

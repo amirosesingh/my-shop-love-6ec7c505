@@ -6,7 +6,7 @@
  * order is Private > Branch > Cluster > Global > hardcoded default. Locks are
  * global and stop any scope from overriding a block at all.
  */
-import { dbRouter } from "./db-router";
+import { dbRouter } from "@/core/api/db-router";
 import type { SettingsSectionId } from "./settings-sections";
 
 export type SectionPatch = Record<string, unknown>;

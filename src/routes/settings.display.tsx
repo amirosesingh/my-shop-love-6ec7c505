@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
-import { DisplayScalingSettings } from "@/components/pos/DisplayScalingSettings";
+import { SettingsFrame } from "@/platforms/web/components/pos/settings/SettingsFrame";
+import { DisplayScalingSettings } from "@/platforms/web/components/pos/DisplayScalingSettings";
 
 export const Route = createFileRoute("/settings/display")({
   head: () => ({

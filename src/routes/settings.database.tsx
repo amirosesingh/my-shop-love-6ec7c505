@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
-import { DatabaseConnectionSettings } from "@/components/pos/DatabaseConnectionSettings";
-import { SchemaHealthPanel } from "@/components/database/SchemaHealthPanel";
-import { BranchSettings } from "@/components/pos/BranchSettings";
+import { SettingsFrame } from "@/platforms/web/components/pos/settings/SettingsFrame";
+import { DatabaseConnectionSettings } from "@/platforms/web/components/pos/DatabaseConnectionSettings";
+import { SchemaHealthPanel } from "@/platforms/web/components/database/SchemaHealthPanel";
+import { BranchSettings } from "@/platforms/web/components/pos/BranchSettings";
 
 export const Route = createFileRoute("/settings/database")({
   head: () => ({

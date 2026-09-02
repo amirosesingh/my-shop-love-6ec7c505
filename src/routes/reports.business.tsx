@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { AppShell } from "@/components/pos/AppShell";
+import { AppShell } from "@/platforms/web/components/pos/AppShell";
 import { Label } from "@/components/ui/label";
-import { ThemedSelect } from "@/components/pos/ThemedSelect";
+import { ThemedSelect } from "@/platforms/web/components/pos/ThemedSelect";
 import {
   Table,
   TableBody,
@@ -11,10 +11,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { TablePagination, usePagination } from "@/components/pos/TablePagination";
+import { TablePagination, usePagination } from "@/platforms/web/components/pos/TablePagination";
 import { money, usePos } from "@/lib/pos-store";
 import { lineCost, lineRevenue } from "@/core/pricing/profit";
-import { ReportHeader, StatCard, defaultRange, downloadCsv, inRange } from "@/components/pos/report-kit";
+import { ReportHeader, StatCard, defaultRange, downloadCsv, inRange } from "@/platforms/web/components/pos/report-kit";
 
 export const Route = createFileRoute("/reports/business")({
   head: () => ({

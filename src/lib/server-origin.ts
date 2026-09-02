@@ -11,7 +11,7 @@
  * is configured per device (`backend-config.ts`, Recovery settings) or baked
  * in with `VITE_POS_SERVER_URL`. Web keeps using relative URLs.
  */
-import { isElectron, isNative } from "@/platform-config/platform";
+import { isWindowsShell, isMobileShell } from "@/platform-config/features";
 
 function configured(): string {
   const fromBuild = (import.meta.env["VITE_POS_SERVER_URL"] as string | undefined) ?? "";
@@ -25,13 +25,13 @@ function configured(): string {
 /** Absolute origin for app-server calls, or "" when relative URLs are right. */
 export function serverOrigin(): string {
   if (typeof window === "undefined") return "";
-  if (!isNative() && !isElectron()) return "";
+  if (!isMobileShell() && !isWindowsShell()) return "";
   return configured();
 }
 
 /** True when a terminal app has no server to talk to for app-server endpoints. */
 export function serverUnreachableOnDevice(): boolean {
-  return (isNative() || isElectron()) && !configured();
+  return (isMobileShell() || isWindowsShell()) && !configured();
 }
 
 /** Resolve an app path against the origin this shell should use. */

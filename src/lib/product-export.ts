@@ -2,7 +2,7 @@
  * Excel export for the catalogue — same column names the bulk importer
  * accepts, so an exported sheet can be edited and imported straight back.
  */
-import type { Product, Store } from "./pos-types";
+import type { Product, Store } from "@/core/types/pos-types";
 
 export async function exportProductsXlsx(
   products: Product[],

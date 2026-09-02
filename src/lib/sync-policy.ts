@@ -5,7 +5,7 @@
  * branch's policy here whenever it changes. Blocked writes simply stay in the
  * outbox until the switch is turned back on — nothing is ever dropped.
  */
-import { defaultBranchPolicy, type BranchPolicy } from "./pos-types";
+import { defaultBranchPolicy, type BranchPolicy } from "@/core/types/pos-types";
 import { syncAllowed } from "./branch-policy";
 
 let current: BranchPolicy = defaultBranchPolicy;

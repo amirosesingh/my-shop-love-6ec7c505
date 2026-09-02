@@ -3,8 +3,8 @@ import { useState } from "react";
 import { Crown, Gift, Percent, Plus, Sparkles, Trash2, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import { notifyError } from "@/lib/notify";
-import { ThemedSelect } from "@/components/pos/ThemedSelect";
-import { AppShell } from "@/components/pos/AppShell";
+import { ThemedSelect } from "@/platforms/web/components/pos/ThemedSelect";
+import { AppShell } from "@/platforms/web/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,7 +20,7 @@ import {
 import { money, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
 import { isLive } from "@/lib/pos-promotions";
-import type { DiscountType, MemberTier, PromoType, Promotion } from "@/lib/pos-types";
+import type { DiscountType, MemberTier, PromoType, Promotion } from "@/core/types/pos-types";
 
 export const Route = createFileRoute("/promotions")({
   head: () => ({

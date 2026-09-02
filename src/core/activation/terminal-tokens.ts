@@ -138,7 +138,7 @@ export async function ensureLocations(locations: TokenLocation[]): Promise<void>
     address: l.address || null,
     phone: l.phone || null,
   }));
-  const { canRelay, relayOp } = await import("@/lib/sync-relay");
+  const { canRelay, relayOp } = await import("@/core/api/sync-relay");
   if (canRelay()) {
     const relayed = await relayOp({ kind: "upsert", table: "stores", rows, onConflict: "id" });
     if (!relayed.ok) throw new Error(relayed.error ?? "Could not save branch locations");

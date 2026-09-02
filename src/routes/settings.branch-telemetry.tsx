@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
-import { TelemetryPanel } from "@/components/pos/settings/panels/TelemetryPanel";
+import { SettingsFrame } from "@/platforms/web/components/pos/settings/SettingsFrame";
+import { TelemetryPanel } from "@/platforms/web/components/pos/settings/panels/TelemetryPanel";
 
 export const Route = createFileRoute("/settings/branch-telemetry")({
   head: () => ({

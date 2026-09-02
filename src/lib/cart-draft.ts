@@ -11,7 +11,7 @@
  * empty basket. It is the only business key the phone persists, it never
  * leaves the device, and it is removed as soon as the ticket is settled.
  */
-import type { CartLine, DiscountType } from "./pos-types";
+import type { CartLine, DiscountType } from "@/core/types/pos-types";
 
 export type CartDraft = {
   lines: CartLine[];

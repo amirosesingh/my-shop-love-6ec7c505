@@ -6,7 +6,7 @@
  * a parked (held) ticket, or a purchase order line that has not been received.
  */
 import { supabaseExternal } from "@/integrations/supabase/external-client";
-import type { Booking, Product } from "./pos-types";
+import type { Booking, Product } from "@/core/types/pos-types";
 import type { HeldOrder } from "./held-orders";
 
 export type MergeBlock = { productId: string; name: string; reason: string };

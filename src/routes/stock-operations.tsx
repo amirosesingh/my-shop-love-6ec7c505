@@ -9,7 +9,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeftRight, ClipboardList, Lock, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
-import { AppShell } from "@/components/pos/AppShell";
+import { AppShell } from "@/platforms/web/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -21,7 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ThemedSelect } from "@/components/pos/ThemedSelect";
+import { ThemedSelect } from "@/platforms/web/components/pos/ThemedSelect";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,7 +33,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/lib/pos-auth";
-import { db } from "@/lib/pos-db";
+import { db } from "@/core/api/pos-db";
 import { money, usePos } from "@/lib/pos-store";
 import { canEditPosted } from "@/lib/stock-ref";
 import { useManagerGate } from "@/lib/manager-gate";
@@ -44,8 +44,8 @@ import {
   withdrawPostedEdit,
   type EditGrant,
 } from "@/lib/record-edit-flow";
-import { StockCountDialog, type StockRecordRow } from "@/components/pos/StockCountDialog";
-import { StockRecordView } from "@/components/pos/StockRecordView";
+import { StockCountDialog, type StockRecordRow } from "@/platforms/web/components/pos/StockCountDialog";
+import { StockRecordView } from "@/platforms/web/components/pos/StockRecordView";
 
 const ALL = "all";
 

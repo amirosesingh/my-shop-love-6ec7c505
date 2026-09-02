@@ -1,14 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { SettingsTabs } from "@/components/pos/settings/SettingsTabs";
+import { SettingsTabs } from "@/platforms/web/components/pos/settings/SettingsTabs";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Loader2, Save, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { notifyError } from "@/lib/notify";
 
-import { AppShell } from "@/components/pos/AppShell";
-import { SaveIndicator } from "@/components/pos/settings/SaveIndicator";
-import { SettingsSections } from "@/components/pos/settings/SettingsSection";
-import { AuthorizationRulesPanel } from "@/components/pos/settings/AuthorizationRulesPanel";
+import { AppShell } from "@/platforms/web/components/pos/AppShell";
+import { SaveIndicator } from "@/platforms/web/components/pos/settings/SaveIndicator";
+import { SettingsSections } from "@/platforms/web/components/pos/settings/SettingsSection";
+import { AuthorizationRulesPanel } from "@/platforms/web/components/pos/settings/AuthorizationRulesPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

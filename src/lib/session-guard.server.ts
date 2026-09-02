@@ -7,7 +7,7 @@
  * revoked and the caller is refused with 401.
  */
 import { hashSessionToken, mintSessionToken } from "./session-token.server";
-import { serviceRest } from "./pos-relay.server";
+import { serviceRest } from "@/core/api/pos-relay.server";
 
 export type SessionRow = {
   id: string;

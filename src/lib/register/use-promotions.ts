@@ -10,11 +10,11 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { notifyError } from "@/lib/notify";
 import { logger } from "@/lib/audit-log";
-import { r2 } from "@/lib/pos-types";
+import { r2 } from "@/core/types/pos-types";
 import { loadMemberVouchers, loadVoucherByToken, voucherValue } from "@/lib/coupons";
 import type { Campaign, VoucherView } from "@/lib/coupons";
 import type { CartCoupon } from "@/lib/register/use-cart";
-import type { CartLine, DiscountType, Product, Promotion } from "@/lib/pos-types";
+import type { CartLine, DiscountType, Product, Promotion } from "@/core/types/pos-types";
 
 type PromotionsDeps = {
   /** Catalogue, active promotions and known members. */

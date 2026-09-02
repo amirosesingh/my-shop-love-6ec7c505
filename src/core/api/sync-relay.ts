@@ -1,0 +1,198 @@
+/**
+ * Client side of the server write relay.
+ *
+ * When a direct write to the central database is refused because the till has
+ * no cloud account (cashier PIN sign-in), the same operation is posted to
+ * `/api/v1/pos/sync`, which proves the caller and writes only within the
+ * branch and permissions that caller actually has.
+ */
+import { authHeaders, cashierTokenSync, readCredentials } from "@/lib/pos-credentials";
+import { serverUrl } from "@/lib/server-origin";
+import { readTerminalConfig } from "@/core/activation/terminal-tokens";
+import type { SyncOp } from "@/lib/sync-outbox";
+
+const credentials = readCredentials;
+
+/** Answer from the server setup probe: presence only, never key material. */
+export type SyncHealth = { serviceKey: boolean; posUrl: boolean; host: string };
+
+/**
+ * Ask the server that is actually answering this browser whether it holds the
+ * central database key. Used by the connection check so an administrator can
+ * tell a server setup problem apart from a till problem.
+ */
+export async function syncHealth(): Promise<SyncHealth | null> {
+  try {
+    const res = await fetch(serverUrl("/api/public/sync-health"), { cache: "no-store" });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { serviceKey?: boolean; posUrl?: boolean };
+    return {
+      serviceKey: !!body.serviceKey,
+      posUrl: !!body.posUrl,
+      host: typeof window === "undefined" ? "" : window.location.host,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Every relay call carries the bearer token as well as the credential body. */
+async function relayHeaders(): Promise<Record<string, string>> {
+  return { "Content-Type": "application/json", ...(await authHeaders()) };
+}
+
+/**
+ * One place that reacts to the relay refusing a caller: a dead token or a
+ * deleted branch ends the session, anything else is left to the caller.
+ */
+async function inspectRelay(res: Response, body: { code?: string } | null): Promise<void> {
+  if (res.status !== 401 && res.status !== 403) return;
+  const { notifySessionExpired } = await import("@/lib/session-expiry");
+  if (body?.code === "SESSION_INVALID" || body?.code === "BRANCH_MISSING" || res.status === 401)
+    notifySessionExpired();
+}
+
+/** True when a staff account is signed in to the central database in this browser. */
+export function hasStaffSession(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = window.localStorage.getItem("sb-external-auth-token");
+    if (!raw) return false;
+    const parsed = JSON.parse(raw) as { access_token?: string } | null;
+    return !!parsed?.access_token;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Whether the server write relay may be used. Activated tills qualify, and so
+ * does any browser with a signed-in staff account — admins and supervisors work
+ * from Chrome, where no till is registered. The endpoint still proves the
+ * caller before writing, so this never opens an anonymous path.
+ */
+export function canRelay(): boolean {
+  if (typeof window === "undefined") return false;
+  if (cashierTokenSync()) return true;
+  return !!readTerminalConfig()?.tokenId || hasStaffSession();
+}
+
+/** Canonical relay endpoint. The old `/api/public/sync` path still answers. */
+const SYNC_PATH = "/api/v1/pos/sync";
+
+/** Push one operation through the relay. */
+export async function relayOp(
+  op: SyncOp,
+): Promise<{ ok: boolean; error?: string; code?: string }> {
+  try {
+    const res = await fetch(serverUrl(SYNC_PATH), {
+      method: "POST",
+      headers: await relayHeaders(),
+      body: JSON.stringify({ ...(await credentials()), ops: [op] }),
+    });
+    const body = (await res.json().catch(() => null)) as
+      | {
+          ok?: boolean;
+          error?: string;
+          code?: string;
+          detail?: { table?: string; kind?: string; role?: string | null; branch?: string | null };
+          results?: { ok: boolean; error?: string }[];
+        }
+      | null;
+    await inspectRelay(res, body);
+    if (!res.ok) {
+      const d = body?.detail;
+      const where = d?.table ? ` (${d.kind ?? "write"} on ${d.table}` +
+        `${d.role ? `, signed in as ${d.role}` : ""}` +
+        `${d.branch ? `, branch ${d.branch}` : ""})` : "";
+      return {
+        ok: false,
+        error: `${body?.error ?? `Relay refused (${res.status})`}${where}`,
+        ...(body?.code ? { code: body.code } : {}),
+      };
+    }
+    const first = body?.results?.[0];
+    return first ?? { ok: !!body?.ok };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+/** Quick health probe used by the connection check panel. */
+export async function relayActiveShift(
+  storeId: string,
+): Promise<{ ok: boolean; row?: Record<string, unknown> | null; error?: string }> {
+  try {
+    const res = await fetch(serverUrl(SYNC_PATH), {
+      method: "POST",
+      headers: await relayHeaders(),
+      body: JSON.stringify({ ...(await credentials()), read: { kind: "activeShift", storeId } }),
+    });
+    const body = (await res.json().catch(() => null)) as
+      | { ok?: boolean; row?: Record<string, unknown> | null; error?: string; code?: string }
+      | null;
+    await inspectRelay(res, body);
+    if (!res.ok || !body?.ok)
+      return { ok: false, error: body?.error ?? `Relay refused (${res.status})` };
+    return { ok: true, row: body.row ?? null };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+/** Protected branch-list read for startup and terminal administration. */
+export async function relayStores(): Promise<{
+  ok: boolean;
+  rows?: Record<string, unknown>[];
+  error?: string;
+}> {
+  try {
+    const res = await fetch(serverUrl(SYNC_PATH), {
+      method: "POST",
+      headers: await relayHeaders(),
+      body: JSON.stringify({ ...(await credentials()), read: { kind: "stores" } }),
+    });
+    const body = (await res.json().catch(() => null)) as
+      | { ok?: boolean; rows?: Record<string, unknown>[]; error?: string; code?: string }
+      | null;
+    await inspectRelay(res, body);
+    if (!res.ok || !body?.ok)
+      return { ok: false, error: body?.error ?? `Relay refused (${res.status})` };
+    return { ok: true, rows: body.rows ?? [] };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+/** Quick health probe used by the connection check panel. */
+export async function probeRelay(): Promise<{ ok: boolean; error?: string; code?: string }> {
+  try {
+    const res = await fetch(serverUrl(SYNC_PATH), {
+      method: "POST",
+      headers: await relayHeaders(),
+      body: JSON.stringify({
+        ...(await credentials()),
+        ops: [{ kind: "update", table: "shift_sessions", values: {}, match: { id: "probe" } }],
+      }),
+    });
+    const body = (await res.json().catch(() => null)) as
+      | { error?: string; code?: string }
+      | null;
+    await inspectRelay(res, body);
+    if (res.status === 401)
+      return {
+        ok: false,
+        ...(body?.code ? { code: body.code } : {}),
+        error: body?.error ?? "This till is not recognised yet",
+      };
+    if (!res.ok)
+      return {
+        ok: false,
+        ...(body?.code ? { code: body.code } : {}),
+        error: body?.error ?? `Relay error ${res.status}`,
+      };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}

@@ -8,8 +8,8 @@
  */
 import { useState } from "react";
 import { toast } from "sonner";
-import { lineUnitDiscount, r2 } from "@/lib/pos-types";
-import type { CartLine, DiscountType, Sale } from "@/lib/pos-types";
+import { lineUnitDiscount, r2 } from "@/core/types/pos-types";
+import type { CartLine, DiscountType, Sale } from "@/core/types/pos-types";
 
 type ExchangeDeps = {
   /** Past sales searched by receipt number. */

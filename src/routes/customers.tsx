@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SectionHub } from "@/components/pos/SectionHub";
+import { SectionHub } from "@/platforms/web/components/pos/SectionHub";
 
 export const Route = createFileRoute("/customers")({
   head: () => ({

@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ShieldAlert } from "lucide-react";
 
-import { RoleManager } from "@/components/admin/RoleManager";
-import { StaffManager } from "@/components/admin/StaffManager";
-import { AppShell } from "@/components/pos/AppShell";
+import { RoleManager } from "@/platforms/web/components/admin/RoleManager";
+import { StaffManager } from "@/platforms/web/components/admin/StaffManager";
+import { AppShell } from "@/platforms/web/components/pos/AppShell";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/lib/pos-auth";
 

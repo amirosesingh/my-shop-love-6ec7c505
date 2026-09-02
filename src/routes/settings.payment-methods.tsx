@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
-import { PaymentMethodsPanel } from "@/components/pos/settings/panels/PaymentMethodsPanel";
+import { SettingsFrame } from "@/platforms/web/components/pos/settings/SettingsFrame";
+import { PaymentMethodsPanel } from "@/platforms/web/components/pos/settings/panels/PaymentMethodsPanel";
 
 export const Route = createFileRoute("/settings/payment-methods")({
   head: () => ({

@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
-import { commitLabel, type CommitTarget } from "./pos-db";
+import { commitLabel, type CommitTarget } from "@/core/api/pos-db";
 
 /**
  * Runs an action that must be stored before anything else happens.

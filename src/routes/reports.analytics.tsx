@@ -15,7 +15,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { AppShell } from "@/components/pos/AppShell";
+import { AppShell } from "@/platforms/web/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/table";
 import { money, usePos } from "@/lib/pos-store";
 import { savingsOf, soldLines, sumLines } from "@/lib/sales-analytics";
-import { ReportHeader, StatCard, defaultRange, inRange } from "@/components/pos/report-kit";
+import { ReportHeader, StatCard, defaultRange, inRange } from "@/platforms/web/components/pos/report-kit";
 
 export const Route = createFileRoute("/reports/analytics")({
   head: () => ({

@@ -12,7 +12,7 @@ import {
   YAxis,
 } from "recharts";
 import { AlertTriangle } from "lucide-react";
-import { AppShell } from "@/components/pos/AppShell";
+import { AppShell } from "@/platforms/web/components/pos/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -26,7 +26,7 @@ import {
 import { money, usePos } from "@/lib/pos-store";
 import { useDrawerEvents } from "@/lib/drawer-events";
 import { hourlyProfit, profitOf } from "@/core/pricing/profit";
-import { paymentsLabel } from "@/lib/pos-types";
+import { paymentsLabel } from "@/core/types/pos-types";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({

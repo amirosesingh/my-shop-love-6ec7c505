@@ -5,7 +5,7 @@
  * activation token that has not been revoked, or a staff account the central
  * database still recognises) AND the branch it belongs to still exists.
  */
-import { hasServiceKey, serviceRest, verifyRelayCaller } from "./pos-relay.server";
+import { hasServiceKey, serviceRest, verifyRelayCaller } from "@/core/api/pos-relay.server";
 
 export type VerifyInput = {
   sessionToken?: string;

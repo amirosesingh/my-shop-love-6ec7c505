@@ -1,5 +1,5 @@
-import type { CartLine, Member, Product, Promotion } from "./pos-types";
-import { r2 } from "./pos-types";
+import type { CartLine, Member, Product, Promotion } from "@/core/types/pos-types";
+import { r2 } from "@/core/types/pos-types";
 
 /** A promotion counts as live when it is active and today sits inside its window. */
 export function isLive(p: Promotion, now = new Date()) {

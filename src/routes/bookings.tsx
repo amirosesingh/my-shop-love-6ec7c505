@@ -16,15 +16,15 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { AppShell } from "@/components/pos/AppShell";
-import { StatusHistoryDialog } from "@/components/pos/StatusHistoryDialog";
-import { ActionButton } from "@/components/pos/ActionButton";
+import { AppShell } from "@/platforms/web/components/pos/AppShell";
+import { StatusHistoryDialog } from "@/platforms/web/components/pos/StatusHistoryDialog";
+import { ActionButton } from "@/platforms/web/components/pos/ActionButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { BOOKING_TIMING_LABELS, bookingRulesOf } from "@/lib/pos-types";
+import { BOOKING_TIMING_LABELS, bookingRulesOf } from "@/core/types/pos-types";
 import {
   Dialog,
   DialogContent,
@@ -46,7 +46,7 @@ import {
   type Booking,
   type JobStatus,
   type PaymentMethod,
-} from "@/lib/pos-types";
+} from "@/core/types/pos-types";
 import {
   printBookingPayment,
   printBookingSlip,

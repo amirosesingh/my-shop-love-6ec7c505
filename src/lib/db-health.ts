@@ -8,7 +8,7 @@
  */
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { supabaseConfig } from "./external-supabase-config";
-import { canRelay, hasStaffSession, probeRelay } from "./sync-relay";
+import { canRelay, hasStaffSession, probeRelay } from "@/core/api/sync-relay";
 import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 
 export type ProbeState = "ok" | "fail" | "skipped";

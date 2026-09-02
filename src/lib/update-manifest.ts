@@ -19,7 +19,8 @@
  * never leave the UI stuck on "Checking for updates…".
  */
 import { httpGetJson } from "@/platforms/mobile/native-http";
-import { isAndroid, isElectron, isNative } from "@/platform-config/platform";
+import { isAndroid } from "@/platform-config/platform";
+import { isWindowsShell, isMobileShell } from "@/platform-config/features";
 
 const ENV_BASE =
   (typeof import.meta !== "undefined" &&
@@ -87,8 +88,8 @@ export function isNewerVersion(candidate: string, current: string): boolean {
 
 /** Which shell we are updating. */
 export function currentPlatform(): UpdatePlatform {
-  if (isNative() && isAndroid()) return "android";
-  if (isElectron()) return "windows";
+  if (isMobileShell() && isAndroid()) return "android";
+  if (isWindowsShell()) return "windows";
   return "web";
 }
 

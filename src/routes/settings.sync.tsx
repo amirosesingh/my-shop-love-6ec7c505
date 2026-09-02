@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
-import { SyncPanel } from "@/components/pos/sync/SyncPanel";
-import { SyncSettings } from "@/components/pos/SyncSettings";
+import { SettingsFrame } from "@/platforms/web/components/pos/settings/SettingsFrame";
+import { SyncPanel } from "@/platforms/web/components/pos/sync/SyncPanel";
+import { SyncSettings } from "@/platforms/web/components/pos/SyncSettings";
 
 export const Route = createFileRoute("/settings/sync")({
   head: () => ({

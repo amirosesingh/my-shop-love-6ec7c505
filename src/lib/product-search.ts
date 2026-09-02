@@ -8,8 +8,8 @@
  * be answered (offline, relay down, local-first desktop).
  */
 import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
-import { rowToProduct } from "./pos-db";
-import type { Product } from "./pos-types";
+import { rowToProduct } from "@/core/api/pos-db";
+import type { Product } from "@/core/types/pos-types";
 
 export type CatalogSearch = {
   products: Product[];

@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SettingsTabs } from "@/components/pos/settings/SettingsTabs";
-import { SettingsFrame, useSettingsCtx } from "@/components/pos/settings/SettingsFrame";
-import { ThemedSelect } from "@/components/pos/ThemedSelect";
+import { SettingsTabs } from "@/platforms/web/components/pos/settings/SettingsTabs";
+import { SettingsFrame, useSettingsCtx } from "@/platforms/web/components/pos/settings/SettingsFrame";
+import { ThemedSelect } from "@/platforms/web/components/pos/ThemedSelect";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import type { ReceiptCustomLine } from "@/lib/pos-types";
+import type { ReceiptCustomLine } from "@/core/types/pos-types";
 
 export const Route = createFileRoute("/settings/qr")({
   head: () => ({

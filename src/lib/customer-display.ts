@@ -1,4 +1,4 @@
-import type { CartLine, PaymentDetails, PaymentMethod } from "./pos-types";
+import type { CartLine, PaymentDetails, PaymentMethod } from "@/core/types/pos-types";
 
 export const DISPLAY_CHANNEL = "pos-customer-display";
 export const DISPLAY_STORAGE_KEY = "pos.display.snapshot";

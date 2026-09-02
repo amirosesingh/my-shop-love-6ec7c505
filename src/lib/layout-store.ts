@@ -6,12 +6,12 @@
  * Electron writes through the existing device-settings IPC (so the layout
  * survives a browser cache wipe) and mirrors to localStorage for instant paint.
  */
-import { isElectron } from "@/platform-config/platform";
+import { isWindowsShell } from "@/platform-config/features";
 import { readLocalSetting, writeLocalSetting } from "@/core/local-db/local-db";
 
 export type PlatformTarget = "web" | "electron";
 
-export const platformTarget = (): PlatformTarget => (isElectron() ? "electron" : "web");
+export const platformTarget = (): PlatformTarget => (isWindowsShell() ? "electron" : "web");
 
 const KEY_PREFIX = "pos.register.layout";
 export const layoutKey = (terminal: string, platform: PlatformTarget = platformTarget()) =>
@@ -47,7 +47,7 @@ export async function readLayoutRaw(terminal: string): Promise<string | null> {
   const key = layoutKey(terminal);
   const local = readLocal(key);
   if (local) return local;
-  if (!isElectron()) return null;
+  if (!isWindowsShell()) return null;
   const remote = await readLocalSetting(key);
   if (remote) writeLocal(key, remote);
   return remote;
@@ -56,5 +56,5 @@ export async function readLayoutRaw(terminal: string): Promise<string | null> {
 export async function writeLayoutRaw(terminal: string, json: string | null) {
   const key = layoutKey(terminal);
   writeLocal(key, json);
-  if (isElectron()) await writeLocalSetting(key, json);
+  if (isWindowsShell()) await writeLocalSetting(key, json);
 }

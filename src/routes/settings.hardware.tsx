@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
-import { HardwarePanel } from "@/components/pos/settings/panels/HardwarePanel";
+import { SettingsFrame } from "@/platforms/web/components/pos/settings/SettingsFrame";
+import { HardwarePanel } from "@/platforms/web/components/pos/settings/panels/HardwarePanel";
 
 export const Route = createFileRoute("/settings/hardware")({
   head: () => ({

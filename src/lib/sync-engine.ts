@@ -3,7 +3,7 @@ import { logSync } from "./sync-log";
 import { replayOrder } from "./activity-journal";
 import { isTerminalRevoked } from "./use-revocation-check";
 import { tableSyncAllowed } from "./sync-policy";
-import { canRelay, hasStaffSession, relayOp } from "./sync-relay";
+import { canRelay, hasStaffSession, relayOp } from "@/core/api/sync-relay";
 import { preferRelay } from "./pos-auth-route";
 import {
   effectiveDatabaseMode,
@@ -73,7 +73,7 @@ async function mirrorCloudState(state: unknown) {
     if (written) recordSync({ direction: "mirror", entity, records: written, status: "success" });
   }
 }
-import { loadCloudState } from "./pos-db";
+import { loadCloudState } from "@/core/api/pos-db";
 import { localDb } from "@/core/local-db/local-db";
 import {
   checkHealth,

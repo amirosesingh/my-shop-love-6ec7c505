@@ -8,7 +8,7 @@ import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Eye, ListPlus, Send } from "lucide-react";
 
-import { AppShell } from "@/components/pos/AppShell";
+import { AppShell } from "@/platforms/web/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -20,7 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { usePos } from "@/lib/pos-store";
-import { TRANSFER_STATUS_LABELS } from "@/lib/pos-types";
+import { TRANSFER_STATUS_LABELS } from "@/core/types/pos-types";
 
 export const Route = createFileRoute("/requests/")({
   head: () => ({

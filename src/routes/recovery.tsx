@@ -13,8 +13,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { LifeBuoy, ArrowLeft, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { RecoveryHub } from "@/components/pos/RecoveryHub";
-import { EmergencyPinGate } from "@/components/pos/EmergencyPinGate";
+import { RecoveryHub } from "@/platforms/web/components/pos/RecoveryHub";
+import { EmergencyPinGate } from "@/platforms/web/components/pos/EmergencyPinGate";
 import { heartbeat } from "@/core/activation/connection-health";
 import { APP_VERSION } from "@/version";
 

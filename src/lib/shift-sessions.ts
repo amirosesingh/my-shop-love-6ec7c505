@@ -7,8 +7,8 @@
  * is the record of truth and is written through the usual outbox, so the till
  * keeps working without a connection.
  */
-import { db } from "./pos-db";
-import type { ShiftSession } from "./pos-types";
+import { db } from "@/core/api/pos-db";
+import type { ShiftSession } from "@/core/types/pos-types";
 
 const KEY = "pos-shift-sessions-v1";
 

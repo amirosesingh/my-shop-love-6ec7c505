@@ -7,7 +7,7 @@
  * shift along and report the state it came back in.
  */
 import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
-import type { ShiftState } from "./pos-types";
+import type { ShiftState } from "@/core/types/pos-types";
 
 export type ShiftCloseStep = { ok: true; state: ShiftState } | { ok: false; error: string };
 

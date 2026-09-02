@@ -68,7 +68,7 @@ export async function handleSyncRequest(request: Request): Promise<Response> {
     return Response.json({ ok: false, error: "Nothing to do" }, { status: 400 });
 
   const { verifyRelayCaller, runRelayOp, runRelayRead, hasServiceKey } = await import(
-    "./pos-relay.server"
+    "@/core/api/pos-relay.server"
   );
   // Without the internal key the relay cannot do anything: answer with a
   // readable "temporarily unavailable" instead of a blank server error.
@@ -87,7 +87,7 @@ export async function handleSyncRequest(request: Request): Promise<Response> {
   // Every request re-checks the caller: token live AND its branch still
   // present. A caller whose branch was deleted is refused with a reason the
   // till can act on instead of a blank failure.
-  const { resolveRelayScope } = await import("./relay-policy.server");
+  const { resolveRelayScope } = await import("@/core/api/relay-policy.server");
   let scope: Awaited<ReturnType<typeof resolveRelayScope>>;
   try {
     const caller = await verifyRelayCaller(body);
@@ -134,7 +134,7 @@ export async function handleSyncRequest(request: Request): Promise<Response> {
     table?: string;
     kind?: string;
   }[] = [];
-  const { batchInsertIds } = await import("./relay-policy.server");
+  const { batchInsertIds } = await import("@/core/api/relay-policy.server");
   const ops = body.ops ?? [];
   // Parents inserted in this same push let their child rows through.
   const batchIds = batchInsertIds(ops);

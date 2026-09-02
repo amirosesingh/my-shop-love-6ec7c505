@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SettingsTabs } from "@/components/pos/settings/SettingsTabs";
-import { SettingsFrame, useSettingsCtx } from "@/components/pos/settings/SettingsFrame";
-import { ThemedSelect } from "@/components/pos/ThemedSelect";
+import { SettingsTabs } from "@/platforms/web/components/pos/settings/SettingsTabs";
+import { SettingsFrame, useSettingsCtx } from "@/platforms/web/components/pos/settings/SettingsFrame";
+import { ThemedSelect } from "@/platforms/web/components/pos/ThemedSelect";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { PAPER_LABELS } from "@/lib/pos-print";
-import type { PaperSize, ReceiptSettings } from "@/lib/pos-types";
+import type { PaperSize, ReceiptSettings } from "@/core/types/pos-types";
 
 const TOGGLES: { key: keyof ReceiptSettings; label: string }[] = [
   { key: "showLogo", label: "Store logo" },

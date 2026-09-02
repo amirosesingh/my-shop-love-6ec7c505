@@ -1,4 +1,4 @@
-import type { Shift, TradingHours } from "./pos-types";
+import type { Shift, TradingHours } from "@/core/types/pos-types";
 
 const TERMINAL_KEY = "pos.terminal.localId";
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateTenders, type Payment } from "@/lib/pos-types";
+import { validateTenders, type Payment } from "@/core/types/pos-types";
 
 const t = (p: Partial<Payment>): Payment => ({
   id: crypto.randomUUID(),

@@ -14,16 +14,16 @@ import { buildBookingMessage, buildSaleMessage, sendBillOnWhatsApp } from "@/lib
 import { logger } from "@/lib/audit-log";
 import { redeemVoucher } from "@/lib/coupons";
 import { publishDisplay, type DisplaySnapshot } from "@/lib/customer-display";
-import { rememberBanks } from "@/components/pos/TenderSplit";
+import { rememberBanks } from "@/platforms/web/components/pos/TenderSplit";
 import { isoDaysFromNow } from "@/lib/register/use-booking-intake";
 import type { useBookingIntake } from "@/lib/register/use-booking-intake";
 import { cartTotals, money, usePos } from "@/lib/pos-store";
-import { db } from "@/lib/pos-db";
+import { db } from "@/core/api/pos-db";
 
 import { applyRounding, roundingOf } from "@/core/pricing/rounding";
 import { applyCombo, intakeTotals, newJobTag } from "@/lib/booking-charges";
-import { bookingRulesOf, lineUnitDiscount, paymentsLabel, r2, validateTenders } from "@/lib/pos-types";
-import type { Store, CartLine, Payment, PaymentMethod, Sale, Booking, Member } from "@/lib/pos-types";
+import { bookingRulesOf, lineUnitDiscount, paymentsLabel, r2, validateTenders } from "@/core/types/pos-types";
+import type { Store, CartLine, Payment, PaymentMethod, Sale, Booking, Member } from "@/core/types/pos-types";
 import type { CartCoupon } from "@/lib/register/use-cart";
 import type { NewBooking } from "@/lib/pos-store";
 

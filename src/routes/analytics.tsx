@@ -18,14 +18,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { AppShell } from "@/components/pos/AppShell";
+import { AppShell } from "@/platforms/web/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { StatCard, downloadCsv, isoDay } from "@/components/pos/report-kit";
+import { StatCard, downloadCsv, isoDay } from "@/platforms/web/components/pos/report-kit";
 import { money, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
-import { AnalyticsErrorPanel } from "@/components/pos/AnalyticsErrorPanel";
+import { AnalyticsErrorPanel } from "@/platforms/web/components/pos/AnalyticsErrorPanel";
 import {
   fetchBoard,
   shopSlices,

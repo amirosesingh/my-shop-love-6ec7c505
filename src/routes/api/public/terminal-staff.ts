@@ -34,7 +34,7 @@ export const Route = createFileRoute("/api/public/terminal-staff")({
             { status: 401 },
           );
         try {
-          const { verifyRelayCaller } = await import("@/lib/pos-relay.server");
+          const { verifyRelayCaller } = await import("@/core/api/pos-relay.server");
           // Throws when the token proves nothing (unknown, revoked, retired).
           const caller = await verifyRelayCaller({ terminalToken: token }).catch(() => null);
           if (!caller || caller.kind !== "terminal")

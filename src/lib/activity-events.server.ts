@@ -6,7 +6,7 @@
  * fan-out happens here too, so a terminal that closes straight after the
  * action cannot skip the message.
  */
-import { serviceRest } from "./pos-relay.server";
+import { serviceRest } from "@/core/api/pos-relay.server";
 
 export type NotificationChannel = "off" | "app" | "whatsapp";
 

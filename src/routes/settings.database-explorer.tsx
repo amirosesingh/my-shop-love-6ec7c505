@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
-import { DatabaseExplorer } from "@/components/database/DatabaseExplorer";
+import { SettingsFrame } from "@/platforms/web/components/pos/settings/SettingsFrame";
+import { DatabaseExplorer } from "@/platforms/web/components/database/DatabaseExplorer";
 import { useAuth } from "@/lib/pos-auth";
 
 export const Route = createFileRoute("/settings/database-explorer")({

@@ -6,7 +6,7 @@
  * inside `AppSettings`, so a write can be routed to the right place without
  * every settings page having to know about scopes.
  */
-import type { AppSettings } from "./pos-types";
+import type { AppSettings } from "@/core/types/pos-types";
 
 export type SettingsSectionId =
   | "tax"

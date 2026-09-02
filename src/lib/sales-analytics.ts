@@ -2,7 +2,7 @@
  * One shared margin engine so the item report and the analytics board can
  * never disagree on revenue, cost or profit.
  */
-import { lineUnitDiscount, r2, type CartLine, type Product, type Sale } from "./pos-types";
+import { lineUnitDiscount, r2, type CartLine, type Product, type Sale } from "@/core/types/pos-types";
 
 export type SoldLine = {
   saleId: string;

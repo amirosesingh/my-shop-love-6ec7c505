@@ -34,8 +34,8 @@ import type {
   TransferItem,
   TransferKind,
   TransferStatus,
-} from "./pos-types";
-import { bookingBalance, lineUnitDiscount, r2, type DiscountType } from "./pos-types";
+} from "@/core/types/pos-types";
+import { bookingBalance, lineUnitDiscount, r2, type DiscountType } from "@/core/types/pos-types";
 import { logger } from "./audit-log";
 import { toast } from "sonner";
 import {
@@ -45,9 +45,9 @@ import {
   loadActiveShift,
   loadCloudState,
   openShiftOnServer,
-} from "./pos-db";
+} from "@/core/api/pos-db";
 import { recordActivity } from "./activity-events";
-import type { CloudSlice, CommitTarget } from "./pos-db";
+import type { CloudSlice, CommitTarget } from "@/core/api/pos-db";
 import { clearSnapshot, readSnapshot, writeSnapshot } from "./offline-snapshot";
 import { isOnlineOnly } from "./live-mode";
 import { useAuth } from "@/lib/pos-auth";
@@ -1889,7 +1889,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     const wanted = [...new Set(ids.filter(Boolean))];
     if (!wanted.length) return;
     try {
-      const { loadProductsByIds } = await import("./pos-db");
+      const { loadProductsByIds } = await import("@/core/api/pos-db");
       const fresh = await loadProductsByIds(wanted);
       if (!fresh.length) return;
       const byId = new Map(fresh.map((p) => [p.id, p]));

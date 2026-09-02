@@ -10,7 +10,7 @@
  * tills actually write to.
  */
 import { COMPARE_TABLES, type CompareKey, type CompareSide } from "./data-compare";
-import { serviceRest } from "./pos-relay.server";
+import { serviceRest } from "@/core/api/pos-relay.server";
 
 const specFor = (table: string) => COMPARE_TABLES.find((t) => t.table === table) ?? null;
 

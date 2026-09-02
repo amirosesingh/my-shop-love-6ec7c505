@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
+import { SettingsFrame } from "@/platforms/web/components/pos/settings/SettingsFrame";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/select";
 import { usePos } from "@/lib/pos-store";
 import { TIME_ZONES, effectiveTimeZone, formatDateTime } from "@/lib/time-zone";
-import type { DateFormat, TimeFormat } from "@/lib/pos-types";
+import type { DateFormat, TimeFormat } from "@/core/types/pos-types";
 
 /** Countries the shop is likely to trade in, with a sensible default zone. */
 const COUNTRIES: { code: string; name: string; zone: string }[] = [

@@ -3,8 +3,8 @@ import { useState } from "react";
 import { BadgeCheck, History, Plus, Printer, Search, ShieldCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { notifyError } from "@/lib/notify";
-import { ThemedSelect } from "@/components/pos/ThemedSelect";
-import { AppShell } from "@/components/pos/AppShell";
+import { ThemedSelect } from "@/platforms/web/components/pos/ThemedSelect";
+import { AppShell } from "@/platforms/web/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,10 +17,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { money, usePos } from "@/lib/pos-store";
-import type { Member } from "@/lib/pos-types";
+import type { Member } from "@/core/types/pos-types";
 import { printMemberStatement } from "@/lib/pos-print";
-import { MemberHistoryDialog } from "@/components/pos/MemberHistoryDialog";
-import { OtpVerificationModal } from "@/components/pos/OtpVerificationModal";
+import { MemberHistoryDialog } from "@/platforms/web/components/pos/MemberHistoryDialog";
+import { OtpVerificationModal } from "@/platforms/web/components/pos/OtpVerificationModal";
 import { useVerificationGateway } from "@/lib/verification-gateway";
 
 export const Route = createFileRoute("/members")({

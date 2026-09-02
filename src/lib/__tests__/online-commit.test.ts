@@ -17,7 +17,7 @@ vi.mock("@/core/local-db/local-db", () => ({
   readBranch: () => ({ branchId: null, branchName: null }),
 }));
 
-import { commitOps, db } from "@/lib/pos-db";
+import { commitOps, db } from "@/core/api/pos-db";
 import { setPreferredDatabaseMode } from "@/core/local-db/db-mode";
 
 const ops = [{ kind: "insert", table: "sales", rows: [{ id: "s1" }] }] as never;

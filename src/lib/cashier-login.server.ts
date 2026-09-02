@@ -6,7 +6,7 @@
  * on success, a device session is opened and its raw token returned once.
  */
 import { signCashierSession } from "./pos-session.server";
-import { serviceRest } from "./pos-relay.server";
+import { serviceRest } from "@/core/api/pos-relay.server";
 import { startSession } from "./session-guard.server";
 import { writeSystemAudit } from "./system-audit.server";
 

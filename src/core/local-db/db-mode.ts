@@ -10,7 +10,7 @@
  * the till returns to online working the moment the internet is back.
  */
 import { isOnlineOnly } from "@/lib/live-mode";
-import { isElectron } from "@/platform-config/platform";
+import { hasFeature } from "@/platform-config/features";
 
 export type DatabaseMode = "online" | "local";
 
@@ -43,7 +43,7 @@ export function subscribeDatabaseMode(listener: Listener) {
  * local-first and reconciles in the background. The browser console has no
  * local database engine, so it stays online-first with local failover.
  */
-export const defaultDatabaseMode = (): DatabaseMode => (isElectron() ? "local" : "online");
+export const defaultDatabaseMode = (): DatabaseMode => (hasFeature("localDb") ? "local" : "online");
 
 /** The mode the operator picked (ignoring any temporary failover). */
 export function preferredDatabaseMode(): DatabaseMode {

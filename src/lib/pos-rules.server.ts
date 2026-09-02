@@ -73,7 +73,7 @@ export async function rpc<T>(name: string, body: unknown, accessToken?: string):
       body: payload,
     });
   } else {
-    const { serviceRest } = await import("./pos-relay.server");
+    const { serviceRest } = await import("@/core/api/pos-relay.server");
     res = await serviceRest(`rpc/${name}`, { method: "POST", body: payload });
   }
   if (!res.ok) throw new Error((await res.text()) || `${name} failed`);
@@ -117,7 +117,7 @@ export async function saveRules(
   // routine re-checks for a signed-in supervisor, which the service role is
   // not, so the branch row is written directly with service rights.
   try {
-    const { serviceRest } = await import("./pos-relay.server");
+    const { serviceRest } = await import("@/core/api/pos-relay.server");
     const res = await serviceRest("pos_store_settings?on_conflict=store_id", {
       method: "POST",
       body: JSON.stringify([{ store_id: storeId || "", ...patch }]),
