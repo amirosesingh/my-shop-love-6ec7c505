@@ -33,6 +33,8 @@ import { StatusHistoryList } from "@/components/pos/StatusHistoryDialog";
 import { usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
 import { TRANSFER_STATUS_LABELS } from "@/lib/pos-types";
+import { exactCodeMatch } from "@/lib/product-search";
+
 
 export const Route = createFileRoute("/receiving/$id")({
   head: () => ({
