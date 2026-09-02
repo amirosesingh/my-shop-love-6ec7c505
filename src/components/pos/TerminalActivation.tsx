@@ -126,7 +126,7 @@ export function TerminalActivation({
   }, [pairing, onActivated]);
 
   return (
-    <Frame>
+    <Frame bare={embedded}>
       <div className="flex items-center gap-3">
         <div className="flex size-11 items-center justify-center rounded-xl bg-sky-500/15 text-sky-400 ring-1 ring-sky-500/40">
           <ShieldCheck className="size-6" />
