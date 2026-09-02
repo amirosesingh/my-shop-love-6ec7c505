@@ -38,7 +38,21 @@ export function RebuildCheck() {
 
   useEffect(refresh, [refresh]);
 
-  if (!bridge?.restoreVerify) return null;
+  // Rebuilding needs a local database to rebuild into, which only the Windows
+  // till has. Say so rather than hiding the feature on phones and the web.
+  if (!bridge?.restoreVerify) {
+    return (
+      <section className="rounded-lg border border-border bg-card p-4">
+        <h2 className="flex items-center gap-2 text-sm font-semibold">
+          <ClipboardCheck className="size-4 text-primary" /> Rebuild check & restore drill
+        </h2>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Available on the Windows till only — it compares and restores that machine's local
+          database. This device reads straight from head office, so there is nothing to rebuild.
+        </p>
+      </section>
+    );
+  }
 
   const runCheck = async () => {
     setChecking(true);

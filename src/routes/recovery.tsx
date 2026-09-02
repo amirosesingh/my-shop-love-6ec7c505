@@ -13,10 +13,11 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { LifeBuoy, ArrowLeft, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { BackendAddressPanel } from "@/components/pos/settings/panels/BackendAddressPanel";
-import { CloudConnectionPanel } from "@/components/pos/settings/panels/CloudConnectionPanel";
+import { RecoveryHub } from "@/components/pos/RecoveryHub";
 import { EmergencyPinGate } from "@/components/pos/EmergencyPinGate";
 import { heartbeat } from "@/lib/connection-health";
+import { APP_VERSION } from "@/version";
+
 
 
 export const Route = createFileRoute("/recovery")({
@@ -60,13 +61,13 @@ function RecoverySettings() {
           Emergency access
         </h1>
         <p className="text-sm text-muted-foreground">
-          This screen works without a connection. Correct the addresses below, test them, then
+          This screen works without a connection. Everything a terminal needs to come back online is
+          here — activation, addresses, keys, database and hardware. Open a card to fix it, then
           return to the till.
         </p>
       </header>
 
-      <BackendAddressPanel />
-      <CloudConnectionPanel />
+      <RecoveryHub />
 
       <div className="flex flex-wrap gap-2 pt-2">
         <Button
@@ -83,6 +84,10 @@ function RecoverySettings() {
           Back to the till
         </Button>
       </div>
+
+      <p className="pt-1 text-center text-[11px] text-muted-foreground">
+        Northwind POS v{APP_VERSION}
+      </p>
     </main>
   );
 }

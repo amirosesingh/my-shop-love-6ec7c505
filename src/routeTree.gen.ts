@@ -42,6 +42,7 @@ import { Route as CTokenSlugRouteImport } from './routes/c.$tokenSlug'
 import { Route as ClaimCampaignSlugRouteImport } from './routes/claim.$campaignSlug'
 import { Route as PosGeneralBookingRouteImport } from './routes/pos.general-booking'
 import { Route as PosRacketServiceRouteImport } from './routes/pos.racket-service'
+import { Route as ReceivingIndexRouteImport } from './routes/receiving.index'
 import { Route as ReceivingIdRouteImport } from './routes/receiving.$id'
 import { Route as ReportsIndexRouteImport } from './routes/reports.index'
 import { Route as ReportsActivityRouteImport } from './routes/reports.activity'
@@ -56,6 +57,7 @@ import { Route as ReportsPaymentsRouteImport } from './routes/reports.payments'
 import { Route as ReportsSalesRouteImport } from './routes/reports.sales'
 import { Route as ReportsStockRouteImport } from './routes/reports.stock'
 import { Route as ReportsVoidsRouteImport } from './routes/reports.voids'
+import { Route as RequestsIndexRouteImport } from './routes/requests.index'
 import { Route as RequestsIdRouteImport } from './routes/requests.$id'
 import { Route as RequestsNewRouteImport } from './routes/requests.new'
 import { Route as SettingsIndexRouteImport } from './routes/settings.index'
@@ -278,6 +280,11 @@ const PosRacketServiceRoute = PosRacketServiceRouteImport.update({
   path: '/pos/racket-service',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReceivingIndexRoute = ReceivingIndexRouteImport.update({
+  id: '/receiving/',
+  path: '/receiving/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReceivingIdRoute = ReceivingIdRouteImport.update({
   id: '/receiving/$id',
   path: '/receiving/$id',
@@ -346,6 +353,11 @@ const ReportsStockRoute = ReportsStockRouteImport.update({
 const ReportsVoidsRoute = ReportsVoidsRouteImport.update({
   id: '/reports/voids',
   path: '/reports/voids',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RequestsIndexRoute = RequestsIndexRouteImport.update({
+  id: '/requests/',
+  path: '/requests/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RequestsIdRoute = RequestsIdRouteImport.update({
@@ -722,7 +734,9 @@ export interface FileRoutesByFullPath {
   '/settings/whatsapp': typeof SettingsWhatsappRoute
   '/transfers/$id': typeof TransfersIdRoute
   '/transfers/new': typeof TransfersNewRoute
+  '/receiving/': typeof ReceivingIndexRoute
   '/reports/': typeof ReportsIndexRoute
+  '/requests/': typeof RequestsIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/transfers/': typeof TransfersIndexRoute
   '/api/public/cashier-login': typeof ApiPublicCashierLoginRoute
@@ -827,7 +841,9 @@ export interface FileRoutesByTo {
   '/settings/whatsapp': typeof SettingsWhatsappRoute
   '/transfers/$id': typeof TransfersIdRoute
   '/transfers/new': typeof TransfersNewRoute
+  '/receiving': typeof ReceivingIndexRoute
   '/reports': typeof ReportsIndexRoute
+  '/requests': typeof RequestsIndexRoute
   '/settings': typeof SettingsIndexRoute
   '/transfers': typeof TransfersIndexRoute
   '/api/public/cashier-login': typeof ApiPublicCashierLoginRoute
@@ -933,7 +949,9 @@ export interface FileRoutesById {
   '/settings/whatsapp': typeof SettingsWhatsappRoute
   '/transfers/$id': typeof TransfersIdRoute
   '/transfers/new': typeof TransfersNewRoute
+  '/receiving/': typeof ReceivingIndexRoute
   '/reports/': typeof ReportsIndexRoute
+  '/requests/': typeof RequestsIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/transfers/': typeof TransfersIndexRoute
   '/api/public/cashier-login': typeof ApiPublicCashierLoginRoute
@@ -1040,7 +1058,9 @@ export interface FileRouteTypes {
     | '/settings/whatsapp'
     | '/transfers/$id'
     | '/transfers/new'
+    | '/receiving/'
     | '/reports/'
+    | '/requests/'
     | '/settings/'
     | '/transfers/'
     | '/api/public/cashier-login'
@@ -1145,7 +1165,9 @@ export interface FileRouteTypes {
     | '/settings/whatsapp'
     | '/transfers/$id'
     | '/transfers/new'
+    | '/receiving'
     | '/reports'
+    | '/requests'
     | '/settings'
     | '/transfers'
     | '/api/public/cashier-login'
@@ -1250,7 +1272,9 @@ export interface FileRouteTypes {
     | '/settings/whatsapp'
     | '/transfers/$id'
     | '/transfers/new'
+    | '/receiving/'
     | '/reports/'
+    | '/requests/'
     | '/settings/'
     | '/transfers/'
     | '/api/public/cashier-login'
@@ -1356,7 +1380,9 @@ export interface RootRouteChildren {
   SettingsWhatsappRoute: typeof SettingsWhatsappRoute
   TransfersIdRoute: typeof TransfersIdRoute
   TransfersNewRoute: typeof TransfersNewRoute
+  ReceivingIndexRoute: typeof ReceivingIndexRoute
   ReportsIndexRoute: typeof ReportsIndexRoute
+  RequestsIndexRoute: typeof RequestsIndexRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
   TransfersIndexRoute: typeof TransfersIndexRoute
   ApiPublicCashierLoginRoute: typeof ApiPublicCashierLoginRoute
@@ -1601,6 +1627,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PosRacketServiceRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/receiving/': {
+      id: '/receiving/'
+      path: '/receiving'
+      fullPath: '/receiving/'
+      preLoaderRoute: typeof ReceivingIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/receiving/$id': {
       id: '/receiving/$id'
       path: '/receiving/$id'
@@ -1697,6 +1730,13 @@ declare module '@tanstack/react-router' {
       path: '/reports/voids'
       fullPath: '/reports/voids'
       preLoaderRoute: typeof ReportsVoidsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/requests/': {
+      id: '/requests/'
+      path: '/requests'
+      fullPath: '/requests/'
+      preLoaderRoute: typeof RequestsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/requests/$id': {
@@ -2200,7 +2240,9 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsWhatsappRoute: SettingsWhatsappRoute,
   TransfersIdRoute: TransfersIdRoute,
   TransfersNewRoute: TransfersNewRoute,
+  ReceivingIndexRoute: ReceivingIndexRoute,
   ReportsIndexRoute: ReportsIndexRoute,
+  RequestsIndexRoute: RequestsIndexRoute,
   SettingsIndexRoute: SettingsIndexRoute,
   TransfersIndexRoute: TransfersIndexRoute,
   ApiPublicCashierLoginRoute: ApiPublicCashierLoginRoute,
