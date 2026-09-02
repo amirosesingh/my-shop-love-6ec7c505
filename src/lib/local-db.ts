@@ -391,10 +391,6 @@ export type LocalSyncStatus = {
 };
 
 export type PosBridge = {
-  /** Verify a time-based emergency recovery code in the main process. */
-  verifyEmergencyPin?: (pin: string) => Promise<{ ok: boolean }>;
-  /** Non-secret fingerprint of the sealed device secret. */
-  emergencyFingerprint?: () => Promise<{ fingerprint: string }>;
   /** Persist one operation to local SQL Server. Resolves once committed. */
   write: (context: string, op: SyncOp) => Promise<{ ok: boolean; error?: string }>;
   /** Persist a related operation set in one SQL transaction. */
