@@ -90,3 +90,27 @@ export function clearDeviceSecret(name: string): void {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(PREFIX + name);
 }
+
+let macPromise: Promise<CryptoKey> | null = null;
+
+const macKey = () => {
+  if (!macPromise) {
+    macPromise = subtle().importKey(
+      "raw",
+      deviceKeyMaterial() as BufferSource,
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"],
+    );
+  }
+  return macPromise;
+};
+
+/**
+ * Sign a string with this device's key. Used to make small local records
+ * tamper-evident: editing the stored fields by hand invalidates the tag.
+ */
+export async function deviceHmac(payload: string): Promise<string> {
+  const sig = new Uint8Array(await subtle().sign("HMAC", await macKey(), enc.encode(payload)));
+  return toB64(sig);
+}
