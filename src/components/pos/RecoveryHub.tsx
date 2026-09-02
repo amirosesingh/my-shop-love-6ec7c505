@@ -19,7 +19,6 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { BackendAddressPanel } from "@/components/pos/settings/panels/BackendAddressPanel";
 import { CloudConnectionPanel } from "@/components/pos/settings/panels/CloudConnectionPanel";
 import { LocalDatabaseSettings } from "@/components/pos/LocalDatabaseSettings";
@@ -207,9 +206,4 @@ export function RecoveryHub() {
       </Card>
     </div>
   );
-}
-
-/** Small helper the recovery page uses for its footer actions. */
-export function RecoveryFooterButton(props: React.ComponentProps<typeof Button>) {
-  return <Button {...props} />;
 }
