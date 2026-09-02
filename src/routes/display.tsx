@@ -140,6 +140,10 @@ function CustomerDisplay() {
               <p className="mt-2 text-muted-foreground">
                 Your items will appear here as they are scanned.
               </p>
+              <p className="mt-6 max-w-md text-xs text-muted-foreground/80">
+                This is the customer-facing screen. It is meant for a second display or tablet next
+                to the till — on the same device as the register it will simply mirror the basket.
+              </p>
             </div>
           ) : (
             <ul className="min-h-0 flex-1 space-y-2 overflow-auto pr-2">
