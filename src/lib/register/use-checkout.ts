@@ -456,11 +456,32 @@ export function useCheckout(deps: CheckoutDeps) {
           : {}),
       });
     } catch (e) {
-      toast.error("Payment was not saved", {
-        description:
-          (e as { message?: string })?.message ?? "Nothing was stored, so the ticket is untouched — try again.",
-      });
+      // The sale header may already be committed even though a later step
+      // failed. Never tell the cashier "nothing was stored" in that case —
+      // it invites a second collection of the same payment.
+      const stored = attemptId.current
+        ? await db.saleAttemptExists(attemptId.current).catch(() => "unknown" as const)
+        : ("no" as const);
+      if (stored === "yes") {
+        toast.warning("The sale is stored, but finishing it failed", {
+          description:
+            "Do not take payment again. The bill is saved and will reconcile; reprint the receipt from Sales if needed.",
+        });
+      } else if (stored === "unknown") {
+        toast.error("Could not confirm whether the payment was saved", {
+          description:
+            (e as { message?: string })?.message ??
+            "Check Sales for this bill before taking payment again.",
+        });
+      } else {
+        toast.error("Payment was not saved", {
+          description:
+            (e as { message?: string })?.message ??
+            "Nothing was stored, so the ticket is untouched — try again.",
+        });
+      }
       return;
+
     } finally {
       setSaving(false);
     }
