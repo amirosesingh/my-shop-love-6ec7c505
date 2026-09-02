@@ -42,6 +42,7 @@ import { Route as CTokenSlugRouteImport } from './routes/c.$tokenSlug'
 import { Route as ClaimCampaignSlugRouteImport } from './routes/claim.$campaignSlug'
 import { Route as PosGeneralBookingRouteImport } from './routes/pos.general-booking'
 import { Route as PosRacketServiceRouteImport } from './routes/pos.racket-service'
+import { Route as ReceivingIndexRouteImport } from './routes/receiving.index'
 import { Route as ReceivingIdRouteImport } from './routes/receiving.$id'
 import { Route as ReportsIndexRouteImport } from './routes/reports.index'
 import { Route as ReportsActivityRouteImport } from './routes/reports.activity'
@@ -277,6 +278,11 @@ const PosGeneralBookingRoute = PosGeneralBookingRouteImport.update({
 const PosRacketServiceRoute = PosRacketServiceRouteImport.update({
   id: '/pos/racket-service',
   path: '/pos/racket-service',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReceivingIndexRoute = ReceivingIndexRouteImport.update({
+  id: '/receiving/',
+  path: '/receiving/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReceivingIdRoute = ReceivingIdRouteImport.update({
@@ -728,6 +734,7 @@ export interface FileRoutesByFullPath {
   '/settings/whatsapp': typeof SettingsWhatsappRoute
   '/transfers/$id': typeof TransfersIdRoute
   '/transfers/new': typeof TransfersNewRoute
+  '/receiving/': typeof ReceivingIndexRoute
   '/reports/': typeof ReportsIndexRoute
   '/requests/': typeof RequestsIndexRoute
   '/settings/': typeof SettingsIndexRoute
@@ -834,6 +841,7 @@ export interface FileRoutesByTo {
   '/settings/whatsapp': typeof SettingsWhatsappRoute
   '/transfers/$id': typeof TransfersIdRoute
   '/transfers/new': typeof TransfersNewRoute
+  '/receiving': typeof ReceivingIndexRoute
   '/reports': typeof ReportsIndexRoute
   '/requests': typeof RequestsIndexRoute
   '/settings': typeof SettingsIndexRoute
@@ -941,6 +949,7 @@ export interface FileRoutesById {
   '/settings/whatsapp': typeof SettingsWhatsappRoute
   '/transfers/$id': typeof TransfersIdRoute
   '/transfers/new': typeof TransfersNewRoute
+  '/receiving/': typeof ReceivingIndexRoute
   '/reports/': typeof ReportsIndexRoute
   '/requests/': typeof RequestsIndexRoute
   '/settings/': typeof SettingsIndexRoute
@@ -1049,6 +1058,7 @@ export interface FileRouteTypes {
     | '/settings/whatsapp'
     | '/transfers/$id'
     | '/transfers/new'
+    | '/receiving/'
     | '/reports/'
     | '/requests/'
     | '/settings/'
@@ -1155,6 +1165,7 @@ export interface FileRouteTypes {
     | '/settings/whatsapp'
     | '/transfers/$id'
     | '/transfers/new'
+    | '/receiving'
     | '/reports'
     | '/requests'
     | '/settings'
@@ -1261,6 +1272,7 @@ export interface FileRouteTypes {
     | '/settings/whatsapp'
     | '/transfers/$id'
     | '/transfers/new'
+    | '/receiving/'
     | '/reports/'
     | '/requests/'
     | '/settings/'
@@ -1368,6 +1380,7 @@ export interface RootRouteChildren {
   SettingsWhatsappRoute: typeof SettingsWhatsappRoute
   TransfersIdRoute: typeof TransfersIdRoute
   TransfersNewRoute: typeof TransfersNewRoute
+  ReceivingIndexRoute: typeof ReceivingIndexRoute
   ReportsIndexRoute: typeof ReportsIndexRoute
   RequestsIndexRoute: typeof RequestsIndexRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
@@ -1612,6 +1625,13 @@ declare module '@tanstack/react-router' {
       path: '/pos/racket-service'
       fullPath: '/pos/racket-service'
       preLoaderRoute: typeof PosRacketServiceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/receiving/': {
+      id: '/receiving/'
+      path: '/receiving'
+      fullPath: '/receiving/'
+      preLoaderRoute: typeof ReceivingIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/receiving/$id': {
@@ -2220,6 +2240,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsWhatsappRoute: SettingsWhatsappRoute,
   TransfersIdRoute: TransfersIdRoute,
   TransfersNewRoute: TransfersNewRoute,
+  ReceivingIndexRoute: ReceivingIndexRoute,
   ReportsIndexRoute: ReportsIndexRoute,
   RequestsIndexRoute: RequestsIndexRoute,
   SettingsIndexRoute: SettingsIndexRoute,
