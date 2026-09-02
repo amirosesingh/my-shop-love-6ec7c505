@@ -14,7 +14,7 @@ import { buildBookingMessage, buildSaleMessage, sendBillOnWhatsApp } from "@/lib
 import { logger } from "@/lib/audit-log";
 import { redeemVoucher } from "@/lib/coupons";
 import { publishDisplay, type DisplaySnapshot } from "@/lib/customer-display";
-import { rememberBanks } from "@/components/pos/TenderSplit";
+import { rememberBanks } from "@/platforms/web/components/pos/TenderSplit";
 import { isoDaysFromNow } from "@/lib/register/use-booking-intake";
 import type { useBookingIntake } from "@/lib/register/use-booking-intake";
 import { cartTotals, money, usePos } from "@/lib/pos-store";

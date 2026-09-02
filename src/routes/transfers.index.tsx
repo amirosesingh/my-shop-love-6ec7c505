@@ -9,7 +9,7 @@ import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { ArrowLeftRight, ClipboardCheck, Eye, Printer, Send } from "lucide-react";
 import { scopeBetween } from "@/lib/stock-transfers";
-import { AppShell } from "@/components/pos/AppShell";
+import { AppShell } from "@/platforms/web/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -25,7 +25,7 @@ import { usePos } from "@/lib/pos-store";
 import { printTransferNote } from "@/lib/pos-print";
 import type { Transfer, TransferKind } from "@/core/types/pos-types";
 import { TRANSFER_STATUS_LABELS } from "@/core/types/pos-types";
-import { fulfilmentLabel, statusStyle } from "@/components/pos/TransferWorkspace";
+import { fulfilmentLabel, statusStyle } from "@/platforms/web/components/pos/TransferWorkspace";
 
 type TransferSearch = { items?: string; kind?: TransferKind };
 

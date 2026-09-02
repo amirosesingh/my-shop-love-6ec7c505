@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { AppShell } from "@/components/pos/AppShell";
+import { AppShell } from "@/platforms/web/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,8 +28,8 @@ import {
   WorkspaceHeader,
   useTransferRecord,
   when,
-} from "@/components/pos/TransferWorkspace";
-import { StatusHistoryList } from "@/components/pos/StatusHistoryDialog";
+} from "@/platforms/web/components/pos/TransferWorkspace";
+import { StatusHistoryList } from "@/platforms/web/components/pos/StatusHistoryDialog";
 import { usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
 import { TRANSFER_STATUS_LABELS } from "@/core/types/pos-types";

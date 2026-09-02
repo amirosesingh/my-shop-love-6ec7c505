@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
-import { TerminalTokens } from "@/components/pos/TerminalTokens";
+import { SettingsFrame } from "@/platforms/web/components/pos/settings/SettingsFrame";
+import { TerminalTokens } from "@/platforms/web/components/pos/TerminalTokens";
 
 export const Route = createFileRoute("/settings/terminals")({
   head: () => ({

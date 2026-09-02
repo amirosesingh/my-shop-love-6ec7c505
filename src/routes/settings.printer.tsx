@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SettingsTabs } from "@/components/pos/settings/SettingsTabs";
-import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
-import { ReceiptPrinterSettings } from "@/components/pos/ReceiptPrinterSettings";
+import { SettingsTabs } from "@/platforms/web/components/pos/settings/SettingsTabs";
+import { SettingsFrame } from "@/platforms/web/components/pos/settings/SettingsFrame";
+import { ReceiptPrinterSettings } from "@/platforms/web/components/pos/ReceiptPrinterSettings";
 
 export const Route = createFileRoute("/settings/printer")({
   head: () => ({

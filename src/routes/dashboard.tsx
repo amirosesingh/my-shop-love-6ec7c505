@@ -12,7 +12,7 @@ import {
   YAxis,
 } from "recharts";
 import { AlertTriangle } from "lucide-react";
-import { AppShell } from "@/components/pos/AppShell";
+import { AppShell } from "@/platforms/web/components/pos/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {

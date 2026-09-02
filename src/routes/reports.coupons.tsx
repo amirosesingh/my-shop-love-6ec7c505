@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { AppShell } from "@/components/pos/AppShell";
+import { AppShell } from "@/platforms/web/components/pos/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { ThemedSelect } from "@/components/pos/ThemedSelect";
+import { ThemedSelect } from "@/platforms/web/components/pos/ThemedSelect";
 import {
   Table,
   TableBody,
@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { TablePagination, usePagination } from "@/components/pos/TablePagination";
+import { TablePagination, usePagination } from "@/platforms/web/components/pos/TablePagination";
 import { money, usePos } from "@/lib/pos-store";
 import { useAuditLogs } from "@/lib/audit-log";
 import {
@@ -24,7 +24,7 @@ import {
   downloadCsv,
   inRange,
   stamp,
-} from "@/components/pos/report-kit";
+} from "@/platforms/web/components/pos/report-kit";
 
 export const Route = createFileRoute("/reports/coupons")({
   head: () => ({

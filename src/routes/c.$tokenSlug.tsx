@@ -10,7 +10,7 @@ import {
 } from "@/lib/coupons";
 import { voucherUrl } from "@/lib/coupon-hosts";
 import { usePublicFlags } from "@/lib/public-flags";
-import { PublicPageClosed } from "@/components/pos/PublicPageClosed";
+import { PublicPageClosed } from "@/platforms/web/components/pos/PublicPageClosed";
 
 export const Route = createFileRoute("/c/$tokenSlug")({
   head: () => ({

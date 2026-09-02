@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Download, RefreshCw } from "lucide-react";
-import { AppShell } from "@/components/pos/AppShell";
+import { AppShell } from "@/platforms/web/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ThemedSelect } from "@/components/pos/ThemedSelect";
+import { ThemedSelect } from "@/platforms/web/components/pos/ThemedSelect";
 import {
   Table,
   TableBody,
@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { TablePagination, usePagination } from "@/components/pos/TablePagination";
+import { TablePagination, usePagination } from "@/platforms/web/components/pos/TablePagination";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/pos-auth";
 import {

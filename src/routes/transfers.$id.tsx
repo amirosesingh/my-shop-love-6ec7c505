@@ -7,7 +7,7 @@ import { useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Check, PackageCheck, Send, X } from "lucide-react";
 import { toast } from "sonner";
-import { AppShell } from "@/components/pos/AppShell";
+import { AppShell } from "@/platforms/web/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
 import {
   Fact,
@@ -17,10 +17,10 @@ import {
   WorkspaceHeader,
   useTransferRecord,
   when,
-} from "@/components/pos/TransferWorkspace";
-import { StatusHistoryList } from "@/components/pos/StatusHistoryDialog";
-import { TransferStepDialog, TransferReasonDialog } from "@/components/pos/TransferStepDialog";
-import type { TransferStep } from "@/components/pos/TransferStepDialog";
+} from "@/platforms/web/components/pos/TransferWorkspace";
+import { StatusHistoryList } from "@/platforms/web/components/pos/StatusHistoryDialog";
+import { TransferStepDialog, TransferReasonDialog } from "@/platforms/web/components/pos/TransferStepDialog";
+import type { TransferStep } from "@/platforms/web/components/pos/TransferStepDialog";
 import { usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
 import { groupOf } from "@/lib/stock-transfers";

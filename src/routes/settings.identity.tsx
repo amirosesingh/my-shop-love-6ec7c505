@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SettingsFrame, useSettingsCtx } from "@/components/pos/settings/SettingsFrame";
+import { SettingsFrame, useSettingsCtx } from "@/platforms/web/components/pos/settings/SettingsFrame";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";

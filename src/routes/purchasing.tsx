@@ -24,7 +24,7 @@ import {
 } from "@/lib/record-edit-flow";
 import { notifyError } from "@/lib/notify";
 import * as XLSX from "xlsx";
-import { AppShell } from "@/components/pos/AppShell";
+import { AppShell } from "@/platforms/web/components/pos/AppShell";
 import {
   db,
   invoiceNumberTaken,
@@ -53,7 +53,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { money, stockAt, usePos } from "@/lib/pos-store";
-import { ThemedSelect } from "@/components/pos/ThemedSelect";
+import { ThemedSelect } from "@/platforms/web/components/pos/ThemedSelect";
 import {
   groupList,
   subCategoryList,
@@ -64,7 +64,7 @@ import { resolveByBarcode } from "@/lib/product-lookup";
 import { centralHub, locationPath, primarySub, routingTargets } from "@/lib/locations";
 import { Badge } from "@/components/ui/badge";
 import { canEditPosted, nextStockRef } from "@/lib/stock-ref";
-import { ReceivingRecordView } from "@/components/pos/ReceivingRecordView";
+import { ReceivingRecordView } from "@/platforms/web/components/pos/ReceivingRecordView";
 
 /** Sentinel for "no value picked" — Radix selects cannot hold an empty value. */
 const PO_NONE = "__none";

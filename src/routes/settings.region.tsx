@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
+import { SettingsFrame } from "@/platforms/web/components/pos/settings/SettingsFrame";
 import { Label } from "@/components/ui/label";
 import {
   Select,

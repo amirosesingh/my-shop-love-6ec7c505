@@ -42,18 +42,18 @@ import {
 import { toast } from "sonner";
 import { notifyError } from "@/lib/notify";
 import { commitLabel } from "@/core/api/pos-db";
-import { AppShell } from "@/components/pos/AppShell";
-import { ActionButton } from "@/components/pos/ActionButton";
-import { CatalogPanel } from "@/components/pos/CatalogPanel";
-import { ColumnResizer, usePanelWidth } from "@/components/pos/ColumnResizer";
-import { ProductSearchDialog } from "@/components/pos/ProductSearchDialog";
-import { ScanBar } from "@/components/pos/ScanBar";
-import { BookingCartPanel } from "@/components/pos/booking/BookingCartPanel";
-import { QuickMemberDialog } from "@/components/pos/QuickMemberDialog";
-import { RegisterWorkspace } from "@/components/pos/layout/RegisterWorkspace";
+import { AppShell } from "@/platforms/web/components/pos/AppShell";
+import { ActionButton } from "@/platforms/web/components/pos/ActionButton";
+import { CatalogPanel } from "@/platforms/web/components/pos/CatalogPanel";
+import { ColumnResizer, usePanelWidth } from "@/platforms/web/components/pos/ColumnResizer";
+import { ProductSearchDialog } from "@/platforms/web/components/pos/ProductSearchDialog";
+import { ScanBar } from "@/platforms/web/components/pos/ScanBar";
+import { BookingCartPanel } from "@/platforms/web/components/pos/booking/BookingCartPanel";
+import { QuickMemberDialog } from "@/platforms/web/components/pos/QuickMemberDialog";
+import { RegisterWorkspace } from "@/platforms/web/components/pos/layout/RegisterWorkspace";
 import { RegisterActionsProvider, type ActionHandlers } from "@/lib/register-actions";
 import { readTerminalConfig } from "@/core/activation/terminal-tokens";
-import { ZoomCanvas } from "@/components/pos/ZoomCanvas";
+import { ZoomCanvas } from "@/platforms/web/components/pos/ZoomCanvas";
 import { setTicketDirty } from "@/platforms/windows/desktop-window";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -70,7 +70,7 @@ import { resolveByBarcode } from "@/lib/product-lookup";
 import { reserveBillNumber } from "@/lib/bill-number";
 import { useAuth } from "@/lib/pos-auth";
 import { productVisibleAt } from "@/lib/branch-policy";
-import { ThemedSelect } from "@/components/pos/ThemedSelect";
+import { ThemedSelect } from "@/platforms/web/components/pos/ThemedSelect";
 import { BOOKING_TIMING_LABELS, bookingRulesOf, type BookingPaymentTiming } from "@/core/types/pos-types";
 import { useUserPermissions } from "@/lib/pos-permissions";
 import { useVisibility } from "@/lib/ui-visibility";
@@ -83,13 +83,13 @@ import {
 import type { Booking, CartLine, DiscountType, IntakeCharge, PaymentMethod, Sale } from "@/core/types/pos-types";
 import { applyCombo, intakeTotals, newJobTag } from "@/lib/booking-charges";
 import type { Payment } from "@/core/types/pos-types";
-import { TenderSplit } from "@/components/pos/TenderSplit";
+import { TenderSplit } from "@/platforms/web/components/pos/TenderSplit";
 import { lineUnitDiscount, methodLabel, paymentsLabel, paymentsTotal, PAYMENT_LABELS, r2, validateTenders } from "@/core/types/pos-types";
 import { activePaymentTypes, tenderIcon, usePaymentTypes } from "@/core/types/payment-types";
 import { NO_SALE_REASON_MAX, NO_SALE_REASON_MIN, recordNoSale } from "@/lib/drawer-events";
 
 import { logger } from "@/lib/audit-log";
-import { DiscountPad } from "@/components/pos/DiscountPad";
+import { DiscountPad } from "@/platforms/web/components/pos/DiscountPad";
 import { useManagerGate, type GateRequest } from "@/lib/manager-gate";
 import { usePosRules } from "@/lib/pos-rules.tsx";
 import { assertShiftClosable } from "@/lib/pos-rules.functions";
@@ -98,10 +98,10 @@ import { getPosCallerAuth } from "@/lib/pos-caller-auth";
 import { evaluatePromotions, focLine } from "@/lib/pos-promotions";
 import { clearCartDraft, loadCartDraft, saveCartDraft } from "@/lib/cart-draft";
 import { openCashDrawer, printSaleReceipt, printShiftReport, saleReceiptPreview } from "@/lib/pos-print";
-import { ShiftCloseDialog } from "@/components/pos/ShiftCloseDialog";
+import { ShiftCloseDialog } from "@/platforms/web/components/pos/ShiftCloseDialog";
 import { logSystemAction } from "@/lib/system-audit";
 import { openCustomerDisplay, publishDisplay, toDisplayLine, type DisplaySnapshot } from "@/lib/customer-display";
-import { MemberHistoryDialog } from "@/components/pos/MemberHistoryDialog";
+import { MemberHistoryDialog } from "@/platforms/web/components/pos/MemberHistoryDialog";
 
 
 

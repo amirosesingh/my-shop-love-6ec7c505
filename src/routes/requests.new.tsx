@@ -5,9 +5,9 @@
  */
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { AppShell } from "@/components/pos/AppShell";
-import { TransferComposer } from "@/components/pos/TransferComposer";
-import { WorkspaceHeader } from "@/components/pos/TransferWorkspace";
+import { AppShell } from "@/platforms/web/components/pos/AppShell";
+import { TransferComposer } from "@/platforms/web/components/pos/TransferComposer";
+import { WorkspaceHeader } from "@/platforms/web/components/pos/TransferWorkspace";
 import { usePos } from "@/lib/pos-store";
 
 export const Route = createFileRoute("/requests/new")({

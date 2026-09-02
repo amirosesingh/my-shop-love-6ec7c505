@@ -10,7 +10,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Check, Clock3, RefreshCw, X } from "lucide-react";
 import { toast } from "sonner";
 
-import { AppShell } from "@/components/pos/AppShell";
+import { AppShell } from "@/platforms/web/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

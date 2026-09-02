@@ -1,8 +1,8 @@
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Search } from "lucide-react";
-import { AppShell } from "@/components/pos/AppShell";
-import { SettingsSheet } from "@/components/pos/settings/SettingsSheet";
+import { AppShell } from "@/platforms/web/components/pos/AppShell";
+import { SettingsSheet } from "@/platforms/web/components/pos/settings/SettingsSheet";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/pos-auth";
 import { isDesktop } from "@/lib/branding";

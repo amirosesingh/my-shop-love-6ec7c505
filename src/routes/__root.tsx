@@ -18,18 +18,18 @@ import { ManagerGateProvider } from "@/lib/manager-gate";
 import { AuthProvider } from "@/lib/pos-auth";
 import { PermissionsProvider } from "@/lib/pos-permissions";
 import { Toaster } from "../components/ui/sonner";
-import { ErrorNotifier } from "../components/pos/ErrorNotifier";
-import { AuditTracker } from "../components/pos/AuditTracker";
-import { TelemetryAgent } from "../components/pos/TelemetryAgent";
-import { TerminalActivation } from "@/components/pos/TerminalActivation";
+import { ErrorNotifier } from "@/platforms/web/components/pos/ErrorNotifier";
+import { AuditTracker } from "@/platforms/web/components/pos/AuditTracker";
+import { TelemetryAgent } from "@/platforms/web/components/pos/TelemetryAgent";
+import { TerminalActivation } from "@/platforms/web/components/pos/TerminalActivation";
 import { isTerminalApp } from "@/platform-config/platform";
 import { readTerminalConfig } from "@/core/activation/terminal-tokens";
-import { FirstRunSetup } from "../components/pos/FirstRunSetup";
+import { FirstRunSetup } from "@/platforms/web/components/pos/FirstRunSetup";
 import { ThemeProvider, themeBootScript } from "../lib/theme";
 import { publicConfigScript } from "../lib/public-config-script";
-import { NativeBoot } from "../components/pos/NativeBoot";
-import { OfflineGate } from "../components/mobile/OfflineGate";
-import { AndroidUpdateBanner } from "../components/pos/AndroidUpdateBanner";
+import { NativeBoot } from "@/platforms/mobile/components/NativeBoot";
+import { OfflineGate } from "@/platforms/mobile/components/OfflineGate";
+import { AndroidUpdateBanner } from "@/platforms/mobile/components/AndroidUpdateBanner";
 import { usePublicHostLanding } from "../lib/coupon-hosts";
 
 function NotFoundComponent() {

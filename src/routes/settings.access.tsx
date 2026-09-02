@@ -11,7 +11,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Loader2, Lock, RotateCcw, Search } from "lucide-react";
 import { toast } from "sonner";
 
-import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
+import { SettingsFrame } from "@/platforms/web/components/pos/settings/SettingsFrame";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

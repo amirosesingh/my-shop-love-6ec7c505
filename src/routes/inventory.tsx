@@ -12,7 +12,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AppShell } from "@/components/pos/AppShell";
+import { AppShell } from "@/platforms/web/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,15 +39,15 @@ import { useAuth } from "@/lib/pos-auth";
 import { useVisibility } from "@/lib/ui-visibility";
 
 import { productVisibleAt } from "@/lib/branch-policy";
-import { TablePagination, usePagination } from "@/components/pos/TablePagination";
+import { TablePagination, usePagination } from "@/platforms/web/components/pos/TablePagination";
 import { Switch } from "@/components/ui/switch";
-import { BulkImportDialog } from "@/components/pos/BulkImportDialog";
-import { MergeProductsDialog } from "@/components/pos/MergeProductsDialog";
+import { BulkImportDialog } from "@/platforms/web/components/pos/BulkImportDialog";
+import { MergeProductsDialog } from "@/platforms/web/components/pos/MergeProductsDialog";
 import { commitLabel } from "@/core/api/pos-db";
 import { notifyError } from "@/lib/notify";
-import { ProductDeleteBlockedDialog } from "@/components/pos/ProductDeleteBlockedDialog";
+import { ProductDeleteBlockedDialog } from "@/platforms/web/components/pos/ProductDeleteBlockedDialog";
 import type { BlockedDelete } from "@/lib/product-delete";
-import { ThemedSelect } from "@/components/pos/ThemedSelect";
+import { ThemedSelect } from "@/platforms/web/components/pos/ThemedSelect";
 import { exportProductsXlsx } from "@/lib/product-export";
 import {
   groupList,
@@ -58,7 +58,7 @@ import {
 } from "@/lib/catalog-meta";
 import { checkCodeAvailable } from "@/lib/product-lookup";
 
-import { ItemActivityDrawer } from "@/components/pos/ItemActivityDrawer";
+import { ItemActivityDrawer } from "@/platforms/web/components/pos/ItemActivityDrawer";
 import type { Product } from "@/core/types/pos-types";
 import { nextSku, peekSku, readSkuSettings } from "@/lib/sku";
 

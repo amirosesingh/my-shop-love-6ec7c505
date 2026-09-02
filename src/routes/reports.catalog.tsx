@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { AppShell } from "@/components/pos/AppShell";
+import { AppShell } from "@/platforms/web/components/pos/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { TablePagination, usePagination } from "@/components/pos/TablePagination";
+import { TablePagination, usePagination } from "@/platforms/web/components/pos/TablePagination";
 import { useAuditLogs } from "@/lib/audit-log";
 import { describeLog } from "@/lib/audit-format";
 import {
@@ -22,7 +22,7 @@ import {
   downloadCsv,
   inRange,
   stamp,
-} from "@/components/pos/report-kit";
+} from "@/platforms/web/components/pos/report-kit";
 
 export const Route = createFileRoute("/reports/catalog")({
   head: () => ({

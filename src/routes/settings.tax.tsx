@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SettingsTabs } from "@/components/pos/settings/SettingsTabs";
-import { SettingsFrame, useSettingsCtx } from "@/components/pos/settings/SettingsFrame";
+import { SettingsTabs } from "@/platforms/web/components/pos/settings/SettingsTabs";
+import { SettingsFrame, useSettingsCtx } from "@/platforms/web/components/pos/settings/SettingsFrame";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { ThemedSelect } from "@/components/pos/ThemedSelect";
+import { ThemedSelect } from "@/platforms/web/components/pos/ThemedSelect";
 import { usePos } from "@/lib/pos-store";
 import { ROUNDING_UNITS, roundingOf } from "@/core/pricing/rounding";
 import type { TaxMode } from "@/core/types/pos-types";

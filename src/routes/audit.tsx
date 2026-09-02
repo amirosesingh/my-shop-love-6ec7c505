@@ -18,7 +18,7 @@ import {
   Rows3,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AppShell } from "@/components/pos/AppShell";
+import { AppShell } from "@/platforms/web/components/pos/AppShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,7 +58,7 @@ import {
 } from "@/lib/audit-log";
 import { useAuth } from "@/lib/pos-auth";
 import { describeLog } from "@/lib/audit-format";
-import { TablePagination, usePagination } from "@/components/pos/TablePagination";
+import { TablePagination, usePagination } from "@/platforms/web/components/pos/TablePagination";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 export const Route = createFileRoute("/audit")({

@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SettingsTabs } from "@/components/pos/settings/SettingsTabs";
+import { SettingsTabs } from "@/platforms/web/components/pos/settings/SettingsTabs";
 import { Plus, Trash2 } from "lucide-react";
-import { SettingsFrame, useSettingsCtx } from "@/components/pos/settings/SettingsFrame";
-import { ThemedSelect } from "@/components/pos/ThemedSelect";
+import { SettingsFrame, useSettingsCtx } from "@/platforms/web/components/pos/settings/SettingsFrame";
+import { ThemedSelect } from "@/platforms/web/components/pos/ThemedSelect";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ReceiptCustomLine } from "@/core/types/pos-types";

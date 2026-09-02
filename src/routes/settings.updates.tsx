@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
-import { AppUpdateSettings } from "@/components/pos/AppUpdateSettings";
-import { SystemHealthCard } from "@/components/pos/SystemHealthCard";
+import { SettingsFrame } from "@/platforms/web/components/pos/settings/SettingsFrame";
+import { AppUpdateSettings } from "@/platforms/web/components/pos/AppUpdateSettings";
+import { SystemHealthCard } from "@/platforms/web/components/pos/SystemHealthCard";
 
 export const Route = createFileRoute("/settings/updates")({
   head: () => ({

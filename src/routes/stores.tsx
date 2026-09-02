@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Archive, ArchiveRestore, Building2, Layers, Plus, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
-import { AppShell } from "@/components/pos/AppShell";
+import { AppShell } from "@/platforms/web/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/sheet";
 import { usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
-import { ConfirmSwitch } from "@/components/pos/ConfirmSwitch";
+import { ConfirmSwitch } from "@/platforms/web/components/pos/ConfirmSwitch";
 import { BRANCH_POLICY_COPY, branchPolicy, type BranchPolicyKey } from "@/lib/branch-policy";
 import type { BranchPolicy, Store } from "@/core/types/pos-types";
 import {

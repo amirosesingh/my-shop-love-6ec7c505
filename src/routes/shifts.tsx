@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Printer, RotateCcw, Users, Vault } from "lucide-react";
 import { toast } from "sonner";
-import { AppShell } from "@/components/pos/AppShell";
+import { AppShell } from "@/platforms/web/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,7 +39,7 @@ import { getPosCallerAuth } from "@/lib/pos-caller-auth";
 import { assertShiftClosable } from "@/lib/pos-rules.functions";
 import { usePosRules } from "@/lib/pos-rules.tsx";
 import { useManagerGate } from "@/lib/manager-gate";
-import { ShiftCloseDialog } from "@/components/pos/ShiftCloseDialog";
+import { ShiftCloseDialog } from "@/platforms/web/components/pos/ShiftCloseDialog";
 import { logSystemAction } from "@/lib/system-audit";
 
 export const Route = createFileRoute("/shifts")({

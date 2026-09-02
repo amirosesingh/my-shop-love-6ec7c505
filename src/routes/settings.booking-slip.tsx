@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SettingsTabs } from "@/components/pos/settings/SettingsTabs";
-import { SettingsFrame, useSettingsCtx } from "@/components/pos/settings/SettingsFrame";
+import { SettingsTabs } from "@/platforms/web/components/pos/settings/SettingsTabs";
+import { SettingsFrame, useSettingsCtx } from "@/platforms/web/components/pos/settings/SettingsFrame";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SettingsTabs } from "@/components/pos/settings/SettingsTabs";
+import { SettingsTabs } from "@/platforms/web/components/pos/settings/SettingsTabs";
 import { useState } from "react";
-import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
+import { SettingsFrame } from "@/platforms/web/components/pos/settings/SettingsFrame";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { usePos } from "@/lib/pos-store";

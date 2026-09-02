@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { Ban, Gift, Printer, ReceiptText, Search, ScrollText, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { notifyError } from "@/lib/notify";
-import { AppShell } from "@/components/pos/AppShell";
+import { AppShell } from "@/platforms/web/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";

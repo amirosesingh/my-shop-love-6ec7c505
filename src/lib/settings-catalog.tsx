@@ -413,7 +413,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     raw: true,
     desktopOnly: true,
     panel: lazy(async () => ({
-      default: (await import("@/components/pos/sync/SyncHub")).SyncHub,
+      default: (await import("@/platforms/web/components/pos/sync/SyncHub")).SyncHub,
     })),
   },
   {
@@ -455,7 +455,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     to: "/settings/system?tab=system",
     raw: true,
     panel: lazy(async () => ({
-      default: (await import("@/components/pos/settings/panels/SystemStatusPanel"))
+      default: (await import("@/platforms/web/components/pos/settings/panels/SystemStatusPanel"))
         .SystemStatusPanel,
     })),
   },
@@ -468,7 +468,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     to: "/settings/system?tab=database-health",
     raw: true,
     panel: lazy(async () => ({
-      default: (await import("@/components/pos/settings/panels/DatabaseHealthPanel"))
+      default: (await import("@/platforms/web/components/pos/settings/panels/DatabaseHealthPanel"))
         .DatabaseHealthPanel,
     })),
   },
@@ -481,7 +481,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     to: "/settings/system?tab=logic-health",
     raw: true,
     panel: lazy(async () => ({
-      default: (await import("@/components/pos/settings/panels/LogicHealthPanel")).LogicHealthPanel,
+      default: (await import("@/platforms/web/components/pos/settings/panels/LogicHealthPanel")).LogicHealthPanel,
     })),
   },
   {
@@ -493,7 +493,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     to: "/settings/system?tab=security-alerts",
     raw: true,
     panel: lazy(async () => ({
-      default: (await import("@/components/pos/settings/panels/SecurityAlertsPanel"))
+      default: (await import("@/platforms/web/components/pos/settings/panels/SecurityAlertsPanel"))
         .SecurityAlertsPanel,
     })),
   },
@@ -506,7 +506,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     to: "/settings/system?tab=data-comparison",
     raw: true,
     panel: lazy(async () => ({
-      default: (await import("@/components/pos/sync/DataComparison")).DataComparison,
+      default: (await import("@/platforms/web/components/pos/sync/DataComparison")).DataComparison,
     })),
   },
   {
@@ -518,7 +518,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     to: "/settings/system?tab=inheritance",
     raw: true,
     panel: lazy(async () => ({
-      default: (await import("@/components/pos/settings/panels/InheritancePanel")).InheritancePanel,
+      default: (await import("@/platforms/web/components/pos/settings/panels/InheritancePanel")).InheritancePanel,
     })),
   },
   {

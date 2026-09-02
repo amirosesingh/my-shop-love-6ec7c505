@@ -13,7 +13,7 @@ import {
   type Campaign,
 } from "@/lib/coupons";
 import { usePublicFlags } from "@/lib/public-flags";
-import { PublicPageClosed } from "@/components/pos/PublicPageClosed";
+import { PublicPageClosed } from "@/platforms/web/components/pos/PublicPageClosed";
 
 export const Route = createFileRoute("/claim/$campaignSlug")({
   head: () => ({

@@ -1,16 +1,16 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 
-import { SettingsFrame } from "@/components/pos/settings/SettingsFrame";
-import { SettingsTabs } from "@/components/pos/settings/SettingsTabs";
-import { SystemStatusPanel } from "@/components/pos/settings/panels/SystemStatusPanel";
-import { BackendAddressPanel } from "@/components/pos/settings/panels/BackendAddressPanel";
-import { CloudConnectionPanel } from "@/components/pos/settings/panels/CloudConnectionPanel";
-import { DatabaseHealthPanel } from "@/components/pos/settings/panels/DatabaseHealthPanel";
-import { LogicHealthPanel } from "@/components/pos/settings/panels/LogicHealthPanel";
-import { SecurityAlertsPanel } from "@/components/pos/settings/panels/SecurityAlertsPanel";
-import { InheritancePanel } from "@/components/pos/settings/panels/InheritancePanel";
-import { SyncHub } from "@/components/pos/sync/SyncHub";
-import { DataComparison } from "@/components/pos/sync/DataComparison";
+import { SettingsFrame } from "@/platforms/web/components/pos/settings/SettingsFrame";
+import { SettingsTabs } from "@/platforms/web/components/pos/settings/SettingsTabs";
+import { SystemStatusPanel } from "@/platforms/web/components/pos/settings/panels/SystemStatusPanel";
+import { BackendAddressPanel } from "@/platforms/web/components/pos/settings/panels/BackendAddressPanel";
+import { CloudConnectionPanel } from "@/platforms/web/components/pos/settings/panels/CloudConnectionPanel";
+import { DatabaseHealthPanel } from "@/platforms/web/components/pos/settings/panels/DatabaseHealthPanel";
+import { LogicHealthPanel } from "@/platforms/web/components/pos/settings/panels/LogicHealthPanel";
+import { SecurityAlertsPanel } from "@/platforms/web/components/pos/settings/panels/SecurityAlertsPanel";
+import { InheritancePanel } from "@/platforms/web/components/pos/settings/panels/InheritancePanel";
+import { SyncHub } from "@/platforms/web/components/pos/sync/SyncHub";
+import { DataComparison } from "@/platforms/web/components/pos/sync/DataComparison";
 import { SYSTEM_TAB_IDS, systemTab, type SystemTabId } from "@/lib/settings-groups";
 
 export const Route = createFileRoute("/settings/system")({

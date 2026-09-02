@@ -16,9 +16,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { AppShell } from "@/components/pos/AppShell";
-import { StatusHistoryDialog } from "@/components/pos/StatusHistoryDialog";
-import { ActionButton } from "@/components/pos/ActionButton";
+import { AppShell } from "@/platforms/web/components/pos/AppShell";
+import { StatusHistoryDialog } from "@/platforms/web/components/pos/StatusHistoryDialog";
+import { ActionButton } from "@/platforms/web/components/pos/ActionButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

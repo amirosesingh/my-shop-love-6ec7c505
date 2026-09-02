@@ -3,8 +3,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Copy, Link2, Loader2, Plus, Send, TicketPercent, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { notifyError } from "@/lib/notify";
-import { AppShell } from "@/components/pos/AppShell";
-import { ThemedSelect } from "@/components/pos/ThemedSelect";
+import { AppShell } from "@/platforms/web/components/pos/AppShell";
+import { ThemedSelect } from "@/platforms/web/components/pos/ThemedSelect";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,10 +26,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CouponAuditLog } from "@/components/pos/CouponAuditLog";
-import { CampaignVouchers } from "@/components/pos/CampaignVouchers";
-import { CouponAnalytics } from "@/components/pos/CouponAnalytics";
-import { IssueVoucherDialog } from "@/components/pos/IssueVoucherDialog";
+import { CouponAuditLog } from "@/platforms/web/components/pos/CouponAuditLog";
+import { CampaignVouchers } from "@/platforms/web/components/pos/CampaignVouchers";
+import { CouponAnalytics } from "@/platforms/web/components/pos/CouponAnalytics";
+import { IssueVoucherDialog } from "@/platforms/web/components/pos/IssueVoucherDialog";
 import { useAuth } from "@/lib/pos-auth";
 import { usePos } from "@/lib/pos-store";
 import { claimUrl } from "@/lib/coupon-hosts";
