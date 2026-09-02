@@ -192,14 +192,7 @@ export function SettingsFrame({
       { productId: "x2", name: "Butter Croissant", price: 3.75, qty: 1, taxRate: 0.05, discount: 0 },
     ];
     const subtotal = 28.75;
-    const rate = tax.enabled ? tax.rate / 100 : 0;
-    const taxAmount = tax.enabled
-      ? tax.mode === "inclusive"
-        ? Number((subtotal - subtotal / (1 + rate)).toFixed(2))
-        : Number((subtotal * rate).toFixed(2))
-      : 0;
-    const total =
-      tax.enabled && tax.mode === "exclusive" ? Number((subtotal + taxAmount).toFixed(2)) : subtotal;
+    const { tax: taxAmount, total } = computeTax(subtotal, tax);
     return {
       id: "preview",
       receiptNo: `${currentStore.code}-000001`,
