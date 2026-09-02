@@ -27,7 +27,7 @@ type EffectiveRow = {
 type ScopedRow = { scope?: string; scope_id?: string; key?: string; value?: unknown };
 
 async function readWithService(scope: SettingScope, scopeId: string): Promise<EffectiveRow[]> {
-  const { serviceRest } = await import("./pos-relay.server");
+  const { serviceRest } = await import("@/core/api/pos-relay.server");
   let cluster = scope === "CLUSTER" ? scopeId : "";
   if (scope === "BRANCH") {
     const storeRes = await serviceRest(
@@ -168,7 +168,7 @@ export async function writeScopedSettingsWithService(
   scopeId: string,
   patch: Record<string, SettingPatchEntry>,
 ): Promise<ResolvedSetting[]> {
-  const { serviceRest } = await import("./pos-relay.server");
+  const { serviceRest } = await import("@/core/api/pos-relay.server");
   const id = scope === "GLOBAL" ? "" : scopeId;
   const keep: Record<string, unknown>[] = [];
   const clear: string[] = [];

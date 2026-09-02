@@ -29,7 +29,7 @@ import {
   shiftReportPreview,
 } from "@/lib/pos-print";
 import type { PaymentMethod, Sale } from "@/lib/pos-types";
-import { loadSalesPage } from "@/lib/pos-db";
+import { loadSalesPage } from "@/core/api/pos-db";
 import type { Cursor } from "@/lib/keyset";
 
 export const Route = createFileRoute("/receipts")({

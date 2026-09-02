@@ -2,7 +2,7 @@
  * Only supervisors and above may read the edit history, so the signed-in
  * user's role is re-checked on the server for every request.
  */
-import { serviceRest } from "./pos-relay.server";
+import { serviceRest } from "@/core/api/pos-relay.server";
 
 const SUPERVISOR_ROLES = new Set(["admin", "owner", "manager", "supervisor"]);
 

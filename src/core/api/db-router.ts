@@ -14,7 +14,7 @@
  * Reads come from whatever is available: the local snapshot first when the
  * connection is down, the cloud otherwise.
  */
-import { commitOps, commitLabel, type CommitTarget } from "./pos-db";
+import { commitOps, commitLabel, type CommitTarget } from "@/core/api/pos-db";
 import { AllTargetsFailed, isCloudDirect, isConnectionError } from "@/core/local-db/db-mode";
 import { checkHealth } from "@/core/activation/connection-health";
 import {
@@ -22,8 +22,8 @@ import {
   routedQueryWithSource,
   type QueryOptions,
   type ReadSource,
-} from "./db-query";
-import type { Row, SyncOp } from "./sync-outbox";
+} from "@/core/api/db-query";
+import type { Row, SyncOp } from "@/lib/sync-outbox";
 
 export { AllTargetsFailed, isCloudDirect };
 export type { CommitTarget, QueryOptions, ReadSource };

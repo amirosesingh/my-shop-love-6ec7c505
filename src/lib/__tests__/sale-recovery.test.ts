@@ -2,7 +2,7 @@
  * A failed-looking checkout must never lose a bill or mint a second one.
  */
 import { describe, expect, it } from "vitest";
-import { isDuplicateBillNumber, stableChildId } from "../pos-db";
+import { isDuplicateBillNumber, stableChildId } from "@/core/api/pos-db";
 
 describe("duplicate bill detection", () => {
   it("recognises a unique-key refusal on the bill number", () => {

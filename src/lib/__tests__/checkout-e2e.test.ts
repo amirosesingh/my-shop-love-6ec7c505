@@ -28,7 +28,7 @@ vi.mock("@/integrations/supabase/external-client", () => ({
   },
 }));
 
-import { db } from "@/lib/pos-db";
+import { db } from "@/core/api/pos-db";
 import { setPreferredDatabaseMode } from "@/core/local-db/db-mode";
 import type { Sale } from "@/lib/pos-types";
 

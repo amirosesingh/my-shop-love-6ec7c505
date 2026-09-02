@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { db } from "./pos-db";
+import { db } from "@/core/api/pos-db";
 import { replayOrder, stamp } from "./activity-journal";
 
 /**

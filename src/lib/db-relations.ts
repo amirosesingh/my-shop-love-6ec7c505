@@ -11,7 +11,7 @@
  * Nothing is written.
  */
 import { supabaseExternal } from "@/integrations/supabase/external-client";
-import { relayRelationalHealth } from "./health-relay";
+import { relayRelationalHealth } from "@/core/api/health-relay";
 
 /** Never inspected here, whatever the database contains. */
 export const IDENTITY_TABLES = [

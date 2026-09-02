@@ -10,7 +10,7 @@ export type CompareCaller =
   | { ok: true; storeId: string | null; isAdmin: boolean };
 
 async function branchOf(column: "user_id" | "id", value: string) {
-  const { serviceRest } = await import("./pos-relay.server");
+  const { serviceRest } = await import("@/core/api/pos-relay.server");
   try {
     const res = await serviceRest(
       `app_users?select=store_id,role,is_active&${encodeURIComponent(column)}=eq.${encodeURIComponent(value)}&limit=1`,

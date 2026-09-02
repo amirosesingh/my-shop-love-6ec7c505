@@ -10,7 +10,7 @@ import { shiftDuration } from "@/lib/shift-hours";
 import { parsePositiveAmount } from "@/core/pricing/amount";
 import { permissionMessage } from "@/components/pos/PermissionGate";
 import { notifyError } from "@/lib/notify";
-import { commitLabel } from "@/lib/pos-db";
+import { commitLabel } from "@/core/api/pos-db";
 
 /**
  * Hard terminal lock.

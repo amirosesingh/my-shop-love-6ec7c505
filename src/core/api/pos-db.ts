@@ -1,12 +1,12 @@
 import { toast } from "sonner";
 import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
-import { defaultSettings, sampleState } from "./pos-seed";
-import { drainOutbox, runOpLive } from "./sync-engine";
+import { defaultSettings, sampleState } from "@/lib/pos-seed";
+import { drainOutbox, runOpLive } from "@/lib/sync-engine";
 import { localDb } from "@/core/local-db/local-db";
-import { routedQuery } from "./db-query";
-import { readSnapshot } from "./offline-snapshot";
-import { enqueue, type SyncOp } from "./sync-outbox";
-import { isOnlineOnly } from "./live-mode";
+import { routedQuery } from "@/core/api/db-query";
+import { readSnapshot } from "@/lib/offline-snapshot";
+import { enqueue, type SyncOp } from "@/lib/sync-outbox";
+import { isOnlineOnly } from "@/lib/live-mode";
 import {
   AllTargetsFailed,
   isConnectionError,
@@ -14,14 +14,14 @@ import {
   noteConnectionRestored,
   setCloudDirect,
 } from "@/core/local-db/db-mode";
-import { notifyError, showNotification } from "./notify";
-import { logSync } from "./sync-log";
-import { recordDiagnostic, reasonCode } from "./diagnostics";
-import { applyStockDeltaBatch } from "./stock-recovery";
-import { canRelay, relayStores } from "./sync-relay";
-import { isOperationalTable } from "./pos-auth-route";
-import { keyset, nextCursor, PAGE_SIZE, type Cursor, type Page } from "./keyset";
-import { isLinkedRecordError, usageBlock, type ProductUsage } from "./product-delete";
+import { notifyError, showNotification } from "@/lib/notify";
+import { logSync } from "@/lib/sync-log";
+import { recordDiagnostic, reasonCode } from "@/lib/diagnostics";
+import { applyStockDeltaBatch } from "@/lib/stock-recovery";
+import { canRelay, relayStores } from "@/core/api/sync-relay";
+import { isOperationalTable } from "@/lib/pos-auth-route";
+import { keyset, nextCursor, PAGE_SIZE, type Cursor, type Page } from "@/lib/keyset";
+import { isLinkedRecordError, usageBlock, type ProductUsage } from "@/lib/product-delete";
 import type {
   AppSettings,
   Member,
@@ -37,7 +37,7 @@ import type {
   PaymentMethod,
   PromoType,
   TaxMode,
-} from "./pos-types";
+} from "@/lib/pos-types";
 
 /** Slices of app state that live in the cloud database. */
 export type CloudSlice = Pick<
@@ -913,7 +913,7 @@ export async function loadCloudState(): Promise<CloudSlice> {
     // builders are thenables, not Promises, so guard with try/catch.
     (async (): Promise<{ data: Row[] | null }> => {
       try {
-        const { loadCashierToken } = await import("./pos-credentials");
+        const { loadCashierToken } = await import("@/lib/pos-credentials");
         const cashierToken = await loadCashierToken();
         // A PIN-only cashier has no database auth session, so use the proven
         // relay immediately instead of accepting an RLS-filtered empty list.
@@ -1017,7 +1017,7 @@ export async function loadActiveShift(storeId: string): Promise<Shift | null> {
   // the direct read is refused or filtered out. The proven server relay answers
   // for those tills — without it the register would flip back to "locked"
   // moments after a shift was opened.
-  const { hasStaffSession, canRelay, relayActiveShift } = await import("./sync-relay");
+  const { hasStaffSession, canRelay, relayActiveShift } = await import("@/core/api/sync-relay");
 
   if (hasStaffSession()) {
     // The server routine answers for every staff account, whatever branch is
@@ -1067,7 +1067,7 @@ export async function loadActiveShift(storeId: string): Promise<Shift | null> {
  * caller falls back to the usual local/offline commit path.
  */
 export async function openShiftOnServer(s: Shift): Promise<Shift | null> {
-  const { hasStaffSession } = await import("./sync-relay");
+  const { hasStaffSession } = await import("@/core/api/sync-relay");
   if (!hasStaffSession()) return null;
   try {
     const res = await supabase.rpc(

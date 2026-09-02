@@ -30,8 +30,8 @@ export const pushActivityEvent = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     // The feed is an audit trail: an unattested caller must not be able to
     // invent sign-ins, refunds or branch activity in it.
-    const { verifyRelayCaller } = await import("./pos-relay.server");
-    const { resolveRelayScope } = await import("./relay-policy.server");
+    const { verifyRelayCaller } = await import("@/core/api/pos-relay.server");
+    const { resolveRelayScope } = await import("@/core/api/relay-policy.server");
     let scope: Awaited<ReturnType<typeof resolveRelayScope>>;
     try {
       const caller = await verifyRelayCaller({

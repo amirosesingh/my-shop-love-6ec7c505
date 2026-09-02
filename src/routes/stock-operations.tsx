@@ -33,7 +33,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/lib/pos-auth";
-import { db } from "@/lib/pos-db";
+import { db } from "@/core/api/pos-db";
 import { money, usePos } from "@/lib/pos-store";
 import { canEditPosted } from "@/lib/stock-ref";
 import { useManagerGate } from "@/lib/manager-gate";

@@ -9,7 +9,7 @@
 import { useEffect, useState } from "react";
 
 import type { CartLine } from "./pos-types";
-import { db } from "./pos-db";
+import { db } from "@/core/api/pos-db";
 
 export type HeldOrder = {
   id: string;

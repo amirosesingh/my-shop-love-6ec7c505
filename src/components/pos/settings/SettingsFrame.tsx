@@ -22,7 +22,7 @@ import { Switch } from "@/components/ui/switch";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
-import { db } from "@/lib/pos-db";
+import { db } from "@/core/api/pos-db";
 import { defaultPaymentDetails, defaultWhatsApp } from "@/lib/pos-seed";
 import {
   PAPER_LABELS,

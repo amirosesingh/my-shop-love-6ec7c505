@@ -16,7 +16,7 @@ export const Route = createFileRoute("/api/public/sync-health")({
           "presence-only flags: no key values, lengths or prefixes are returned",
         );
         if (denied) return denied;
-        const { hasServiceKey } = await import("@/lib/pos-relay.server");
+        const { hasServiceKey } = await import("@/core/api/pos-relay.server");
         const { hasSupabaseConfig, supabaseConfigSource, runtimeEnvValue } = await import(
           "@/lib/external-supabase-config"
         );

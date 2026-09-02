@@ -35,7 +35,7 @@ async function handle({ request }: { request: Request }) {
   }
 
   const { verifyRelayCaller, serviceRest, hasServiceKey, serviceKey } = await import(
-    "@/lib/pos-relay.server"
+    "@/core/api/pos-relay.server"
   );
   if (!hasServiceKey()) {
     return Response.json(

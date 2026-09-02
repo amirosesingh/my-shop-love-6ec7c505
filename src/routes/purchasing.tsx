@@ -31,7 +31,7 @@ import {
   loadReceivingDrafts,
   loadReceivingInvoices,
   type ReceivingInvoice,
-} from "@/lib/pos-db";
+} from "@/core/api/pos-db";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

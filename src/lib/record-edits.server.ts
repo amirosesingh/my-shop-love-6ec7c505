@@ -17,7 +17,7 @@ const TABLE: Record<RecordKind, string> = {
 };
 
 async function rest(path: string, init: RequestInit & { prefer?: string } = {}) {
-  const { serviceRest } = await import("./pos-relay.server");
+  const { serviceRest } = await import("@/core/api/pos-relay.server");
   return serviceRest(path, init);
 }
 

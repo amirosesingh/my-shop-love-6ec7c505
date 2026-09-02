@@ -7,7 +7,7 @@ import { Loader2, RotateCcw, Save } from "lucide-react";
 import { toast } from "sonner";
 import { SaveIndicator } from "@/components/pos/settings/SaveIndicator";
 import { Button } from "@/components/ui/button";
-import { db } from "@/lib/pos-db";
+import { db } from "@/core/api/pos-db";
 import { usePos } from "@/lib/pos-store";
 
 export function usePanelSave() {

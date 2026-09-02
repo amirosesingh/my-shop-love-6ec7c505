@@ -5,7 +5,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import type { Booking, JobStatus } from "./pos-types";
-import { commitOps, type CommitTarget } from "./pos-db";
+import { commitOps, type CommitTarget } from "@/core/api/pos-db";
 import type { SyncOp } from "./sync-outbox";
 
 const sb = supabaseExternal as unknown as SupabaseClient;

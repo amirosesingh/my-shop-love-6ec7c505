@@ -9,7 +9,7 @@
  */
 import { createHmac } from "node:crypto";
 import { supabaseConfig } from "./external-supabase-config";
-import { serviceRest, serviceKey } from "./pos-relay.server";
+import { serviceRest, serviceKey } from "@/core/api/pos-relay.server";
 
 export type TerminalAccount = { email: string; password: string };
 

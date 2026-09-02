@@ -12,10 +12,10 @@
  *
  * A caller who cannot be scoped writes nothing.
  */
-import { serviceRest } from "./pos-relay.server";
-import type { RelayOp } from "./pos-relay.server";
-import { claimsFromPayload, normalisePermissions } from "./relay-claims.server";
-import type { CallerClaims } from "./relay-claims.server";
+import { serviceRest } from "@/core/api/pos-relay.server";
+import type { RelayOp } from "@/core/api/pos-relay.server";
+import { claimsFromPayload, normalisePermissions } from "@/core/api/relay-claims.server";
+import type { CallerClaims } from "@/core/api/relay-claims.server";
 
 export type RelayScope = {
   kind: "cashier" | "terminal" | "staff";

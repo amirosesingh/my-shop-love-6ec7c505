@@ -21,7 +21,7 @@ const NO_KEY =
 export const compareServerSummary = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => callerInput.parse(input))
   .handler(async ({ data }) => {
-    const { hasServiceKey } = await import("./pos-relay.server");
+    const { hasServiceKey } = await import("@/core/api/pos-relay.server");
     if (!hasServiceKey()) return { ok: false as const, error: NO_KEY, tables: [] };
     const { resolveCompareCaller } = await import("./data-compare-access.server");
     const caller = await resolveCompareCaller(data);
@@ -41,7 +41,7 @@ export const compareServerSummary = createServerFn({ method: "POST" })
 export const compareServerRows = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => rowsInput.parse(input))
   .handler(async ({ data }) => {
-    const { hasServiceKey } = await import("./pos-relay.server");
+    const { hasServiceKey } = await import("@/core/api/pos-relay.server");
     if (!hasServiceKey()) return { ok: false as const, error: NO_KEY, rows: [] };
     const { resolveCompareCaller } = await import("./data-compare-access.server");
     const caller = await resolveCompareCaller(data);

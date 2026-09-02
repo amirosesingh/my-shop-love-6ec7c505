@@ -36,7 +36,7 @@ import {
 } from "@/components/ui/table";
 import { ThemedSelect } from "@/components/pos/ThemedSelect";
 import { useAuth } from "@/lib/pos-auth";
-import { db } from "@/lib/pos-db";
+import { db } from "@/core/api/pos-db";
 import { localTerminalId } from "@/lib/shift-hours";
 import { money, stockAt, usePos } from "@/lib/pos-store";
 import { resolveByBarcode } from "@/lib/product-lookup";

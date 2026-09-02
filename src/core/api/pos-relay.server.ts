@@ -7,8 +7,8 @@
  * session, an active terminal token, or a staff access token) and then performs
  * the write with the service key, which never reaches the browser.
  */
-import { runtimeEnvValue, supabaseConfig } from "./external-supabase-config";
-import type { RelayScope } from "./relay-policy.server";
+import { runtimeEnvValue, supabaseConfig } from "@/lib/external-supabase-config";
+import type { RelayScope } from "@/core/api/relay-policy.server";
 
 export type RelayOp =
   | { kind: "insert"; table: string; rows: Record<string, unknown>[] }
@@ -279,7 +279,7 @@ export async function runRelayOp(
 ): Promise<{ ok: boolean; error?: string; code?: string }> {
   if (!RELAY_TABLES.has(op.table)) return { ok: false, error: `"${op.table}" cannot be synced` };
 
-  const { safeAuthorizeRelayOp } = await import("./relay-policy.server");
+  const { safeAuthorizeRelayOp } = await import("@/core/api/relay-policy.server");
   const decision = await safeAuthorizeRelayOp(op, scope, batchIds);
   if (!decision.ok) return { ok: false, error: decision.error, code: decision.code };
   const safeOp = decision.op;
@@ -376,7 +376,7 @@ export type RelayCaller = {
   /** Supabase Auth id, for staff signed in with email + password. */
   authUserId?: string | null;
   /** Signed claims from the proof, used as the no-round-trip fast path. */
-  claims?: import("./relay-claims.server").CallerClaims | null;
+  claims?: import("@/core/api/relay-claims.server").CallerClaims | null;
 };
 
 /**
@@ -402,7 +402,7 @@ export async function verifyRelayCaller(input: {
   // A cryptographic session record is the strongest proof: it can be revoked
   // centrally and expires when the till has been left idle.
   if (input.sessionToken) {
-    const { touchSession } = await import("./session-guard.server");
+    const { touchSession } = await import("@/lib/session-guard.server");
     const check = await touchSession(input.sessionToken);
     if (check.ok) {
       const s = check.session;
@@ -421,7 +421,7 @@ export async function verifyRelayCaller(input: {
   }
 
   if (!identity && input.cashierToken) {
-    const { verifyCashierSession } = await import("./pos-session.server");
+    const { verifyCashierSession } = await import("@/lib/pos-session.server");
     const session = verifyCashierSession(input.cashierToken);
     if (session)
       identity = { kind: "cashier", label: session.username, staffUserId: session.username };
@@ -463,7 +463,7 @@ export async function verifyRelayCaller(input: {
       const user = (await res.json()) as { id?: string; email?: string };
       if (user.id) {
         // The token is proven; only now are its claims worth reading.
-        const { claimsFromJwt, claimsFromPayload } = await import("./relay-claims.server");
+        const { claimsFromJwt, claimsFromPayload } = await import("@/core/api/relay-claims.server");
         const claims = claimsFromJwt(input.accessToken) ?? claimsFromPayload(user);
         identity = {
           kind: "staff",

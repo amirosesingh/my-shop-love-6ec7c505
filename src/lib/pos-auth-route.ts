@@ -9,7 +9,7 @@
  *    which proves the till and commits with the server's own key.
  */
 import { cashierTokenSync } from "./pos-credentials";
-import { hasStaffSession } from "./sync-relay";
+import { hasStaffSession } from "@/core/api/sync-relay";
 import type { SyncOp } from "./sync-outbox";
 
 /**

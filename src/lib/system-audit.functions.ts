@@ -24,8 +24,8 @@ export const recordSystemAudit = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     // The edit history is only worth keeping if every line came from a proven
     // caller, filed against the branch that caller belongs to.
-    const { verifyRelayCaller } = await import("./pos-relay.server");
-    const { resolveRelayScope } = await import("./relay-policy.server");
+    const { verifyRelayCaller } = await import("@/core/api/pos-relay.server");
+    const { resolveRelayScope } = await import("@/core/api/relay-policy.server");
     let scope: Awaited<ReturnType<typeof resolveRelayScope>>;
     try {
       scope = await resolveRelayScope(

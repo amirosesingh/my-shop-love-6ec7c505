@@ -31,7 +31,7 @@ import { useUserPermissions } from "@/lib/pos-permissions";
 import { openCashDrawer, printSaleReceipt, printShiftReport } from "@/lib/pos-print";
 import { signInsForDay, type SignInEntry } from "@/lib/shift-attendance";
 import { localShiftSessions, mergeSessions } from "@/lib/shift-sessions";
-import { commitLabel, loadShiftSessions } from "@/lib/pos-db";
+import { commitLabel, loadShiftSessions } from "@/core/api/pos-db";
 import { notifyError } from "@/lib/notify";
 import type { ShiftSession } from "@/lib/pos-types";
 import { parseAmount, parsePositiveAmount } from "@/core/pricing/amount";

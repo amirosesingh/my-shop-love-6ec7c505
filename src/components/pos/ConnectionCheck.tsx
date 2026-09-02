@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 import { ensureTerminalSession } from "@/lib/terminal-session";
-import { probeRelay, syncHealth } from "@/lib/sync-relay";
+import { probeRelay, syncHealth } from "@/core/api/sync-relay";
 import { isDesktop } from "@/lib/branding";
 import { isNative } from "@/platform-config/platform";
 

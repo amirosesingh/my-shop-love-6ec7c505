@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { db } from "./pos-db";
+import { db } from "@/core/api/pos-db";
 import { recordActivity } from "./activity-events";
 
 /** Minimum / maximum length of the typed no-sale reason. */

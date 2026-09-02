@@ -11,10 +11,10 @@
  */
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { effectiveDatabaseMode, isConnectionError } from "@/core/local-db/db-mode";
-import { readSnapshot } from "./offline-snapshot";
+import { readSnapshot } from "@/lib/offline-snapshot";
 import { lastHealth } from "@/core/activation/connection-health";
-import { noteVersions } from "./row-versions";
-import type { Row } from "./sync-outbox";
+import { noteVersions } from "@/lib/row-versions";
+import type { Row } from "@/lib/sync-outbox";
 
 /** Table names are dynamic here, so the generated row types do not apply. */
 type LooseSelect = {

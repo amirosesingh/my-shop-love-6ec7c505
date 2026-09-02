@@ -9,7 +9,7 @@
  * Writes go through the internal service key so a till cannot forge or
  * suppress a transition.
  */
-import { serviceRest } from "./pos-relay.server";
+import { serviceRest } from "@/core/api/pos-relay.server";
 
 /** Anything that survives a JSON round trip, so history can cross the wire. */
 export type Json = string | number | boolean | null | Json[] | { [key: string]: Json };

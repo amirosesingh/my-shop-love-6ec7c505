@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
-import { dbRouter, type ReadSource } from "@/lib/db-router";
+import { dbRouter, type ReadSource } from "@/core/api/db-router";
 import { OfflineDataNotice } from "@/components/pos/OfflineDataNotice";
 import { money } from "@/lib/pos-store";
 import type { Product } from "@/lib/pos-types";

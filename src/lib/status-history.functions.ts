@@ -43,8 +43,8 @@ const recordInput = z.object({
 export const recordStatusHistory = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => recordInput.parse(input))
   .handler(async ({ data }) => {
-    const { verifyRelayCaller } = await import("./pos-relay.server");
-    const { resolveRelayScope } = await import("./relay-policy.server");
+    const { verifyRelayCaller } = await import("@/core/api/pos-relay.server");
+    const { resolveRelayScope } = await import("@/core/api/relay-policy.server");
     let scope: Awaited<ReturnType<typeof resolveRelayScope>>;
     try {
       const caller = await verifyRelayCaller({
@@ -93,7 +93,7 @@ const readInput = z.object({
 export const loadStatusHistory = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => readInput.parse(input))
   .handler(async ({ data }) => {
-    const { verifyRelayCaller } = await import("./pos-relay.server");
+    const { verifyRelayCaller } = await import("@/core/api/pos-relay.server");
     try {
       await verifyRelayCaller({
         ...(data.sessionToken ? { sessionToken: data.sessionToken } : {}),

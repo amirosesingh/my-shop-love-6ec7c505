@@ -6,8 +6,8 @@
  * of our own server instead, which proves the device and reads the metadata
  * centrally. Read-only in both directions.
  */
-import { readCredentials, authHeaders } from "./pos-credentials";
-import { posFetch } from "./server-origin";
+import { readCredentials, authHeaders } from "@/lib/pos-credentials";
+import { posFetch } from "@/lib/server-origin";
 
 type Answer = { ok?: boolean; error?: string; tables?: unknown; data?: unknown };
 

@@ -29,7 +29,7 @@ export function classifyCentralInventoryError(error: string): CentralInventoryFa
 
 export const fetchCentralInventory = createServerFn({ method: "GET" }).handler(
   async (): Promise<CentralInventoryResult> => {
-    const { hasServiceKey, runRelayRead } = await import("./pos-relay.server");
+    const { hasServiceKey, runRelayRead } = await import("@/core/api/pos-relay.server");
     if (!hasServiceKey()) {
       return {
         ok: false,

@@ -15,7 +15,7 @@ export const issueCashierSession = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const { signCashierSession } = await import("./pos-session.server");
-    const { serviceRest } = await import("./pos-relay.server");
+    const { serviceRest } = await import("@/core/api/pos-relay.server");
     try {
       const res = await serviceRest("rpc/verify_terminal_pin", {
         method: "POST",

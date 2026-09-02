@@ -18,7 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { money } from "@/lib/pos-store";
-import type { ReceivingInvoice } from "@/lib/pos-db";
+import type { ReceivingInvoice } from "@/core/api/pos-db";
 
 export function ReceivingRecordView({
   record,

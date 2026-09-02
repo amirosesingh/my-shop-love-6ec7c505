@@ -12,7 +12,7 @@ import {
   type DbHealthReport,
   type RecentRows,
 } from "@/lib/db-health";
-import { importSampleData } from "@/lib/pos-db";
+import { importSampleData } from "@/core/api/pos-db";
 import { FeatureSchemaReport } from "@/components/pos/settings/panels/FeatureSchemaReport";
 import { RelationFlowGraph } from "@/components/pos/settings/RelationFlowGraph";
 import {

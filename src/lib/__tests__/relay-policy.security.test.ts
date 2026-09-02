@@ -1,9 +1,9 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 const restMock = vi.fn();
-vi.mock("../pos-relay.server", () => ({ serviceRest: (...a: unknown[]) => restMock(...a) }));
+vi.mock("@/core/api/pos-relay.server", () => ({ serviceRest: (...a: unknown[]) => restMock(...a) }));
 
-import { safeAuthorizeRelayOp, batchInsertIds, type RelayScope } from "../relay-policy.server";
+import { safeAuthorizeRelayOp, batchInsertIds, type RelayScope } from "@/core/api/relay-policy.server";
 
 const cashier: RelayScope = {
   kind: "cashier",

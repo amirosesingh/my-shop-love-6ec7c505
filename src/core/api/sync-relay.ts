@@ -6,10 +6,10 @@
  * `/api/v1/pos/sync`, which proves the caller and writes only within the
  * branch and permissions that caller actually has.
  */
-import { authHeaders, cashierTokenSync, readCredentials } from "./pos-credentials";
-import { serverUrl } from "./server-origin";
+import { authHeaders, cashierTokenSync, readCredentials } from "@/lib/pos-credentials";
+import { serverUrl } from "@/lib/server-origin";
 import { readTerminalConfig } from "@/core/activation/terminal-tokens";
-import type { SyncOp } from "./sync-outbox";
+import type { SyncOp } from "@/lib/sync-outbox";
 
 const credentials = readCredentials;
 
@@ -47,7 +47,7 @@ async function relayHeaders(): Promise<Record<string, string>> {
  */
 async function inspectRelay(res: Response, body: { code?: string } | null): Promise<void> {
   if (res.status !== 401 && res.status !== 403) return;
-  const { notifySessionExpired } = await import("./session-expiry");
+  const { notifySessionExpired } = await import("@/lib/session-expiry");
   if (body?.code === "SESSION_INVALID" || body?.code === "BRANCH_MISSING" || res.status === 401)
     notifySessionExpired();
 }

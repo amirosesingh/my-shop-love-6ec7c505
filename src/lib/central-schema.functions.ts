@@ -23,7 +23,7 @@ export type CentralSchemaResult =
 
 export const fetchCentralSchema = createServerFn({ method: "GET" }).handler(
   async (): Promise<CentralSchemaResult> => {
-    const { hasServiceKey, runRelayRead } = await import("./pos-relay.server");
+    const { hasServiceKey, runRelayRead } = await import("@/core/api/pos-relay.server");
     if (!hasServiceKey()) {
       return {
         ok: false,
@@ -64,7 +64,7 @@ export type CentralProbeResult =
  */
 export const probeCentralTables = createServerFn({ method: "GET" }).handler(
   async (): Promise<CentralProbeResult> => {
-    const { hasServiceKey, runRelayRead } = await import("./pos-relay.server");
+    const { hasServiceKey, runRelayRead } = await import("@/core/api/pos-relay.server");
     const { CENTRAL_SCHEMA } = await import("./central-schema");
     if (!hasServiceKey()) {
       return {

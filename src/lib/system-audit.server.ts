@@ -4,7 +4,7 @@
  * Every entry is written with the internal service key so a till cannot forge
  * or suppress one, and the table itself refuses updates and deletes.
  */
-import { serviceRest } from "./pos-relay.server";
+import { serviceRest } from "@/core/api/pos-relay.server";
 
 export type SystemAuditEntry = {
   actorId?: string | null;

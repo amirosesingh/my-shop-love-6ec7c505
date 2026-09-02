@@ -18,7 +18,7 @@ import { rememberBanks } from "@/components/pos/TenderSplit";
 import { isoDaysFromNow } from "@/lib/register/use-booking-intake";
 import type { useBookingIntake } from "@/lib/register/use-booking-intake";
 import { cartTotals, money, usePos } from "@/lib/pos-store";
-import { db } from "@/lib/pos-db";
+import { db } from "@/core/api/pos-db";
 
 import { applyRounding, roundingOf } from "@/core/pricing/rounding";
 import { applyCombo, intakeTotals, newJobTag } from "@/lib/booking-charges";

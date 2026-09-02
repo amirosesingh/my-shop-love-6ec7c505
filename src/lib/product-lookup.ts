@@ -7,7 +7,7 @@
  * product.
  */
 import type { Product } from "./pos-types";
-import { dbProxy } from "./db-router";
+import { dbProxy } from "@/core/api/db-router";
 
 export const normaliseCode = (code: string) => code.trim().toLowerCase();
 
