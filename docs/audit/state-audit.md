@@ -164,3 +164,8 @@ Stage 8 — inventory ledger, security sweep and final report. **Delivered:**
   the permission model is built on, and the realtime feeds, which stay
   RLS-gated.
 
+
+Nothing in this audit is left open. The suite runs green (286 tests), the
+coverage, conflict and recovery documents are regenerated from the registry,
+and any future change to a feature should be followed by
+`bun scripts/sync-coverage.cjs`.
