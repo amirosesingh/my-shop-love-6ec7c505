@@ -64,7 +64,8 @@ describe("bill number reservation failures", () => {
     const b = await reserveBillNumber("B1", [], { branchCode: "B101", padding: 4 });
     expect(a).not.toEqual(b);
   });
-})
+
+
   it("never hands the same number to two concurrent callers", async () => {
     const { reserveBillNumber } = await import("@/lib/bill-number");
     const cfg = { branchCode: "B1", terminalNo: "01" };
