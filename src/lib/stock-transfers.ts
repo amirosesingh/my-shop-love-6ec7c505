@@ -203,7 +203,7 @@ export type LineQty = { productId: string; qty: number };
 const toLines = (lines: LineQty[] | undefined) =>
   lines?.length ? lines.map((l) => ({ product_id: l.productId, qty: Math.max(0, l.qty) })) : null;
 
-type RpcResult = { success: boolean; error?: string };
+export type RpcResult = { success: boolean; error?: string };
 
 /**
  * Approve: the database checks the note is still waiting, records the allowed

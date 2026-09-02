@@ -72,9 +72,11 @@ import {
   approveTransferInDb,
   dispatchTransferInDb,
   receiveTransferInDb,
+  verifyTransferInDb,
   saveTransfer,
   setTransferStatus,
   type LineQty,
+  type RpcResult,
 } from "./stock-transfers";
 import { commitBooking, deleteBookingRow, loadBookings, saveBookingQuietly } from "./bookings-db";
 import { trackTransition } from "./status-history";
@@ -323,7 +325,10 @@ type Ctx = {
   approveTransfer: (id: string, lines?: LineQty[]) => void;
   /** send what is actually on the shelf — this closes the request */
   dispatchTransfer: (id: string, lines?: LineQty[]) => void;
-  receiveTransfer: (id: string, lines?: LineQty[]) => void;
+  /** the box arrived — no stock moves yet */
+  receiveTransfer: (id: string) => void;
+  /** the count that puts stock on the destination shelf */
+  verifyTransfer: (id: string, lines: LineQty[], reason?: string) => Promise<RpcResult>;
   rejectTransfer: (id: string, reason: string) => void;
   reset: () => void;
 };
@@ -2625,6 +2630,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     approveTransfer,
     dispatchTransfer,
     receiveTransfer,
+    verifyTransfer,
     rejectTransfer,
     reset,
   };
