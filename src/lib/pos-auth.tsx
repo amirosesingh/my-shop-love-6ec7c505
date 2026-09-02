@@ -169,11 +169,6 @@ type AuthCtx = {
   login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
   /** Cashier tab: numeric User ID + PIN mapped onto a Supabase email account. */
   cashierLogin: (userId: string, pin: string) => Promise<{ ok: boolean; error?: string }>;
-  signUp: (
-    email: string,
-    password: string,
-    fullName: string,
-  ) => Promise<{ ok: boolean; error?: string; needsConfirmation?: boolean }>;
   logout: () => Promise<void>;
   /** Lock the till / switch user — clears the session without losing local data. */
   lock: () => Promise<void>;
@@ -673,19 +668,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { ok: true };
   }, [finishAccountPinSignIn]);
 
-  const signUp = useCallback(async (email: string, password: string, fullName: string) => {
-    const { data, error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-      options: {
-        emailRedirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
-        data: { full_name: fullName.trim() },
-      },
-    });
-    if (error) return { ok: false, error: error.message };
-    return { ok: true, needsConfirmation: !data.session };
-  }, []);
-
   const logout = useCallback(async () => {
     // Stamp the sign-out time on this user's open shift sessions first.
     endShiftSessions({});
@@ -940,7 +922,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       removeStaff,
       login,
       cashierLogin,
-      signUp,
       logout,
       lock: logout,
     }),
@@ -959,7 +940,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       removeStaff,
       login,
       cashierLogin,
-      signUp,
       logout,
     ],
   );
