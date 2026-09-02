@@ -205,9 +205,26 @@ function ReceivingWorkspace() {
 
         <Panel
           title="Physical count"
-          description="Type what is actually in the box. Sent quantities are shown so a difference is obvious, but nothing is pre-filled."
+          description="Type what is actually in the box, or scan each item to count it up. Sent quantities are shown so a difference is obvious, but nothing is pre-filled."
         >
+          {arrived && allowed && (
+            <div className="mb-4 max-w-sm">
+              <Label htmlFor="scan-count" className="text-xs text-muted-foreground">
+                Scan to count
+              </Label>
+              <Input
+                id="scan-count"
+                value={scan}
+                onChange={(e) => setScan(e.target.value)}
+                onKeyDown={countByScan}
+                placeholder="Scan a barcode…"
+                className="numeric mt-1 h-9"
+                disabled={busy}
+              />
+            </div>
+          )}
           <Table>
+
             <TableHeader>
               <TableRow>
                 <TableHead>Product</TableHead>
