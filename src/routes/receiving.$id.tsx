@@ -33,6 +33,8 @@ import { StatusHistoryList } from "@/components/pos/StatusHistoryDialog";
 import { usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
 import { TRANSFER_STATUS_LABELS } from "@/lib/pos-types";
+import { exactCodeMatch } from "@/lib/product-search";
+
 
 export const Route = createFileRoute("/receiving/$id")({
   head: () => ({
@@ -63,7 +65,28 @@ function ReceivingWorkspace() {
   const { transfer, live, loading } = useTransferRecord(id);
   const [counts, setCounts] = useState<Record<string, string>>({});
   const [reason, setReason] = useState("");
+  const [scan, setScan] = useState("");
   const [busy, setBusy] = useState(false);
+
+  /** Scanner wedge: an exact code on the note bumps that line's count by one. */
+  function countByScan(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const code = scan.trim();
+    if (!code) return;
+    const hit = exactCodeMatch(state.products, code);
+    const listed = hit && transfer?.items.some((i) => i.productId === hit.id) ? hit : null;
+    if (!listed) {
+      toast.error("That code is not on this delivery note");
+      return;
+    }
+    setCounts((prev) => ({
+      ...prev,
+      [listed.id]: String(Math.max(0, Math.floor(Number(prev[listed.id] ?? 0) || 0)) + 1),
+    }));
+    setScan("");
+  }
+
 
   // Start blank so the count is a real count, not a rubber stamp.
   useEffect(() => {
@@ -205,9 +228,26 @@ function ReceivingWorkspace() {
 
         <Panel
           title="Physical count"
-          description="Type what is actually in the box. Sent quantities are shown so a difference is obvious, but nothing is pre-filled."
+          description="Type what is actually in the box, or scan each item to count it up. Sent quantities are shown so a difference is obvious, but nothing is pre-filled."
         >
+          {arrived && allowed && (
+            <div className="mb-4 max-w-sm">
+              <Label htmlFor="scan-count" className="text-xs text-muted-foreground">
+                Scan to count
+              </Label>
+              <Input
+                id="scan-count"
+                value={scan}
+                onChange={(e) => setScan(e.target.value)}
+                onKeyDown={countByScan}
+                placeholder="Scan a barcode…"
+                className="numeric mt-1 h-9"
+                disabled={busy}
+              />
+            </div>
+          )}
           <Table>
+
             <TableHeader>
               <TableRow>
                 <TableHead>Product</TableHead>
