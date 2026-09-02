@@ -28,6 +28,7 @@ import { Route as MembersRouteImport } from './routes/members'
 import { Route as PromotionsRouteImport } from './routes/promotions'
 import { Route as PurchasingRouteImport } from './routes/purchasing'
 import { Route as ReceiptsRouteImport } from './routes/receipts'
+import { Route as RecoveryRouteImport } from './routes/recovery'
 import { Route as SalesRouteImport } from './routes/sales'
 import { Route as ShiftsRouteImport } from './routes/shifts'
 import { Route as StaffRouteImport } from './routes/staff'
@@ -205,6 +206,11 @@ const PurchasingRoute = PurchasingRouteImport.update({
 const ReceiptsRoute = ReceiptsRouteImport.update({
   id: '/receipts',
   path: '/receipts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RecoveryRoute = RecoveryRouteImport.update({
+  id: '/recovery',
+  path: '/recovery',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SalesRoute = SalesRouteImport.update({
@@ -644,6 +650,7 @@ export interface FileRoutesByFullPath {
   '/promotions': typeof PromotionsRoute
   '/purchasing': typeof PurchasingRoute
   '/receipts': typeof ReceiptsRoute
+  '/recovery': typeof RecoveryRoute
   '/sales': typeof SalesRoute
   '/shifts': typeof ShiftsRoute
   '/staff': typeof StaffRoute
@@ -748,6 +755,7 @@ export interface FileRoutesByTo {
   '/promotions': typeof PromotionsRoute
   '/purchasing': typeof PurchasingRoute
   '/receipts': typeof ReceiptsRoute
+  '/recovery': typeof RecoveryRoute
   '/sales': typeof SalesRoute
   '/shifts': typeof ShiftsRoute
   '/staff': typeof StaffRoute
@@ -853,6 +861,7 @@ export interface FileRoutesById {
   '/promotions': typeof PromotionsRoute
   '/purchasing': typeof PurchasingRoute
   '/receipts': typeof ReceiptsRoute
+  '/recovery': typeof RecoveryRoute
   '/sales': typeof SalesRoute
   '/shifts': typeof ShiftsRoute
   '/staff': typeof StaffRoute
@@ -959,6 +968,7 @@ export interface FileRouteTypes {
     | '/promotions'
     | '/purchasing'
     | '/receipts'
+    | '/recovery'
     | '/sales'
     | '/shifts'
     | '/staff'
@@ -1063,6 +1073,7 @@ export interface FileRouteTypes {
     | '/promotions'
     | '/purchasing'
     | '/receipts'
+    | '/recovery'
     | '/sales'
     | '/shifts'
     | '/staff'
@@ -1167,6 +1178,7 @@ export interface FileRouteTypes {
     | '/promotions'
     | '/purchasing'
     | '/receipts'
+    | '/recovery'
     | '/sales'
     | '/shifts'
     | '/staff'
@@ -1272,6 +1284,7 @@ export interface RootRouteChildren {
   PromotionsRoute: typeof PromotionsRoute
   PurchasingRoute: typeof PurchasingRoute
   ReceiptsRoute: typeof ReceiptsRoute
+  RecoveryRoute: typeof RecoveryRoute
   SalesRoute: typeof SalesRoute
   ShiftsRoute: typeof ShiftsRoute
   StaffRoute: typeof StaffRoute
@@ -1488,6 +1501,13 @@ declare module '@tanstack/react-router' {
       path: '/receipts'
       fullPath: '/receipts'
       preLoaderRoute: typeof ReceiptsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/recovery': {
+      id: '/recovery'
+      path: '/recovery'
+      fullPath: '/recovery'
+      preLoaderRoute: typeof RecoveryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sales': {
@@ -2108,6 +2128,7 @@ const rootRouteChildren: RootRouteChildren = {
   PromotionsRoute: PromotionsRoute,
   PurchasingRoute: PurchasingRoute,
   ReceiptsRoute: ReceiptsRoute,
+  RecoveryRoute: RecoveryRoute,
   SalesRoute: SalesRoute,
   ShiftsRoute: ShiftsRoute,
   StaffRoute: StaffRoute,
