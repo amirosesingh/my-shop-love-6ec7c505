@@ -172,6 +172,9 @@ async function startAppServer() {
   if (!fs.existsSync(serverEntry)) {
     throw new Error(`Desktop build missing (${serverEntry}). Run: npm run desktop:build`);
   }
+  // Older builds sealed a central service key on this machine. It is no longer
+  // used or accepted, so it is erased the first time this build starts.
+  serverKeys.purgeLegacyServiceKey();
   const port = await choosePort();
   // ELECTRON_RUN_AS_NODE makes the bundled Electron binary behave as plain
   // Node, so the packaged app needs no separate Node.js install.
