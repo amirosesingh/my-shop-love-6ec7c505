@@ -82,10 +82,15 @@ function bags(): Record<string, unknown>[] {
   // so a dynamic lookup finds nothing — these static reads are the only way
   // the browser bundle can carry build-time values.
   out.push({
+    // The POS-specific pair comes first everywhere: a hosting platform can
+    // inject its own SUPABASE_* values, and the shop's own project must win.
+    VITE_POS_SUPABASE_URL: import.meta.env.VITE_POS_SUPABASE_URL,
+    VITE_POS_SUPABASE_ANON_KEY: import.meta.env.VITE_POS_SUPABASE_ANON_KEY,
     VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
     VITE_SUPABASE_ANON_KEY:
       import.meta.env.VITE_SUPABASE_ANON_KEY ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
   });
+
   try {
     if (import.meta.env) out.push(import.meta.env as unknown as Record<string, unknown>);
   } catch {
