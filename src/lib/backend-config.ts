@@ -36,10 +36,11 @@ function apply(url: string): void {
   (window as unknown as { __POS_SERVER_URL__?: string }).__POS_SERVER_URL__ = url;
 }
 
-/** The build-time default, used when the device has nothing saved. */
-function baked(): string {
-  return clean(import.meta.env["VITE_POS_SERVER_URL"] as string | undefined);
-}
+/**
+ * There is no build-time default on purpose. A shipped APK or installer must
+ * carry no address belonging to another deployment, so when the device has
+ * nothing saved the address stays empty and the operator is asked for it.
+ */
 
 /** The address this device is configured to use, "" when it has none. */
 export async function backendUrl(): Promise<string> {
