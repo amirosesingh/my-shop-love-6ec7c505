@@ -14,7 +14,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+
 import type { Product } from "@/lib/pos-types";
 import { stockAt } from "@/lib/pos-store";
 import { exactCodeMatch, searchCatalog, searchLocal } from "@/lib/product-search";
