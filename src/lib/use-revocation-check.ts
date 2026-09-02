@@ -20,6 +20,7 @@ import {
   subscribeTerminalConfig,
   type TerminalConfig,
 } from "./terminal-tokens";
+import { clearActivationRecord, writeActivationRecord } from "./activation-record";
 
 const CHECK_MS = 5 * 60 * 1000;
 const BLOCK_KEY = "pos.terminal.revoked";
@@ -113,10 +114,17 @@ export function useRevocationCheck(): RevocationState {
         if (remote.status === "revoked") {
           setBlocked(true);
           clearTerminalConfig();
+          // A confirmed revocation also drops the local "registered" record.
+          clearActivationRecord();
           return;
         }
         setBlocked(false);
         void stampHeartbeat(config.tokenId);
+        // A verified status is the only thing that extends the offline grace.
+        void writeActivationRecord({
+          tokenId: config.tokenId,
+          stamp: (remote as { stamp?: string | null }).stamp ?? null,
+        }).catch(() => {});
       } catch {
         /* transient network error — try again on the next tick */
       }
