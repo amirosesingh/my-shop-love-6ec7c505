@@ -161,6 +161,22 @@ export const navGroups: NavGroup[] = [
         blurb: "Move or request stock between branches.",
       },
       {
+        to: "/requests",
+        label: "Stock Requests",
+        icon: ListPlus,
+        flag: "can_create_transfer",
+        keywords: "request ask branch supply approval",
+        blurb: "Ask another branch for stock and track every request.",
+      },
+      {
+        to: "/receiving",
+        label: "Goods Receiving",
+        icon: ClipboardCheck,
+        flag: "can_receive_transfer",
+        keywords: "receive delivery count blind arrival post stock",
+        blurb: "Count arriving deliveries in and post them to the shelf.",
+      },
+      {
         to: "/stock-operations",
         label: "Stock Operations",
         icon: ScanBarcode,
