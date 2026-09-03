@@ -179,7 +179,7 @@ export function publicSupabaseConfig(): { url: string; key: string } | undefined
   }
 }
 
-export const EXTERNAL_SUPABASE_URL_NAME = "VITE_SUPABASE_URL";
+export const EXTERNAL_SUPABASE_URL_NAME = "SUPABASE_URL";
 
 /**
  * Kept as named exports because call sites read them directly. They are getters
