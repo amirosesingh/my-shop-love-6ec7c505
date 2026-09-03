@@ -19,6 +19,7 @@ const { app, safeStorage } = require("electron");
 const FALLBACK_PIN_SALT = "northwind-pos-emergency-v1";
 
 const sealedPath = () => path.join(app.getPath("userData"), "emergency-secret.bin");
+const saltPath = () => path.join(app.getPath("userData"), "emergency-company-salt.bin");
 const plainPath = () => path.join(app.getPath("userData"), "emergency-secret.json");
 
 const canSeal = () => {
@@ -70,6 +71,36 @@ function ensureSecret() {
   const fresh = crypto.randomBytes(32).toString("hex");
   writeSecret(fresh);
   return fresh;
+}
+
+/**
+ * The company recovery salt, delivered by the backend over the activation
+ * token (see src/lib/emergency-escrow.ts) and sealed with the OS vault. Once
+ * it is present the build-time salt stops opening this machine.
+ */
+function readCompanySalt() {
+  try {
+    const raw = fs.readFileSync(saltPath());
+    const value = canSeal() ? safeStorage.decryptString(raw) : raw.toString("utf8");
+    return value && value.length >= 16 ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function setCompanySalt(salt) {
+  const value = String(salt || "").trim();
+  if (value.length < 16) return false;
+  try {
+    fs.writeFileSync(
+      saltPath(),
+      canSeal() ? safeStorage.encryptString(value) : Buffer.from(value, "utf8"),
+      { mode: 0o600 },
+    );
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** `YYYYMMDDHHmm` in the device's own local time — the slot the PIN covers. */
@@ -134,10 +165,12 @@ function verifyPin(pin, drift = 3) {
   };
   if (!/^\d{6}$/.test(code)) return fail();
   const now = Date.now();
-  // The clock-only fallback code (see src/lib/emergency-fallback-pin.ts)
-  // opens the gate too, so support can read a code out without the secret.
+  // The clock-only master code (see src/lib/emergency-fallback-pin.ts) opens
+  // the gate too. Once this machine has its company salt the build-time salt
+  // is refused, so a code computed from a downloaded installer is worthless.
+  const fallbackSalt = readCompanySalt() || FALLBACK_PIN_SALT;
   for (let i = -drift; i <= drift; i += 1) {
-    if (equal(code, pinForSlot(FALLBACK_PIN_SALT, slotAt(new Date(now + i * 60_000))))) {
+    if (equal(code, pinForSlot(fallbackSalt, slotAt(new Date(now + i * 60_000))))) {
       attempts.count = 0;
       attempts.until = 0;
       return { ok: true };
@@ -163,4 +196,13 @@ function fingerprint() {
   return crypto.createHash("sha256").update(ensureSecret()).digest("hex").slice(0, 8).toUpperCase();
 }
 
-module.exports = { ensureSecret, verifyPin, pinForSlot, slotAt, fingerprint, FALLBACK_PIN_SALT };
+module.exports = {
+  ensureSecret,
+  verifyPin,
+  pinForSlot,
+  slotAt,
+  fingerprint,
+  readCompanySalt,
+  setCompanySalt,
+  FALLBACK_PIN_SALT,
+};
