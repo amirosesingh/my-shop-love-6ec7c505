@@ -31,12 +31,43 @@ describe("recovery is never blocked by connection gates", () => {
   });
 
   it("emergency access navigates with the router, never a page load", () => {
-    expect(gate).not.toMatch(/<a\s+href="\/recovery"/);
-    expect(gate).toMatch(/<Link\s+to="\/recovery"/);
+    const link = read("src/platforms/web/components/pos/EmergencyAccessLink.tsx");
+    expect(link).toMatch(/<Link\s+to="\/recovery"/);
+    expect(gate).toMatch(/<EmergencyAccessLink/);
+    for (const file of [
+      "src/platforms/mobile/components/OfflineGate.tsx",
+      "src/platforms/web/components/pos/TerminalActivation.tsx",
+      "src/routes/__root.tsx",
+      "src/platforms/web/components/pos/CloudSetupGate.tsx",
+    ]) {
+      expect(read(file)).not.toMatch(/<a\s+href="\/recovery"/);
+    }
   });
 
   it("start-up work never stalls the recovery screen", () => {
     expect(boot).toMatch(/onRecoveryScreen/);
     expect(boot).toMatch(/useState\(recovery\)/);
+  });
+});
+
+describe("no fresh-install screen is a dead end", () => {
+  it("the first-run naming form steps aside on the recovery screen", () => {
+    const setup = read("src/platforms/web/components/pos/FirstRunSetup.tsx");
+    expect(setup).toMatch(/onRecoveryScreen/);
+    expect(setup).toMatch(/if \(recovery\) return <>\{children\}<\/>;/);
+  });
+
+  it("the activation screen and the error screen both offer emergency access", () => {
+    expect(read("src/platforms/web/components/pos/TerminalActivation.tsx")).toMatch(
+      /<EmergencyAccessLink/,
+    );
+    expect(read("src/routes/__root.tsx")).toMatch(/<EmergencyAccessLink/);
+  });
+
+  it("the emergency keypad uses its own lockout counter and resets on mount", () => {
+    const pinGate = read("src/platforms/web/components/pos/EmergencyPinGate.tsx");
+    expect(pinGate).toMatch(/LockoutScope = "recovery"/);
+    expect(pinGate).toMatch(/lockoutRemaining\(SCOPE\)/);
+    expect(pinGate).toMatch(/alive\.current/);
   });
 });
