@@ -12,6 +12,8 @@ import { isNative } from "@/platform-config/platform";
 import { onRecoveryScreen } from "@/lib/recovery-route";
 import { hydrateNativeStorage } from "@/platforms/mobile/mobile-storage";
 import { hydrateBackendUrl } from "@/lib/backend-config";
+import { hasRequiredPlatformConfig } from "@/lib/platform-config-ready";
+
 import { hydrateTerminalConfig } from "@/core/activation/terminal-tokens";
 import { applyPendingWebBundle, startWebBundleChecks } from "@/platforms/mobile/web-bundle-updates";
 import { TillLoader } from "@/components/shared/TillLoader";
