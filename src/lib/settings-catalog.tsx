@@ -161,17 +161,6 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     keywords: "token pair activate revoke",
   },
   {
-    id: "emergency-codes",
-    label: "Emergency codes",
-    blurb: "Read the live six-digit recovery code for any till, or the company master code.",
-    icon: KeyRound,
-    category: "terminal",
-    to: "/settings/emergency-codes",
-    panel: page(() => import("@/routes/settings.emergency-codes")),
-    cloudOnly: true,
-    keywords: "emergency access recovery pin master code unlock till",
-  },
-  {
     id: "mobile-terminals",
     label: "Mobile terminals",
     blurb: "Phones and tablets running the POS, managed separately.",
