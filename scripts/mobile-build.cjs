@@ -96,9 +96,15 @@ async function main() {
   console.log("› rendering the app shell");
   const server = spawn(process.execPath, [serverEntry], {
     cwd: root,
-    env: { ...process.env, PORT: String(PORT), HOST: "127.0.0.1", NITRO_PORT: String(PORT) },
+    env: {
+      ...withoutWebEnv(),
+      PORT: String(PORT),
+      HOST: "127.0.0.1",
+      NITRO_PORT: String(PORT),
+    },
     stdio: ["ignore", "inherit", "inherit"],
   });
+
 
   server.on("error", (error) => {
     console.error(`Could not start the phone render server: ${error.message}`);
