@@ -720,12 +720,18 @@ async function runCycle() {
 }
 
 export async function runExclusive(reason: string = "timer"): Promise<void> {
+  // An unconfigured terminal has no central database to talk to. That is a
+  // normal state, not a failure: no request is attempted and nothing is
+  // inherited from the web deployment.
+  const readiness = await hasRequiredPlatformConfig();
+  if (!readiness.ready) return;
   if (cycleRunning) {
     cycleQueued = true;
     return;
   }
   cycleRunning = true;
   setSyncState({ phase: "syncing" });
+
   try {
     await runCycle();
     setSyncState({ phase: isOnline() ? "idle" : "offline" });
