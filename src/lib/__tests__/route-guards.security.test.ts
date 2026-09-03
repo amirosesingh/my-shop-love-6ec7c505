@@ -43,9 +43,12 @@ describe("route guards", () => {
       if (PUBLIC_ROUTES.has(f)) return false;
       if (redirectOnly.has(f)) return false;
       const src = readFileSync(join(ROUTES_DIR, f), "utf8");
-      // SectionHub and SettingsFrame both render inside AppShell.
+      // SectionHub, SettingsFrame and SettingsShell all render inside AppShell.
       return (
-        !src.includes("AppShell") && !src.includes("SettingsFrame") && !src.includes("SectionHub")
+        !src.includes("AppShell") &&
+        !src.includes("SettingsFrame") &&
+        !src.includes("SettingsShell") &&
+        !src.includes("SectionHub")
       );
     });
     expect(unguarded).toEqual([]);
