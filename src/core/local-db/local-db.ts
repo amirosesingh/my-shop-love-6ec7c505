@@ -601,10 +601,6 @@ export type PosBridge = {
     value: string,
   ) => Promise<{ ok: boolean; url?: string; error?: string }>;
 
-  /* ---- emergency access recovery PIN (secret stays in the main process) ---- */
-  verifyEmergencyPin?: (pin: string) => Promise<{ ok: boolean }>;
-  emergencyFingerprint?: () => Promise<{ ok: boolean; fingerprint?: string }>;
-
   /* ---- tenant cloud credentials sealed in the OS vault ---- */
 
   cloudKeyStatus?: () => Promise<{

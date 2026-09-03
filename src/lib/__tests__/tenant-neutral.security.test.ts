@@ -38,8 +38,7 @@ describe("public credential surfaces are throttled", () => {
     expect(route).toContain("429");
   });
 
-  it("the recovery PIN locks out after repeated wrong codes on both platforms", () => {
-    expect(read("electron", "emergency-pin.cjs")).toMatch(/attempts\.count \+= 1/);
+  it("the recovery code locks out after repeated wrong entries", () => {
     expect(read("src", "lib", "emergency-pin.ts")).toMatch(/guesses\.count \+= 1/);
   });
 });
