@@ -1,11 +1,23 @@
-// @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { attemptsLeft, clearPinFailures, lockoutRemaining, notePinFailure } from "../pin-lockout";
 
+/** Minimal storage: the module only ever reads/writes string keys. */
+function installStorage() {
+  const map = new Map<string, string>();
+  (globalThis as unknown as { window: unknown }).window = {
+    localStorage: {
+      getItem: (k: string) => map.get(k) ?? null,
+      setItem: (k: string, v: string) => void map.set(k, v),
+      removeItem: (k: string) => void map.delete(k),
+      clear: () => map.clear(),
+    },
+  };
+}
+
 describe("keypad lockouts are per keypad", () => {
   beforeEach(() => {
-    window.localStorage.clear();
+    installStorage();
   });
 
   it("a locked cashier keypad leaves emergency access open", () => {
