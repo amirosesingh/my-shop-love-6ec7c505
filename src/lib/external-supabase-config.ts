@@ -117,9 +117,9 @@ export class SupabaseConfigError extends Error {
       isTerminalApp()
         ? "Cloud sync is not set up on this device. Open Settings → Database & Cloud Connection " +
             "and enter the central database URL and API key. Local trading is unaffected."
-        : "Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY " +
-            "(and the matching SUPABASE_URL / SUPABASE_ANON_KEY for the server) to your " +
-            "own Supabase project before starting the app.",
+        : "Supabase is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY in the " +
+            "hosting variables (Cloudflare: Workers → Settings → Variables & Secrets) " +
+            "to your own Supabase project before starting the app.",
     );
     this.name = "SupabaseConfigError";
   }
