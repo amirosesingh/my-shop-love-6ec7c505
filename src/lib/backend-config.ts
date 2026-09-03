@@ -20,6 +20,20 @@ const STORAGE_KEY = "pos.backend.url";
 const clean = (value: unknown): string =>
   typeof value === "string" ? value.trim().replace(/\/+$/, "") : "";
 
+/**
+ * Accept what an operator would naturally type. A bare host gets `https://`,
+ * a trailing slash goes, and a pasted endpoint path (`.../api/public/...`) is
+ * trimmed back to the site root — the address is the site, not an endpoint.
+ */
+export function normaliseBackendUrl(value: string): string {
+  let url = clean(value);
+  if (!url) return "";
+  if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+  url = url.replace(/\/api(\/.*)?$/i, "");
+  return url.replace(/\/+$/, "");
+}
+
+
 type Bridge = {
   backendUrl?: () => Promise<{ ok: boolean; url?: string }>;
   setBackendUrl?: (value: string) => Promise<{ ok: boolean; url?: string; error?: string }>;
