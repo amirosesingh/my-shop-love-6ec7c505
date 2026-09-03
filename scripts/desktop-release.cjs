@@ -7,12 +7,14 @@
  *
  * The installer is handed to other shops, so it must carry no web deployment
  * configuration. Web environment names are removed from the build environment
- * here, vite.config.ts loads no .env file for a DESKTOP_BUILD, and the
- * finished output is scanned before packaging is considered done.
+ * here (see scripts/web-only-env.cjs) and vite.config.ts loads no .env file
+ * for a DESKTOP_BUILD.
  */
 const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
+
+const { withoutWebEnv } = require("./web-only-env.cjs");
 
 const root = path.resolve(__dirname, "..");
 
@@ -22,26 +24,13 @@ if (!process.env.POS_UPDATE_URL) {
   console.log(`POS_UPDATE_URL is not set — baking in the default feed ${url}`);
 }
 
-const WEB_ONLY_ENV_NAMES = [
-  "VITE_SUPABASE_URL",
-  "VITE_SUPABASE_ANON_KEY",
-  "VITE_SUPABASE_PUBLISHABLE_KEY",
-  "VITE_SUPABASE_PROJECT_ID",
-  "VITE_POS_SUPABASE_URL",
-  "VITE_POS_SUPABASE_ANON_KEY",
-  "VITE_POS_SUPABASE_PUBLISHABLE_KEY",
-  "VITE_SUPABASE_EXTERNAL_URL",
-  "VITE_SUPABASE_EXTERNAL_PUBLISHABLE_KEY",
-  "VITE_POS_SERVER_URL",
-];
-
-const env = { ...process.env, POS_UPDATE_URL: url, DESKTOP_BUILD: "1" };
-for (const name of WEB_ONLY_ENV_NAMES) delete env[name];
+const env = { ...withoutWebEnv(), POS_UPDATE_URL: url, DESKTOP_BUILD: "1" };
 
 const run = (cmd, args) => {
   const r = spawnSync(cmd, args, { stdio: "inherit", shell: true, env });
   if (r.status !== 0) process.exit(r.status ?? 1);
 };
+
 
 // A stale bundle from an earlier (web-flavoured) build must never be packaged.
 console.log("› clearing stale desktop output");
