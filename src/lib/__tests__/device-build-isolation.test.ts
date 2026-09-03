@@ -32,12 +32,24 @@ describe("device builds are isolated from web configuration", () => {
     expect(viteConfig).toContain("blankWebEnv");
   });
 
-  it("scrubs web env names from both platform build scripts", () => {
+  it("removes web env names from every terminal build process", () => {
+    const shared = read("scripts/web-only-env.cjs");
+    for (const name of [
+      "SUPABASE_URL",
+      "SUPABASE_ANON_KEY",
+      "SUPABASE_PUBLISHABLE_KEY",
+      "POS_SUPABASE_SERVICE_ROLE_KEY",
+      "VITE_SUPABASE_URL",
+      "VITE_POS_SUPABASE_URL",
+      "VITE_POS_SERVER_URL",
+    ]) {
+      expect(shared).toContain(`"${name}"`);
+    }
     for (const script of ["scripts/mobile-build.cjs", "scripts/desktop-release.cjs"]) {
       const text = read(script);
-      expect(text).toContain("WEB_ONLY_ENV_NAMES");
-      expect(text).toContain("VITE_POS_SUPABASE_URL");
-      expect(text).toContain("verify-no-web-config.cjs");
+      expect(text).toContain("web-only-env.cjs");
+      expect(text).toContain("withoutWebEnv");
+      expect(text).not.toContain("...process.env");
     }
   });
 
@@ -46,17 +58,22 @@ describe("device builds are isolated from web configuration", () => {
     expect(text).not.toContain("VITE_POS_SERVER_URL");
   });
 
+  it("still strips injected cloud config from the rendered phone shell", () => {
+    const text = read("scripts/mobile-build.cjs");
+    expect(text).toContain("__POS_CONFIG__");
+    expect(text).toContain("must ship no tenant identity");
+  });
+
   it("keeps web environment out of the Android workflow", () => {
     const text = read(".github/workflows/android-apk.yml");
     expect(text).not.toMatch(/VITE_[A-Z_]*SUPABASE/);
     expect(text).not.toContain("VITE_POS_SERVER_URL");
-    expect(text).toContain("verify-no-web-config.cjs");
   });
 
   it("keeps web environment out of the Windows workflow", () => {
     const text = read(".github/workflows/desktop-release.yml");
     expect(text).not.toMatch(/VITE_[A-Z_]*SUPABASE/);
     expect(text).not.toContain("VITE_POS_SERVER_URL");
-    expect(text).toContain("verify-no-web-config.cjs");
   });
 });
+
