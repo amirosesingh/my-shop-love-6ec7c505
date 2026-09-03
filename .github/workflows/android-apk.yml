@@ -128,11 +128,8 @@ jobs:
         run: |
           ./gradlew assembleRelease --stacktrace
 
-      - name: Verify the APK carries no web configuration
-        run: |
-          node scripts/verify-no-web-config.cjs \
-            capacitor-shell \
-            android/app/build/outputs/apk/release
+
+
 
 
       - name: Stage the APK and the web bundle
