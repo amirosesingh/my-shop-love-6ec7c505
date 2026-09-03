@@ -5,12 +5,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { isDesktop, restoreBrandingFromDisk, writeBranding } from "@/lib/branding";
 import { usePosOptional } from "@/lib/pos-store";
+import { onRecoveryScreen } from "@/lib/recovery-route";
 
 /**
  * Shown once per machine right after install: the operator names their business
  * and this till, and every screen and receipt picks that name up.
  */
 export function FirstRunSetup({ children }: { children: React.ReactNode }) {
+  // Emergency Access must open on a brand-new machine, before anyone has named
+  // the shop: naming it is not a prerequisite for repairing the connection.
+  const [recovery] = useState(() => onRecoveryScreen());
   const pos = usePosOptional();
   const state = pos?.state;
   const updateSettings = pos?.updateSettings;
@@ -20,7 +24,7 @@ export function FirstRunSetup({ children }: { children: React.ReactNode }) {
   const [terminal, setTerminal] = useState("POS Terminal 01");
 
   useEffect(() => {
-    if (!isDesktop()) {
+    if (recovery || !isDesktop()) {
       setChecked(true);
       return;
     }
@@ -29,8 +33,9 @@ export function FirstRunSetup({ children }: { children: React.ReactNode }) {
       setNeeded(!b.configured);
       setChecked(true);
     });
-  }, []);
+  }, [recovery]);
 
+  if (recovery) return <>{children}</>;
   if (!checked) return null;
   if (!needed) return <>{children}</>;
 

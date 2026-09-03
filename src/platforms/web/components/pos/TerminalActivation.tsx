@@ -32,6 +32,7 @@ import { writeActivationRecord } from "@/core/activation/activation-record";
 import { isCloudConnected } from "@/core/activation/registration-status";
 import { subscribeConnectivity } from "@/core/activation/connection-health";
 import { CameraScanner } from "@/platforms/web/components/pos/CameraScanner";
+import { EmergencyAccessLink } from "@/platforms/web/components/pos/EmergencyAccessLink";
 import { useBranding } from "@/lib/branding";
 
 const qrDataUrl = (value: string) => {
@@ -296,6 +297,14 @@ export function TerminalActivation({
       <p className="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-slate-500">
         <ScanLine className="size-3.5" /> The code links this machine to one location.
       </p>
+
+      {/* A till that cannot be activated — wrong address, no network, nothing
+          configured yet — still needs the repair screen. Never a dead end. */}
+      {!embedded && (
+        <div className="mt-4 flex justify-center">
+          <EmergencyAccessLink className="border-slate-700 bg-slate-800/60 text-slate-200 hover:bg-slate-800" />
+        </div>
+      )}
     </Frame>
   );
 }
