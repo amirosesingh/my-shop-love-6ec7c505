@@ -12,7 +12,7 @@ import { Delete, LifeBuoy, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { isTerminalApp } from "@/platform-config/platform";
 import {
-  emergencyFingerprint,
+  EMERGENCY_CODE_LENGTH,
   emergencyPinAvailable,
   verifyEmergencyPin,
 } from "@/lib/emergency-pin";
@@ -40,7 +40,6 @@ export function EmergencyPinGate({ children }: { children: ReactNode }) {
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [fingerprint, setFingerprint] = useState("");
   const [locked, setLocked] = useState(0);
   // A verification still in flight when this screen closes must not write to a
   // gone component, and reopening must never inherit its result.
@@ -59,7 +58,6 @@ export function EmergencyPinGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!gated) return;
     void emergencyPinAvailable().then(setAvailable).catch(() => setAvailable(false));
-    void emergencyFingerprint().then(setFingerprint).catch(() => {});
   }, [gated]);
 
   useEffect(() => {
@@ -100,9 +98,9 @@ export function EmergencyPinGate({ children }: { children: ReactNode }) {
       return;
     }
     if (!key) return;
-    const next = (pin + key).slice(0, 6);
+    const next = (pin + key).slice(0, EMERGENCY_CODE_LENGTH);
     setPin(next);
-    if (next.length === 6) void submit(next);
+    if (next.length === EMERGENCY_CODE_LENGTH) void submit(next);
   };
 
   return (
@@ -112,7 +110,8 @@ export function EmergencyPinGate({ children }: { children: ReactNode }) {
         <h1 className="text-lg font-semibold">Emergency access</h1>
       </div>
       <p className="text-sm text-muted-foreground">
-        Enter the 6-digit recovery code for this terminal to open the connection settings.
+        Enter this device&apos;s current date and time as 12 digits — YYYYMMDDHHMM — to open the
+        connection settings.
       </p>
 
       {!available ? (
@@ -121,13 +120,11 @@ export function EmergencyPinGate({ children }: { children: ReactNode }) {
         </p>
       ) : (
         <>
-          <div className="flex items-center gap-3" aria-label="PIN entry">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <span
-                key={i}
-                className={`size-3 rounded-full ${i < pin.length ? "bg-primary" : "bg-muted"}`}
-              />
-            ))}
+          <div
+            className="font-mono text-xl tracking-[0.2em] text-foreground"
+            aria-label="Recovery code entry"
+          >
+            {pin.padEnd(EMERGENCY_CODE_LENGTH, "·")}
           </div>
 
           <div className="grid w-full grid-cols-3 gap-2">
@@ -152,7 +149,7 @@ export function EmergencyPinGate({ children }: { children: ReactNode }) {
           {error && locked === 0 && <p className="text-sm text-destructive">{error}</p>}
           <p className="flex items-center gap-1 text-xs text-muted-foreground">
             <Lock className="size-3" />
-            Terminal {fingerprint || "—"} · the code changes every minute
+            The code is this device&apos;s own clock and changes every minute
           </p>
         </>
       )}
