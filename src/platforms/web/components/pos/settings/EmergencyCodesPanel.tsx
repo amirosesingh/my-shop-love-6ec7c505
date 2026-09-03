@@ -282,23 +282,6 @@ export function EmergencyCodesPanel() {
           ),
         },
         {
-          id: "company",
-          title: "Company master code",
-          blurb:
-            "Opens any till of this company, including one that has never been online. It is derived from a secret that lives only on this server — never inside an installer.",
-          content: (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-3">
-              <div className="flex items-start gap-2">
-                <ShieldAlert className="mt-0.5 size-4 text-amber-600" />
-                <p className="max-w-xl text-sm text-muted-foreground">
-                  Use this only when the per-terminal code is unavailable. The till must have its
-                  clock roughly right — three minutes either way is accepted.
-                </p>
-              </div>
-              {codeCell("__company", true)}
-            </div>
-          ),
-        },
         {
           id: "how",
           title: "How to use it",
