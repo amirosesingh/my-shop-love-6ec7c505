@@ -6,7 +6,9 @@ import {
   useMemo,
   useRef,
   useState,
+  type Context,
   type ReactNode,
+
 } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { Loader2, ShieldAlert } from "lucide-react";
