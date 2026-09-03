@@ -157,7 +157,7 @@ function SettingsHub() {
               <>
                 <section className="space-y-2">
                   <h2 className="text-sm font-semibold">Quick access</h2>
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {pinned.map((c) => (
                       <Card key={c.id} c={c} />
                     ))}
@@ -177,7 +177,7 @@ function SettingsHub() {
                           onClick={() =>
                             void navigate({ search: { cat: g.id } as never, replace: true })
                           }
-                          className={`whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                          className={`whitespace-nowrap rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors ${
                             active
                               ? "bg-primary text-primary-foreground"
                               : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -193,7 +193,7 @@ function SettingsHub() {
             )}
 
             {shown.length ? (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {shown.map((c) => (
                   <Card key={c.id} c={c} />
                 ))}
