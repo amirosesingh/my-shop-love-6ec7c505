@@ -8,8 +8,10 @@
  * till never renders the gate: `isOnlineOnly()` is false there.
  */
 import { useEffect, useState, type ReactNode } from "react";
-import { CloudOff, LifeBuoy, RefreshCw } from "lucide-react";
-import { Link, useRouterState } from "@tanstack/react-router";
+import { CloudOff, RefreshCw } from "lucide-react";
+import { useRouterState } from "@tanstack/react-router";
+
+import { EmergencyAccessLink } from "@/platforms/web/components/pos/EmergencyAccessLink";
 
 import { isOnlineOnly } from "@/lib/live-mode";
 import { isRecoveryPath, onRecoveryScreen } from "@/lib/recovery-route";
@@ -88,13 +90,7 @@ export function OfflineGate({ children }: { children: ReactNode }) {
         {/* The way back in when the address itself is what is wrong. Router
             navigation, never a page load: a hard load would restart the shell
             and put this gate straight back in front of the repair screen. */}
-        <Link
-          to="/recovery"
-          className="inline-flex items-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground"
-        >
-          <LifeBuoy className="h-4 w-4" aria-hidden />
-          Emergency access
-        </Link>
+        <EmergencyAccessLink />
 
       </div>
     </div>
