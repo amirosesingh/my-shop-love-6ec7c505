@@ -2,6 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const cloud = { ok: true };
 
+// The probe refuses to call an unconfigured device's central database, and
+// tests carry no real credentials, so the configuration check is stubbed.
+vi.mock("@/lib/external-supabase-config", () => ({
+  hasSupabaseConfig: () => true,
+}));
+
 vi.mock("@/integrations/supabase/external-client", () => ({
   supabaseExternal: {
     from: () => ({
