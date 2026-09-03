@@ -47,11 +47,23 @@ export function NativeBoot({ children }: { children: React.ReactNode }) {
     };
   }, [ready]);
 
-  // Background check for a newer web bundle once the app is up.
+  // Background check for a newer web bundle once the app is up — but only on a
+  // configured terminal. An unconfigured phone must reach its setup screen
+  // without any backend-dependent work running behind it.
   useEffect(() => {
     if (!ready || recovery || !isNative()) return;
-    return startWebBundleChecks();
+    let stop: (() => void) | undefined;
+    let cancelled = false;
+    void hasRequiredPlatformConfig().then((state) => {
+      if (cancelled || !state.ready) return;
+      stop = startWebBundleChecks();
+    });
+    return () => {
+      cancelled = true;
+      stop?.();
+    };
   }, [ready, recovery]);
+
 
 
   // The splash reports what the till is actually loading against: green for the
