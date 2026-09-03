@@ -32,7 +32,7 @@ import { writeActivationRecord } from "@/core/activation/activation-record";
 import { isCloudConnected } from "@/core/activation/registration-status";
 import { subscribeConnectivity } from "@/core/activation/connection-health";
 import { CameraScanner } from "@/platforms/web/components/pos/CameraScanner";
-import { EmergencyAccessLink } from "@/platforms/web/components/pos/EmergencyAccessLink";
+import { EmergencyAccessLink } from "@/components/shared/EmergencyAccessLink";
 import { useBranding } from "@/lib/branding";
 
 const qrDataUrl = (value: string) => {

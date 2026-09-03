@@ -25,7 +25,7 @@ import { TerminalActivation } from "@/platforms/web/components/pos/TerminalActiv
 import { isTerminalApp } from "@/platform-config/platform";
 import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 import { FirstRunSetup } from "@/platforms/web/components/pos/FirstRunSetup";
-import { EmergencyAccessLink } from "@/platforms/web/components/pos/EmergencyAccessLink";
+import { EmergencyAccessLink } from "@/components/shared/EmergencyAccessLink";
 import { ThemeProvider, themeBootScript } from "../lib/theme";
 import { publicConfigScript } from "../lib/public-config-script";
 import { NativeBoot } from "@/platforms/mobile/components/NativeBoot";

@@ -11,7 +11,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { CloudOff, RefreshCw } from "lucide-react";
 import { useRouterState } from "@tanstack/react-router";
 
-import { EmergencyAccessLink } from "@/platforms/web/components/pos/EmergencyAccessLink";
+import { EmergencyAccessLink } from "@/components/shared/EmergencyAccessLink";
 
 import { isOnlineOnly } from "@/lib/live-mode";
 import { isRecoveryPath, onRecoveryScreen } from "@/lib/recovery-route";
