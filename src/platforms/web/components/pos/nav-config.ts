@@ -82,14 +82,6 @@ export const navGroups: NavGroup[] = [
         blurb: "Scan, discount and charge a ticket.",
       },
       {
-        to: "/sales",
-        label: "Sales",
-        icon: Wallet,
-        flag: "can_view_sales_reports",
-        keywords: "takings transactions bills today",
-        blurb: "Everything sold on this till, newest first.",
-      },
-      {
         to: "/holds",
         label: "Hold Tickets",
         icon: PauseCircle,
@@ -198,14 +190,6 @@ export const navGroups: NavGroup[] = [
         blurb: "Products, prices, stock counts and bulk import.",
       },
       {
-        to: "/inventory-hub",
-        label: "Inventory Hub",
-        icon: PackageSearch,
-        flag: "can_view_inventory",
-        keywords: "overview stock dashboard low stock value",
-        blurb: "One overview of stock value, movement and alerts.",
-      },
-      {
         to: "/stock-operations",
         label: "Stock Operations",
         icon: ScanBarcode,
@@ -278,13 +262,6 @@ export const navGroups: NavGroup[] = [
     blurb: "Customers, members, staff and admin.",
     items: [
       {
-        to: "/customers",
-        label: "Customers",
-        icon: Users,
-        keywords: "customer directory contact purchase history",
-        blurb: "Everyone who has bought from you, with their history.",
-      },
-      {
         to: "/members",
         label: "Member Directory",
         icon: Users,
@@ -317,7 +294,7 @@ export const navGroups: NavGroup[] = [
     id: "company",
     label: "Company",
     icon: Building2,
-    hubTo: "/dashboard",
+    hubTo: "/admin",
     blurb: "Stores, live boards and the audit trail.",
     items: [
       {
