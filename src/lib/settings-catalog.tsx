@@ -16,6 +16,7 @@ import {
   DownloadCloud,
   EyeOff,
   Globe,
+  KeyRound,
   Landmark,
   ListPlus,
   MessageCircle,
