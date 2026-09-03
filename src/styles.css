@@ -343,3 +343,11 @@
     background-color: color-mix(in oklab, var(--color-muted) 55%, transparent);
   }
 }
+
+/* Quick-access strips scroll horizontally without showing a bar. */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
