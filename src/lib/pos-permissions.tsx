@@ -57,7 +57,7 @@ type Ctx = {
  * pattern as the auth and register-store contexts.
  */
 const permissionsRegistry = globalThis as typeof globalThis & {
-  __posPermissionsContext?: React.Context<Ctx | null>;
+  __posPermissionsContext?: Context<Ctx | null>;
 };
 const PermissionsContext = (permissionsRegistry.__posPermissionsContext ??=
   createContext<Ctx | null>(null));
