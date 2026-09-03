@@ -16,6 +16,7 @@
 - [x] Hosted-shell (`app_url`) Android builds cannot publish to R2 / GitHub release
 
 ## Open (needs your input, not code)
-- [ ] Decide whether `.env` may drop `VITE_POS_SUPABASE_URL` / `VITE_POS_SUPABASE_ANON_KEY` —
-      only safe once the Cloudflare Worker has SUPABASE_URL / SUPABASE_ANON_KEY set there.
+- [ ] `VITE_POS_SUPABASE_URL` / `VITE_POS_SUPABASE_ANON_KEY` are now local-dev-only names
+      (`.env.local`); production Web reads the canonical SUPABASE_URL / SUPABASE_ANON_KEY
+      from the Cloudflare Worker — confirm both are set there.
 - [ ] Real APK / Electron installer scan runs in GitHub Actions only (sandbox cannot package).
