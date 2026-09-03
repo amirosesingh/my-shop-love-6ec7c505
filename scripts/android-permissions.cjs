@@ -36,10 +36,44 @@ const missing = lines.filter((l) => {
 });
 if (missing.length) {
   xml = xml.replace("</manifest>", `${missing.join("\n")}\n</manifest>`);
-  fs.writeFileSync(manifest, xml, "utf8");
   console.log(`✓ added ${missing.length} manifest entr${missing.length === 1 ? "y" : "ies"}`);
 } else {
   console.log("✓ camera and install permissions already present");
+}
+
+/* --------------------------- backup policy ---------------------------- */
+
+/**
+ * Uninstalling a till must leave nothing behind. Android's Auto Backup would
+ * otherwise upload preferences and sealed blobs to the user's Google account
+ * and silently restore them onto a reinstalled app, so the "deleted" terminal
+ * would come back already activated and already configured.
+ */
+function setAttr(source, name, value) {
+  const attr = `android:${name}="${value}"`;
+  if (source.includes(attr)) return source;
+  const existing = new RegExp(`\\s*android:${name}="[^"]*"`);
+  const stripped = source.replace(existing, "");
+  return stripped.replace(/<application\b/, `<application\n        ${attr}`);
+}
+
+const before = xml;
+xml = setAttr(xml, "allowBackup", "false");
+xml = setAttr(xml, "fullBackupContent", "false");
+xml = setAttr(xml, "dataExtractionRules", "@xml/data_extraction_rules");
+if (xml !== before) console.log("✓ Auto Backup disabled — uninstall leaves nothing behind");
+
+fs.writeFileSync(manifest, xml, "utf8");
+
+const rules = path.join(androidMain, "res", "xml", "data_extraction_rules.xml");
+if (!fs.existsSync(rules)) {
+  fs.mkdirSync(path.dirname(rules), { recursive: true });
+  fs.writeFileSync(
+    rules,
+    '<?xml version="1.0" encoding="utf-8"?>\n<data-extraction-rules>\n  <cloud-backup>\n    <exclude domain="root" />\n    <exclude domain="file" />\n    <exclude domain="database" />\n    <exclude domain="sharedpref" />\n    <exclude domain="external" />\n  </cloud-backup>\n  <device-transfer>\n    <exclude domain="root" />\n    <exclude domain="file" />\n    <exclude domain="database" />\n    <exclude domain="sharedpref" />\n    <exclude domain="external" />\n  </device-transfer>\n</data-extraction-rules>\n',
+    "utf8",
+  );
+  console.log("✓ data_extraction_rules.xml written (nothing is backed up or transferred)");
 }
 
 /* --------------------------- FileProvider ----------------------------- */

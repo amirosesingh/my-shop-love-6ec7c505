@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import { isNative } from "@/platform-config/platform";
 import { onRecoveryScreen } from "@/lib/recovery-route";
 import { hydrateNativeStorage } from "@/platforms/mobile/mobile-storage";
+import { runDeviceCleanup } from "@/platforms/mobile/device-cleanup";
 import { hydrateBackendUrl } from "@/lib/backend-config";
 import { hasRequiredPlatformConfig } from "@/lib/platform-config-ready";
 
@@ -32,6 +33,8 @@ export function NativeBoot({ children }: { children: React.ReactNode }) {
     void hydrateBackendUrl()
       .catch(() => "")
       .then(() => hydrateNativeStorage())
+      // Keep only what a terminal needs: caches and leftover installers go.
+      .then(() => runDeviceCleanup())
       // The activation is sealed on the device; unseal it before anything can
       // decide the terminal is not registered.
       .then(() => hydrateTerminalConfig())

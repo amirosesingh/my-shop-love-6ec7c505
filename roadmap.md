@@ -16,6 +16,16 @@
 - [x] Sync engine + Android OTA hold off until the device is configured
 - [x] Hosted-shell (`app_url`) Android builds cannot publish to R2 / GitHub release
 
+## Device storage lifecycle (v1.3.98) — done
+- [x] Windows: `electron/storage-hygiene.cjs` prunes Chromium scratch on every launch and
+      completely on the first launch after a version change; identity, sealed credentials,
+      settings and the local mirror are never touched
+- [x] Windows uninstall removes application data (`nsis.deleteAppDataOnUninstall`)
+- [x] Android: Auto Backup and device transfer disabled in the manifest patcher, so a
+      reinstall can no longer be restored with an old activation
+- [x] Android: launch cleanup drops leftover downloaded APKs and derived cache keys,
+      keeping activation, device key, configuration, preferences and the open ticket
+
 ## Open (needs your input, not code)
 - [ ] Production Web reads canonical `SUPABASE_URL` / `SUPABASE_ANON_KEY` from the Cloudflare
       Worker — confirm both are set there. No repository `.env` is required for a Web build.
