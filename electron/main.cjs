@@ -24,7 +24,6 @@ const diagnostics = require("./diagnostics.cjs");
 const serverKeys = require("./server-keys.cjs");
 const staffAuth = require("./staff-auth.cjs");
 const cloudCredentials = require("./cloud-credentials.cjs");
-const emergencyPin = require("./emergency-pin.cjs");
 const storageHygiene = require("./storage-hygiene.cjs");
 
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
@@ -1473,22 +1472,6 @@ function registerIpc() {
     if (saved && saved.ok === false) return saved;
     return { ok: true, url: next };
   });
-
-  /* ------------- emergency access PIN (secret never leaves here) ------------- */
-  ipcMain.handle("emergency:verify-pin", (_e, pin) => emergencyPin.verifyPin(pin));
-  ipcMain.handle("emergency:fingerprint", () => ({
-    ok: true,
-    fingerprint: emergencyPin.fingerprint(),
-  }));
-  // Escrow: the only path that lets the secret leave this process, and it
-  // goes straight to the company's own backend over the activation token.
-  ipcMain.handle("emergency:escrow-secret", () => ({
-    ok: true,
-    secret: emergencyPin.ensureSecret(),
-  }));
-  ipcMain.handle("emergency:set-company-salt", (_e, salt) => ({
-    ok: emergencyPin.setCompanySalt(salt),
-  }));
 
   /* ------------- tenant cloud credentials (OS-sealed store) ------------- */
 
