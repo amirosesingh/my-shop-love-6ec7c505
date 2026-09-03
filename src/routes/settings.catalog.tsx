@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { ChevronDown, ChevronUp, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { AppShell } from "@/platforms/web/components/pos/AppShell";
+import { SettingsShell } from "@/platforms/web/components/pos/settings/SettingsShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -224,7 +224,7 @@ function CatalogMetaSettings() {
   }
 
   return (
-    <AppShell>
+    <SettingsShell>
       <div className="max-w-5xl space-y-6 p-6">
         <header>
           <h1 className="text-2xl font-semibold tracking-tight">Categories & Units</h1>
@@ -335,6 +335,6 @@ function CatalogMetaSettings() {
           </div>
         </section>
       </div>
-    </AppShell>
+    </SettingsShell>
   );
 }

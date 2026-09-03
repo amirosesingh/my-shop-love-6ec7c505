@@ -5,7 +5,7 @@ import { ArrowLeft, Loader2, Save, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { notifyError } from "@/lib/notify";
 
-import { AppShell } from "@/platforms/web/components/pos/AppShell";
+import { SettingsShell } from "@/platforms/web/components/pos/settings/SettingsShell";
 import { SaveIndicator } from "@/platforms/web/components/pos/settings/SaveIndicator";
 import { SettingsSections } from "@/platforms/web/components/pos/settings/SettingsSection";
 import { AuthorizationRulesPanel } from "@/platforms/web/components/pos/settings/AuthorizationRulesPanel";
@@ -114,7 +114,7 @@ function RulesSettings() {
   }
 
   return (
-    <AppShell>
+    <SettingsShell>
       <div className="mx-auto w-full max-w-4xl space-y-5 p-6">
         <div className="sticky top-0 z-20 -mx-6 -mt-6 border-b border-border bg-background/95 px-4 py-2 backdrop-blur">
           <Button asChild variant="ghost" size="sm" className="h-8 text-xs">
@@ -246,6 +246,6 @@ function RulesSettings() {
           </div>
         )}
       </div>
-    </AppShell>
+    </SettingsShell>
   );
 }
