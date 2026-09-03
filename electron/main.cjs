@@ -1480,6 +1480,15 @@ function registerIpc() {
     ok: true,
     fingerprint: emergencyPin.fingerprint(),
   }));
+  // Escrow: the only path that lets the secret leave this process, and it
+  // goes straight to the company's own backend over the activation token.
+  ipcMain.handle("emergency:escrow-secret", () => ({
+    ok: true,
+    secret: emergencyPin.ensureSecret(),
+  }));
+  ipcMain.handle("emergency:set-company-salt", (_e, salt) => ({
+    ok: emergencyPin.setCompanySalt(salt),
+  }));
 
   /* ------------- tenant cloud credentials (OS-sealed store) ------------- */
 
