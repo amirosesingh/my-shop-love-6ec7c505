@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import { isNative } from "@/platform-config/platform";
 import { onRecoveryScreen } from "@/lib/recovery-route";
 import { hydrateNativeStorage } from "@/platforms/mobile/mobile-storage";
+import { runDeviceCleanup } from "@/platforms/mobile/device-cleanup";
 import { hydrateBackendUrl } from "@/lib/backend-config";
 import { hasRequiredPlatformConfig } from "@/lib/platform-config-ready";
 
