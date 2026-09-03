@@ -111,15 +111,13 @@ export function EmergencyCodesPanel() {
         notifyError(res.error);
         return;
       }
-      setCodes((c) => ({
-        ...c,
-        [tokenId]: {
-          code: res.code,
-          expiresInSeconds: res.expiresInSeconds,
-          ...("fingerprint" in res ? { fingerprint: res.fingerprint } : {}),
-          at: Date.now(),
-        },
-      }));
+      const shown: Shown = {
+        code: res.code,
+        expiresInSeconds: res.expiresInSeconds,
+        ...("fingerprint" in res ? { fingerprint: String(res.fingerprint) } : {}),
+        at: Date.now(),
+      };
+      setCodes((c) => ({ ...c, [tokenId]: shown }));
     } finally {
       setBusy(null);
     }
@@ -164,11 +162,12 @@ export function EmergencyCodesPanel() {
 
   return (
     <SettingsSections
-      sections={[
+      storageKey="pos.settings.emergency-codes"
+      items={[
         {
           id: "per-terminal",
           title: "Emergency code per terminal",
-          description:
+          blurb:
             "The code changes every minute and is read from the till's own recovery secret. Read it out to whoever is standing at the machine — never send it ahead of time.",
           content: (
             <div className="space-y-3">
@@ -220,7 +219,7 @@ export function EmergencyCodesPanel() {
         {
           id: "company",
           title: "Company master code",
-          description:
+          blurb:
             "Opens any till of this company, including one that has never been online. It is derived from a secret that lives only on this server — never inside an installer.",
           content: (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-3">
@@ -238,7 +237,7 @@ export function EmergencyCodesPanel() {
         {
           id: "how",
           title: "How to use it",
-          description: "At the terminal: Emergency Access, then type the six digits.",
+          blurb: "At the terminal: Emergency Access, then type the six digits.",
           content: (
             <div className="flex items-start gap-2 text-sm text-muted-foreground">
               <KeyRound className="mt-0.5 size-4" />
