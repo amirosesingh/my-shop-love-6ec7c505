@@ -21,8 +21,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { isTerminalApp } from "@/platform-config/platform";
-import { cloudKeyStatus, subscribeCloudKeys } from "@/lib/secure-cloud-config";
-import { isCloudConnected } from "@/core/activation/registration-status";
+import { subscribeConfigReady } from "@/lib/platform-config-ready";
+
 
 export function CloudSetupGate() {
   const navigate = useNavigate();
