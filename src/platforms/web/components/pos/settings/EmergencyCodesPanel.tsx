@@ -6,6 +6,7 @@
  * is written to the audit log, and the code is hidden again after two minutes.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { Eye, EyeOff, KeyRound, Loader2, RefreshCw, ShieldAlert } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
