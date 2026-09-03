@@ -13,9 +13,12 @@ const { spawnSync, spawn } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 
+const { withoutWebEnv, scrubWebEnv } = require("./web-only-env.cjs");
+
 const root = path.resolve(__dirname, "..");
 const out = path.join(root, "capacitor-shell");
 const PORT = Number(process.env["MOBILE_RENDER_PORT"] || 43119);
+
 
 function run(cmd, args, env) {
   const res = spawnSync(cmd, args, {
