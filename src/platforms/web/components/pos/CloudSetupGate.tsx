@@ -21,8 +21,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { isTerminalApp } from "@/platform-config/platform";
-import { cloudKeyStatus, subscribeCloudKeys } from "@/lib/secure-cloud-config";
-import { isCloudConnected } from "@/core/activation/registration-status";
+import { subscribeConfigReady } from "@/lib/platform-config-ready";
+
 
 export function CloudSetupGate() {
   const navigate = useNavigate();
@@ -31,57 +31,42 @@ export function CloudSetupGate() {
   useEffect(() => {
     if (!isTerminalApp()) return;
 
-    const check = async () => {
-      try {
-        const status = await cloudKeyStatus();
-        // Prompting for cloud keys with no connection is misleading: the
-        // device cannot verify them anyway, and it trades locally regardless.
-        if (!status.configured && isCloudConnected()) setOpen(true);
-      } catch {
-        /* a storage hiccup must never block the till from opening */
-      }
-    };
-    void check();
-
+    // Configuration readiness is a local fact: it does not depend on whether
+    // the device happens to be online, and there is no web fallback to hide
+    // behind. Missing configuration means setup, every launch, until saved.
+    const offReady = subscribeConfigReady((state) => setOpen(!state.ready));
     // The desktop shell announces the missing keys as soon as the window shows.
-    const offShell = window.pos?.onCloudSetupRequired?.(() => {
-      if (isCloudConnected()) setOpen(true);
-    });
-    // Saving keys anywhere in the app closes the prompt immediately.
-    const offKeys = subscribeCloudKeys(() => {
-      void cloudKeyStatus()
-        .then((status) => {
-          if (status.configured) setOpen(false);
-        })
-        .catch(() => {});
-    });
+    const offShell = window.pos?.onCloudSetupRequired?.(() => setOpen(true));
     return () => {
       offShell?.();
-      offKeys();
+      offReady();
     };
   }, []);
 
   if (!isTerminalApp()) return null;
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="sm:max-w-md">
+    <Dialog open={open}>
+      <DialogContent
+        className="sm:max-w-md [&>button]:hidden"
+        onEscapeKeyDown={(e) => e.preventDefault()}
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CloudOff className="size-5 text-warning" />
-            Cloud Sync Setup Required
+            Terminal not configured
           </DialogTitle>
           <DialogDescription>
-            Please configure your Online Database Keys in Settings to enable automatic
-            synchronization. Until then this device trades fully offline — sign-in, scanning,
-            checkout and receipt printing all work as normal, and every sale is kept safely on
-            this device.
+            This terminal has no central database configured yet. Nothing is assumed and nothing is
+            inherited from another deployment: enter this shop&apos;s database address and API key
+            in Settings, and the terminal continues to registration and sign-in once they are saved
+            securely on this device.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="gap-2 sm:justify-between">
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            Continue Offline
-          </Button>
+
           <Button
             variant="outline"
             onClick={() => {
