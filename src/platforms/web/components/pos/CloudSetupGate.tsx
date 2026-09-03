@@ -47,24 +47,26 @@ export function CloudSetupGate() {
 
   return (
     <Dialog open={open}>
-      <DialogContent className="sm:max-w-md" showCloseButton={false}>
-
+      <DialogContent
+        className="sm:max-w-md [&>button]:hidden"
+        onEscapeKeyDown={(e) => e.preventDefault()}
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CloudOff className="size-5 text-warning" />
-            Cloud Sync Setup Required
+            Terminal not configured
           </DialogTitle>
           <DialogDescription>
-            Please configure your Online Database Keys in Settings to enable automatic
-            synchronization. Until then this device trades fully offline — sign-in, scanning,
-            checkout and receipt printing all work as normal, and every sale is kept safely on
-            this device.
+            This terminal has no central database configured yet. Nothing is assumed and nothing is
+            inherited from another deployment: enter this shop&apos;s database address and API key
+            in Settings, and the terminal continues to registration and sign-in once they are saved
+            securely on this device.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="gap-2 sm:justify-between">
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            Continue Offline
-          </Button>
+
           <Button
             variant="outline"
             onClick={() => {
