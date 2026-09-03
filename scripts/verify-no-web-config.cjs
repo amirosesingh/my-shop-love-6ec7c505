@@ -115,9 +115,22 @@ function* zipEntries(buf) {
 function* asarEntries(buf) {
   // header: 4 bytes pickle size, 4 bytes header-string size, 4 bytes, 4 bytes json length
   const headerSize = buf.readUInt32LE(4);
-  const jsonLen = buf.readUInt32LE(12);
-  const json = buf.toString("utf8", 16, 16 + jsonLen);
-  const header = JSON.parse(json);
+  // Electron writes 4 | headerSize | headerStringSize | jsonLen | json, but
+  // some producers omit one length field. Try both offsets rather than
+  // reporting a false "cannot be inspected" failure.
+  let header = null;
+  for (const [lenAt, jsonAt] of [
+    [12, 16],
+    [8, 12],
+  ]) {
+    try {
+      header = JSON.parse(buf.toString("utf8", jsonAt, jsonAt + buf.readUInt32LE(lenAt)));
+      break;
+    } catch {
+      /* try the other layout */
+    }
+  }
+  if (!header) throw new Error("unreadable asar header");
   const base = 8 + headerSize;
   const walk = function* (node, prefix) {
     for (const [name, entry] of Object.entries(node.files || {})) {
