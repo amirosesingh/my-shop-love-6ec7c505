@@ -104,12 +104,14 @@ function SettingsHub() {
       key={c.id}
       type="button"
       onClick={() => openCard(c.id)}
-      className="flex items-start gap-3 rounded-lg border border-border bg-card p-4 text-left transition-colors hover:border-primary/60"
+      className="flex items-start gap-2 rounded-md border border-border bg-card p-2.5 text-left transition-colors hover:border-primary/60"
     >
-      <c.icon className="mt-0.5 size-5 shrink-0 text-primary" />
+      <c.icon className="mt-0.5 size-4 shrink-0 text-primary" />
       <span className="min-w-0">
-        <span className="block text-sm font-medium">{c.label}</span>
-        <span className="block text-xs text-muted-foreground">{c.blurb}</span>
+        <span className="block text-[13px] font-medium leading-tight">{c.label}</span>
+        <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
+          {c.blurb}
+        </span>
       </span>
     </button>
   );
