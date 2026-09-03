@@ -6,7 +6,7 @@
  * device — no internet, no cloud, no database, nobody signed in — and the
  * unlock lasts for this screen only, never persisted.
  */
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Delete, LifeBuoy, Lock } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,20 @@ import {
   emergencyPinAvailable,
   verifyEmergencyPin,
 } from "@/lib/emergency-pin";
-import { lockoutRemaining, notePinFailure, attemptsLeft, clearPinFailures } from "@/lib/pin-lockout";
+import {
+  lockoutRemaining,
+  notePinFailure,
+  attemptsLeft,
+  clearPinFailures,
+  type LockoutScope,
+} from "@/lib/pin-lockout";
+
+/**
+ * Recovery keeps its own guessing counter. A cashier who mistyped their PIN
+ * must never lock this terminal out of the screen that repairs its connection,
+ * and a wrong recovery code must never lock the till keypad.
+ */
+const SCOPE: LockoutScope = "recovery";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "back"];
 
@@ -29,6 +42,19 @@ export function EmergencyPinGate({ children }: { children: ReactNode }) {
   const [busy, setBusy] = useState(false);
   const [fingerprint, setFingerprint] = useState("");
   const [locked, setLocked] = useState(0);
+  // A verification still in flight when this screen closes must not write to a
+  // gone component, and reopening must never inherit its result.
+  const alive = useRef(true);
+
+  useEffect(() => {
+    alive.current = true;
+    setPin("");
+    setError("");
+    setBusy(false);
+    return () => {
+      alive.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!gated) return;
@@ -38,7 +64,7 @@ export function EmergencyPinGate({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!gated || unlocked) return;
-    const tick = () => setLocked(lockoutRemaining());
+    const tick = () => setLocked(lockoutRemaining(SCOPE));
     tick();
     const id = window.setInterval(tick, 1000);
     return () => window.clearInterval(id);
@@ -50,20 +76,21 @@ export function EmergencyPinGate({ children }: { children: ReactNode }) {
     if (busy || locked > 0) return;
     setBusy(true);
     setError("");
-    const ok = await verifyEmergencyPin(code);
+    const ok = await verifyEmergencyPin(code).catch(() => false);
+    if (!alive.current) return;
     setBusy(false);
     setPin("");
     if (ok) {
-      clearPinFailures();
+      clearPinFailures(SCOPE);
       setUnlocked(true);
       return;
     }
-    const wait = notePinFailure();
+    const wait = notePinFailure(SCOPE);
     setLocked(wait);
     setError(
       wait > 0
         ? "Too many attempts. Try again in a few minutes."
-        : `Incorrect code. ${attemptsLeft()} attempt(s) left.`,
+        : `Incorrect code. ${attemptsLeft(SCOPE)} attempt(s) left.`,
     );
   };
 
