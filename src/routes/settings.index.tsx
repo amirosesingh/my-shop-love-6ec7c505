@@ -21,16 +21,23 @@ import {
   type SettingsCategoryId,
 } from "@/lib/settings-catalog";
 
-type Search = { cat?: SettingsCategoryId };
+/** `section` and `card` are legacy deep links; `beforeLoad` forwards them. */
+type Search = { cat?: SettingsCategoryId; section?: string; card?: string };
 
 const CATEGORY_IDS = SETTINGS_CATEGORIES.map((c) => c.id) as string[];
 
 export const Route = createFileRoute("/settings/")({
   validateSearch: (search: Record<string, unknown>): Search => {
     const cat = search["cat"];
-    return typeof cat === "string" && CATEGORY_IDS.includes(cat)
-      ? { cat: cat as SettingsCategoryId }
-      : {};
+    const section = search["section"];
+    const card = search["card"];
+    return {
+      ...(typeof cat === "string" && CATEGORY_IDS.includes(cat)
+        ? { cat: cat as SettingsCategoryId }
+        : {}),
+      ...(typeof section === "string" && section ? { section } : {}),
+      ...(typeof card === "string" && card ? { card } : {}),
+    };
   },
   // Older links used ?section=tax or ?card=tax — both now open the real page.
   beforeLoad: ({ search }) => {
