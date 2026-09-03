@@ -19,5 +19,5 @@ export const Route = createFileRoute("/customers")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
-  component: () => <SectionHub groupId="customers" />,
+  component: () => <SectionHub groupId="people" />,
 });

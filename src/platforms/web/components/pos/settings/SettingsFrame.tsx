@@ -11,7 +11,7 @@ import { Link } from "@tanstack/react-router";
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ArrowLeft, Eye, Loader2, RotateCcw, Save } from "lucide-react";
 import { toast } from "sonner";
-import { AppShell } from "@/platforms/web/components/pos/AppShell";
+import { SettingsShell } from "@/platforms/web/components/pos/settings/SettingsShell";
 import { SaveIndicator } from "@/platforms/web/components/pos/settings/SaveIndicator";
 import { useEmbeddedSettings } from "@/platforms/web/components/pos/settings/embed";
 import { ScopePanel } from "@/platforms/web/components/pos/settings/ScopeControls";
@@ -246,7 +246,7 @@ export function SettingsFrame({
     );
     if (embedded) return denied;
     return (
-      <AppShell>{denied}</AppShell>
+      <SettingsShell>{denied}</SettingsShell>
     );
   }
 
@@ -277,17 +277,6 @@ export function SettingsFrame({
               : `mx-auto w-full space-y-5 p-6 ${wide ? "max-w-full" : "max-w-4xl"}`
           }
         >
-          {/* Stays visible while the page scrolls, so there is always a way back. */}
-          {!embedded && (
-            <div className="sticky top-0 z-20 -mx-6 -mt-6 border-b border-border bg-background/95 px-4 py-2 backdrop-blur">
-              <Button asChild variant="ghost" size="sm" className="h-8 text-xs">
-                <Link to="/settings">
-                  <ArrowLeft className="size-4" /> All settings
-                </Link>
-              </Button>
-            </div>
-          )}
-
           <header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
             {embedded ? (
               <div />
@@ -377,5 +366,5 @@ export function SettingsFrame({
     </SettingsCtx.Provider>
   );
 
-  return embedded ? body : <AppShell>{body}</AppShell>;
+  return embedded ? body : <SettingsShell>{body}</SettingsShell>;
 }
