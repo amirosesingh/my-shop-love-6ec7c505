@@ -31,7 +31,7 @@ describe("recovery is never blocked by connection gates", () => {
   });
 
   it("emergency access navigates with the router, never a page load", () => {
-    const link = read("src/platforms/web/components/pos/EmergencyAccessLink.tsx");
+    const link = read("src/components/shared/EmergencyAccessLink.tsx");
     expect(link).toMatch(/<Link\s+to="\/recovery"/);
     expect(gate).toMatch(/<EmergencyAccessLink/);
     for (const file of [
