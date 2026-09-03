@@ -6,6 +6,7 @@
  * is written to the audit log, and the code is hidden again after two minutes.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { Eye, EyeOff, KeyRound, Loader2, RefreshCw, ShieldAlert } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -138,23 +139,45 @@ export function EmergencyCodesPanel() {
     if (shown) {
       const seconds = left(shown);
       return (
-        <div className="flex items-center gap-3">
-          <span className="font-mono text-2xl tracking-[0.35em] tabular-nums">{shown.code}</span>
-          <span className="text-xs text-muted-foreground">
-            {seconds > 0 ? `${seconds}s left` : "expired — refresh"}
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-xl tracking-[0.3em] tabular-nums">{shown.code}</span>
+          <span className="text-[11px] text-muted-foreground">
+            {seconds > 0 ? `${seconds}s` : "expired"}
           </span>
-          <Button size="sm" variant="ghost" onClick={() => void reveal(id)}>
-            <RefreshCw className="size-4" />
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-7"
+            aria-label="Refresh code"
+            onClick={() => void reveal(id)}
+          >
+            <RefreshCw className="size-3.5" />
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => hide(id)}>
-            <EyeOff className="size-4" />
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-7"
+            aria-label="Hide code"
+            onClick={() => hide(id)}
+          >
+            <EyeOff className="size-3.5" />
           </Button>
         </div>
       );
     }
     return (
-      <Button size="sm" variant="outline" disabled={!ready || busy === id} onClick={() => void reveal(id)}>
-        {busy === id ? <Loader2 className="size-4 animate-spin" /> : <Eye className="size-4" />}
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-7 px-2 text-xs"
+        disabled={!ready || busy === id}
+        onClick={() => void reveal(id)}
+      >
+        {busy === id ? (
+          <Loader2 className="size-3.5 animate-spin" />
+        ) : (
+          <Eye className="size-3.5" />
+        )}
         Show code
       </Button>
     );
@@ -165,6 +188,24 @@ export function EmergencyCodesPanel() {
       storageKey="pos.settings.emergency-codes"
       items={[
         {
+          id: "company",
+          title: "Company master code",
+          blurb:
+            "Opens any till of this company, including one that has never been online. It is derived from a secret that lives only on this server — never inside an installer.",
+          content: (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-3">
+              <div className="flex items-start gap-2">
+                <ShieldAlert className="mt-0.5 size-4 text-amber-600" />
+                <p className="max-w-xl text-sm text-muted-foreground">
+                  Use this when a till has no code of its own yet. The till must have its clock
+                  roughly right — three minutes either way is accepted.
+                </p>
+              </div>
+              {codeCell("__company", true)}
+            </div>
+          ),
+        },
+        {
           id: "per-terminal",
           title: "Emergency code per terminal",
           blurb:
@@ -172,15 +213,38 @@ export function EmergencyCodesPanel() {
           content: (
             <div className="space-y-3">
               <div className="flex justify-end">
-                <Button size="sm" variant="ghost" onClick={() => void load()} disabled={loading}>
-                  {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => void load()}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="size-3.5" />
+                  )}
                   Refresh list
                 </Button>
               </div>
               {loading ? (
                 <p className="text-sm text-muted-foreground">Loading terminals…</p>
               ) : terminals.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No registered terminals yet.</p>
+                <div className="space-y-2 rounded-lg border border-dashed border-border p-4">
+                  <p className="text-sm font-medium">No till is registered yet</p>
+                  <p className="text-sm text-muted-foreground">
+                    A Windows or Android till appears here once it has been activated, and its own
+                    code becomes readable after it has been online once. Until then use the company
+                    master code above.
+                  </p>
+                  <Link
+                    to="/settings/terminals"
+                    className="inline-flex text-sm font-medium text-primary underline-offset-4 hover:underline"
+                  >
+                    Open Terminal activation
+                  </Link>
+                </div>
               ) : (
                 <div className="space-y-2">
                   {terminals.map((t) => (
@@ -189,16 +253,18 @@ export function EmergencyCodesPanel() {
                       className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-3"
                     >
                       <div className="min-w-56">
-                        <p className="font-medium">{t.deviceName}</p>
+                        <p className="text-sm font-medium">{t.deviceName}</p>
                         <p className="text-xs text-muted-foreground">
-                          {t.locationName || "No branch"} · {t.platform} · last seen {seen(t.lastSeenAt)}
+                          {t.locationName || "No branch"} · {t.platform} · last seen{" "}
+                          {seen(t.lastSeenAt)}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {t.fingerprint ? (
                             <>Device fingerprint {t.fingerprint}</>
                           ) : (
                             <span className="text-amber-600">
-                              Recovery secret not received — open this till once while it is online.
+                              Waiting for this till to come online once — use the company master
+                              code meanwhile.
                             </span>
                           )}
                         </p>
@@ -213,24 +279,6 @@ export function EmergencyCodesPanel() {
                   ))}
                 </div>
               )}
-            </div>
-          ),
-        },
-        {
-          id: "company",
-          title: "Company master code",
-          blurb:
-            "Opens any till of this company, including one that has never been online. It is derived from a secret that lives only on this server — never inside an installer.",
-          content: (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-3">
-              <div className="flex items-start gap-2">
-                <ShieldAlert className="mt-0.5 size-4 text-amber-600" />
-                <p className="max-w-xl text-sm text-muted-foreground">
-                  Use this only when the per-terminal code is unavailable. The till must have its
-                  clock roughly right — three minutes either way is accepted.
-                </p>
-              </div>
-              {codeCell("__company", true)}
             </div>
           ),
         },
