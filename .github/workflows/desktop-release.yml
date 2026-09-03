@@ -76,7 +76,7 @@ jobs:
 
       - name: Verify the installer carries no web configuration
         shell: bash
-        run: node scripts/verify-no-web-config.cjs release/win-unpacked/resources dist-desktop
+        run: node scripts/verify-no-web-config.cjs release dist-desktop
 
       - name: Write release manifest
         shell: bash
