@@ -139,6 +139,27 @@ export async function emergencyPinAvailable(): Promise<boolean> {
 }
 
 /**
+ * The device recovery secret, for the one purpose of escrowing it with the
+ * company's own backend (`emergency-escrow.ts`) so the owner can read a live
+ * code off the admin screen. Nothing else may call this, and it never returns
+ * anything in a plain browser.
+ */
+export async function deviceEmergencySecret(): Promise<string | null> {
+  const desktop = bridge() as { emergencyEscrowSecret?: () => Promise<{ secret?: string }> } | null;
+  if (isWindowsShell() && desktop?.emergencyEscrowSecret) {
+    try {
+      const res = await desktop.emergencyEscrowSecret();
+      return res?.secret && res.secret.length >= 32 ? res.secret : null;
+    } catch {
+      return null;
+    }
+  }
+  if (isMobileShell()) return androidSecret();
+  return null;
+}
+
+
+/**
  * Guessing brake for the phone. Windows enforces its own in the main process;
  * on Android the check happens here, so the pause lives here too — a screen
  * that is reloaded still faces it because the module stays loaded with the app.
