@@ -282,7 +282,6 @@ export function EmergencyCodesPanel() {
           ),
         },
         {
-        {
           id: "how",
           title: "How to use it",
           blurb: "At the terminal: Emergency Access, then type the six digits.",
