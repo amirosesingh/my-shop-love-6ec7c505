@@ -73,7 +73,6 @@ import { Route as SettingsDatabaseExplorerRouteImport } from './routes/settings.
 import { Route as SettingsDiagnosticsRouteImport } from './routes/settings.diagnostics'
 import { Route as SettingsDisplayRouteImport } from './routes/settings.display'
 import { Route as SettingsElementsRouteImport } from './routes/settings.elements'
-import { Route as SettingsEmergencyCodesRouteImport } from './routes/settings.emergency-codes'
 import { Route as SettingsHardwareRouteImport } from './routes/settings.hardware'
 import { Route as SettingsIdentityRouteImport } from './routes/settings.identity'
 import { Route as SettingsInheritanceRouteImport } from './routes/settings.inheritance'
@@ -107,7 +106,6 @@ import { Route as TransfersIndexRouteImport } from './routes/transfers.index'
 import { Route as TransfersIdRouteImport } from './routes/transfers.$id'
 import { Route as TransfersNewRouteImport } from './routes/transfers.new'
 import { Route as ApiPublicCashierLoginRouteImport } from './routes/api/public/cashier-login'
-import { Route as ApiPublicEmergencyEscrowRouteImport } from './routes/api/public/emergency-escrow'
 import { Route as ApiPublicHealthMetadataRouteImport } from './routes/api/public/health-metadata'
 import { Route as ApiPublicSecurityAlertsRouteImport } from './routes/api/public/security-alerts'
 import { Route as ApiPublicSyncRouteImport } from './routes/api/public/sync'
@@ -438,11 +436,6 @@ const SettingsElementsRoute = SettingsElementsRouteImport.update({
   path: '/settings/elements',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SettingsEmergencyCodesRoute = SettingsEmergencyCodesRouteImport.update({
-  id: '/settings/emergency-codes',
-  path: '/settings/emergency-codes',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SettingsHardwareRoute = SettingsHardwareRouteImport.update({
   id: '/settings/hardware',
   path: '/settings/hardware',
@@ -608,12 +601,6 @@ const ApiPublicCashierLoginRoute = ApiPublicCashierLoginRouteImport.update({
   path: '/api/public/cashier-login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicEmergencyEscrowRoute =
-  ApiPublicEmergencyEscrowRouteImport.update({
-    id: '/api/public/emergency-escrow',
-    path: '/api/public/emergency-escrow',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 const ApiPublicHealthMetadataRoute = ApiPublicHealthMetadataRouteImport.update({
   id: '/api/public/health-metadata',
   path: '/api/public/health-metadata',
@@ -716,7 +703,6 @@ export interface FileRoutesByFullPath {
   '/settings/diagnostics': typeof SettingsDiagnosticsRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
-  '/settings/emergency-codes': typeof SettingsEmergencyCodesRoute
   '/settings/hardware': typeof SettingsHardwareRoute
   '/settings/identity': typeof SettingsIdentityRoute
   '/settings/inheritance': typeof SettingsInheritanceRoute
@@ -754,7 +740,6 @@ export interface FileRoutesByFullPath {
   '/settings/': typeof SettingsIndexRoute
   '/transfers/': typeof TransfersIndexRoute
   '/api/public/cashier-login': typeof ApiPublicCashierLoginRoute
-  '/api/public/emergency-escrow': typeof ApiPublicEmergencyEscrowRoute
   '/api/public/health-metadata': typeof ApiPublicHealthMetadataRoute
   '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
   '/api/public/sync': typeof ApiPublicSyncRoute
@@ -825,7 +810,6 @@ export interface FileRoutesByTo {
   '/settings/diagnostics': typeof SettingsDiagnosticsRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
-  '/settings/emergency-codes': typeof SettingsEmergencyCodesRoute
   '/settings/hardware': typeof SettingsHardwareRoute
   '/settings/identity': typeof SettingsIdentityRoute
   '/settings/inheritance': typeof SettingsInheritanceRoute
@@ -863,7 +847,6 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsIndexRoute
   '/transfers': typeof TransfersIndexRoute
   '/api/public/cashier-login': typeof ApiPublicCashierLoginRoute
-  '/api/public/emergency-escrow': typeof ApiPublicEmergencyEscrowRoute
   '/api/public/health-metadata': typeof ApiPublicHealthMetadataRoute
   '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
   '/api/public/sync': typeof ApiPublicSyncRoute
@@ -935,7 +918,6 @@ export interface FileRoutesById {
   '/settings/diagnostics': typeof SettingsDiagnosticsRoute
   '/settings/display': typeof SettingsDisplayRoute
   '/settings/elements': typeof SettingsElementsRoute
-  '/settings/emergency-codes': typeof SettingsEmergencyCodesRoute
   '/settings/hardware': typeof SettingsHardwareRoute
   '/settings/identity': typeof SettingsIdentityRoute
   '/settings/inheritance': typeof SettingsInheritanceRoute
@@ -973,7 +955,6 @@ export interface FileRoutesById {
   '/settings/': typeof SettingsIndexRoute
   '/transfers/': typeof TransfersIndexRoute
   '/api/public/cashier-login': typeof ApiPublicCashierLoginRoute
-  '/api/public/emergency-escrow': typeof ApiPublicEmergencyEscrowRoute
   '/api/public/health-metadata': typeof ApiPublicHealthMetadataRoute
   '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
   '/api/public/sync': typeof ApiPublicSyncRoute
@@ -1046,7 +1027,6 @@ export interface FileRouteTypes {
     | '/settings/diagnostics'
     | '/settings/display'
     | '/settings/elements'
-    | '/settings/emergency-codes'
     | '/settings/hardware'
     | '/settings/identity'
     | '/settings/inheritance'
@@ -1084,7 +1064,6 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/transfers/'
     | '/api/public/cashier-login'
-    | '/api/public/emergency-escrow'
     | '/api/public/health-metadata'
     | '/api/public/security-alerts'
     | '/api/public/sync'
@@ -1155,7 +1134,6 @@ export interface FileRouteTypes {
     | '/settings/diagnostics'
     | '/settings/display'
     | '/settings/elements'
-    | '/settings/emergency-codes'
     | '/settings/hardware'
     | '/settings/identity'
     | '/settings/inheritance'
@@ -1193,7 +1171,6 @@ export interface FileRouteTypes {
     | '/settings'
     | '/transfers'
     | '/api/public/cashier-login'
-    | '/api/public/emergency-escrow'
     | '/api/public/health-metadata'
     | '/api/public/security-alerts'
     | '/api/public/sync'
@@ -1264,7 +1241,6 @@ export interface FileRouteTypes {
     | '/settings/diagnostics'
     | '/settings/display'
     | '/settings/elements'
-    | '/settings/emergency-codes'
     | '/settings/hardware'
     | '/settings/identity'
     | '/settings/inheritance'
@@ -1302,7 +1278,6 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/transfers/'
     | '/api/public/cashier-login'
-    | '/api/public/emergency-escrow'
     | '/api/public/health-metadata'
     | '/api/public/security-alerts'
     | '/api/public/sync'
@@ -1374,7 +1349,6 @@ export interface RootRouteChildren {
   SettingsDiagnosticsRoute: typeof SettingsDiagnosticsRoute
   SettingsDisplayRoute: typeof SettingsDisplayRoute
   SettingsElementsRoute: typeof SettingsElementsRoute
-  SettingsEmergencyCodesRoute: typeof SettingsEmergencyCodesRoute
   SettingsHardwareRoute: typeof SettingsHardwareRoute
   SettingsIdentityRoute: typeof SettingsIdentityRoute
   SettingsInheritanceRoute: typeof SettingsInheritanceRoute
@@ -1412,7 +1386,6 @@ export interface RootRouteChildren {
   SettingsIndexRoute: typeof SettingsIndexRoute
   TransfersIndexRoute: typeof TransfersIndexRoute
   ApiPublicCashierLoginRoute: typeof ApiPublicCashierLoginRoute
-  ApiPublicEmergencyEscrowRoute: typeof ApiPublicEmergencyEscrowRoute
   ApiPublicHealthMetadataRoute: typeof ApiPublicHealthMetadataRoute
   ApiPublicSecurityAlertsRoute: typeof ApiPublicSecurityAlertsRoute
   ApiPublicSyncRoute: typeof ApiPublicSyncRoute
@@ -1871,13 +1844,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsElementsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/settings/emergency-codes': {
-      id: '/settings/emergency-codes'
-      path: '/settings/emergency-codes'
-      fullPath: '/settings/emergency-codes'
-      preLoaderRoute: typeof SettingsEmergencyCodesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/settings/hardware': {
       id: '/settings/hardware'
       path: '/settings/hardware'
@@ -2109,13 +2075,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCashierLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/emergency-escrow': {
-      id: '/api/public/emergency-escrow'
-      path: '/api/public/emergency-escrow'
-      fullPath: '/api/public/emergency-escrow'
-      preLoaderRoute: typeof ApiPublicEmergencyEscrowRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/public/health-metadata': {
       id: '/api/public/health-metadata'
       path: '/api/public/health-metadata'
@@ -2250,7 +2209,6 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsDiagnosticsRoute: SettingsDiagnosticsRoute,
   SettingsDisplayRoute: SettingsDisplayRoute,
   SettingsElementsRoute: SettingsElementsRoute,
-  SettingsEmergencyCodesRoute: SettingsEmergencyCodesRoute,
   SettingsHardwareRoute: SettingsHardwareRoute,
   SettingsIdentityRoute: SettingsIdentityRoute,
   SettingsInheritanceRoute: SettingsInheritanceRoute,
@@ -2288,7 +2246,6 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsIndexRoute: SettingsIndexRoute,
   TransfersIndexRoute: TransfersIndexRoute,
   ApiPublicCashierLoginRoute: ApiPublicCashierLoginRoute,
-  ApiPublicEmergencyEscrowRoute: ApiPublicEmergencyEscrowRoute,
   ApiPublicHealthMetadataRoute: ApiPublicHealthMetadataRoute,
   ApiPublicSecurityAlertsRoute: ApiPublicSecurityAlertsRoute,
   ApiPublicSyncRoute: ApiPublicSyncRoute,
