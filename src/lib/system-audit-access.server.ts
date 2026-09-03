@@ -10,9 +10,8 @@ const SUPERVISOR_ROLES = new Set(["admin", "owner", "manager", "supervisor"]);
 export async function describeAccessToken(
   accessToken: string,
 ): Promise<{ id: string | null; name: string | null; role: string | null }> {
-  const url = process.env["SUPABASE_URL"] ?? process.env["VITE_SUPABASE_URL"];
-  const key =
-    process.env["SUPABASE_PUBLISHABLE_KEY"] ?? process.env["VITE_SUPABASE_PUBLISHABLE_KEY"];
+  const url = process.env["SUPABASE_URL"];
+  const key = process.env["SUPABASE_ANON_KEY"];
   if (!url || !key) return { id: null, name: null, role: null };
   const res = await fetch(`${url}/auth/v1/user`, {
     headers: { apikey: key, Authorization: `Bearer ${accessToken}` },

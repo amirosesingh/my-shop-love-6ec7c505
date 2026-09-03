@@ -78,17 +78,8 @@ function conflictKey(table: string): string {
   return RELAY_CONFLICT_KEYS[table] ?? "id";
 }
 
-/**
- * The one name the service key is bound under. Older deployments also accepted
- * `POS_SERVICE_ROLE_KEY` and `SUPABASE_POS_SERVICE_ROLE_KEY`; those are only
- * looked at to fail loudly, so a stale duplicate cannot stay silently live and
- * rotation is always verifiable.
- */
+/** The one name the service key is bound under. */
 const SERVICE_KEY_NAME = "POS_SUPABASE_SERVICE_ROLE_KEY";
-const RETIRED_SERVICE_KEY_NAMES = [
-  "POS_SERVICE_ROLE_KEY",
-  "SUPABASE_POS_SERVICE_ROLE_KEY",
-] as const;
 
 const envValue = (name: string): string | undefined =>
   // Cloudflare hands secrets to the worker per request, so check what the
@@ -97,12 +88,6 @@ const envValue = (name: string): string | undefined =>
 
 /** Read the key at call time: some runtimes inject env per request. */
 function readServiceKey(): string | undefined {
-  const stale = RETIRED_SERVICE_KEY_NAMES.filter((name) => envValue(name));
-  if (stale.length) {
-    throw new Error(
-      `Retired service key name(s) still set: ${stale.join(", ")}. Remove them and use ${SERVICE_KEY_NAME} only, so key rotation can be verified.`,
-    );
-  }
   return envValue(SERVICE_KEY_NAME);
 }
 
