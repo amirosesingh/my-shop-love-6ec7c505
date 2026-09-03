@@ -31,41 +31,24 @@ export function CloudSetupGate() {
   useEffect(() => {
     if (!isTerminalApp()) return;
 
-    const check = async () => {
-      try {
-        const status = await cloudKeyStatus();
-        // Prompting for cloud keys with no connection is misleading: the
-        // device cannot verify them anyway, and it trades locally regardless.
-        if (!status.configured && isCloudConnected()) setOpen(true);
-      } catch {
-        /* a storage hiccup must never block the till from opening */
-      }
-    };
-    void check();
-
+    // Configuration readiness is a local fact: it does not depend on whether
+    // the device happens to be online, and there is no web fallback to hide
+    // behind. Missing configuration means setup, every launch, until saved.
+    const offReady = subscribeConfigReady((state) => setOpen(!state.ready));
     // The desktop shell announces the missing keys as soon as the window shows.
-    const offShell = window.pos?.onCloudSetupRequired?.(() => {
-      if (isCloudConnected()) setOpen(true);
-    });
-    // Saving keys anywhere in the app closes the prompt immediately.
-    const offKeys = subscribeCloudKeys(() => {
-      void cloudKeyStatus()
-        .then((status) => {
-          if (status.configured) setOpen(false);
-        })
-        .catch(() => {});
-    });
+    const offShell = window.pos?.onCloudSetupRequired?.(() => setOpen(true));
     return () => {
       offShell?.();
-      offKeys();
+      offReady();
     };
   }, []);
 
   if (!isTerminalApp()) return null;
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="sm:max-w-md">
+    <Dialog open={open}>
+      <DialogContent className="sm:max-w-md" showCloseButton={false}>
+
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CloudOff className="size-5 text-warning" />
