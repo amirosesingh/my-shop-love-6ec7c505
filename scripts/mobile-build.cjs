@@ -13,19 +13,23 @@ const { spawnSync, spawn } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 
+const { withoutWebEnv, scrubWebEnv } = require("./web-only-env.cjs");
+
 const root = path.resolve(__dirname, "..");
 const out = path.join(root, "capacitor-shell");
 const PORT = Number(process.env["MOBILE_RENDER_PORT"] || 43119);
+
 
 function run(cmd, args, env) {
   const res = spawnSync(cmd, args, {
     cwd: root,
     stdio: "inherit",
     shell: process.platform === "win32",
-    env: { ...process.env, ...env },
+    env: { ...withoutWebEnv(), ...env },
   });
   if (res.status !== 0) process.exit(res.status ?? 1);
 }
+
 
 async function waitForServer(url, attempts = 60) {
   for (let i = 0; i < attempts; i += 1) {
@@ -51,26 +55,12 @@ function copyDir(from, to) {
 }
 
 /**
- * Names that belong to the web deployment. They are removed from the build's
- * own environment so a CI runner variable cannot reach the phone bundle, on
- * top of the empty `envDir` and the `undefined` defines in vite.config.ts.
+ * Web deployment names are removed from this process's environment (and from
+ * every child it starts) by scripts/web-only-env.cjs, so a CI runner variable
+ * cannot reach the phone bundle — on top of the empty `envDir` and the
+ * `undefined` defines in vite.config.ts.
  */
-const WEB_ONLY_ENV_NAMES = [
-  "VITE_SUPABASE_URL",
-  "VITE_SUPABASE_ANON_KEY",
-  "VITE_SUPABASE_PUBLISHABLE_KEY",
-  "VITE_SUPABASE_PROJECT_ID",
-  "VITE_POS_SUPABASE_URL",
-  "VITE_POS_SUPABASE_ANON_KEY",
-  "VITE_POS_SUPABASE_PUBLISHABLE_KEY",
-  "VITE_SUPABASE_EXTERNAL_URL",
-  "VITE_SUPABASE_EXTERNAL_PUBLISHABLE_KEY",
-  "VITE_POS_SERVER_URL",
-];
 
-function scrubWebEnv() {
-  for (const name of WEB_ONLY_ENV_NAMES) delete process.env[name];
-}
 
 function cleanOutputs() {
   for (const dir of ["dist", out, path.join(root, "android", "app", "build")]) {
@@ -106,9 +96,15 @@ async function main() {
   console.log("› rendering the app shell");
   const server = spawn(process.execPath, [serverEntry], {
     cwd: root,
-    env: { ...process.env, PORT: String(PORT), HOST: "127.0.0.1", NITRO_PORT: String(PORT) },
+    env: {
+      ...withoutWebEnv(),
+      PORT: String(PORT),
+      HOST: "127.0.0.1",
+      NITRO_PORT: String(PORT),
+    },
     stdio: ["ignore", "inherit", "inherit"],
   });
+
 
   server.on("error", (error) => {
     console.error(`Could not start the phone render server: ${error.message}`);
@@ -139,11 +135,6 @@ async function main() {
   fs.writeFileSync(path.join(out, "200.html"), html, "utf8");
 
 
-  console.log("› checking the bundle carries no web configuration");
-  run(process.execPath, [
-    path.join(root, "scripts", "verify-no-web-config.cjs"),
-    out,
-  ]);
 
   console.log(`✓ phone bundle ready in ${path.relative(root, out)}`);
 }

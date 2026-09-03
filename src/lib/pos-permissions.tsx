@@ -6,7 +6,9 @@ import {
   useMemo,
   useRef,
   useState,
+  type Context,
   type ReactNode,
+
 } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { Loader2, ShieldAlert } from "lucide-react";
@@ -46,7 +48,20 @@ type Ctx = {
   requirePermission: (flag: PermissionFlag | string) => Promise<boolean>;
 };
 
-const PermissionsContext = createContext<Ctx | null>(null);
+/**
+ * One context object per browser session, not per module evaluation. A hot
+ * reload (or a second copy of this module in the graph) would otherwise mint a
+ * fresh context, so the provider and the consumer would look at different
+ * objects and the till would blank with "useUserPermissions must be used
+ * inside PermissionsProvider" even though the provider is mounted. Same
+ * pattern as the auth and register-store contexts.
+ */
+const permissionsRegistry = globalThis as typeof globalThis & {
+  __posPermissionsContext?: Context<Ctx | null>;
+};
+const PermissionsContext = (permissionsRegistry.__posPermissionsContext ??=
+  createContext<Ctx | null>(null));
+
 
 /**
  * Degrades gracefully when the auth context is missing (duplicate module
