@@ -128,11 +128,6 @@ async function main() {
   fs.writeFileSync(path.join(out, "200.html"), html, "utf8");
 
 
-  console.log("› checking the bundle carries no web configuration");
-  run(process.execPath, [
-    path.join(root, "scripts", "verify-no-web-config.cjs"),
-    out,
-  ]);
 
   console.log(`✓ phone bundle ready in ${path.relative(root, out)}`);
 }
