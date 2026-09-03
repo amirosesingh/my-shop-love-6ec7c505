@@ -25,10 +25,11 @@ function run(cmd, args, env) {
     cwd: root,
     stdio: "inherit",
     shell: process.platform === "win32",
-    env: { ...process.env, ...env },
+    env: { ...withoutWebEnv(), ...env },
   });
   if (res.status !== 0) process.exit(res.status ?? 1);
 }
+
 
 async function waitForServer(url, attempts = 60) {
   for (let i = 0; i < attempts; i += 1) {
