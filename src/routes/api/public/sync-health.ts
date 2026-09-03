@@ -10,7 +10,6 @@ import { corsPreflight, withCors } from "@/lib/public-cors";
  * lengths or prefixes — so it is safe to leave open.
  */
 async function handleGet(): Promise<Response> {
-      {
         const { publiclyReadable } = await import("@/lib/public-api-guard.server");
         const denied = publiclyReadable(
           "presence-only flags: no key values, lengths or prefixes are returned",
