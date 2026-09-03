@@ -7135,3 +7135,26 @@ SELECT 'table without grants', c.relname
 ORDER BY 1, 2;
 
 
+
+-- ---------------------------------------------------------------------------
+-- Emergency recovery secrets (v1.3.99)
+-- Each till escrows its recovery secret here, encrypted with the server's
+-- SETTINGS_ENCRYPTION_KEY. Service role only: no policy is granted on purpose,
+-- so the row is unreachable through the data API.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.terminal_recovery_secrets (
+    terminal_token_id uuid PRIMARY KEY,
+    sealed_secret text NOT NULL,
+    fingerprint text NOT NULL,
+    platform text DEFAULT 'unknown'::text NOT NULL,
+    device_name text,
+    utc_offset_minutes integer DEFAULT 0 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+ALTER TABLE public.terminal_recovery_secrets ADD COLUMN IF NOT EXISTS utc_offset_minutes integer DEFAULT 0 NOT NULL;
+ALTER TABLE public.terminal_recovery_secrets ADD COLUMN IF NOT EXISTS device_name text;
+
+GRANT ALL ON public.terminal_recovery_secrets TO service_role;
+ALTER TABLE public.terminal_recovery_secrets ENABLE ROW LEVEL SECURITY;

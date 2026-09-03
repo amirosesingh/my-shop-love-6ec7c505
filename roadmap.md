@@ -30,3 +30,5 @@
 - [ ] Production Web reads canonical `SUPABASE_URL` / `SUPABASE_ANON_KEY` from the Cloudflare
       Worker — confirm both are set there. No repository `.env` is required for a Web build.
 
+
+- Emergency codes admin screen (/settings/emergency-codes): tills escrow their recovery secret encrypted; owner-only reveal returns only the live six digits; per-company master salt replaces the build-time salt. (v1.3.99)

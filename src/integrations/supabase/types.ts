@@ -3798,6 +3798,39 @@ export type Database = {
         }
         Relationships: []
       }
+      terminal_recovery_secrets: {
+        Row: {
+          created_at: string
+          device_name: string | null
+          fingerprint: string
+          platform: string
+          sealed_secret: string
+          terminal_token_id: string
+          updated_at: string
+          utc_offset_minutes: number
+        }
+        Insert: {
+          created_at?: string
+          device_name?: string | null
+          fingerprint: string
+          platform?: string
+          sealed_secret: string
+          terminal_token_id: string
+          updated_at?: string
+          utc_offset_minutes?: number
+        }
+        Update: {
+          created_at?: string
+          device_name?: string | null
+          fingerprint?: string
+          platform?: string
+          sealed_secret?: string
+          terminal_token_id?: string
+          updated_at?: string
+          utc_offset_minutes?: number
+        }
+        Relationships: []
+      }
       terminal_tokens: {
         Row: {
           activated_at: string | null

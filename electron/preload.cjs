@@ -135,6 +135,10 @@ contextBridge.exposeInMainWorld("pos", {
   /* emergency access recovery PIN — verified in the main process */
   verifyEmergencyPin: (pin) => invoke("emergency:verify-pin", pin),
   emergencyFingerprint: () => invoke("emergency:fingerprint"),
+  /* escrow only: the secret is handed to the company's own backend so the
+     owner can read a live code from the admin screen */
+  emergencyEscrowSecret: () => invoke("emergency:escrow-secret"),
+  setEmergencyCompanySalt: (salt) => invoke("emergency:set-company-salt", salt),
   /* tenant cloud credentials sealed in the OS vault (DPAPI) */
   cloudKeyStatus: () => invoke("cloud:status"),
   bootstrapCloudCredentials: () => invoke("cloud:bootstrap"),

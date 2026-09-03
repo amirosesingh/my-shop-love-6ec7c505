@@ -120,6 +120,9 @@ export function useRevocationCheck(): RevocationState {
         }
         setBlocked(false);
         void stampHeartbeat(config.tokenId);
+        // While the till is proven online, lodge its recovery secret so the
+        // owner can read a live emergency code from the admin screen.
+        void import("@/lib/emergency-escrow").then((m) => m.syncEmergencyEscrow());
         // A verified status is the only thing that extends the offline grace.
         void writeActivationRecord({
           tokenId: config.tokenId,
