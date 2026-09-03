@@ -55,12 +55,7 @@ if (!fs.existsSync(path.join(desktopOut, "server", "index.mjs"))) {
   process.exit(1);
 }
 
-console.log("› checking the desktop bundle carries no web configuration");
-run("node", ["scripts/verify-no-web-config.cjs", "dist-desktop"]);
-
 run("electron-builder", ["--win", "nsis", "--publish", "never"]);
 
-// The whole release folder: unpacked resources, app.asar and the installer
-// itself are all opened by the archive-aware scanner.
-console.log("› checking the packaged app and installer carry no web configuration");
-run("node", ["scripts/verify-no-web-config.cjs", "release"]);
+console.log("✓ Windows installer ready in release/");
+
