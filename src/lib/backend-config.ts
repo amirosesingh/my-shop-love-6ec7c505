@@ -20,6 +20,20 @@ const STORAGE_KEY = "pos.backend.url";
 const clean = (value: unknown): string =>
   typeof value === "string" ? value.trim().replace(/\/+$/, "") : "";
 
+/**
+ * Accept what an operator would naturally type. A bare host gets `https://`,
+ * a trailing slash goes, and a pasted endpoint path (`.../api/public/...`) is
+ * trimmed back to the site root — the address is the site, not an endpoint.
+ */
+export function normaliseBackendUrl(value: string): string {
+  let url = clean(value);
+  if (!url) return "";
+  if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+  url = url.replace(/\/api(\/.*)?$/i, "");
+  return url.replace(/\/+$/, "");
+}
+
+
 type Bridge = {
   backendUrl?: () => Promise<{ ok: boolean; url?: string }>;
   setBackendUrl?: (value: string) => Promise<{ ok: boolean; url?: string; error?: string }>;
@@ -71,9 +85,9 @@ export type BackendSaveResult = { ok: boolean; error?: string; url?: string };
 
 /** Save (or clear, with an empty value) the address for this device. */
 export async function saveBackendUrl(value: string): Promise<BackendSaveResult> {
-  const next = clean(value);
-  if (next && !/^https?:\/\/.+/i.test(next))
-    return { ok: false, error: "Enter a full address starting with https://" };
+  const next = normaliseBackendUrl(value);
+  if (value.trim() && !next)
+    return { ok: false, error: "Enter the web address of your POS site, e.g. https://pos.example.com" };
   if (isWindowsShell()) {
     const res = await bridge()
       ?.setBackendUrl?.(next)
@@ -91,18 +105,81 @@ export async function saveBackendUrl(value: string): Promise<BackendSaveResult> 
   return { ok: true, url: next };
 }
 
+export type BackendTestResult = {
+  ok: boolean;
+  /** true when the address answered but still needs an administrator */
+  warn?: boolean;
+  detail: string;
+  /** the address that was actually tried, after tidying up what was typed */
+  url?: string;
+};
+
 /**
- * Ask the backend whether it is alive, without any credential. Used by the
- * recovery screen so an operator can tell a wrong address from a dead line.
+ * Ask the address whether it is this POS backend, using the open presence
+ * probe — no credential, no cloud account. The answer distinguishes the four
+ * mistakes an operator actually makes: the database address, a plain website,
+ * a POS server missing its central key, and a dead line.
  */
-export async function testBackendUrl(value: string): Promise<{ ok: boolean; detail: string }> {
-  const url = clean(value);
+export async function testBackendUrl(value: string): Promise<BackendTestResult> {
+  const url = normaliseBackendUrl(value);
   if (!url) return { ok: false, detail: "Enter the backend address first." };
+  let res: Response;
   try {
-    const res = await fetch(`${url}/api/public/health-metadata`, { method: "GET" });
-    if (res.ok) return { ok: true, detail: "The backend answered — this address works." };
-    return { ok: false, detail: `The backend answered ${res.status}. Check the address.` };
+    res = await fetch(`${url}/api/public/sync-health`, { method: "GET", cache: "no-store" });
   } catch (e) {
-    return { ok: false, detail: `No answer from ${url}: ${(e as Error).message}` };
+    return {
+      ok: false,
+      url,
+      detail: `No answer from ${url} — check the address, its certificate and this device's connection (${(e as Error).message}).`,
+    };
   }
+
+  const text = await res.text().catch(() => "");
+  let body: unknown = null;
+  try {
+    body = JSON.parse(text) as unknown;
+  } catch {
+    /* not JSON — handled below */
+  }
+  const data = (body ?? {}) as {
+    serviceKey?: boolean;
+    posUrl?: boolean;
+    message?: string;
+    hint?: string;
+    code?: string;
+  };
+
+  // The central database answers its own error shape and never these flags.
+  if (typeof data.serviceKey !== "boolean") {
+    if (data.message || data.hint || data.code || /supabase\.co/i.test(url))
+      return {
+        ok: false,
+        url,
+        detail:
+          "That is the central database address, not your POS website. Enter the web address you open the POS on, e.g. https://pos.example.com.",
+      };
+    if (/<html/i.test(text))
+      return {
+        ok: false,
+        url,
+        detail: `${url} serves a website, but not this POS backend. Check the address is the POS deployment.`,
+      };
+    return {
+      ok: false,
+      url,
+      detail: `${url} answered ${res.status} but not as a POS backend. Check the address.`,
+    };
+  }
+
+  if (!data.serviceKey)
+    return {
+      ok: false,
+      warn: true,
+      url,
+      detail:
+        "This is the POS backend, but it has no central database key. An administrator must set SUPABASE_URL, SUPABASE_ANON_KEY and the service key on the hosting environment.",
+    };
+
+  return { ok: true, url, detail: `${url} answered as your POS backend — sign-in and sync will work.` };
 }
+

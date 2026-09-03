@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
+import { corsPreflight, withCors } from "@/lib/public-cors";
+
 /**
  * POST /api/public/health-metadata
  *
@@ -120,5 +122,10 @@ async function handle({ request }: { request: Request }) {
 }
 
 export const Route = createFileRoute("/api/public/health-metadata")({
-  server: { handlers: { POST: handle } },
+  server: {
+    handlers: {
+      POST: async (ctx) => withCors(await handle(ctx), ctx.request),
+      OPTIONS: async ({ request }) => corsPreflight(request),
+    },
+  },
 });

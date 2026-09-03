@@ -15,12 +15,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { isTerminalApp } from "@/platform-config/platform";
-import { backendUrl, saveBackendUrl, testBackendUrl } from "@/lib/backend-config";
+import {
+  backendUrl,
+  saveBackendUrl,
+  testBackendUrl,
+  type BackendTestResult,
+} from "@/lib/backend-config";
 
 export function BackendAddressPanel() {
   const [saved, setSaved] = useState("");
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState<"test" | "save" | null>(null);
+  const [result, setResult] = useState<BackendTestResult | null>(null);
 
   const refresh = useCallback(async () => {
     const current = await backendUrl();
@@ -37,9 +43,12 @@ export function BackendAddressPanel() {
   const test = async () => {
     setBusy("test");
     try {
-      const result = await testBackendUrl(url);
-      if (result.ok) toast.success(result.detail);
-      else toast.error(result.detail);
+      const res = await testBackendUrl(url);
+      setResult(res);
+      if (res.url) setUrl(res.url);
+      if (res.ok) toast.success(res.detail);
+      else if (res.warn) toast.warning(res.detail);
+      else toast.error(res.detail);
     } finally {
       setBusy(null);
     }
@@ -87,8 +96,11 @@ export function BackendAddressPanel() {
           onChange={(e) => setUrl(e.target.value)}
         />
         <p className="text-xs text-muted-foreground">
-          The public address of your POS server. No private key is stored on this device — the
-          server performs every privileged operation itself.
+          Enter the web address you open the POS on — your own company domain, for example{" "}
+          <code>https://pos.example.com</code>. This is <strong>not</strong> the central database
+          address and <strong>not</strong> a key: the till talks to your POS site, and your POS
+          site talks to the database with the key it holds on the server. No private key is ever
+          stored on this device.
         </p>
       </div>
 
@@ -106,6 +118,16 @@ export function BackendAddressPanel() {
           Save address
         </Button>
       </div>
+
+      {result && (
+        <p
+          className={`text-xs ${
+            result.ok ? "text-success" : result.warn ? "text-amber-600" : "text-destructive"
+          }`}
+        >
+          {result.ok ? "✓" : result.warn ? "!" : "✕"} {result.detail}
+        </p>
+      )}
     </section>
   );
 }

@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
+import { corsPreflight, withCors } from "@/lib/public-cors";
+
 /**
  * GET /api/public/sync-health
  *
@@ -7,10 +9,7 @@ import { createFileRoute } from "@tanstack/react-router";
  * reach the central database. It reports presence only — never key values,
  * lengths or prefixes — so it is safe to leave open.
  */
-export const Route = createFileRoute("/api/public/sync-health")({
-  server: {
-    handlers: {
-      GET: async () => {
+async function handleGet(): Promise<Response> {
         const { publiclyReadable } = await import("@/lib/public-api-guard.server");
         const denied = publiclyReadable(
           "presence-only flags: no key values, lengths or prefixes are returned",
@@ -40,7 +39,13 @@ export const Route = createFileRoute("/api/public/sync-health")({
           },
           { headers: { "Cache-Control": "no-store" } },
         );
-      },
+}
+
+export const Route = createFileRoute("/api/public/sync-health")({
+  server: {
+    handlers: {
+      GET: async ({ request }) => withCors(await handleGet(), request),
+      OPTIONS: async ({ request }) => corsPreflight(request),
     },
   },
 });
