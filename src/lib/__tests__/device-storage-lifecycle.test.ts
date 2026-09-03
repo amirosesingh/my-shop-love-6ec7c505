@@ -1,0 +1,102 @@
+import { describe, expect, it } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { createRequire } from "node:module";
+
+import { staleKeys, shellUpgraded } from "@/platforms/mobile/device-cleanup";
+
+const require = createRequire(import.meta.url);
+const hygiene = require(path.resolve(process.cwd(), "electron/storage-hygiene.cjs"));
+
+describe("Windows till storage hygiene", () => {
+  it("never treats identity or configuration as cache", () => {
+    for (const name of [
+      "pos_config.json",
+      "terminal-config.bin",
+      "local-db-config.bin",
+      "cloud-credentials.bin",
+      "pos-local.db",
+    ]) {
+      expect(hygiene.isRequiredEntry(name)).toBe(true);
+      expect(hygiene.isDisposableCacheDir(name)).toBe(false);
+    }
+  });
+
+  it("classes Chromium scratch folders as disposable", () => {
+    for (const name of ["Cache", "Code Cache", "GPUCache", "Crashpad", "logs"]) {
+      expect(hygiene.isDisposableCacheDir(name)).toBe(true);
+    }
+  });
+
+  it("clears caches but keeps required files, and only bumps on a new version", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pos-userdata-"));
+    fs.mkdirSync(path.join(dir, "Cache"));
+    fs.writeFileSync(path.join(dir, "Cache", "data_1"), "x");
+    fs.writeFileSync(path.join(dir, "pos_config.json"), "{}");
+    fs.writeFileSync(path.join(dir, "terminal-config.bin"), "sealed");
+
+    const first = hygiene.runOnLaunch(dir, "1.0.0");
+    expect(first.upgraded).toBe(true); // fresh install
+    expect(fs.existsSync(path.join(dir, "Cache", "data_1"))).toBe(false);
+    expect(fs.readFileSync(path.join(dir, "terminal-config.bin"), "utf8")).toBe("sealed");
+    expect(fs.existsSync(path.join(dir, "pos_config.json"))).toBe(true);
+
+    expect(hygiene.runOnLaunch(dir, "1.0.0").upgraded).toBe(false);
+    expect(hygiene.runOnLaunch(dir, "1.0.1").upgraded).toBe(true);
+
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe("phone storage hygiene", () => {
+  const keys = [
+    "pos.terminal.config",
+    "pos.terminal.token",
+    "pos.secure.cloud",
+    "pos.theme",
+    "pos.cart.draft.1",
+    "pos.ui.webBundle",
+    "pos.report.cache",
+    "pos.shell.version",
+  ];
+
+  it("keeps identity, configuration, preferences and the open ticket", () => {
+    const removed = staleKeys(keys, true);
+    expect(removed).not.toContain("pos.terminal.config");
+    expect(removed).not.toContain("pos.terminal.token");
+    expect(removed).not.toContain("pos.secure.cloud");
+    expect(removed).not.toContain("pos.theme");
+    expect(removed).not.toContain("pos.cart.draft.1");
+    expect(removed).not.toContain("pos.shell.version");
+  });
+
+  it("drops derived caches on an upgrade", () => {
+    expect(staleKeys(keys, true)).toEqual(
+      expect.arrayContaining(["pos.ui.webBundle", "pos.report.cache"]),
+    );
+  });
+
+  it("detects the first launch after a version change", () => {
+    expect(shellUpgraded(null, "1.4.0")).toBe(true);
+    expect(shellUpgraded("1.3.9", "1.4.0")).toBe(true);
+    expect(shellUpgraded("1.4.0", "1.4.0")).toBe(false);
+  });
+});
+
+describe("uninstall leaves nothing behind", () => {
+  it("the Windows installer removes application data", () => {
+    const pkg = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "package.json"), "utf8"));
+    expect(pkg.build.nsis.deleteAppDataOnUninstall).toBe(true);
+  });
+
+  it("the Android manifest patcher disables Auto Backup", () => {
+    const src = fs.readFileSync(
+      path.resolve(process.cwd(), "scripts/android-permissions.cjs"),
+      "utf8",
+    );
+    expect(src).toContain('"allowBackup", "false"');
+    expect(src).toContain('"fullBackupContent", "false"');
+    expect(src).toContain("data_extraction_rules");
+  });
+});
