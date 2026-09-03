@@ -80,15 +80,12 @@ function bags(): Record<string, unknown>[] {
   // Vite only inlines STATIC `import.meta.env.VITE_*` reads. In a production
   // build `import.meta.env` itself is a small object without the VITE_ names,
   // so a dynamic lookup finds nothing — these static reads are the only way
-  // the browser bundle can carry build-time values.
+  // the browser bundle can carry build-time values. Only the POS-specific
+  // pair exists here: a hosting platform can inject its own SUPABASE_*
+  // values, and the shop's own project must win.
   out.push({
-    // The POS-specific pair comes first everywhere: a hosting platform can
-    // inject its own SUPABASE_* values, and the shop's own project must win.
     VITE_POS_SUPABASE_URL: import.meta.env.VITE_POS_SUPABASE_URL,
     VITE_POS_SUPABASE_ANON_KEY: import.meta.env.VITE_POS_SUPABASE_ANON_KEY,
-    VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
-    VITE_SUPABASE_ANON_KEY:
-      import.meta.env.VITE_SUPABASE_ANON_KEY ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
   });
 
   try {
@@ -105,17 +102,12 @@ function bags(): Record<string, unknown>[] {
 
 /** Name pairs tried in order; the first pair with BOTH halves present wins. */
 const PAIRS: [string, string][] = [
-  // The shop's own project, named explicitly so a hosting platform's injected
-  // SUPABASE_* values can never take over the POS.
+  // Local development only: the shop's own project, named explicitly so a
+  // hosting platform's injected SUPABASE_* values can never take over.
   ["VITE_POS_SUPABASE_URL", "VITE_POS_SUPABASE_ANON_KEY"],
-  ["POS_SUPABASE_URL", "POS_SUPABASE_PUBLISHABLE_KEY"],
-  ["POS_SUPABASE_URL", "POS_SUPABASE_ANON_KEY"],
-  ["VITE_SUPABASE_URL", "VITE_SUPABASE_ANON_KEY"],
-  ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY"],
+  // The canonical pair: Cloudflare variables, and the values the server
+  // prints into the page for the browser.
   ["SUPABASE_URL", "SUPABASE_ANON_KEY"],
-  // Rename bridge for older deployments. No values are baked in.
-  ["VITE_SUPABASE_EXTERNAL_URL", "VITE_SUPABASE_EXTERNAL_PUBLISHABLE_KEY"],
-  ["SUPABASE_EXTERNAL_URL", "SUPABASE_EXTERNAL_PUBLISHABLE_KEY"],
 ];
 
 

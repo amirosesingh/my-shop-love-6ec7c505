@@ -39,9 +39,8 @@ export async function describeAccessToken(
 }
 
 export async function verifySupervisorToken(accessToken: string): Promise<boolean> {
-  const url = process.env["SUPABASE_URL"] ?? process.env["VITE_SUPABASE_URL"];
-  const key =
-    process.env["SUPABASE_PUBLISHABLE_KEY"] ?? process.env["VITE_SUPABASE_PUBLISHABLE_KEY"];
+  const url = process.env["SUPABASE_URL"];
+  const key = process.env["SUPABASE_ANON_KEY"];
   if (!url || !key) return false;
   const res = await fetch(`${url}/auth/v1/user`, {
     headers: { apikey: key, Authorization: `Bearer ${accessToken}` },
