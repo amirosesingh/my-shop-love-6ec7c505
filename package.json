@@ -147,7 +147,8 @@
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
-      "differentialPackage": true
+      "differentialPackage": true,
+      "deleteAppDataOnUninstall": true
     },
     "publish": [
       {

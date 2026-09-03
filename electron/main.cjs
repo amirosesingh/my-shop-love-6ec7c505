@@ -25,6 +25,7 @@ const serverKeys = require("./server-keys.cjs");
 const staffAuth = require("./staff-auth.cjs");
 const cloudCredentials = require("./cloud-credentials.cjs");
 const emergencyPin = require("./emergency-pin.cjs");
+const storageHygiene = require("./storage-hygiene.cjs");
 
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
 const DEBUG = process.env.POS_DEBUG === "1";
@@ -1711,6 +1712,15 @@ app.whenReady().then(async () => {
     win.show();
     win.focus();
   });
+  // Keep only what the till needs: Chromium scratch is dropped on every
+  // launch, and completely on the first launch after an update. Identity,
+  // configuration and the local mirror are never touched.
+  try {
+    const hygiene = storageHygiene.runOnLaunch(app.getPath("userData"), app.getVersion());
+    if (DEBUG) console.log("[pos] storage hygiene:", hygiene);
+  } catch (error) {
+    if (DEBUG) console.warn("[pos] storage hygiene skipped:", fail(error).error);
+  }
   const engine = localDb.init(app.getPath("userData"));
   if (DEBUG) console.log("[pos] local database:", engine.engine, engine.path);
   registerIpc();
