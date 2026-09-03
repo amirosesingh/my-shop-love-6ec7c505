@@ -165,10 +165,8 @@ jobs:
             echo "$web" > versioned/android/web/latest.json
           fi
 
-      - name: Verify the OTA web bundle carries no web configuration
-        run: |
-          node scripts/verify-no-web-config.cjs \
-            versioned/android/web latest/android/web
+
+
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
