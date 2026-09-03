@@ -140,6 +140,7 @@ export const SETTINGS_VISIBILITY_ELEMENTS: VisibilityElement[] = (
     ["/settings/display", "Display & text size", "Interface scale, density and theme.", "none"],
     ["/settings/updates", "Software updates", "App version and background updates.", "sensitive"],
     ["/settings/terminals", "Terminal activation", "Register tills and activation codes.", "core"],
+    ["/settings/emergency-codes", "Emergency codes", "Live recovery code for each till.", "core"],
     ["/settings/mobile-terminals", "Mobile terminals", "Phones and tablets running the POS.", "sensitive"],
     ["/settings/sessions", "Active sessions", "Who is signed in, with remote sign-out.", "sensitive"],
     ["/settings/printer", "Receipt printer", "Device, margins, drawer pin, test print.", "none"],
