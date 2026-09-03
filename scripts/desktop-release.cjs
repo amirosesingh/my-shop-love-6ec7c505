@@ -71,8 +71,7 @@ run("node", ["scripts/verify-no-web-config.cjs", "dist-desktop"]);
 
 run("electron-builder", ["--win", "nsis", "--publish", "never"]);
 
-console.log("› checking the packaged app carries no web configuration");
-run("node", [
-  "scripts/verify-no-web-config.cjs",
-  "release/win-unpacked/resources",
-]);
+// The whole release folder: unpacked resources, app.asar and the installer
+// itself are all opened by the archive-aware scanner.
+console.log("› checking the packaged app and installer carry no web configuration");
+run("node", ["scripts/verify-no-web-config.cjs", "release"]);

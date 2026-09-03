@@ -95,6 +95,12 @@ export default defineConfig({
     : {}),
   ...(isTerminalBuild
     ? {
+        // Deny by default: the Lovable wrapper otherwise runs
+        // loadEnv(mode, process.cwd(), "VITE_") and defines EVERY VITE_* name
+        // it finds in the repository's .env — ignoring `envDir`. Turning
+        // envDefine off means a new VITE_* variable added to the web
+        // environment in the future cannot reach Android or Windows either.
+        envDefine: false as const,
         vite: {
           // No .env file in this repository is visible to a device build.
           envDir: "scripts/no-env",

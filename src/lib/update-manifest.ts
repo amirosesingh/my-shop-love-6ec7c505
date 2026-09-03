@@ -46,6 +46,8 @@ export type UpdateManifest = {
   releaseNotes?: string;
   apkUrl?: string;
   bundleUrl?: string;
+  /** Compatibility generation of `bundleUrl` (see src/lib/bundle-epoch.ts). */
+  bundleEpoch?: number;
   windowsUrl?: string;
 };
 

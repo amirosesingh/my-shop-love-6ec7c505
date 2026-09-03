@@ -140,6 +140,7 @@ jobs:
           v="${{ steps.meta.outputs.version }}"
           rid="${{ steps.meta.outputs.release_id }}"
           released=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          epoch=$(node -e "const m=/BUNDLE_EPOCH\s*=\s*(\d+)/.exec(require('fs').readFileSync('src/lib/bundle-epoch.ts','utf8'));if(!m){process.exit(1)}console.log(m[1])")
           mkdir -p versioned/android/web latest/android latest/android/web release-assets
           src=$(ls android/app/build/outputs/apk/release/*.apk | head -n1)
           cp "$src" "versioned/android/NorthwindPOS-$v.apk"
@@ -154,18 +155,23 @@ jobs:
           # Unified cross-platform manifest read by Android, Windows and web.
           base="https://updatecms.luckycharmsdnbhd.com/pos-app"
           build=$(echo "$v" | awk -F. '{printf "%d", ($1*10000)+($2*100)+$3}')
-          printf '{"version":"%s","buildNumber":%s,"releaseNotes":"%s","apkUrl":"%s/latest/android/NorthwindPOS-%s.apk","bundleUrl":"%s/latest/android/web/web-%s.zip"}\n' \
-            "$v" "$build" "Release $v" "$base" "$v" "$base" "$v" > release-assets/manifest.json
+          printf '{"version":"%s","buildNumber":%s,"releaseNotes":"%s","apkUrl":"%s/latest/android/NorthwindPOS-%s.apk","bundleUrl":"%s/latest/android/web/web-%s.zip","bundleEpoch":%s}\n' \
+            "$v" "$build" "Release $v" "$base" "$v" "$base" "$v" "$epoch" > release-assets/manifest.json
           cp release-assets/manifest.json latest/manifest.json 2>/dev/null || { mkdir -p latest && cp release-assets/manifest.json latest/manifest.json; }
           if [ -z "${{ inputs.app_url }}" ]; then
             (cd capacitor-shell && zip -qr "$GITHUB_WORKSPACE/versioned/android/web/web-$v.zip" .)
             cp "versioned/android/web/web-$v.zip" "latest/android/web/web-$v.zip"
             cp "versioned/android/web/web-$v.zip" "latest/android/web/web-latest.zip"
-            web=$(printf '{"version":"%s","file":"web-%s.zip","tag":"%s","commit":"%s","released":"%s"}\n' \
-              "$v" "$v" "${{ steps.meta.outputs.tag }}" "${{ steps.meta.outputs.commit }}" "$released")
+            web=$(printf '{"version":"%s","file":"web-%s.zip","bundleEpoch":%s,"tag":"%s","commit":"%s","released":"%s"}\n' \
+              "$v" "$v" "$epoch" "${{ steps.meta.outputs.tag }}" "${{ steps.meta.outputs.commit }}" "$released")
             echo "$web" > latest/android/web/latest.json
             echo "$web" > versioned/android/web/latest.json
           fi
+
+      - name: Verify the OTA web bundle carries no web configuration
+        run: |
+          node scripts/verify-no-web-config.cjs \
+            versioned/android/web latest/android/web
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
