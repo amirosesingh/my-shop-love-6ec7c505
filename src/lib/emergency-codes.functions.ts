@@ -38,9 +38,12 @@ async function audit(userId: string, action: string, detail: Record<string, unkn
       body: JSON.stringify([
         {
           action,
+          action_category: "security",
+          action_name: action,
+          target_module: "emergency_codes",
           entity: "emergency_code",
-          actor_id: userId,
-          detail,
+          user_id: userId,
+          details: detail,
           created_at: new Date().toISOString(),
         },
       ]),
