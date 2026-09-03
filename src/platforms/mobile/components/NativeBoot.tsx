@@ -32,6 +32,8 @@ export function NativeBoot({ children }: { children: React.ReactNode }) {
     void hydrateBackendUrl()
       .catch(() => "")
       .then(() => hydrateNativeStorage())
+      // Keep only what a terminal needs: caches and leftover installers go.
+      .then(() => runDeviceCleanup())
       // The activation is sealed on the device; unseal it before anything can
       // decide the terminal is not registered.
       .then(() => hydrateTerminalConfig())
