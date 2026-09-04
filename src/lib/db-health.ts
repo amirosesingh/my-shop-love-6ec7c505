@@ -295,7 +295,10 @@ async function probeList(): Promise<{ table: string; label: string; writable: bo
     };
     const { data, error } = await rpc.rpc("schema_inventory");
     if (error || !data) return list;
-    const inventory = (data as { tables?: { name?: string }[] }).tables ?? [];
+    const reported = (data as { tables?: unknown }).tables;
+    // Older or reshaped helpers can answer with an object instead of a list;
+    // that means "nothing extra to probe", never a crash mid-report.
+    const inventory = Array.isArray(reported) ? (reported as { name?: string }[]) : [];
     const known = new Set(list.map((t) => t.table));
     for (const row of inventory) {
       const name = String(row?.name ?? "").trim();
@@ -303,6 +306,7 @@ async function probeList(): Promise<{ table: string; label: string; writable: bo
       known.add(name);
       list.push({ table: name, label: prettyTable(name), writable: false });
     }
+
   } catch {
     // An older database without the inventory helper simply keeps the core list.
   }
