@@ -127,7 +127,17 @@ export function ProductPicker({
                   {p.barcode || p.sku || "—"}
                 </td>
                 <td className="px-2 py-1.5">{p.name}</td>
-                <td className="numeric px-2 py-1.5 text-right">{stockAt(p, storeId)}</td>
+                {/* A figure below zero means the item was sold on two tills at
+                    once while one of them was offline. It is shown as it is,
+                    never hidden or clamped, so the count is corrected. */}
+                <td
+                  className={`numeric px-2 py-1.5 text-right ${
+                    stockAt(p, storeId) < 0 ? "font-semibold text-destructive" : ""
+                  }`}
+                  title={stockAt(p, storeId) < 0 ? "Oversold — count this item and correct it" : undefined}
+                >
+                  {stockAt(p, storeId)}
+                </td>
                 {showBranch && (
                   <td className="numeric px-2 py-1.5 text-right text-muted-foreground">
                     {destinationStoreId ? stockAt(p, destinationStoreId) : "—"}
