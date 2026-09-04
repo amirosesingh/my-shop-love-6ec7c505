@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { db } from "@/core/api/pos-db";
+import { hasSignedInIdentity } from "./session-presence";
 import { replayOrder, stamp } from "./activity-journal";
 
 /**
@@ -305,6 +306,9 @@ async function flushBatch() {
   const pending = replayOrder(logs.filter((l) => !l.synced_to_cloud));
   setSync({ online, pending: pending.length });
   if (!online || !pending.length) return;
+  // Nobody signed in: the central journal would reject the write anyway.
+  // The entries stay queued locally and go up on the next signed-in flush.
+  if (!hasSignedInIdentity()) return;
 
   // Push in batches to the cloud audit_logs table; failures stay pending.
   const slice = pending.slice(0, BATCH);

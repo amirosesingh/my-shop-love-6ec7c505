@@ -1,6 +1,7 @@
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { logSync } from "./sync-log";
 import { hasRequiredPlatformConfig } from "./platform-config-ready";
+import { hasSignedInIdentity } from "./session-presence";
 
 import { replayOrder } from "./activity-journal";
 import { isTerminalRevoked } from "./use-revocation-check";
@@ -735,6 +736,11 @@ export async function runExclusive(reason: string = "timer"): Promise<void> {
   // inherited from the web deployment.
   const readiness = await hasRequiredPlatformConfig();
   if (!readiness.ready) return;
+  // Nobody signed in means nothing this device sends would be accepted: the
+  // central tables are protected per user. Staying quiet on the sign-in screen
+  // is correct, and it keeps rejected requests out of the logs.
+  if (!hasSignedInIdentity()) return;
+
   if (cycleRunning) {
     cycleQueued = true;
     return;
