@@ -86,8 +86,20 @@ function unlocked() {
 
 function status() {
   return unlocked()
-    ? { unlocked: true, name: grant.name, expiresAt: grant.until }
+    ? { unlocked: true, name: grant.name, level: grant.level, expiresAt: grant.until }
     : { unlocked: false };
+}
+
+/** True while the live grant is at least as strong as the level asked for. */
+function hasLevel(level) {
+  if (!unlocked()) return false;
+  if (level === "supervisor") return grant.level === "supervisor" || grant.level === "admin";
+  return grant.level === "admin";
+}
+
+/** Keeps an in-use grant alive; an idle one still times out on its own. */
+function touch() {
+  if (grant) grant.until = Date.now() + TTL_MS;
 }
 
 /**
@@ -95,7 +107,7 @@ function status() {
  * caller has not unlocked administration on this machine.
  */
 async function requireAdmin(work) {
-  if (!unlocked())
+  if (!hasLevel("admin"))
     return {
       ok: false,
       code: "EADMINLOCK",
@@ -104,8 +116,20 @@ async function requireAdmin(work) {
         "Database administration is locked on this terminal. An administrator must unlock it with their username and PIN first.",
     };
   // Active use keeps the grant alive; an idle one still times out.
-  grant.until = Date.now() + TTL_MS;
+  touch();
   return work();
 }
 
-module.exports = { unlock, lock, unlocked, status, requireAdmin, isAdministrator, TTL_MS };
+module.exports = {
+  unlock,
+  lock,
+  unlocked,
+  status,
+  hasLevel,
+  touch,
+  requireAdmin,
+  isAdministrator,
+  isSupervisor,
+  TTL_MS,
+};
+
