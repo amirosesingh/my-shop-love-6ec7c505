@@ -258,7 +258,12 @@ export async function testCloudCredentials(url: string, key: string): Promise<Cl
   return { ok: probe.reachable && probe.authenticated, detail: probe.detail };
 }
 
-/** Persist a new pair in the platform vault and make it live immediately. */
+/**
+ * Persist a new pair in the platform vault and make it live immediately.
+ *
+ * Deliberately does NOT start sync: that happens once the *whole* profile is
+ * committed and activated, at the end of `saveConnectionProfile()`.
+ */
 export async function saveCloudCredentials(
   url: string,
   key: string,
@@ -271,7 +276,6 @@ export async function saveCloudCredentials(
     setTerminalSupabaseOverride(cleanUrl, cleanKey);
     resetExternalClient();
     notifyCloudKeysChanged();
-    afterCredentialsSaved();
     return { ok: true, encrypted: res.encrypted };
   }
   if (isMobileShell()) {
@@ -284,7 +288,6 @@ export async function saveCloudCredentials(
       setTerminalSupabaseOverride(cleanUrl, cleanKey);
       resetExternalClient();
       notifyCloudKeysChanged();
-      afterCredentialsSaved();
       return { ok: true, encrypted: true };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
@@ -292,6 +295,7 @@ export async function saveCloudCredentials(
   }
   return { ok: false, error: "Cloud keys are managed by this deployment." };
 }
+
 
 /** Forget the saved pair — the till keeps trading locally, cloud sync stops. */
 export async function removeCloudCredentials(): Promise<{ ok: boolean; error?: string }> {
@@ -380,11 +384,20 @@ function notifyCloudKeysChanged() {
 export type ConnectionProfile = {
   /** central database (Supabase project) address */
   supabaseUrl: string;
-  /** publishable / anon key — public by design, still sealed at rest */
-  supabaseKey: string;
+  /**
+   * publishable / anon key — public by design, still sealed at rest.
+   *
+   * `null` means "keep whatever is already stored". An operator who only
+   * changes the backend address must never be made to type the key again: the
+   * renderer never sees it on Windows, and it is masked everywhere.
+   */
+  supabaseKey: string | null;
   /** the POS website this device sends sign-in and sync to */
   backendUrl: string;
 };
+
+/** The profile as it is actually stored, with a real key. */
+type ResolvedProfile = { supabaseUrl: string; supabaseKey: string; backendUrl: string };
 
 export type ProfileSaveResult = {
   ok: boolean;
@@ -393,26 +406,88 @@ export type ProfileSaveResult = {
   detail: string;
   cloud?: CloudProbe;
   backend?: BackendTestResult;
-  profile?: ConnectionProfile;
+  profile?: ResolvedProfile;
 };
 
-/** Read the three values currently in force on this device. */
-export async function connectionProfile(): Promise<ConnectionProfile> {
+/**
+ * Read the three values currently in force on this device, for prefilling the
+ * settings form. The key is a mask — the real one never leaves storage.
+ */
+export async function connectionProfile(): Promise<{
+  supabaseUrl: string;
+  keyHint: string;
+  hasKey: boolean;
+  backendUrl: string;
+}> {
   const [status, backend] = await Promise.all([cloudKeyStatus(), backendUrl()]);
   return {
     supabaseUrl: status.url,
-    supabaseKey: status.configured ? status.keyHint : "",
+    keyHint: status.configured ? status.keyHint : "",
+    hasKey: Boolean(status.configured),
     backendUrl: backend,
   };
 }
 
 /**
+ * The key this device is using right now, so a candidate profile that only
+ * changes the backend can still be tested end to end. On Windows the live pair
+ * comes from the main process through the bootstrap channel; on Android from
+ * the Keystore. Never persisted or displayed by callers.
+ */
+async function storedCloudKey(): Promise<{ url: string; key: string } | null> {
+  if (isWindowsShell() && window.pos?.bootstrapCloudCredentials) {
+    const res = await window.pos.bootstrapCloudCredentials().catch(() => null);
+    return res?.ok && res.url && res.key ? { url: res.url, key: res.key } : null;
+  }
+  if (isMobileShell()) return androidRead();
+  return null;
+}
+
+/** Fill in the values the operator did not change from what is already stored. */
+async function resolveCandidate(input: ConnectionProfile): Promise<ResolvedProfile | null> {
+  const supabaseUrl = input.supabaseUrl.trim().replace(/\/+$/, "");
+  const typedKey = input.supabaseKey?.trim() ?? "";
+  if (typedKey) return { supabaseUrl, supabaseKey: typedKey, backendUrl: input.backendUrl };
+  const stored = await storedCloudKey();
+  if (!stored) return null;
+  return {
+    supabaseUrl: supabaseUrl || stored.url,
+    supabaseKey: stored.key,
+    backendUrl: input.backendUrl,
+  };
+}
+
+/** Test a candidate profile without writing anything. */
+export async function testConnectionProfile(input: ConnectionProfile): Promise<{
+  ok: boolean;
+  cloud: CloudProbe;
+  backend: BackendTestResult;
+}> {
+  const candidate = await resolveCandidate(input);
+  if (!candidate)
+    return {
+      ok: false,
+      cloud: {
+        reachable: false,
+        authenticated: false,
+        schemaReady: false,
+        stage: "invalid",
+        detail: "Enter the publishable API key for that project.",
+      },
+      backend: { ok: false, detail: "Not tested — the database details are incomplete." },
+    };
+  const cloud = await probeCloudConnection(candidate.supabaseUrl, candidate.supabaseKey);
+  const backend = await testBackendUrl(candidate.backendUrl);
+  return { ok: cloud.reachable && cloud.authenticated && (backend.ok || Boolean(backend.warn)), cloud, backend };
+}
+
+/**
  * The ONE way a terminal's connection is written.
  *
- * Validate → normalise → test the database → test the backend → only then
- * store, so a half-typed address can never replace a working one. Storage is
- * unchanged: Windows keeps the pair in the OS vault, Android in the Keystore,
- * and the backend address goes to the shell's own configuration store.
+ * Complete the candidate from what is already stored → validate → test the
+ * database → test the backend → commit both halves → activate → start sync.
+ * Nothing is written until both halves pass, and if the second write fails the
+ * first is rolled back, so a working profile is never half-replaced.
  */
 export async function saveConnectionProfile(
   input: ConnectionProfile,
@@ -425,8 +500,9 @@ export async function saveConnectionProfile(
       detail: "On the website these values come from the hosting environment.",
     };
 
-  const supabaseUrl = input.supabaseUrl.trim().replace(/\/+$/, "");
-  const supabaseKey = input.supabaseKey.trim();
+  const candidate = await resolveCandidate(input);
+  const supabaseUrl = candidate?.supabaseUrl ?? input.supabaseUrl.trim().replace(/\/+$/, "");
+  const supabaseKey = candidate?.supabaseKey ?? "";
   const backend = normaliseBackendUrl(input.backendUrl);
 
   if (!/^https:\/\/.+/i.test(supabaseUrl))
@@ -440,7 +516,7 @@ export async function saveConnectionProfile(
       detail: "Enter the web address of your POS site, e.g. https://pos.example.com",
     };
 
-  const profile: ConnectionProfile = { supabaseUrl, supabaseKey, backendUrl: backend };
+  const profile: ResolvedProfile = { supabaseUrl, supabaseKey, backendUrl: backend };
 
   let cloud: CloudProbe | undefined;
   let backendResult: BackendTestResult | undefined;
@@ -482,6 +558,8 @@ export async function saveConnectionProfile(
   }
 
   notifyCloudKeysChanged();
+  // Committed and activated — only now may sync run against the new profile.
+  afterCredentialsSaved();
   return {
     ok: true,
     stage: "saved",
@@ -493,3 +571,4 @@ export async function saveConnectionProfile(
     profile,
   };
 }
+

@@ -16,10 +16,17 @@ import { isTerminalApp } from "@/platform-config/platform";
 import { cloudKeyStatus, subscribeCloudKeys } from "@/lib/secure-cloud-config";
 import { hasTerminalSupabaseOverride } from "@/lib/external-supabase-config";
 import { backendUrl } from "@/lib/backend-config";
+import {
+  hydrateConnectionProfile,
+  isConnectionProfileHydrated,
+  subscribeProfileHydrated,
+} from "@/lib/connection-profile";
 
 export type ConfigReadinessState =
   /** web, or anything that is not a terminal build */
   | "not-applicable"
+  /** the saved profile is still being read out of platform storage */
+  | "hydrating"
   /** nothing at all has been configured on this device */
   | "missing"
   /** some of the three values are present, not all */
@@ -45,12 +52,20 @@ const NONE = { supabaseUrl: false, supabaseKey: false, backendUrl: false };
 
 const looksLikeUrl = (value: string) => /^https:\/\/[^\s/]+\.[^\s/]+/i.test(value.trim());
 
+/** Last settled answer, so synchronous callers never guess mid-restore. */
+let lastReady = false;
+
 /**
  * Local-only readiness. Web is always ready — its configuration is supplied by
  * the hosting environment (Cloudflare) and validated elsewhere.
+ *
+ * On a terminal the saved profile is restored first: an unconfigured verdict
+ * is only honest once platform storage has actually been read.
  */
 export async function hasRequiredPlatformConfig(): Promise<ConfigReadiness> {
   if (!isTerminalApp()) return { ready: true, state: "not-applicable", have: NONE };
+  await hydrateConnectionProfile();
+
   try {
     const [status, backend] = await Promise.all([cloudKeyStatus(), backendUrl()]);
     const have = {
@@ -61,55 +76,78 @@ export async function hasRequiredPlatformConfig(): Promise<ConfigReadiness> {
     const count = Object.values(have).filter(Boolean).length;
 
     if (count === 0)
-      return {
+      return settle({
         ready: false,
         state: "missing",
         reason: "This terminal has not been connected to a company yet.",
         have,
-      };
+      });
     if (count < 3)
-      return {
+      return settle({
         ready: false,
         state: "incomplete",
         reason: have.backendUrl
           ? "The central database address and API key are still missing."
           : "The POS backend address is still missing.",
         have,
-      };
+      });
     if (!looksLikeUrl(status.url))
-      return {
+      return settle({
         ready: false,
         state: "failed",
         reason: "The saved central database address is not a valid https:// URL.",
         have,
-      };
+      });
     if (!looksLikeUrl(backend))
-      return {
+      return settle({
         ready: false,
         state: "failed",
         reason: "The saved POS backend address is not a valid https:// URL.",
         have,
-      };
-    return { ready: true, state: "ready", have };
+      });
+    return settle({ ready: true, state: "ready", have });
   } catch (error) {
-    return {
+    return settle({
       ready: false,
       state: "failed",
       reason: error instanceof Error ? error.message : "Saved configuration could not be read.",
       have: NONE,
-    };
+    });
   }
 }
 
-/** Synchronous best-effort answer for hot paths that cannot await. */
+function settle(result: ConfigReadiness): ConfigReadiness {
+  lastReady = result.ready;
+  return result;
+}
+
+/**
+ * Synchronous best-effort answer for hot paths that cannot await.
+ *
+ * While the profile is still being restored this reports the last settled
+ * answer rather than guessing from an empty in-memory override — an
+ * unconfigured verdict during the restore window is what used to bounce a
+ * working terminal into setup.
+ */
 export function platformConfigReadySync(): boolean {
   if (!isTerminalApp()) return true;
-  return hasTerminalSupabaseOverride();
+  if (!isConnectionProfileHydrated()) {
+    void hydrateConnectionProfile();
+    return lastReady;
+  }
+  return lastReady || hasTerminalSupabaseOverride();
 }
 
 /** Re-run the check whenever the device's stored credentials change. */
 export function subscribeConfigReady(fn: (state: ConfigReadiness) => void): () => void {
   const run = () => void hasRequiredPlatformConfig().then(fn).catch(() => {});
   run();
-  return subscribeCloudKeys(run);
+  const offKeys = subscribeCloudKeys(run);
+  // The backend half arrives with the restore, not with a key change.
+  const offHydrated = subscribeProfileHydrated(run);
+  return () => {
+    offKeys();
+    offHydrated();
+  };
 }
+

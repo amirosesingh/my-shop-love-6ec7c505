@@ -40,14 +40,14 @@ import { isTerminalApp } from "@/platform-config/platform";
 import { useAuthOptional } from "@/lib/pos-auth";
 import {
   cloudKeyStatus,
-  probeCloudConnection,
   removeCloudCredentials,
   saveConnectionProfile,
   subscribeCloudKeys,
+  testConnectionProfile,
   type CloudKeyStatus,
   type CloudProbe,
 } from "@/lib/secure-cloud-config";
-import { backendUrl, testBackendUrl, type BackendTestResult } from "@/lib/backend-config";
+import { backendUrl, type BackendTestResult } from "@/lib/backend-config";
 
 export function CloudConnectionPanel() {
   const auth = useAuthOptional();
@@ -64,11 +64,14 @@ export function CloudConnectionPanel() {
   const refresh = useCallback(async () => {
     const next = await cloudKeyStatus();
     setStatus(next);
+    // Prefill from what is saved: an operator changing one value must never be
+    // shown blank fields for the other two.
     if (next.configured && next.url) setUrl((current) => current || next.url);
     const current = await backendUrl();
     setSavedBackend(current);
     setBackend((value) => value || current);
   }, []);
+
 
   useEffect(() => {
     void refresh();
@@ -116,49 +119,57 @@ export function CloudConnectionPanel() {
   const privileged = Boolean(auth?.isSupervisor || auth?.isAdmin);
   const editable = firstRun || privileged || unlocked;
 
+  // An empty key box means "keep the key already sealed on this device", so
+  // changing only the backend address never asks for the key again.
+  const candidate = () => ({
+    supabaseUrl: url,
+    supabaseKey: key.trim() ? key : null,
+    backendUrl: backend,
+  });
+
+  /** Probes what is typed. Writes nothing: the working profile stays in force. */
   const testAll = async () => {
     setBusy("test");
     try {
-      const cloud = await probeCloudConnection(url, key);
-      setCloudResult(cloud);
-      if (cloud.stage === "ok") toast.success(`Central database: ${cloud.detail}`);
-      else if (cloud.stage === "no-schema") toast.warning(`Central database: ${cloud.detail}`);
-      else toast.error(`Central database: ${cloud.detail}`);
+      const res = await testConnectionProfile(candidate());
+      setCloudResult(res.cloud);
+      if (res.cloud.stage === "ok") toast.success(`Central database: ${res.cloud.detail}`);
+      else if (res.cloud.stage === "no-schema") toast.warning(`Central database: ${res.cloud.detail}`);
+      else toast.error(`Central database: ${res.cloud.detail}`);
 
-      if (backend.trim()) {
-        const res = await testBackendUrl(backend);
-        setBackendResult(res);
-        if (res.url) setBackend(res.url);
-        if (res.ok) toast.success(`POS backend: ${res.detail}`);
-        else if (res.warn) toast.warning(`POS backend: ${res.detail}`);
-        else toast.error(`POS backend: ${res.detail}`);
-      }
+      setBackendResult(res.backend);
+      if (res.backend.url) setBackend(res.backend.url);
+      if (res.backend.ok) toast.success(`POS backend: ${res.backend.detail}`);
+      else if (res.backend.warn) toast.warning(`POS backend: ${res.backend.detail}`);
+      else toast.error(`POS backend: ${res.backend.detail}`);
     } finally {
       setBusy(null);
     }
   };
 
+  /** Test → commit → activate → reconnect. Only then is success reported. */
   const saveAll = async () => {
     setBusy("save");
     try {
-      const res = await saveConnectionProfile({
-        supabaseUrl: url,
-        supabaseKey: key,
-        backendUrl: backend,
-      });
+      const res = await saveConnectionProfile(candidate());
       if (res.cloud) setCloudResult(res.cloud);
       if (res.backend) setBackendResult(res.backend);
       if (res.ok) {
         setKey("");
-        toast.success(res.detail);
+        toast.success(`${res.detail} Saved ✓ Activated ✓ Connected ✓`);
         await refresh();
       } else {
-        toast.error(res.detail);
+        toast.error(
+          res.stage === "save"
+            ? `${res.detail} The previous connection is still in use.`
+            : res.detail,
+        );
       }
     } finally {
       setBusy(null);
     }
   };
+
 
   const remove = async () => {
     setBusy("remove");
@@ -176,9 +187,12 @@ export function CloudConnectionPanel() {
     }
   };
 
-  const complete = url.trim().length > 0 && key.trim().length > 0 && backend.trim().length > 0;
+  // A saved key counts as supplied: the operator only retypes it to replace it.
+  const haveKey = key.trim().length > 0 || Boolean(status?.configured);
+  const complete = url.trim().length > 0 && haveKey && backend.trim().length > 0;
   const canTest = editable && complete && busy === null;
   const canSave = editable && complete && busy === null;
+
 
   return (
     <section className="space-y-4 rounded-lg border border-border bg-card p-4">
@@ -242,7 +256,10 @@ export function CloudConnectionPanel() {
             autoComplete="off"
             disabled={!editable}
             placeholder={
-              status?.configured ? `Saved (${status.keyHint}) — enter a new key to replace` : "sb_publishable_…"
+              status?.configured
+                ? `Saved (${status.keyHint}) — leave blank to keep it`
+                : "sb_publishable_…"
+
             }
             value={key}
             onChange={(e) => setKey(e.target.value)}

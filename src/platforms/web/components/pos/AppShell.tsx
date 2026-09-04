@@ -64,7 +64,10 @@ import { closeCustomerDisplay } from "@/lib/customer-display";
 import { reportAppReady } from "@/lib/app-health";
 import { localDb } from "@/core/local-db/local-db";
 import { supabaseConfig } from "@/lib/external-supabase-config";
-import { initCloudConfigFromShell } from "@/lib/secure-cloud-config";
+import {
+  hydrateConnectionProfile,
+  isConnectionProfileHydrated,
+} from "@/lib/connection-profile";
 import { CloudSetupGate } from "@/platforms/web/components/pos/CloudSetupGate";
 import { readCredentials } from "@/lib/pos-credentials";
 import { TillLoader } from "@/components/shared/TillLoader";
@@ -149,7 +152,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Set when the operator chooses to carry on from the terminal's own copy
   // after the first load could not reach the central database.
   const [offlineBypass, setOfflineBypass] = useState(false);
+  // The saved connection profile is read out of platform storage, which takes
+  // a moment. Until it is back, this device's configuration is unknown — not
+  // absent — so no start-up decision may be taken on it.
+  const [profileHydrated, setProfileHydrated] = useState(() => isConnectionProfileHydrated());
   const branding = useBranding();
+
   // Windows tills must be registered to a location before they can be used.
   const terminal = useRevocationCheck();
   // Registration and connectivity are read separately: a dead link must never
@@ -181,7 +189,10 @@ export function AppShell({ children }: { children: ReactNode }) {
     const bridge = localDb();
     if (!bridge) return;
     void (async () => {
-      await initCloudConfigFromShell().catch(() => {});
+      // One restore for the whole profile — the same promise the start-up
+      // gate below waits on, so nothing runs against a half-restored device.
+      await hydrateConnectionProfile();
+
       let cloud: { url: string; key: string } | null = null;
       try {
         cloud = supabaseConfig();
@@ -260,15 +271,32 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (user && pinned && currentStore.id !== pinned) setCurrentStore(pinned);
   }, [user, isAdmin, canSwitchStores, terminalStoreId, currentStore.id, setCurrentStore]);
 
+  // Restore the saved profile once per launch, then release the gate below.
+  useEffect(() => {
+    if (profileHydrated) return;
+    let cancelled = false;
+    void hydrateConnectionProfile().finally(() => {
+      if (!cancelled) setProfileHydrated(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [profileHydrated]);
+
+
   if (!ready) return null;
   // Every activated terminal, including a browser-based till, must finish
   // unsealing its tenant configuration before any data read or write starts.
-  if (terminal.hydrating)
+  // The connection profile is part of that: showing setup while it is still
+  // being read out of the vault is what used to send a working till back to
+  // the connection screen after a restart.
+  if (terminal.hydrating || !profileHydrated)
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="size-6 animate-spin text-primary" />
       </div>
     );
+
   // Desktop tills and Android terminals both have to register before use.
   if (isDesktop() || isNative()) {
     if (terminal.revoked) return <TerminalRevokedScreen onReactivate={clearRevocation} />;
