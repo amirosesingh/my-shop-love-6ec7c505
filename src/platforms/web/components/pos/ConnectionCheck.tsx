@@ -3,8 +3,10 @@ import { Button } from "@/components/ui/button";
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 import { ensureTerminalSession } from "@/lib/terminal-session";
-import { probeRelay, syncHealth } from "@/core/api/sync-relay";
+import { probeRelay, syncHealthResult } from "@/core/api/sync-relay";
 import { isDesktop } from "@/lib/branding";
+import { serverUnreachableOnDevice } from "@/lib/server-origin";
+
 import { isNative } from "@/platform-config/platform";
 
 type Check = { label: string; ok: boolean; warn?: boolean; detail: string };
@@ -46,26 +48,39 @@ export function ConnectionCheck() {
     // A missing key is a server setup task, not a fault with this till, so it
     // reads as a warning with a clear instruction instead of a red failure.
     const keyMissing = relay.code === "NO_SERVICE_KEY";
+    // "Failed to fetch" means the request never reached a server: no backend
+    // address saved, the address does not answer, or the browser layer blocked
+    // it. Say which, rather than repeating the browser's own wording.
+    const noRoute = !relay.ok && /failed to fetch|load failed|networkerror/i.test(relay.error ?? "");
     results.push({
       label: "Server backup route",
       ok: relay.ok,
       warn: keyMissing,
-      detail: relay.ok ? "Writes can go through the server" : (relay.error ?? "Unavailable"),
+      detail: relay.ok
+        ? "Writes can go through the server"
+        : noRoute
+          ? serverUnreachableOnDevice()
+            ? "No POS backend address is saved on this device — enter it in Settings → Database & Cloud Connection."
+            : `The request never reached the server (${relay.error}) — check the backend address and that this device can open it.`
+          : (relay.error ?? "Unavailable"),
     });
 
+
     // Say which server answered and whether it holds the central database key,
-    // so a setup problem is not mistaken for a problem with this till.
-    const health = await syncHealth();
+    // so a setup problem is not mistaken for a problem with this till. Every
+    // failure names its own reason instead of one catch-all sentence.
+    const health = await syncHealthResult();
     results.push({
       label: "Server setup",
-      ok: !!health?.serviceKey,
-      warn: !health?.serviceKey,
-      detail: !health
-        ? "Could not reach the setup check on this server"
-        : health.serviceKey
-          ? `Key present on ${health.host}`
-          : `Key missing on ${health.host} — an administrator needs to re-save it`,
+      ok: health.ok && health.health.serviceKey,
+      warn: !health.ok || !health.health.serviceKey,
+      detail: !health.ok
+        ? health.reason
+        : health.health.serviceKey
+          ? `Key present on ${health.health.host}`
+          : `Key missing on ${health.health.host} — an administrator needs to re-save it`,
     });
+
 
     setChecks(results);
     setBusy(false);

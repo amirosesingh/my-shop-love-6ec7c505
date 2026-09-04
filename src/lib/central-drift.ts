@@ -47,21 +47,36 @@ export type CentralDriftRow = {
   typeWarnings: TypeWarning[];
 };
 
-/** Build the actual-schema map from relay introspection rows. */
+/**
+ * Build the actual-schema map from relay introspection rows.
+ *
+ * The rows arrive from a server call, so a failed or reshaped answer can hand
+ * this anything at all. A non-list answer means "the central schema could not
+ * be read", which is an empty map — not a crash inside a `for … of` that
+ * surfaces to staff as "E is not iterable".
+ */
 export function actualFromRows(
-  rows: { table: string; column: string; type?: string | null; format?: string | null }[],
+  rows:
+    | { table: string; column: string; type?: string | null; format?: string | null }[]
+    | null
+    | undefined,
 ): ActualCentralSchema {
   const map = new Map<string, Map<string, ActualColumn>>();
+  if (!Array.isArray(rows)) return map;
   for (const row of rows) {
-    const table = row.table.toLowerCase();
+    if (!row || typeof row !== "object") continue;
+    const table = String(row.table ?? "").toLowerCase();
+    const column = String(row.column ?? "").toLowerCase();
+    if (!table || !column) continue;
     if (!map.has(table)) map.set(table, new Map());
-    map.get(table)!.set(row.column.toLowerCase(), {
+    map.get(table)!.set(column, {
       type: row.type ?? null,
       format: row.format ?? null,
     });
   }
   return map;
 }
+
 
 /**
  * Coarse type family so a column's type can be sanity-checked across the
