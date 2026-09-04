@@ -13,9 +13,35 @@
  * reads. The web build ignores all of this and keeps using relative URLs.
  */
 import { isTerminalApp } from "@/platform-config/platform";
-import { isWindowsShell } from "@/platform-config/features";
+import { isWindowsShell, isMobileShell } from "@/platform-config/features";
 
-const STORAGE_KEY = "pos.backend.url";
+/**
+ * Android keeps the address in the same secure store as the cloud pair, so a
+ * start-up purge of `localStorage` can never take it away. The plain key is
+ * still written as a fast read-through copy and is listed as device state in
+ * `live-mode.ts`, so the Preferences mirror keeps it across launches too.
+ */
+export const BACKEND_STORAGE_KEY = "pos.backend.url";
+const STORAGE_KEY = BACKEND_STORAGE_KEY;
+
+type SecureStore = {
+  get(options: { key: string }): Promise<{ value: string }>;
+  set(options: { key: string; value: string }): Promise<{ value: boolean }>;
+  remove(options: { key: string }): Promise<{ value: boolean }>;
+};
+
+/** Wrapped, because a Capacitor plugin proxy answers `then` with a native call. */
+async function secureStore(): Promise<{ value: SecureStore } | null> {
+  try {
+    const mod = await import("capacitor-secure-storage-plugin");
+    const plugin = mod.SecureStoragePlugin as unknown as SecureStore | undefined;
+    if (!plugin || typeof plugin.get !== "function") return null;
+    return { value: plugin };
+  } catch {
+    return null;
+  }
+}
+
 
 const clean = (value: unknown): string =>
   typeof value === "string" ? value.trim().replace(/\/+$/, "") : "";
@@ -63,6 +89,23 @@ export async function backendUrl(): Promise<string> {
     const res = await bridge()?.backendUrl?.().catch(() => undefined);
     const saved = clean(res?.url);
     if (saved) return saved;
+  } else if (isMobileShell()) {
+    // Secure storage is the authority on the phone; the plain copy is only a
+    // read-through cache that a start-up purge is allowed to lose.
+    const loaded = await secureStore();
+    if (loaded) {
+      const value = await loaded.value
+        .get({ key: STORAGE_KEY })
+        .then((r) => clean(r.value))
+        .catch(() => "");
+      if (value) return value;
+    }
+    try {
+      const saved = clean(window.localStorage.getItem(STORAGE_KEY));
+      if (saved) return saved;
+    } catch {
+      /* storage unavailable — the device has no address */
+    }
   } else if (isTerminalApp()) {
     try {
       const saved = clean(window.localStorage.getItem(STORAGE_KEY));
@@ -94,13 +137,26 @@ export async function saveBackendUrl(value: string): Promise<BackendSaveResult> 
       .catch((e: unknown) => ({ ok: false, error: (e as Error).message }));
     if (res && res.ok === false) return res;
   } else {
+    if (isMobileShell()) {
+      const loaded = await secureStore();
+      if (!loaded) return { ok: false, error: "Secure storage is unavailable on this device." };
+      try {
+        if (next) await loaded.value.set({ key: STORAGE_KEY, value: next });
+        else await loaded.value.remove({ key: STORAGE_KEY }).catch(() => ({ value: true }));
+      } catch (e) {
+        return { ok: false, error: (e as Error).message };
+      }
+    }
     try {
       if (next) window.localStorage.setItem(STORAGE_KEY, next);
       else window.localStorage.removeItem(STORAGE_KEY);
     } catch (e) {
-      return { ok: false, error: (e as Error).message };
+      // On the phone the sealed copy is already written, so this is only the
+      // read-through cache failing: not a reason to report a failed save.
+      if (!isMobileShell()) return { ok: false, error: (e as Error).message };
     }
   }
+
   apply(next);
   return { ok: true, url: next };
 }

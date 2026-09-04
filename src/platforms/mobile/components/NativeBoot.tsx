@@ -12,7 +12,7 @@ import { isNative } from "@/platform-config/platform";
 import { onRecoveryScreen } from "@/lib/recovery-route";
 import { hydrateNativeStorage } from "@/platforms/mobile/mobile-storage";
 import { runDeviceCleanup } from "@/platforms/mobile/device-cleanup";
-import { hydrateBackendUrl } from "@/lib/backend-config";
+import { hydrateConnectionProfile } from "@/lib/connection-profile";
 import { hasRequiredPlatformConfig } from "@/lib/platform-config-ready";
 
 import { hydrateTerminalConfig } from "@/core/activation/terminal-tokens";
@@ -29,12 +29,15 @@ export function NativeBoot({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (ready) return;
     let cancelled = false;
-    // The backend address must be in place before anything tries to sign in.
-    void hydrateBackendUrl()
-      .catch(() => "")
-      .then(() => hydrateNativeStorage())
+    // Preferences first: the mirrored device keys (including the backend
+    // address) must be back in storage before anything reads them. Only then
+    // is the connection profile restored and applied.
+    void hydrateNativeStorage()
+      .catch(() => {})
+      .then(() => hydrateConnectionProfile())
       // Keep only what a terminal needs: caches and leftover installers go.
       .then(() => runDeviceCleanup())
+
       // The activation is sealed on the device; unseal it before anything can
       // decide the terminal is not registered.
       .then(() => hydrateTerminalConfig())
