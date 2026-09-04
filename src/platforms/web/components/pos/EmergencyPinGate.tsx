@@ -26,6 +26,23 @@ import {
 } from "@/lib/pin-lockout";
 
 /**
+ * The desktop till refuses connection, identity and database changes until
+ * somebody unlocks it. On this screen the recovery code *is* the unlock: the
+ * desktop process re-checks the same code against its own clock and opens a
+ * short repair session, so the operator is never asked for a supervisor sign-in
+ * halfway through fixing a terminal that cannot sign anybody in.
+ */
+type RecoveryBridge = {
+  recoveryUnlock?: (code: string) => Promise<{ ok: boolean }>;
+  recoveryLock?: () => Promise<unknown>;
+};
+
+const recoveryBridge = (): RecoveryBridge | undefined =>
+  typeof window === "undefined"
+    ? undefined
+    : (window as unknown as { sqlAdmin?: RecoveryBridge }).sqlAdmin;
+
+/**
  * Recovery keeps its own guessing counter. A cashier who mistyped their PIN
  * must never lock this terminal out of the screen that repairs its connection,
  * and a wrong recovery code must never lock the till keypad.
@@ -53,6 +70,8 @@ export function EmergencyPinGate({ children }: { children: ReactNode }) {
     setBusy(false);
     return () => {
       alive.current = false;
+      // Leaving recovery closes the repair session on the desktop till.
+      void recoveryBridge()?.recoveryLock?.();
     };
   }, []);
 
@@ -84,6 +103,7 @@ export function EmergencyPinGate({ children }: { children: ReactNode }) {
     // though the screen itself never needs a connection.
     if (ok) {
       clearPinFailures(SCOPE);
+      await recoveryBridge()?.recoveryUnlock?.(code).catch(() => undefined);
       logger.log("security", "Emergency access unlocked", "recovery", { outcome: "granted" });
       setUnlocked(true);
       return;

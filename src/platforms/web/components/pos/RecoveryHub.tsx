@@ -156,13 +156,11 @@ export function RecoveryHub() {
   const [cloud, setCloud] = useState<boolean | null>(null);
   const [branch, setBranch] = useState<string | null>(null);
 
-  // The recovery code is a device clock, not an identity. It may repair what a
-  // dead terminal cannot repair anywhere else — the connection details, and
-  // activation while the device is still unactivated — and nothing more. The
-  // rest of this hub stays behind a supervisor sign-in exactly as it does in
-  // Settings, so holding the device is never the same as being trusted with it.
-  const privileged = Boolean(auth?.isSupervisor || auth?.isAdmin);
-  const mayActivate = privileged || activated === false;
+  // A terminal that cannot sign anybody in cannot be asked for a supervisor
+  // sign-in before it is repaired. Passing the recovery code therefore opens
+  // the whole of this screen — connection, activation, local database, branch,
+  // grace period and hardware. The audit trail, backups and app control are
+  // not here: they are not repairs and still need a real administrator.
 
   useEffect(() => {
     setActivated(Boolean(readTerminalConfig()));
@@ -179,7 +177,7 @@ export function RecoveryHub() {
     <div className="space-y-3">
       <ModeBanner />
 
-      {terminalApp && mayActivate && (
+      {terminalApp && (
         <Card
           icon={ShieldCheck}
           title="Terminal activation"
@@ -203,7 +201,7 @@ export function RecoveryHub() {
         <CloudConnectionPanel />
       </Card>
 
-      {desktop && privileged && (
+      {desktop && (
         <Card
           icon={Database}
           title="Local database (SQL Server)"
@@ -229,7 +227,6 @@ export function RecoveryHub() {
         </p>
       </Card>
 
-      {privileged && (
       <Card
         icon={ShieldCheck}
         title="Offline grace period"
@@ -248,9 +245,7 @@ export function RecoveryHub() {
           />
         </label>
       </Card>
-      )}
 
-      {privileged && (
       <Card
         icon={MonitorCog}
         title="Receipt printer & cash drawer"
@@ -260,14 +255,6 @@ export function RecoveryHub() {
       >
         <ReceiptPrinterSettings />
       </Card>
-      )}
-
-      {!privileged && (
-        <p className="rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
-          The recovery code opens the connection details only. Local database, printer, drawer and
-          grace-period settings stay closed until a supervisor or administrator signs in.
-        </p>
-      )}
     </div>
   );
 }
