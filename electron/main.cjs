@@ -28,6 +28,24 @@ const staffAuth = require("./staff-auth.cjs");
 const adminSession = require("./admin-session.cjs");
 const cloudCredentials = require("./cloud-credentials.cjs");
 const storageHygiene = require("./storage-hygiene.cjs");
+// Who may call which channel. Installed before any handler is registered so
+// the boundary is enforced by this process, not by what the window shows.
+const ipcPrivilege = require("./ipc-privilege.cjs");
+
+ipcPrivilege.install(ipcMain, {
+  /** A till with no stored connection and no activation is still being set up. */
+  isFirstRun: () => {
+    try {
+      const activated = Boolean(terminalStore.read()?.tokenId);
+      const connected = Boolean(dbConfigStore.read());
+      const cloud = Boolean(cloudCredentials.status?.().configured);
+      return !activated && !connected && !cloud;
+    } catch {
+      return false;
+    }
+  },
+});
+
 
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
 const DEBUG = process.env.POS_DEBUG === "1";
