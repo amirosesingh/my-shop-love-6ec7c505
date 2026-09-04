@@ -144,17 +144,24 @@ export async function handleSyncRequest(request: Request): Promise<Response> {
     kind?: string;
   }[] = [];
   const { batchInsertIds } = await import("@/core/api/relay-policy.server");
-  const ops = body.ops ?? [];
+  const all = body.ops ?? [];
+  const rpcs = all.filter((o) => o.kind === "rpc");
+  const ops = all.filter((o) => o.kind !== "rpc");
   // Parents inserted in this same push let their child rows through.
   const batchIds = batchInsertIds(ops);
-  for (const op of ops) {
+  for (const op of all) {
     try {
-      const result = await runRelayOp(op, scope, batchIds);
+      const result =
+        op.kind === "rpc"
+          ? await (await import("@/core/api/pos-relay.server")).runRelayRpc(op, scope)
+          : await runRelayOp(op, scope, batchIds);
       results.push({ ...result, table: op.table, kind: op.kind });
     } catch (e) {
       results.push({ ok: false, error: (e as Error).message, table: op.table, kind: op.kind });
     }
   }
+  void rpcs;
+
   const refused = results.find(
     (r) =>
       r.code === "STORE_FORBIDDEN" ||
