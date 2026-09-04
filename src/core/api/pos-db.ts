@@ -685,6 +685,11 @@ const saleToRow = (s: Sale): Row => ({
   coupon_promo_id: s.couponPromoId ?? null,
   coupon_scope: s.couponScope ?? null,
   coupon_discount: s.couponDiscount ?? 0,
+  // The approval that permitted a gated action on this bill, so the bill and
+  // the decision that allowed it can never be read apart.
+  authorization_request_id: s.authorizationRequestId ?? null,
+  authorized_by: s.authorizedBy ?? null,
+  authorized_at: s.authorizedAt ?? null,
   ...(hasRoundingColumns
     ? {
         rounding_adjustment: s.roundingAdjustment ?? 0,

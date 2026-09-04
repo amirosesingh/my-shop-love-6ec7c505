@@ -298,6 +298,10 @@ export type Sale = {
   transferRef?: string;
   /** coupon code used on this bill */
   couponCode?: string;
+  /** the approval that permitted a gated action on this bill */
+  authorizationRequestId?: string | null;
+  authorizedBy?: string | null;
+  authorizedAt?: string | null;
   /** promotion the coupon matched */
   couponPromoId?: string;
   /** whether the coupon hit the whole bill or one line */
