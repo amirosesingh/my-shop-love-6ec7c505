@@ -4741,6 +4741,10 @@ export type Database = {
           status: string
         }[]
       }
+      transfer_in_my_branch: {
+        Args: { _transfer_id: string }
+        Returns: boolean
+      }
       upsert_cashier: {
         Args: {
           p_full_name: string
