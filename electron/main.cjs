@@ -1168,29 +1168,51 @@ function registerIpc() {
     }
   };
 
+  /**
+   * Administration is a privileged surface: the desktop process refuses every
+   * one of these channels until an administrator has unlocked it here with
+   * their own username and PIN. Hiding the screen in the window is not a
+   * control — anything running in the window can call the bridge directly.
+   */
+  ipcMain.handle("admin:unlock", (_e, username, pin) =>
+    adminSession.unlock(username, pin),
+  );
+  ipcMain.handle("admin:lock", () => adminSession.lock());
+  ipcMain.handle("admin:status", () => adminSession.status());
+
+  const admin = (work) => adminSession.requireAdmin(work);
+
   ipcMain.handle("sqladmin:connect", (_e, credentials) =>
-    adminSession.requireAdmin(() => bounded(
-      45_000,
-      "The SQL driver did not finish the authentication handshake in time.",
-      () => sqlAdmin.connectInstance(credentials),
-      credentials?.attemptId ?? null,
+    admin(() =>
+      bounded(
+        45_000,
+        "The SQL driver did not finish the authentication handshake in time.",
+        () => sqlAdmin.connectInstance(credentials),
+        credentials?.attemptId ?? null,
+      ),
     ),
   );
   ipcMain.handle("sqladmin:cancel", (_e, attemptId) =>
-    adminSession.requireAdmin(() => bounded(5_000, "The cancel request did not finish in time.", () => sqlAdmin.cancel(attemptId)),
+    admin(() =>
+      bounded(5_000, "The cancel request did not finish in time.", () => sqlAdmin.cancel(attemptId)),
+    ),
   );
   ipcMain.handle("sqladmin:probe-port", (_e, credentials) =>
-    adminSession.requireAdmin(() => bounded(15_000, "The port probe did not finish in time.", () =>
-      sqlAdmin.probePort(credentials),
+    admin(() =>
+      bounded(15_000, "The port probe did not finish in time.", () => sqlAdmin.probePort(credentials)),
     ),
   );
   ipcMain.handle("sqladmin:lock", (_e, credentials) =>
-    adminSession.requireAdmin(() => bounded(45_000, "The database could not be opened in time.", () =>
-      sqlAdmin.lockDatabase(credentials),
+    admin(() =>
+      bounded(45_000, "The database could not be opened in time.", () =>
+        sqlAdmin.lockDatabase(credentials),
+      ),
     ),
   );
   ipcMain.handle("sqladmin:databases", () =>
-    adminSession.requireAdmin(() => bounded(15_000, "The database list did not arrive in time.", () => sqlAdmin.listDatabases()),
+    admin(() =>
+      bounded(15_000, "The database list did not arrive in time.", () => sqlAdmin.listDatabases()),
+    ),
   );
 
   /* Write verification runs on the OPERATIONAL pool the till itself uses. */
@@ -1198,21 +1220,31 @@ function registerIpc() {
     bounded(20_000, "The write check did not finish in time.", () => pool.verifyWrite()),
   );
   ipcMain.handle("sqladmin:tables", (_e, dbName) =>
-    adminSession.requireAdmin(() => bounded(15_000, "The table list did not arrive in time.", () => sqlAdmin.getTables(dbName)),
+    admin(() =>
+      bounded(15_000, "The table list did not arrive in time.", () => sqlAdmin.getTables(dbName)),
+    ),
   );
   ipcMain.handle("sqladmin:columns", (_e, dbName, tableName, schemaName) =>
-    adminSession.requireAdmin(() => bounded(15_000, "The column list did not arrive in time.", () =>
-      sqlAdmin.getTableColumns(dbName, tableName, schemaName),
+    admin(() =>
+      bounded(15_000, "The column list did not arrive in time.", () =>
+        sqlAdmin.getTableColumns(dbName, tableName, schemaName),
+      ),
     ),
   );
   ipcMain.handle("sqladmin:query", (_e, dbName, queryText) =>
-    adminSession.requireAdmin(() => bounded(30_000, "The query did not finish in time.", () =>
-      sqlAdmin.executeQuery(dbName, queryText),
+    admin(() =>
+      bounded(30_000, "The query did not finish in time.", () =>
+        sqlAdmin.executeQuery(dbName, queryText),
+      ),
     ),
   );
   ipcMain.handle("sqladmin:disconnect", () =>
-    adminSession.requireAdmin(() => bounded(10_000, "The disconnect did not finish in time.", () => sqlAdmin.disconnect()),
+    admin(() =>
+      bounded(10_000, "The disconnect did not finish in time.", () => sqlAdmin.disconnect()),
+    ),
   );
+  // Reading whether a connection exists reveals nothing and is what the screen
+  // uses to decide whether to ask for the unlock at all.
   ipcMain.handle("sqladmin:status", () =>
     bounded(5_000, "The connection status did not arrive in time.", () => sqlAdmin.status()),
   );
@@ -1227,7 +1259,8 @@ function registerIpc() {
     batches parsed from database/schema.sql may run — the renderer supplies
     table names, never SQL.
   */
-  ipcMain.handle("sqladmin:repair", async (_e, payload) => {
+  ipcMain.handle("sqladmin:repair", async (_e, payload) =>
+    admin(async () => {
     try {
       const tables = Array.isArray(payload?.tables) ? payload.tables : [];
       const database = String(payload?.database ?? "").trim();
