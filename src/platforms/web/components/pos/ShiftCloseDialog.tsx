@@ -336,9 +336,13 @@ export function ShiftCloseDialog({
                   });
                   setBusy(false);
                   if (!res.ok) {
-                    toast.error(res.error);
+                    // A parked count is not a failure: the drawer has been
+                    // counted, the server just cannot be told yet.
+                    if (res.queued) toast.success(res.error);
+                    else toast.error(res.error);
                     return;
                   }
+
                   await handleState(res.state);
                 })();
               }}
