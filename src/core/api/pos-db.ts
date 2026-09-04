@@ -1764,10 +1764,14 @@ export const db = {
     );
   },
 
-  /** Persist a completed bill, its lines, the stock movement and member points. */
-  recordSale(sale: Sale, products: Product[], member: Member | null) {
-    void db.commitSale(sale, products, member).catch((error) => dbError("Saving sale", error));
-  },
+  /*
+   * There is deliberately no fire-and-forget sale writer here. A bill is only
+   * real once it is stored, so the register awaits `commitSale` and shows the
+   * failure; an unawaited version would let a checkout finish and print while
+   * the sale was quietly lost.
+   */
+
+
 
   /**
    * Hand a bill back. The till sends only the bill and the refund's own id:
