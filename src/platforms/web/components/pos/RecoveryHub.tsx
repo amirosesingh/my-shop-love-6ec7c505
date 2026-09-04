@@ -24,7 +24,6 @@ import { LocalDatabaseSettings } from "@/platforms/web/components/pos/LocalDatab
 import { ReceiptPrinterSettings } from "@/platforms/web/components/pos/ReceiptPrinterSettings";
 import { TerminalActivation } from "@/platforms/web/components/pos/TerminalActivation";
 import { isElectron, isTerminalApp } from "@/platform-config/platform";
-import { useAuth } from "@/lib/pos-auth";
 import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 import { cloudKeyStatus, subscribeCloudKeys } from "@/lib/secure-cloud-config";
 import { boundBranchName } from "@/lib/active-branch";
@@ -151,7 +150,6 @@ function ModeBanner() {
 export function RecoveryHub() {
   const terminalApp = isTerminalApp();
   const desktop = isElectron();
-  const auth = useAuth();
   const [activated, setActivated] = useState<boolean | null>(null);
   const [cloud, setCloud] = useState<boolean | null>(null);
   const [branch, setBranch] = useState<string | null>(null);
