@@ -160,6 +160,49 @@ const FIRST_RUN_CHANNELS = new Set([
   "config:set",
 ]);
 
+/**
+ * Channels an Emergency Access session may use without a username and PIN.
+ *
+ * Emergency Access exists to repair a terminal that cannot sign anybody in, so
+ * everything needed to get it connected, activated and printing again is here:
+ * connection, cloud keys, backend address, identity, configuration, the local
+ * SQL Server and its driver, schema repair and hardware. Deliberately absent:
+ * clearing the audit trail, backup/restore, and quitting or rolling back the
+ * app — those are not repairs and stay with a real administrator.
+ */
+const RECOVERY_CHANNELS = new Set([
+  "pos:connect",
+  "pos:configure-cloud",
+  "pos:forget-connection",
+  "pos:remove-connection",
+  "pos:apply-schema",
+  "pos:apply-schema-tables",
+  "pos:retry-connection",
+  "pos:reconnect",
+  "pos:set-sync-enabled",
+  "cloud:set",
+  "cloud:remove",
+  "backend:set",
+  "terminal:write",
+  "config:write",
+  "config:set",
+  "config:reset",
+  "settings:set",
+  "db:set-branch",
+  "branding:write",
+  "driver:install",
+  "local:rollback",
+  "sqladmin:connect",
+  "sqladmin:cancel",
+  "sqladmin:probe-port",
+  "sqladmin:lock",
+  "sqladmin:databases",
+  "sqladmin:tables",
+  "sqladmin:columns",
+  "sqladmin:repair",
+  "sqladmin:disconnect",
+]);
+
 /* --------------------------- settings by key --------------------------- */
 
 /**
@@ -245,6 +288,10 @@ function allowed(channel, args = []) {
   const level = levelFor(channel, args);
   if (level === OPEN) return true;
   if (FIRST_RUN_CHANNELS.has(channel) && firstRun()) return true;
+  if (RECOVERY_CHANNELS.has(channel) && typeof adminSession.recoveryActive === "function" && adminSession.recoveryActive()) {
+    adminSession.recoveryTouch?.();
+    return true;
+  }
   if (adminSession.hasLevel(level)) {
     adminSession.touch();
     return true;
@@ -273,6 +320,7 @@ module.exports = {
   ADMIN,
   CHANNEL_LEVELS,
   FIRST_RUN_CHANNELS,
+  RECOVERY_CHANNELS,
   settingLevel,
   levelFor,
   allowed,

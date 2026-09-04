@@ -11,6 +11,7 @@ const sessionPath = require_.resolve("../../../../electron/admin-session.cjs");
 
 let level: string | null = null; // null = locked
 let firstRun = false;
+let recovery = false; // an Emergency Access session is open
 
 type Privilege = {
   allowed: (channel: string, args?: unknown[]) => boolean;
@@ -29,6 +30,8 @@ function load(): Privilege {
       hasLevel: (want: string) =>
         level === "admin" || (level === "supervisor" && want === "supervisor"),
       touch: () => {},
+      recoveryActive: () => recovery,
+      recoveryTouch: () => {},
     },
   } as never;
   const mod = require_(privilegePath) as Privilege;
@@ -39,6 +42,7 @@ function load(): Privilege {
 beforeEach(() => {
   level = null;
   firstRun = false;
+  recovery = false;
   delete require_.cache[sessionPath];
 });
 
@@ -99,6 +103,48 @@ describe("desktop channel privilege", () => {
     // Never a blanket opening: the database tools stay shut.
     expect(p.allowed("sqladmin:query")).toBe(false);
     firstRun = false;
+    expect(p.allowed("cloud:set")).toBe(false);
+  });
+
+  it("lets Emergency Access repair a till without a supervisor sign-in", () => {
+    const p = load();
+    recovery = true;
+    for (const channel of [
+      "cloud:set",
+      "backend:set",
+      "terminal:write",
+      "pos:connect",
+      "config:set",
+      "driver:install",
+      "sqladmin:connect",
+      "sqladmin:repair",
+    ]) {
+      expect(p.allowed(channel)).toBe(true);
+    }
+    expect(p.allowed("settings:set", ["offline_grace_days", "7"])).toBe(true);
+  });
+
+  it("keeps the audit trail, backups and app control out of Emergency Access", () => {
+    const p = load();
+    recovery = true;
+    for (const channel of [
+      "local:audit-clear",
+      "pos:backup",
+      "pos:restore",
+      "health:quit",
+      "health:rollback",
+      "sqladmin:query",
+      "staff:remember-pin",
+    ]) {
+      expect(p.allowed(channel)).toBe(false);
+    }
+  });
+
+  it("closes the repair door when the recovery session ends", () => {
+    const p = load();
+    recovery = true;
+    expect(p.allowed("cloud:set")).toBe(true);
+    recovery = false;
     expect(p.allowed("cloud:set")).toBe(false);
   });
 

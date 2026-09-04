@@ -120,6 +120,81 @@ async function requireAdmin(work) {
   return work();
 }
 
+/* ------------------------- emergency recovery --------------------------- */
+
+/**
+ * Emergency Access unlock.
+ *
+ * The recovery screen exists to repair a till that cannot sign anybody in, so
+ * it cannot ask for a username and PIN it may have no way to check. Its code
+ * is the machine's own clock, `YYYYMMDDHHMM` in local time, and the desktop
+ * process checks it against its own clock rather than trusting the window.
+ *
+ * The grant it opens is narrow on purpose: repair channels only (see
+ * `ipc-privilege.cjs`), never the audit trail, backups or app control.
+ */
+const RECOVERY_TTL_MS = 15 * 60 * 1000;
+const RECOVERY_DRIFT_MINUTES = 1;
+
+let recoveryUntil = 0;
+
+function clockCode(date) {
+  const p = (n, w = 2) => String(n).padStart(w, "0");
+  return (
+    `${p(date.getFullYear(), 4)}${p(date.getMonth() + 1)}${p(date.getDate())}` +
+    `${p(date.getHours())}${p(date.getMinutes())}`
+  );
+}
+
+/** Constant-time compare of two equal-length codes. */
+function sameCode(a, b) {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i += 1) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+/** True when `code` matches this machine's clock, one minute either side. */
+function validRecoveryCode(code, now = Date.now()) {
+  const typed = String(code ?? "").trim();
+  if (!/^\d{12}$/.test(typed)) return false;
+  for (let i = -RECOVERY_DRIFT_MINUTES; i <= RECOVERY_DRIFT_MINUTES; i += 1) {
+    if (sameCode(typed, clockCode(new Date(now + i * 60_000)))) return true;
+  }
+  return false;
+}
+
+/** Open a recovery session. Refuses silently on a wrong or stale code. */
+function recoveryUnlock(code) {
+  if (!validRecoveryCode(code)) {
+    recoveryUntil = 0;
+    return { ok: false, error: "That recovery code was not accepted on this terminal." };
+  }
+  recoveryUntil = Date.now() + RECOVERY_TTL_MS;
+  return { ok: true, expiresAt: recoveryUntil };
+}
+
+/** Close it — the window does this when the recovery screen is left. */
+function recoveryLock() {
+  recoveryUntil = 0;
+  return { ok: true };
+}
+
+/** True while a recovery session is live; idle sessions expire on their own. */
+function recoveryActive() {
+  if (!recoveryUntil) return false;
+  if (Date.now() > recoveryUntil) {
+    recoveryUntil = 0;
+    return false;
+  }
+  return true;
+}
+
+/** Keeps a recovery session in use alive. */
+function recoveryTouch() {
+  if (recoveryActive()) recoveryUntil = Date.now() + RECOVERY_TTL_MS;
+}
+
 module.exports = {
   unlock,
   lock,
@@ -131,5 +206,11 @@ module.exports = {
   isAdministrator,
   isSupervisor,
   TTL_MS,
+  validRecoveryCode,
+  recoveryUnlock,
+  recoveryLock,
+  recoveryActive,
+  recoveryTouch,
+  RECOVERY_TTL_MS,
 };
 
