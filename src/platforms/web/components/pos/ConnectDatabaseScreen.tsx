@@ -12,7 +12,6 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { CloudConnectionPanel } from "@/platforms/web/components/pos/settings/panels/CloudConnectionPanel";
-import { BackendAddressPanel } from "@/platforms/web/components/pos/settings/panels/BackendAddressPanel";
 import { checkCloudConnected } from "@/core/activation/registration-status";
 
 export function ConnectDatabaseScreen({
@@ -47,9 +46,6 @@ export function ConnectDatabaseScreen({
 
         <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-4">
           <CloudConnectionPanel />
-        </div>
-        <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-4">
-          <BackendAddressPanel />
         </div>
 
         <div className="flex flex-wrap gap-2">
