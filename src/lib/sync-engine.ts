@@ -1,6 +1,7 @@
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { logSync } from "./sync-log";
 import { hasRequiredPlatformConfig } from "./platform-config-ready";
+import { hasSignedInIdentity } from "./session-presence";
 
 import { replayOrder } from "./activity-journal";
 import { isTerminalRevoked } from "./use-revocation-check";

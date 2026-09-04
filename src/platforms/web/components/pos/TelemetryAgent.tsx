@@ -9,6 +9,7 @@ import { useEffect } from "react";
 import { useAuth } from "@/lib/pos-auth";
 import { publishTelemetry } from "@/lib/telemetry";
 import { runPendingCommands } from "@/lib/terminal-commands";
+import { hasSignedInIdentity } from "@/lib/session-presence";
 
 export function TelemetryAgent() {
   const { user, terminalUser } = useAuth();
@@ -27,6 +28,9 @@ export function TelemetryAgent() {
     const beat = async () => {
       if (stopped) return;
       if (document.visibilityState === "hidden") return;
+      // A visitor on the sign-in screen is not a till in service: reporting
+      // before anyone signs in would only be rejected by the database.
+      if (!hasSignedInIdentity()) return;
       await publishTelemetry({ name, role });
       try {
         await runPendingCommands(refreshCatalogue);
