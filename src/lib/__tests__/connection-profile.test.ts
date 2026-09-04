@@ -80,7 +80,7 @@ import { saveConnectionProfile, connectionProfile, cloudKeyStatus } from "../sec
 import { hasRequiredPlatformConfig, platformConfigReadySync } from "../platform-config-ready";
 import { __resetProfileHydrationForTests } from "../connection-profile";
 
-const KEY_A = "sb_publishable_aaaaaaaaaaaa";
+const KEY_A = "test-publishable-key-a";
 
 /** Minimal browser surface: the suite runs in node, the code expects a device. */
 function installWindow() {
@@ -210,7 +210,7 @@ describe("connection profile", () => {
     });
     const res = await saveConnectionProfile({
       supabaseUrl: "https://tenant-b.example.co",
-      supabaseKey: "sb_publishable_bbbbbbbbbbbb",
+      supabaseKey: "test-publishable-key-b",
       backendUrl: "https://pos.example.com",
     });
     expect(res.ok).toBe(true);
