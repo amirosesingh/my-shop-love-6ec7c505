@@ -1557,7 +1557,7 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
   // Web and Android are live-only: the backend is the single source of truth.
   if (isOnlineOnly()) {
     try {
-      for (const op of cloudOps) await runOpLive(context, op);
+      await runBatchLive(context, cloudOps);
       await applyStockDeltas(deltas);
     } catch (e) {
       if (isConnectionError(e)) throw new AllTargetsFailed(context, e);
@@ -1572,7 +1572,7 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
     // Desktop is always cloud first. Local SQL is a durable fallback only for
     // connection-class cloud failures; validation and permission errors remain visible.
     try {
-      for (const op of cloudOps) await runOpLive(context, op);
+      await runBatchLive(context, cloudOps);
       await applyStockDeltas(deltas);
       noteConnectionRestored();
       setCloudDirect(false);
@@ -1607,7 +1607,7 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
   const operational = ops.every((op) => isOperationalTable(op.table));
   {
     try {
-      for (const op of cloudOps) await runOpLive(context, op);
+      await runBatchLive(context, cloudOps);
       await applyStockDeltas(deltas);
       noteConnectionRestored();
       setCloudDirect(operational);
