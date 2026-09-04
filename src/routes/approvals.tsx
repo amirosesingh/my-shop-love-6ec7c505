@@ -73,6 +73,8 @@ function ApprovalsPage() {
   const [allBranches, setAllBranches] = useState(false);
   const [history, setHistory] = useState(false);
   const [note, setNote] = useState<Record<string, string>>({});
+  // What the approver is granting, when it differs from what was asked.
+  const [amount, setAmount] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -119,7 +121,16 @@ function ApprovalsPage() {
     try {
       const auth = await getPosCallerAuth();
       const res = await decideAuthorizationRequest({
-        data: { ...auth, id: row.id, approve, note: note[row.id] ?? "" },
+        data: {
+          ...auth,
+          id: row.id,
+          approve,
+          note: note[row.id] ?? "",
+          // Blank means "as requested"; a number here grants a different value.
+          ...(approve && (amount[row.id] ?? "").trim() !== ""
+            ? { approvedAmount: Number(amount[row.id]) }
+            : {}),
+        },
       });
       if (!res.ok) toast.error(res.error ?? "Could not record the decision");
       else toast.success(approve ? "Approved" : "Rejected");
@@ -220,6 +231,7 @@ function ApprovalsPage() {
                     ))}
                   </dl>
                 ) : null}
+                <TicketReview row={row} />
                 {row.status === "pending" ? (
                   mine ? (
                     <div className="flex items-center justify-between gap-3">
@@ -245,6 +257,22 @@ function ApprovalsPage() {
                           setNote((n) => ({ ...n, [row.id]: e.target.value.slice(0, 400) }))
                         }
                       />
+                      <Input
+                        className="h-9 w-36"
+                        inputMode="decimal"
+                        placeholder={
+                          row.requestedAmount !== null
+                            ? `Approve ${row.requestedAmount.toFixed(2)}`
+                            : "Amount (optional)"
+                        }
+                        value={amount[row.id] ?? ""}
+                        onChange={(e) =>
+                          setAmount((a) => ({
+                            ...a,
+                            [row.id]: e.target.value.replace(/[^0-9.]/g, "").slice(0, 12),
+                          }))
+                        }
+                      />
                       <Button
                         size="sm"
                         disabled={busy === row.id}
@@ -268,6 +296,13 @@ function ApprovalsPage() {
                       ? `${row.status} by ${row.decidedByName || row.decidedBy}`
                       : row.status}
                     {row.decisionNote ? ` — ${row.decisionNote}` : ""}
+                    {row.requestedAmount !== null
+                      ? ` · asked ${row.requestedAmount.toFixed(2)}`
+                      : ""}
+                    {row.approvedAmount !== null
+                      ? ` · granted ${row.approvedAmount.toFixed(2)}`
+                      : ""}
+                    {row.consumedAt ? " · used" : ""}
                   </p>
                 )}
               </CardContent>
@@ -276,5 +311,78 @@ function ApprovalsPage() {
         })}
       </div>
     </AppShell>
+  );
+}
+
+/**
+ * The whole ticket the cashier was ringing when the request was sent, so the
+ * approver decides on what they can see rather than a bare number.
+ */
+function TicketReview({ row }: { row: AuthorizationRequest }) {
+  const t = row.snapshot;
+  if (!t) return null;
+  const money = (n: number) => n.toFixed(2);
+  return (
+    <div className="rounded-md border border-border/60">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-3 py-2 text-xs">
+        <span className="font-medium">
+          Ticket {t.billNo || t.ticketId || "—"} · {t.cashier || row.requestedByName}
+        </span>
+        {t.member ? (
+          <span className="text-muted-foreground">
+            Member {t.member.name}
+            {t.member.tier ? ` · ${t.member.tier}` : ""}
+            {t.member.points !== undefined ? ` · ${t.member.points} pts` : ""}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">Walk-in</span>
+        )}
+      </div>
+      <table className="w-full text-xs">
+        <thead className="text-muted-foreground">
+          <tr>
+            <th className="px-3 py-1 text-left font-normal">Item</th>
+            <th className="px-3 py-1 text-right font-normal">Qty</th>
+            <th className="px-3 py-1 text-right font-normal">Price</th>
+            <th className="px-3 py-1 text-right font-normal">Disc</th>
+            <th className="px-3 py-1 text-right font-normal">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {t.lines.map((l, i) => (
+            <tr key={`${l.sku}-${i}`} className="border-t border-border/40">
+              <td className="px-3 py-1">
+                {l.name || l.sku}
+                {l.priceOverridden ? " · price changed" : ""}
+              </td>
+              <td className="px-3 py-1 text-right">{l.qty}</td>
+              <td className="px-3 py-1 text-right">{money(l.unitPrice)}</td>
+              <td className="px-3 py-1 text-right">{money(l.discount)}</td>
+              <td className="px-3 py-1 text-right">{money(l.lineTotal)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="flex flex-wrap justify-end gap-4 border-t border-border/60 px-3 py-2 text-xs">
+        <span className="text-muted-foreground">Subtotal {money(t.subtotal)}</span>
+        <span className="text-muted-foreground">Discount {money(t.discount)}</span>
+        <span className="text-muted-foreground">Tax {money(t.tax)}</span>
+        <span className="font-medium">Total {money(t.total)}</span>
+        {t.expectedTotal !== undefined ? (
+          <span className="font-medium text-primary">
+            If approved {money(t.expectedTotal)}
+          </span>
+        ) : null}
+      </div>
+      {row.requestedAmount !== null ? (
+        <p className="border-t border-border/60 px-3 py-2 text-xs">
+          Requested{t.requestedLabel ? ` ${t.requestedLabel}` : ""}:{" "}
+          <span className="font-medium">{money(row.requestedAmount)}</span>
+          {row.approvedAmount !== null && row.approvedAmount !== row.requestedAmount ? (
+            <span className="text-primary"> · granted {money(row.approvedAmount)}</span>
+          ) : null}
+        </p>
+      ) : null}
+    </div>
   );
 }

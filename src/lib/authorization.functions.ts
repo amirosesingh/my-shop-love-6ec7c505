@@ -36,6 +36,42 @@ const pinInput = caller.extend({
   reason: z.string().max(400).optional(),
 });
 
+const snapshotLine = z.object({
+  sku: z.string().max(60).default(""),
+  name: z.string().max(160).default(""),
+  qty: z.number().finite(),
+  unitPrice: z.number().finite(),
+  discount: z.number().finite().default(0),
+  lineTotal: z.number().finite(),
+  priceOverridden: z.boolean().optional(),
+});
+
+const snapshotInput = z.object({
+  ticketId: z.string().max(80).default(""),
+  capturedAt: z.string().max(40).default(""),
+  storeId: z.string().max(64).default(""),
+  terminalId: z.string().max(64).default(""),
+  cashier: z.string().max(120).default(""),
+  billNo: z.string().max(40).optional(),
+  lines: z.array(snapshotLine).max(300).default([]),
+  subtotal: z.number().finite().default(0),
+  discount: z.number().finite().default(0),
+  tax: z.number().finite().default(0),
+  serviceCharge: z.number().finite().default(0),
+  total: z.number().finite().default(0),
+  requestedValue: z.number().finite().nullish(),
+  requestedLabel: z.string().max(120).optional(),
+  expectedTotal: z.number().finite().nullish(),
+  member: z
+    .object({
+      id: z.string().max(80).default(""),
+      name: z.string().max(160).default(""),
+      tier: z.string().max(60).optional(),
+      points: z.number().finite().optional(),
+    })
+    .nullish(),
+});
+
 const submitInput = caller.extend({
   actionKey: z.string().min(1).max(64),
   storeId: z.string().max(64).optional(),
@@ -44,6 +80,9 @@ const submitInput = caller.extend({
   payload: z
     .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
     .default({}),
+  requestedAmount: z.number().finite().nullish(),
+  heldOrderId: z.string().max(80).nullish(),
+  snapshot: snapshotInput.nullish(),
 });
 
 const listInput = caller.extend({
@@ -56,9 +95,17 @@ const decideInput = caller.extend({
   id: z.string().uuid(),
   approve: z.boolean(),
   note: z.string().max(400).default(""),
+  /** the approver may grant a different value than the one asked for */
+  approvedAmount: z.number().finite().nullish(),
 });
 
 const idInput = caller.extend({ id: z.string().uuid() });
+
+const claimInput = caller.extend({
+  id: z.string().uuid(),
+  /** the ticket in hand right now, so a changed ticket cannot use an old approval */
+  snapshotHash: z.string().max(40).optional(),
+});
 
 type Caller = { id: string; name: string; role: string; isSupervisor: boolean };
 
@@ -201,13 +248,21 @@ export const authorizeWithPin = createServerFn({ method: "POST" })
     };
   });
 
-/** Send an action to the approvals queue. */
+/**
+ * Send an action to the approvals queue.
+ *
+ * The ticket travelling with the request is fingerprinted here, on the
+ * server, so the till cannot claim later that a different ticket was the one
+ * approved. Only people allowed to decide the action are told about it.
+ */
 export const submitAuthorizationRequest = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => submitInput.parse(data))
   .handler(async ({ data }) => {
     try {
       const who = await assertCaller(data);
-      const { createRequest } = await import("./authorization.server");
+      const { createRequest, markRequestNotified } = await import("./authorization.server");
+      const { normalizeSnapshot, snapshotFingerprint } = await import("./ticket-snapshot");
+      const snapshot = data.snapshot ? normalizeSnapshot(data.snapshot) : null;
       const request = await createRequest({
         actionKey: data.actionKey,
         requestedBy: who.id,
@@ -217,12 +272,81 @@ export const submitAuthorizationRequest = createServerFn({ method: "POST" })
         reason: data.reason,
         payload: data.payload,
         ttlHours: 24,
+        requestedAmount: data.requestedAmount ?? snapshot?.requestedValue ?? null,
+        snapshot,
+        snapshotHash: snapshotFingerprint(snapshot),
+        heldOrderId: data.heldOrderId ?? null,
       });
+      await notifyApprovers(request, who).catch(() => undefined);
+      await markRequestNotified(request.id);
       return { ok: true as const, request };
     } catch (e) {
       return { ok: false as const, error: (e as Error).message.slice(0, 300) };
     }
   });
+
+/**
+ * Tell the people who may decide this action, through the existing activity
+ * feed. Nobody else is notified.
+ */
+async function notifyApprovers(
+  request: Awaited<ReturnType<typeof import("./authorization.server").createRequest>>,
+  who: Caller,
+): Promise<void> {
+  const { writeActivityEvent } = await import("./activity-events.server");
+  const { AUTH_ACTION_LABEL } = await import("./authorization");
+  const label = AUTH_ACTION_LABEL[request.actionKey] ?? request.actionKey;
+  await writeActivityEvent({
+    event_type: "approval_requested",
+    severity: "warning",
+    title: `Approval needed — ${label}`,
+    message: request.reason || `${who.name} is waiting for a decision.`,
+    actor_id: who.id,
+    actor_name: who.name,
+    actor_role: who.role,
+    terminal_id: request.terminalId || null,
+    terminal_name: null,
+    store_id: request.storeId || null,
+    entity_type: "authorization_request",
+    entity_id: request.id,
+    amount: request.requestedAmount,
+    meta: { action_key: request.actionKey, audience: "approvers" },
+    client_event_id: `approval-req-${request.id}`,
+    created_at: new Date().toISOString(),
+  });
+}
+
+/** Tell the cashier who asked what happened to their request. */
+async function notifyRequester(
+  request: { id: string; actionKey: string; requestedBy: string; storeId: string; terminalId: string },
+  approve: boolean,
+  approver: Caller,
+  amount: number | null,
+): Promise<void> {
+  const { writeActivityEvent } = await import("./activity-events.server");
+  const { AUTH_ACTION_LABEL } = await import("./authorization");
+  const label = AUTH_ACTION_LABEL[request.actionKey] ?? request.actionKey;
+  await writeActivityEvent({
+    event_type: approve ? "approval_granted" : "approval_rejected",
+    severity: approve ? "info" : "warning",
+    title: approve ? `Approved — ${label}` : `Rejected — ${label}`,
+    message: approve
+      ? `${approver.name} approved the request. It is ready to use once.`
+      : `${approver.name} rejected the request.`,
+    actor_id: approver.id,
+    actor_name: approver.name,
+    actor_role: approver.role,
+    terminal_id: request.terminalId || null,
+    terminal_name: null,
+    store_id: request.storeId || null,
+    entity_type: "authorization_request",
+    entity_id: request.id,
+    amount,
+    meta: { action_key: request.actionKey, audience: request.requestedBy },
+    client_event_id: `approval-decision-${request.id}`,
+    created_at: new Date().toISOString(),
+  });
+}
 
 /** The approvals queue, for anyone allowed to decide something. */
 export const listAuthorizationRequests = createServerFn({ method: "POST" })
@@ -295,12 +419,21 @@ export const decideAuthorizationRequest = createServerFn({ method: "POST" })
       if (existing.requestedBy.toLowerCase() === who.id.toLowerCase()) {
         return { ok: false as const, error: "You cannot approve your own request" };
       }
+      // The approver may grant a smaller value than the one asked for; the
+      // amount stored is the one their session sent, never the till's.
+      const approvedAmount = data.approve
+        ? (data.approvedAmount ?? existing.requestedAmount ?? null)
+        : null;
       const updated = await decideRequest({
         id: data.id,
         approve: data.approve,
         decidedBy: who.id,
         decidedByName: who.name,
         note: data.note,
+        approvedAmount,
+        approvedPayload: data.approve
+          ? { ...existing.payload, approved_amount: approvedAmount }
+          : {},
       });
       await writeLog({
         actionKey: existing.actionKey,
@@ -312,8 +445,15 @@ export const decideAuthorizationRequest = createServerFn({ method: "POST" })
         storeId: existing.storeId,
         terminalId: existing.terminalId,
         outcome: data.approve ? "approved" : "rejected",
-        detail: { note: data.note },
+        detail: {
+          note: data.note,
+          requested_amount: existing.requestedAmount,
+          approved_amount: approvedAmount,
+          snapshot_hash: existing.snapshotHash,
+          held_order_id: existing.heldOrderId,
+        },
       });
+      await notifyRequester(existing, data.approve, who, approvedAmount).catch(() => undefined);
       // A rejected request must not leave a posted record locked.
       if (!data.approve) {
         const { releaseDecidedHold } = await import("./record-edits.server");
@@ -325,9 +465,16 @@ export const decideAuthorizationRequest = createServerFn({ method: "POST" })
     }
   });
 
-/** Where a request the caller made has got to; an approval is single-use. */
+/**
+ * Where a request the caller made has got to.
+ *
+ * This is the only place an approval turns into permission. A live message
+ * saying "approved" is a notification, nothing more; the till still has to
+ * come here, and the server checks the owner, the status, the expiry, the
+ * ticket it was granted against and that nobody has used it already.
+ */
 export const claimAuthorizationRequest = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => idInput.parse(data))
+  .inputValidator((data: unknown) => claimInput.parse(data))
   .handler(async ({ data }) => {
     try {
       const who = await assertCaller(data);
@@ -339,15 +486,31 @@ export const claimAuthorizationRequest = createServerFn({ method: "POST" })
         return { ok: false as const, error: "That request belongs to someone else" };
       }
       if (request.status !== "approved") {
-        return { ok: true as const, status: request.status, grantToken: "" };
+        return {
+          ok: true as const,
+          status: request.status,
+          grantToken: "",
+          approvedAmount: null,
+        };
       }
-      const claimed = await consumeRequest(request.id);
+      // The ticket must still be the one the approver looked at.
+      if (request.snapshotHash && data.snapshotHash && data.snapshotHash !== request.snapshotHash) {
+        return {
+          ok: false as const,
+          error: "The ticket has changed since it was approved — send it again",
+        };
+      }
+      const claimed = await consumeRequest(
+        request.id,
+        request.snapshotHash ? request.snapshotHash : undefined,
+      );
       if (!claimed) {
         return { ok: false as const, error: "That approval has already been used" };
       }
       return {
         ok: true as const,
         status: "approved" as const,
+        approvedAmount: request.approvedAmount ?? request.requestedAmount,
         grantToken: signOverrideGrant({
           action: request.actionKey,
           approvedBy: request.decidedBy ?? "approval",

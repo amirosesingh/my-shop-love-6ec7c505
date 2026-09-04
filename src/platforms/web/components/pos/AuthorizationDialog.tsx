@@ -31,6 +31,7 @@ import {
 import { looksOffline, parkGovernanceRow } from "@/lib/governance-offline";
 import { useAuthOptional } from "@/lib/pos-auth";
 import type { AuthMode, AuthPayload } from "@/lib/authorization";
+import type { TicketSnapshot } from "@/lib/ticket-snapshot";
 
 const newId = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -46,6 +47,10 @@ export type AuthorizationPrompt = {
   storeId?: string | null;
   terminalId?: string | null;
   payload?: AuthPayload;
+  /** The ticket the approver will review, when the action came from a sale. */
+  snapshot?: TicketSnapshot | null;
+  requestedAmount?: number | null;
+  heldOrderId?: string | null;
 };
 
 export type PromptOutcome =
@@ -174,6 +179,11 @@ export function AuthorizationDialog({
           payload: prompt.payload ?? {},
           ...(prompt.storeId ? { storeId: prompt.storeId } : {}),
           ...(prompt.terminalId ? { terminalId: prompt.terminalId } : {}),
+          ...(prompt.snapshot ? { snapshot: prompt.snapshot } : {}),
+          ...(prompt.requestedAmount === undefined || prompt.requestedAmount === null
+            ? {}
+            : { requestedAmount: prompt.requestedAmount }),
+          ...(prompt.heldOrderId ? { heldOrderId: prompt.heldOrderId } : {}),
         },
       });
       if (!res.ok || !res.request) {
@@ -227,10 +237,23 @@ export function AuthorizationDialog({
   );
 
   const requestPane = (
-    <p className="text-sm text-muted-foreground">
-      This will wait in the approvals queue until someone allowed to decide it
-      approves or rejects it. Nothing happens to the sale until then.
-    </p>
+    <div className="space-y-2">
+      <p className="text-sm text-muted-foreground">
+        This will wait in the approvals queue until someone allowed to decide it
+        approves or rejects it. Nothing happens to the sale until then.
+      </p>
+      {prompt?.snapshot ? (
+        <div className="rounded-md border border-border/60 bg-muted/30 p-2 text-[11px]">
+          <p className="font-medium">
+            {prompt.snapshot.lines.length} item(s) · total {prompt.snapshot.total.toFixed(2)}
+          </p>
+          <p className="text-muted-foreground">
+            The whole ticket is sent with the request, and it is parked while you serve the
+            next customer. If it changes afterwards the approval no longer applies.
+          </p>
+        </div>
+      ) : null}
+    </div>
   );
 
   return (

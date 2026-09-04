@@ -21,6 +21,7 @@ export type Database = {
           actor_role: string | null
           amount: number | null
           branch_id: string | null
+          cleared_by: string[]
           client_event_id: string | null
           created_at: string
           entity_id: string | null
@@ -45,6 +46,7 @@ export type Database = {
           actor_role?: string | null
           amount?: number | null
           branch_id?: string | null
+          cleared_by?: string[]
           client_event_id?: string | null
           created_at?: string
           entity_id?: string | null
@@ -69,6 +71,7 @@ export type Database = {
           actor_role?: string | null
           amount?: number | null
           branch_id?: string | null
+          cleared_by?: string[]
           client_event_id?: string | null
           created_at?: string
           entity_id?: string | null
@@ -293,6 +296,9 @@ export type Database = {
       authorization_requests: {
         Row: {
           action_key: string
+          approved_amount: number | null
+          approved_payload: Json
+          bill_snapshot: Json
           consumed_at: string | null
           created_at: string
           decided_at: string | null
@@ -300,11 +306,15 @@ export type Database = {
           decided_by_name: string | null
           decision_note: string | null
           expires_at: string
+          held_order_id: string | null
           id: string
+          notified_at: string | null
           payload: Json
           reason: string
+          requested_amount: number | null
           requested_by: string
           requested_by_name: string
+          snapshot_hash: string
           status: string
           store_id: string
           terminal_id: string
@@ -312,6 +322,9 @@ export type Database = {
         }
         Insert: {
           action_key: string
+          approved_amount?: number | null
+          approved_payload?: Json
+          bill_snapshot?: Json
           consumed_at?: string | null
           created_at?: string
           decided_at?: string | null
@@ -319,11 +332,15 @@ export type Database = {
           decided_by_name?: string | null
           decision_note?: string | null
           expires_at?: string
+          held_order_id?: string | null
           id?: string
+          notified_at?: string | null
           payload?: Json
           reason?: string
+          requested_amount?: number | null
           requested_by: string
           requested_by_name?: string
+          snapshot_hash?: string
           status?: string
           store_id?: string
           terminal_id?: string
@@ -331,6 +348,9 @@ export type Database = {
         }
         Update: {
           action_key?: string
+          approved_amount?: number | null
+          approved_payload?: Json
+          bill_snapshot?: Json
           consumed_at?: string | null
           created_at?: string
           decided_at?: string | null
@@ -338,11 +358,15 @@ export type Database = {
           decided_by_name?: string | null
           decision_note?: string | null
           expires_at?: string
+          held_order_id?: string | null
           id?: string
+          notified_at?: string | null
           payload?: Json
           reason?: string
+          requested_amount?: number | null
           requested_by?: string
           requested_by_name?: string
+          snapshot_hash?: string
           status?: string
           store_id?: string
           terminal_id?: string
@@ -979,8 +1003,10 @@ export type Database = {
           member_id: string | null
           member_name: string | null
           note: string
+          pending_request_id: string | null
           row_version: number
           shift_id: string | null
+          status: string
           store_id: string | null
           total: number
           updated_at: string
@@ -1000,8 +1026,10 @@ export type Database = {
           member_id?: string | null
           member_name?: string | null
           note?: string
+          pending_request_id?: string | null
           row_version?: number
           shift_id?: string | null
+          status?: string
           store_id?: string | null
           total?: number
           updated_at?: string
@@ -1021,8 +1049,10 @@ export type Database = {
           member_id?: string | null
           member_name?: string | null
           note?: string
+          pending_request_id?: string | null
           row_version?: number
           shift_id?: string | null
+          status?: string
           store_id?: string | null
           total?: number
           updated_at?: string
@@ -2402,6 +2432,9 @@ export type Database = {
       }
       sales: {
         Row: {
+          authorization_request_id: string | null
+          authorized_at: string | null
+          authorized_by: string | null
           bill_number: string
           branch_id: string | null
           cashier_id: string | null
@@ -2440,6 +2473,9 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          authorization_request_id?: string | null
+          authorized_at?: string | null
+          authorized_by?: string | null
           bill_number: string
           branch_id?: string | null
           cashier_id?: string | null
@@ -2478,6 +2514,9 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          authorization_request_id?: string | null
+          authorized_at?: string | null
+          authorized_by?: string | null
           bill_number?: string
           branch_id?: string | null
           cashier_id?: string | null

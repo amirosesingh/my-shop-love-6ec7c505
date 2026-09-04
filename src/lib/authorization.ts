@@ -6,6 +6,9 @@
  * applies to a branch; every check that matters happens on the server.
  */
 import { GATE_RULE_KEY, type GateAction, type PosRules } from "./pos-rules";
+import { normalizeSnapshot, type TicketSnapshot } from "./ticket-snapshot";
+
+export type { TicketSnapshot } from "./ticket-snapshot";
 
 /** How an action must be authorised. */
 export type AuthMode = "none" | "pin" | "request" | "either";
@@ -202,7 +205,22 @@ export type AuthorizationRequest = {
   decisionNote: string | null;
   expiresAt: string;
   createdAt: string;
+  /** the value the cashier asked for, and the one that was actually granted */
+  requestedAmount: number | null;
+  approvedAmount: number | null;
+  approvedPayload: AuthPayload;
+  /** the ticket the approver reviewed, and its fingerprint */
+  snapshot: TicketSnapshot | null;
+  snapshotHash: string;
+  /** the parked ticket this request belongs to, when there is one */
+  heldOrderId: string | null;
+  consumedAt: string | null;
 };
+
+const numberOrNull = (raw: unknown): number | null =>
+  raw === null || raw === undefined || raw === "" || !Number.isFinite(Number(raw))
+    ? null
+    : Number(raw);
 
 export function normalizeRequest(input: unknown): AuthorizationRequest {
   const row = (input ?? {}) as Record<string, unknown>;
@@ -225,5 +243,24 @@ export function normalizeRequest(input: unknown): AuthorizationRequest {
     decisionNote: (row["decision_note"] as string) ?? null,
     expiresAt: String(row["expires_at"] ?? ""),
     createdAt: String(row["created_at"] ?? ""),
+    requestedAmount: numberOrNull(row["requested_amount"]),
+    approvedAmount: numberOrNull(row["approved_amount"]),
+    approvedPayload: (row["approved_payload"] as AuthPayload) ?? {},
+    snapshot: normalizeSnapshotRow(row["bill_snapshot"]),
+    snapshotHash: String(row["snapshot_hash"] ?? ""),
+    heldOrderId: (row["held_order_id"] as string) ?? null,
+    consumedAt: (row["consumed_at"] as string) ?? null,
   };
 }
+
+/** An empty jsonb column means "no ticket was attached", not an empty ticket. */
+function normalizeSnapshotRow(raw: unknown): TicketSnapshot | null {
+  if (!raw || typeof raw !== "object") return null;
+  if (Object.keys(raw as Record<string, unknown>).length === 0) return null;
+  return normalizeSnapshot(raw);
+}
+
+/** The value that applies once a request is decided: the granted one wins. */
+export const effectiveAmount = (r: AuthorizationRequest): number | null =>
+  r.approvedAmount ?? r.requestedAmount;
+

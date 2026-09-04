@@ -33,6 +33,15 @@ export type HeldOrder = {
   memberName?: string | null;
   coupon?: unknown;
   note?: string;
+  /**
+   * "held" is an ordinary parked ticket; "waiting" means it is parked because
+   * it is waiting for a manager's decision, and "ready" means the decision has
+   * arrived and the ticket can be resumed.
+   */
+  status?: "held" | "waiting" | "ready";
+  /** the approval request this ticket is bound to, when it is waiting */
+  pendingRequestId?: string | null;
+
 };
 
 const KEY = "pos.held.orders";
@@ -135,3 +144,27 @@ export function useHeldOrders(): HeldOrder[] {
   }, []);
   return orders;
 }
+
+/**
+ * Park a ticket because it is waiting for a manager's decision.
+ *
+ * The cashier can then serve the next customer; the ticket stays exactly as
+ * the approver saw it, bound to the request that will decide it.
+ */
+export function markHeldWaiting(id: string, requestId: string) {
+  updateHeldOrder(id, { status: "waiting", pendingRequestId: requestId });
+}
+
+/** The decision has arrived — the ticket can be picked up again. */
+export function markHeldReady(id: string) {
+  updateHeldOrder(id, { status: "ready" });
+}
+
+/** Back to an ordinary parked ticket, with no request attached. */
+export function clearHeldPending(id: string) {
+  updateHeldOrder(id, { status: "held", pendingRequestId: null });
+}
+
+/** The parked ticket bound to a given approval request, if it is still here. */
+export const heldOrderForRequest = (requestId: string): HeldOrder | undefined =>
+  readHeldOrders().find((h) => h.pendingRequestId === requestId);
