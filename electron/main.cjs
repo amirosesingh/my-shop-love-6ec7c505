@@ -675,6 +675,9 @@ function printSilent(html, deviceName, paper, dialog = false) {
       ...(dialog ? { title: "Print", autoHideMenuBar: true } : {}),
       webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: false },
     });
+    // A receipt is printed content, never a place to browse from.
+    win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+    win.webContents.on("will-navigate", (event) => event.preventDefault());
     const done = (result) => {
       if (!win.isDestroyed()) win.destroy();
       resolve(result);
