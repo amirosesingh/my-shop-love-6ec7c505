@@ -197,6 +197,9 @@ contextBridge.exposeInMainWorld("sqlAdmin", {
   unlock: (username, pin) => invoke("admin:unlock", username, pin),
   lockAdmin: () => invoke("admin:lock"),
   adminStatus: () => invoke("admin:status"),
+  // Emergency Access: the desktop process re-checks the clock code itself.
+  recoveryUnlock: (code) => invoke("admin:recovery-unlock", code),
+  recoveryLock: () => invoke("admin:recovery-lock"),
   connectInstance: (credentials) => invoke("sqladmin:connect", credentials),
   cancel: (attemptId) => invoke("sqladmin:cancel", attemptId),
   probePort: (credentials) => invoke("sqladmin:probe-port", credentials),

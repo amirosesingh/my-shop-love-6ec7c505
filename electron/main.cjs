@@ -1273,6 +1273,14 @@ function registerIpc() {
   ipcMain.handle("admin:lock", () => adminSession.lock());
   ipcMain.handle("admin:status", () => adminSession.status());
 
+  /**
+   * Emergency Access: the window says it accepted the recovery code, and this
+   * process checks that code against its own clock before opening the narrow
+   * repair session defined in `ipc-privilege.cjs`.
+   */
+  ipcMain.handle("admin:recovery-unlock", (_e, code) => adminSession.recoveryUnlock(code));
+  ipcMain.handle("admin:recovery-lock", () => adminSession.recoveryLock());
+
   const admin = (work) => adminSession.requireAdmin(work);
 
   ipcMain.handle("sqladmin:connect", (_e, credentials) =>
