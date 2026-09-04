@@ -155,22 +155,16 @@ export function supabaseConfig(): Source {
   // (applied above as the terminal override). Bundle-baked and environment
   // values belong to the web deployment and are deliberately invisible here.
   if (isTerminalApp()) throw new SupabaseConfigError();
-  // Each half is looked up independently across the sources, in order, so a
-  // deployment that names the key differently from the address still resolves
-  // to one connection instead of silently falling back to none.
-  let url = "";
-  let key = "";
   for (const bag of bags()) {
-    const found = fromEnv(bag);
-    if (!url) url = found.url;
-    if (!key) key = found.key;
-    if (url && key) {
-      cached = { url, key };
-      return cached;
+    for (const [urlName, keyNames] of PAIRS) {
+      const found = fromEnv(bag, urlName, keyNames);
+      if (found.url && found.key) {
+        cached = found;
+        return cached;
+      }
     }
   }
   throw new SupabaseConfigError();
-
 }
 
 /** True when both halves are present — for health checks that must not throw. */
@@ -185,10 +179,11 @@ export function hasSupabaseConfig(): boolean {
 
 /** Where the resolved values came from — for the health probe, never throws. */
 export function supabaseConfigSource(): "injected" | "runtime" | "build" | "missing" {
-  const check = (bag: Record<string, unknown> | undefined) => {
-    const found = fromEnv(bag);
-    return !!found.url && !!found.key;
-  };
+  const check = (bag: Record<string, unknown> | undefined) =>
+    PAIRS.some(([urlName, keyNames]) => {
+      const found = fromEnv(bag, urlName, keyNames);
+      return !!found.url && !!found.key;
+    });
 
   if (check(injectedBag())) return "injected";
   if (check(runtimeEnv)) return "runtime";
