@@ -7,7 +7,7 @@
  * branch and permissions that caller actually has.
  */
 import { authHeaders, cashierTokenSync, readCredentials } from "@/lib/pos-credentials";
-import { serverUrl } from "@/lib/server-origin";
+import { serverOrigin, serverUnreachableOnDevice, serverUrl } from "@/lib/server-origin";
 import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 import type { SyncOp } from "@/lib/sync-outbox";
 
