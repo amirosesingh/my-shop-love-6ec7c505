@@ -260,6 +260,70 @@ const query = (match: Record<string, unknown>) =>
     .join("&");
 
 /**
+ * Database routines a proven till may ask the server to run, with the branch
+ * the row belongs to and the permission the caller must hold.
+ */
+const RELAY_RPCS: Record<
+  string,
+  { permission: string; ownerTable: string; idArg: string; storeColumn: string }
+> = {
+  sale_refund: {
+    permission: "can_process_refund",
+    ownerTable: "sales",
+    idArg: "_sale_id",
+    storeColumn: "store_id",
+  },
+};
+
+/**
+ * Run one allow-listed routine on the caller's behalf.
+ *
+ * The branch of the record is read on the server and compared with the
+ * caller's own branch, and the permission flag is checked here, because the
+ * service key bypasses the database's own row rules.
+ */
+export async function runRelayRpc(
+  op: RelayRpc,
+  scope: RelayScope,
+): Promise<{ ok: boolean; error?: string; code?: string }> {
+  const spec = RELAY_RPCS[op.fn];
+  if (!spec) return { ok: false, code: "TABLE_FORBIDDEN", error: `"${op.fn}" cannot be run` };
+  if (!scope.isSupervisor && scope.permissions[spec.permission] !== true)
+    return {
+      ok: false,
+      code: "PERMISSION_DENIED",
+      error: "You are not allowed to do this.",
+    };
+
+  const id = op.args[spec.idArg];
+  if (typeof id !== "string" || !id)
+    return { ok: false, code: "SCOPE_MISSING", error: "Nothing to act on." };
+
+  const lookup = await serviceRest(
+    `${spec.ownerTable}?id=eq.${encodeURIComponent(id)}&select=${spec.storeColumn}&limit=1`,
+  );
+  if (!lookup.ok) return { ok: false, error: (await lookup.text()).slice(0, 300) };
+  const rows = (await lookup.json()) as Record<string, unknown>[];
+  const owner = rows[0];
+  if (!owner) return { ok: false, code: "SCOPE_MISSING", error: "That record no longer exists." };
+  const storeId = owner[spec.storeColumn];
+  if (!scope.isSupervisor && storeId !== scope.storeId)
+    return {
+      ok: false,
+      code: "STORE_FORBIDDEN",
+      error: "You can only do this for your own branch.",
+    };
+
+  const res = await serviceRest(`rpc/${op.fn}`, {
+    method: "POST",
+    body: JSON.stringify(op.args),
+  });
+  if (res.ok) return { ok: true };
+  return { ok: false, error: (await res.text()).slice(0, 400) };
+}
+
+/**
+
  * Execute one queued operation with service rights.
  *
  * The caller's scope is mandatory: the operation is first rewritten so it can
