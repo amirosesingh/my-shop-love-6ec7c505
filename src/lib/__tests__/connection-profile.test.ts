@@ -82,11 +82,25 @@ import { __resetProfileHydrationForTests } from "../connection-profile";
 
 const KEY_A = "sb_publishable_aaaaaaaaaaaa";
 
+/** Minimal browser surface: the suite runs in node, the code expects a device. */
+function installWindow() {
+  const map = new Map<string, string>();
+  const localStorage = {
+    getItem: (k: string) => map.get(k) ?? null,
+    setItem: (k: string, v: string) => void map.set(k, v),
+    removeItem: (k: string) => void map.delete(k),
+    clear: () => map.clear(),
+  };
+  (globalThis as { window?: unknown }).window = globalThis;
+  (globalThis as { localStorage?: unknown }).localStorage = localStorage;
+}
+
 /** Android's start-up purge: plain storage goes, the sealed store stays. */
 function restart() {
   window.localStorage.clear();
   __resetProfileHydrationForTests();
 }
+
 
 function mockFetch() {
   globalThis.fetch = (async (input: RequestInfo | URL) => {
