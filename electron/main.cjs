@@ -20,6 +20,8 @@ const brandingStore = require("./branding-store.cjs");
 const health = require("./health.cjs");
 const recovery = require("./recovery.cjs");
 const netHttp = require("./net.cjs");
+// Every channel argument arriving from the window goes through these checks.
+const guard = require("./ipc-guard.cjs");
 const diagnostics = require("./diagnostics.cjs");
 const serverKeys = require("./server-keys.cjs");
 const staffAuth = require("./staff-auth.cjs");
@@ -880,24 +882,29 @@ function registerIpc() {
   });
   ipcMain.handle("health:quit", () => app.quit());
 
-  ipcMain.handle("print:silent", async (_e, html, options) => {
-    try {
-      return await printSilent(
-        String(html),
-        options?.deviceName || undefined,
-        options?.paper || undefined,
-        !!options?.dialog,
-      );
-    } catch (err) {
-      return fail(err);
-    }
-  });
+  ipcMain.handle("print:silent", async (_e, html, options) =>
+    guard.guarded(async () => {
+      const body = guard.text(html, { name: "receipt", max: 2 * 1024 * 1024 });
+      const opts = guard.plainObject(options, { name: "print options" });
+      const device = guard.shellSafeText(opts.deviceName, { name: "printer name" });
+      const paper = guard.text(opts.paper, { name: "paper size", max: 32, allowEmpty: true });
+      try {
+        return await printSilent(body, device || undefined, paper || undefined, !!opts.dialog);
+      } catch (err) {
+        return fail(err);
+      }
+    }),
+  );
 
-  ipcMain.handle("print:raw", async (_e, bytes, options) => {
+  ipcMain.handle("print:raw", async (_e, bytes, options) =>
+    guard.guarded(async () => {
+    const payload = guard.bytes(bytes);
+    const opts = guard.plainObject(options, { name: "print options" });
     try {
-      const result = await printRaw(bytes, {
-        deviceName: options?.deviceName || "",
-        share: options?.share || "",
+      const result = await printRaw(payload, {
+        // Both reach a Windows command line, so no punctuation is allowed.
+        deviceName: guard.shellSafeText(opts.deviceName, { name: "printer name" }),
+        share: guard.shellSafeText(opts.share, { name: "printer share" }),
       });
       // No page fallback on purpose: rendering escape sequences through the
       // driver only produces a slip and never kicks the drawer.
@@ -906,7 +913,8 @@ function registerIpc() {
     } catch (err) {
       return fail(err);
     }
-  });
+    }),
+  );
 
   ipcMain.handle("print:list", async () => {
     try {
@@ -1324,14 +1332,19 @@ function registerIpc() {
   });
   ipcMain.handle("driver:install", async (_e, id) => {
     try {
-      return await driverInstall.installDriver(String(id), {
-        onProgress: (progress) => {
-          for (const win of BrowserWindow.getAllWindows()) {
-            win.webContents.send("driver:progress", progress);
-          }
+      // Catalogue identifier only; never a path or a command.
+      return await driverInstall.installDriver(
+        guard.text(id, { name: "driver", max: 64, pattern: /^[A-Za-z0-9._-]+$/ }),
+        {
+          onProgress: (progress) => {
+            for (const win of BrowserWindow.getAllWindows()) {
+              win.webContents.send("driver:progress", progress);
+            }
+          },
         },
-      });
+      );
     } catch (error) {
+      if (error instanceof guard.BadArg) return guard.refuse(error.message);
       // The installer already reports its own failures; this is the last net.
       return { ok: false, code: "EFAILED", error: fail(error).error };
     }
@@ -1395,9 +1408,15 @@ function registerIpc() {
     path: configStore.filePath(),
     sealed: configStore.encryptionAvailable(),
   }));
-  ipcMain.handle("config:write", (_e, patch) => configStore.merge(patch ?? {}));
-  ipcMain.handle("config:get", (_e, key) => ({ ok: true, value: configStore.get(String(key)) }));
-  ipcMain.handle("config:set", (_e, key, value) => configStore.set(String(key), value));
+  ipcMain.handle("config:write", (_e, patch) =>
+    guard.guarded(() => configStore.merge(guard.plainObject(patch, { name: "settings" }))),
+  );
+  ipcMain.handle("config:get", (_e, key) =>
+    guard.guarded(() => ({ ok: true, value: configStore.get(guard.key(key)) })),
+  );
+  ipcMain.handle("config:set", (_e, key, value) =>
+    guard.guarded(() => configStore.set(guard.key(key), value)),
+  );
   /** Admin-only hard reset: configuration AND the mirrored local database. */
   ipcMain.handle("config:reset", () => {
     const cfg = configStore.reset();
@@ -1411,27 +1430,40 @@ function registerIpc() {
     ...localDb.info(),
     counts: localDb.counts(),
   }));
-  ipcMain.handle("local:mirror", (_e, entity, rows) => ({
-    ok: true,
-    written: localDb.mirror(String(entity), rows ?? []),
-  }));
-  ipcMain.handle("local:list", (_e, entity, limit) => ({
-    ok: true,
-    rows: localDb.listMirror(String(entity), Number(limit) || 500),
-  }));
-  ipcMain.handle("local:audit-log", (_e, entry) => ({
-    ok: true,
-    row: localDb.logAudit(entry ?? {}),
-  }));
-  ipcMain.handle("local:audit-list", (_e, limit) => ({
-    ok: true,
-    rows: localDb.listAudit(Number(limit) || 200),
-  }));
+  ipcMain.handle("local:mirror", (_e, entity, rows) =>
+    guard.guarded(() => ({
+      ok: true,
+      written: localDb.mirror(guard.key(entity, { name: "table" }), guard.list(rows ?? [], { name: "rows", max: 5000 })),
+    })),
+  );
+  ipcMain.handle("local:list", (_e, entity, limit) =>
+    guard.guarded(() => ({
+      ok: true,
+      rows: localDb.listMirror(
+        guard.key(entity, { name: "table" }),
+        Math.min(Math.max(Number(limit) || 500, 1), 5000),
+      ),
+    })),
+  );
+  ipcMain.handle("local:audit-log", (_e, entry) =>
+    guard.guarded(() => ({
+      ok: true,
+      row: localDb.logAudit(guard.plainObject(entry, { name: "audit entry" })),
+    })),
+  );
+  ipcMain.handle("local:audit-list", (_e, limit) =>
+    guard.guarded(() => ({
+      ok: true,
+      rows: localDb.listAudit(Math.min(Math.max(Number(limit) || 200, 1), 2000)),
+    })),
+  );
   ipcMain.handle("local:audit-clear", () => {
     localDb.clearAudit();
     return { ok: true };
   });
-  ipcMain.handle("local:rollback", (_e, op) => localDb.rollbackOp(op ?? {}));
+  ipcMain.handle("local:rollback", (_e, op) =>
+    guard.guarded(() => localDb.rollbackOp(guard.plainObject(op, { name: "entry" }))),
+  );
 
   /* ---------------------- offline staff sign-in ---------------------- */
   ipcMain.handle("staff:roster", (_e, storeId) => ({
@@ -1670,7 +1702,8 @@ function registerIpc() {
   ipcMain.handle("pos:backup", async (_e, target) => {
     try {
       const config = pool.getConfig();
-      let destination = target;
+      // A destination chosen in the window must still be a plain local file.
+      let destination = target ? guard.filePath(target, { name: "backup file", extension: "bak" }) : "";
       if (!destination) {
         const res = await dialog.showSaveDialog(mainWindow, {
           title: "Back up local database",

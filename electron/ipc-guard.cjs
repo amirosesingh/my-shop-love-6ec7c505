@@ -1,0 +1,119 @@
+/**
+ * Argument checks for the bridge between the window and the desktop process.
+ *
+ * The window renders application code, so everything arriving through the
+ * bridge is treated as untrusted input: each channel that takes an argument
+ * states the shape it accepts, and anything else is refused with a plain
+ * message instead of being passed on to a printer, a file path or a database.
+ */
+
+/** A refusal the channel can hand straight back to the window. */
+function refuse(message) {
+  return { ok: false, code: "EBADARG", error: message };
+}
+
+class BadArg extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "BadArg";
+  }
+}
+
+/** Run a channel body, turning an argument complaint into a clean refusal. */
+async function guarded(work) {
+  try {
+    return await work();
+  } catch (error) {
+    if (error instanceof BadArg) return refuse(error.message);
+    throw error;
+  }
+}
+
+function text(value, { name = "value", max = 500, pattern = null, allowEmpty = false } = {}) {
+  if (value === undefined || value === null) {
+    if (allowEmpty) return "";
+    throw new BadArg(`A ${name} is required.`);
+  }
+  if (typeof value !== "string") throw new BadArg(`The ${name} must be text.`);
+  if (!allowEmpty && value.trim() === "") throw new BadArg(`The ${name} cannot be empty.`);
+  if (value.length > max) throw new BadArg(`The ${name} is too long.`);
+  if (pattern && value !== "" && !pattern.test(value)) {
+    throw new BadArg(`The ${name} contains characters that are not allowed.`);
+  }
+  return value;
+}
+
+/**
+ * A name that will be handed to a Windows command. Anything a shell could
+ * read as punctuation is rejected rather than escaped.
+ */
+const SHELL_SAFE = /^[^&|<>^"'`;\r\n%$]*$/;
+
+function shellSafeText(value, { name = "value", max = 200 } = {}) {
+  const out = text(value, { name, max, allowEmpty: true });
+  if (!SHELL_SAFE.test(out)) throw new BadArg(`The ${name} contains characters that are not allowed.`);
+  return out;
+}
+
+function plainObject(value, { name = "value" } = {}) {
+  if (value === undefined || value === null) return {};
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new BadArg(`The ${name} is not in the expected form.`);
+  }
+  return value;
+}
+
+function list(value, { name = "list", max = 1000 } = {}) {
+  if (!Array.isArray(value)) throw new BadArg(`The ${name} is not in the expected form.`);
+  if (value.length > max) throw new BadArg(`Too many entries in the ${name} (limit ${max}).`);
+  return value;
+}
+
+/** Bytes for the receipt printer: a real byte list, size-capped. */
+function bytes(value, { max = 4 * 1024 * 1024 } = {}) {
+  const array = value instanceof Uint8Array ? Array.from(value) : value;
+  if (!Array.isArray(array)) throw new BadArg("The print data is not in the expected form.");
+  if (array.length > max) throw new BadArg("The print job is too large.");
+  for (const b of array) {
+    if (typeof b !== "number" || !Number.isInteger(b) || b < 0 || b > 255) {
+      throw new BadArg("The print data is not in the expected form.");
+    }
+  }
+  return array;
+}
+
+/** A settings key: a plain identifier, never a path or an expression. */
+const KEY = /^[A-Za-z0-9_.:-]{1,128}$/;
+
+function key(value, { name = "setting name" } = {}) {
+  return text(value, { name, max: 128, pattern: KEY });
+}
+
+/**
+ * A file the operator chose to write. Absolute, on a local drive, with the
+ * expected extension, and never a network share or a quoted expression.
+ */
+function filePath(value, { name = "file", extension = null } = {}) {
+  const out = text(value, { name, max: 400 });
+  if (/[\r\n"'`|&<>^]/.test(out)) throw new BadArg(`The ${name} contains characters that are not allowed.`);
+  if (out.startsWith("\\\\")) throw new BadArg(`A network location cannot be used for the ${name}.`);
+  const absolute = /^[A-Za-z]:[\\/]/.test(out) || out.startsWith("/");
+  if (!absolute) throw new BadArg(`The ${name} must be a full path.`);
+  if (extension && !out.toLowerCase().endsWith(`.${extension}`)) {
+    throw new BadArg(`The ${name} must end in .${extension}.`);
+  }
+  return out;
+}
+
+module.exports = {
+  BadArg,
+  guarded,
+  refuse,
+  text,
+  shellSafeText,
+  plainObject,
+  list,
+  bytes,
+  key,
+  filePath,
+};
