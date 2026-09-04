@@ -119,32 +119,136 @@ export async function cloudKeyStatus(): Promise<CloudKeyStatus> {
 export type CloudTestResult = { ok: boolean; detail: string };
 
 /**
- * Validate a URL + key pair against the tenant before anything is saved:
- * the auth health endpoint proves the URL, a one-row REST read proves the key.
+ * Two separate questions, answered separately, because a brand-new customer
+ * has a perfectly good project whose POS schema has not been created yet:
+ *
+ *   A. reachable + authenticated — the address answers and accepts the key
+ *   B. schemaReady               — the POS tables exist in that project
+ *
+ * A failure of B is a warning, never a reason to refuse the configuration.
  */
-export async function testCloudCredentials(url: string, key: string): Promise<CloudTestResult> {
-  const cleanUrl = url.trim().replace(/\/+$/, "");
-  if (!/^https:\/\/.+/i.test(cleanUrl)) return { ok: false, detail: "Enter the full https:// project URL." };
-  if (key.trim().length < 10) return { ok: false, detail: "The API key looks too short." };
+export type CloudProbe = {
+  /** the address answered at all */
+  reachable: boolean;
+  /** the project accepted the publishable key */
+  authenticated: boolean;
+  /** the POS tables are present */
+  schemaReady: boolean;
+  stage: "invalid" | "unreachable" | "rejected" | "no-schema" | "ok";
+  detail: string;
+};
+
+const NOT_REACHED = (detail: string): CloudProbe => ({
+  reachable: false,
+  authenticated: false,
+  schemaReady: false,
+  stage: "unreachable",
+  detail,
+});
+
+/** A. Does the address answer, and does it accept this key? */
+async function probeAuth(url: string, key: string): Promise<CloudProbe | null> {
   try {
-    const client = createTenantClient(cleanUrl, key.trim());
-    const { error } = await client.from("stores").select("id").limit(1);
-    if (error) {
-      const msg = error.message ?? "query failed";
-      if (/invalid api ?key|jwt|unauthorized|permission/i.test(msg)) {
-        return { ok: false, detail: "The key was rejected by the server — check it and try again." };
-      }
-      if (/does not exist|relation/i.test(msg)) {
-        // Key accepted, schema not deployed yet — still a valid connection.
-        return { ok: true, detail: "Connected. The central schema has not been deployed yet." };
-      }
-      return { ok: false, detail: msg };
-    }
-    return { ok: true, detail: "Connection verified." };
+    const res = await fetch(`${url}/auth/v1/health`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+      cache: "no-store",
+    });
+    if (res.status === 401 || res.status === 403)
+      return {
+        reachable: true,
+        authenticated: false,
+        schemaReady: false,
+        stage: "rejected",
+        detail: "The address answered but rejected this API key — check the key and try again.",
+      };
+    return null; // reachable; the key is proven properly by the REST call below
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    return { ok: false, detail: /fetch|network/i.test(msg) ? "No route to the server — check the URL and this device's internet connection." : msg };
+    return NOT_REACHED(
+      `No answer from ${url} — check the address and this device's internet connection (${msg}).`,
+    );
   }
+}
+
+/** Full two-part probe. Never throws. */
+export async function probeCloudConnection(url: string, key: string): Promise<CloudProbe> {
+  const cleanUrl = url.trim().replace(/\/+$/, "");
+  const cleanKey = key.trim();
+  if (!/^https:\/\/.+/i.test(cleanUrl))
+    return {
+      reachable: false,
+      authenticated: false,
+      schemaReady: false,
+      stage: "invalid",
+      detail: "Enter the full https:// project URL.",
+    };
+  if (cleanKey.length < 10)
+    return {
+      reachable: false,
+      authenticated: false,
+      schemaReady: false,
+      stage: "invalid",
+      detail: "The API key looks too short.",
+    };
+
+  const early = await probeAuth(cleanUrl, cleanKey);
+  if (early) return early;
+
+  try {
+    const client = createTenantClient(cleanUrl, cleanKey);
+    const { error } = await client.from("stores").select("id").limit(1);
+    if (!error)
+      return {
+        reachable: true,
+        authenticated: true,
+        schemaReady: true,
+        stage: "ok",
+        detail: "Connected — the address, the key and the POS tables all check out.",
+      };
+
+    const msg = error.message ?? "query failed";
+    if (/invalid api ?key|jwt|unauthorized|not authorized/i.test(msg))
+      return {
+        reachable: true,
+        authenticated: false,
+        schemaReady: false,
+        stage: "rejected",
+        detail: "The key was rejected by the server — check it and try again.",
+      };
+    // Missing table or a row rule that hides everything: the connection itself
+    // is proven, the customer's POS schema simply is not provisioned yet.
+    if (/does not exist|relation|schema cache|permission denied/i.test(msg))
+      return {
+        reachable: true,
+        authenticated: true,
+        schemaReady: false,
+        stage: "no-schema",
+        detail: "Connected. The POS tables are not provisioned in this project yet.",
+      };
+    return {
+      reachable: true,
+      authenticated: true,
+      schemaReady: false,
+      stage: "no-schema",
+      detail: `Connected, but the POS tables could not be read: ${msg}`,
+    };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    return NOT_REACHED(
+      /fetch|network/i.test(msg)
+        ? "No route to the server — check the URL and this device's internet connection."
+        : msg,
+    );
+  }
+}
+
+/**
+ * Back-compatible wrapper: a connection counts as usable once the address
+ * answers and the key is accepted, whether or not the schema exists yet.
+ */
+export async function testCloudCredentials(url: string, key: string): Promise<CloudTestResult> {
+  const probe = await probeCloudConnection(url, key);
+  return { ok: probe.reachable && probe.authenticated, detail: probe.detail };
 }
 
 /** Persist a new pair in the platform vault and make it live immediately. */
