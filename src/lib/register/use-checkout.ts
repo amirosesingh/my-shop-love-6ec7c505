@@ -36,6 +36,11 @@ export type CheckoutDeps = {
   getActiveCashier: () => string;
   /** Manager-gated permission check. */
   requirePermission: (perm: string) => Promise<boolean>;
+  /**
+   * The approval a manager granted for this ticket, if any. Stamped on the
+   * bill so a decision and the bill it allowed are always read together.
+   */
+  getAuthorization?: () => { requestId: string; approvedBy?: string | null } | null;
 
   // Cart / ticket
   getLines: () => CartLine[];
@@ -446,6 +451,16 @@ export function useCheckout(deps: CheckoutDeps) {
         ...(rounding.adjustment ? { roundingLabel: roundingOf(roundingCfg).receiptLabel } : {}),
         ...(method === "bank_transfer" ? { transferRef: transferRef.trim() } : {}),
         ...(exchangeRef ? { exchangeOfReceiptNo: exchangeRef, exchangeCredit: totals.credit } : {}),
+        ...(() => {
+          const grant = deps.getAuthorization?.();
+          return grant
+            ? {
+                authorizationRequestId: grant.requestId,
+                authorizedBy: grant.approvedBy ?? null,
+                authorizedAt: new Date().toISOString(),
+              }
+            : {};
+        })(),
         ...(coupon
           ? {
               couponCode: coupon.code,
