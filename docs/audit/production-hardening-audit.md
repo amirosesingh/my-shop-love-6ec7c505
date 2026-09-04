@@ -85,3 +85,39 @@ activation shape, clean refusal). Full suite: 61 files, 416 tests, all passing.
 Still **NOT PRODUCTION READY**: the failure-injection suite, the verification matrix and
 the go-live checklist remain, and nothing has yet been exercised on real hardware
 (receipt printer, cash drawer, a Windows till, an Android device).
+
+## Stage 3 — prove it breaks safely (v1.3.117)
+
+Failure injection, not code review: every case below broke the system on
+purpose and the result was recorded.
+
+**Defect found and fixed — a blind cash count could be lost.** Closing a shift
+sent the count straight to the central database. If the line was down at that
+moment the count was simply refused with "The central database could not be
+reached" and the drawer had already been counted. `submitCashCount` now parks
+the call in the durable outbox when, and only when, nothing could reach the
+central database, carrying the same client key so a replay cannot count the
+drawer twice, and the till says the count is saved and will be sent. A count
+the server refused on principle (no permission, wrong state) is still refused
+on the spot and never parked.
+
+**Confirmed safe.** A refused first row leaves no bill anywhere; a refusal
+part-way through parks the rest of the basket; a dropped line writes the whole
+basket locally on desktop; a resent tender rewrites the same row rather than
+charging twice; a retried stock movement moves nothing the second time; a
+movement for another branch is refused. These were checked against the live
+database with a throwaway branch and product, all rows removed afterwards.
+
+**Known limit, accepted.** Two tills selling the same last unit both succeed:
+the row is locked, the arithmetic stays exact and the branch and total figures
+stay in step, but the count goes negative rather than the second sale being
+refused. This is normal POS behaviour and shows on the reorder report; refusing
+an oversell would be a business decision.
+
+**Still not proven.** The relay's mid-basket refusal of a revoked token has no
+automated test, and nothing here touches real hardware. See
+`verification-matrix.md` for the full picture and `go-live-checklist.md` for
+what must be signed off on the shop floor.
+
+**Verdict: NOT PRODUCTION READY** until the hardware rows in the matrix are
+signed off.
