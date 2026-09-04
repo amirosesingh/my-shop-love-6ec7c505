@@ -128,8 +128,6 @@ export function canRelay(): boolean {
  */
 const syncPath = (): string =>
   serverOrigin() ? "/api/public/sync" : "/api/v1/pos/sync";
-const SYNC_PATH = "/api/v1/pos/sync";
-void SYNC_PATH;
 
 
 /** Push one operation through the relay. */
@@ -137,7 +135,7 @@ export async function relayOp(
   op: SyncOp,
 ): Promise<{ ok: boolean; error?: string; code?: string }> {
   try {
-    const res = await fetch(serverUrl(SYNC_PATH), {
+    const res = await fetch(serverUrl(syncPath()), {
       method: "POST",
       headers: await relayHeaders(),
       body: JSON.stringify({ ...(await credentials()), ops: [op] }),
@@ -175,7 +173,7 @@ export async function relayActiveShift(
   storeId: string,
 ): Promise<{ ok: boolean; row?: Record<string, unknown> | null; error?: string }> {
   try {
-    const res = await fetch(serverUrl(SYNC_PATH), {
+    const res = await fetch(serverUrl(syncPath()), {
       method: "POST",
       headers: await relayHeaders(),
       body: JSON.stringify({ ...(await credentials()), read: { kind: "activeShift", storeId } }),
@@ -199,7 +197,7 @@ export async function relayStores(): Promise<{
   error?: string;
 }> {
   try {
-    const res = await fetch(serverUrl(SYNC_PATH), {
+    const res = await fetch(serverUrl(syncPath()), {
       method: "POST",
       headers: await relayHeaders(),
       body: JSON.stringify({ ...(await credentials()), read: { kind: "stores" } }),
@@ -219,7 +217,7 @@ export async function relayStores(): Promise<{
 /** Quick health probe used by the connection check panel. */
 export async function probeRelay(): Promise<{ ok: boolean; error?: string; code?: string }> {
   try {
-    const res = await fetch(serverUrl(SYNC_PATH), {
+    const res = await fetch(serverUrl(syncPath()), {
       method: "POST",
       headers: await relayHeaders(),
       body: JSON.stringify({
