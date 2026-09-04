@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /**
  * A browser sitting on the sign-in screen must not talk to the central
  * database. Every table is protected per user, so background work started
