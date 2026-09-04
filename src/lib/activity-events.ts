@@ -338,3 +338,56 @@ export function toCsv(rows: ActivityEvent[]): string {
   );
   return [head.map(cell).join(","), ...body].join("\n");
 }
+/* ------------------------------------------------------- cleared entries */
+
+/**
+ * Clearing an entry hides it for the person who cleared it. The event, the
+ * approval request and the authorisation log are untouched — anything cleared
+ * can be reopened from the Cleared tab.
+ */
+const CLEARED_KEY = "pos.activity.cleared";
+
+type ClearedMap = Record<string, string[]>;
+
+function readClearedMap(): ClearedMap {
+  if (!isBrowser()) return {};
+  try {
+    const raw = window.localStorage.getItem(CLEARED_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === "object" ? (parsed as ClearedMap) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeClearedMap(map: ClearedMap) {
+  if (!isBrowser()) return;
+  try {
+    window.localStorage.setItem(CLEARED_KEY, JSON.stringify(map));
+  } catch {
+    /* storage blocked — clearing is only a view preference */
+  }
+  window.dispatchEvent(new CustomEvent("pos:activity-cleared-changed"));
+}
+
+const who = (userId: string) => (userId || "anon").toLowerCase();
+
+export const clearedIds = (userId: string): string[] => readClearedMap()[who(userId)] ?? [];
+
+export function clearActivityEntry(userId: string, id: string) {
+  const map = readClearedMap();
+  const key = who(userId);
+  const list = map[key] ?? [];
+  if (!list.includes(id)) map[key] = [...list, id].slice(-500);
+  writeClearedMap(map);
+}
+
+export function reopenActivityEntry(userId: string, id: string) {
+  const map = readClearedMap();
+  const key = who(userId);
+  map[key] = (map[key] ?? []).filter((x) => x !== id);
+  writeClearedMap(map);
+}
+
+export const isCleared = (userId: string, id: string): boolean =>
+  clearedIds(userId).includes(id);

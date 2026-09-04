@@ -1,5 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { markHeldWaiting } from "@/lib/held-orders";
+import { terminalId as posTerminalId } from "@/lib/activity-journal";
+import type { TicketSnapshot } from "@/lib/ticket-snapshot";
 import { useCart } from "@/lib/register/use-cart";
 import { useTender } from "@/lib/register/use-tender";
 import { isoDaysFromNow, useBookingIntake } from "@/lib/register/use-booking-intake";
@@ -154,8 +157,37 @@ function Register() {
    * action was refused.
    */
   const { authorize } = useManagerGate();
+  /**
+   * The open ticket, filled in below once the totals exist. Sending it with a
+   * request lets a remote approver decide on what the cashier can see.
+   */
+  const ticketSnapshot = useRef<() => TicketSnapshot | null>(() => null);
+  /** Parks the open ticket; filled in once the held-orders hook exists. */
+  const parkTicket = useRef<(() => { id: string } | null) | null>(null);
+  /** The single-use grant claimed when a ticket comes back approved. */
+  const claimedGrant = useRef<{ requestId: string; grantToken: string; amount: number | null } | null>(
+    null,
+  );
   const askManager = async (request: GateRequest) => {
-    const res = await authorize(request);
+    const snapshot = ticketSnapshot.current();
+    const res = await authorize({
+      ...request,
+      ...(snapshot ? { snapshot } : {}),
+      ...(request.requestedAmount === undefined && snapshot?.requestedValue !== undefined
+        ? { requestedAmount: snapshot.requestedValue }
+        : {}),
+    });
+    // A queued action must not hold the till hostage: the ticket is parked
+    // exactly as the approver sees it and the next customer can be served.
+    if (res.pendingRequestId) {
+      const parked = parkTicket.current?.();
+      if (parked) {
+        markHeldWaiting(parked.id, res.pendingRequestId);
+        toast.info("Ticket parked while it waits for approval", {
+          description: "Pick it up from Hold tickets once the decision arrives.",
+        });
+      }
+    }
     // A gate that is switched off returns ok with no token — still a "go".
     return res.ok ? (res.grantToken ?? "") : null;
   };
@@ -559,7 +591,47 @@ function Register() {
     setCoupon,
     setBillNo,
     resetCart,
+    snapshot: () => ticketSnapshot.current(),
+    onApprovalClaimed: (grant) => {
+      claimedGrant.current = {
+        requestId: grant.requestId,
+        grantToken: grant.grantToken,
+        amount: grant.approvedAmount,
+      };
+      toast.success(
+        grant.approvedAmount === null
+          ? "Approval applied to this ticket"
+          : `Approved ${grant.approvedAmount.toFixed(2)} — applied to this ticket`,
+      );
+    },
   });
+  // Keep the picture of the open ticket current for anything that needs it.
+  ticketSnapshot.current = () =>
+    lines.length === 0
+      ? null
+      : {
+          ticketId: billNo ?? `draft-${currentStore.id}`,
+          capturedAt: new Date().toISOString(),
+          storeId: currentStore.id,
+          terminalId: posTerminalId(),
+          cashier: activeCashier,
+          ...(billNo ? { billNo } : {}),
+          lines: lines.map((l) => ({
+            sku: l.productId,
+            name: l.name,
+            qty: l.qty,
+            unitPrice: l.price,
+            discount: l.discount ?? 0,
+            lineTotal: r2(l.price * l.qty - (l.discount ?? 0)),
+          })),
+          subtotal: totals.subtotal,
+          discount: totals.discount ?? 0,
+          tax: totals.tax ?? 0,
+          serviceCharge: 0,
+          total: totals.total,
+          member: member ? { id: member.id, name: member.name, points: member.points } : null,
+        };
+  parkTicket.current = () => holdOrder(true);
   const detail = state.products.find((p) => p.id === detailId) ?? null;
 
   const memberMatches = memberQuery.trim()

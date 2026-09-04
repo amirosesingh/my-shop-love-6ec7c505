@@ -38,6 +38,7 @@ import {
   type AuthPayload,
   type RuleMap,
 } from "@/lib/authorization";
+import type { TicketSnapshot } from "@/lib/ticket-snapshot";
 
 export type GateRequest = {
   action: AuthActionKey;
@@ -49,7 +50,14 @@ export type GateRequest = {
   detail?: string;
   /** What the approver needs to see when the action is queued. */
   payload?: AuthPayload;
+  /** The whole ticket, so a remote approver decides on what the cashier sees. */
+  snapshot?: TicketSnapshot | null;
+  /** The value being asked for, kept beside whatever is finally granted. */
+  requestedAmount?: number | null;
+  /** The parked ticket this request belongs to. */
+  heldOrderId?: string | null;
 };
+
 
 export type GateResult = {
   ok: boolean;
@@ -146,6 +154,11 @@ export function ManagerGateProvider({
           ...(request.storeId ? { storeId: request.storeId } : {}),
           ...(request.terminalId ? { terminalId: request.terminalId } : {}),
           ...(request.payload ? { payload: request.payload } : {}),
+          ...(request.snapshot ? { snapshot: request.snapshot } : {}),
+          ...(request.requestedAmount === undefined || request.requestedAmount === null
+            ? {}
+            : { requestedAmount: request.requestedAmount }),
+          ...(request.heldOrderId ? { heldOrderId: request.heldOrderId } : {}),
         });
       });
 

@@ -11,6 +11,7 @@ import {
   type AuthorizationRequest,
   type AuthorizationRule,
   type AuthPayload,
+  type TicketSnapshot,
 } from "./authorization";
 
 type Row = Record<string, unknown>;
@@ -122,6 +123,10 @@ export async function createRequest(input: {
   reason: string;
   payload: AuthPayload;
   ttlHours: number;
+  requestedAmount?: number | null;
+  snapshot?: TicketSnapshot | null;
+  snapshotHash?: string;
+  heldOrderId?: string | null;
 }): Promise<AuthorizationRequest> {
   const res = await rest("authorization_requests", {
     method: "POST",
@@ -135,6 +140,10 @@ export async function createRequest(input: {
         reason: input.reason,
         payload: input.payload,
         status: "pending",
+        requested_amount: input.requestedAmount ?? null,
+        bill_snapshot: input.snapshot ?? {},
+        snapshot_hash: input.snapshotHash ?? "",
+        held_order_id: input.heldOrderId ?? null,
         expires_at: new Date(Date.now() + input.ttlHours * 3600_000).toISOString(),
       },
     ]),
@@ -183,6 +192,8 @@ export async function decideRequest(input: {
   decidedBy: string;
   decidedByName: string;
   note: string;
+  approvedAmount?: number | null;
+  approvedPayload?: AuthPayload;
 }): Promise<AuthorizationRequest | null> {
   const res = await rest(
     `authorization_requests?id=eq.${encodeURIComponent(input.id)}&status=eq.pending`,
@@ -194,6 +205,10 @@ export async function decideRequest(input: {
         decided_by_name: input.decidedByName,
         decided_at: new Date().toISOString(),
         decision_note: input.note,
+        // The granted value is written by the server from the approver's own
+        // decision; the till never supplies it.
+        approved_amount: input.approve ? (input.approvedAmount ?? null) : null,
+        approved_payload: input.approve ? (input.approvedPayload ?? {}) : {},
       }),
       prefer: "return=representation",
     },
@@ -203,10 +218,27 @@ export async function decideRequest(input: {
   return rows[0] ? normalizeRequest(rows[0]) : null;
 }
 
-/** A granted request may only be used once. */
-export async function consumeRequest(id: string): Promise<boolean> {
+/** Note that the people who may decide this request have been told about it. */
+export async function markRequestNotified(id: string): Promise<void> {
+  await rest(`authorization_requests?id=eq.${encodeURIComponent(id)}&notified_at=is.null`, {
+    method: "PATCH",
+    body: JSON.stringify({ notified_at: new Date().toISOString() }),
+    prefer: "return=minimal",
+  }).catch(() => undefined);
+}
+
+/**
+ * A granted request may only be used once, and only for the ticket it was
+ * granted against. Both conditions are part of the single UPDATE, so two
+ * tills racing for the same approval cannot both win.
+ */
+export async function consumeRequest(id: string, expectedHash?: string): Promise<boolean> {
+  const guard =
+    expectedHash === undefined
+      ? ""
+      : `&snapshot_hash=eq.${encodeURIComponent(expectedHash)}`;
   const res = await rest(
-    `authorization_requests?id=eq.${encodeURIComponent(id)}&status=eq.approved&consumed_at=is.null`,
+    `authorization_requests?id=eq.${encodeURIComponent(id)}&status=eq.approved&consumed_at=is.null${guard}`,
     {
       method: "PATCH",
       body: JSON.stringify({ consumed_at: new Date().toISOString() }),

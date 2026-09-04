@@ -7,7 +7,14 @@
  * the register screen unchanged, including the audit trail.
  */
 import { toast } from "sonner";
-import { addHeldOrder, removeHeldOrder, useHeldOrders, type HeldOrder } from "@/lib/held-orders";
+import {
+  addHeldOrder,
+  removeHeldOrder,
+  useHeldOrders,
+  type HeldOrder,
+} from "@/lib/held-orders";
+import { claimApproval } from "@/lib/approval-centre";
+import type { TicketSnapshot } from "@/lib/ticket-snapshot";
 import { TICKET_ACTIONS, logTicketEvent } from "@/lib/ticket-audit";
 import type { CartLine, DiscountType } from "@/core/types/pos-types";
 import type { CartCoupon } from "@/lib/register/use-cart";
@@ -34,6 +41,17 @@ type HeldOrdersDeps = {
   setCoupon: (c: CartCoupon | null) => void;
   setBillNo: (no: string | null) => void;
   resetCart: () => void;
+  /**
+   * A picture of the open ticket, used to prove to the server that a ticket
+   * resumed after an approval is still the one the approver reviewed.
+   */
+  snapshot?: () => TicketSnapshot | null;
+  /** Called with the single-use grant when a parked approval is claimed. */
+  onApprovalClaimed?: (grant: {
+    requestId: string;
+    grantToken: string;
+    approvedAmount: number | null;
+  }) => void;
 };
 
 export function useRegisterHeldOrders(deps: HeldOrdersDeps) {
@@ -77,10 +95,38 @@ export function useRegisterHeldOrders(deps: HeldOrdersDeps) {
   }
 
   /** Reopen a parked ticket. An open ticket is parked first, so the cashier
-   *  can switch between drafts without losing either one. */
-  function resumeHeld(id: string) {
+   *  can switch between drafts without losing either one.
+   *
+   *  A ticket parked for a manager's decision only comes back with the
+   *  approval attached: the server is asked to hand over the single-use
+   *  permission, and it refuses if the ticket changed or somebody already
+   *  used it. */
+  async function resumeHeld(id: string) {
     const order = held.find((h) => h.id === id);
     if (!order) return;
+    if (order.pendingRequestId) {
+      if (order.status === "waiting") {
+        toast.info("Still waiting for a decision on this ticket");
+        return;
+      }
+      const claimed = await claimApproval(order.pendingRequestId).catch(() => null);
+      if (!claimed || !claimed.ok) {
+        toast.error(
+          (claimed && "error" in claimed ? claimed.error : "") ||
+            "That approval can no longer be used",
+        );
+        return;
+      }
+      if (claimed.status !== "approved" || !claimed.grantToken) {
+        toast.error(`The request was ${claimed.status}`);
+        return;
+      }
+      deps.onApprovalClaimed?.({
+        requestId: order.pendingRequestId,
+        grantToken: claimed.grantToken,
+        approvedAmount: claimed.approvedAmount ?? null,
+      });
+    }
     const parked = deps.lines.length ? holdOrder(true) : null;
     deps.setLines(order.lines);
     deps.setCartDiscount(order.cartDiscount ?? 0);
