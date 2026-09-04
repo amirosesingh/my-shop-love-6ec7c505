@@ -49,6 +49,11 @@
 - Tests extend `manager-gate.test.ts` and add `approval-centre.test.ts`: threshold below/above, PIN vs request path, request only on explicit send, ticket binding and changed-ticket refusal, requested vs approved values, single-use claim, hold/resume, live delivery plus poll reconciliation, clear without cancelling, reopen.
 - Verification: typecheck, full vitest suite, web build, security scans, version bump. Android and Windows hardware restarts cannot be run in this environment and will be reported as untested.
 
-## Not touched
+## Preservation guarantees
 
-Sales, printing, inventory, shifts, sync architecture, RLS model, stock transfer requests, emergency access, connection profile manager.
+Everything is additive. No screen, button, workflow, table, column, permission, report or test is removed, and no component is replaced by a reduced version. Existing behaviour of `ActivityBell`, `AuthorizationDialog`, `holds.tsx` and `/approvals` is kept and the new capability is added around it. Untouched: sales, cart, discounts, price overrides, refunds, voids, payments, receipts, printing, inventory, stock transfers (`src/routes/requests.*` stays the stock-transfer feature), members, shifts, drawer, reports, offline queue and sync engine, connection profile manager, emergency access, RLS model, Electron and Capacitor boundaries.
+
+Offline states stay distinct — queued locally, request created on the server, approved on the server — and a local queue entry is never shown as a manager approval. Notifications go only to approvers who may decide the action, and back to the requester on decision, through the existing activity/WhatsApp pipeline.
+
+Regression check before reporting: the full existing vitest suite, typecheck, web build and the existing security scans, plus the new approval tests. Android and Windows hardware runs are not possible here and will be reported as untested.
+
