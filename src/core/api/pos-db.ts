@@ -1500,6 +1500,41 @@ async function applyStockDeltas(deltas: StockDelta[]) {
 }
 
 /**
+ * Run one batch against the central database in order.
+ *
+ * The central database has no single transaction across these separate
+ * writes, so the risk is a half-stored bill: the header lands, a child row is
+ * refused, and the rest of the basket is dropped on the floor. When that
+ * happens the remaining writes are parked in the durable outbox — visible in
+ * Sync, retried, and quarantined if they keep failing — before the error is
+ * raised. Every op is keyed on its own id, so a replay rewrites the same rows
+ * rather than adding a second copy.
+ *
+ * A connection failure is left alone: the caller's own fallback stores the
+ * whole batch locally, which is the better outcome.
+ */
+async function runBatchLive(context: string, ops: SyncOp[]) {
+  for (let i = 0; i < ops.length; i++) {
+    try {
+      await runOpLive(context, ops[i]!);
+    } catch (e) {
+      const committed = i > 0;
+      if (committed && !isConnectionError(e)) {
+        recordDiagnostic({
+          kind: "partial_commit",
+          entity: ops[i]!.table,
+          code: reasonCode(e),
+        });
+        for (const rest of ops.slice(i)) enqueue(context, rest);
+        void drainOutbox();
+      }
+      throw e;
+    }
+  }
+}
+
+
+/**
  * Store a group of writes and only resolve once they are safe somewhere:
  * the cloud database, the local desktop database, or the on-disk outbox.
  *
