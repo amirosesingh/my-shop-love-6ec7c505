@@ -8,18 +8,20 @@
  * calls itself, which meant keeping a privileged key on a shop counter.
  *
  * Both therefore send app-server calls to the hosted backend, whose address
- * is configured per device (`backend-config.ts`, Recovery settings) or baked
- * in with `VITE_POS_SERVER_URL`. Web keeps using relative URLs.
+ * is configured per device and applied at runtime by `backend-config.ts`.
+ * There is deliberately NO build-time fallback: the same APK and installer
+ * are sold to different customers, so an address baked in at build time would
+ * point one customer's till at another customer's server. When the device has
+ * nothing saved the address stays empty and the setup screen asks for it.
+ * Web keeps using relative URLs.
  */
 import { isWindowsShell, isMobileShell } from "@/platform-config/features";
 
 function configured(): string {
-  const fromBuild = (import.meta.env["VITE_POS_SERVER_URL"] as string | undefined) ?? "";
+  if (typeof window === "undefined") return "";
   const fromRuntime =
-    typeof window === "undefined"
-      ? ""
-      : ((window as unknown as { __POS_SERVER_URL__?: string }).__POS_SERVER_URL__ ?? "");
-  return (fromRuntime || fromBuild).trim().replace(/\/+$/, "");
+    (window as unknown as { __POS_SERVER_URL__?: string }).__POS_SERVER_URL__ ?? "";
+  return fromRuntime.trim().replace(/\/+$/, "");
 }
 
 /** Absolute origin for app-server calls, or "" when relative URLs are right. */
