@@ -77,7 +77,7 @@ vi.mock("@/lib/sync-engine", () => ({
 
 import { backendUrl, saveBackendUrl } from "../backend-config";
 import { saveConnectionProfile, connectionProfile, cloudKeyStatus } from "../secure-cloud-config";
-import { hasRequiredPlatformConfig } from "../platform-config-ready";
+import { hasRequiredPlatformConfig, platformConfigReadySync } from "../platform-config-ready";
 import { __resetProfileHydrationForTests } from "../connection-profile";
 
 const KEY_A = "sb_publishable_aaaaaaaaaaaa";
@@ -250,6 +250,19 @@ describe("connection profile", () => {
       backendUrl: "https://pos.example.com",
     });
     expect(res.ok).toBe(true);
+  });
+
+  it("does not report a configured device as unconfigured mid-restore", async () => {
+    await saveConnectionProfile({
+      supabaseUrl: "https://tenant.example.co",
+      supabaseKey: KEY_A,
+      backendUrl: "https://pos.example.com",
+    });
+    expect(await hasRequiredPlatformConfig()).toMatchObject({ ready: true });
+    // A restart puts the restore back in flight; the synchronous answer must
+    // fall back to the last settled verdict rather than guessing "missing".
+    restart();
+    expect(platformConfigReadySync()).toBe(true);
   });
 
   it("shows the saved values back to the settings screen, key masked", async () => {
