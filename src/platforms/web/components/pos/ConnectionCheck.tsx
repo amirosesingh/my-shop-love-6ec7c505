@@ -5,6 +5,8 @@ import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 import { ensureTerminalSession } from "@/lib/terminal-session";
 import { probeRelay, syncHealthResult } from "@/core/api/sync-relay";
 import { isDesktop } from "@/lib/branding";
+import { serverUnreachableOnDevice } from "@/lib/server-origin";
+
 import { isNative } from "@/platform-config/platform";
 
 type Check = { label: string; ok: boolean; warn?: boolean; detail: string };
