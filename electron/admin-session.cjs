@@ -21,29 +21,53 @@ let grant = null; // { username, name, until }
 /** Permissions that count as "may administer this till's database". */
 const ADMIN_PERMISSIONS = ["can_manage_sync_backup", "can_manage_settings", "can_access_pos_settings"];
 
+/** Permissions that count as "may take a supervisor decision on this till". */
+const SUPERVISOR_PERMISSIONS = [
+  ...ADMIN_PERMISSIONS,
+  "can_approve_requests",
+  "can_override",
+  "can_manage_stock",
+  "can_open_drawer",
+];
+
+function hasAny(staff, wanted) {
+  const permissions = staff?.permissions;
+  if (Array.isArray(permissions)) return permissions.some((p) => wanted.includes(p));
+  if (permissions && typeof permissions === "object")
+    return wanted.some((p) => permissions[p] === true);
+  return false;
+}
+
 function isAdministrator(staff) {
   const role = String(staff?.role_slug ?? "").toLowerCase();
   if (role === "admin" || role === "administrator" || role === "owner") return true;
-  const permissions = staff?.permissions;
-  if (Array.isArray(permissions)) return permissions.some((p) => ADMIN_PERMISSIONS.includes(p));
-  if (permissions && typeof permissions === "object")
-    return ADMIN_PERMISSIONS.some((p) => permissions[p] === true);
-  return false;
+  return hasAny(staff, ADMIN_PERMISSIONS);
+}
+
+/** Supervisors and above. Every administrator is also a supervisor. */
+function isSupervisor(staff) {
+  if (isAdministrator(staff)) return true;
+  const role = String(staff?.role_slug ?? "").toLowerCase();
+  if (role === "supervisor" || role === "manager") return true;
+  return hasAny(staff, SUPERVISOR_PERMISSIONS);
 }
 
 /** Sign in for administration. Returns a plain refusal, never a reason to guess from. */
 function unlock(username, pin) {
   const result = staffAuth.verifyPin(String(username ?? ""), String(pin ?? ""));
   if (!result.ok) return { ok: false, error: "That username or PIN was not accepted on this till." };
-  if (!isAdministrator(result.staff))
+  const admin = isAdministrator(result.staff);
+  if (!admin && !isSupervisor(result.staff))
     return { ok: false, error: "This account may not administer the database on this terminal." };
   grant = {
     username: result.staff.username,
     name: result.staff.full_name ?? result.staff.username,
+    level: admin ? "admin" : "supervisor",
     until: Date.now() + TTL_MS,
   };
-  return { ok: true, name: grant.name, expiresAt: grant.until };
+  return { ok: true, name: grant.name, level: grant.level, expiresAt: grant.until };
 }
+
 
 function lock() {
   grant = null;
@@ -62,8 +86,20 @@ function unlocked() {
 
 function status() {
   return unlocked()
-    ? { unlocked: true, name: grant.name, expiresAt: grant.until }
+    ? { unlocked: true, name: grant.name, level: grant.level, expiresAt: grant.until }
     : { unlocked: false };
+}
+
+/** True while the live grant is at least as strong as the level asked for. */
+function hasLevel(level) {
+  if (!unlocked()) return false;
+  if (level === "supervisor") return grant.level === "supervisor" || grant.level === "admin";
+  return grant.level === "admin";
+}
+
+/** Keeps an in-use grant alive; an idle one still times out on its own. */
+function touch() {
+  if (grant) grant.until = Date.now() + TTL_MS;
 }
 
 /**
@@ -71,7 +107,7 @@ function status() {
  * caller has not unlocked administration on this machine.
  */
 async function requireAdmin(work) {
-  if (!unlocked())
+  if (!hasLevel("admin"))
     return {
       ok: false,
       code: "EADMINLOCK",
@@ -80,8 +116,20 @@ async function requireAdmin(work) {
         "Database administration is locked on this terminal. An administrator must unlock it with their username and PIN first.",
     };
   // Active use keeps the grant alive; an idle one still times out.
-  grant.until = Date.now() + TTL_MS;
+  touch();
   return work();
 }
 
-module.exports = { unlock, lock, unlocked, status, requireAdmin, isAdministrator, TTL_MS };
+module.exports = {
+  unlock,
+  lock,
+  unlocked,
+  status,
+  hasLevel,
+  touch,
+  requireAdmin,
+  isAdministrator,
+  isSupervisor,
+  TTL_MS,
+};
+

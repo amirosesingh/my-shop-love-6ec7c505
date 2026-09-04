@@ -166,7 +166,14 @@ contextBridge.exposeInMainWorld("pos", {
     ipcRenderer.on("pos:status-changed", handler);
     return () => ipcRenderer.removeListener("pos:status-changed", handler);
   },
+  /* The till has stopped because its own records or identity are unsound. */
+  onFatal: (cb) => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on("app:fatal", handler);
+    return () => ipcRenderer.removeListener("app:fatal", handler);
+  },
 });
+
 
 /**
  * Database surface used by the register. Checkout runs 100% offline through
