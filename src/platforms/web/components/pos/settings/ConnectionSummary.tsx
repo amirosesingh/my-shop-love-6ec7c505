@@ -38,13 +38,17 @@ export function ConnectionSummary() {
   }
 
   const tone =
-    status.tone === "ok" ? "text-success" : status.tone === "bad" ? "text-destructive" : "text-warning";
+    status.tone === "ok"
+      ? "text-success"
+      : status.tone === "error"
+        ? "text-destructive"
+        : "text-warning";
 
   return (
     <section className="space-y-3 rounded-lg border border-border bg-card p-4">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Cell label="Company server" value={server} />
-        <Cell label="This machine's database" value={local.label ?? "Not in use"} />
+        <Cell label="This machine's database" value={local.connected ? (local.database ?? local.server ?? "In use") : "Not in use"} />
         <Cell label="Sending changes" value={status.label} tone={tone} />
         <Cell label="Last successful send" value={when(status.lastSyncAt)} />
       </div>
