@@ -57,11 +57,14 @@ describe("failure injection — checkout", () => {
     delete (globalThis as unknown as { window: Record<string, unknown> }).window["pos"];
   });
 
-  it("keeps the whole basket when the very first write is refused", async () => {
+  it("stores nothing at all when the very first write is refused", async () => {
+    // Nothing landed centrally, so the sale is simply refused: the cashier
+    // sees the error, the cart is untouched, and no half bill is left behind.
     const before = listQueue().length;
     live.mockRejectedValue(new Error("null value in column"));
     await expect(commitOps("Saving sale", basket())).rejects.toThrow();
-    expect(queuedTables(before)).toEqual(["sales", "sale_items", "payment_transactions"]);
+    expect(queuedTables(before)).toEqual([]);
+    expect(live).toHaveBeenCalledTimes(1);
   });
 
   it("keeps only the tender when the last write is refused", async () => {

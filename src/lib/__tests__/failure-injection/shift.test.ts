@@ -25,6 +25,8 @@ const store = new Map<string, string>();
   addEventListener: () => {},
   removeEventListener: () => {},
 };
+// A desktop till: the only platform allowed to hold work on the device.
+(globalThis as unknown as { window: Record<string, unknown> }).window["pos"] = {};
 
 import { submitCashCount } from "@/lib/shift-closing";
 import { listQueue } from "@/lib/sync-outbox";
