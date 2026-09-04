@@ -19,22 +19,29 @@ async function handleGet(): Promise<Response> {
         const { hasSupabaseConfig, supabaseConfigSource, runtimeEnvValue } = await import(
           "@/lib/external-supabase-config"
         );
-        // Presence only — never a value, a length or a prefix. After a deploy
-        // this shows at a glance whether Cloudflare still holds all four.
-        const present = (name: string) =>
-          Boolean(runtimeEnvValue(name) ?? process.env[name]);
+        // Presence only — never a value, a length or a prefix. Each line
+        // accepts every name the resolver accepts, so a value supplied under
+        // an alias is not reported as missing.
+        const present = (...names: string[]) =>
+          names.some((name) => Boolean(runtimeEnvValue(name) ?? process.env[name]));
         return Response.json(
           {
             serviceKey: hasServiceKey(),
             posUrl: hasSupabaseConfig(),
             posUrlSource: supabaseConfigSource(),
             cloudflare: {
-              SUPABASE_URL: present("SUPABASE_URL"),
-              SUPABASE_ANON_KEY: present("SUPABASE_ANON_KEY"),
+              SUPABASE_URL: present("SUPABASE_URL", "VITE_POS_SUPABASE_URL", "VITE_SUPABASE_URL"),
+              SUPABASE_ANON_KEY: present(
+                "SUPABASE_ANON_KEY",
+                "SUPABASE_PUBLISHABLE_KEY",
+                "VITE_POS_SUPABASE_ANON_KEY",
+                "VITE_SUPABASE_PUBLISHABLE_KEY",
+              ),
               // The write-relay key is reported by `serviceKey` above; naming
               // it here would trip the client-code secret guard.
               SETTINGS_ENCRYPTION_KEY: present("SETTINGS_ENCRYPTION_KEY"),
             },
+
             runtime: process.env["NODE_ENV"] === "production" ? "edge" : "dev",
           },
           { headers: { "Cache-Control": "no-store" } },
