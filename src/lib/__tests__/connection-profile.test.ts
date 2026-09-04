@@ -116,6 +116,7 @@ function mockFetch() {
 
 describe("connection profile", () => {
   beforeEach(() => {
+    installWindow();
     secure.clear();
     window.localStorage.clear();
     syncRuns.length = 0;
