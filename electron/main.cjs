@@ -3,7 +3,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const net = require("node:net");
 const { spawn } = require("node:child_process");
-const { app, BrowserWindow, ipcMain, screen, dialog, shell } = require("electron");
+const { app, BrowserWindow, ipcMain, screen, dialog, session, shell } = require("electron");
 
 const pool = require("./db/pool.cjs");
 const repo = require("./db/repo.cjs");
@@ -228,7 +228,49 @@ function load(win, route) {
   return win.loadURL(`${baseUrl}${route}`);
 }
 
+/**
+ * The window that holds the till bridge must stay on the till.
+ *
+ * Nothing here changes normal use: the app's own pages, the print preview and
+ * the update flow all still work. What it stops is a stray or planted link
+ * moving this privileged window to somewhere on the internet, or opening a
+ * second window that inherits the same bridge. Links to elsewhere are handed
+ * to the operator's normal browser instead, where they hold nothing.
+ */
+function sameApp(target) {
+  try {
+    const url = new URL(target);
+    if (url.protocol === "data:" || url.protocol === "about:") return true;
+    if (!baseUrl) return false;
+    return url.origin === new URL(baseUrl).origin;
+  } catch {
+    return false;
+  }
+}
+
+function lockDownNavigation(win, route) {
+  win.webContents.on("will-navigate", (event, target) => {
+    if (sameApp(target)) return;
+    event.preventDefault();
+    diagnostics.logCrash("window.navigation-blocked", { route, target });
+    void shell.openExternal(target).catch(() => {});
+  });
+  win.webContents.on("will-redirect", (event, target) => {
+    if (sameApp(target)) return;
+    event.preventDefault();
+    diagnostics.logCrash("window.redirect-blocked", { route, target });
+  });
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    // No second window ever gets the bridge; outside links go to the browser.
+    if (!sameApp(url)) void shell.openExternal(url).catch(() => {});
+    return { action: "deny" };
+  });
+  // A page in this window may not attach anything of its own to the shell.
+  win.webContents.on("will-attach-webview", (event) => event.preventDefault());
+}
+
 function instrument(win, route) {
+  lockDownNavigation(win, route);
   win.webContents.on("did-fail-load", (_e, code, description, url) => {
     console.error(`[window] failed to load ${url || route}: ${description} (${code})`);
     diagnostics.logCrash("window.did-fail-load", { route, code, description });
@@ -1796,6 +1838,29 @@ function registerIpc() {
 }
 
 app.whenReady().then(async () => {
+  // A content-security policy on every page the shell serves: the till loads
+  // its own code and talks to its own database, and nothing else may inject a
+  // script into the window that holds the bridge.
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    const headers = { ...details.responseHeaders };
+    delete headers["content-security-policy"];
+    delete headers["Content-Security-Policy"];
+    headers["Content-Security-Policy"] = [
+      [
+        "default-src 'self' data: blob:",
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data: blob: https:",
+        "font-src 'self' data:",
+        "connect-src 'self' https: wss: http://127.0.0.1:* http://localhost:*",
+        "frame-ancestors 'none'",
+        "object-src 'none'",
+        "base-uri 'self'",
+      ].join("; "),
+    ];
+    callback({ responseHeaders: headers });
+  });
+
   // A second launch (double-clicked shortcut) surfaces the running till
   // instead of doing nothing.
   app.on("second-instance", () => {
