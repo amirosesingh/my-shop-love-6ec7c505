@@ -3876,10 +3876,13 @@ export type Database = {
       terminal_tokens: {
         Row: {
           activated_at: string | null
+          claim_proof: string | null
           claimed_at: string | null
           claimed_by_device: string | null
+          claimed_os: string | null
           created_at: string
           device_name: string
+          expires_at: string | null
           id: string
           last_seen_at: string | null
           location_id: string | null
@@ -3893,10 +3896,13 @@ export type Database = {
         }
         Insert: {
           activated_at?: string | null
+          claim_proof?: string | null
           claimed_at?: string | null
           claimed_by_device?: string | null
+          claimed_os?: string | null
           created_at?: string
           device_name: string
+          expires_at?: string | null
           id?: string
           last_seen_at?: string | null
           location_id?: string | null
@@ -3910,10 +3916,13 @@ export type Database = {
         }
         Update: {
           activated_at?: string | null
+          claim_proof?: string | null
           claimed_at?: string | null
           claimed_by_device?: string | null
+          claimed_os?: string | null
           created_at?: string
           device_name?: string
+          expires_at?: string | null
           id?: string
           last_seen_at?: string | null
           location_id?: string | null
@@ -4777,7 +4786,13 @@ export type Database = {
         }[]
       }
       terminal_token_claim: {
-        Args: { p_device?: string; p_token_id: string }
+        Args: {
+          p_device?: string
+          p_os?: string
+          p_platform?: string
+          p_proof_hash?: string
+          p_token_id: string
+        }
         Returns: boolean
       }
       terminal_token_heartbeat: {
@@ -4787,6 +4802,8 @@ export type Database = {
       terminal_token_status: {
         Args: { p_token_id: string }
         Returns: {
+          expires_at: string
+          is_claimed: boolean
           location_id: string
           location_name: string
           status: string

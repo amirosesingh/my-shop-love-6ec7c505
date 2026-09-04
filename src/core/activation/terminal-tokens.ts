@@ -96,6 +96,8 @@ const rpc = (fn: string, args: Record<string, unknown>) =>
     args,
   );
 
+import { deviceProofHash } from "@/core/activation/device-proof";
+
 /** Same helper against a throwaway client for a tenant we are not paired to. */
 const rpcOn = (client: unknown, fn: string, args: Record<string, unknown>) =>
   (client as { rpc: (n: string, a: unknown) => PromiseLike<any> }).rpc(fn, args);
@@ -552,9 +554,24 @@ function activationFailureMessage(e: unknown): string {
   const err = e as { code?: string; message?: string } | null;
   const code = err?.code ?? "";
   const message = err?.message ?? "";
+  // Verdicts the database itself reached, so a till that skipped the client
+  // pre-checks still gets refused — and still reads a plain reason.
+  if (/TERMINAL_TOKEN_REVOKED/.test(message)) {
+    return "This activation code has been revoked by management.";
+  }
+  if (/TERMINAL_TOKEN_EXPIRED/.test(message)) {
+    return "This activation code has expired. Ask an administrator to generate a new one.";
+  }
+  if (/TERMINAL_BRANCH_INACTIVE/.test(message)) {
+    return "The branch this code belongs to is no longer active. Ask an administrator for a code on a live branch.";
+  }
+  if (/TERMINAL_BRANCH_REQUIRED/.test(message)) {
+    return "This activation code is not linked to a branch. Ask an administrator to reissue it.";
+  }
   if (code === "PGRST203" || /could not choose the best candidate/i.test(message)) {
     return "This POS database has two versions of the terminal activation routine. Run supabase/schema33.sql on the POS database, then try again.";
   }
+
   if (code === "PGRST202" && /terminal_token_claim/.test(message)) {
     return "This POS database is missing the one-time terminal claim helper. Run supabase/schema.sql on the POS database, then try again.";
   }
@@ -688,7 +705,7 @@ export async function activateTerminal(code: string): Promise<TerminalConfig> {
   const { data: claimed, error: claimError } = await rpcOn(tenant, "terminal_token_claim", {
     p_token_id: payload.token_id,
     p_device: deviceName,
-    p_proof_hash: null,
+    p_proof_hash: await deviceProofHash(),
     p_platform: claimPlatform(),
     p_os: claimOs(),
   });
@@ -851,7 +868,7 @@ export async function activateWithTokenId(tokenId: string): Promise<TerminalConf
   const { data: claimed, error } = await rpc("terminal_token_claim", {
     p_token_id: tokenId,
     p_device: deviceName,
-    p_proof_hash: null,
+    p_proof_hash: await deviceProofHash(),
     p_platform: claimPlatform(),
     p_os: claimOs(),
   });

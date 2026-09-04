@@ -933,8 +933,14 @@ function registerIpc() {
     }
   });
 
-  ipcMain.handle("pos:connect", async (_e, config, cloud) => {
+  ipcMain.handle("pos:connect", async (_e, rawConfig, cloud) => {
     let verified;
+    let config;
+    try {
+      config = guard.connectionConfig(rawConfig);
+    } catch (err) {
+      return guard.refuse(err.message);
+    }
     try {
       verified = await withTimeout(
         connectLocal(config),
@@ -975,7 +981,7 @@ function registerIpc() {
 
   ipcMain.handle("pos:test", async (_e, config) => {
     try {
-      return await pool.test(config);
+      return await pool.test(guard.connectionConfig(config));
     } catch (err) {
       return { ok: false, ...pool.describeSqlError(err) };
     }
@@ -1267,28 +1273,36 @@ function registerIpc() {
     }
   });
 
-  ipcMain.handle("pos:write", async (_e, _context, op) => {
-    try {
-      await repo.applyOp(op);
-      void worker.run();
-      return { ok: true };
-    } catch (err) {
-      return fail(err);
-    }
-  });
-  ipcMain.handle("pos:write-batch", async (_e, _context, ops) => {
-    try {
-      await repo.applyOps(ops);
-      void worker.run();
-      return { ok: true };
-    } catch (err) {
-      return fail(err);
-    }
-  });
+  ipcMain.handle("pos:write", async (_e, _context, op) =>
+    guard.guarded(async () => {
+      const checked = guard.writeOp(op);
+      try {
+        await repo.applyOp(checked);
+        void worker.run();
+        return { ok: true };
+      } catch (err) {
+        return fail(err);
+      }
+    }),
+  );
+  ipcMain.handle("pos:write-batch", async (_e, _context, ops) =>
+    guard.guarded(async () => {
+      const checked = guard.writeOps(ops);
+      try {
+        await repo.applyOps(checked);
+        void worker.run();
+        return { ok: true };
+      } catch (err) {
+        return fail(err);
+      }
+    }),
+  );
+
 
   ipcMain.handle("pos:status", () => statusPayload());
-  ipcMain.handle("pos:housekeep", async (_e, options) => {
+  ipcMain.handle("pos:housekeep", async (_e, raw) => {
     try {
+      const options = guard.options(raw, { name: "housekeeping options" });
       const retentionDays = Number(options?.retentionDays);
       if (Number.isFinite(retentionDays) && retentionDays >= 7) {
         await repo.setState("retention_days", String(Math.round(retentionDays)));
@@ -1366,8 +1380,15 @@ function registerIpc() {
     }
     return { ok: true, config: null };
   });
-  ipcMain.handle("terminal:write", async (_e, config) => {
+  ipcMain.handle("terminal:write", async (_e, raw) => {
+    let config;
+    try {
+      config = guard.terminalConfig(raw);
+    } catch (err) {
+      return guard.refuse(err.message);
+    }
     const result = terminalStore.write(config);
+    if (!result.ok) return result;
     try {
       await repo.setSetting("terminal_config", config ? JSON.stringify(config) : null);
       await repo.setSetting("terminal_branch_id", config?.locationId ?? null);
@@ -1626,12 +1647,18 @@ function registerIpc() {
   ipcMain.handle("pos:push", () => worker.push());
   ipcMain.handle("pos:pull", () => worker.pull());
   // Operator-triggered history restore; never runs on the sync timer.
-  ipcMain.handle("pos:restore", (_e, options) => worker.restore(options ?? {}));
+  ipcMain.handle("pos:restore", (_e, options) =>
+    guard.guarded(() => worker.restore(guard.options(options, { name: "restore options" }))),
+  );
   ipcMain.handle("pos:restore-status", () => worker.restoreStatus());
   // Rebuild check: counts only, safe at any time.
-  ipcMain.handle("pos:restore-verify", (_e, options) => worker.verifyRestore(options ?? {}));
+  ipcMain.handle("pos:restore-verify", (_e, options) =>
+    guard.guarded(() => worker.verifyRestore(guard.options(options, { name: "restore options" }))),
+  );
   // The drill: a real wipe and restore, guarded and reversible.
-  ipcMain.handle("pos:restore-drill", (_e, options) => worker.restoreDrill(options ?? {}));
+  ipcMain.handle("pos:restore-drill", (_e, options) =>
+    guard.guarded(() => worker.restoreDrill(guard.options(options, { name: "restore options" }))),
+  );
   ipcMain.handle("pos:restore-evidence", () => worker.restoreEvidence());
 
   /**
@@ -1656,14 +1683,20 @@ function registerIpc() {
   /* ---- shop side of the server/shop data comparison ---- */
   ipcMain.handle("pos:compare-summary", async (_e, options) => {
     try {
-      return { ok: true, tables: await repo.compareSummary(options ?? {}) };
+      return { ok: true, tables: await repo.compareSummary(guard.options(options, { name: "comparison options" })) };
     } catch (err) {
       return fail(err);
     }
   });
   ipcMain.handle("pos:compare-rows", async (_e, table, options) => {
     try {
-      return { ok: true, rows: await repo.compareRows(table, options ?? {}) };
+      return {
+        ok: true,
+        rows: await repo.compareRows(
+          guard.key(table, { name: "table name" }),
+          guard.options(options, { name: "comparison options" }),
+        ),
+      };
     } catch (err) {
       return fail(err);
     }

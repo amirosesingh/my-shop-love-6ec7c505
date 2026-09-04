@@ -48,18 +48,25 @@ function write(config) {
       fs.rmSync(sealed(), { force: true });
       return { ok: true };
     }
-    if (canSeal()) {
-      fs.writeFileSync(sealed(), safeStorage.encryptString(JSON.stringify(config)));
-      // The plain copy must not linger once the vault holds the activation.
-      fs.rmSync(file(), { force: true });
-      return { ok: true };
+    if (!canSeal()) {
+      // One state only: sealed, or not stored at all. Silently falling back to
+      // a plain-text activation on a machine whose vault is unavailable would
+      // leave the terminal's identity readable by anything on the disk.
+      return {
+        ok: false,
+        error:
+          "This computer's secure store is unavailable, so the activation cannot be saved. Sign in to Windows with a normal user profile (not a temporary one) and try again.",
+      };
     }
-    fs.writeFileSync(file(), JSON.stringify(config, null, 2), "utf8");
+    fs.writeFileSync(sealed(), safeStorage.encryptString(JSON.stringify(config)));
+    // The plain copy must not linger once the vault holds the activation.
+    fs.rmSync(file(), { force: true });
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
+
 
 /** Whether the activation is protected by the operating system's vault. */
 function isSecure() {
