@@ -31,7 +31,16 @@ const opSchema = z.discriminatedUnion("kind", [
     table: z.string().min(1).max(64),
     match: z.record(z.string(), z.unknown()),
   }),
+  z.object({
+    kind: z.literal("rpc"),
+    table: z.string().min(1).max(64),
+    // Only routines the relay knows about are accepted, and it re-checks the
+    // caller's branch and permission before running one.
+    fn: z.enum(["sale_refund"]),
+    args: z.record(z.string(), z.unknown()),
+  }),
 ]);
+
 
 const bodySchema = z.object({
   sessionToken: z.string().max(400).optional(),
