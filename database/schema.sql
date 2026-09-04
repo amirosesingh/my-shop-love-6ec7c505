@@ -2038,6 +2038,9 @@ BEGIN
   IF COL_LENGTH('dbo.held_orders', 'sync_attempts') IS NULL ALTER TABLE dbo.held_orders ADD [sync_attempts] INT DEFAULT 0;
   IF COL_LENGTH('dbo.held_orders', 'last_error_at') IS NULL ALTER TABLE dbo.held_orders ADD [last_error_at] DATETIME2(3);
   IF COL_LENGTH('dbo.held_orders', 'client_transaction_id') IS NULL ALTER TABLE dbo.held_orders ADD [client_transaction_id] NVARCHAR(120);
+  IF COL_LENGTH('dbo.held_orders', 'status') IS NULL ALTER TABLE dbo.held_orders ADD [status] NVARCHAR(40) DEFAULT N'held';
+  IF COL_LENGTH('dbo.held_orders', 'pending_request_id') IS NULL ALTER TABLE dbo.held_orders ADD [pending_request_id] NVARCHAR(400);
+  IF COL_LENGTH('dbo.held_orders', 'decided_at') IS NULL ALTER TABLE dbo.held_orders ADD [decided_at] DATETIME2(3);
 END
 GO
 IF OBJECT_ID('dbo.integration_settings', 'U') IS NOT NULL
@@ -2540,6 +2543,9 @@ BEGIN
   IF COL_LENGTH('dbo.sales', 'coupon_promo_id') IS NULL ALTER TABLE dbo.sales ADD [coupon_promo_id] NVARCHAR(400);
   IF COL_LENGTH('dbo.sales', 'coupon_scope') IS NULL ALTER TABLE dbo.sales ADD [coupon_scope] NVARCHAR(MAX);
   IF COL_LENGTH('dbo.sales', 'coupon_discount') IS NULL ALTER TABLE dbo.sales ADD [coupon_discount] DECIMAL(18,4) DEFAULT 0;
+  IF COL_LENGTH('dbo.sales', 'authorization_request_id') IS NULL ALTER TABLE dbo.sales ADD [authorization_request_id] NVARCHAR(400);
+  IF COL_LENGTH('dbo.sales', 'authorized_by') IS NULL ALTER TABLE dbo.sales ADD [authorized_by] NVARCHAR(400);
+  IF COL_LENGTH('dbo.sales', 'authorized_at') IS NULL ALTER TABLE dbo.sales ADD [authorized_at] DATETIME2(3);
   IF COL_LENGTH('dbo.sales', 'payments') IS NULL ALTER TABLE dbo.sales ADD [payments] NVARCHAR(MAX) DEFAULT N'[]';
   IF COL_LENGTH('dbo.sales', 'rounding_adjustment') IS NULL ALTER TABLE dbo.sales ADD [rounding_adjustment] DECIMAL(18,4) DEFAULT 0;
   IF COL_LENGTH('dbo.sales', 'rounding_label') IS NULL ALTER TABLE dbo.sales ADD [rounding_label] NVARCHAR(120) NULL;
