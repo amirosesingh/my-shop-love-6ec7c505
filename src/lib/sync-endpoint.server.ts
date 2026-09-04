@@ -145,7 +145,6 @@ export async function handleSyncRequest(request: Request): Promise<Response> {
   }[] = [];
   const { batchInsertIds } = await import("@/core/api/relay-policy.server");
   const all = body.ops ?? [];
-  const rpcs = all.filter((o) => o.kind === "rpc");
   const ops = all.filter((o) => o.kind !== "rpc");
   // Parents inserted in this same push let their child rows through.
   const batchIds = batchInsertIds(ops);
@@ -160,7 +159,6 @@ export async function handleSyncRequest(request: Request): Promise<Response> {
       results.push({ ok: false, error: (e as Error).message, table: op.table, kind: op.kind });
     }
   }
-  void rpcs;
 
   const refused = results.find(
     (r) =>
