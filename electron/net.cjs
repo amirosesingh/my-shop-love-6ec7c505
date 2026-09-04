@@ -215,4 +215,4 @@ async function getBinary(url) {
   }
 }
 
-module.exports = { getJson, head, getBinary };
+module.exports = { getJson, head, getBinary, checkUrl };
