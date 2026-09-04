@@ -8,8 +8,21 @@
  */
 import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
 import type { ShiftState } from "@/core/types/pos-types";
+import { enqueue } from "./sync-outbox";
 
-export type ShiftCloseStep = { ok: true; state: ShiftState } | { ok: false; error: string };
+export type ShiftCloseStep =
+  | { ok: true; state: ShiftState }
+  | { ok: false; error: string; queued?: boolean };
+
+/**
+ * A closing step that failed because nothing could reach the central database,
+ * as opposed to one the server refused. Only the first kind may be parked.
+ */
+function isUnreachable(message: string): boolean {
+  return /could not be reached|Failed to fetch|NetworkError|Load failed|network|offline|timeout|ECONN|fetch failed/i.test(
+    message,
+  );
+}
 
 const fail = (e: unknown, fallback: string): ShiftCloseStep => ({
   ok: false,
@@ -49,19 +62,36 @@ export function startShiftClose(
  * Step 2 — the blind count. The reply is a state only: the cashier is never
  * told the expected figure or the variance.
  */
-export function submitCashCount(
+export async function submitCashCount(
   shiftId: string,
   counted: { cash: number; card: number | null; digital: number | null },
   opts: { clientKey?: string; terminalId?: string | null } = {},
 ): Promise<ShiftCloseStep> {
-  return callState("shift_cash_count_submit", {
+  const args = {
     p_shift: shiftId,
     p_cash: counted.cash,
     p_card: counted.card,
     p_digital: counted.digital,
-    p_client_key: opts.clientKey ?? null,
+    p_client_key: opts.clientKey ?? `${shiftId}:original`,
     p_terminal: opts.terminalId ?? null,
+  };
+  const res = await callState("shift_cash_count_submit", args);
+  if (res.ok || !isUnreachable(res.error)) return res;
+  // The line is down. The count is parked exactly as the server would have
+  // received it and replayed on reconnect; the database still works out the
+  // variance, and the client key means a replay cannot count the drawer twice.
+  enqueue("Cash count (waiting for the line)", {
+    kind: "rpc",
+    table: "shift_cash_counts",
+    fn: "shift_cash_count_submit",
+    args,
   });
+  return {
+    ok: false,
+    queued: true,
+    error:
+      "No connection to the central database. The count is saved on this till and will be sent as soon as the line is back.",
+  };
 }
 
 /** An authorised recount — always kept alongside the original count. */
