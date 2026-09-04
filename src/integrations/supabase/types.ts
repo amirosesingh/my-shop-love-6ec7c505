@@ -2334,6 +2334,7 @@ export type Database = {
           product_name: string
           promo_id: string | null
           quantity: number
+          refunded_qty: number
           row_version: number
           sale_id: string
           tax_rate: number
@@ -2354,6 +2355,7 @@ export type Database = {
           product_name: string
           promo_id?: string | null
           quantity?: number
+          refunded_qty?: number
           row_version?: number
           sale_id: string
           tax_rate?: number
@@ -2374,6 +2376,7 @@ export type Database = {
           product_name?: string
           promo_id?: string | null
           quantity?: number
+          refunded_qty?: number
           row_version?: number
           sale_id?: string
           tax_rate?: number
@@ -4372,6 +4375,15 @@ export type Database = {
         Returns: Json
       }
       product_delete_guard: { Args: { _product_id: string }; Returns: Json }
+      sale_refund: {
+        Args: {
+          _client_refund_id?: string
+          _lines?: Json
+          _reason?: string
+          _sale_id: string
+        }
+        Returns: Json
+      }
       schema_inventory: { Args: never; Returns: Json }
       schema_inventory_deep: { Args: never; Returns: Json }
       security_report_findings: {
