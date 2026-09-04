@@ -105,6 +105,62 @@ function filePath(value, { name = "file", extension = null } = {}) {
   return out;
 }
 
+/**
+ * One write instruction from the register: a table name, a kind, and rows.
+ * Anything else never reaches the local database layer.
+ */
+const OP_KINDS = new Set(["insert", "update", "upsert", "delete", "rpc"]);
+
+function writeOp(value, { name = "write" } = {}) {
+  const op = plainObject(value, { name });
+  const kind = String(op.kind ?? "");
+  if (!OP_KINDS.has(kind)) throw new BadArg(`The ${name} kind is not recognised.`);
+  key(op.table, { name: "table name" });
+  if (op.rows !== undefined) list(op.rows, { name: "rows", max: 5000 });
+  return op;
+}
+
+function writeOps(value, { max = 500 } = {}) {
+  const ops = list(value, { name: "write batch", max });
+  return ops.map((op, i) => writeOp(op, { name: `write ${i + 1}` }));
+}
+
+/**
+ * Options for a maintenance action (restore, compare, housekeeping): a plain
+ * object of scalars only, so nothing nested can be smuggled through.
+ */
+function options(value, { name = "options", max = 40 } = {}) {
+  const out = plainObject(value ?? {}, { name });
+  const entries = Object.entries(out);
+  if (entries.length > max) throw new BadArg(`Too many ${name}.`);
+  for (const [k, v] of entries) {
+    if (!KEY.test(k)) throw new BadArg(`The ${name} contain an unexpected setting.`);
+    if (v === null || v === undefined) continue;
+    const type = typeof v;
+    if (type === "string") {
+      if (v.length > 400) throw new BadArg(`The ${name} contain a value that is too long.`);
+      continue;
+    }
+    if (type === "number" || type === "boolean") continue;
+    if (Array.isArray(v) && v.every((e) => typeof e === "string" && e.length <= 200)) continue;
+    throw new BadArg(`The ${name} are not in the expected form.`);
+  }
+  return out;
+}
+
+/** Connection details for the branch database. Scalars only, size-capped. */
+function connectionConfig(value, { name = "connection details" } = {}) {
+  return options(value, { name, max: 40 });
+}
+
+/** The sealed activation record, or null to forget it. */
+function terminalConfig(value) {
+  if (value === null || value === undefined) return null;
+  const config = plainObject(value, { name: "activation" });
+  text(config.tokenId, { name: "terminal id", max: 100 });
+  return options(config, { name: "activation", max: 40 });
+}
+
 module.exports = {
   BadArg,
   guarded,
@@ -116,4 +172,9 @@ module.exports = {
   bytes,
   key,
   filePath,
+  writeOp,
+  writeOps,
+  options,
+  connectionConfig,
+  terminalConfig,
 };

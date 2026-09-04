@@ -10,6 +10,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Delete, LifeBuoy, Lock } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { logger } from "@/lib/audit-log";
 import { isTerminalApp } from "@/platform-config/platform";
 import {
   EMERGENCY_CODE_LENGTH,
@@ -78,12 +79,21 @@ export function EmergencyPinGate({ children }: { children: ReactNode }) {
     if (!alive.current) return;
     setBusy(false);
     setPin("");
+    // Every attempt is written to the local trail and travels with the next
+    // sync, so a stream of guesses on a till is visible to management even
+    // though the screen itself never needs a connection.
     if (ok) {
       clearPinFailures(SCOPE);
+      logger.log("security", "Emergency access unlocked", "recovery", { outcome: "granted" });
       setUnlocked(true);
       return;
     }
     const wait = notePinFailure(SCOPE);
+    logger.log("security", "Emergency access refused", "recovery", {
+      outcome: "refused",
+      attemptsLeft: attemptsLeft(SCOPE),
+      lockedForMs: wait,
+    });
     setLocked(wait);
     setError(
       wait > 0

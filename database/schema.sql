@@ -1657,6 +1657,9 @@ CREATE TABLE dbo.terminal_tokens (
   [claimed_by_device] NVARCHAR(MAX),
   [claimed_at] DATETIME2(3),
   [platform] NVARCHAR(MAX) DEFAULT N'unknown' NOT NULL,
+  [expires_at] DATETIME2(3),
+  [claimed_os] NVARCHAR(200),
+  [claim_proof] NVARCHAR(400),
   [row_version] INT DEFAULT 1 NOT NULL,
   [is_synced] BIT DEFAULT 0,
   [sync_status] NVARCHAR(40) DEFAULT N'pending',
@@ -2972,6 +2975,9 @@ BEGIN
   IF COL_LENGTH('dbo.terminal_tokens', 'claimed_by_device') IS NULL ALTER TABLE dbo.terminal_tokens ADD [claimed_by_device] NVARCHAR(MAX);
   IF COL_LENGTH('dbo.terminal_tokens', 'claimed_at') IS NULL ALTER TABLE dbo.terminal_tokens ADD [claimed_at] DATETIME2(3);
   IF COL_LENGTH('dbo.terminal_tokens', 'platform') IS NULL ALTER TABLE dbo.terminal_tokens ADD [platform] NVARCHAR(MAX) DEFAULT N'unknown';
+  IF COL_LENGTH('dbo.terminal_tokens', 'expires_at') IS NULL ALTER TABLE dbo.terminal_tokens ADD [expires_at] DATETIME2(3);
+  IF COL_LENGTH('dbo.terminal_tokens', 'claimed_os') IS NULL ALTER TABLE dbo.terminal_tokens ADD [claimed_os] NVARCHAR(200);
+  IF COL_LENGTH('dbo.terminal_tokens', 'claim_proof') IS NULL ALTER TABLE dbo.terminal_tokens ADD [claim_proof] NVARCHAR(400);
   IF COL_LENGTH('dbo.terminal_tokens', 'row_version') IS NULL ALTER TABLE dbo.terminal_tokens ADD [row_version] INT DEFAULT 1;
   IF COL_LENGTH('dbo.terminal_tokens', 'is_synced') IS NULL ALTER TABLE dbo.terminal_tokens ADD [is_synced] BIT DEFAULT 0;
   IF COL_LENGTH('dbo.terminal_tokens', 'sync_status') IS NULL ALTER TABLE dbo.terminal_tokens ADD [sync_status] NVARCHAR(40) DEFAULT N'pending';
