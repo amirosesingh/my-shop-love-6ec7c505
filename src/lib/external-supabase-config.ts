@@ -21,8 +21,8 @@ type Source = { url: string; key: string };
 
 const clean = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
 
-function fromEnv(bag: Record<string, unknown> | undefined): Source {
-  return { url: firstOf(bag, URL_NAMES), key: firstOf(bag, KEY_NAMES) };
+function fromEnv(bag: Record<string, unknown> | undefined, urlName: string, keyNames: string[]): Source {
+  return { url: clean(bag?.[urlName]), key: firstOf(bag, keyNames) };
 }
 
 
