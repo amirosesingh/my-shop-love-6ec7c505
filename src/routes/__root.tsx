@@ -211,8 +211,11 @@ function RootComponent() {
           <AuditTracker />
           <TelemetryAgent />
           <FirstRunSetup>
-            <Outlet />
+            <PrivilegeGate>
+              <Outlet />
+            </PrivilegeGate>
           </FirstRunSetup>
+
           <AndroidUpdateBanner />
           <Toaster position="top-center" />
           <ErrorNotifier />
