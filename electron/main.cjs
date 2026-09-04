@@ -25,6 +25,7 @@ const guard = require("./ipc-guard.cjs");
 const diagnostics = require("./diagnostics.cjs");
 const serverKeys = require("./server-keys.cjs");
 const staffAuth = require("./staff-auth.cjs");
+const adminSession = require("./admin-session.cjs");
 const cloudCredentials = require("./cloud-credentials.cjs");
 const storageHygiene = require("./storage-hygiene.cjs");
 
@@ -1168,7 +1169,7 @@ function registerIpc() {
   };
 
   ipcMain.handle("sqladmin:connect", (_e, credentials) =>
-    bounded(
+    adminSession.requireAdmin(() => bounded(
       45_000,
       "The SQL driver did not finish the authentication handshake in time.",
       () => sqlAdmin.connectInstance(credentials),
@@ -1176,20 +1177,20 @@ function registerIpc() {
     ),
   );
   ipcMain.handle("sqladmin:cancel", (_e, attemptId) =>
-    bounded(5_000, "The cancel request did not finish in time.", () => sqlAdmin.cancel(attemptId)),
+    adminSession.requireAdmin(() => bounded(5_000, "The cancel request did not finish in time.", () => sqlAdmin.cancel(attemptId)),
   );
   ipcMain.handle("sqladmin:probe-port", (_e, credentials) =>
-    bounded(15_000, "The port probe did not finish in time.", () =>
+    adminSession.requireAdmin(() => bounded(15_000, "The port probe did not finish in time.", () =>
       sqlAdmin.probePort(credentials),
     ),
   );
   ipcMain.handle("sqladmin:lock", (_e, credentials) =>
-    bounded(45_000, "The database could not be opened in time.", () =>
+    adminSession.requireAdmin(() => bounded(45_000, "The database could not be opened in time.", () =>
       sqlAdmin.lockDatabase(credentials),
     ),
   );
   ipcMain.handle("sqladmin:databases", () =>
-    bounded(15_000, "The database list did not arrive in time.", () => sqlAdmin.listDatabases()),
+    adminSession.requireAdmin(() => bounded(15_000, "The database list did not arrive in time.", () => sqlAdmin.listDatabases()),
   );
 
   /* Write verification runs on the OPERATIONAL pool the till itself uses. */
@@ -1197,20 +1198,20 @@ function registerIpc() {
     bounded(20_000, "The write check did not finish in time.", () => pool.verifyWrite()),
   );
   ipcMain.handle("sqladmin:tables", (_e, dbName) =>
-    bounded(15_000, "The table list did not arrive in time.", () => sqlAdmin.getTables(dbName)),
+    adminSession.requireAdmin(() => bounded(15_000, "The table list did not arrive in time.", () => sqlAdmin.getTables(dbName)),
   );
   ipcMain.handle("sqladmin:columns", (_e, dbName, tableName, schemaName) =>
-    bounded(15_000, "The column list did not arrive in time.", () =>
+    adminSession.requireAdmin(() => bounded(15_000, "The column list did not arrive in time.", () =>
       sqlAdmin.getTableColumns(dbName, tableName, schemaName),
     ),
   );
   ipcMain.handle("sqladmin:query", (_e, dbName, queryText) =>
-    bounded(30_000, "The query did not finish in time.", () =>
+    adminSession.requireAdmin(() => bounded(30_000, "The query did not finish in time.", () =>
       sqlAdmin.executeQuery(dbName, queryText),
     ),
   );
   ipcMain.handle("sqladmin:disconnect", () =>
-    bounded(10_000, "The disconnect did not finish in time.", () => sqlAdmin.disconnect()),
+    adminSession.requireAdmin(() => bounded(10_000, "The disconnect did not finish in time.", () => sqlAdmin.disconnect()),
   );
   ipcMain.handle("sqladmin:status", () =>
     bounded(5_000, "The connection status did not arrive in time.", () => sqlAdmin.status()),
