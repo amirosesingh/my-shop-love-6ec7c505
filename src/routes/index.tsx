@@ -632,6 +632,10 @@ function Register() {
           member: member ? { id: member.id, name: member.name, points: member.points } : null,
         };
   parkTicket.current = () => holdOrder(true);
+  // A grant belongs to one ticket only: once the ticket is gone, so is it.
+  useEffect(() => {
+    if (lines.length === 0) claimedGrant.current = null;
+  }, [lines.length]);
   const detail = state.products.find((p) => p.id === detailId) ?? null;
 
   const memberMatches = memberQuery.trim()
@@ -744,6 +748,10 @@ function Register() {
     getCurrentStore: () => currentStore,
     getActiveCashier: () => activeCashier,
     requirePermission,
+    getAuthorization: () =>
+      claimedGrant.current
+        ? { requestId: claimedGrant.current.requestId, approvedBy: null }
+        : null,
     getLines: () => lines,
     getTotals: () => totals,
     getMember: () => member,
