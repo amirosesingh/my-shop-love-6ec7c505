@@ -1642,12 +1642,12 @@ export function PosProvider({ children }: { children: ReactNode }) {
       const snap = stateRef.current;
       const sale = snap.sales.find((x) => x.id === saleId);
       if (sale && !sale.refunded) {
-        const restocked = snap.products
-          .filter((p) => sale.lines.some((l) => l.productId === p.id))
-          .map((p) => bump(p, sale.storeId, sale.lines.find((l) => l.productId === p.id)!.qty));
-        void db.refundSale(saleId, restocked);
+        // The database decides how much stock comes back; the till only names
+        // the bill and a stable id for this refund so a replay is a no-op.
+        void db.refundSale(saleId, `refund:${saleId}`);
       }
     }
+
     setState((s) => {
       const sale = s.sales.find((x) => x.id === saleId);
       if (!sale || sale.refunded) return s;
