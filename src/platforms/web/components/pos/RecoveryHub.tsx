@@ -19,14 +19,12 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
-import { BackendAddressPanel } from "@/platforms/web/components/pos/settings/panels/BackendAddressPanel";
 import { CloudConnectionPanel } from "@/platforms/web/components/pos/settings/panels/CloudConnectionPanel";
 import { LocalDatabaseSettings } from "@/platforms/web/components/pos/LocalDatabaseSettings";
 import { ReceiptPrinterSettings } from "@/platforms/web/components/pos/ReceiptPrinterSettings";
 import { TerminalActivation } from "@/platforms/web/components/pos/TerminalActivation";
 import { isElectron, isTerminalApp } from "@/platform-config/platform";
 import { readTerminalConfig } from "@/core/activation/terminal-tokens";
-import { backendUrl } from "@/lib/backend-config";
 import { cloudKeyStatus, subscribeCloudKeys } from "@/lib/secure-cloud-config";
 import { boundBranchName } from "@/lib/active-branch";
 import { emergencyMode, useStartupGate } from "@/core/activation/registration-status";
@@ -153,16 +151,12 @@ export function RecoveryHub() {
   const terminalApp = isTerminalApp();
   const desktop = isElectron();
   const [activated, setActivated] = useState<boolean | null>(null);
-  const [backend, setBackend] = useState("");
   const [cloud, setCloud] = useState<boolean | null>(null);
   const [branch, setBranch] = useState<string | null>(null);
 
   useEffect(() => {
     setActivated(Boolean(readTerminalConfig()));
     setBranch(boundBranchName());
-    void backendUrl()
-      .then(setBackend)
-      .catch(() => setBackend(""));
     const read = () =>
       void cloudKeyStatus()
         .then((s) => setCloud(Boolean(s.configured)))
@@ -188,23 +182,10 @@ export function RecoveryHub() {
         </Card>
       )}
 
-      {terminalApp && (
-        <Card
-          icon={Server}
-          title="Backend address"
-          blurb="Where this device sends sign-in, sync and health calls."
-          health={backend ? "ok" : "todo"}
-          status={backend ? "Set" : "Not set"}
-          defaultOpen={!backend}
-        >
-          <BackendAddressPanel />
-        </Card>
-      )}
-
       <Card
         icon={KeyRound}
-        title="Central database keys"
-        blurb="Cloud database URL and publishable key held in this device's secure store."
+        title="Database & cloud connection"
+        blurb="Database URL, publishable key and POS backend address for this device."
         health={cloud ? "ok" : "todo"}
         status={cloud === null ? "Checking…" : cloud ? "Configured" : "Missing"}
         defaultOpen={cloud === false}
