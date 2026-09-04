@@ -104,33 +104,17 @@ function bags(): Record<string, unknown>[] {
 }
 
 /**
- * One value, many spellings.
- *
- * The address and the publishable key are each a SINGLE setting; these lists
- * are only the names a hosting platform or an older build may have used for
- * them. They are tried in order and the first non-empty one wins, so the value
- * is entered once — on a device in Settings → Database & Cloud Connection, on
- * the web in the hosting variables — and every caller sees the same pair.
+ * Accepted name pairs, tried in order. Both halves must come from the SAME
+ * source, so an address from one project can never be paired with a key from
+ * another. The managed-platform `VITE_SUPABASE_*` names are deliberately not
+ * accepted: the shop's own project is the only database this POS talks to.
  */
-const URL_NAMES = [
+const PAIRS: [string, string[]][] = [
   // The shop's own project, named explicitly so a hosting platform's injected
-  // SUPABASE_URL can never take over during local development.
-  "VITE_POS_SUPABASE_URL",
+  // SUPABASE_* values can never take over during local development.
+  ["VITE_POS_SUPABASE_URL", ["VITE_POS_SUPABASE_ANON_KEY", "VITE_POS_SUPABASE_PUBLISHABLE_KEY"]],
   // Canonical: Cloudflare variables, and what the server prints into the page.
-  "SUPABASE_URL",
-  "VITE_SUPABASE_URL",
-  "VITE_SUPABASE_EXTERNAL_URL",
-];
-
-const KEY_NAMES = [
-  "VITE_POS_SUPABASE_ANON_KEY",
-  "VITE_POS_SUPABASE_PUBLISHABLE_KEY",
-  "SUPABASE_ANON_KEY",
-  // Same value under the name the managed platform writes.
-  "SUPABASE_PUBLISHABLE_KEY",
-  "VITE_SUPABASE_ANON_KEY",
-  "VITE_SUPABASE_PUBLISHABLE_KEY",
-  "VITE_SUPABASE_EXTERNAL_PUBLISHABLE_KEY",
+  ["SUPABASE_URL", ["SUPABASE_ANON_KEY", "SUPABASE_PUBLISHABLE_KEY"]],
 ];
 
 /** First non-empty value among the accepted names for one setting. */
