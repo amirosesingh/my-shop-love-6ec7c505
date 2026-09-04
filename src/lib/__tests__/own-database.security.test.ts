@@ -23,6 +23,10 @@ const FORBIDDEN = [
   /from\s+["']@\/integrations\/supabase\/client["']/,
   /from\s+["']@\/integrations\/supabase\/client\.server["']/,
   /from\s+["']@\/integrations\/supabase\/auth-middleware["']/,
+  // The managed bearer attacher instantiates the managed client on every
+  // server-fn call, which is what produced "Missing Supabase environment
+  // variable(s)" on tills and APKs. Only the external attacher may be used.
+  /from\s+["']@\/integrations\/supabase\/auth-attacher["']/,
   /from\s+["'](\.\.?\/)+integrations\/supabase\/client(\.server)?["']/,
   // Deferred imports count too: `await import("...client.server")` was how the
   // comparison page quietly read the managed database instead of the operator's.
