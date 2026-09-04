@@ -1442,11 +1442,20 @@ type StockDelta = { movementId: string; productId: string; storeId: string | nul
  * Split absolute stock out of a batch. When the batch carries stock movement
  * rows, the products upsert loses its stock columns and the movements become
  * relative deltas for the central database to apply.
+ *
+ * Movements travel as `upsert` (a replayed checkout or a re-posted receiving
+ * note must rewrite the same movement row, not add a second one), so both
+ * shapes count here. Matching only `insert` used to leave every sale sending
+ * a client-calculated absolute stock figure, which two tills selling the same
+ * product at the same time would overwrite for each other.
  */
 function withRelativeStock(ops: SyncOp[]): { ops: SyncOp[]; deltas: StockDelta[] } {
   const movements = ops.flatMap((op) =>
-    op.kind === "insert" && op.table === "item_activity_logs" ? (op.rows as Row[]) : [],
+    (op.kind === "insert" || op.kind === "upsert") && op.table === "item_activity_logs"
+      ? (op.rows as Row[])
+      : [],
   );
+
   if (!movements.length) return { ops, deltas: [] };
 
   const deltas: StockDelta[] = movements
