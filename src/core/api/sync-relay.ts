@@ -117,8 +117,20 @@ export function canRelay(): boolean {
   return !!readTerminalConfig()?.tokenId || hasStaffSession();
 }
 
-/** Canonical relay endpoint. The old `/api/public/sync` path still answers. */
+/**
+ * Where relay calls go.
+ *
+ * The website talks to itself, so it uses the canonical path. A till or a
+ * phone talks to a hosted deployment from another origin, and only the
+ * `/api/public/*` prefix is guaranteed to stay reachable there without a site
+ * session — so devices use the alias, which runs the identical handler and
+ * the identical caller checks.
+ */
+const syncPath = (): string =>
+  serverOrigin() ? "/api/public/sync" : "/api/v1/pos/sync";
 const SYNC_PATH = "/api/v1/pos/sync";
+void SYNC_PATH;
+
 
 /** Push one operation through the relay. */
 export async function relayOp(
