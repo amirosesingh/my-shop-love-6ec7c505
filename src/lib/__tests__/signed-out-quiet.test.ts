@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 /**
  * A browser sitting on the sign-in screen must not talk to the central
  * database. Every table is protected per user, so background work started
@@ -33,6 +32,8 @@ import { hasSignedInIdentity, __setAuthSessionForTests } from "../session-presen
 
 describe("hasSignedInIdentity", () => {
   beforeEach(() => {
+    // The guard only speaks for a real device; give it a minimal browser.
+    (globalThis as { window?: unknown }).window = globalThis;
     tokens.session = null;
     tokens.cashier = null;
     __setAuthSessionForTests(false);
