@@ -185,6 +185,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
  * so browsing schema never interferes with sales or sync.
  */
 contextBridge.exposeInMainWorld("sqlAdmin", {
+  // Administration is refused by the desktop process until it is unlocked
+  // here with an administrator's own username and PIN.
+  unlock: (username, pin) => invoke("admin:unlock", username, pin),
+  lockAdmin: () => invoke("admin:lock"),
+  adminStatus: () => invoke("admin:status"),
   connectInstance: (credentials) => invoke("sqladmin:connect", credentials),
   cancel: (attemptId) => invoke("sqladmin:cancel", attemptId),
   probePort: (credentials) => invoke("sqladmin:probe-port", credentials),

@@ -2,6 +2,11 @@
  * Persistent copy of the terminal activation, kept in the app's user-data
  * folder so an in-place update (or a cleared renderer storage) never forces the
  * branch to register the till again.
+ *
+ * One state only: sealed in the operating system's vault, or not stored at all.
+ * An older build could leave an unencrypted `terminal-config.json` behind; that
+ * copy is migrated into the vault once and deleted. It is never trusted on its
+ * own, because a plain file on disk can be edited by anything on the machine.
  */
 const fs = require("node:fs");
 const path = require("node:path");
@@ -19,26 +24,38 @@ const canSeal = () => {
 };
 
 function read() {
-  // Preferred: the OS vault copy (DPAPI on Windows, Keychain on macOS).
+  // Preferred, and the only trusted source: the OS vault copy (DPAPI on
+  // Windows, Keychain on macOS).
   if (canSeal()) {
     try {
       const buf = fs.readFileSync(sealed());
       const parsed = JSON.parse(safeStorage.decryptString(buf));
       if (parsed && parsed.tokenId) return parsed;
     } catch {
-      /* fall through to the legacy plain copy */
+      /* unreadable or tampered: fall through to the one-time migration */
     }
   }
+
+  // Legacy unencrypted activation from an older build. It is only ever used to
+  // seal itself; if it cannot be sealed it is discarded and the till goes
+  // through normal reactivation rather than trusting an editable file.
+  let legacy = null;
   try {
-    const raw = fs.readFileSync(file(), "utf8");
-    const parsed = JSON.parse(raw);
-    if (!parsed || !parsed.tokenId) return null;
-    // One-time migration of an older unencrypted activation.
-    if (canSeal()) write(parsed);
-    return parsed;
+    legacy = JSON.parse(fs.readFileSync(file(), "utf8"));
   } catch {
     return null;
   }
+  if (!legacy || !legacy.tokenId) {
+    fs.rmSync(file(), { force: true });
+    return null;
+  }
+  const migrated = write(legacy);
+  if (!migrated.ok) {
+    // No vault: the plain copy must not survive as a usable activation.
+    fs.rmSync(file(), { force: true });
+    return null;
+  }
+  return legacy;
 }
 
 function write(config) {
@@ -49,9 +66,9 @@ function write(config) {
       return { ok: true };
     }
     if (!canSeal()) {
-      // One state only: sealed, or not stored at all. Silently falling back to
-      // a plain-text activation on a machine whose vault is unavailable would
-      // leave the terminal's identity readable by anything on the disk.
+      // Silently falling back to a plain-text activation on a machine whose
+      // vault is unavailable would leave the terminal's identity readable by
+      // anything on the disk.
       return {
         ok: false,
         error:

@@ -69,3 +69,15 @@ shop floor before go-live:
 - A real Android device: activation, a sale, and a flight-mode close.
 - An automatic update installing over a live till.
 - Row 21 above, on a real activated terminal.
+
+## Stage 4 additions
+
+| # | What must hold | How it was checked | Result |
+|---|---|---|---|
+| 25 | The recovery screen shows only connection repair to a non-supervisor | Role walk-through of `RecoveryHub` | Proven |
+| 26 | The recovery hint does not teach the code format | `EmergencyPinGate` copy | Proven |
+| 27 | Desktop database tools refuse everyone until an administrator unlocks them | `admin-session.test.ts` | Proven |
+| 28 | A cashier with a correct PIN cannot unlock those tools | same | Proven |
+| 29 | The till window cannot be navigated or popped out to another site | `window-lockdown.test.ts` | Proven |
+| 30 | An interrupted local database upgrade re-runs and keeps every sale | `local-schema-upgrade.test.ts` | Proven |
+| 31 | An oversold count is shown, not hidden | `ProductPicker` renders a below-zero figure in red | Proven |

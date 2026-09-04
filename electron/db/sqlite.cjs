@@ -72,6 +72,7 @@ function init(directory) {
     // so the local shape stays reviewable next to the cloud schema.
     db.exec(fs.readFileSync(path.join(__dirname, "offline_sqlite_v2.sql"), "utf8"));
     migrate();
+    stampSchemaVersion();
     
     lastError = null;
     return { ok: true, engine: "sqlite", path: dbPath };
@@ -130,6 +131,33 @@ const TOMBSTONE_TABLES = [
   "stores",
   "members",
 ];
+
+/**
+ * The shape this build expects. It is written into the file only after the
+ * upgrade has finished, so a machine switched off part-way through still
+ * reports the older number next time and simply runs the upgrade again. Every
+ * step is an additive column check inside the existing tables, so sales,
+ * stock, shifts, the queued rows waiting to be sent and the terminal's own
+ * settings are never rebuilt or cleared.
+ */
+const SCHEMA_VERSION = 6;
+
+/** What the file on disk says it is. 0 for a database from before versioning. */
+function schemaVersion() {
+  try {
+    return Number(db.prepare("PRAGMA user_version").get()?.user_version ?? 0);
+  } catch {
+    return 0;
+  }
+}
+
+function stampSchemaVersion() {
+  try {
+    db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+  } catch {
+    /* an older engine without the pragma still runs the additive upgrade */
+  }
+}
 
 function migrate() {
   // 1. Sync bookkeeping on every mirror table.
@@ -250,6 +278,11 @@ function migrate() {
       db.exec(`DROP TABLE sync_metadata_old`);
     });
   }
+}
+
+/** Reported to the diagnostics screen so a stalled upgrade is visible. */
+function schemaState() {
+  return { version: schemaVersion(), expected: SCHEMA_VERSION, upToDate: schemaVersion() === SCHEMA_VERSION };
 }
 
 /** Called by the shell once the branch and till are known. */
@@ -633,6 +666,9 @@ function relationalHealth() {
 }
 
 module.exports = {
+  schemaState,
+  schemaVersion,
+  SCHEMA_VERSION,
   upsertStaffRoster,
   listStaffRoster,
   getStaff,

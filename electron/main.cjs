@@ -3,7 +3,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const net = require("node:net");
 const { spawn } = require("node:child_process");
-const { app, BrowserWindow, ipcMain, screen, dialog, shell } = require("electron");
+const { app, BrowserWindow, ipcMain, screen, dialog, session, shell } = require("electron");
 
 const pool = require("./db/pool.cjs");
 const repo = require("./db/repo.cjs");
@@ -25,6 +25,7 @@ const guard = require("./ipc-guard.cjs");
 const diagnostics = require("./diagnostics.cjs");
 const serverKeys = require("./server-keys.cjs");
 const staffAuth = require("./staff-auth.cjs");
+const adminSession = require("./admin-session.cjs");
 const cloudCredentials = require("./cloud-credentials.cjs");
 const storageHygiene = require("./storage-hygiene.cjs");
 
@@ -227,7 +228,49 @@ function load(win, route) {
   return win.loadURL(`${baseUrl}${route}`);
 }
 
+/**
+ * The window that holds the till bridge must stay on the till.
+ *
+ * Nothing here changes normal use: the app's own pages, the print preview and
+ * the update flow all still work. What it stops is a stray or planted link
+ * moving this privileged window to somewhere on the internet, or opening a
+ * second window that inherits the same bridge. Links to elsewhere are handed
+ * to the operator's normal browser instead, where they hold nothing.
+ */
+function sameApp(target) {
+  try {
+    const url = new URL(target);
+    if (url.protocol === "data:" || url.protocol === "about:") return true;
+    if (!baseUrl) return false;
+    return url.origin === new URL(baseUrl).origin;
+  } catch {
+    return false;
+  }
+}
+
+function lockDownNavigation(win, route) {
+  win.webContents.on("will-navigate", (event, target) => {
+    if (sameApp(target)) return;
+    event.preventDefault();
+    diagnostics.logCrash("window.navigation-blocked", { route, target });
+    void shell.openExternal(target).catch(() => {});
+  });
+  win.webContents.on("will-redirect", (event, target) => {
+    if (sameApp(target)) return;
+    event.preventDefault();
+    diagnostics.logCrash("window.redirect-blocked", { route, target });
+  });
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    // No second window ever gets the bridge; outside links go to the browser.
+    if (!sameApp(url)) void shell.openExternal(url).catch(() => {});
+    return { action: "deny" };
+  });
+  // A page in this window may not attach anything of its own to the shell.
+  win.webContents.on("will-attach-webview", (event) => event.preventDefault());
+}
+
 function instrument(win, route) {
+  lockDownNavigation(win, route);
   win.webContents.on("did-fail-load", (_e, code, description, url) => {
     console.error(`[window] failed to load ${url || route}: ${description} (${code})`);
     diagnostics.logCrash("window.did-fail-load", { route, code, description });
@@ -632,6 +675,9 @@ function printSilent(html, deviceName, paper, dialog = false) {
       ...(dialog ? { title: "Print", autoHideMenuBar: true } : {}),
       webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: false },
     });
+    // A receipt is printed content, never a place to browse from.
+    win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+    win.webContents.on("will-navigate", (event) => event.preventDefault());
     const done = (result) => {
       if (!win.isDestroyed()) win.destroy();
       resolve(result);
@@ -1167,29 +1213,51 @@ function registerIpc() {
     }
   };
 
+  /**
+   * Administration is a privileged surface: the desktop process refuses every
+   * one of these channels until an administrator has unlocked it here with
+   * their own username and PIN. Hiding the screen in the window is not a
+   * control — anything running in the window can call the bridge directly.
+   */
+  ipcMain.handle("admin:unlock", (_e, username, pin) =>
+    adminSession.unlock(username, pin),
+  );
+  ipcMain.handle("admin:lock", () => adminSession.lock());
+  ipcMain.handle("admin:status", () => adminSession.status());
+
+  const admin = (work) => adminSession.requireAdmin(work);
+
   ipcMain.handle("sqladmin:connect", (_e, credentials) =>
-    bounded(
-      45_000,
-      "The SQL driver did not finish the authentication handshake in time.",
-      () => sqlAdmin.connectInstance(credentials),
-      credentials?.attemptId ?? null,
+    admin(() =>
+      bounded(
+        45_000,
+        "The SQL driver did not finish the authentication handshake in time.",
+        () => sqlAdmin.connectInstance(credentials),
+        credentials?.attemptId ?? null,
+      ),
     ),
   );
   ipcMain.handle("sqladmin:cancel", (_e, attemptId) =>
-    bounded(5_000, "The cancel request did not finish in time.", () => sqlAdmin.cancel(attemptId)),
+    admin(() =>
+      bounded(5_000, "The cancel request did not finish in time.", () => sqlAdmin.cancel(attemptId)),
+    ),
   );
   ipcMain.handle("sqladmin:probe-port", (_e, credentials) =>
-    bounded(15_000, "The port probe did not finish in time.", () =>
-      sqlAdmin.probePort(credentials),
+    admin(() =>
+      bounded(15_000, "The port probe did not finish in time.", () => sqlAdmin.probePort(credentials)),
     ),
   );
   ipcMain.handle("sqladmin:lock", (_e, credentials) =>
-    bounded(45_000, "The database could not be opened in time.", () =>
-      sqlAdmin.lockDatabase(credentials),
+    admin(() =>
+      bounded(45_000, "The database could not be opened in time.", () =>
+        sqlAdmin.lockDatabase(credentials),
+      ),
     ),
   );
   ipcMain.handle("sqladmin:databases", () =>
-    bounded(15_000, "The database list did not arrive in time.", () => sqlAdmin.listDatabases()),
+    admin(() =>
+      bounded(15_000, "The database list did not arrive in time.", () => sqlAdmin.listDatabases()),
+    ),
   );
 
   /* Write verification runs on the OPERATIONAL pool the till itself uses. */
@@ -1197,21 +1265,31 @@ function registerIpc() {
     bounded(20_000, "The write check did not finish in time.", () => pool.verifyWrite()),
   );
   ipcMain.handle("sqladmin:tables", (_e, dbName) =>
-    bounded(15_000, "The table list did not arrive in time.", () => sqlAdmin.getTables(dbName)),
+    admin(() =>
+      bounded(15_000, "The table list did not arrive in time.", () => sqlAdmin.getTables(dbName)),
+    ),
   );
   ipcMain.handle("sqladmin:columns", (_e, dbName, tableName, schemaName) =>
-    bounded(15_000, "The column list did not arrive in time.", () =>
-      sqlAdmin.getTableColumns(dbName, tableName, schemaName),
+    admin(() =>
+      bounded(15_000, "The column list did not arrive in time.", () =>
+        sqlAdmin.getTableColumns(dbName, tableName, schemaName),
+      ),
     ),
   );
   ipcMain.handle("sqladmin:query", (_e, dbName, queryText) =>
-    bounded(30_000, "The query did not finish in time.", () =>
-      sqlAdmin.executeQuery(dbName, queryText),
+    admin(() =>
+      bounded(30_000, "The query did not finish in time.", () =>
+        sqlAdmin.executeQuery(dbName, queryText),
+      ),
     ),
   );
   ipcMain.handle("sqladmin:disconnect", () =>
-    bounded(10_000, "The disconnect did not finish in time.", () => sqlAdmin.disconnect()),
+    admin(() =>
+      bounded(10_000, "The disconnect did not finish in time.", () => sqlAdmin.disconnect()),
+    ),
   );
+  // Reading whether a connection exists reveals nothing and is what the screen
+  // uses to decide whether to ask for the unlock at all.
   ipcMain.handle("sqladmin:status", () =>
     bounded(5_000, "The connection status did not arrive in time.", () => sqlAdmin.status()),
   );
@@ -1226,7 +1304,8 @@ function registerIpc() {
     batches parsed from database/schema.sql may run — the renderer supplies
     table names, never SQL.
   */
-  ipcMain.handle("sqladmin:repair", async (_e, payload) => {
+  ipcMain.handle("sqladmin:repair", async (_e, payload) =>
+    admin(async () => {
     try {
       const tables = Array.isArray(payload?.tables) ? payload.tables : [];
       const database = String(payload?.database ?? "").trim();
@@ -1271,7 +1350,8 @@ function registerIpc() {
     } catch (err) {
       return { ok: false, stage: "repair", ...pool.describeSqlError(err) };
     }
-  });
+    }),
+  );
 
   ipcMain.handle("pos:write", async (_e, _context, op) =>
     guard.guarded(async () => {
@@ -1761,6 +1841,29 @@ function registerIpc() {
 }
 
 app.whenReady().then(async () => {
+  // A content-security policy on every page the shell serves: the till loads
+  // its own code and talks to its own database, and nothing else may inject a
+  // script into the window that holds the bridge.
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    const headers = { ...details.responseHeaders };
+    delete headers["content-security-policy"];
+    delete headers["Content-Security-Policy"];
+    headers["Content-Security-Policy"] = [
+      [
+        "default-src 'self' data: blob:",
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data: blob: https:",
+        "font-src 'self' data:",
+        "connect-src 'self' https: wss: http://127.0.0.1:* http://localhost:*",
+        "frame-ancestors 'none'",
+        "object-src 'none'",
+        "base-uri 'self'",
+      ].join("; "),
+    ];
+    callback({ responseHeaders: headers });
+  });
+
   // A second launch (double-clicked shortcut) surfaces the running till
   // instead of doing nothing.
   app.on("second-instance", () => {

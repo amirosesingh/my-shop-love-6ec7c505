@@ -164,6 +164,17 @@ export type SqlAdminBridge = {
   }) => Promise<SqlAdminRepairResult>;
   disconnect: () => Promise<{ ok: boolean }>;
   status: () => Promise<SqlAdminStatus>;
+  /**
+   * The desktop process refuses every administration call until it is
+   * unlocked here with an administrator's own username and PIN. Hiding the
+   * screen is not a control; this is.
+   */
+  unlock?: (
+    username: string,
+    pin: string,
+  ) => Promise<{ ok: boolean; name?: string; expiresAt?: number; error?: string }>;
+  lockAdmin?: () => Promise<{ ok: boolean }>;
+  adminStatus?: () => Promise<{ unlocked: boolean; name?: string; expiresAt?: number }>;
 };
 
 export type SqlAdminRepairResult =

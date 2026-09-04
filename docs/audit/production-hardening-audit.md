@@ -121,3 +121,24 @@ what must be signed off on the shop floor.
 
 **Verdict: NOT PRODUCTION READY** until the hardware rows in the matrix are
 signed off.
+
+---
+
+## Stage 4 — recovery scope, desktop hardening, local upgrades (v1.3.118)
+
+| Finding | Severity | Root cause | Where | Fix | Test | Limit |
+|---|---|---|---|---|---|---|
+| Recovery screen exposed till-wide settings to anyone holding the recovery code | High | `RecoveryHub` rendered every card unconditionally | `src/platforms/web/components/pos/RecoveryHub.tsx` | Only activation, cloud connection and branch binding are open; SQL Server, offline grace and hardware need a supervisor or administrator | Manual walk-through of both roles | Recovery code is still a device clock code by the owner's decision |
+| Recovery hint told a bystander how to make the code | High | The hint spelt out `YYYYMMDDHHMM` | `EmergencyPinGate.tsx` | Hint reduced to "the recovery code for this device"; it no longer teaches the format | — | As above |
+| Activation could sit on disk in an editable file | High | `terminal-store.cjs` fell back to plain JSON when the vault was unavailable | `electron/terminal-store.cjs` | Sealed copy only; a legacy plain file is migrated once then deleted, and a machine without a vault stores nothing | `terminal-store.test.ts` | — |
+| Desktop database tools were reachable by anyone at the keyboard | High | The `sqladmin:*` channels had no authorisation | `electron/admin-session.cjs`, `main.cjs`, `DatabaseExplorer.tsx` | Every channel except `status` needs an administrator username and PIN unlock, good for fifteen minutes and renewed on use | `admin-session.test.ts` (4 cases) | Rate limiting of the unlock itself relies on the shared PIN throttle |
+| The till window could be navigated to any site while holding the bridge | High | No navigation, popup or webview guards, and no content policy | `electron/main.cjs` | Same-origin only, popups denied, external links handed to the browser, webviews refused, strict content policy on every response | `window-lockdown.test.ts` | — |
+| Oversold items were not visible where they are worked with | Medium | Stock figures were rendered plainly | `ProductPicker.tsx` | A figure below zero is shown in red with "Oversold — count this item and correct it" | Visual | The oversell itself stays allowed (see Stage 3) |
+| The till's own database had no version, so a half-finished upgrade was undetectable | Medium | `sqlite.cjs` ran additive steps with no record of the shape | `electron/db/sqlite.cjs` | `PRAGMA user_version` stamped only after the upgrade finishes; `schemaState()` reports version, expected and whether it is current | `local-schema-upgrade.test.ts` (3 cases, incl. interruption) | Rebuild-in-place steps (queue, watermarks) are still detected by shape, not by version |
+
+**Regression.** 66 files / 433 tests. One flake: `driver-install.test.ts` times
+out under a full parallel run and passes on its own — a slow fake timer, not a
+defect. Type check clean.
+
+**Verdict: NOT PRODUCTION READY** — unchanged. The hardware rows and the relay
+revocation row in the matrix are still open.

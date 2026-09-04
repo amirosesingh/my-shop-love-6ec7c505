@@ -1,0 +1,87 @@
+/**
+ * Who is allowed to use the desktop administration channels.
+ *
+ * The window renders application code, so a screen that merely hides a button
+ * proves nothing: anything running in the window can call the bridge directly.
+ * The database administration channels therefore ask the desktop process
+ * itself, and the desktop process only says yes while an administrator has
+ * unlocked them with their own username and PIN, checked against this till's
+ * local staff copy.
+ *
+ * The grant lives in memory only. It never survives a restart, it expires on
+ * its own, and it is dropped the moment the window reloads.
+ */
+const staffAuth = require("./staff-auth.cjs");
+
+/** Long enough for a repair session, short enough to be forgotten. */
+const TTL_MS = 15 * 60 * 1000;
+
+let grant = null; // { username, name, until }
+
+/** Permissions that count as "may administer this till's database". */
+const ADMIN_PERMISSIONS = ["can_manage_sync_backup", "can_manage_settings", "can_access_pos_settings"];
+
+function isAdministrator(staff) {
+  const role = String(staff?.role_slug ?? "").toLowerCase();
+  if (role === "admin" || role === "administrator" || role === "owner") return true;
+  const permissions = staff?.permissions;
+  if (Array.isArray(permissions)) return permissions.some((p) => ADMIN_PERMISSIONS.includes(p));
+  if (permissions && typeof permissions === "object")
+    return ADMIN_PERMISSIONS.some((p) => permissions[p] === true);
+  return false;
+}
+
+/** Sign in for administration. Returns a plain refusal, never a reason to guess from. */
+function unlock(username, pin) {
+  const result = staffAuth.verifyPin(String(username ?? ""), String(pin ?? ""));
+  if (!result.ok) return { ok: false, error: "That username or PIN was not accepted on this till." };
+  if (!isAdministrator(result.staff))
+    return { ok: false, error: "This account may not administer the database on this terminal." };
+  grant = {
+    username: result.staff.username,
+    name: result.staff.full_name ?? result.staff.username,
+    until: Date.now() + TTL_MS,
+  };
+  return { ok: true, name: grant.name, expiresAt: grant.until };
+}
+
+function lock() {
+  grant = null;
+  return { ok: true };
+}
+
+/** True only while a live grant exists. Expiry is checked on every call. */
+function unlocked() {
+  if (!grant) return false;
+  if (Date.now() > grant.until) {
+    grant = null;
+    return false;
+  }
+  return true;
+}
+
+function status() {
+  return unlocked()
+    ? { unlocked: true, name: grant.name, expiresAt: grant.until }
+    : { unlocked: false };
+}
+
+/**
+ * Gate for a channel body: refuses without touching the database when the
+ * caller has not unlocked administration on this machine.
+ */
+async function requireAdmin(work) {
+  if (!unlocked())
+    return {
+      ok: false,
+      code: "EADMINLOCK",
+      stage: "authorize",
+      error:
+        "Database administration is locked on this terminal. An administrator must unlock it with their username and PIN first.",
+    };
+  // Active use keeps the grant alive; an idle one still times out.
+  grant.until = Date.now() + TTL_MS;
+  return work();
+}
+
+module.exports = { unlock, lock, unlocked, status, requireAdmin, isAdministrator, TTL_MS };

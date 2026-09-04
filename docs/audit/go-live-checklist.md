@@ -66,3 +66,11 @@ stops the go-live — none of these are optional.
 | Offline rehearsal passed | | |
 | Online rehearsal passed | | |
 | Owner accepts go-live | | |
+
+## Stage 4 sign-off
+
+- [ ] On a real till, confirm the database tools ask for an administrator sign-in and refuse a cashier.
+- [ ] Confirm a link in a receipt or note opens in the browser, not inside the till window.
+- [ ] Install this build over an older till and confirm unsent sales and shifts are still there afterwards.
+- [ ] Switch a till off during the first launch of this build and confirm it comes up complete on the next start.
+- [ ] Confirm a non-supervisor on the recovery screen sees only the connection cards.

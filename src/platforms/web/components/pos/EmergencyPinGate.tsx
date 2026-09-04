@@ -120,8 +120,7 @@ export function EmergencyPinGate({ children }: { children: ReactNode }) {
         <h1 className="text-lg font-semibold">Emergency access</h1>
       </div>
       <p className="text-sm text-muted-foreground">
-        Enter this device&apos;s current date and time as 12 digits — YYYYMMDDHHMM — to open the
-        connection settings.
+        Enter the recovery code for this device to open its connection settings.
       </p>
 
       {!available ? (
@@ -159,7 +158,7 @@ export function EmergencyPinGate({ children }: { children: ReactNode }) {
           {error && locked === 0 && <p className="text-sm text-destructive">{error}</p>}
           <p className="flex items-center gap-1 text-xs text-muted-foreground">
             <Lock className="size-3" />
-            The code is this device&apos;s own clock and changes every minute
+            The code changes every minute
           </p>
         </>
       )}
