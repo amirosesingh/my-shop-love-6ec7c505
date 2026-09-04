@@ -1305,7 +1305,8 @@ function registerIpc() {
     } catch (err) {
       return { ok: false, stage: "repair", ...pool.describeSqlError(err) };
     }
-  });
+    }),
+  );
 
   ipcMain.handle("pos:write", async (_e, _context, op) =>
     guard.guarded(async () => {
