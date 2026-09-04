@@ -54,18 +54,20 @@ export function ConnectionCheck() {
     });
 
     // Say which server answered and whether it holds the central database key,
-    // so a setup problem is not mistaken for a problem with this till.
-    const health = await syncHealth();
+    // so a setup problem is not mistaken for a problem with this till. Every
+    // failure names its own reason instead of one catch-all sentence.
+    const health = await syncHealthResult();
     results.push({
       label: "Server setup",
-      ok: !!health?.serviceKey,
-      warn: !health?.serviceKey,
-      detail: !health
-        ? "Could not reach the setup check on this server"
-        : health.serviceKey
-          ? `Key present on ${health.host}`
-          : `Key missing on ${health.host} — an administrator needs to re-save it`,
+      ok: health.ok && health.health.serviceKey,
+      warn: !health.ok || !health.health.serviceKey,
+      detail: !health.ok
+        ? health.reason
+        : health.health.serviceKey
+          ? `Key present on ${health.health.host}`
+          : `Key missing on ${health.health.host} — an administrator needs to re-save it`,
     });
+
 
     setChecks(results);
     setBusy(false);
