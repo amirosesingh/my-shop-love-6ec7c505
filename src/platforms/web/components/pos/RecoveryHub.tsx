@@ -150,9 +150,18 @@ function ModeBanner() {
 export function RecoveryHub() {
   const terminalApp = isTerminalApp();
   const desktop = isElectron();
+  const auth = useAuth();
   const [activated, setActivated] = useState<boolean | null>(null);
   const [cloud, setCloud] = useState<boolean | null>(null);
   const [branch, setBranch] = useState<string | null>(null);
+
+  // The recovery code is a device clock, not an identity. It may repair what a
+  // dead terminal cannot repair anywhere else — the connection details, and
+  // activation while the device is still unactivated — and nothing more. The
+  // rest of this hub stays behind a supervisor sign-in exactly as it does in
+  // Settings, so holding the device is never the same as being trusted with it.
+  const privileged = Boolean(auth?.isSupervisor || auth?.isAdmin);
+  const mayActivate = privileged || activated === false;
 
   useEffect(() => {
     setActivated(Boolean(readTerminalConfig()));
