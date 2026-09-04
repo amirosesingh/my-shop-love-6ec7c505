@@ -58,35 +58,65 @@ diagnostics.watchApp(app);
 /* ---------------------------------------------------------------------------
    Safety net.
 
-   An unhandled error must never be the reason a shop cannot ring up a sale.
-   Everything is written to the connection diagnostics log and the till keeps
-   running; the native SQL driver is isolated in its own process, so the only
-   faults that can reach here are ordinary JavaScript ones.
+   An unhandled error must never be the reason a shop cannot ring up a sale, so
+   an ordinary fault is written to the diagnostics log and the till keeps
+   trading. A fault that means the till can no longer be trusted — the local
+   database file, the sealed activation or the sealed credentials — is a
+   different thing: swallowing it would let the register keep taking money on a
+   broken foundation. Those are logged as fatal and the window is told to stop.
    --------------------------------------------------------------------------- */
-process.on("uncaughtException", (error) => {
+
+/** Faults that mean the till's own records or identity are unsound. */
+const FATAL_PATTERNS = [
+  /SQLITE_(CORRUPT|NOTADB|IOERR|READONLY|FULL)/i,
+  /database disk image is malformed/i,
+  /terminal-config/i,
+  /safeStorage|DPAPI|decryptString/i,
+  /EROFS|ENOSPC/i,
+];
+
+function isFatal(error) {
+  const text = `${error?.code ?? ""} ${error?.message ?? String(error ?? "")}`;
+  return FATAL_PATTERNS.some((p) => p.test(text));
+}
+
+/** Tell every window the till must stop, then leave it on screen to be read. */
+function haltForFatal(detail) {
   try {
-    const detail = {
-      error: error?.message ?? String(error),
-      stack: String(error?.stack ?? "")
-        .split("\n")
-        .slice(0, 4)
-        .join(" | "),
-    };
-    pool.logConnection("main.uncaught-exception", detail);
-    diagnostics.logCrash("main.uncaught-exception", detail);
+    for (const win of BrowserWindow.getAllWindows()) {
+      win.webContents.send("app:fatal", {
+        message:
+          "This till has stopped because its own records or identity could not be trusted. Do not take payments on it. Call support and quote the diagnostics log.",
+        detail,
+      });
+    }
   } catch {
-    console.error("[pos] uncaught exception:", error);
+    /* the window may already be gone */
   }
-});
-process.on("unhandledRejection", (reason) => {
+}
+
+function recordFault(scope, error) {
+  const fatal = isFatal(error);
+  const detail = {
+    error: error?.message ?? String(error),
+    severity: fatal ? "fatal" : "recoverable",
+    stack: String(error?.stack ?? "")
+      .split("\n")
+      .slice(0, 4)
+      .join(" | "),
+  };
   try {
-    const detail = { error: reason?.message ?? String(reason) };
-    pool.logConnection("main.unhandled-rejection", detail);
-    diagnostics.logCrash("main.unhandled-rejection", detail);
+    pool.logConnection(scope, detail);
+    diagnostics.logCrash(scope, detail);
   } catch {
-    console.error("[pos] unhandled rejection:", reason);
+    console.error(`[pos] ${scope}:`, error);
   }
-});
+  if (fatal) haltForFatal(detail);
+}
+
+process.on("uncaughtException", (error) => recordFault("main.uncaught-exception", error));
+process.on("unhandledRejection", (reason) => recordFault("main.unhandled-rejection", reason));
+
 
 /* ---------------------------------------------------------------------------
    One till per PC.
