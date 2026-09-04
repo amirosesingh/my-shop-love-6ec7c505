@@ -21,8 +21,8 @@ type Source = { url: string; key: string };
 
 const clean = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
 
-function fromEnv(bag: Record<string, unknown> | undefined): Source {
-  return { url: firstOf(bag, URL_NAMES), key: firstOf(bag, KEY_NAMES) };
+function fromEnv(bag: Record<string, unknown> | undefined, urlName: string, keyNames: string[]): Source {
+  return { url: clean(bag?.[urlName]), key: firstOf(bag, keyNames) };
 }
 
 
@@ -104,33 +104,17 @@ function bags(): Record<string, unknown>[] {
 }
 
 /**
- * One value, many spellings.
- *
- * The address and the publishable key are each a SINGLE setting; these lists
- * are only the names a hosting platform or an older build may have used for
- * them. They are tried in order and the first non-empty one wins, so the value
- * is entered once — on a device in Settings → Database & Cloud Connection, on
- * the web in the hosting variables — and every caller sees the same pair.
+ * Accepted name pairs, tried in order. Both halves must come from the SAME
+ * source, so an address from one project can never be paired with a key from
+ * another. The managed-platform `VITE_SUPABASE_*` names are deliberately not
+ * accepted: the shop's own project is the only database this POS talks to.
  */
-const URL_NAMES = [
+const PAIRS: [string, string[]][] = [
   // The shop's own project, named explicitly so a hosting platform's injected
-  // SUPABASE_URL can never take over during local development.
-  "VITE_POS_SUPABASE_URL",
+  // SUPABASE_* values can never take over during local development.
+  ["VITE_POS_SUPABASE_URL", ["VITE_POS_SUPABASE_ANON_KEY", "VITE_POS_SUPABASE_PUBLISHABLE_KEY"]],
   // Canonical: Cloudflare variables, and what the server prints into the page.
-  "SUPABASE_URL",
-  "VITE_SUPABASE_URL",
-  "VITE_SUPABASE_EXTERNAL_URL",
-];
-
-const KEY_NAMES = [
-  "VITE_POS_SUPABASE_ANON_KEY",
-  "VITE_POS_SUPABASE_PUBLISHABLE_KEY",
-  "SUPABASE_ANON_KEY",
-  // Same value under the name the managed platform writes.
-  "SUPABASE_PUBLISHABLE_KEY",
-  "VITE_SUPABASE_ANON_KEY",
-  "VITE_SUPABASE_PUBLISHABLE_KEY",
-  "VITE_SUPABASE_EXTERNAL_PUBLISHABLE_KEY",
+  ["SUPABASE_URL", ["SUPABASE_ANON_KEY", "SUPABASE_PUBLISHABLE_KEY"]],
 ];
 
 /** First non-empty value among the accepted names for one setting. */
@@ -171,22 +155,16 @@ export function supabaseConfig(): Source {
   // (applied above as the terminal override). Bundle-baked and environment
   // values belong to the web deployment and are deliberately invisible here.
   if (isTerminalApp()) throw new SupabaseConfigError();
-  // Each half is looked up independently across the sources, in order, so a
-  // deployment that names the key differently from the address still resolves
-  // to one connection instead of silently falling back to none.
-  let url = "";
-  let key = "";
   for (const bag of bags()) {
-    const found = fromEnv(bag);
-    if (!url) url = found.url;
-    if (!key) key = found.key;
-    if (url && key) {
-      cached = { url, key };
-      return cached;
+    for (const [urlName, keyNames] of PAIRS) {
+      const found = fromEnv(bag, urlName, keyNames);
+      if (found.url && found.key) {
+        cached = found;
+        return cached;
+      }
     }
   }
   throw new SupabaseConfigError();
-
 }
 
 /** True when both halves are present — for health checks that must not throw. */
@@ -201,10 +179,11 @@ export function hasSupabaseConfig(): boolean {
 
 /** Where the resolved values came from — for the health probe, never throws. */
 export function supabaseConfigSource(): "injected" | "runtime" | "build" | "missing" {
-  const check = (bag: Record<string, unknown> | undefined) => {
-    const found = fromEnv(bag);
-    return !!found.url && !!found.key;
-  };
+  const check = (bag: Record<string, unknown> | undefined) =>
+    PAIRS.some(([urlName, keyNames]) => {
+      const found = fromEnv(bag, urlName, keyNames);
+      return !!found.url && !!found.key;
+    });
 
   if (check(injectedBag())) return "injected";
   if (check(runtimeEnv)) return "runtime";
