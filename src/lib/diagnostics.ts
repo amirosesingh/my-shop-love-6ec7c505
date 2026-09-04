@@ -18,8 +18,11 @@ export type DiagnosticKind =
   | "local_mirror_failed"
   | "sale_idempotency_unavailable"
   | "shift_lookup_unavailable"
+  /** Part of a basket was stored and the rest was parked for retry. */
+  | "partial_commit"
   /** A visibility-only write (sign-in log, drawer opening) could not be stored. */
   | "soft_write_failed";
+
 
 export type DiagnosticEvent = {
   id: string;

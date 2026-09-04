@@ -1442,11 +1442,20 @@ type StockDelta = { movementId: string; productId: string; storeId: string | nul
  * Split absolute stock out of a batch. When the batch carries stock movement
  * rows, the products upsert loses its stock columns and the movements become
  * relative deltas for the central database to apply.
+ *
+ * Movements travel as `upsert` (a replayed checkout or a re-posted receiving
+ * note must rewrite the same movement row, not add a second one), so both
+ * shapes count here. Matching only `insert` used to leave every sale sending
+ * a client-calculated absolute stock figure, which two tills selling the same
+ * product at the same time would overwrite for each other.
  */
 function withRelativeStock(ops: SyncOp[]): { ops: SyncOp[]; deltas: StockDelta[] } {
   const movements = ops.flatMap((op) =>
-    op.kind === "insert" && op.table === "item_activity_logs" ? (op.rows as Row[]) : [],
+    (op.kind === "insert" || op.kind === "upsert") && op.table === "item_activity_logs"
+      ? (op.rows as Row[])
+      : [],
   );
+
   if (!movements.length) return { ops, deltas: [] };
 
   const deltas: StockDelta[] = movements
@@ -1491,6 +1500,41 @@ async function applyStockDeltas(deltas: StockDelta[]) {
 }
 
 /**
+ * Run one batch against the central database in order.
+ *
+ * The central database has no single transaction across these separate
+ * writes, so the risk is a half-stored bill: the header lands, a child row is
+ * refused, and the rest of the basket is dropped on the floor. When that
+ * happens the remaining writes are parked in the durable outbox — visible in
+ * Sync, retried, and quarantined if they keep failing — before the error is
+ * raised. Every op is keyed on its own id, so a replay rewrites the same rows
+ * rather than adding a second copy.
+ *
+ * A connection failure is left alone: the caller's own fallback stores the
+ * whole batch locally, which is the better outcome.
+ */
+async function runBatchLive(context: string, ops: SyncOp[]) {
+  for (let i = 0; i < ops.length; i++) {
+    try {
+      await runOpLive(context, ops[i]!);
+    } catch (e) {
+      const committed = i > 0;
+      if (committed && !isConnectionError(e)) {
+        recordDiagnostic({
+          kind: "partial_commit",
+          entity: ops[i]!.table,
+          code: reasonCode(e),
+        });
+        for (const rest of ops.slice(i)) enqueue(context, rest);
+        void drainOutbox();
+      }
+      throw e;
+    }
+  }
+}
+
+
+/**
  * Store a group of writes and only resolve once they are safe somewhere:
  * the cloud database, the local desktop database, or the on-disk outbox.
  *
@@ -1513,7 +1557,7 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
   // Web and Android are live-only: the backend is the single source of truth.
   if (isOnlineOnly()) {
     try {
-      for (const op of cloudOps) await runOpLive(context, op);
+      await runBatchLive(context, cloudOps);
       await applyStockDeltas(deltas);
     } catch (e) {
       if (isConnectionError(e)) throw new AllTargetsFailed(context, e);
@@ -1528,7 +1572,7 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
     // Desktop is always cloud first. Local SQL is a durable fallback only for
     // connection-class cloud failures; validation and permission errors remain visible.
     try {
-      for (const op of cloudOps) await runOpLive(context, op);
+      await runBatchLive(context, cloudOps);
       await applyStockDeltas(deltas);
       noteConnectionRestored();
       setCloudDirect(false);
@@ -1563,7 +1607,7 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
   const operational = ops.every((op) => isOperationalTable(op.table));
   {
     try {
-      for (const op of cloudOps) await runOpLive(context, op);
+      await runBatchLive(context, cloudOps);
       await applyStockDeltas(deltas);
       noteConnectionRestored();
       setCloudDirect(operational);
@@ -1720,10 +1764,14 @@ export const db = {
     );
   },
 
-  /** Persist a completed bill, its lines, the stock movement and member points. */
-  recordSale(sale: Sale, products: Product[], member: Member | null) {
-    void db.commitSale(sale, products, member).catch((error) => dbError("Saving sale", error));
-  },
+  /*
+   * There is deliberately no fire-and-forget sale writer here. A bill is only
+   * real once it is stored, so the register awaits `commitSale` and shows the
+   * failure; an unawaited version would let a checkout finish and print while
+   * the sale was quietly lost.
+   */
+
+
 
   /**
    * Hand a bill back. The till sends only the bill and the refund's own id:

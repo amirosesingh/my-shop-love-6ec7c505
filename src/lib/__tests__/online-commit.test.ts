@@ -99,4 +99,25 @@ describe("commitOps in online mode with a local database present", () => {
     localWrite.mockResolvedValue({ ok: false, error: "no local engine" });
     await expect(commitOps("Saving sale", ops)).rejects.toThrow(/Database Connection Required|Central server relay is offline/);
   });
+
+  it("parks the rest of a half-stored basket instead of dropping it", async () => {
+    const { listQueue } = await import("@/lib/sync-outbox");
+    const before = listQueue().length;
+    // The bill lands, the lines are refused for a reason retrying cannot fix.
+    live.mockResolvedValueOnce(undefined).mockRejectedValue(new Error("null value in column"));
+    localWrite.mockResolvedValue({ ok: true });
+    const basket = [
+      { kind: "insert", table: "sales", rows: [{ id: "s9" }] },
+      { kind: "insert", table: "sale_items", rows: [{ id: "l9", sale_id: "s9" }] },
+      { kind: "insert", table: "payment_transactions", rows: [{ id: "t9" }] },
+    ] as never;
+    await expect(commitOps("Saving sale", basket)).rejects.toThrow();
+    // The two writes that never reached the database are queued for retry.
+    expect(listQueue().slice(before).map((q) => q.op.table)).toEqual([
+      "sale_items",
+      "payment_transactions",
+    ]);
+  });
+
 });
+
