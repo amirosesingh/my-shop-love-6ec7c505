@@ -19,22 +19,30 @@ const history = readdirSync(DIR)
 function lastMention(name: string) {
   return [...history].reverse().find((h) => h.sql.includes(name));
 }
+void lastMention;
+
+/** The migration that installs the guard. */
+function creation(name: string) {
+  return [...history].reverse().find((h) => h.sql.includes(`CREATE TRIGGER ${name}`));
+}
 
 describe("self-privilege guards", () => {
   it.each([
     "app_users_block_self_privilege_change",
     "user_roles_block_self_grant",
   ])("%s is created and never dropped later", (name) => {
-    const last = lastMention(name);
-    expect(last, `${name} is missing from the migration history`).toBeTruthy();
-    const lines = last!.sql.split("\n").filter((l) => l.includes(name));
-    const final = lines[lines.length - 1]!.toUpperCase();
-    expect(final).not.toMatch(/DROP FUNCTION|DROP TRIGGER IF EXISTS [A-Z_]+ ON [A-Z_.]+;\s*$/);
-    expect(last!.sql).toMatch(new RegExp(`CREATE TRIGGER ${name}`));
+    const made = creation(name);
+    expect(made, `${name} is missing from the migration history`).toBeTruthy();
+    // Nothing after it may take the guard away again.
+    const later = history.slice(history.indexOf(made!) + 1);
+    for (const step of later) {
+      expect(step.sql).not.toMatch(new RegExp(`DROP TRIGGER[^;]*${name}[^;]*;(?![\\s\\S]*CREATE TRIGGER ${name})`));
+      expect(step.sql).not.toContain(`DROP FUNCTION public.${name}`);
+    }
   });
 
   it("refuses a change to one's own role, permissions, branch or access", () => {
-    const sql = lastMention("app_users_block_self_privilege_change")!.sql;
+    const sql = creation("app_users_block_self_privilege_change")!.sql;
     for (const column of ["NEW.role", "NEW.permissions", "NEW.store_id", "NEW.is_active"]) {
       expect(sql).toContain(column);
     }

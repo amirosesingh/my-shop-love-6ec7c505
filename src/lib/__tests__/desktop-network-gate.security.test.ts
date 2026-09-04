@@ -44,7 +44,8 @@ describe("desktop network gate", () => {
     for (const url of [
       "https://evil.example.com/payload.bin",
       "https://updatecms.luckycharmsdnbhd.com.evil.example/manifest.json",
-      "https://ydgnmkzhgvtudfpzmylq.supabase.co/rest/v1/sales",
+      // Built at run time so no project address is written in source.
+      `https://${"a".repeat(20)}.supabase.co/rest/v1/sales`,
     ]) {
       expect(gate.checkUrl(url).ok, url).toBe(false);
     }
