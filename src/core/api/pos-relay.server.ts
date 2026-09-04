@@ -24,13 +24,15 @@ export type RelayOp =
       values: Record<string, unknown>;
       match: Record<string, unknown>;
     }
-  | { kind: "delete"; table: string; match: Record<string, unknown> }
-  /**
-   * A named database routine. Only routines on the allow-list below may be
-   * called, and the caller's branch and permission are proven here first —
-   * the till sends identifiers and quantities only, never computed figures.
-   */
-  | { kind: "rpc"; table: string; fn: string; args: Record<string, unknown> };
+  | { kind: "delete"; table: string; match: Record<string, unknown> };
+
+/**
+ * A named database routine. Only routines on the allow-list may be called,
+ * and the caller's branch and permission are proven here first — the till
+ * sends identifiers and quantities only, never computed figures.
+ */
+export type RelayRpc = { kind: "rpc"; table: string; fn: string; args: Record<string, unknown> };
+
 
 
 /** Read requests the relay may answer for a proven till. */
