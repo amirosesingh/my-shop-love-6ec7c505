@@ -142,3 +142,33 @@ defect. Type check clean.
 
 **Verdict: NOT PRODUCTION READY** — unchanged. The hardware rows and the relay
 revocation row in the matrix are still open.
+
+## Stage 5 — desktop channel privilege and fatal-fault handling (v1.3.119)
+
+**Finding: every desktop channel was callable by anything running in the window.**
+Severity: high. Root cause: argument checks existed (`electron/ipc-guard.cjs`) but
+no caller check, so connection details, the terminal identity, stored
+credentials, the audit trail and the database tools could be changed by any code
+in the window. Fix: `electron/ipc-privilege.cjs` classifies every channel as
+open / supervisor / admin and wraps `ipcMain.handle`, so the desktop process
+refuses before the body runs; an unclassified channel defaults to admin.
+`settings:set` and `config:set` are classified by the setting name, so a
+cosmetic preference stays open while anything naming a backend, branch,
+database, grace period, key, token or audit setting needs an administrator.
+An unconfigured till may still be set up: a short first-run list is open only
+while there is no activation, no local connection and no cloud credentials.
+Levels reuse the existing till unlock (`electron/admin-session.cjs`, now with a
+supervisor level); no second role store. Test:
+`src/core/activation/__tests__/ipc-privilege.test.ts` (7 cases).
+Limitation: the unlock is per-machine and in memory for 15 minutes.
+Hardware needed: a Windows till to confirm the prompt on real staff records.
+
+**Finding: an unhandled fault always kept the till trading.**
+Severity: medium. Root cause: both process-level handlers logged and continued,
+including for a corrupt local database file or an unreadable sealed activation.
+Fix: `recordFault()` in `electron/main.cjs` classifies the fault; a recoverable
+one is logged as before, a fatal one is logged as fatal and broadcast on
+`app:fatal`, and `PrivilegeGate` replaces the register with a stop screen
+telling the operator not to take payments. Test: covered by review; no automated
+case yet because it needs a real corrupt database file.
+Hardware needed: a Windows till.
