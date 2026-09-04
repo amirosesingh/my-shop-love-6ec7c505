@@ -31,7 +31,16 @@ const opSchema = z.discriminatedUnion("kind", [
     table: z.string().min(1).max(64),
     match: z.record(z.string(), z.unknown()),
   }),
+  z.object({
+    kind: z.literal("rpc"),
+    table: z.string().min(1).max(64),
+    // Only routines the relay knows about are accepted, and it re-checks the
+    // caller's branch and permission before running one.
+    fn: z.enum(["sale_refund"]),
+    args: z.record(z.string(), z.unknown()),
+  }),
 ]);
+
 
 const bodySchema = z.object({
   sessionToken: z.string().max(400).optional(),
@@ -135,17 +144,22 @@ export async function handleSyncRequest(request: Request): Promise<Response> {
     kind?: string;
   }[] = [];
   const { batchInsertIds } = await import("@/core/api/relay-policy.server");
-  const ops = body.ops ?? [];
+  const all = body.ops ?? [];
+  const ops = all.filter((o) => o.kind !== "rpc");
   // Parents inserted in this same push let their child rows through.
   const batchIds = batchInsertIds(ops);
-  for (const op of ops) {
+  for (const op of all) {
     try {
-      const result = await runRelayOp(op, scope, batchIds);
+      const result =
+        op.kind === "rpc"
+          ? await (await import("@/core/api/pos-relay.server")).runRelayRpc(op, scope)
+          : await runRelayOp(op, scope, batchIds);
       results.push({ ...result, table: op.table, kind: op.kind });
     } catch (e) {
       results.push({ ok: false, error: (e as Error).message, table: op.table, kind: op.kind });
     }
   }
+
   const refused = results.find(
     (r) =>
       r.code === "STORE_FORBIDDEN" ||

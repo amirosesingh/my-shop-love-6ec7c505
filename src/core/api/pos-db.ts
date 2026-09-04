@@ -1720,15 +1720,26 @@ export const db = {
     void db.commitSale(sale, products, member).catch((error) => dbError("Saving sale", error));
   },
 
-  refundSale(saleId: string, products: Product[]) {
+  /**
+   * Hand a bill back. The till sends only the bill and the refund's own id:
+   * the database works out how much may still be returned, puts exactly that
+   * much stock back, and marks the bill. Replaying the same refund id (retry,
+   * double tap, queued replay) changes nothing a second time.
+   */
+  refundSale(saleId: string, refundId: string, reason?: string) {
     queue("Refunding sale", {
-      kind: "update",
+      kind: "rpc",
       table: "sales",
-      values: { is_refunded: true },
-      match: { id: saleId },
+      fn: "sale_refund",
+      args: {
+        _sale_id: saleId,
+        _lines: null,
+        _client_refund_id: refundId,
+        _reason: reason ?? null,
+      },
     });
-    if (products.length) db.upsertProducts(products);
   },
+
 
   /** Correct the tender recorded against a completed bill (e.g. card -> cash). */
   updateSalePayment(saleId: string, method: PaymentMethod) {

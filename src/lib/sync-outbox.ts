@@ -18,7 +18,14 @@ export type SyncOp =
   | { kind: "insert"; table: string; rows: Row[] }
   | { kind: "upsert"; table: string; rows: Row[]; onConflict?: string }
   | { kind: "update"; table: string; values: Row; match: Record<string, unknown> }
-  | { kind: "delete"; table: string; match: Record<string, unknown> };
+  | { kind: "delete"; table: string; match: Record<string, unknown> }
+  /**
+   * A named database routine. Used where the change must be worked out by the
+   * database itself (refunds), so the till never sends a computed figure.
+   * `table` is only the label the sync log shows.
+   */
+  | { kind: "rpc"; table: string; fn: string; args: Row };
+
 
 export type QueuedOp = {
   id: string;

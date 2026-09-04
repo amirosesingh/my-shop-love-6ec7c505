@@ -36,3 +36,6 @@ dist-ssr
 # Local env overrides (never commit real values)
 .env.local
 .env.*.local
+.env
+.env.*
+!.env.example

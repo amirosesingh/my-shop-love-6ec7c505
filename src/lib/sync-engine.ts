@@ -258,8 +258,16 @@ async function execute(op: SyncOp): Promise<QueryResult> {
       for (const [k, v] of Object.entries(op.match)) q = q.eq(k, v);
       return q;
     }
+    case "rpc": {
+      // The database works the change out itself; we only send identifiers.
+      const client = supabaseExternal as unknown as {
+        rpc: (fn: string, args: Record<string, unknown>) => PromiseLike<QueryResult>;
+      };
+      return client.rpc(op.fn, op.args);
+    }
   }
 }
+
 
 /** Codes the relay uses when a change is refused on principle. */
 const REFUSAL_CODES = new Set([
