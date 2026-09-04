@@ -8,19 +8,23 @@
  *   3. POS backend address — the web address of your POS site, used for
  *      cashier sign-in and the sync relay
  *
+ * Together they are one connection profile: they are tested together and
+ * saved together (`saveConnectionProfile`), so a device can never end up with
+ * one customer's address and another customer's key.
+ *
  * Storage is unchanged and still platform-sealed: Windows keeps the pair in
  * the OS vault (DPAPI via safeStorage), Android in the Keystore
  * (EncryptedSharedPreferences); the backend address, which is not a secret,
- * goes to the shell's own configuration store. Nothing is ever entered twice.
+ * goes to the shell's own configuration store.
  *
  * On the web build the deployment supplies the database values through its
- * hosting variables, so the panel shows them read-only instead of hiding —
- * there is never a second, invisible place holding a connection value.
+ * hosting variables, so the panel shows them read-only.
  */
 import { useCallback, useEffect, useState } from "react";
 import {
   CloudCog,
   Loader2,
+  Lock,
   PlugZap,
   Server,
   ShieldCheck,
@@ -33,29 +37,29 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { isTerminalApp } from "@/platform-config/platform";
+import { useAuthOptional } from "@/lib/pos-auth";
 import {
   cloudKeyStatus,
+  probeCloudConnection,
   removeCloudCredentials,
-  saveCloudCredentials,
+  saveConnectionProfile,
   subscribeCloudKeys,
-  testCloudCredentials,
   type CloudKeyStatus,
+  type CloudProbe,
 } from "@/lib/secure-cloud-config";
-import {
-  backendUrl,
-  saveBackendUrl,
-  testBackendUrl,
-  type BackendTestResult,
-} from "@/lib/backend-config";
+import { backendUrl, testBackendUrl, type BackendTestResult } from "@/lib/backend-config";
 
 export function CloudConnectionPanel() {
+  const auth = useAuthOptional();
   const [status, setStatus] = useState<CloudKeyStatus | null>(null);
   const [url, setUrl] = useState("");
   const [key, setKey] = useState("");
   const [savedBackend, setSavedBackend] = useState("");
   const [backend, setBackend] = useState("");
+  const [cloudResult, setCloudResult] = useState<CloudProbe | null>(null);
   const [backendResult, setBackendResult] = useState<BackendTestResult | null>(null);
   const [busy, setBusy] = useState<"test" | "save" | "remove" | null>(null);
+  const [unlocked, setUnlocked] = useState(false);
 
   const refresh = useCallback(async () => {
     const next = await cloudKeyStatus();
@@ -105,11 +109,20 @@ export function CloudConnectionPanel() {
     );
   }
 
+  // An unconfigured terminal has nothing to protect and nobody to sign in as:
+  // first-run setup is open. Once a connection exists, only a supervisor or
+  // administrator may point this device at a different company.
+  const firstRun = !status?.configured;
+  const privileged = Boolean(auth?.isSupervisor || auth?.isAdmin);
+  const editable = firstRun || privileged || unlocked;
+
   const testAll = async () => {
     setBusy("test");
     try {
-      const cloud = await testCloudCredentials(url, key);
-      if (cloud.ok) toast.success(`Central database: ${cloud.detail}`);
+      const cloud = await probeCloudConnection(url, key);
+      setCloudResult(cloud);
+      if (cloud.stage === "ok") toast.success(`Central database: ${cloud.detail}`);
+      else if (cloud.stage === "no-schema") toast.warning(`Central database: ${cloud.detail}`);
       else toast.error(`Central database: ${cloud.detail}`);
 
       if (backend.trim()) {
@@ -128,30 +141,20 @@ export function CloudConnectionPanel() {
   const saveAll = async () => {
     setBusy("save");
     try {
-      let ok = true;
-      if (url.trim() && key.trim()) {
-        const res = await saveCloudCredentials(url, key);
-        if (res.ok) {
-          setKey("");
-          toast.success(
-            res.encrypted
-              ? "Database connection saved — sealed with this device's secure storage"
-              : "Database connection saved",
-          );
-        } else {
-          ok = false;
-          toast.error(res.error ?? "Could not save the database credentials");
-        }
+      const res = await saveConnectionProfile({
+        supabaseUrl: url,
+        supabaseKey: key,
+        backendUrl: backend,
+      });
+      if (res.cloud) setCloudResult(res.cloud);
+      if (res.backend) setBackendResult(res.backend);
+      if (res.ok) {
+        setKey("");
+        toast.success(res.detail);
+        await refresh();
+      } else {
+        toast.error(res.detail);
       }
-      if (backend.trim() !== savedBackend) {
-        const res = await saveBackendUrl(backend);
-        if (res.ok) toast.success("POS backend address saved for this device");
-        else {
-          ok = false;
-          toast.error(res.error ?? "Could not save the backend address");
-        }
-      }
-      if (ok) await refresh();
     } finally {
       setBusy(null);
     }
@@ -173,10 +176,9 @@ export function CloudConnectionPanel() {
     }
   };
 
-  const canTest = url.trim().length > 0 && key.trim().length > 0 && busy === null;
-  const canSave =
-    busy === null &&
-    ((url.trim().length > 0 && key.trim().length > 0) || backend.trim() !== savedBackend);
+  const complete = url.trim().length > 0 && key.trim().length > 0 && backend.trim().length > 0;
+  const canTest = editable && complete && busy === null;
+  const canSave = editable && complete && busy === null;
 
   return (
     <section className="space-y-4 rounded-lg border border-border bg-card p-4">
@@ -186,8 +188,9 @@ export function CloudConnectionPanel() {
       </header>
 
       <p className="text-xs text-muted-foreground">
-        Everything this device needs to reach your company is entered here, once. No other screen
-        asks for these values.
+        Everything this device needs to reach your company is entered here, once. Changing it
+        points the terminal at a different company, so it is tested before it is saved and the
+        three values are always stored together.
       </p>
 
       <p
@@ -202,8 +205,21 @@ export function CloudConnectionPanel() {
         )}
         {status?.configured
           ? `Connected to ${status.url} (key ${status.keyHint})${status.encrypted ? " — sealed with this device's secure storage" : ""}`
-          : "Not configured — the device trades fully offline. Save the central database URL and API key to enable automatic synchronization."}
+          : "Not configured — the device trades fully offline. Save the central database URL, API key and backend address to connect it."}
       </p>
+
+      {!editable && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+          <Lock className="size-4" />
+          <span>
+            This terminal is already connected. Only a supervisor or administrator may change where
+            it reads and writes.
+          </span>
+          <Button size="sm" variant="outline" onClick={() => setUnlocked(true)} disabled={!privileged}>
+            {privileged ? "Unlock to change" : "Sign in as a supervisor"}
+          </Button>
+        </div>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1">
@@ -212,6 +228,7 @@ export function CloudConnectionPanel() {
             id="cloud-url"
             type="url"
             autoComplete="off"
+            disabled={!editable}
             placeholder="https://your-project.supabase.co"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
@@ -223,6 +240,7 @@ export function CloudConnectionPanel() {
             id="cloud-key"
             type="password"
             autoComplete="off"
+            disabled={!editable}
             placeholder={
               status?.configured ? `Saved (${status.keyHint}) — enter a new key to replace` : "sb_publishable_…"
             }
@@ -238,6 +256,21 @@ export function CloudConnectionPanel() {
         is never displayed again after saving.
       </p>
 
+      {cloudResult && (
+        <div className="space-y-0.5 text-xs">
+          <p className={cloudResult.reachable ? "text-success" : "text-destructive"}>
+            {cloudResult.reachable ? "✓" : "✕"} Address reachable
+          </p>
+          <p className={cloudResult.authenticated ? "text-success" : "text-destructive"}>
+            {cloudResult.authenticated ? "✓" : "✕"} API key accepted
+          </p>
+          <p className={cloudResult.schemaReady ? "text-success" : "text-amber-600"}>
+            {cloudResult.schemaReady ? "✓" : "!"} POS tables provisioned
+          </p>
+          <p className="text-muted-foreground">{cloudResult.detail}</p>
+        </div>
+      )}
+
       <div className="space-y-1 border-t border-border pt-4">
         <Label htmlFor="backend-url" className="flex items-center gap-2">
           <Server className="size-4 text-muted-foreground" />
@@ -247,6 +280,7 @@ export function CloudConnectionPanel() {
           id="backend-url"
           type="url"
           autoComplete="off"
+          disabled={!editable}
           placeholder="https://pos.example.com"
           value={backend}
           onChange={(e) => setBackend(e.target.value)}
@@ -284,7 +318,7 @@ export function CloudConnectionPanel() {
           Save &amp; connect
         </Button>
         {status?.configured && (
-          <Button variant="ghost" onClick={() => void remove()} disabled={busy !== null}>
+          <Button variant="ghost" onClick={() => void remove()} disabled={busy !== null || !editable}>
             {busy === "remove" ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
             Remove saved connection
           </Button>
