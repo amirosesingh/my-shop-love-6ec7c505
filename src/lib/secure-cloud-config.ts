@@ -22,6 +22,13 @@ import {
 } from "./external-supabase-config";
 import { resetExternalClient, createTenantClient } from "@/integrations/supabase/external-client";
 import { setSyncState } from "./sync-status";
+import {
+  backendUrl,
+  normaliseBackendUrl,
+  saveBackendUrl,
+  testBackendUrl,
+  type BackendTestResult,
+} from "./backend-config";
 
 /** Fresh keys saved: unpark the sync engine and let it catch up at once. */
 function afterCredentialsSaved() {
@@ -358,4 +365,131 @@ function notifyCloudKeysChanged() {
       /* a broken listener must not break the settings flow */
     }
   }
+}
+
+/* --------------------------- connection profile -------------------------- */
+
+/**
+ * Everything a terminal needs to reach ONE customer's deployment, as a single
+ * unit. This POS is sold to many customers and the same APK/EXE serves all of
+ * them, so these three values are runtime configuration, never build values.
+ *
+ * SQL Server credentials are deliberately NOT part of this: they stay in the
+ * Electron main process's own sealed store and never reach the renderer.
+ */
+export type ConnectionProfile = {
+  /** central database (Supabase project) address */
+  supabaseUrl: string;
+  /** publishable / anon key — public by design, still sealed at rest */
+  supabaseKey: string;
+  /** the POS website this device sends sign-in and sync to */
+  backendUrl: string;
+};
+
+export type ProfileSaveResult = {
+  ok: boolean;
+  /** where it stopped, so the setup screen can say something useful */
+  stage: "validate" | "cloud" | "backend" | "save" | "saved";
+  detail: string;
+  cloud?: CloudProbe;
+  backend?: BackendTestResult;
+  profile?: ConnectionProfile;
+};
+
+/** Read the three values currently in force on this device. */
+export async function connectionProfile(): Promise<ConnectionProfile> {
+  const [status, backend] = await Promise.all([cloudKeyStatus(), backendUrl()]);
+  return {
+    supabaseUrl: status.url,
+    supabaseKey: status.configured ? status.keyHint : "",
+    backendUrl: backend,
+  };
+}
+
+/**
+ * The ONE way a terminal's connection is written.
+ *
+ * Validate → normalise → test the database → test the backend → only then
+ * store, so a half-typed address can never replace a working one. Storage is
+ * unchanged: Windows keeps the pair in the OS vault, Android in the Keystore,
+ * and the backend address goes to the shell's own configuration store.
+ */
+export async function saveConnectionProfile(
+  input: ConnectionProfile,
+  options?: { skipTests?: boolean },
+): Promise<ProfileSaveResult> {
+  if (!isTerminalApp())
+    return {
+      ok: false,
+      stage: "validate",
+      detail: "On the website these values come from the hosting environment.",
+    };
+
+  const supabaseUrl = input.supabaseUrl.trim().replace(/\/+$/, "");
+  const supabaseKey = input.supabaseKey.trim();
+  const backend = normaliseBackendUrl(input.backendUrl);
+
+  if (!/^https:\/\/.+/i.test(supabaseUrl))
+    return { ok: false, stage: "validate", detail: "Enter the full https:// central database URL." };
+  if (supabaseKey.length < 10)
+    return { ok: false, stage: "validate", detail: "Enter the publishable API key for that project." };
+  if (!backend)
+    return {
+      ok: false,
+      stage: "validate",
+      detail: "Enter the web address of your POS site, e.g. https://pos.example.com",
+    };
+
+  const profile: ConnectionProfile = { supabaseUrl, supabaseKey, backendUrl: backend };
+
+  let cloud: CloudProbe | undefined;
+  let backendResult: BackendTestResult | undefined;
+  if (!options?.skipTests) {
+    cloud = await probeCloudConnection(supabaseUrl, supabaseKey);
+    if (!cloud.reachable || !cloud.authenticated)
+      return { ok: false, stage: "cloud", detail: cloud.detail, cloud };
+
+    backendResult = await testBackendUrl(backend);
+    // `warn` means "this is the POS backend, but its administrator still has
+    // work to do" — the address itself is proven, so the profile may be saved.
+    if (!backendResult.ok && !backendResult.warn)
+      return { ok: false, stage: "backend", detail: backendResult.detail, cloud, backend: backendResult };
+  }
+
+  // Both halves are proven before anything is written. The backend address is
+  // written first because it is the one we can put back if the vault refuses.
+  const previousBackend = await backendUrl();
+  const savedBackend = await saveBackendUrl(backend);
+  if (!savedBackend.ok)
+    return {
+      ok: false,
+      stage: "save",
+      detail: savedBackend.error ?? "Could not save the backend address on this device.",
+      cloud,
+      backend: backendResult,
+    };
+
+  const savedCloud = await saveCloudCredentials(supabaseUrl, supabaseKey);
+  if (!savedCloud.ok) {
+    await saveBackendUrl(previousBackend); // no partial profile is left behind
+    return {
+      ok: false,
+      stage: "save",
+      detail: savedCloud.error ?? "Could not save the database credentials on this device.",
+      cloud,
+      backend: backendResult,
+    };
+  }
+
+  notifyCloudKeysChanged();
+  return {
+    ok: true,
+    stage: "saved",
+    detail: cloud?.schemaReady === false
+      ? "Saved and connected. The POS tables are not provisioned in that project yet."
+      : "Saved and connected.",
+    cloud,
+    backend: backendResult,
+    profile,
+  };
 }
