@@ -16,25 +16,65 @@ const credentials = readCredentials;
 /** Answer from the server setup probe: presence only, never key material. */
 export type SyncHealth = { serviceKey: boolean; posUrl: boolean; host: string };
 
+/** Why the setup probe could not be read, in words staff can act on. */
+export type SyncHealthResult =
+  | { ok: true; health: SyncHealth }
+  | { ok: false; reason: string };
+
 /**
- * Ask the server that is actually answering this browser whether it holds the
+ * Ask the server that is actually answering this device whether it holds the
  * central database key. Used by the connection check so an administrator can
- * tell a server setup problem apart from a till problem.
+ * tell a server setup problem apart from a till problem — so every failure
+ * says which of the two it is instead of one catch-all sentence.
  */
-export async function syncHealth(): Promise<SyncHealth | null> {
-  try {
-    const res = await fetch(serverUrl("/api/public/sync-health"), { cache: "no-store" });
-    if (!res.ok) return null;
-    const body = (await res.json()) as { serviceKey?: boolean; posUrl?: boolean };
+export async function syncHealthResult(): Promise<SyncHealthResult> {
+  const origin = serverOrigin();
+  if (serverUnreachableOnDevice())
     return {
+      ok: false,
+      reason:
+        "No POS backend address is saved on this device — enter it in Settings → Database & Cloud Connection.",
+    };
+  const where = origin || (typeof window === "undefined" ? "" : window.location.origin);
+  let res: Response;
+  try {
+    res = await fetch(serverUrl("/api/public/sync-health"), { cache: "no-store" });
+  } catch (e) {
+    return {
+      ok: false,
+      reason: `${where} did not answer — check the address, its certificate and this device's connection (${(e as Error).message}).`,
+    };
+  }
+  const text = await res.text().catch(() => "");
+  let body: { serviceKey?: boolean; posUrl?: boolean } | null = null;
+  try {
+    body = JSON.parse(text) as { serviceKey?: boolean; posUrl?: boolean };
+  } catch {
+    /* handled below */
+  }
+  if (!res.ok)
+    return { ok: false, reason: `${where} refused the setup check (${res.status}).` };
+  if (!body || typeof body.serviceKey !== "boolean")
+    return {
+      ok: false,
+      reason: `${where} answered with a web page, not the POS backend — check the backend address.`,
+    };
+  return {
+    ok: true,
+    health: {
       serviceKey: !!body.serviceKey,
       posUrl: !!body.posUrl,
-      host: typeof window === "undefined" ? "" : window.location.host,
-    };
-  } catch {
-    return null;
-  }
+      host: origin || (typeof window === "undefined" ? "" : window.location.host),
+    },
+  };
 }
+
+/** Back-compat shape: the health answer, or null when it could not be read. */
+export async function syncHealth(): Promise<SyncHealth | null> {
+  const res = await syncHealthResult();
+  return res.ok ? res.health : null;
+}
+
 
 /** Every relay call carries the bearer token as well as the credential body. */
 async function relayHeaders(): Promise<Record<string, string>> {
