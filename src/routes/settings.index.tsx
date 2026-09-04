@@ -17,9 +17,12 @@ import {
   PINNED_SETTINGS,
   settingsCard,
   SETTINGS_CATEGORIES,
+  SETTINGS_GROUPS,
   type SettingsCard,
   type SettingsCategoryId,
 } from "@/lib/settings-catalog";
+import { PinButton } from "@/platforms/web/components/pos/PinButton";
+import { useNavPins } from "@/lib/nav-pins";
 
 /** `section` and `card` are legacy deep links; `beforeLoad` forwards them. */
 type Search = { cat?: SettingsCategoryId; section?: string; card?: string };
@@ -74,9 +77,10 @@ export const Route = createFileRoute("/settings/")({
 
 function Row({ c }: { c: SettingsCard }) {
   return (
+    <div className="flex items-center gap-1 rounded-lg border border-border bg-card pr-2 transition-colors hover:border-primary/60">
     <SettingsLink
       card={c}
-      className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5 text-left transition-colors hover:border-primary/60 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-3 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <c.icon className="size-4 shrink-0 text-primary" />
       <span className="min-w-0 flex-1">
@@ -87,11 +91,13 @@ function Row({ c }: { c: SettingsCard }) {
       </span>
       <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
     </SettingsLink>
+      <PinButton kind="settings" itemKey={c.id} label={c.label} />
+    </div>
   );
 }
 
 function SettingsHome() {
-  const { isAdmin, can } = useAuth();
+  const { isAdmin, can, authUserId } = useAuth();
   const allowed = isAdmin || can("can_access_pos_settings");
   const navigate = useNavigate({ from: "/settings/" });
   const { cat } = Route.useSearch();
@@ -103,9 +109,12 @@ function SettingsHome() {
 
   const activeCat = cat && categories.some((g) => g.id === cat) ? cat : undefined;
   const category = categories.find((g) => g.id === activeCat);
-  const pinned = PINNED_SETTINGS.map((id) => cards.find((c) => c.id === id)).filter(
-    (c): c is SettingsCard => !!c,
-  );
+  const { pins } = useNavPins(authUserId ?? null);
+  const chosen = pins.filter((p) => p.kind === "settings").map((p) => p.key);
+  // Until someone pins their own, the busiest areas stand in.
+  const pinned = (chosen.length ? chosen : PINNED_SETTINGS)
+    .map((id) => cards.find((c) => c.id === id))
+    .filter((c): c is SettingsCard => !!c);
 
   return (
     <SettingsShell home>
@@ -243,20 +252,30 @@ function SettingsHome() {
               ))}
             </div>
 
-            <div className="hidden space-y-5 lg:block">
-              {categories.map((g) => (
-                <section key={g.id} className="space-y-2">
-                  <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    {g.label}
-                  </h2>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {cards
-                      .filter((c) => c.category === g.id)
-                      .map((c) => (
-                        <Row key={c.id} c={c} />
-                      ))}
-                  </div>
-                </section>
+            <div className="hidden space-y-7 lg:block">
+              {SETTINGS_GROUPS.filter((h) => categories.some((g) => g.group === h.id)).map((h) => (
+                <div key={h.id} className="space-y-4">
+                  <h2 className="border-b border-border pb-1 text-sm font-semibold">{h.label}</h2>
+                  {categories
+                    .filter((g) => g.group === h.id)
+                    .map((g) => (
+                      <section key={g.id} className="space-y-2">
+                        <div>
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            {g.label}
+                          </h3>
+                          <p className="text-[11px] text-muted-foreground">{g.blurb}</p>
+                        </div>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {cards
+                            .filter((c) => c.category === g.id)
+                            .map((c) => (
+                              <Row key={c.id} c={c} />
+                            ))}
+                        </div>
+                      </section>
+                    ))}
+                </div>
               ))}
             </div>
           </>

@@ -9,6 +9,7 @@ import { AppShell } from "@/platforms/web/components/pos/AppShell";
 import { navGroups, navItemKey, type NavItem } from "@/platforms/web/components/pos/nav-config";
 import { useAuth } from "@/lib/pos-auth";
 import { isDesktop } from "@/lib/branding";
+import { PinButton } from "@/platforms/web/components/pos/PinButton";
 
 export function SectionHub({ groupId }: { groupId: string }) {
   const { can, isAdmin } = useAuth();
@@ -55,12 +56,15 @@ export function SectionHub({ groupId }: { groupId: string }) {
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
             {items.map((item) => (
-              <Link
+              <div
                 key={navItemKey(item)}
+                className="flex items-start gap-1 rounded-lg border border-border bg-card p-2 transition-colors hover:border-primary/60"
+              >
+              <Link
                 to={item.to}
                 hash={item.hash}
                 search={item.section ? { section: item.section } : {}}
-                className="flex items-start gap-3 rounded-lg border border-border bg-card p-4 transition-colors hover:border-primary/60"
+                className="flex min-w-0 flex-1 items-start gap-3 rounded-md p-2"
               >
                 <item.icon className="mt-0.5 size-5 shrink-0 text-primary" />
                 <span className="min-w-0">
@@ -70,6 +74,8 @@ export function SectionHub({ groupId }: { groupId: string }) {
                   )}
                 </span>
               </Link>
+                <PinButton kind="nav" itemKey={navItemKey(item)} label={item.label} />
+              </div>
             ))}
           </div>
         )}

@@ -15,6 +15,7 @@ import { SettingsShell } from "@/platforms/web/components/pos/settings/SettingsS
 import { SaveIndicator } from "@/platforms/web/components/pos/settings/SaveIndicator";
 import { useEmbeddedSettings } from "@/platforms/web/components/pos/settings/embed";
 import { ScopePanel } from "@/platforms/web/components/pos/settings/ScopeControls";
+import { ScopeChip } from "@/platforms/web/components/pos/settings/ScopeChip";
 import { ThemedSelect } from "@/platforms/web/components/pos/ThemedSelect";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -281,8 +282,11 @@ export function SettingsFrame({
             {embedded ? (
               <div />
             ) : (
-              <div className="min-w-0">
-                <h1 className="text-2xl font-semibold">{title}</h1>
+              <div className="min-w-0 space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="text-2xl font-semibold">{title}</h1>
+                  <ScopeChip />
+                </div>
                 <p className="text-sm text-muted-foreground">{description}</p>
               </div>
             )}

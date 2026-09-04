@@ -32,57 +32,103 @@ import {
 } from "lucide-react";
 
 export type SettingsCategoryId =
-  | "terminal"
-  | "printing"
   | "business"
+  | "products"
   | "payments"
+  | "receipts"
   | "bookings"
+  | "terminal"
   | "data"
-  | "diagnostics"
-  | "access";
+  | "security"
+  | "health"
+  | "messaging";
+
+/** Heading a category sits under on the settings home page. */
+export type SettingsGroupId = "business" | "sales" | "terminal" | "admin";
+
+export const SETTINGS_GROUPS: { id: SettingsGroupId; label: string }[] = [
+  { id: "business", label: "Business" },
+  { id: "sales", label: "Sales & customer experience" },
+  { id: "terminal", label: "Terminal" },
+  { id: "admin", label: "Security & administration" },
+];
+
+/** Where a change made on this page applies. A label only. */
+export type SettingsScope = "company" | "branch" | "terminal";
+
+export const SCOPE_LABEL: Record<SettingsScope, string> = {
+  company: "Company",
+  branch: "Branch",
+  terminal: "This terminal",
+};
 
 export type SettingsCategory = {
   id: SettingsCategoryId;
   label: string;
   blurb: string;
+  group: SettingsGroupId;
 };
 
 export const SETTINGS_CATEGORIES: SettingsCategory[] = [
   {
-    id: "terminal",
-    label: "Terminal & display",
-    blurb: "How this till looks, updates and activates.",
-  },
-  {
-    id: "printing",
-    label: "Printing & receipts",
-    blurb: "The printer and everything printed on a slip.",
-  },
-  {
     id: "business",
-    label: "Business & pricing",
-    blurb: "Who you are, what you charge, how codes run.",
+    label: "Business",
+    blurb: "Who you are, what you charge and how documents are numbered.",
+    group: "business",
+  },
+  {
+    id: "products",
+    label: "Products & inventory",
+    blurb: "Categories, units and the codes products are given.",
+    group: "business",
   },
   {
     id: "payments",
-    label: "Payments & messaging",
-    blurb: "How customers pay and how bills reach them.",
+    label: "Payments",
+    blurb: "What customers can pay with and where the money lands.",
+    group: "sales",
+  },
+  {
+    id: "receipts",
+    label: "Receipts & printing",
+    blurb: "The printer and everything printed on a slip.",
+    group: "sales",
   },
   {
     id: "bookings",
     label: "Bookings & services",
     blurb: "Job cards, deposits, turnaround and the slip the customer signs.",
-  },
-  { id: "data", label: "Data & sync", blurb: "Keeping this till in step with the company." },
-  {
-    id: "diagnostics",
-    label: "Diagnostics & health",
-    blurb: "Scanners, alerts and support tools.",
+    group: "sales",
   },
   {
-    id: "access",
-    label: "Access & visibility",
-    blurb: "What each role sees on the busiest screens.",
+    id: "messaging",
+    label: "Messaging",
+    blurb: "How bills and alerts reach the customer.",
+    group: "sales",
+  },
+  {
+    id: "terminal",
+    label: "Terminal",
+    blurb: "This machine: screen, hardware, updates and its identity.",
+    group: "terminal",
+  },
+  {
+    id: "data",
+    label: "Data & connectivity",
+    blurb: "Company connection, local database and keeping them in step.",
+    group: "terminal",
+  },
+  {
+    id: "security",
+    label: "Staff & security",
+    blurb: "Who may do what, and what each role can see.",
+    group: "admin",
+  },
+  {
+    id: "health",
+    label: "System health",
+    blurb: "Status checks, alerts and support tools.",
+    group: "admin",
   },
 ];
 
@@ -92,6 +138,8 @@ export type SettingsCard = {
   blurb: string;
   icon: typeof MonitorCog;
   category: SettingsCategoryId;
+  /** Where the change applies — shown as a chip on the page header. */
+  scope?: SettingsScope;
   /** Full-page fallback, and the deep link shown inside the sheet. */
   to: string;
   /** Panel mounted inside the sheet. */
@@ -117,13 +165,14 @@ const page = (load: () => Promise<{ Route: { options: { component?: unknown } } 
   lazy(async () => ({ default: (await load()).Route.options.component as ComponentType }));
 
 export const SETTINGS_CARDS: SettingsCard[] = [
-  /* ---- Terminal & display --------------------------------------------- */
+  /* ---- Terminal --------------------------------------------- */
   {
     id: "display",
     label: "Display & text size",
     blurb: "Interface scale, density and light / dark theme.",
     icon: MonitorCog,
     category: "terminal",
+    scope: "terminal",
     to: "/settings/display",
     panel: page(() => import("@/routes/settings.display")),
     keywords: "font scaling zoom theme dark light",
@@ -134,6 +183,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     blurb: "App version, background updates and system health.",
     icon: DownloadCloud,
     category: "terminal",
+    scope: "terminal",
     to: "/settings/updates",
     panel: page(() => import("@/routes/settings.updates")),
     keywords: "version upgrade rollback",
@@ -144,6 +194,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     blurb: "Printer, drawer and device identity for this machine only.",
     icon: Printer,
     category: "terminal",
+    scope: "terminal",
     to: "/settings/hardware",
     panel: page(() => import("@/routes/settings.hardware")),
     keywords: "local only device kick pin",
@@ -154,6 +205,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     blurb: "Register Windows tills, issue and revoke activation codes.",
     icon: MonitorSmartphone,
     category: "terminal",
+    scope: "company",
     to: "/settings/terminals",
     panel: page(() => import("@/routes/settings.terminals")),
     cloudOnly: true,
@@ -165,6 +217,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     blurb: "Phones and tablets running the POS, managed separately.",
     icon: Smartphone,
     category: "terminal",
+    scope: "company",
     to: "/settings/mobile-terminals",
     panel: page(() => import("@/routes/settings.mobile-terminals")),
     cloudOnly: true,
@@ -176,19 +229,21 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     blurb: "Everyone signed in right now, with instant remote sign-out.",
     icon: MonitorSmartphone,
     category: "terminal",
+    scope: "company",
     to: "/settings/sessions",
     panel: page(() => import("@/routes/settings.sessions")),
     cloudOnly: true,
     keywords: "logged in kick out device",
   },
 
-  /* ---- Printing & receipts -------------------------------------------- */
+  /* ---- Receipts & printing -------------------------------------------- */
   {
     id: "printer",
     label: "Receipt printer",
     blurb: "Device, encoding, margins, drawer pin and a test print.",
     icon: Printer,
-    category: "printing",
+    category: "receipts",
+    scope: "terminal",
     to: "/settings/printer",
     panel: page(() => import("@/routes/settings.printer")),
     keywords: "thermal escpos 58mm 80mm",
@@ -198,7 +253,8 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     label: "Receipt elements",
     blurb: "Paper size, logo, points, barcode and tax blocks.",
     icon: ReceiptText,
-    category: "printing",
+    category: "receipts",
+    scope: "company",
     to: "/settings/elements",
     panel: page(() => import("@/routes/settings.elements")),
   },
@@ -207,7 +263,8 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     label: "Receipt typography",
     blurb: "Fonts, sizes and spacing for printed slips.",
     icon: Type,
-    category: "printing",
+    category: "receipts",
+    scope: "company",
     to: "/settings/type",
     panel: page(() => import("@/routes/settings.type")),
   },
@@ -216,7 +273,8 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     label: "Receipt extra lines",
     blurb: "Policy notes, promotions and opening hours.",
     icon: ListPlus,
-    category: "printing",
+    category: "receipts",
+    scope: "company",
     to: "/settings/lines",
     panel: page(() => import("@/routes/settings.lines")),
   },
@@ -225,7 +283,8 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     label: "Receipt designer",
     blurb: "Dynamic fields, logo upload and scoped receipt CSS.",
     icon: ListPlus,
-    category: "printing",
+    category: "receipts",
+    scope: "company",
     to: "/settings/receipt-designer",
     panel: page(() => import("@/routes/settings.receipt-designer")),
     keywords: "template css logo fields variables",
@@ -235,18 +294,20 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     label: "Receipt QR code",
     blurb: "QR payload, size and placement on the slip.",
     icon: QrCode,
-    category: "printing",
+    category: "receipts",
+    scope: "company",
     to: "/settings/qr",
     panel: page(() => import("@/routes/settings.qr")),
   },
 
-  /* ---- Business & pricing --------------------------------------------- */
+  /* ---- Business, products --------------------------------------------- */
   {
     id: "identity",
     label: "Business identity & logo",
     blurb: "Company name, tax numbers, logo, header and footer.",
     icon: Building2,
     category: "business",
+    scope: "company",
     to: "/settings/identity",
     panel: page(() => import("@/routes/settings.identity")),
     keywords: "branding company name png",
@@ -257,6 +318,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     blurb: "Global tax rate and inclusive or exclusive pricing.",
     icon: ReceiptText,
     category: "business",
+    scope: "company",
     to: "/settings/tax",
     panel: page(() => import("@/routes/settings.tax")),
     keywords: "vat gst",
@@ -267,6 +329,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     blurb: "Shift, discount, refund and terminal security limits.",
     icon: ShieldCheck,
     category: "business",
+    scope: "company",
     to: "/settings/rules",
     panel: page(() => import("@/routes/settings.rules")),
   },
@@ -275,7 +338,8 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     label: "SKU numbering",
     blurb: "Automatic running-number product codes, or manual entry.",
     icon: ScanBarcode,
-    category: "business",
+    category: "products",
+    scope: "company",
     to: "/settings/sku",
     panel: page(() => import("@/routes/settings.sku")),
   },
@@ -285,6 +349,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     blurb: "Branch, till, date and running number on every receipt.",
     icon: ReceiptText,
     category: "business",
+    scope: "branch",
     to: "/settings/numbering",
     panel: page(() => import("@/routes/settings.numbering")),
   },
@@ -294,6 +359,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     blurb: "Reference numbers for stock counts and goods received.",
     icon: ListPlus,
     category: "business",
+    scope: "branch",
     to: "/settings/stock-numbering",
     panel: page(() => import("@/routes/settings.stock-numbering")),
     keywords: "stock count reference goods received prefix padding reset",
@@ -303,7 +369,8 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     label: "Categories & units",
     blurb: "Category groups, sub-categories and units of measure.",
     icon: ScanBarcode,
-    category: "business",
+    category: "products",
+    scope: "company",
     to: "/settings/catalog",
     panel: page(() => import("@/routes/settings.catalog")),
   },
@@ -313,6 +380,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     blurb: "Country, time zone, date order and 12 / 24-hour clock.",
     icon: Globe,
     category: "business",
+    scope: "company",
     to: "/settings/region",
     panel: page(() => import("@/routes/settings.region")),
   },
@@ -324,6 +392,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     blurb: "Tenders cashiers can collect, including voucher redemptions.",
     icon: Landmark,
     category: "payments",
+    scope: "company",
     to: "/settings/payment-methods",
     panel: page(() => import("@/routes/settings.payment-methods")),
   },
@@ -333,6 +402,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     blurb: "Bank account and payment QR for the customer display.",
     icon: Landmark,
     category: "payments",
+    scope: "company",
     to: "/settings/payment",
     panel: page(() => import("@/routes/settings.payment")),
   },
@@ -342,6 +412,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     blurb: "Card machines, bank accounts and e-wallets cashiers can pick.",
     icon: Landmark,
     category: "payments",
+    scope: "company",
     to: "/settings/accounts",
     panel: page(() => import("@/routes/settings.accounts")),
   },
@@ -350,7 +421,8 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     label: "WhatsApp bills & integrations",
     blurb: "Send receipts over the WhatsApp Cloud API.",
     icon: MessageCircle,
-    category: "payments",
+    category: "messaging",
+    scope: "company",
     to: "/settings/whatsapp",
     panel: page(() => import("@/routes/settings.whatsapp")),
   },
@@ -362,6 +434,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     blurb: "Deposits, turnaround, racket jobs and who may cancel.",
     icon: CalendarClock,
     category: "bookings",
+    scope: "company",
     to: "/settings/booking-rules",
     panel: page(() => import("@/routes/settings.booking-rules")),
   },
@@ -371,6 +444,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     blurb: "Re-stringing, repairs and other jobs with their default fee.",
     icon: CalendarClock,
     category: "bookings",
+    scope: "company",
     to: "/settings/services",
     panel: page(() => import("@/routes/settings.services")),
   },
@@ -380,17 +454,19 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     blurb: "Terms & conditions and the customer signature line.",
     icon: ReceiptText,
     category: "bookings",
+    scope: "company",
     to: "/settings/booking-slip",
     panel: page(() => import("@/routes/settings.booking-slip")),
   },
 
-  /* ---- Data & sync ----------------------------------------------------- */
+  /* ---- Data & connectivity ----------------------------------------------------- */
   {
     id: "sync",
     label: "Sync",
     blurb: "Run a sync, watch each table and clear the queue.",
     icon: RefreshCw,
     category: "data",
+    scope: "terminal",
     to: "/settings/sync",
     panel: page(() => import("@/routes/settings.sync")),
   },
@@ -400,6 +476,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     blurb: "Central and local database connections, tests and schema health.",
     icon: Database,
     category: "data",
+    scope: "terminal",
     to: "/settings/database",
     panel: page(() => import("@/routes/settings.database")),
   },
@@ -409,6 +486,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     blurb: "Every push and pull between this till and the company data.",
     icon: RefreshCw,
     category: "data",
+    scope: "terminal",
     to: "/settings/system?tab=data-sync",
     raw: true,
     desktopOnly: true,
@@ -421,7 +499,8 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     label: "Shift alerts",
     blurb: "How the day-end summary reaches this device.",
     icon: Activity,
-    category: "data",
+    category: "messaging",
+    scope: "branch",
     to: "/settings/shift-alerts",
     panel: page(() => import("@/routes/settings.shift-alerts")),
   },
@@ -430,7 +509,8 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     label: "Notification delivery",
     blurb: "Which events raise an alert and how they are delivered.",
     icon: MessageCircle,
-    category: "data",
+    category: "messaging",
+    scope: "company",
     to: "/settings/notifications",
     panel: page(() => import("@/routes/settings.notifications")),
   },
@@ -439,19 +519,21 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     label: "Branch telemetry centre",
     blurb: "Live health of every till, with remote data-only sync requests.",
     icon: MonitorSmartphone,
-    category: "data",
+    category: "health",
+    scope: "company",
     to: "/settings/branch-telemetry",
     panel: page(() => import("@/routes/settings.branch-telemetry")),
     cloudOnly: true,
   },
 
-  /* ---- Diagnostics & health -------------------------------------------- */
+  /* ---- System health -------------------------------------------- */
   {
     id: "system",
     label: "System status",
     blurb: "Connections, recovery tools and domains.",
     icon: Activity,
-    category: "diagnostics",
+    category: "health",
+    scope: "terminal",
     to: "/settings/system?tab=system",
     raw: true,
     panel: lazy(async () => ({
@@ -464,7 +546,8 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     label: "Database health",
     blurb: "Table links, orphan records and read / write checks.",
     icon: Database,
-    category: "diagnostics",
+    category: "health",
+    scope: "terminal",
     to: "/settings/system?tab=database-health",
     raw: true,
     panel: lazy(async () => ({
@@ -477,7 +560,8 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     label: "Logic health",
     blurb: "Unfinished logic, dead actions and missing guards.",
     icon: ShieldCheck,
-    category: "diagnostics",
+    category: "health",
+    scope: "company",
     to: "/settings/system?tab=logic-health",
     raw: true,
     panel: lazy(async () => ({
@@ -489,7 +573,8 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     label: "Security alerts",
     blurb: "Findings raised by the security scanner, with acknowledgement.",
     icon: ShieldCheck,
-    category: "diagnostics",
+    category: "health",
+    scope: "company",
     to: "/settings/system?tab=security-alerts",
     raw: true,
     panel: lazy(async () => ({
@@ -502,7 +587,8 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     label: "Server vs. shop data",
     blurb: "Record counts here against the company server.",
     icon: Database,
-    category: "diagnostics",
+    category: "data",
+    scope: "branch",
     to: "/settings/system?tab=data-comparison",
     raw: true,
     panel: lazy(async () => ({
@@ -514,7 +600,8 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     label: "Settings inheritance",
     blurb: "Which values come from global, cluster or this branch.",
     icon: Building2,
-    category: "diagnostics",
+    category: "data",
+    scope: "company",
     to: "/settings/system?tab=inheritance",
     raw: true,
     panel: lazy(async () => ({
@@ -526,25 +613,27 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     label: "Database explorer",
     blurb: "Browse the SQL Server on this machine and run read-only checks.",
     icon: Database,
-    category: "diagnostics",
+    category: "data",
+    scope: "terminal",
     to: "/settings/database-explorer",
     panel: page(() => import("@/routes/settings.database-explorer")),
     desktopOnly: true,
   },
 
-  /* ---- Access & visibility --------------------------------------------- */
+  /* ---- Staff & security --------------------------------------------- */
   {
     id: "access",
     label: "Roles & access",
     blurb: "One page: what each role may do, and what it can see.",
     icon: EyeOff,
-    category: "access",
+    category: "security",
+    scope: "company",
     to: "/settings/access",
     panel: page(() => import("@/routes/settings.access")),
   },
 ];
 
-/** Areas pinned to the top of the workspace — the ones opened most often. */
+/** Fallback quick access, used until someone pins their own shortcuts. */
 export const PINNED_SETTINGS = [
   "identity",
   "branch-telemetry",

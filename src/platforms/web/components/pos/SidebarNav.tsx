@@ -1,17 +1,22 @@
+/**
+ * Top-level navigation only.
+ *
+ * The sidebar lists the pinned shortcuts and the seven sections — nothing is
+ * nested inside it. Every option that used to hang off a section is a card on
+ * that section's own page, so the same screens are reachable in one more
+ * predictable click instead of a fold-out tree.
+ */
 import { Link, useRouterState } from "@tanstack/react-router";
-import { ChevronLeft, ChevronRight, Search, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import {
-  navGroups,
-  navItemKey,
-  standaloneNavItems,
-  type NavGroup,
-  type NavItem,
-} from "./nav-config";
+import { ChevronLeft, ChevronRight, Search, Settings as SettingsIcon, X } from "lucide-react";
+import { useMemo, useState, useEffect } from "react";
+import { navGroups, navItemKey, type NavItem } from "./nav-config";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useAuth } from "@/lib/pos-auth";
+import { useNavPins } from "@/lib/nav-pins";
+import { SETTINGS_CARDS } from "@/lib/settings-catalog";
 import { cn } from "@/lib/utils";
 
 const COLLAPSE_KEY = "pos.nav.collapsed";
@@ -38,6 +43,18 @@ type Props = {
   footer?: React.ReactNode;
 };
 
+type Entry = {
+  key: string;
+  label: string;
+  icon: NavItem["icon"];
+  to: string;
+  hash?: string;
+  search?: Record<string, string>;
+  /** Section entries stay lit for every page underneath them. */
+  prefix?: boolean;
+  badge?: boolean;
+};
+
 export function SidebarNav({
   collapsed = false,
   onToggleCollapse,
@@ -48,80 +65,126 @@ export function SidebarNav({
   footer,
 }: Props) {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
-  const hash = useRouterState({ select: (r) => r.location.hash });
-  const search = useRouterState({ select: (r) => r.location.search as Record<string, unknown> });
   const [query, setQuery] = useState("");
+  const { authUserId, isAdmin, can } = useAuth();
+  const { pins } = useNavPins(authUserId ?? null);
 
-  const groups: NavGroup[] = useMemo(
-    () =>
-      navGroups
-        .map((g) => ({ ...g, items: g.items.filter(canSee) }))
-        .filter((g) => g.items.length > 0),
-    [canSee],
-  );
+  const settingsAllowed = isAdmin || can("can_access_pos_settings");
 
-  const activeGroupId = useMemo(() => {
-    const match = groups.find((g) =>
-      g.items.some((i) => (i.to === "/" ? pathname === "/" : pathname.startsWith(i.to))),
+  /** The seven top-level destinations. */
+  const sections: Entry[] = useMemo(() => {
+    const list = navGroups
+      .map((g) => ({ ...g, items: g.items.filter(canSee) }))
+      .filter((g) => g.items.length > 0)
+      .map((g) => ({
+        key: g.id,
+        label: g.label,
+        icon: g.icon,
+        to: g.hubTo,
+        prefix: true,
+        badge: g.items.some((i) => i.to === "/transfers"),
+      }));
+    if (settingsAllowed) {
+      list.push({
+        key: "settings",
+        label: "Settings",
+        icon: SettingsIcon,
+        to: "/settings",
+        prefix: true,
+        badge: false,
+      });
+    }
+    return list;
+  }, [canSee, settingsAllowed]);
+
+  /**
+   * Pins are rebuilt from the shared lists, so a pin cannot show a screen the
+   * person is not allowed to see.
+   */
+  const pinnedEntries: Entry[] = useMemo(() => {
+    const navByKey = new Map(
+      navGroups.flatMap((g) => g.items).map((i) => [navItemKey(i), i] as const),
     );
-    return match?.id;
-  }, [groups, pathname]);
+    const out: Entry[] = [];
+    for (const pin of pins) {
+      if (pin.kind === "nav") {
+        const item = navByKey.get(pin.key);
+        if (!item || !canSee(item)) continue;
+        out.push({
+          key: `nav:${pin.key}`,
+          label: item.label,
+          icon: item.icon,
+          to: item.to,
+          ...(item.hash ? { hash: item.hash } : {}),
+          ...(item.section ? { search: { section: item.section } } : {}),
+        });
+      } else {
+        if (!settingsAllowed) continue;
+        const card = SETTINGS_CARDS.find((c) => c.id === pin.key);
+        if (!card) continue;
+        const [to, qs] = card.to.split("?");
+        if (!canSee({ to: to as string, label: card.label, icon: card.icon })) continue;
+        out.push({
+          key: `settings:${pin.key}`,
+          label: card.label,
+          icon: card.icon,
+          to: to as string,
+          ...(qs ? { search: Object.fromEntries(new URLSearchParams(qs).entries()) } : {}),
+        });
+      }
+    }
+    return out;
+  }, [pins, canSee, settingsAllowed]);
+
+  /** The till itself always stays one click away, above everything else. */
+  const registerEntry: Entry | null = useMemo(() => {
+    const item = navGroups.flatMap((g) => g.items).find((i) => i.to === "/");
+    if (!item || !canSee(item)) return null;
+    return { key: "register-pos", label: item.label, icon: item.icon, to: "/" };
+  }, [canSee]);
 
   const q = query.trim().toLowerCase();
-  const pinned = useMemo(() => standaloneNavItems.filter(canSee), [canSee]);
-  const pinnedFiltered = q
-    ? pinned.filter(
-        (i) => i.label.toLowerCase().includes(q) || (i.keywords ?? "").includes(q),
-      )
-    : pinned;
-  const filtered = q
-    ? groups
-        .map((g) => ({
-          ...g,
-          items: g.items.filter(
-            (i) =>
-              i.label.toLowerCase().includes(q) ||
-              (i.keywords ?? "").includes(q) ||
-              g.label.toLowerCase().includes(q),
-          ),
-        }))
-        .filter((g) => g.items.length > 0)
-    : groups;
+  const match = (e: Entry) => !q || e.label.toLowerCase().includes(q);
+  const visiblePinned = pinnedEntries.filter(match);
+  const visibleSections = sections.filter(match);
 
-  const isActive = (i: NavItem) => {
-    // "/settings" is a hub with real child pages, so it must not stay lit on them.
-    const exactOnly = i.to === "/" || i.to === "/settings";
-    const pathOk = exactOnly
-      ? pathname === i.to
-      : pathname === i.to || pathname.startsWith(`${i.to}/`);
-    if (!pathOk) return false;
-    const current = (hash ?? "").replace(/^#/, "");
-    if ((i.hash ?? "") !== current) return false;
-    const activeSection = typeof search?.["section"] === "string" ? search["section"] : "";
-    return (i.section ?? "") === activeSection;
+  const isActive = (e: Entry) => {
+    if (e.to === "/") return pathname === "/";
+    if (!e.prefix) return pathname === e.to;
+    return pathname === e.to || pathname.startsWith(`${e.to}/`);
   };
 
-  const ItemLink = ({ item, dense }: { item: NavItem; dense?: boolean }) => (
-    <Link
-      to={item.to}
-      hash={item.hash}
-      search={item.section ? { section: item.section } : {}}
-      onClick={onNavigate}
-      className={cn(
-        "flex items-center gap-2 rounded-md px-2 py-2 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground",
-        dense && "text-[13px]",
-        isActive(item) && "bg-sidebar-accent font-medium text-primary",
-      )}
-    >
-      <item.icon className="size-4 shrink-0" />
-      <span className="min-w-0 truncate">{item.label}</span>
-      {item.to === "/transfers" && inbound > 0 && (
-        <Badge className="ml-auto h-5 min-w-5 shrink-0 justify-center px-1 text-[10px]">
-          {inbound}
-        </Badge>
-      )}
-    </Link>
-  );
+  const Row = ({ entry }: { entry: Entry }) => {
+    const link = (
+      <Link
+        to={entry.to}
+        hash={entry.hash}
+        search={entry.search ?? {}}
+        onClick={onNavigate}
+        aria-label={entry.label}
+        className={cn(
+          "flex items-center gap-2 rounded-md text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground",
+          collapsed ? "justify-center py-2.5" : "px-2 py-2",
+          isActive(entry) && "bg-sidebar-accent font-medium text-primary",
+        )}
+      >
+        <entry.icon className={collapsed ? "size-5" : "size-4 shrink-0"} />
+        {!collapsed && <span className="min-w-0 truncate">{entry.label}</span>}
+        {entry.badge && inbound > 0 && !collapsed && (
+          <Badge className="ml-auto h-5 min-w-5 shrink-0 justify-center px-1 text-[10px]">
+            {inbound}
+          </Badge>
+        )}
+      </Link>
+    );
+    if (!collapsed) return link;
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>{link}</TooltipTrigger>
+        <TooltipContent side="right">{entry.label}</TooltipContent>
+      </Tooltip>
+    );
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -150,97 +213,27 @@ export function SidebarNav({
       )}
 
       <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-2 pb-2">
-        {!collapsed &&
-          !q &&
-          (() => {
-            const register = groups.flatMap((g) => g.items).find((i) => i.to === "/");
-            return register ? <ItemLink item={register} /> : null;
-          })()}
-        {!collapsed &&
-          !q &&
-          pinned.map((i) => <ItemLink key={navItemKey(i)} item={i} />)}
-        {collapsed &&
-          pinned.map((i) => (
-            <Link
-              key={navItemKey(i)}
-              to={i.to}
-              onClick={onNavigate}
-              aria-label={i.label}
-              className={cn(
-                "flex w-full items-center justify-center rounded-md py-2.5 text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground",
-                pathname.startsWith(i.to) && "bg-sidebar-accent text-primary",
-              )}
-            >
-              <i.icon className="size-5" />
-            </Link>
-          ))}
-        {!collapsed && q
-          ? [
-              ...pinnedFiltered.map((i) => <ItemLink key={navItemKey(i)} item={i} />),
-              ...filtered.flatMap((g) =>
-                g.items.map((i) => <ItemLink key={navItemKey(i)} item={i} />),
-              ),
-            ]
-          : filtered.map((g) => {
-          if (collapsed) {
-            return (
-              <Popover key={g.id}>
-                <PopoverTrigger asChild>
-                  <button
-                    type="button"
-                    onMouseEnter={(e) => e.currentTarget.click()}
-                    className={cn(
-                      "flex w-full items-center justify-center rounded-md py-2.5 text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground",
-                      activeGroupId === g.id && "bg-sidebar-accent text-primary",
-                    )}
-                    aria-label={g.label}
-                  >
-                    <g.icon className="size-5" />
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent side="right" align="start" className="w-60 p-2">
-                  <Link
-                    to={g.hubTo}
-                    onClick={onNavigate}
-                    className="block rounded-md px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
-                  >
-                    {g.label}
-                  </Link>
-                  <div className="space-y-0.5">
-                    {g.items.map((i) => (
-                      <ItemLink key={navItemKey(i)} item={i} dense />
-                    ))}
-                  </div>
-                </PopoverContent>
-              </Popover>
-            );
-          }
+        {registerEntry && match(registerEntry) && <Row entry={registerEntry} />}
 
-          return (
-            <div key={g.id}>
-              <Link
-                to={g.hubTo}
-                onClick={onNavigate}
-                className={cn(
-                  "flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-2 text-sm transition-colors hover:bg-sidebar-accent hover:text-foreground",
-                  activeGroupId === g.id
-                    ? "bg-sidebar-accent font-medium text-primary"
-                    : "text-muted-foreground",
-                )}
-              >
-                <g.icon className="size-4 shrink-0" />
-                <span className="min-w-0 truncate">{g.label}</span>
-                {inbound > 0 && g.items.some((i) => i.to === "/transfers") && (
-                  <Badge className="ml-auto h-5 min-w-5 shrink-0 justify-center px-1 text-[10px]">
-                    {inbound}
-                  </Badge>
-                )}
-              </Link>
-            </div>
-          );
-        })}
+        {visiblePinned.length > 0 && (
+          <>
+            {!collapsed && (
+              <p className="px-2 pt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Pinned
+              </p>
+            )}
+            {visiblePinned.map((e) => (
+              <Row key={e.key} entry={e} />
+            ))}
+            <div className="my-1 border-t border-border" />
+          </>
+        )}
 
-        {filtered.length === 0 && pinnedFiltered.length === 0 && (
+        {visibleSections.map((e) => (
+          <Row key={e.key} entry={e} />
+        ))}
+
+        {visibleSections.length === 0 && visiblePinned.length === 0 && !(registerEntry && match(registerEntry)) && (
           <p className="px-2 py-4 text-center text-xs text-muted-foreground">No matches</p>
         )}
       </nav>

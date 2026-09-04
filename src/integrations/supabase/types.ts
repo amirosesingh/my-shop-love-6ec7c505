@@ -1401,6 +1401,36 @@ export type Database = {
         }
         Relationships: []
       }
+      nav_pins: {
+        Row: {
+          created_at: string
+          id: string
+          item_key: string
+          item_kind: string
+          owner_id: string | null
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          item_key: string
+          item_kind: string
+          owner_id?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          item_key?: string
+          item_kind?: string
+          owner_id?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       offline_sync_audit_log: {
         Row: {
           created_at: string
