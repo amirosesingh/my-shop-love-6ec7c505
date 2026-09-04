@@ -1,5 +1,6 @@
 /**
- * A terminal is ready only when its own secure store holds a valid tenant.
+ * A terminal is ready only when its own secure store holds a complete
+ * connection profile: central database URL, API key and POS backend address.
  * Nothing may come from the web deployment's environment.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -7,6 +8,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const platform = vi.hoisted(() => ({ terminal: true }));
 const store = vi.hoisted(() => ({
   status: { configured: false, url: "", keyHint: "", encrypted: true, source: "android" as const },
+  backend: "",
 }));
 
 vi.mock("@/platform-config/platform", () => ({
@@ -22,12 +24,25 @@ vi.mock("@/lib/external-supabase-config", () => ({
   hasTerminalSupabaseOverride: () => store.status.configured,
 }));
 
+vi.mock("@/lib/backend-config", () => ({
+  backendUrl: async () => store.backend,
+}));
+
 import { hasRequiredPlatformConfig } from "../platform-config-ready";
+
+const configured = {
+  configured: true,
+  url: "https://tenant.example.co",
+  keyHint: "abc…wxyz",
+  encrypted: true,
+  source: "android" as const,
+};
 
 describe("hasRequiredPlatformConfig", () => {
   beforeEach(() => {
     platform.terminal = true;
     store.status = { configured: false, url: "", keyHint: "", encrypted: true, source: "android" };
+    store.backend = "";
   });
 
   it("reports a fresh terminal as missing, not as an error", async () => {
@@ -36,28 +51,41 @@ describe("hasRequiredPlatformConfig", () => {
     expect(res.state).toBe("missing");
   });
 
-  it("rejects a stored address that is not a real https URL", async () => {
-    store.status = { configured: true, url: "not-a-url", keyHint: "x", encrypted: true, source: "android" };
+  it("reports a half-configured terminal as incomplete", async () => {
+    store.backend = "https://pos.example.com";
     const res = await hasRequiredPlatformConfig();
-    expect(res.ready).toBe(false);
-    expect(res.state).toBe("invalid");
+    expect(res.state).toBe("incomplete");
+    expect(res.have).toEqual({ supabaseUrl: false, supabaseKey: false, backendUrl: true });
   });
 
-  it("accepts a configured terminal", async () => {
-    store.status = {
-      configured: true,
-      url: "https://tenant.example.co",
-      keyHint: "abc…wxyz",
-      encrypted: true,
-      source: "android",
-    };
+  it("is not ready when the backend address was never entered", async () => {
+    store.status = configured;
     const res = await hasRequiredPlatformConfig();
-    expect(res).toEqual({ ready: true, state: "ready" });
+    expect(res.ready).toBe(false);
+    expect(res.state).toBe("incomplete");
+    expect(res.reason).toMatch(/backend address/i);
+  });
+
+  it("rejects a stored address that is not a real https URL", async () => {
+    store.status = { ...configured, url: "not-a-url" };
+    store.backend = "https://pos.example.com";
+    const res = await hasRequiredPlatformConfig();
+    expect(res.ready).toBe(false);
+    expect(res.state).toBe("failed");
+  });
+
+  it("accepts a fully configured terminal", async () => {
+    store.status = configured;
+    store.backend = "https://pos.example.com";
+    const res = await hasRequiredPlatformConfig();
+    expect(res.ready).toBe(true);
+    expect(res.state).toBe("ready");
   });
 
   it("never blocks the web build", async () => {
     platform.terminal = false;
     const res = await hasRequiredPlatformConfig();
-    expect(res).toEqual({ ready: true, state: "not-applicable" });
+    expect(res.ready).toBe(true);
+    expect(res.state).toBe("not-applicable");
   });
 });
