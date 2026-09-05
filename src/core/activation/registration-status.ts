@@ -71,7 +71,31 @@ export function useStartupGate(): StartupGate {
   const [cloudConnected, setCloudConnected] = useState(() => isCloudConnected());
   const [verdict, setVerdict] = useState<CloudVerdict>(() => cloudVerdict());
   const [cloudConfigured, setCloudConfigured] = useState<boolean | null>(null);
+  const [probing, setProbing] = useState(() => !hasProbedCloud());
   const [tick, setTick] = useState(0);
+
+  // Nothing else runs a connection check during start-up, so the launch
+  // decision used to be taken while the verdict was still its "unreachable"
+  // default — which sent a configured, registered terminal to the connection
+  // screen. One awaited check per launch, before any decision is shown.
+  useEffect(() => {
+    if (hasProbedCloud()) {
+      setProbing(false);
+      return;
+    }
+    let cancelled = false;
+    void checkHealth(true)
+      .catch(() => undefined)
+      .then(() => {
+        if (cancelled) return;
+        setCloudConnected(isCloudConnected());
+        setVerdict(cloudVerdict());
+        setProbing(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tick]);
 
   useEffect(() => {
     let cancelled = false;
