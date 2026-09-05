@@ -100,9 +100,14 @@ export function TerminalLogin() {
                 }
                 setBusy(true);
                 setError("");
+                setFailure(null);
                 const res = await login(email, password);
-                if (!res.ok) setError(res.error ?? "Sign in failed");
+                if (!res.ok) {
+                  setError(res.error ?? "Sign in could not be completed.");
+                  setFailure((res as { code?: LoginFailure }).code ?? null);
+                }
                 setBusy(false);
+
               }}
             >
               <div className="space-y-1">
