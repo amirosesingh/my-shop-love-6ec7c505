@@ -67,29 +67,63 @@ export function PrivilegeGate({ children }: { children: React.ReactNode }) {
     if (!pos) return; // web and Android have no desktop bridge
 
     const undo: Array<() => void> = [];
+    let off: (() => void) | undefined;
 
-    for (const name of BRIDGES) {
-      const bridge = win[name];
-      if (!bridge) continue;
-      for (const [key, fn] of Object.entries(bridge)) {
-        if (typeof fn !== "function" || key.startsWith("on") || key === "unlock") continue;
-        const original = fn as (...args: unknown[]) => unknown;
-        (bridge as Record<string, unknown>)[key] = async (...args: unknown[]) => {
-          const first = await original(...args);
-          if (!isRefusal(first)) return first;
-          const unlocked = await requestUnlock(first.error ?? "");
-          if (!unlocked) return first;
-          return original(...args);
-        };
-        undo.push(() => {
-          (bridge as Record<string, unknown>)[key] = original;
+    // The desktop shell hands these objects over read-only, so their functions
+    // can never be replaced in place. A stand-in in front of the whole bridge
+    // forwards every call untouched and only adds the administrator prompt
+    // when a call comes back refused. Anything that goes wrong here must leave
+    // the till running rather than blanking the screen.
+    try {
+      for (const name of BRIDGES) {
+        const bridge = win[name];
+        if (!bridge) continue;
+        const cache = new Map<string, unknown>();
+        const proxy = new Proxy(bridge, {
+          get(target, prop, receiver) {
+            const value = Reflect.get(target, prop, receiver);
+            if (typeof prop !== "string" || typeof value !== "function") return value;
+            if (prop.startsWith("on") || prop === "unlock") return value;
+            const cached = cache.get(prop);
+            if (cached) return cached;
+            const original = value.bind(target) as (...args: unknown[]) => unknown;
+            const wrapped = async (...args: unknown[]) => {
+              const first = await original(...args);
+              if (!isRefusal(first)) return first;
+              const unlocked = await requestUnlock(first.error ?? "");
+              if (!unlocked) return first;
+              return original(...args);
+            };
+            cache.set(prop, wrapped);
+            return wrapped;
+          },
+          set() {
+            return true; // the underlying bridge is read-only; ignore writes
+          },
         });
+        try {
+          win[name] = proxy as unknown as Record<string, unknown>;
+          undo.push(() => {
+            win[name] = bridge;
+          });
+        } catch {
+          /* this shell will not let us stand in front of the bridge */
+        }
       }
+
+      off = pos.onFatal?.((payload) => setFatal(payload?.message ?? "This till has stopped."));
+    } catch {
+      /* never block the till from loading */
     }
 
-    const off = pos.onFatal?.((payload) => setFatal(payload?.message ?? "This till has stopped."));
     return () => {
-      for (const restore of undo) restore();
+      for (const restore of undo) {
+        try {
+          restore();
+        } catch {
+          /* ignore */
+        }
+      }
       off?.();
     };
   }, []);
