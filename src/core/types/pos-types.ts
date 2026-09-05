@@ -92,6 +92,8 @@ export type ProductCategory = {
   kind: CatalogKind;
   parentId?: string | null;
   sort: number;
+  /** Retired entries stay readable on old records but cannot be chosen again. */
+  active?: boolean;
 };
 
 /** A unit of measure the catalogue can use. */
@@ -102,6 +104,8 @@ export type UomUnit = {
   /** weight / length style units accept fractional quantities */
   allowDecimal: boolean;
   sort: number;
+  /** Retired entries stay readable on old records but cannot be chosen again. */
+  active?: boolean;
 };
 
 export type Member = {

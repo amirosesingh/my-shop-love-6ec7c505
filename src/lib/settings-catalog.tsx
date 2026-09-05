@@ -30,19 +30,20 @@ import {
   ShieldCheck,
   Smartphone,
   Type,
+  Users,
 } from "lucide-react";
 
 export type SettingsCategoryId =
   | "business"
+  | "people"
   | "products"
-  | "payments"
-  | "receipts"
-  | "bookings"
   | "terminal"
+  | "receipts"
+  | "sales"
+  | "payments"
   | "data"
   | "security"
-  | "health"
-  | "messaging";
+  | "health";
 
 /** Heading a category sits under on the settings home page. */
 export type SettingsGroupId = "business" | "sales" | "terminal" | "admin";
@@ -68,68 +69,79 @@ export type SettingsCategory = {
   label: string;
   blurb: string;
   group: SettingsGroupId;
+  icon: typeof MonitorCog;
 };
 
 export const SETTINGS_CATEGORIES: SettingsCategory[] = [
   {
     id: "business",
-    label: "Business",
-    blurb: "Who you are, what you charge and how documents are numbered.",
+    label: "Business & locations",
+    blurb: "Who you are, where you trade and how documents are numbered.",
     group: "business",
+    icon: Building2,
+  },
+  {
+    id: "people",
+    label: "People & permissions",
+    blurb: "Who may do what, and who is signed in right now.",
+    group: "business",
+    icon: Users,
   },
   {
     id: "products",
     label: "Products & inventory",
     blurb: "Categories, units and the codes products are given.",
     group: "business",
+    icon: ScanBarcode,
   },
   {
     id: "payments",
-    label: "Payments",
-    blurb: "What customers can pay with and where the money lands.",
+    label: "Payments & tax",
+    blurb: "What customers can pay with, where the money lands and what you charge.",
     group: "sales",
+    icon: Landmark,
   },
   {
     id: "receipts",
-    label: "Receipts & printing",
+    label: "Printing & receipts",
     blurb: "The printer and everything printed on a slip.",
     group: "sales",
+    icon: Printer,
   },
   {
-    id: "bookings",
-    label: "Bookings & services",
-    blurb: "Job cards, deposits, turnaround and the slip the customer signs.",
+    id: "sales",
+    label: "Sales & bookings",
+    blurb: "Job cards, deposits, turnaround and how bills reach the customer.",
     group: "sales",
-  },
-  {
-    id: "messaging",
-    label: "Messaging",
-    blurb: "How bills and alerts reach the customer.",
-    group: "sales",
+    icon: CalendarClock,
   },
   {
     id: "terminal",
-    label: "Terminal",
-    blurb: "This machine: screen, hardware, updates and its identity.",
+    label: "Terminals & devices",
+    blurb: "This machine and every till and phone paired to the company.",
     group: "terminal",
+    icon: MonitorSmartphone,
   },
   {
     id: "data",
-    label: "Data & connectivity",
+    label: "Sync & data",
     blurb: "Company connection, local database and keeping them in step.",
     group: "terminal",
+    icon: RefreshCw,
   },
   {
     id: "security",
-    label: "Staff & security",
-    blurb: "Who may do what, and what each role can see.",
+    label: "Security",
+    blurb: "Enforcement rules and the alerts raised against them.",
     group: "admin",
+    icon: ShieldCheck,
   },
   {
     id: "health",
     label: "System health",
     blurb: "Status checks, alerts and support tools.",
     group: "admin",
+    icon: Activity,
   },
 ];
 
@@ -229,7 +241,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     label: "Active sessions",
     blurb: "Everyone signed in right now, with instant remote sign-out.",
     icon: MonitorSmartphone,
-    category: "terminal",
+    category: "people",
     scope: "company",
     to: "/settings/sessions",
     panel: page(() => import("@/routes/settings.sessions")),
@@ -330,7 +342,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     label: "Tax & pricing",
     blurb: "Global tax rate and inclusive or exclusive pricing.",
     icon: ReceiptText,
-    category: "business",
+    category: "payments",
     scope: "company",
     to: "/settings/tax",
     panel: page(() => import("@/routes/settings.tax")),
@@ -341,7 +353,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     label: "POS rules & enforcement",
     blurb: "Shift, discount, refund and terminal security limits.",
     icon: ShieldCheck,
-    category: "business",
+    category: "security",
     scope: "company",
     to: "/settings/rules",
     panel: page(() => import("@/routes/settings.rules")),
@@ -434,7 +446,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     label: "WhatsApp bills & integrations",
     blurb: "Send receipts over the WhatsApp Cloud API.",
     icon: MessageCircle,
-    category: "messaging",
+    category: "sales",
     scope: "company",
     to: "/settings/whatsapp",
     panel: page(() => import("@/routes/settings.whatsapp")),
@@ -446,7 +458,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     label: "Booking rules & deposits",
     blurb: "Deposits, turnaround, racket jobs and who may cancel.",
     icon: CalendarClock,
-    category: "bookings",
+    category: "sales",
     scope: "company",
     to: "/settings/booking-rules",
     panel: page(() => import("@/routes/settings.booking-rules")),
@@ -456,7 +468,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     label: "Booking services & fees",
     blurb: "Re-stringing, repairs and other jobs with their default fee.",
     icon: CalendarClock,
-    category: "bookings",
+    category: "sales",
     scope: "company",
     to: "/settings/services",
     panel: page(() => import("@/routes/settings.services")),
@@ -466,7 +478,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     label: "Booking slip wording",
     blurb: "Terms & conditions and the customer signature line.",
     icon: ReceiptText,
-    category: "bookings",
+    category: "sales",
     scope: "company",
     to: "/settings/booking-slip",
     panel: page(() => import("@/routes/settings.booking-slip")),
@@ -498,7 +510,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     label: "Shift alerts",
     blurb: "How the day-end summary reaches this device.",
     icon: Activity,
-    category: "messaging",
+    category: "health",
     scope: "branch",
     to: "/settings/shift-alerts",
     panel: page(() => import("@/routes/settings.shift-alerts")),
@@ -508,7 +520,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     label: "Notification delivery",
     blurb: "Which events raise an alert and how they are delivered.",
     icon: MessageCircle,
-    category: "messaging",
+    category: "health",
     scope: "company",
     to: "/settings/notifications",
     panel: page(() => import("@/routes/settings.notifications")),
@@ -572,7 +584,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     label: "Security alerts",
     blurb: "Findings raised by the security scanner, with acknowledgement.",
     icon: ShieldCheck,
-    category: "health",
+    category: "security",
     scope: "company",
     to: "/settings/system?tab=security-alerts",
     raw: true,
@@ -625,7 +637,7 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     label: "Roles & access",
     blurb: "One page: what each role may do, and what it can see.",
     icon: EyeOff,
-    category: "security",
+    category: "people",
     scope: "company",
     to: "/settings/access",
     panel: page(() => import("@/routes/settings.access")),

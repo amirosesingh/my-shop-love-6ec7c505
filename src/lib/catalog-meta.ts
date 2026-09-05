@@ -71,6 +71,7 @@ export async function loadCatalogMeta() {
         kind: ((r as { kind?: string }).kind as CatalogKind) ?? "category",
         parentId: (r.parent_id as string | null) ?? null,
         sort: Number(r.sort ?? 0),
+        active: (r as { is_active?: boolean }).is_active !== false,
       })),
     );
   }
@@ -83,6 +84,7 @@ export async function loadCatalogMeta() {
         name: r.name as string,
         allowDecimal: !!r.allow_decimal,
         sort: Number(r.sort ?? 0),
+        active: (r as { is_active?: boolean }).is_active !== false,
       })),
     );
   }
@@ -95,6 +97,7 @@ export async function saveCategory(cat: Omit<ProductCategory, "id"> & { id?: str
     kind: cat.kind ?? "category",
     parent_id: cat.parentId ?? null,
     sort: cat.sort ?? 0,
+    is_active: cat.active !== false,
   };
   const { data, error } = await supabase
     .from("product_categories")
@@ -108,6 +111,7 @@ export async function saveCategory(cat: Omit<ProductCategory, "id"> & { id?: str
     kind: cat.kind ?? "category",
     parentId: cat.parentId ?? null,
     sort: cat.sort ?? 0,
+    active: cat.active !== false,
   };
   const list = readCategories().filter((c) => c.id !== saved.id);
   writeLocal(CAT_KEY, [...list, saved].sort((a, b) => a.sort - b.sort));
@@ -133,6 +137,7 @@ export async function saveUnit(unit: Omit<UomUnit, "id"> & { id?: string }) {
     name: unit.name,
     allow_decimal: unit.allowDecimal,
     sort: unit.sort ?? 0,
+    is_active: unit.active !== false,
   };
   const { data, error } = await supabase
     .from("uom_units")
@@ -146,6 +151,7 @@ export async function saveUnit(unit: Omit<UomUnit, "id"> & { id?: string }) {
     name: unit.name,
     allowDecimal: unit.allowDecimal,
     sort: unit.sort ?? 0,
+    active: unit.active !== false,
   };
   const list = readUnits().filter((u) => u.code !== saved.code);
   writeLocal(UOM_KEY, [...list, saved].sort((a, b) => a.sort - b.sort));
@@ -203,6 +209,34 @@ export async function reorderCategory(all: ProductCategory[], id: string, dir: -
   if (!swap) return;
   await saveCategory({ ...node, sort: swap.sort });
   await saveCategory({ ...swap, sort: node.sort });
+}
+
+/**
+ * Retiring an entry keeps every old record readable — only new choices lose it.
+ * A value already on the record being edited stays offered, so an old product
+ * does not silently change unit or category the moment someone opens it.
+ */
+export async function setCategoryActive(id: string, active: boolean) {
+  const cat = readCategories().find((c) => c.id === id);
+  if (!cat) return;
+  await saveCategory({ ...cat, active });
+}
+
+export async function setUnitActive(id: string, active: boolean) {
+  const unit = readUnits().find((u) => u.id === id);
+  if (!unit) return;
+  await saveUnit({ ...unit, active });
+}
+
+export const isActive = (entry: { active?: boolean }) => entry.active !== false;
+
+/** Active entries, plus whatever the record already carries. */
+export function selectableCategories(all: ProductCategory[], keep?: string | null) {
+  return all.filter((c) => isActive(c) || c.id === keep);
+}
+
+export function selectableUnits(all: UomUnit[], keep?: string | null) {
+  return all.filter((u) => isActive(u) || u.code === keep || u.id === keep);
 }
 
 export const unitLabel = (units: UomUnit[], code: string | undefined) =>

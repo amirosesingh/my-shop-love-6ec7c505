@@ -56,6 +56,7 @@ import { money, stockAt, usePos } from "@/lib/pos-store";
 import { ThemedSelect } from "@/platforms/web/components/pos/ThemedSelect";
 import {
   groupList,
+  selectableCategories,
   subCategoryList,
   topCategories,
   useCategories,
@@ -1632,7 +1633,7 @@ function Purchasing() {
                   ariaLabel="Category"
                   placeholder="Choose a category"
                   onChange={(v) => setDraft({ ...draft, category: v === PO_NONE ? "" : v })}
-                  options={poOptions(topCategories(catalogLists).map((c) => c.name), draft.category)}
+                  options={poOptions(topCategories(selectableCategories(catalogLists)).map((c) => c.name), draft.category)}
                 />
               </Field>
               <Field label="Group">
@@ -1641,7 +1642,7 @@ function Purchasing() {
                   ariaLabel="Group"
                   placeholder="Choose a group"
                   onChange={(v) => setDraft({ ...draft, group: v === PO_NONE ? "" : v })}
-                  options={poOptions(groupList(catalogLists).map((c) => c.name), draft.group)}
+                  options={poOptions(groupList(selectableCategories(catalogLists)).map((c) => c.name), draft.group)}
                 />
               </Field>
               <Field label="Sub-category">
@@ -1651,7 +1652,7 @@ function Purchasing() {
                   placeholder="Choose a sub-category"
                   onChange={(v) => setDraft({ ...draft, subCategory: v === PO_NONE ? "" : v })}
                   options={poOptions(
-                    subCategoryList(catalogLists).map((c) => c.name),
+                    subCategoryList(selectableCategories(catalogLists)).map((c) => c.name),
                     draft.subCategory,
                   )}
                 />

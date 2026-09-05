@@ -5,7 +5,7 @@
 - [x] Phase 2 — Cross-group transfers always need someone else's approval (enforced in the database)
 - [x] Phase 3 — Terminals screen shows status, version, last seen, last sync; this-device panel; clear terminal revokes centrally
 - [x] Phase 4 — Sync you can act on (one panel, failed list, retry, replay protection)
-- [ ] Phase 5 — Settings reorganisation and controlled values
+- [x] Phase 5 — Settings reorganisation and controlled values (ten categories, folding navigation, retire units and categories)
 - [ ] Phase 6 — Server-side access review and final report
 
 ## PC and Android setup/login loop (v1.3.129) — done
