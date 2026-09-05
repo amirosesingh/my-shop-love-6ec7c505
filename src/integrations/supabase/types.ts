@@ -2021,6 +2021,7 @@ export type Database = {
           is_archived: boolean
           landing_pct: number | null
           name: string
+          owner_store_id: string | null
           packs: Json
           point_multiplier: number
           product_group: string | null
@@ -2052,6 +2053,7 @@ export type Database = {
           is_archived?: boolean
           landing_pct?: number | null
           name: string
+          owner_store_id?: string | null
           packs?: Json
           point_multiplier?: number
           product_group?: string | null
@@ -2083,6 +2085,7 @@ export type Database = {
           is_archived?: boolean
           landing_pct?: number | null
           name?: string
+          owner_store_id?: string | null
           packs?: Json
           point_multiplier?: number
           product_group?: string | null
@@ -2097,7 +2100,15 @@ export type Database = {
           unit?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "products_owner_store_id_fkey"
+            columns: ["owner_store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       promotions: {
         Row: {
@@ -3661,6 +3672,7 @@ export type Database = {
           name: string
           parent_id: string | null
           phone: string | null
+          private_catalogue: boolean
           receipt_prefix: string | null
           row_version: number
           updated_at: string
@@ -3682,6 +3694,7 @@ export type Database = {
           name: string
           parent_id?: string | null
           phone?: string | null
+          private_catalogue?: boolean
           receipt_prefix?: string | null
           row_version?: number
           updated_at?: string
@@ -3703,6 +3716,7 @@ export type Database = {
           name?: string
           parent_id?: string | null
           phone?: string | null
+          private_catalogue?: boolean
           receipt_prefix?: string | null
           row_version?: number
           updated_at?: string
@@ -4508,6 +4522,10 @@ export type Database = {
         Returns: Json
       }
       product_delete_guard: { Args: { _product_id: string }; Returns: Json }
+      product_visible_to_me: {
+        Args: { _owner_store_id: string }
+        Returns: boolean
+      }
       sale_refund: {
         Args: {
           _client_refund_id?: string
