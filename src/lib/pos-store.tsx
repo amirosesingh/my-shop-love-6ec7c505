@@ -1729,9 +1729,9 @@ export function PosProvider({ children }: { children: ReactNode }) {
     }
     setState((s) => ({
       ...s,
-      products: s.products.some((p) => p.id === record.id)
-        ? s.products.map((p) => (p.id === record.id ? record : p))
-        : [record, ...s.products],
+      products: s.products.some((p) => p.id === stored.id)
+        ? s.products.map((p) => (p.id === stored.id ? stored : p))
+        : [stored, ...s.products],
     }));
     return target;
   }, []);
