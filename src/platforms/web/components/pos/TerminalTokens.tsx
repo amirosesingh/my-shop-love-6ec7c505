@@ -176,6 +176,16 @@ export function TerminalTokens({
     return () => window.clearInterval(timer);
   }, [code, claimed]);
 
+  // Keep online / offline honest without anyone pressing Refresh.
+  useEffect(() => {
+    const tick = window.setInterval(() => setNow(Date.now()), 30_000);
+    const reload = window.setInterval(() => void refresh(), 60_000);
+    return () => {
+      window.clearInterval(tick);
+      window.clearInterval(reload);
+    };
+  }, [refresh]);
+
   // Watch the issued token until a till redeems it, then celebrate and reload.
   useEffect(() => {
     if (!codeTokenId || claimed || expired) return;
