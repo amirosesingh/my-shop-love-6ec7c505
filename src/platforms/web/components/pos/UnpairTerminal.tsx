@@ -18,7 +18,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { isTerminalApp } from "@/platform-config/platform";
-import { readTerminalConfig, unpairTerminal } from "@/core/activation/terminal-tokens";
+import {
+  readTerminalConfig,
+  revokeTerminalToken,
+  unpairTerminal,
+} from "@/core/activation/terminal-tokens";
 import { useManagerGate } from "@/lib/manager-gate";
 import { useAuthOptional } from "@/lib/pos-auth";
 
