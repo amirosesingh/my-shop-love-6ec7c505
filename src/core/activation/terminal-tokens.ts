@@ -19,6 +19,7 @@ import {
 } from "@/lib/terminal-crypto";
 import { clearDeviceSecret, getDeviceSecret, setDeviceSecret } from "@/lib/device-secrets";
 import { recordActivationAttempt } from "@/core/activation/terminal-activation-log";
+import { APP_VERSION } from "@/version";
 
 import {
   clearTerminalSupabaseOverride,
