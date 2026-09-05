@@ -70,29 +70,7 @@ export function PrivilegeGate({ children }: { children: React.ReactNode }) {
       for (const name of BRIDGES) {
         const bridge = win[name];
         if (!bridge) continue;
-        const cache = new Map<string, unknown>();
-        const proxy = new Proxy(bridge, {
-          get(target, prop, receiver) {
-            const value = Reflect.get(target, prop, receiver);
-            if (typeof prop !== "string" || typeof value !== "function") return value;
-            if (prop.startsWith("on") || prop === "unlock") return value;
-            const cached = cache.get(prop);
-            if (cached) return cached;
-            const original = value.bind(target) as (...args: unknown[]) => unknown;
-            const wrapped = async (...args: unknown[]) => {
-              const first = await original(...args);
-              if (!isRefusal(first)) return first;
-              const unlocked = await requestUnlock(first.error ?? "");
-              if (!unlocked) return first;
-              return original(...args);
-            };
-            cache.set(prop, wrapped);
-            return wrapped;
-          },
-          set() {
-            return true; // the underlying bridge is read-only; ignore writes
-          },
-        });
+        const proxy = wrapBridge(bridge, requestUnlock);
         try {
           win[name] = proxy as unknown as Record<string, unknown>;
           undo.push(() => {
