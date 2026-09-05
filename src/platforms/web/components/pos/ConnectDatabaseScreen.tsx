@@ -11,6 +11,7 @@ import { CloudCog, LifeBuoy, Loader2, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { reportAppReady } from "@/lib/app-health";
 import { CloudConnectionPanel } from "@/platforms/web/components/pos/settings/panels/CloudConnectionPanel";
 import { checkCloudConnected } from "@/core/activation/registration-status";
 import {
