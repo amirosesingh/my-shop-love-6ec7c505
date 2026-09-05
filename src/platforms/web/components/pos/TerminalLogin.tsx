@@ -9,6 +9,7 @@ import { useBranding } from "@/lib/branding";
 import { isTerminalApp } from "@/platform-config/platform";
 import { CashierPinLogin } from "@/platforms/web/components/auth/CashierPinLogin";
 import { isExternalEmail, usernameFromAddress } from "@/lib/internal-domains";
+import { isConfigurationFailure, type LoginFailure } from "@/lib/login-failure";
 
 export function TerminalLogin() {
   const { login } = useAuth();
@@ -19,12 +20,16 @@ export function TerminalLogin() {
   const [terminal, setTerminal] = useState(false);
   useEffect(() => setTerminal(isTerminalApp()), []);
   const [error, setError] = useState("");
+  // Why the last attempt failed. A connection problem gets a way out of the
+  // screen; only a genuine refusal is presented as a wrong password.
+  const [failure, setFailure] = useState<LoginFailure | null>(null);
   const [busy, setBusy] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [tab, setTab] = useState("admin");
   const [pinIdentifier, setPinIdentifier] = useState("");
   const [routed, setRouted] = useState(false);
+
 
   useEffect(() => {
     setTab(terminal ? "cashier" : "admin");
