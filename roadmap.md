@@ -1,10 +1,10 @@
 # Roadmap
 
 ## PC and Android setup/login loop — in progress
-- [ ] Prevent authentication from starting before secure device configuration is ready
-- [ ] Route fresh installs through API configuration, activation, then login
-- [ ] Keep Emergency Access hidden only on a completely fresh install
-- [ ] Verify recovery, retry, activation, and subsequent-launch flows
+- [x] Prevent authentication from starting before secure device configuration is ready
+- [x] Route fresh installs through API configuration, activation, then login
+- [x] Keep Emergency Access hidden only on a completely fresh install
+- [x] Verify recovery, retry, activation, and subsequent-launch flows
 
 ## Platform configuration isolation — done
 - [x] Device build env isolation: `envDefine: false` + empty `envDir` for MOBILE_BUILD / DESKTOP_BUILD

@@ -64,6 +64,31 @@ describe("no fresh-install screen is a dead end", () => {
     expect(read("src/routes/__root.tsx")).toMatch(/<EmergencyAccessLink/);
   });
 
+  it("routes missing terminal configuration to connection setup before activation", () => {
+    const root = read("src/routes/__root.tsx");
+    const configBranch = root.indexOf("if (notConfigured && isTerminalApp())");
+    const setup = root.indexOf("<ConnectDatabaseScreen", configBranch);
+
+    expect(configBranch).toBeGreaterThan(-1);
+    expect(setup).toBeGreaterThan(configBranch);
+    expect(root.slice(configBranch, setup + 100)).not.toMatch(/<TerminalActivation/);
+  });
+
+  it("hides Emergency Access only while no connection value has ever been saved", () => {
+    const setup = read("src/platforms/web/components/pos/ConnectDatabaseScreen.tsx");
+    expect(setup).toMatch(/Object\.values\(state\.have\)\.some\(Boolean\)/);
+    expect(setup).toMatch(/\{hasSavedConfiguration && \(/);
+  });
+
+  it("does not start terminal cloud authentication before configuration is ready", () => {
+    const auth = read("src/lib/pos-auth.tsx");
+    expect(auth).toMatch(/const \[authEnabled, setAuthEnabled\] = useState/);
+    expect(auth).toMatch(/if \(!authEnabled\) return;/);
+    expect(auth.indexOf("if (!authEnabled) return;")).toBeLessThan(
+      auth.indexOf("supabase.auth.onAuthStateChange"),
+    );
+  });
+
   it("the emergency keypad uses its own lockout counter and resets on mount", () => {
     const pinGate = read("src/platforms/web/components/pos/EmergencyPinGate.tsx");
     expect(pinGate).toMatch(/LockoutScope = "recovery"/);
