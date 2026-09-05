@@ -10556,3 +10556,7 @@ BEGIN
   END IF;
 END
 $verify$;
+
+-- Branch-owned catalogue (Phase 6 branch isolation)
+ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS private_catalogue boolean DEFAULT false NOT NULL;
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS owner_store_id text REFERENCES public.stores(id) ON DELETE SET NULL;

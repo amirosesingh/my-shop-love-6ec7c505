@@ -2382,6 +2382,7 @@ BEGIN
   IF COL_LENGTH('dbo.products', 'ecom_price') IS NULL ALTER TABLE dbo.products ADD [ecom_price] DECIMAL(18,4);
   IF COL_LENGTH('dbo.products', 'stock_quantity') IS NULL ALTER TABLE dbo.products ADD [stock_quantity] INT DEFAULT 0;
   IF COL_LENGTH('dbo.products', 'custom_points') IS NULL ALTER TABLE dbo.products ADD [custom_points] DECIMAL(18,4);
+  IF COL_LENGTH('dbo.products', 'owner_store_id') IS NULL ALTER TABLE dbo.products ADD [owner_store_id] NVARCHAR(200);
   IF COL_LENGTH('dbo.products', 'point_multiplier') IS NULL ALTER TABLE dbo.products ADD [point_multiplier] DECIMAL(18,4) DEFAULT 1.0;
   IF COL_LENGTH('dbo.products', 'created_at') IS NULL ALTER TABLE dbo.products ADD [created_at] DATETIME2(3) DEFAULT SYSUTCDATETIME();
   IF COL_LENGTH('dbo.products', 'sku') IS NULL ALTER TABLE dbo.products ADD [sku] NVARCHAR(400);
@@ -2864,6 +2865,7 @@ BEGIN
   IF COL_LENGTH('dbo.stores', 'is_active') IS NULL ALTER TABLE dbo.stores ADD [is_active] BIT DEFAULT 1;
   IF COL_LENGTH('dbo.stores', 'archived_at') IS NULL ALTER TABLE dbo.stores ADD [archived_at] DATETIME2(3);
   IF COL_LENGTH('dbo.stores', 'is_primary_sub') IS NULL ALTER TABLE dbo.stores ADD [is_primary_sub] BIT DEFAULT 0;
+  IF COL_LENGTH('dbo.stores', 'private_catalogue') IS NULL ALTER TABLE dbo.stores ADD [private_catalogue] BIT DEFAULT 0;
   IF COL_LENGTH('dbo.stores', 'is_synced') IS NULL ALTER TABLE dbo.stores ADD [is_synced] BIT DEFAULT 0;
   IF COL_LENGTH('dbo.stores', 'sync_status') IS NULL ALTER TABLE dbo.stores ADD [sync_status] NVARCHAR(40) DEFAULT N'pending';
   IF COL_LENGTH('dbo.stores', 'sync_attempts') IS NULL ALTER TABLE dbo.stores ADD [sync_attempts] INT DEFAULT 0;
