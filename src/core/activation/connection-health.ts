@@ -32,9 +32,21 @@ export type HealthReport = {
   at: number;
 };
 
-const CLOUD_TIMEOUT = 1000;
+// A phone on mobile data regularly needs more than a second for the first
+// call of a session (DNS + TLS on a cold connection). Calling that "offline"
+// is what sent a correctly configured terminal back to the setup screen, so
+// the first probe of a launch is given a realistic budget and later probes,
+// which reuse a warm connection, stay quick.
+const CLOUD_TIMEOUT_FIRST = 8000;
+const CLOUD_TIMEOUT = 2500;
 const LOCAL_TIMEOUT = 800;
 const CACHE_MS = 2000;
+
+/** False until the first probe of this launch has settled. */
+let probedOnce = false;
+
+/** True once the launch's first connection check has produced a verdict. */
+export const hasProbedCloud = (): boolean => probedOnce;
 
 const OFFLINE: HealthReport = { cloud: false, local: false, anyOnline: false, at: 0 };
 
@@ -67,6 +79,16 @@ export const cloudVerdict = (): CloudVerdict => verdict;
 
 async function probeCloudVerdict(): Promise<CloudVerdict> {
   await hydrateTerminalConfig();
+  // The device's own saved connection is the authority and is restored
+  // asynchronously. Probing before it lands tests either nothing at all or the
+  // pair carried by an older activation record — both of which come back as
+  // "not configured" or "refused" on a perfectly good terminal.
+  try {
+    const { awaitProfileHydrated } = await import("@/lib/connection-profile");
+    await awaitProfileHydrated();
+  } catch {
+    /* the restore is best-effort; the checks below still hold */
+  }
   if (!hasSupabaseConfig()) return "unconfigured";
   if (typeof navigator !== "undefined" && navigator.onLine === false) return "unreachable";
   try {
@@ -117,10 +139,16 @@ export function checkHealth(force = false): Promise<HealthReport> {
   if (!force && fresh(cached)) return Promise.resolve(cached);
   if (inflight) return inflight;
   inflight = (async () => {
-    const [cloud, local] = await Promise.all([
-      withTimeout(probeCloud(), CLOUD_TIMEOUT),
+    const budget = probedOnce ? CLOUD_TIMEOUT : CLOUD_TIMEOUT_FIRST;
+    const [firstCloud, local] = await Promise.all([
+      withTimeout(probeCloud(), budget),
       withTimeout(probeLocal(), LOCAL_TIMEOUT),
     ]);
+    // A single slow answer must not be recorded as "cannot be reached": that
+    // verdict sends a configured terminal back to the connection screen.
+    let cloud = firstCloud;
+    if (!cloud && verdict === "unreachable") cloud = await withTimeout(probeCloud(), budget);
+    probedOnce = true;
     settleVerdict(cloud);
     const report: HealthReport = { cloud, local, anyOnline: cloud || local, at: Date.now() };
     cached = report;
