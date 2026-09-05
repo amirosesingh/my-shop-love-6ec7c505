@@ -153,17 +153,32 @@ let reconnectAttempt = 0;
 let lastConnectionError = null;
 let cloudConfig = null;
 
+/** The till reported in, the page painted, or a person is looking at a screen. */
+function markStartupSettled() {
+  if (!readyWatchdog) return;
+  clearTimeout(readyWatchdog);
+  readyWatchdog = null;
+}
+
 function enterSafeMode(reason) {
   if (safeMode) return;
   safeMode = true;
+  markStartupSettled();
   if (reason) health.markFailed(reason);
   else health.beginRecovery("Repeated failed launches");
   updater.pause();
-  for (const win of BrowserWindow.getAllWindows()) win.destroy();
+  // The repair window opens FIRST: destroying the last till window with no
+  // replacement on screen fires `window-all-closed`, which used to quit the
+  // whole app — the operator saw the till vanish instead of a repair screen.
+  recovery.open();
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!recovery.isOwn?.(win)) win.destroy();
+  }
   mainWindow = null;
   displayWindow = null;
   recovery.open();
 }
+
 
 /* ------------------------- local app server ------------------------- */
 
