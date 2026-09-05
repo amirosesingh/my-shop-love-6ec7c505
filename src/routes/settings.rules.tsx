@@ -150,12 +150,22 @@ function RulesSettings() {
 
         {usingDefaults && !loading && (
           <p className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
-            The saved rules could not be read, so the strictest built-in settings are being
-            enforced right now. Anything you save here may not take effect until the connection is
-            back.
+            {failureText || "The saved rules could not be read."} The strictest built-in settings
+            are being enforced right now, and anything you save here may not take effect until the
+            connection is back.
             {backendError ? <span className="mt-1 block text-xs opacity-80">{backendError}</span> : null}
           </p>
         )}
+
+        {degraded && !loading && (
+          <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-700 dark:text-amber-400">
+            {failureText || "The saved rules could not be refreshed."} The last confirmed settings
+            {lastSyncedAt ? ` (read ${new Date(lastSyncedAt).toLocaleTimeString()})` : ""} are still
+            in force, and this page will catch up on its own once the connection returns.
+            {backendError ? <span className="mt-1 block text-xs opacity-80">{backendError}</span> : null}
+          </p>
+        )}
+
 
         <section className="rounded-lg border border-border bg-card px-5">
           <SettingsSections
