@@ -5,7 +5,7 @@
  * tap your PIN on the keypad. Sign-in fires as soon as the last digit lands.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, Delete, Loader2, ShieldAlert, UserRound } from "lucide-react";
+import { ArrowLeft, Delete, Loader2, MapPin, ShieldAlert, UserRound } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/pos-auth";
 import { serverUnreachableOnDevice } from "@/lib/server-origin";
-import { activeBranchId } from "@/lib/active-branch";
+import { activeBranchId, boundBranchName } from "@/lib/active-branch";
 import { listTerminalStaff, type RosterReason, type TerminalStaff } from "@/lib/staff-admin";
 import { usernameFromAddress } from "@/lib/internal-domains";
 import {
