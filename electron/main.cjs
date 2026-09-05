@@ -147,23 +147,41 @@ let baseUrl = DEV_URL || null;
 /** Cleared as soon as the renderer reports that the till actually mounted. */
 let readyWatchdog = null;
 let safeMode = false;
+/** Set once the operator (or the shell) has genuinely asked the till to close. */
+let quitting = false;
+
 let reconnectTimer = null;
 let reconnectDelay = 5_000;
 let reconnectAttempt = 0;
 let lastConnectionError = null;
 let cloudConfig = null;
 
+/** The till reported in, the page painted, or a person is looking at a screen. */
+function markStartupSettled() {
+  if (!readyWatchdog) return;
+  clearTimeout(readyWatchdog);
+  readyWatchdog = null;
+}
+
 function enterSafeMode(reason) {
   if (safeMode) return;
   safeMode = true;
+  markStartupSettled();
   if (reason) health.markFailed(reason);
   else health.beginRecovery("Repeated failed launches");
   updater.pause();
-  for (const win of BrowserWindow.getAllWindows()) win.destroy();
+  // The repair window opens FIRST: destroying the last till window with no
+  // replacement on screen fires `window-all-closed`, which used to quit the
+  // whole app — the operator saw the till vanish instead of a repair screen.
+  recovery.open();
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!recovery.isOwn(win)) win.destroy();
+  }
   mainWindow = null;
   displayWindow = null;
-  recovery.open();
 }
+
+
 
 /* ------------------------- local app server ------------------------- */
 
@@ -261,7 +279,11 @@ async function startAppServer() {
     console.error(`[app-server] exited with code ${code}`);
     diagnostics.logServer(`exited with code ${code}`);
     diagnostics.logCrash("app-server.exit", { code });
+    // The pages the till is showing now point at a dead address. Go to the
+    // repair screen instead of leaving a window that can never load again.
+    if (!quitting && !safeMode) enterSafeMode("The local app server stopped");
   });
+
 
   await waitForPort(port);
   return `http://127.0.0.1:${port}`;
@@ -319,10 +341,15 @@ function lockDownNavigation(win, route) {
 
 function instrument(win, route) {
   lockDownNavigation(win, route);
+  // A page that painted is proof the build works, whatever screen it landed on
+  // — setup, sign-in or the register. Only a window that never renders at all
+  // counts as a failed launch.
+  win.webContents.on("did-finish-load", () => markStartupSettled());
   win.webContents.on("did-fail-load", (_e, code, description, url) => {
     console.error(`[window] failed to load ${url || route}: ${description} (${code})`);
     diagnostics.logCrash("window.did-fail-load", { route, code, description });
   });
+
   diagnostics.watchWindow(win, route);
   if (DEBUG) win.webContents.openDevTools({ mode: "detach" });
 }
@@ -912,8 +939,8 @@ function registerIpc() {
 
   // The healthy signal: the register mounted, so this build works.
   ipcMain.handle("app:ready", () => {
-    if (readyWatchdog) clearTimeout(readyWatchdog);
-    readyWatchdog = null;
+    markStartupSettled();
+
     const state = health.markHealthy();
     // This build reached the till, so a previous bad start may no longer keep
     // automatic updates switched off.
@@ -2013,11 +2040,19 @@ app.whenReady().then(async () => {
 });
 
 app.on("before-quit", () => {
+  quitting = true;
   closeCustomerDisplay();
 });
 
 app.on("window-all-closed", async () => {
-  if (readyWatchdog) clearTimeout(readyWatchdog);
+  // In repair mode the till windows are closed on purpose and the repair
+  // window is the app. Quitting here is what made an unconfigured PC appear
+  // to shut itself down a minute after launch. Once the operator closes the
+  // repair window too, the normal shutdown below runs as before.
+  if (recovery.isOpen()) return;
+
+  markStartupSettled();
+
   worker.stop();
   if (reconnectTimer) clearTimeout(reconnectTimer);
   updater.stop();

@@ -36,6 +36,10 @@ function open() {
 
 const isOpen = () => Boolean(win && !win.isDestroyed());
 
+/** True when this window is the repair window, so it is never torn down with the till. */
+const isOwn = (candidate) => isOpen() && candidate === win;
+
+
 function progress(payload) {
   if (isOpen()) win.webContents.send("health:progress", payload);
 }
@@ -45,4 +49,4 @@ function close() {
   win = null;
 }
 
-module.exports = { open, close, progress, isOpen };
+module.exports = { open, close, progress, isOpen, isOwn };
