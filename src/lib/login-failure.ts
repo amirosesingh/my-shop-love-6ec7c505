@@ -92,3 +92,30 @@ export function failureFromAuthError(message: string | undefined): LoginFailure 
   if (/too many requests|rate limit/.test(msg)) return "unknown-error";
   return "unknown-error";
 }
+
+/**
+ * Classify a cheap read taken against the saved company database *before* a
+ * password is ever sent. This is what separates "your password is wrong" from
+ * "this terminal is pointed at the wrong place": a refusal on grounds of
+ * permission proves the project is reachable and carries the point-of-sale
+ * tables, which is all we need to know before trusting a credential refusal.
+ *
+ * `undefined` means the saved connection is good enough to sign in against.
+ */
+export function failureFromProbeError(
+  error: { message?: string; code?: string } | null | undefined,
+): LoginFailure | undefined {
+  if (!error) return undefined;
+  const code = (error.code ?? "").toUpperCase();
+  const msg = (error.message ?? "").toLowerCase();
+  // The table is there and the database said "not for you" — exactly right
+  // for a signed-out probe.
+  if (code === "42501" || /permission denied|row-level security/.test(msg)) return undefined;
+  if (code === "PGRST205" || code === "42P01" || /does not exist|undefined table/.test(msg))
+    return "cloud-schema-missing";
+  if (/invalid api ?key|no api key|jwt/.test(msg)) return "configuration-invalid";
+  if (/failed to fetch|load failed|network|timeout|abort|dns|enotfound|econnrefused/.test(msg))
+    return "cloud-unreachable";
+  // Anything else was still an answer from a live project.
+  return undefined;
+}
