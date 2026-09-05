@@ -1,97 +1,39 @@
-# Supervisor/Admin sign-in on the till and the Android app
+# Fix Supervisor/Admin online login on Electron and Android
 
-## What the reading confirms
+## Confirmed cause
 
-There is **one** supervisor/admin sign-in path, shared by all three platforms
-(`login()` in `src/lib/pos-auth.tsx`): it maps what was typed to an address and
-calls `signInWithPassword` on the cloud client. Cashier/staff PIN sign-in is a
-separate path (`cashierLogin()` → local server endpoint → cached verifier) and
-is untouched by everything below.
+The Web app and terminal apps already share the same `login()` implementation and password-authentication client. The failed requests reach authentication and are rejected before staff, role, or POS session mapping runs.
 
-Two facts explain why the browser can succeed while the till fails with the
-same username and password:
+On Electron and Android, startup currently restores the saved cloud URL/key from the device vault and then restores terminal activation. Restoring activation calls `applyTenantOverride()` with the URL/key embedded in the older activation record, resets the cloud client, and overwrites the newer connection profile. The login therefore can target a different authentication project from the one shown/saved in Database & Cloud Connection, producing “Invalid login credentials” even when those credentials work on Web.
 
-1. **The two platforms can be pointed at different central databases.**
-   `supabaseConfig()` (`src/lib/external-supabase-config.ts`) resolves the
-   website's address and key from the hosting environment, but on a till or
-   phone it uses *only* the per-device values saved in Settings → Database &
-   Cloud Connection. An account that exists in the website's project does not
-   exist in a different project, and the cloud replies with exactly
-   "Invalid login credentials".
+## Changes
 
-2. **Every failure is shown as the cloud's raw sentence.** `login()` returns
-   `error.message` verbatim, so a wrong address, a stale saved key, a blocked
-   network or an unreachable service all read as "Invalid login credentials".
-   This is why the real cause is currently invisible.
+1. **Make the saved connection profile authoritative at startup**
+   - Adjust terminal startup ordering so activation/branch identity is restored first, then the current URL/key from the existing Electron vault or Android Keystore is applied last.
+   - Keep activation as the fallback source only when the device has no separately saved connection profile.
+   - Do not change terminal identity, branch, company, activation, or the stored connection values.
 
-Which of the two is happening on your machine is **not yet proven** — no code
-read can tell me what a particular till has saved in its vault. Step 1 makes
-the till say it out loud; step 2 fixes what it reports.
+2. **Guard the existing online login path**
+   - Make the existing Supervisor/Admin `login()` await connection-profile hydration before accessing the lazy cloud client.
+   - Keep the entered email normalization and `signInWithPassword` call unchanged.
+   - Keep successful session, staff, role, permission, and device-session handling unchanged.
 
-## Step 1 — Make the till tell the truth about a refusal
+3. **Add focused regression coverage**
+   - Verify both Electron and Android startup apply the current device-vault profile after an older activation profile.
+   - Verify Supervisor/Admin password login cannot call authentication before profile hydration completes.
+   - Verify successful authentication still flows into the existing role/session mapping.
+   - Run the existing Cashier/PIN and platform-configuration tests to prove local staff login remains independent.
+   - Run the existing Emergency Access tests without modifying any Emergency Access source.
 
-- Classify the outcome of a supervisor/admin sign-in into distinct internal
-  results instead of one string: `INVALID_CREDENTIALS`,
-  `AUTH_SERVICE_UNAVAILABLE`, `CONFIG_MISSING`, `CONFIG_REJECTED` (bad key /
-  bad project address), `STAFF_DISABLED`, `SESSION_CREATION_FAILED`.
-- Show a plain sentence per case on the sign-in screen, and, on a till only,
-  a small line naming which central database this device is signed in
-  against (host only — never the key). That single line is usually enough to
-  confirm or rule out cause 1 immediately.
-- When the cloud cannot be reached at all, the message becomes
-  "Supervisor/Admin sign-in needs an online connection" — no offline
-  supervisor login is invented, because none exists today.
-- Record the classified reason in the existing diagnostics log.
+4. **Validate supported builds**
+   - Run the targeted tests, full test suite, and existing Electron/Android packaging checks.
+   - Run the existing own-database/configuration isolation security test to confirm no URL/key fallback or bundled secret was introduced.
+   - Bump the application version using the project’s required version script.
 
-## Step 2 — Fix the cause the classification names
+## Explicitly unchanged
 
-- **Wrong or stale saved connection** (expected outcome): the Database & Cloud
-  Connection screen gains a "Test sign-in reachability" result that reports
-  the project it is talking to and whether the saved key is accepted, so the
-  operator can correct the address/key once and the till then authenticates
-  against the same database as the website. No hardcoded fallback address is
-  added — the device store stays the only source on a till.
-- **Configuration read after the client was built**: ensure the sign-in screen
-  waits for the saved connection profile to be restored before it will submit,
-  so a first-launch sign-in can never run against a half-restored profile.
-- **Anything else the classification reveals** (for example the account being
-  inactive, or the staff/role lookup failing after a successful sign-in) is
-  fixed at that exact point, keeping authentication and authorisation
-  separate: a successful sign-in is never rejected merely because role data
-  has not loaded yet.
-
-## What does not change
-
-- Cashier and staff PIN sign-in, local backend, local database and offline
-  trading: untouched.
-- Emergency Access — code generation, verification, recovery sessions,
-  expiry, lockout, privileges: **not modified at all**.
-- Terminal identity, branch, company, backend address and cloud configuration
-  are never reset or rewritten because someone signs in.
-- The central database stays authoritative for roles and permissions; the
-  screen can never grant itself supervisor rights, and no service key or
-  password is added to the desktop or Android build.
-
-## Technical notes
-
-- `src/lib/pos-auth.tsx`: `login()` returns `{ ok, code, error }`; error text is
-  derived from `code`, not passed through from the cloud.
-- New small helper for classifying a sign-in failure, with unit tests covering
-  each code (invalid password, unreachable service, missing/refused
-  configuration, deactivated account).
-- `src/platforms/web/components/pos/TerminalLogin.tsx`: renders the message for
-  the code and, on terminals, the connected-host line; blocks submit until
-  `awaitProfileHydrated()` resolves.
-- `src/platforms/web/components/pos/DatabaseConnectionSettings.tsx`: adds the
-  auth-reachability result to the existing connection test.
-- Checks after the change: typecheck, the full existing test suite, the new
-  auth tests, the desktop and Android build scripts, and the existing
-  configuration-leak tests (`src/lib/__tests__/own-database.security.test.ts`).
-- Version bumped with `node scripts/bump-version.cjs`.
-
-## One thing I need from you
-
-If you can, open Settings → Database & Cloud Connection on the failing till and
-tell me the address shown there, and the address the website uses. If they
-differ, that is the whole bug and step 2 is a one-line correction on the
-device rather than a code change.
+- Cashier/staff local login, local backend, local database, and offline operation
+- Authentication provider, password handling, role verification, permissions, and privileged IPC
+- Terminal identity, branch, company, activation, and existing cloud architecture
+- Emergency Access code, recovery sessions, expiry, lockout, and authorization
+- No hardcoded URL, fallback project, universal password, service credential, or diagnostic UI
