@@ -19,14 +19,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-type Refusal = { ok?: boolean; code?: string; error?: string };
-
-const isRefusal = (value: unknown): value is Refusal =>
-  Boolean(value) &&
-  typeof value === "object" &&
-  (value as Refusal).ok === false &&
-  (value as Refusal).code === "EPRIVILEGE";
-
 type Ask = { message: string; resolve: (unlocked: boolean) => void };
 
 /** Bridges that carry privileged calls. */
