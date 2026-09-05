@@ -35,6 +35,7 @@ import {
   failureFromAuthError,
   failureFromReadiness,
   loginFailureMessage,
+  type LoginFailure,
 } from "@/lib/login-failure";
 
 import {
