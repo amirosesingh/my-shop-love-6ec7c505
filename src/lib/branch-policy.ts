@@ -62,13 +62,20 @@ export function privateStockStores(settings: AppSettings): Set<string> {
 /**
  * Can this store see this product? Products owned by a private-catalogue
  * branch are only visible at that branch.
+ *
+ * The owning branch is read from the product itself when the caller has the
+ * record — that is the value the central database now enforces on — and falls
+ * back to the older settings map for records saved before the column existed.
  */
 export function productVisibleAt(
   settings: AppSettings,
-  productId: string,
+  product: string | { id: string; ownerStoreId?: string | null },
   storeId: string,
 ): boolean {
-  const owner = settings.integrations.productOwners?.[productId];
+  const id = typeof product === "string" ? product : product.id;
+  const owner =
+    (typeof product === "string" ? null : product.ownerStoreId) ||
+    settings.integrations.productOwners?.[id];
   if (!owner || owner === storeId) return true;
   return !branchPolicy(settings, owner).privateCatalogue;
 }
