@@ -17,6 +17,7 @@ type Privilege = {
   allowed: (channel: string, args?: unknown[]) => boolean;
   levelFor: (channel: string, args?: unknown[]) => string;
   settingLevel: (key: string) => string;
+  refusal: (level: string) => { ok: false; code: string; requiredLevel: string };
   install: (ipcMain: unknown, deps: { isFirstRun: () => boolean }) => void;
 };
 
