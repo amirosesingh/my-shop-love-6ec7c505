@@ -26,6 +26,7 @@ import {
   rolledUpStock,
   subWarehouses,
 } from "@/lib/locations";
+import { groupName, selectableGroups, useStoreGroups } from "@/lib/store-groups";
 
 export const Route = createFileRoute("/stores")({
   head: () => ({
@@ -95,6 +96,8 @@ function Locations() {
     updateSettings,
   } = usePos();
   const { isAdmin } = useAuth();
+  const groups = useStoreGroups();
+  const pickableGroups = useMemo(() => selectableGroups(groups), [groups]);
   const [draft, setDraft] = useState<Draft | null>(null);
 
   const roots = useMemo(
@@ -493,12 +496,29 @@ function Locations() {
                     </select>
                   </Field>
                   <Field label="Group / cluster">
-                    <Input
-                      className="h-9"
+                    <select
+                      className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
                       value={draft.groupId}
-                      placeholder="default"
+                      aria-label="Group or cluster"
                       onChange={(e) => setDraft({ ...draft, groupId: e.target.value })}
-                    />
+                    >
+                      <option value="">No group</option>
+                      {pickableGroups.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.name}
+                        </option>
+                      ))}
+                      {draft.groupId &&
+                        !pickableGroups.some((g) => g.id === draft.groupId) && (
+                          <option value={draft.groupId}>
+                            {groupName(groups, draft.groupId)} (not selectable)
+                          </option>
+                        )}
+                    </select>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Groups are created in Settings → Groups &amp; clusters. Moves between two
+                      different groups always need approval.
+                    </p>
                   </Field>
                   <Field label="Building name">
                     <Input
