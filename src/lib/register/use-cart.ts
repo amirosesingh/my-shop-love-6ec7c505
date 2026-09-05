@@ -47,7 +47,7 @@ type CartDeps = {
 export function useCart(deps: CartDeps) {
   const [lines, setLines] = useState<CartLine[]>([]);
   const [cartDiscount, setCartDiscount] = useState(0);
-  const [cartDiscountType, setCartDiscountType] = useState<DiscountType>("amount");
+  const [cartDiscountType, setCartDiscountType] = useState<DiscountType>("percent");
   const [exchangeRef, setExchangeRef] = useState<string | null>(null);
   const [memberId, setMemberId] = useState<string | null>(null);
   const [billNo, setBillNo] = useState<string | null>(null);
@@ -86,7 +86,7 @@ export function useCart(deps: CartDeps) {
           qty: 1,
           taxRate: product.taxRate,
           discount: 0,
-          discountType: "amount",
+          discountType: "percent",
         },
       ];
     });

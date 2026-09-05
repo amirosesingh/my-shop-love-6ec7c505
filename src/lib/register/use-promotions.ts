@@ -278,7 +278,8 @@ export function usePromotions(deps: PromotionsDeps) {
     if (!coupon) return;
     if (coupon.scope === "item") {
       const i = lines.findIndex((l) => l.couponCode === coupon.code);
-      if (i >= 0) patchLine(i, { discount: 0, couponCode: undefined, couponDiscount: undefined });
+      // Only the coupon goes; the cashier's own discount on that line stays.
+      if (i >= 0) patchLine(i, { couponCode: undefined, couponDiscount: undefined });
     } else {
       setCartDiscount(0);
     }
