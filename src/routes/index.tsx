@@ -487,10 +487,9 @@ function Register() {
     base: promoBase,
     member,
   });
-  const manualBillDiscount = r2(
-    cartDiscountType === "percent" ? (promoBase * (cartDiscount || 0)) / 100 : cartDiscount || 0,
-  );
-  const totals = cartTotals(lines, r2(manualBillDiscount + promo.promoDiscount), "amount", taxSettings);
+  // One conversion, one place: the calculator turns the cashier's entry into
+  // money and folds the automatic promotion in on the same base.
+  const totals = cartTotals(lines, cartDiscount, cartDiscountType, taxSettings, promo.promoDiscount);
   const pointsEarned = member ? Math.max(0, Math.round(totals.total * promo.pointsRate)) : 0;
 
 
