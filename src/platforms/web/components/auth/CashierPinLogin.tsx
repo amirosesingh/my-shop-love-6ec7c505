@@ -155,7 +155,12 @@ export function CashierPinLogin({
         const message = res.error ?? "That PIN was not recognised";
         const deactivated = /deactivat|not active|blocked/i.test(message);
         setPin("");
-        if (deactivated) {
+        // A till that is not connected has not judged the PIN at all, so the
+        // attempt must not count towards the keypad lockout.
+        if (res.code && isConfigurationFailure(res.code)) {
+          setConfigFailure(res.code);
+          setError(message);
+        } else if (deactivated) {
           setError("Account deactivated. Please contact an administrator.");
         } else {
           const locked = notePinFailure();
@@ -170,6 +175,7 @@ export function CashierPinLogin({
       } else {
         clearPinFailures();
       }
+
       setBusy(false);
     },
     [cashierLogin, username],
