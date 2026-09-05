@@ -168,23 +168,23 @@ function Inventory() {
   const categoryNames = useMemo(() => {
     const names = new Set<string>(topCategories(categories).map((c) => c.name));
     state.products.forEach((p) => p.category && names.add(p.category));
-    return offer(names, draft.category);
+    return offer(names, draft?.category);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categories, state.products, retired, draft.category]);
+  }, [categories, state.products, retired, draft?.category]);
 
   const groupNames = useMemo(() => {
     const names = new Set<string>(groupList(categories).map((c) => c.name));
     state.products.forEach((p) => p.group && names.add(p.group));
-    return offer(names, draft.group);
+    return offer(names, draft?.group);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categories, state.products, retired, draft.group]);
+  }, [categories, state.products, retired, draft?.group]);
 
   const subNames = useMemo(() => {
     const names = new Set<string>(subCategoryList(categories).map((c) => c.name));
     state.products.forEach((p) => p.subCategory && names.add(p.subCategory));
-    return offer(names, draft.subCategory);
+    return offer(names, draft?.subCategory);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categories, state.products, retired, draft.subCategory]);
+  }, [categories, state.products, retired, draft?.subCategory]);
 
   const rows = state.products.filter(
     (p) =>
@@ -318,7 +318,7 @@ function Inventory() {
                         ariaLabel="Category"
                         placeholder="Choose a category"
                         onChange={(v) => setDraft({ ...draft, category: v === NONE ? "" : v })}
-                        options={pickerOptions(categoryNames, draft.category)}
+                        options={pickerOptions(categoryNames, draft?.category)}
                       />
                     </Field>
                     <Field label="Group">
@@ -327,7 +327,7 @@ function Inventory() {
                         ariaLabel="Group"
                         placeholder="Choose a group"
                         onChange={(v) => setDraft({ ...draft, group: v === NONE ? "" : v })}
-                        options={pickerOptions(groupNames, draft.group)}
+                        options={pickerOptions(groupNames, draft?.group)}
                       />
                     </Field>
                     <Field label="Sub-category">
@@ -336,7 +336,7 @@ function Inventory() {
                         ariaLabel="Sub-category"
                         placeholder="Choose a sub-category"
                         onChange={(v) => setDraft({ ...draft, subCategory: v === NONE ? "" : v })}
-                        options={pickerOptions(subNames, draft.subCategory)}
+                        options={pickerOptions(subNames, draft?.subCategory)}
                       />
                     </Field>
                     <Field label="Unit of measure">
