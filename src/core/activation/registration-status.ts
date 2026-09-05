@@ -54,6 +54,8 @@ export type StartupGate = {
   record: ActivationRecord | null;
   /** true while the first read of the sealed record is in flight */
   loading: boolean;
+  /** true until this launch's first connection check has produced a verdict */
+  probing: boolean;
   /** registered, offline, but still inside the grace window */
   offlineGrace: boolean;
   refresh: () => void;
