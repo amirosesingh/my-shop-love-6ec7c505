@@ -7158,3 +7158,3270 @@ ALTER TABLE public.terminal_recovery_secrets ADD COLUMN IF NOT EXISTS device_nam
 
 GRANT ALL ON public.terminal_recovery_secrets TO service_role;
 ALTER TABLE public.terminal_recovery_secrets ENABLE ROW LEVEL SECURITY;
+
+
+-- ===========================================================================
+-- PART 2 - objects added after the first release
+--
+-- Everything below is guarded: CREATE TABLE IF NOT EXISTS, ADD COLUMN IF NOT
+-- EXISTS, CREATE INDEX IF NOT EXISTS, DROP POLICY/TRIGGER IF EXISTS before
+-- each CREATE, CREATE OR REPLACE for every view and routine. No table is
+-- dropped, truncated or recreated and no row is touched.
+-- ===========================================================================
+
+-- ------------------------------------------------------------------
+-- Daily sales reporting views
+-- (source: 20260806052443_83af0584-4075-40e8-b0b1-b1439ce91436.sql)
+-- ------------------------------------------------------------------
+-- Line-level sales facts shared by every analytics surface.
+CREATE OR REPLACE VIEW public.v_sale_line_facts
+WITH (security_invoker = true) AS
+SELECT
+  si.id                                        AS line_id,
+  si.sale_id,
+  s.bill_number,
+  s.store_id,
+  s.cashier_name,
+  s.created_at,
+  (s.created_at)::date                         AS sale_day,
+  to_char(s.created_at, 'YYYY-MM')             AS sale_month,
+  s.payment_type,
+  s.is_refunded,
+  si.product_id,
+  si.product_name,
+  si.quantity,
+  si.unit_price,
+  si.unit_cost,
+  si.is_foc,
+  si.is_return,
+  round((CASE WHEN si.discount_percent > 0
+              THEN si.unit_price * si.discount_percent / 100.0
+              ELSE si.discount_amount END)::numeric, 2)                    AS unit_discount,
+  round((((CASE WHEN si.discount_percent > 0
+                THEN si.unit_price * si.discount_percent / 100.0
+                ELSE si.discount_amount END) * si.quantity)
+         + coalesce(si.coupon_discount, 0))::numeric, 2)                   AS line_discount,
+  round((greatest(si.unit_price - (CASE WHEN si.discount_percent > 0
+                                        THEN si.unit_price * si.discount_percent / 100.0
+                                        ELSE si.discount_amount END), 0) * si.quantity
+         - coalesce(si.coupon_discount, 0))::numeric, 2)                   AS line_revenue,
+  round((coalesce(si.unit_cost, 0) * si.quantity)::numeric, 2)             AS line_cost
+FROM public.sale_items si
+JOIN public.sales s ON s.id = si.sale_id;
+
+GRANT SELECT ON public.v_sale_line_facts TO authenticated;
+GRANT ALL ON public.v_sale_line_facts TO service_role;
+
+-- Daily totals per shop.
+CREATE OR REPLACE VIEW public.v_daily_store_sales
+WITH (security_invoker = true) AS
+SELECT
+  f.sale_day,
+  f.sale_month,
+  f.store_id,
+  count(DISTINCT f.sale_id)                       AS bills,
+  round(sum(f.line_revenue), 2)                   AS revenue,
+  round(sum(f.line_cost), 2)                      AS cost,
+  round(sum(f.line_revenue - f.line_cost), 2)     AS profit,
+  round(sum(f.line_discount), 2)                  AS discount,
+  round(sum(CASE WHEN f.is_foc THEN f.unit_price * f.quantity ELSE 0 END), 2) AS foc_value,
+  round(sum(f.quantity), 2)                       AS units
+FROM public.v_sale_line_facts f
+GROUP BY f.sale_day, f.sale_month, f.store_id;
+
+GRANT SELECT ON public.v_daily_store_sales TO authenticated;
+GRANT ALL ON public.v_daily_store_sales TO service_role;
+
+-- Daily item mix per shop.
+CREATE OR REPLACE VIEW public.v_daily_item_sales
+WITH (security_invoker = true) AS
+SELECT
+  f.sale_day,
+  f.sale_month,
+  f.store_id,
+  f.product_id,
+  f.product_name,
+  round(sum(f.quantity), 2)                       AS units,
+  round(sum(f.line_revenue), 2)                   AS revenue,
+  round(sum(f.line_cost), 2)                      AS cost,
+  round(sum(f.line_revenue - f.line_cost), 2)     AS profit
+FROM public.v_sale_line_facts f
+GROUP BY f.sale_day, f.sale_month, f.store_id, f.product_id, f.product_name;
+
+GRANT SELECT ON public.v_daily_item_sales TO authenticated;
+GRANT ALL ON public.v_daily_item_sales TO service_role;
+
+-- ------------------------------------------------------------------
+-- Per-branch POS rules (pos_store_settings) + rules routines
+-- (source: 20260820144433_dc87f136-8945-44fc-a734-b34f9443478c.sql)
+-- ------------------------------------------------------------------
+-- POS rules, manager override and held-order backend.
+-- Reuses app_users (bcrypt PIN), audit_logs, held_orders and the existing
+-- supervisor/visibility helpers. Only the per-branch rules store is new.
+
+CREATE TABLE IF NOT EXISTS public.pos_store_settings (
+  store_id text PRIMARY KEY,
+  block_shift_close_on_hold boolean,
+  require_daily_sales_for_shift_close boolean,
+  require_counted_cash_on_close boolean,
+  require_opening_float_count boolean,
+  enable_blind_cash_count boolean,
+  max_drawer_cash_limit numeric,
+  require_reason_for_payout boolean,
+  allow_multiple_shifts_per_terminal boolean,
+  enable_cashier_x_report boolean,
+  show_opening_float_at_close boolean,
+  show_expected_totals_at_close boolean,
+  show_live_variance_at_close boolean,
+  show_itemized_tender_breakdown boolean,
+  require_manager_pin_on_variance boolean,
+  variance_pin_threshold numeric,
+  max_cashier_discount_percent numeric,
+  max_cart_discount_amount numeric,
+  allow_discount_stacking boolean,
+  require_reason_for_price_override boolean,
+  prevent_below_cost_sale boolean,
+  allow_tax_exemption boolean,
+  prevent_negative_stock_sale boolean,
+  require_receipt_for_refund boolean,
+  require_manager_pin_for_refund boolean,
+  max_refund_days_limit numeric,
+  track_item_voids boolean,
+  auto_lock_timeout_seconds numeric,
+  require_manager_pin_for_cash_drawer_open boolean,
+  enable_manager_pin_audit_log boolean,
+  require_pin_void_cart boolean,
+  require_pin_void_line boolean,
+  require_pin_reduce_qty boolean,
+  require_pin_manual_discount boolean,
+  require_pin_price_override boolean,
+  require_pin_stock_adjustment boolean,
+  require_pin_shift_close boolean,
+  require_pin_edit_tenders boolean,
+  require_pin_terminal_reset boolean,
+  row_version integer NOT NULL DEFAULT 1,
+  updated_by text,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+GRANT SELECT, INSERT, UPDATE ON public.pos_store_settings TO authenticated;
+GRANT ALL ON public.pos_store_settings TO service_role;
+
+ALTER TABLE public.pos_store_settings ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Staff read rules for visible branches" ON public.pos_store_settings;
+CREATE POLICY "Staff read rules for visible branches"
+  ON public.pos_store_settings FOR SELECT TO authenticated
+  USING (public.store_visible(store_id));
+
+DROP POLICY IF EXISTS "Supervisors write rules" ON public.pos_store_settings;
+CREATE POLICY "Supervisors write rules"
+  ON public.pos_store_settings FOR INSERT TO authenticated
+  WITH CHECK (public.is_supervisor_now());
+
+DROP POLICY IF EXISTS "Supervisors update rules" ON public.pos_store_settings;
+CREATE POLICY "Supervisors update rules"
+  ON public.pos_store_settings FOR UPDATE TO authenticated
+  USING (public.is_supervisor_now())
+  WITH CHECK (public.is_supervisor_now());
+
+-- The shipped defaults, kept in one place so every routine agrees.
+CREATE OR REPLACE FUNCTION public.pos_rules_defaults()
+RETURNS jsonb LANGUAGE sql IMMUTABLE AS $$
+  SELECT '{
+    "block_shift_close_on_hold": true,
+    "require_daily_sales_for_shift_close": true,
+    "require_counted_cash_on_close": true,
+    "require_opening_float_count": true,
+    "enable_blind_cash_count": true,
+    "max_drawer_cash_limit": 1000,
+    "require_reason_for_payout": true,
+    "allow_multiple_shifts_per_terminal": false,
+    "enable_cashier_x_report": false,
+    "show_opening_float_at_close": true,
+    "show_expected_totals_at_close": false,
+    "show_live_variance_at_close": false,
+    "show_itemized_tender_breakdown": true,
+    "require_manager_pin_on_variance": true,
+    "variance_pin_threshold": 10,
+    "max_cashier_discount_percent": 10,
+    "max_cart_discount_amount": 100,
+    "allow_discount_stacking": false,
+    "require_reason_for_price_override": true,
+    "prevent_below_cost_sale": true,
+    "allow_tax_exemption": false,
+    "prevent_negative_stock_sale": false,
+    "require_receipt_for_refund": true,
+    "require_manager_pin_for_refund": true,
+    "max_refund_days_limit": 30,
+    "track_item_voids": true,
+    "auto_lock_timeout_seconds": 90,
+    "require_manager_pin_for_cash_drawer_open": true,
+    "enable_manager_pin_audit_log": true,
+    "require_pin_void_cart": true,
+    "require_pin_void_line": false,
+    "require_pin_reduce_qty": false,
+    "require_pin_manual_discount": true,
+    "require_pin_price_override": true,
+    "require_pin_stock_adjustment": true,
+    "require_pin_shift_close": false,
+    "require_pin_edit_tenders": false,
+    "require_pin_terminal_reset": true
+  }'::jsonb;
+$$;
+
+-- One row's set rules, with the bookkeeping columns removed.
+CREATE OR REPLACE FUNCTION public.pos_rules_row(_store_id text)
+RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public', 'pg_temp' AS $$
+  SELECT COALESCE(
+    (SELECT jsonb_strip_nulls(to_jsonb(s))
+            - 'store_id' - 'row_version' - 'updated_by' - 'updated_at'
+       FROM public.pos_store_settings s
+      WHERE s.store_id = COALESCE(btrim(_store_id), '')),
+    '{}'::jsonb);
+$$;
+
+-- Effective rules: defaults, then the global row, then the branch row.
+CREATE OR REPLACE FUNCTION public.pos_rules_get(_store_id text DEFAULT '')
+RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public', 'pg_temp' AS $$
+  SELECT public.pos_rules_defaults()
+         || public.pos_rules_row('')
+         || CASE WHEN COALESCE(btrim(_store_id), '') = ''
+                 THEN '{}'::jsonb ELSE public.pos_rules_row(_store_id) END;
+$$;
+
+-- Supervisor-only write. Unknown keys are ignored; a stale expected version
+-- is refused so two supervisors cannot silently overwrite each other.
+CREATE OR REPLACE FUNCTION public.pos_rules_save(
+  _store_id text,
+  _patch jsonb,
+  _expected_version integer DEFAULT NULL
+)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public', 'pg_temp' AS $$
+DECLARE
+  sid text := COALESCE(btrim(_store_id), '');
+  known jsonb := public.pos_rules_defaults();
+  clean jsonb := '{}'::jsonb;
+  k text;
+  current_version integer;
+  sets text;
+BEGIN
+  IF NOT public.is_supervisor_now() THEN
+    RAISE EXCEPTION 'NOT_AUTHORISED: supervisors only' USING ERRCODE = '42501';
+  END IF;
+
+  FOR k IN SELECT jsonb_object_keys(COALESCE(_patch, '{}'::jsonb)) LOOP
+    IF known ? k AND jsonb_typeof(_patch -> k) IN ('boolean', 'number') THEN
+      clean := clean || jsonb_build_object(k, _patch -> k);
+    END IF;
+  END LOOP;
+
+  IF clean = '{}'::jsonb THEN
+    RAISE EXCEPTION 'NO_VALID_RULES: nothing recognised in the change' USING ERRCODE = '22023';
+  END IF;
+
+  INSERT INTO public.pos_store_settings(store_id) VALUES (sid)
+    ON CONFLICT (store_id) DO NOTHING;
+
+  SELECT row_version INTO current_version
+    FROM public.pos_store_settings WHERE store_id = sid FOR UPDATE;
+
+  IF _expected_version IS NOT NULL AND _expected_version <> current_version THEN
+    RAISE EXCEPTION 'STALE_RULES: these rules were changed elsewhere (version %, expected %)',
+      current_version, _expected_version USING ERRCODE = '40001';
+  END IF;
+
+  SELECT string_agg(format('%I = ($1 ->> %L)::%s', key, key,
+           CASE WHEN jsonb_typeof(known -> key) = 'boolean' THEN 'boolean' ELSE 'numeric' END), ', ')
+    INTO sets
+    FROM jsonb_object_keys(clean) AS key;
+
+  EXECUTE format(
+    'UPDATE public.pos_store_settings SET %s, row_version = row_version + 1,
+        updated_by = $2, updated_at = now() WHERE store_id = $3', sets)
+    USING clean, COALESCE(auth.uid()::text, 'service'), sid;
+
+  RETURN public.pos_rules_get(sid);
+END $$;
+
+-- Override audit. Reuses audit_logs; raises so a lost record is never silent.
+CREATE OR REPLACE FUNCTION public.log_manager_override(
+  _action text,
+  _rule_key text DEFAULT NULL,
+  _requested_by text DEFAULT NULL,
+  _approved_by text DEFAULT NULL,
+  _approved_role text DEFAULT NULL,
+  _store_id text DEFAULT NULL,
+  _terminal_id text DEFAULT NULL,
+  _detail text DEFAULT NULL,
+  _outcome text DEFAULT 'approved'
+)
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public', 'pg_temp' AS $$
+DECLARE new_id uuid;
+BEGIN
+  IF COALESCE(btrim(_action), '') = '' THEN
+    RAISE EXCEPTION 'ACTION_REQUIRED: an override needs an action' USING ERRCODE = '22023';
+  END IF;
+  INSERT INTO public.audit_logs(
+    action_category, action_name, target_module, user_id, user_name, action, entity, details)
+  VALUES (
+    'override',
+    btrim(_action),
+    'pos',
+    _approved_by,
+    _approved_by,
+    btrim(_action),
+    COALESCE(_rule_key, btrim(_action)),
+    jsonb_strip_nulls(jsonb_build_object(
+      'rule_key', _rule_key,
+      'requested_by', _requested_by,
+      'approved_by', _approved_by,
+      'approved_role', _approved_role,
+      'store_id', _store_id,
+      'terminal_id', _terminal_id,
+      'outcome', COALESCE(NULLIF(btrim(_outcome), ''), 'approved'),
+      'detail', left(COALESCE(_detail, ''), 400))))
+  RETURNING id INTO new_id;
+  RETURN new_id;
+END $$;
+
+-- Manager PIN check. Comparison stays in the database; the PIN is never
+-- returned, logged or stored. Nothing comes back on any failure.
+CREATE OR REPLACE FUNCTION public.verify_manager_pin(
+  p_user_id text,
+  p_pin text,
+  p_action text DEFAULT NULL,
+  p_rule_key text DEFAULT NULL,
+  p_requested_by text DEFAULT NULL,
+  p_store_id text DEFAULT NULL,
+  p_terminal_id text DEFAULT NULL,
+  p_detail text DEFAULT NULL
+)
+RETURNS TABLE(user_id text, full_name text, role app_role)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public', 'pg_temp', 'extensions' AS $$
+DECLARE u public.app_users%rowtype;
+BEGIN
+  SELECT * INTO u FROM public.app_users a
+   WHERE lower(a.user_id) = lower(btrim(p_user_id)) AND a.is_active;
+  IF NOT FOUND THEN RETURN; END IF;
+
+  IF NOT (u.role IN ('admin', 'manager')
+          OR COALESCE((u.permissions ->> 'can_access_pos_settings')::boolean, false)
+          OR COALESCE((u.permissions ->> 'can_manage_staff')::boolean, false)) THEN
+    RETURN;
+  END IF;
+
+  IF u.pin_hash = '' OR u.pin_hash <> extensions.crypt(p_pin::text, u.pin_hash::text) THEN
+    RETURN;
+  END IF;
+
+  IF COALESCE(btrim(p_action), '') <> '' THEN
+    PERFORM public.log_manager_override(
+      p_action, p_rule_key, p_requested_by, u.user_id::text, u.role::text,
+      p_store_id, p_terminal_id, p_detail, 'approved');
+  END IF;
+
+  RETURN QUERY SELECT u.user_id::text, u.full_name::text, u.role;
+END $$;
+
+-- Open held tickets for a branch, within the caller's visible scope.
+CREATE OR REPLACE FUNCTION public.held_orders_open_count(_store_id text DEFAULT '')
+RETURNS integer LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path TO 'public', 'pg_temp' AS $$
+DECLARE sid text := COALESCE(btrim(_store_id), '');
+BEGIN
+  IF sid <> '' AND NOT public.store_visible(sid) THEN
+    RAISE EXCEPTION 'NOT_AUTHORISED: this branch is not visible to you' USING ERRCODE = '42501';
+  END IF;
+  RETURN (
+    SELECT count(*)::integer FROM public.held_orders h
+     WHERE h.cancelled_from IS NULL
+       AND (sid = '' OR COALESCE(h.store_id, '') = sid)
+       AND (sid <> '' OR public.store_visible(COALESCE(h.store_id, '')))
+  );
+END $$;
+
+-- Elevated routines are never reachable by a visitor.
+DO $$
+DECLARE r record;
+BEGIN
+  FOR r IN
+    SELECT p.oid::regprocedure AS sig
+      FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+     WHERE n.nspname = 'public'
+       AND p.proname IN ('pos_rules_get', 'pos_rules_save', 'pos_rules_row',
+                         'pos_rules_defaults', 'verify_manager_pin',
+                         'log_manager_override', 'held_orders_open_count')
+  LOOP
+    EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC, anon', r.sig);
+    EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO authenticated, service_role', r.sig);
+  END LOOP;
+END $$;
+
+-- The global row must exist so branch rules always have a base to layer over.
+INSERT INTO public.pos_store_settings(store_id) VALUES ('')
+  ON CONFLICT (store_id) DO NOTHING;
+
+-- ------------------------------------------------------------------
+-- Product deletion guard
+-- (source: 20260820150733_cb7c5870-e413-4308-a3dc-d2bb119b1f06.sql)
+-- ------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.product_delete_guard(_product_id uuid)
+RETURNS jsonb
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT jsonb_build_object(
+    'exists', EXISTS (SELECT 1 FROM public.products p WHERE p.id = _product_id),
+    'archived', COALESCE((SELECT p.is_archived FROM public.products p WHERE p.id = _product_id), false),
+    'sales', EXISTS (SELECT 1 FROM public.sale_items si WHERE si.product_id = _product_id),
+    'purchases', EXISTS (SELECT 1 FROM public.purchase_order_items poi WHERE poi.product_id = _product_id),
+    'transfers', EXISTS (SELECT 1 FROM public.stock_transfer_items sti WHERE sti.product_id = _product_id),
+    'adjustments', EXISTS (SELECT 1 FROM public.stock_adjustments sa WHERE sa.product_id = _product_id),
+    'promotions', EXISTS (SELECT 1 FROM public.promotions pr WHERE pr.foc_product_id = _product_id)
+  );
+$$;
+
+REVOKE ALL ON FUNCTION public.product_delete_guard(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.product_delete_guard(uuid) TO authenticated, service_role;
+
+CREATE INDEX IF NOT EXISTS sale_items_product_id_idx ON public.sale_items (product_id);
+CREATE INDEX IF NOT EXISTS purchase_order_items_product_id_idx ON public.purchase_order_items (product_id);
+CREATE INDEX IF NOT EXISTS stock_transfer_items_product_id_idx ON public.stock_transfer_items (product_id);
+CREATE INDEX IF NOT EXISTS stock_adjustments_product_id_idx ON public.stock_adjustments (product_id);
+CREATE INDEX IF NOT EXISTS promotions_foc_product_id_idx ON public.promotions (foc_product_id);
+
+-- ------------------------------------------------------------------
+-- Atomic stock deltas and reconciliation
+-- (source: 20260820162215_24601ef9-b24d-4ae3-9e9e-0655aee6b183.sql)
+-- ------------------------------------------------------------------
+-- Batch relative stock application. Each element reuses the single-movement
+-- routine, so the replay guard and branch check are unchanged.
+CREATE OR REPLACE FUNCTION public.stock_apply_deltas(_movements jsonb)
+RETURNS TABLE(movement_id uuid, status text, balance integer, reason text)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  _m jsonb;
+  _seen uuid[] := ARRAY[]::uuid[];
+  _id uuid;
+  _pid uuid;
+  _store text;
+  _delta integer;
+  _bal integer;
+  _existed boolean;
+BEGIN
+  FOR _m IN SELECT * FROM jsonb_array_elements(COALESCE(_movements, '[]'::jsonb)) LOOP
+    BEGIN
+      _id := NULLIF(_m ->> 'movement_id', '')::uuid;
+      _pid := NULLIF(_m ->> 'product_id', '')::uuid;
+      _store := NULLIF(_m ->> 'store_id', '');
+      _delta := COALESCE((_m ->> 'delta')::int, 0);
+    EXCEPTION WHEN others THEN
+      movement_id := NULL; status := 'refused'; balance := NULL; reason := 'invalid';
+      RETURN NEXT; CONTINUE;
+    END;
+
+    IF _id IS NULL OR _pid IS NULL THEN
+      movement_id := _id; status := 'refused'; balance := NULL; reason := 'invalid';
+      RETURN NEXT; CONTINUE;
+    END IF;
+
+    -- A movement id repeated inside one batch is answered once.
+    IF _id = ANY(_seen) THEN
+      movement_id := _id; status := 'duplicate'; balance := NULL; reason := NULL;
+      RETURN NEXT; CONTINUE;
+    END IF;
+    _seen := _seen || _id;
+
+    SELECT EXISTS(SELECT 1 FROM public.stock_delta_applied s WHERE s.movement_id = _id)
+      INTO _existed;
+
+    BEGIN
+      _bal := public.stock_apply_delta(_id, _pid, _store, _delta);
+      movement_id := _id;
+      status := CASE WHEN _existed THEN 'duplicate' ELSE 'applied' END;
+      balance := _bal;
+      reason := NULL;
+      RETURN NEXT;
+    EXCEPTION WHEN others THEN
+      movement_id := _id;
+      status := 'refused';
+      balance := NULL;
+      reason := CASE
+        WHEN SQLERRM ILIKE '%own branch%' THEN 'not_permitted'
+        WHEN SQLERRM ILIKE '%unknown product%' THEN 'unknown_product'
+        WHEN SQLERRM ILIKE '%required%' THEN 'invalid'
+        ELSE 'failed'
+      END;
+      RETURN NEXT;
+    END;
+  END LOOP;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.stock_apply_deltas(jsonb) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.stock_apply_deltas(jsonb) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.stock_apply_deltas(jsonb) TO service_role;
+
+-- Read-only drift report for one branch.
+CREATE OR REPLACE FUNCTION public.stock_reconcile(_store_id text, _since timestamptz DEFAULT (now() - interval '30 days'))
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  _missing jsonb;
+  _mismatched jsonb;
+  _products jsonb;
+BEGIN
+  IF _store_id IS NULL OR NOT public.store_visible(_store_id) THEN
+    RAISE EXCEPTION 'You can only reconcile your own branch';
+  END IF;
+
+  -- Movement exists in the ledger but no central application was recorded.
+  SELECT COALESCE(jsonb_agg(x), '[]'::jsonb) INTO _missing FROM (
+    SELECT l.id AS movement_id, l.product_id, l.quantity_delta AS delta, l.created_at
+      FROM public.item_activity_logs l
+      LEFT JOIN public.stock_delta_applied s ON s.movement_id = l.id
+     WHERE l.store_id = _store_id
+       AND COALESCE(l.quantity_delta, 0) <> 0
+       AND l.created_at >= _since
+       AND s.movement_id IS NULL
+     ORDER BY l.created_at DESC
+     LIMIT 200
+  ) x;
+
+  -- Applied, but for a different amount than the ledger row says: the sign of
+  -- a movement that reached the centre more than once, or was edited after.
+  SELECT COALESCE(jsonb_agg(x), '[]'::jsonb) INTO _mismatched FROM (
+    SELECT l.id AS movement_id, l.product_id, l.quantity_delta AS ledger_delta, s.delta AS applied_delta
+      FROM public.item_activity_logs l
+      JOIN public.stock_delta_applied s ON s.movement_id = l.id
+     WHERE l.store_id = _store_id
+       AND l.created_at >= _since
+       AND COALESCE(s.delta, 0) <> COALESCE(l.quantity_delta, 0)
+     ORDER BY l.created_at DESC
+     LIMIT 200
+  ) x;
+
+  -- Central figure against the sum of everything applied for this branch.
+  SELECT COALESCE(jsonb_agg(x), '[]'::jsonb) INTO _products FROM (
+    SELECT p.id AS product_id,
+           COALESCE((p.stock_by_store ->> _store_id)::int, 0) AS central,
+           a.applied_sum
+      FROM (
+        SELECT product_id, SUM(delta)::int AS applied_sum
+          FROM public.stock_delta_applied
+         WHERE store_id = _store_id
+         GROUP BY product_id
+      ) a
+      JOIN public.products p ON p.id = a.product_id
+     WHERE COALESCE((p.stock_by_store ->> _store_id)::int, 0) <> a.applied_sum
+     LIMIT 200
+  ) x;
+
+  RETURN jsonb_build_object(
+    'store_id', _store_id,
+    'checked_at', now(),
+    'not_applied', _missing,
+    'amount_mismatch', _mismatched,
+    'stock_mismatch', _products
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.stock_reconcile(text, timestamptz) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.stock_reconcile(text, timestamptz) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.stock_reconcile(text, timestamptz) TO service_role;
+
+-- ------------------------------------------------------------------
+-- Scoped settings (settings_scoped) and inheritance
+-- (source: 20260820231635_ca1885c0-6e56-4ad4-b3cd-27a11acb3b7a.sql)
+-- ------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.settings_scoped (
+  scope text NOT NULL DEFAULT 'GLOBAL',
+  scope_id text NOT NULL DEFAULT '',
+  key text NOT NULL,
+  value jsonb,
+  is_overridden boolean NOT NULL DEFAULT true,
+  updated_by text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (scope, scope_id, key)
+);
+
+GRANT SELECT ON public.settings_scoped TO authenticated;
+GRANT ALL ON public.settings_scoped TO service_role;
+
+ALTER TABLE public.settings_scoped ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS settings_scoped_read ON public.settings_scoped;
+CREATE POLICY settings_scoped_read ON public.settings_scoped
+  FOR SELECT TO authenticated USING (true);
+
+DROP TRIGGER IF EXISTS settings_scoped_touch ON public.settings_scoped;
+CREATE TRIGGER settings_scoped_touch BEFORE UPDATE ON public.settings_scoped
+  FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+
+CREATE OR REPLACE FUNCTION public.settings_cluster_of(_scope text, _scope_id text)
+RETURNS text
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT CASE
+    WHEN _scope = 'CLUSTER' THEN _scope_id
+    WHEN _scope = 'BRANCH' THEN COALESCE(NULLIF((SELECT group_id FROM public.stores WHERE id = _scope_id), ''), 'default')
+    ELSE ''
+  END
+$$;
+
+CREATE OR REPLACE FUNCTION public.settings_effective(_scope text, _scope_id text)
+RETURNS TABLE(setting_key text, effective_value jsonb, source text, is_overridden boolean, parent_inherited_value jsonb)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_cluster text := public.settings_cluster_of(_scope, _scope_id);
+BEGIN
+  RETURN QUERY
+  WITH keys AS (
+    SELECT DISTINCT s.key FROM public.settings_scoped s
+    WHERE s.is_overridden
+      AND (
+        (s.scope = 'GLOBAL')
+        OR (_scope <> 'GLOBAL' AND s.scope = 'CLUSTER' AND s.scope_id = v_cluster)
+        OR (_scope = 'BRANCH' AND s.scope = 'BRANCH' AND s.scope_id = _scope_id)
+      )
+  ), vals AS (
+    SELECT k.key,
+      (SELECT s.value FROM public.settings_scoped s
+        WHERE s.scope = 'GLOBAL' AND s.scope_id = '' AND s.key = k.key AND s.is_overridden) AS g,
+      (SELECT s.value FROM public.settings_scoped s
+        WHERE s.scope = 'CLUSTER' AND s.scope_id = v_cluster AND s.key = k.key AND s.is_overridden) AS c,
+      (SELECT s.value FROM public.settings_scoped s
+        WHERE s.scope = 'BRANCH' AND s.scope_id = _scope_id AND s.key = k.key AND s.is_overridden) AS b
+    FROM keys k
+  )
+  SELECT
+    v.key,
+    CASE _scope WHEN 'GLOBAL' THEN v.g WHEN 'CLUSTER' THEN COALESCE(v.c, v.g) ELSE COALESCE(v.b, v.c, v.g) END,
+    CASE
+      WHEN _scope = 'BRANCH' AND v.b IS NOT NULL THEN 'BRANCH'
+      WHEN _scope <> 'GLOBAL' AND v.c IS NOT NULL THEN 'CLUSTER'
+      ELSE 'GLOBAL'
+    END,
+    CASE _scope WHEN 'GLOBAL' THEN v.g IS NOT NULL WHEN 'CLUSTER' THEN v.c IS NOT NULL ELSE v.b IS NOT NULL END,
+    CASE _scope WHEN 'GLOBAL' THEN NULL::jsonb WHEN 'CLUSTER' THEN v.g ELSE COALESCE(v.c, v.g) END
+  FROM vals v;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.settings_upsert(_scope text, _scope_id text, _patch jsonb)
+RETURNS TABLE(setting_key text, effective_value jsonb, source text, is_overridden boolean, parent_inherited_value jsonb)
+LANGUAGE plpgsql
+VOLATILE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  rec record;
+  v_actor text := COALESCE(auth.uid()::text, 'system');
+BEGIN
+  IF NOT public.is_supervisor_now() THEN
+    RAISE EXCEPTION 'Not allowed to change settings';
+  END IF;
+  IF _scope NOT IN ('GLOBAL','CLUSTER','BRANCH') THEN
+    RAISE EXCEPTION 'Unknown settings scope %', _scope;
+  END IF;
+
+  FOR rec IN SELECT * FROM jsonb_each(COALESCE(_patch, '{}'::jsonb)) LOOP
+    IF COALESCE((rec.value->>'is_overridden')::boolean, false) OR _scope = 'GLOBAL' THEN
+      INSERT INTO public.settings_scoped(scope, scope_id, key, value, is_overridden, updated_by)
+      VALUES (_scope, COALESCE(_scope_id, ''), rec.key, rec.value->'value', true, v_actor)
+      ON CONFLICT (scope, scope_id, key)
+      DO UPDATE SET value = EXCLUDED.value, is_overridden = true,
+                    updated_by = EXCLUDED.updated_by, updated_at = now();
+    ELSE
+      DELETE FROM public.settings_scoped s
+      WHERE s.scope = _scope AND s.scope_id = COALESCE(_scope_id, '') AND s.key = rec.key;
+    END IF;
+  END LOOP;
+
+  RETURN QUERY SELECT * FROM public.settings_effective(_scope, _scope_id);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.settings_sync_batch(_scope text, _scope_id text, _keys text[])
+RETURNS jsonb
+LANGUAGE plpgsql
+VOLATILE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_targets int := 0;
+  v_written int := 0;
+  v_detail jsonb := '[]'::jsonb;
+  v_actor text := COALESCE(auth.uid()::text, 'system');
+  store record;
+  n int;
+BEGIN
+  IF NOT public.is_supervisor_now() THEN
+    RAISE EXCEPTION 'Not allowed to push settings';
+  END IF;
+
+  FOR store IN
+    SELECT st.id, st.name FROM public.stores st
+    WHERE st.archived_at IS NULL
+      AND (_scope = 'GLOBAL' OR COALESCE(NULLIF(st.group_id, ''), 'default') = _scope_id)
+  LOOP
+    v_targets := v_targets + 1;
+    n := 0;
+    INSERT INTO public.settings_scoped(scope, scope_id, key, value, is_overridden, updated_by)
+    SELECT 'BRANCH', store.id, e.setting_key, e.effective_value, true, v_actor
+    FROM public.settings_effective(_scope, _scope_id) e
+    WHERE (_keys IS NULL OR e.setting_key = ANY(_keys))
+      AND e.effective_value IS NOT NULL
+    ON CONFLICT (scope, scope_id, key)
+    DO UPDATE SET value = EXCLUDED.value, is_overridden = true,
+                  updated_by = EXCLUDED.updated_by, updated_at = now();
+    GET DIAGNOSTICS n = ROW_COUNT;
+    v_written := v_written + n;
+    v_detail := v_detail || jsonb_build_object('store_id', store.id, 'store_name', store.name, 'written', n);
+  END LOOP;
+
+  RETURN jsonb_build_object('targets', v_targets, 'written', v_written, 'detail', v_detail);
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.settings_effective(text, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.settings_upsert(text, text, jsonb) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.settings_sync_batch(text, text, text[]) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.settings_cluster_of(text, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.settings_effective(text, text) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.settings_upsert(text, text, jsonb) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.settings_sync_batch(text, text, text[]) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.settings_cluster_of(text, text) TO authenticated, service_role;
+
+-- ------------------------------------------------------------------
+-- Stock count drafts
+-- (source: 20260828090357_89f057c3-3a2b-45f7-9518-e005aa688bdb.sql)
+-- ------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.stock_count_drafts (
+  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  store_id TEXT,
+  terminal_id TEXT,
+  staff_id TEXT,
+  staff_name TEXT,
+  status TEXT NOT NULL DEFAULT 'draft',
+  reason TEXT,
+  note TEXT NOT NULL DEFAULT '',
+  lines JSONB NOT NULL DEFAULT '[]'::jsonb,
+  line_count INTEGER NOT NULL DEFAULT 0,
+  total_impact NUMERIC(18,4) NOT NULL DEFAULT 0,
+  posted_at TIMESTAMPTZ,
+  posted_by TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.stock_count_drafts TO authenticated;
+GRANT ALL ON public.stock_count_drafts TO service_role;
+
+ALTER TABLE public.stock_count_drafts ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Branch staff read stock count drafts" ON public.stock_count_drafts;
+CREATE POLICY "Branch staff read stock count drafts"
+  ON public.stock_count_drafts FOR SELECT TO authenticated
+  USING ((SELECT public.is_staff_now()) AND public.store_visible(store_id));
+
+DROP POLICY IF EXISTS "Branch staff create stock count drafts" ON public.stock_count_drafts;
+CREATE POLICY "Branch staff create stock count drafts"
+  ON public.stock_count_drafts FOR INSERT TO authenticated
+  WITH CHECK ((SELECT public.is_staff_now()) AND public.store_visible(store_id));
+
+DROP POLICY IF EXISTS "Branch staff update stock count drafts" ON public.stock_count_drafts;
+CREATE POLICY "Branch staff update stock count drafts"
+  ON public.stock_count_drafts FOR UPDATE TO authenticated
+  USING ((SELECT public.is_staff_now()) AND public.store_visible(store_id))
+  WITH CHECK ((SELECT public.is_staff_now()) AND public.store_visible(store_id));
+
+DROP POLICY IF EXISTS "Branch staff delete stock count drafts" ON public.stock_count_drafts;
+CREATE POLICY "Branch staff delete stock count drafts"
+  ON public.stock_count_drafts FOR DELETE TO authenticated
+  USING ((SELECT public.is_staff_now()) AND public.store_visible(store_id));
+
+CREATE INDEX IF NOT EXISTS stock_count_drafts_store_idx
+  ON public.stock_count_drafts (store_id, status, updated_at DESC);
+
+DROP TRIGGER IF EXISTS update_stock_count_drafts_updated_at ON public.stock_count_drafts;
+CREATE TRIGGER update_stock_count_drafts_updated_at
+  BEFORE UPDATE ON public.stock_count_drafts
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+ALTER TABLE public.stock_adjustments ADD COLUMN IF NOT EXISTS draft_id UUID;
+
+-- ------------------------------------------------------------------
+-- Stock count drafts - grants
+-- (source: 20260828090501_1e424b90-075f-4afc-909a-418d7f7263fb.sql)
+-- ------------------------------------------------------------------
+ALTER TABLE public.stock_count_drafts
+  ALTER COLUMN lines TYPE TEXT USING lines::text;
+
+ALTER TABLE public.stock_count_drafts
+  ALTER COLUMN lines SET DEFAULT '[]';
+
+-- ------------------------------------------------------------------
+-- Stock count drafts - extra columns
+-- (source: 20260828093906_fcd4c105-7f29-4b40-bd7e-094c5efb3b8d.sql)
+-- ------------------------------------------------------------------
+ALTER TABLE public.stock_count_drafts ADD COLUMN IF NOT EXISTS reference text;
+ALTER TABLE public.stock_count_drafts ADD COLUMN IF NOT EXISTS store_code text;
+
+WITH numbered AS (
+  SELECT id, row_number() OVER (ORDER BY created_at, id) AS rn
+  FROM public.stock_count_drafts
+  WHERE reference IS NULL
+)
+UPDATE public.stock_count_drafts d
+SET reference = 'SO-LEGACY-' || lpad(n.rn::text, 4, '0')
+FROM numbered n
+WHERE d.id = n.id;
+
+CREATE UNIQUE INDEX IF NOT EXISTS stock_count_drafts_reference_uidx
+  ON public.stock_count_drafts (reference) WHERE reference IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS stock_count_drafts_store_status_idx
+  ON public.stock_count_drafts (store_id, status, created_at DESC);
+
+-- ------------------------------------------------------------------
+-- Authorisation framework (actions, requests, log, PIN)
+-- (source: 20260828111638_4419bb54-6603-4392-a576-79ebd3335799.sql)
+-- ------------------------------------------------------------------
+-- ===========================================================================
+-- Authorisation framework: per-user PINs, configurable sensitive actions,
+-- approval requests and one consistent authorisation log.
+-- ===========================================================================
+
+-- --------------------------------------------------------------- PIN audit
+ALTER TABLE public.app_users ADD COLUMN IF NOT EXISTS pin_set_at timestamptz;
+ALTER TABLE public.app_users ADD COLUMN IF NOT EXISTS pin_updated_by text;
+
+-- ------------------------------------------------------- authorization_actions
+CREATE TABLE IF NOT EXISTS public.authorization_actions (
+  id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  action_key text NOT NULL,
+  scope_type text NOT NULL DEFAULT 'global',
+  scope_id text NOT NULL DEFAULT '',
+  mode text NOT NULL DEFAULT 'none',
+  allowed_roles text[] NOT NULL DEFAULT ARRAY['admin','manager']::text[],
+  allowed_user_ids text[] NOT NULL DEFAULT ARRAY[]::text[],
+  require_reason boolean NOT NULL DEFAULT false,
+  threshold numeric,
+  is_enabled boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS authorization_actions_scope_uidx
+  ON public.authorization_actions (action_key, scope_type, scope_id);
+
+GRANT SELECT ON public.authorization_actions TO authenticated;
+GRANT ALL ON public.authorization_actions TO service_role;
+ALTER TABLE public.authorization_actions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Staff read authorisation rules" ON public.authorization_actions;
+CREATE POLICY "Staff read authorisation rules"
+  ON public.authorization_actions FOR SELECT TO authenticated
+  USING (scope_id = '' OR public.store_visible(scope_id));
+
+-- ------------------------------------------------------ authorization_requests
+CREATE TABLE IF NOT EXISTS public.authorization_requests (
+  id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  action_key text NOT NULL,
+  requested_by text NOT NULL,
+  requested_by_name text NOT NULL DEFAULT '',
+  store_id text NOT NULL DEFAULT '',
+  terminal_id text NOT NULL DEFAULT '',
+  reason text NOT NULL DEFAULT '',
+  payload jsonb NOT NULL DEFAULT '{}'::jsonb,
+  status text NOT NULL DEFAULT 'pending',
+  decided_by text,
+  decided_by_name text,
+  decided_at timestamptz,
+  decision_note text,
+  expires_at timestamptz NOT NULL DEFAULT (now() + interval '24 hours'),
+  consumed_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS authorization_requests_status_idx
+  ON public.authorization_requests (status, created_at DESC);
+CREATE INDEX IF NOT EXISTS authorization_requests_store_idx
+  ON public.authorization_requests (store_id, created_at DESC);
+
+GRANT SELECT ON public.authorization_requests TO authenticated;
+GRANT ALL ON public.authorization_requests TO service_role;
+ALTER TABLE public.authorization_requests ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Staff read authorisation requests" ON public.authorization_requests;
+CREATE POLICY "Staff read authorisation requests"
+  ON public.authorization_requests FOR SELECT TO authenticated
+  USING (store_id = '' OR public.store_visible(store_id));
+
+-- ---------------------------------------------------------- authorization_log
+CREATE TABLE IF NOT EXISTS public.authorization_log (
+  id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  action_key text NOT NULL,
+  mode_used text NOT NULL,
+  request_id uuid,
+  requested_by text,
+  authorized_by text,
+  authorizer_role text,
+  store_id text NOT NULL DEFAULT '',
+  terminal_id text NOT NULL DEFAULT '',
+  outcome text NOT NULL,
+  detail jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS authorization_log_created_idx
+  ON public.authorization_log (created_at DESC);
+CREATE INDEX IF NOT EXISTS authorization_log_action_idx
+  ON public.authorization_log (action_key, created_at DESC);
+
+GRANT SELECT ON public.authorization_log TO authenticated;
+GRANT ALL ON public.authorization_log TO service_role;
+ALTER TABLE public.authorization_log ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Staff read authorisation log" ON public.authorization_log;
+CREATE POLICY "Staff read authorisation log"
+  ON public.authorization_log FOR SELECT TO authenticated
+  USING (store_id = '' OR public.store_visible(store_id));
+
+-- The log is evidence: it may never be edited or erased from the app.
+CREATE OR REPLACE FUNCTION public.authorization_log_immutable()
+RETURNS trigger LANGUAGE plpgsql SET search_path TO 'public', 'pg_temp' AS $$
+BEGIN
+  RAISE EXCEPTION 'authorization_log is insert-only';
+END $$;
+
+DROP TRIGGER IF EXISTS authorization_log_no_change ON public.authorization_log;
+CREATE TRIGGER authorization_log_no_change
+  BEFORE UPDATE OR DELETE ON public.authorization_log
+  FOR EACH ROW EXECUTE FUNCTION public.authorization_log_immutable();
+
+-- --------------------------------------------------------------- timestamps
+DROP TRIGGER IF EXISTS authorization_actions_touch ON public.authorization_actions;
+CREATE TRIGGER authorization_actions_touch
+  BEFORE UPDATE ON public.authorization_actions
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+DROP TRIGGER IF EXISTS authorization_requests_touch ON public.authorization_requests;
+CREATE TRIGGER authorization_requests_touch
+  BEFORE UPDATE ON public.authorization_requests
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+-- ------------------------------------------------------------- PIN checking
+-- Verifies a PIN against the people a rule allows. The PIN is compared inside
+-- the database and never returned; nothing comes back on any failure.
+CREATE OR REPLACE FUNCTION public.authorization_verify_pin(
+  p_user_id text,
+  p_pin text,
+  p_allowed_roles text[] DEFAULT ARRAY['admin','manager']::text[],
+  p_allowed_users text[] DEFAULT ARRAY[]::text[]
+)
+RETURNS TABLE(user_id text, full_name text, role app_role)
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp', 'extensions' AS $$
+DECLARE u public.app_users%rowtype;
+BEGIN
+  SELECT * INTO u FROM public.app_users a
+   WHERE lower(a.user_id) = lower(btrim(p_user_id)) AND a.is_active;
+  IF NOT FOUND THEN RETURN; END IF;
+
+  IF NOT (
+      u.role::text = ANY (COALESCE(p_allowed_roles, ARRAY[]::text[]))
+      OR lower(u.user_id) = ANY (
+           SELECT lower(x) FROM unnest(COALESCE(p_allowed_users, ARRAY[]::text[])) AS x)
+  ) THEN
+    RETURN;
+  END IF;
+
+  IF COALESCE(u.pin_hash, '') = ''
+     OR u.pin_hash <> extensions.crypt(p_pin::text, u.pin_hash::text) THEN
+    RETURN;
+  END IF;
+
+  RETURN QUERY SELECT u.user_id::text, u.full_name::text, u.role;
+END $$;
+
+-- Lets an administrator's own PIN be set for authorisation use.
+CREATE OR REPLACE FUNCTION public.set_authorization_pin(
+  p_user_id text,
+  p_pin text,
+  p_updated_by text DEFAULT NULL
+)
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp', 'extensions' AS $$
+BEGIN
+  IF p_pin !~ '^[0-9]{4,8}$' THEN
+    RAISE EXCEPTION 'A PIN must be 4 to 8 digits';
+  END IF;
+  UPDATE public.app_users
+     SET pin_hash = extensions.crypt(p_pin, extensions.gen_salt('bf', 10)),
+         pin_length = length(p_pin),
+         pin_set_at = now(),
+         pin_updated_by = p_updated_by,
+         updated_at = now()
+   WHERE lower(user_id) = lower(btrim(p_user_id));
+  RETURN FOUND;
+END $$;
+
+-- Elevated routines are never reachable by a visitor.
+DO $$
+DECLARE r record;
+BEGIN
+  FOR r IN
+    SELECT p.oid::regprocedure AS sig
+      FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+     WHERE n.nspname = 'public'
+       AND p.proname IN ('authorization_verify_pin', 'set_authorization_pin')
+  LOOP
+    EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC, anon', r.sig);
+    EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO authenticated, service_role', r.sig);
+  END LOOP;
+END $$;
+
+-- ------------------------------------------- starting rules from the old switches
+INSERT INTO public.authorization_actions (action_key, scope_type, scope_id, mode, require_reason)
+VALUES
+  ('refund',                'global', '', 'pin',  true),
+  ('void_cart',             'global', '', 'pin',  false),
+  ('void_line',             'global', '', 'none', false),
+  ('reduce_qty',            'global', '', 'none', false),
+  ('manual_discount',       'global', '', 'pin',  false),
+  ('discount_over_limit',   'global', '', 'pin',  true),
+  ('price_override',        'global', '', 'pin',  true),
+  ('below_cost_sale',       'global', '', 'pin',  true),
+  ('tax_exemption',         'global', '', 'pin',  true),
+  ('no_sale_drawer',        'global', '', 'pin',  true),
+  ('stock_adjustment',      'global', '', 'pin',  false),
+  ('shift_close',           'global', '', 'none', false),
+  ('shift_close_variance',  'global', '', 'pin',  true),
+  ('edit_tenders',          'global', '', 'none', false),
+  ('terminal_unpair',       'global', '', 'pin',  true),
+  ('edit_posted_stock',     'global', '', 'either', true),
+  ('edit_posted_purchase',  'global', '', 'either', true),
+  ('discard_draft',         'global', '', 'none', true),
+  ('delete_product',        'global', '', 'pin',  true),
+  ('member_points_adjust',  'global', '', 'pin',  true)
+ON CONFLICT (action_key, scope_type, scope_id) DO NOTHING;
+
+-- ------------------------------------------------------------------
+-- Record edits (post-approval edit trail)
+-- (source: 20260828113801_613be733-0854-4b88-8678-0c27051632b5.sql)
+-- ------------------------------------------------------------------
+ALTER TABLE public.stock_count_drafts
+  ADD COLUMN IF NOT EXISTS pending_edit_request_id uuid,
+  ADD COLUMN IF NOT EXISTS pending_edit_by text,
+  ADD COLUMN IF NOT EXISTS pending_edit_at timestamptz;
+
+ALTER TABLE public.purchase_orders
+  ADD COLUMN IF NOT EXISTS pending_edit_request_id uuid,
+  ADD COLUMN IF NOT EXISTS pending_edit_by text,
+  ADD COLUMN IF NOT EXISTS pending_edit_at timestamptz;
+
+CREATE TABLE IF NOT EXISTS public.record_edits (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  record_type text NOT NULL,
+  record_id text NOT NULL,
+  reference text,
+  store_id text,
+  terminal_id text,
+  action_key text NOT NULL,
+  request_id uuid,
+  edited_by text,
+  edited_by_name text,
+  authorized_by text,
+  authorized_by_name text,
+  mode_used text,
+  before_value jsonb NOT NULL DEFAULT '{}'::jsonb,
+  after_value jsonb NOT NULL DEFAULT '{}'::jsonb,
+  stock_deltas jsonb NOT NULL DEFAULT '{}'::jsonb,
+  note text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+GRANT SELECT, INSERT ON public.record_edits TO authenticated;
+GRANT ALL ON public.record_edits TO service_role;
+
+ALTER TABLE public.record_edits ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Staff read record edits" ON public.record_edits;
+CREATE POLICY "Staff read record edits" ON public.record_edits
+  FOR SELECT TO authenticated USING (public.is_staff_now());
+
+DROP POLICY IF EXISTS "Staff write record edits" ON public.record_edits;
+CREATE POLICY "Staff write record edits" ON public.record_edits
+  FOR INSERT TO authenticated WITH CHECK (public.is_staff_now());
+
+CREATE INDEX IF NOT EXISTS record_edits_record_idx
+  ON public.record_edits (record_type, record_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS record_edits_store_idx
+  ON public.record_edits (store_id, created_at DESC);
+
+-- ------------------------------------------------------------------
+-- Secure shift closing: cash counts, close events, reconciliations, alerts
+-- (source: 20260901103118_1ec67acd-e0ee-400d-8e64-ce1f81b57169.sql)
+-- ------------------------------------------------------------------
+-- ============================================================
+-- Secure shift closing — Stage 1: authoritative state & audit
+-- ============================================================
+
+/* ---------- 1. shifts: closing state ---------- */
+ALTER TABLE public.shifts
+  ADD COLUMN IF NOT EXISTS state text NOT NULL DEFAULT 'ACTIVE',
+  ADD COLUMN IF NOT EXISTS close_reason text,
+  ADD COLUMN IF NOT EXISTS closing_started_at timestamptz,
+  ADD COLUMN IF NOT EXISTS closing_started_by text,
+  ADD COLUMN IF NOT EXISTS final_counted_cash numeric,
+  ADD COLUMN IF NOT EXISTS variance_status text;
+
+DO $$ BEGIN
+  ALTER TABLE public.shifts ADD CONSTRAINT shifts_state_chk CHECK (state IN
+    ('ACTIVE','CLOSING_STARTED','CASH_COUNT_REQUIRED','CASH_COUNT_SUBMITTED',
+     'RECONCILIATION','VARIANCE_REVIEW_REQUIRED','CLOSED'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+UPDATE public.shifts SET state = CASE WHEN status = 'CLOSED' THEN 'CLOSED' ELSE 'ACTIVE' END
+ WHERE state IS DISTINCT FROM (CASE WHEN status = 'CLOSED' THEN 'CLOSED' ELSE 'ACTIVE' END);
+
+/* ---------- 2. immutable cash counts ---------- */
+CREATE TABLE IF NOT EXISTS public.shift_cash_counts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  shift_id uuid NOT NULL REFERENCES public.shifts(id) ON DELETE CASCADE,
+  store_id text NOT NULL,
+  terminal_id text,
+  kind text NOT NULL DEFAULT 'ORIGINAL',
+  counted_cash numeric NOT NULL,
+  counted_card numeric,
+  counted_digital numeric,
+  reason text,
+  counted_by_name text,
+  counted_by_staff_id text,
+  counted_by_user_id uuid,
+  client_key text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT shift_cash_counts_kind_chk CHECK (kind IN ('ORIGINAL','RECOUNT'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS shift_cash_counts_original_uidx
+  ON public.shift_cash_counts (shift_id) WHERE kind = 'ORIGINAL';
+CREATE UNIQUE INDEX IF NOT EXISTS shift_cash_counts_client_key_uidx
+  ON public.shift_cash_counts (client_key) WHERE client_key IS NOT NULL;
+CREATE INDEX IF NOT EXISTS shift_cash_counts_shift_idx ON public.shift_cash_counts (shift_id, created_at);
+
+GRANT SELECT ON public.shift_cash_counts TO authenticated;
+GRANT ALL ON public.shift_cash_counts TO service_role;
+ALTER TABLE public.shift_cash_counts ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Staff read shift cash counts" ON public.shift_cash_counts;
+CREATE POLICY "Staff read shift cash counts" ON public.shift_cash_counts
+  FOR SELECT TO authenticated
+  USING (public.is_staff_now() AND public.store_visible(store_id));
+
+/* ---------- 3. append-only closing audit ---------- */
+CREATE TABLE IF NOT EXISTS public.shift_close_events (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  shift_id uuid NOT NULL REFERENCES public.shifts(id) ON DELETE CASCADE,
+  store_id text NOT NULL,
+  terminal_id text,
+  event text NOT NULL,
+  from_state text,
+  to_state text,
+  detail jsonb NOT NULL DEFAULT '{}'::jsonb,
+  actor_name text,
+  actor_staff_id text,
+  actor_user_id uuid,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS shift_close_events_shift_idx ON public.shift_close_events (shift_id, created_at);
+
+GRANT SELECT ON public.shift_close_events TO authenticated;
+GRANT ALL ON public.shift_close_events TO service_role;
+ALTER TABLE public.shift_close_events ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Staff read shift close events" ON public.shift_close_events;
+CREATE POLICY "Staff read shift close events" ON public.shift_close_events
+  FOR SELECT TO authenticated
+  USING (public.is_staff_now() AND public.store_visible(store_id));
+
+/* ---------- 4. private reconciliation (expected cash / variance) ---------- */
+CREATE TABLE IF NOT EXISTS public.shift_reconciliations (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  shift_id uuid NOT NULL REFERENCES public.shifts(id) ON DELETE CASCADE,
+  store_id text NOT NULL,
+  count_id uuid REFERENCES public.shift_cash_counts(id) ON DELETE SET NULL,
+  expected_cash numeric NOT NULL DEFAULT 0,
+  expected_card numeric NOT NULL DEFAULT 0,
+  expected_digital numeric NOT NULL DEFAULT 0,
+  counted_cash numeric,
+  counted_card numeric,
+  counted_digital numeric,
+  variance_cash numeric,
+  variance_card numeric,
+  variance_digital numeric,
+  variance_total numeric,
+  variance_status text NOT NULL DEFAULT 'NO_VARIANCE',
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS shift_reconciliations_shift_idx ON public.shift_reconciliations (shift_id, created_at);
+
+GRANT SELECT ON public.shift_reconciliations TO authenticated;
+GRANT ALL ON public.shift_reconciliations TO service_role;
+ALTER TABLE public.shift_reconciliations ENABLE ROW LEVEL SECURITY;
+
+-- Only staff explicitly granted the variance permission may read expected cash.
+DROP POLICY IF EXISTS "Variance viewers read reconciliations" ON public.shift_reconciliations;
+CREATE POLICY "Variance viewers read reconciliations" ON public.shift_reconciliations
+  FOR SELECT TO authenticated
+  USING (public.has_perm('can_shift_variance_view') AND public.store_visible(store_id));
+
+/* ---------- 5. variance alerts ---------- */
+CREATE TABLE IF NOT EXISTS public.shift_variance_alerts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  shift_id uuid NOT NULL REFERENCES public.shifts(id) ON DELETE CASCADE,
+  store_id text NOT NULL,
+  reconciliation_id uuid REFERENCES public.shift_reconciliations(id) ON DELETE SET NULL,
+  variance_total numeric NOT NULL,
+  variance_status text NOT NULL,
+  severity text NOT NULL DEFAULT 'warning',
+  message text NOT NULL,
+  delivery_status text NOT NULL DEFAULT 'pending',
+  attempts integer NOT NULL DEFAULT 0,
+  last_error text,
+  last_attempt_at timestamptz,
+  acknowledged_at timestamptz,
+  acknowledged_by text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS shift_variance_alerts_recon_uidx
+  ON public.shift_variance_alerts (reconciliation_id) WHERE reconciliation_id IS NOT NULL;
+
+GRANT SELECT, UPDATE ON public.shift_variance_alerts TO authenticated;
+GRANT ALL ON public.shift_variance_alerts TO service_role;
+ALTER TABLE public.shift_variance_alerts ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Variance viewers read alerts" ON public.shift_variance_alerts;
+CREATE POLICY "Variance viewers read alerts" ON public.shift_variance_alerts
+  FOR SELECT TO authenticated
+  USING (public.has_perm('can_shift_variance_view') AND public.store_visible(store_id));
+
+DROP POLICY IF EXISTS "Variance viewers update alert delivery" ON public.shift_variance_alerts;
+CREATE POLICY "Variance viewers update alert delivery" ON public.shift_variance_alerts
+  FOR UPDATE TO authenticated
+  USING (public.has_perm('can_shift_variance_view') AND public.store_visible(store_id))
+  WITH CHECK (public.has_perm('can_shift_variance_view') AND public.store_visible(store_id));
+
+/* ---------- 6. immutability ---------- */
+CREATE OR REPLACE FUNCTION public.shift_records_immutable()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF coalesce(current_setting('pos.shift_fn', true), '') = 'on' THEN
+    RETURN CASE TG_OP WHEN 'DELETE' THEN OLD ELSE NEW END;
+  END IF;
+  RAISE EXCEPTION 'Shift closing records are permanent and cannot be % .', lower(TG_OP);
+END $$;
+
+DROP TRIGGER IF EXISTS shift_cash_counts_immutable ON public.shift_cash_counts;
+CREATE TRIGGER shift_cash_counts_immutable
+  BEFORE UPDATE OR DELETE ON public.shift_cash_counts
+  FOR EACH ROW EXECUTE FUNCTION public.shift_records_immutable();
+
+DROP TRIGGER IF EXISTS shift_close_events_immutable ON public.shift_close_events;
+CREATE TRIGGER shift_close_events_immutable
+  BEFORE UPDATE OR DELETE ON public.shift_close_events
+  FOR EACH ROW EXECUTE FUNCTION public.shift_records_immutable();
+
+DROP TRIGGER IF EXISTS shift_reconciliations_immutable ON public.shift_reconciliations;
+CREATE TRIGGER shift_reconciliations_immutable
+  BEFORE UPDATE OR DELETE ON public.shift_reconciliations
+  FOR EACH ROW EXECUTE FUNCTION public.shift_records_immutable();
+
+/* ---------- 7. clients may not touch financial shift columns ---------- */
+CREATE OR REPLACE FUNCTION public.shifts_guard_client_writes()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF coalesce(current_setting('pos.shift_fn', true), '') = 'on' THEN RETURN NEW; END IF;
+
+  IF TG_OP = 'INSERT' THEN
+    NEW.state              := 'ACTIVE';
+    NEW.status             := 'OPEN';
+    NEW.closed_at          := NULL;
+    NEW.counted_cash       := NULL;
+    NEW.counted_card       := NULL;
+    NEW.counted_digital    := NULL;
+    NEW.final_counted_cash := NULL;
+    NEW.expected_cash      := NULL;
+    NEW.expected_card      := NULL;
+    NEW.expected_digital   := NULL;
+    NEW.variance_cash      := NULL;
+    NEW.variance_card      := NULL;
+    NEW.variance_digital   := NULL;
+    NEW.variance_total     := NULL;
+    NEW.variance_status    := NULL;
+    NEW.close_reason       := NULL;
+    NEW.closing_started_at := NULL;
+    RETURN NEW;
+  END IF;
+
+  -- Updates from a client can only ever touch the housekeeping fields.
+  NEW.state              := OLD.state;
+  NEW.status             := OLD.status;
+  NEW.closed_at          := OLD.closed_at;
+  NEW.closed_by_name     := OLD.closed_by_name;
+  NEW.closed_by_staff_id := OLD.closed_by_staff_id;
+  NEW.closed_by_role     := OLD.closed_by_role;
+  NEW.opening_float      := OLD.opening_float;
+  NEW.counted_cash       := OLD.counted_cash;
+  NEW.counted_card       := OLD.counted_card;
+  NEW.counted_digital    := OLD.counted_digital;
+  NEW.closing_float      := OLD.closing_float;
+  NEW.final_counted_cash := OLD.final_counted_cash;
+  NEW.expected_cash      := OLD.expected_cash;
+  NEW.expected_card      := OLD.expected_card;
+  NEW.expected_digital   := OLD.expected_digital;
+  NEW.variance_cash      := OLD.variance_cash;
+  NEW.variance_card      := OLD.variance_card;
+  NEW.variance_digital   := OLD.variance_digital;
+  NEW.variance_total     := OLD.variance_total;
+  NEW.variance_status    := OLD.variance_status;
+  NEW.close_reason       := OLD.close_reason;
+  NEW.closing_started_at := OLD.closing_started_at;
+  RETURN NEW;
+END $$;
+
+DROP TRIGGER IF EXISTS shifts_guard_client_writes ON public.shifts;
+CREATE TRIGGER shifts_guard_client_writes
+  BEFORE INSERT OR UPDATE ON public.shifts
+  FOR EACH ROW EXECUTE FUNCTION public.shifts_guard_client_writes();
+
+/* ---------- 8. no trading once closing has started ---------- */
+CREATE OR REPLACE FUNCTION public.sales_block_closing_shift()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE s_state text;
+BEGIN
+  IF NEW.shift_id IS NULL OR NEW.shift_id = '' THEN RETURN NEW; END IF;
+  BEGIN
+    SELECT state INTO s_state FROM public.shifts WHERE id = NEW.shift_id::uuid;
+  EXCEPTION WHEN others THEN RETURN NEW; END;
+  IF s_state IS NOT NULL AND s_state <> 'ACTIVE' THEN
+    RAISE EXCEPTION 'This shift is being closed — no further transactions can be recorded against it.';
+  END IF;
+  RETURN NEW;
+END $$;
+
+DROP TRIGGER IF EXISTS sales_block_closing_shift ON public.sales;
+CREATE TRIGGER sales_block_closing_shift
+  BEFORE INSERT ON public.sales
+  FOR EACH ROW EXECUTE FUNCTION public.sales_block_closing_shift();
+
+/* ---------- 9. server-side expected cash ---------- */
+CREATE OR REPLACE FUNCTION public.shift_expected_totals(p_shift uuid)
+RETURNS TABLE (expected_cash numeric, expected_card numeric, expected_digital numeric)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_float numeric := 0;
+BEGIN
+  SELECT coalesce(opening_float, 0) INTO v_float FROM public.shifts WHERE id = p_shift;
+  RETURN QUERY
+  WITH paid AS (
+    SELECT
+      CASE WHEN jsonb_typeof(s.payments) = 'array'
+        THEN coalesce((SELECT sum((p ->> 'amount')::numeric) FROM jsonb_array_elements(s.payments) p
+                        WHERE lower(coalesce(p ->> 'method','')) = 'cash'), 0)
+        WHEN lower(coalesce(s.payment_type,'')) = 'cash' THEN coalesce(s.total_amount, 0) ELSE 0 END AS cash,
+      CASE WHEN jsonb_typeof(s.payments) = 'array'
+        THEN coalesce((SELECT sum((p ->> 'amount')::numeric) FROM jsonb_array_elements(s.payments) p
+                        WHERE lower(coalesce(p ->> 'method','')) = 'card'), 0)
+        WHEN lower(coalesce(s.payment_type,'')) = 'card' THEN coalesce(s.total_amount, 0) ELSE 0 END AS card,
+      CASE WHEN jsonb_typeof(s.payments) = 'array'
+        THEN coalesce((SELECT sum((p ->> 'amount')::numeric) FROM jsonb_array_elements(s.payments) p
+                        WHERE lower(coalesce(p ->> 'method','')) IN ('wallet','transfer','qr','online','ewallet')), 0)
+        WHEN lower(coalesce(s.payment_type,'')) IN ('wallet','transfer','qr','online','ewallet')
+          THEN coalesce(s.total_amount, 0) ELSE 0 END AS digital
+    FROM public.sales s
+    WHERE s.shift_id = p_shift::text AND coalesce(s.is_refunded, false) = false
+  )
+  SELECT v_float + coalesce(sum(cash), 0), coalesce(sum(card), 0), coalesce(sum(digital), 0) FROM paid;
+END $$;
+
+REVOKE ALL ON FUNCTION public.shift_expected_totals(uuid) FROM public, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.shift_expected_totals(uuid) TO service_role;
+
+-- Permission-gated read for managers.
+CREATE OR REPLACE FUNCTION public.shift_expected_view(p_shift uuid)
+RETURNS TABLE (expected_cash numeric, expected_card numeric, expected_digital numeric)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF NOT public.has_perm('can_shift_expected_cash_view') THEN
+    RAISE EXCEPTION 'You do not have permission to view expected cash.';
+  END IF;
+  RETURN QUERY SELECT * FROM public.shift_expected_totals(p_shift);
+END $$;
+GRANT EXECUTE ON FUNCTION public.shift_expected_view(uuid) TO authenticated, service_role;
+
+/* ---------- 10. workflow routines ---------- */
+CREATE OR REPLACE FUNCTION public.shift_log_event(
+  p_shift uuid, p_event text, p_from text, p_to text, p_detail jsonb, p_terminal text)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_store text; v_me record;
+BEGIN
+  SELECT store_id INTO v_store FROM public.shifts WHERE id = p_shift;
+  SELECT * INTO v_me FROM public.current_app_user();
+  PERFORM set_config('pos.shift_fn', 'on', true);
+  INSERT INTO public.shift_close_events
+    (shift_id, store_id, terminal_id, event, from_state, to_state, detail,
+     actor_name, actor_staff_id, actor_user_id)
+  VALUES (p_shift, coalesce(v_store,''), p_terminal, p_event, p_from, p_to,
+          coalesce(p_detail,'{}'::jsonb), v_me.full_name, v_me.user_id, auth.uid());
+  PERFORM set_config('pos.shift_fn', '', true);
+END $$;
+GRANT EXECUTE ON FUNCTION public.shift_log_event(uuid, text, text, text, jsonb, text) TO authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION public.shift_close_start(p_shift uuid, p_reason text, p_terminal text DEFAULT NULL)
+RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v public.shifts%ROWTYPE; v_me record; v_reason text := btrim(coalesce(p_reason,''));
+BEGIN
+  IF NOT public.has_perm('can_close_shift') THEN
+    RAISE EXCEPTION 'You do not have permission to close a shift.';
+  END IF;
+  IF v_reason = '' THEN RAISE EXCEPTION 'A reason for closing this shift is required.'; END IF;
+
+  SELECT * INTO v FROM public.shifts WHERE id = p_shift FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'That shift no longer exists.'; END IF;
+  IF NOT public.store_visible(v.store_id) THEN RAISE EXCEPTION 'That shift belongs to another branch.'; END IF;
+
+  IF v.state <> 'ACTIVE' THEN
+    -- Already closing: never go backwards, just report where it is.
+    RETURN v.state;
+  END IF;
+
+  SELECT * INTO v_me FROM public.current_app_user();
+  PERFORM set_config('pos.shift_fn', 'on', true);
+  UPDATE public.shifts
+     SET state = 'CASH_COUNT_REQUIRED',
+         close_reason = v_reason,
+         closing_started_at = now(),
+         closing_started_by = coalesce(v_me.full_name, v.opened_by_name),
+         updated_at = now()
+   WHERE id = p_shift;
+  PERFORM set_config('pos.shift_fn', '', true);
+
+  PERFORM public.shift_log_event(p_shift, 'closing_started', 'ACTIVE', 'CASH_COUNT_REQUIRED',
+                                 jsonb_build_object('reason', v_reason), p_terminal);
+  RETURN 'CASH_COUNT_REQUIRED';
+END $$;
+GRANT EXECUTE ON FUNCTION public.shift_close_start(uuid, text, text) TO authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION public.shift_reconcile_now(
+  p_shift uuid, p_count_id uuid, p_cash numeric, p_card numeric, p_digital numeric)
+RETURNS TABLE (state text, variance_status text) LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  v public.shifts%ROWTYPE; e record; v_rec uuid;
+  v_var_cash numeric; v_var_card numeric; v_var_digital numeric; v_total numeric;
+  v_status text; v_threshold numeric := 0; v_state text;
+BEGIN
+  SELECT * INTO v FROM public.shifts WHERE id = p_shift;
+  SELECT * INTO e FROM public.shift_expected_totals(p_shift);
+
+  v_var_cash    := round(p_cash - e.expected_cash, 2);
+  v_var_card    := CASE WHEN p_card IS NULL THEN NULL ELSE round(p_card - e.expected_card, 2) END;
+  v_var_digital := CASE WHEN p_digital IS NULL THEN NULL ELSE round(p_digital - e.expected_digital, 2) END;
+  v_total       := round(v_var_cash + coalesce(v_var_card,0) + coalesce(v_var_digital,0), 2);
+
+  SELECT coalesce(abs((r ->> 'variance_pin_threshold')::numeric), 0) INTO v_threshold
+    FROM public.pos_rules_get() AS r;
+  IF v_threshold IS NULL THEN v_threshold := 0; END IF;
+
+  v_status := CASE WHEN abs(v_total) <= 0.005 THEN 'NO_VARIANCE'
+                   WHEN v_total > 0 THEN 'OVER' ELSE 'SHORT' END;
+  v_state  := CASE WHEN v_status = 'NO_VARIANCE' OR abs(v_total) <= v_threshold
+                   THEN 'CLOSED' ELSE 'VARIANCE_REVIEW_REQUIRED' END;
+
+  PERFORM set_config('pos.shift_fn', 'on', true);
+  INSERT INTO public.shift_reconciliations
+    (shift_id, store_id, count_id, expected_cash, expected_card, expected_digital,
+     counted_cash, counted_card, counted_digital,
+     variance_cash, variance_card, variance_digital, variance_total, variance_status)
+  VALUES (p_shift, v.store_id, p_count_id, e.expected_cash, e.expected_card, e.expected_digital,
+          p_cash, p_card, p_digital, v_var_cash, v_var_card, v_var_digital, v_total, v_status)
+  RETURNING id INTO v_rec;
+
+  UPDATE public.shifts
+     SET state = v_state,
+         status = CASE WHEN v_state = 'CLOSED' THEN 'CLOSED' ELSE status END,
+         closed_at = CASE WHEN v_state = 'CLOSED' THEN now() ELSE closed_at END,
+         final_counted_cash = p_cash,
+         counted_cash = p_cash,
+         closing_float = p_cash,
+         counted_card = p_card,
+         counted_digital = p_digital,
+         variance_status = v_status,
+         updated_at = now()
+   WHERE id = p_shift;
+
+  IF v_status <> 'NO_VARIANCE' THEN
+    INSERT INTO public.shift_variance_alerts
+      (shift_id, store_id, reconciliation_id, variance_total, variance_status, severity, message)
+    VALUES (p_shift, v.store_id, v_rec, v_total, v_status,
+            CASE WHEN abs(v_total) > v_threshold THEN 'critical' ELSE 'warning' END,
+            format('Shift at %s closed %s by %s.', v.store_id, lower(v_status), abs(v_total)))
+    ON CONFLICT (reconciliation_id) DO NOTHING;
+  END IF;
+  PERFORM set_config('pos.shift_fn', '', true);
+
+  PERFORM public.shift_log_event(p_shift, 'reconciled', 'CASH_COUNT_SUBMITTED', v_state,
+    jsonb_build_object('variance_status', v_status), v.terminal_id);
+
+  RETURN QUERY SELECT v_state, v_status;
+END $$;
+REVOKE ALL ON FUNCTION public.shift_reconcile_now(uuid, uuid, numeric, numeric, numeric) FROM public, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.shift_reconcile_now(uuid, uuid, numeric, numeric, numeric) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.shift_cash_count_submit(
+  p_shift uuid, p_cash numeric, p_card numeric DEFAULT NULL,
+  p_digital numeric DEFAULT NULL, p_client_key text DEFAULT NULL, p_terminal text DEFAULT NULL)
+RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v public.shifts%ROWTYPE; v_me record; v_count uuid; v_res record;
+BEGIN
+  IF NOT (public.has_perm('can_shift_cash_count') OR public.has_perm('can_close_shift')) THEN
+    RAISE EXCEPTION 'You do not have permission to submit a cash count.';
+  END IF;
+  IF p_cash IS NULL OR p_cash < 0 THEN RAISE EXCEPTION 'Enter the cash counted in the drawer.'; END IF;
+
+  SELECT * INTO v FROM public.shifts WHERE id = p_shift FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'That shift no longer exists.'; END IF;
+  IF NOT public.store_visible(v.store_id) THEN RAISE EXCEPTION 'That shift belongs to another branch.'; END IF;
+  IF v.state = 'ACTIVE' THEN RAISE EXCEPTION 'Start the closing process before counting the drawer.'; END IF;
+  IF v.state NOT IN ('CLOSING_STARTED','CASH_COUNT_REQUIRED') THEN
+    RETURN v.state;  -- already counted: never accept a second original count
+  END IF;
+
+  SELECT * INTO v_me FROM public.current_app_user();
+  PERFORM set_config('pos.shift_fn', 'on', true);
+  INSERT INTO public.shift_cash_counts
+    (shift_id, store_id, terminal_id, kind, counted_cash, counted_card, counted_digital,
+     reason, counted_by_name, counted_by_staff_id, counted_by_user_id, client_key)
+  VALUES (p_shift, v.store_id, coalesce(p_terminal, v.terminal_id), 'ORIGINAL',
+          round(p_cash, 2), round(p_card, 2), round(p_digital, 2), v.close_reason,
+          coalesce(v_me.full_name, v.opened_by_name), v_me.user_id, auth.uid(), p_client_key)
+  ON CONFLICT (shift_id) WHERE kind = 'ORIGINAL' DO NOTHING
+  RETURNING id INTO v_count;
+
+  UPDATE public.shifts SET state = 'CASH_COUNT_SUBMITTED', updated_at = now() WHERE id = p_shift;
+  PERFORM set_config('pos.shift_fn', '', true);
+
+  IF v_count IS NULL THEN
+    SELECT id INTO v_count FROM public.shift_cash_counts
+      WHERE shift_id = p_shift AND kind = 'ORIGINAL' LIMIT 1;
+  END IF;
+
+  PERFORM public.shift_log_event(p_shift, 'cash_count_submitted', 'CASH_COUNT_REQUIRED',
+    'CASH_COUNT_SUBMITTED', jsonb_build_object('count_id', v_count), p_terminal);
+
+  SELECT * INTO v_res FROM public.shift_reconcile_now(p_shift, v_count, round(p_cash,2), round(p_card,2), round(p_digital,2));
+  RETURN v_res.state;  -- state only: never the variance
+END $$;
+GRANT EXECUTE ON FUNCTION public.shift_cash_count_submit(uuid, numeric, numeric, numeric, text, text) TO authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION public.shift_recount_submit(
+  p_shift uuid, p_cash numeric, p_reason text,
+  p_card numeric DEFAULT NULL, p_digital numeric DEFAULT NULL, p_terminal text DEFAULT NULL)
+RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v public.shifts%ROWTYPE; v_me record; v_count uuid; v_res record; v_reason text := btrim(coalesce(p_reason,''));
+BEGIN
+  IF NOT public.has_perm('can_shift_cash_recount') THEN
+    RAISE EXCEPTION 'You do not have permission to recount a drawer.';
+  END IF;
+  IF v_reason = '' THEN RAISE EXCEPTION 'A reason for the recount is required.'; END IF;
+  IF p_cash IS NULL OR p_cash < 0 THEN RAISE EXCEPTION 'Enter the recounted cash amount.'; END IF;
+
+  SELECT * INTO v FROM public.shifts WHERE id = p_shift FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'That shift no longer exists.'; END IF;
+  IF v.state NOT IN ('VARIANCE_REVIEW_REQUIRED','RECONCILIATION','CLOSED') THEN
+    RAISE EXCEPTION 'This shift has not been counted yet.';
+  END IF;
+
+  SELECT * INTO v_me FROM public.current_app_user();
+  PERFORM set_config('pos.shift_fn', 'on', true);
+  INSERT INTO public.shift_cash_counts
+    (shift_id, store_id, terminal_id, kind, counted_cash, counted_card, counted_digital,
+     reason, counted_by_name, counted_by_staff_id, counted_by_user_id)
+  VALUES (p_shift, v.store_id, coalesce(p_terminal, v.terminal_id), 'RECOUNT',
+          round(p_cash,2), round(p_card,2), round(p_digital,2), v_reason,
+          v_me.full_name, v_me.user_id, auth.uid())
+  RETURNING id INTO v_count;
+  PERFORM set_config('pos.shift_fn', '', true);
+
+  PERFORM public.shift_log_event(p_shift, 'recount_submitted', v.state, v.state,
+    jsonb_build_object('reason', v_reason, 'count_id', v_count), p_terminal);
+
+  SELECT * INTO v_res FROM public.shift_reconcile_now(p_shift, v_count, round(p_cash,2), round(p_card,2), round(p_digital,2));
+  RETURN v_res.state;
+END $$;
+GRANT EXECUTE ON FUNCTION public.shift_recount_submit(uuid, numeric, text, numeric, numeric, text) TO authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION public.shift_variance_approve(p_shift uuid, p_note text DEFAULT NULL)
+RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v public.shifts%ROWTYPE;
+BEGIN
+  IF NOT public.has_perm('can_shift_variance_approve') THEN
+    RAISE EXCEPTION 'You do not have permission to approve a shift variance.';
+  END IF;
+  SELECT * INTO v FROM public.shifts WHERE id = p_shift FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'That shift no longer exists.'; END IF;
+  IF v.state = 'CLOSED' THEN RETURN 'CLOSED'; END IF;
+
+  PERFORM set_config('pos.shift_fn', 'on', true);
+  UPDATE public.shifts
+     SET state = 'CLOSED', status = 'CLOSED', closed_at = coalesce(closed_at, now()), updated_at = now()
+   WHERE id = p_shift;
+  UPDATE public.shift_variance_alerts
+     SET acknowledged_at = now(), acknowledged_by = (SELECT full_name FROM public.current_app_user()),
+         updated_at = now()
+   WHERE shift_id = p_shift AND acknowledged_at IS NULL;
+  PERFORM set_config('pos.shift_fn', '', true);
+
+  PERFORM public.shift_log_event(p_shift, 'variance_approved', v.state, 'CLOSED',
+    jsonb_build_object('note', p_note), v.terminal_id);
+  RETURN 'CLOSED';
+END $$;
+GRANT EXECUTE ON FUNCTION public.shift_variance_approve(uuid, text) TO authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION public.shift_state(p_shift uuid)
+RETURNS text LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT state FROM public.shifts WHERE id = p_shift
+$$;
+GRANT EXECUTE ON FUNCTION public.shift_state(uuid) TO authenticated, service_role;
+
+-- ------------------------------------------------------------------
+-- Shift state helper
+-- (source: 20260901103154_08cfbb6c-2ff4-4ce9-b261-4ebd32f02734.sql)
+-- ------------------------------------------------------------------
+REVOKE ALL ON FUNCTION public.shift_log_event(uuid, text, text, text, jsonb, text) FROM public, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.shift_log_event(uuid, text, text, text, jsonb, text) TO service_role;
+
+REVOKE ALL ON FUNCTION public.shift_expected_view(uuid) FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.shift_expected_view(uuid) TO authenticated, service_role;
+
+REVOKE ALL ON FUNCTION public.shift_close_start(uuid, text, text) FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.shift_close_start(uuid, text, text) TO authenticated, service_role;
+
+REVOKE ALL ON FUNCTION public.shift_cash_count_submit(uuid, numeric, numeric, numeric, text, text) FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.shift_cash_count_submit(uuid, numeric, numeric, numeric, text, text) TO authenticated, service_role;
+
+REVOKE ALL ON FUNCTION public.shift_recount_submit(uuid, numeric, text, numeric, numeric, text) FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.shift_recount_submit(uuid, numeric, text, numeric, numeric, text) TO authenticated, service_role;
+
+REVOKE ALL ON FUNCTION public.shift_variance_approve(uuid, text) FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.shift_variance_approve(uuid, text) TO authenticated, service_role;
+
+REVOKE ALL ON FUNCTION public.shift_state(uuid) FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.shift_state(uuid) TO authenticated, service_role;
+
+REVOKE ALL ON FUNCTION public.shift_records_immutable() FROM public, anon, authenticated;
+REVOKE ALL ON FUNCTION public.shifts_guard_client_writes() FROM public, anon, authenticated;
+REVOKE ALL ON FUNCTION public.sales_block_closing_shift() FROM public, anon, authenticated;
+
+-- ------------------------------------------------------------------
+-- Booking payment routines (collect, cancel, balance)
+-- (source: 20260901110406_08d970bc-b939-4aca-a62c-0f247228deee.sql)
+-- ------------------------------------------------------------------
+-- 1. Payment settlement status ------------------------------------------------
+ALTER TABLE public.booking_payments
+  ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'settled',
+  ADD COLUMN IF NOT EXISTS client_payment_id text,
+  ADD COLUMN IF NOT EXISTS reference text,
+  ADD COLUMN IF NOT EXISTS reversed_at timestamptz,
+  ADD COLUMN IF NOT EXISTS reversed_by text;
+
+DO $$ BEGIN
+  ALTER TABLE public.booking_payments
+    ADD CONSTRAINT booking_payments_status_chk CHECK (status IN ('settled','reversed','void'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE UNIQUE INDEX IF NOT EXISTS booking_payments_client_id_uidx
+  ON public.booking_payments (booking_id, client_payment_id)
+  WHERE client_payment_id IS NOT NULL;
+
+-- 2. Cancellation record --------------------------------------------------------
+ALTER TABLE public.bookings
+  ADD COLUMN IF NOT EXISTS cancel_reason text,
+  ADD COLUMN IF NOT EXISTS cancelled_by text,
+  ADD COLUMN IF NOT EXISTS cancelled_at timestamptz,
+  ADD COLUMN IF NOT EXISTS cancelled_terminal text;
+
+-- 3. Authoritative balance ------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.booking_balance_state(_booking_id uuid)
+RETURNS TABLE (
+  booking_id uuid,
+  total numeric,
+  settled_paid numeric,
+  outstanding numeric,
+  fully_paid boolean,
+  status text,
+  job_status text
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT b.id,
+         round(coalesce(b.total, 0), 2),
+         round(coalesce((SELECT sum(p.amount) FROM public.booking_payments p
+                          WHERE p.booking_id = b.id AND p.status = 'settled'), 0), 2),
+         round(greatest(0, coalesce(b.total, 0)
+               - coalesce((SELECT sum(p.amount) FROM public.booking_payments p
+                            WHERE p.booking_id = b.id AND p.status = 'settled'), 0)), 2),
+         (coalesce(b.total, 0)
+           - coalesce((SELECT sum(p.amount) FROM public.booking_payments p
+                        WHERE p.booking_id = b.id AND p.status = 'settled'), 0)) <= 0.005,
+         b.status,
+         b.job_status
+  FROM public.bookings b
+  WHERE b.id = _booking_id;
+$$;
+
+REVOKE ALL ON FUNCTION public.booking_balance_state(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.booking_balance_state(uuid) TO authenticated, service_role;
+
+-- 4. Guard: never collected while money is owed ---------------------------------
+CREATE OR REPLACE FUNCTION public.bookings_block_unpaid_collection()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  owed numeric;
+BEGIN
+  IF current_setting('pos.booking_collect', true) = 'on' THEN
+    RETURN NEW;
+  END IF;
+  IF NEW.status IS DISTINCT FROM 'collected'
+     AND coalesce(NEW.job_status, '') IS DISTINCT FROM 'collected' THEN
+    RETURN NEW;
+  END IF;
+  IF TG_OP = 'UPDATE'
+     AND OLD.status IS NOT DISTINCT FROM NEW.status
+     AND coalesce(OLD.job_status, '') IS NOT DISTINCT FROM coalesce(NEW.job_status, '') THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT round(coalesce(NEW.total, 0)
+         - coalesce((SELECT sum(p.amount) FROM public.booking_payments p
+                      WHERE p.booking_id = NEW.id AND p.status = 'settled'), 0), 2)
+    INTO owed;
+
+  IF owed > 0.005 THEN
+    RAISE EXCEPTION 'BOOKING_BALANCE_DUE: % still outstanding on this booking', owed;
+  END IF;
+  RETURN NEW;
+END $$;
+
+DROP TRIGGER IF EXISTS bookings_block_unpaid_collection ON public.bookings;
+CREATE TRIGGER bookings_block_unpaid_collection
+  BEFORE INSERT OR UPDATE ON public.bookings
+  FOR EACH ROW EXECUTE FUNCTION public.bookings_block_unpaid_collection();
+
+-- 5. Collect payment ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.booking_collect(
+  _booking_id uuid,
+  _amount numeric,
+  _method text,
+  _cashier text DEFAULT NULL,
+  _reference text DEFAULT NULL,
+  _client_payment_id text DEFAULT NULL,
+  _complete boolean DEFAULT true
+)
+RETURNS TABLE (
+  total numeric,
+  settled_paid numeric,
+  outstanding numeric,
+  fully_paid boolean,
+  status text,
+  job_status text,
+  duplicate boolean
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  b public.bookings%ROWTYPE;
+  owed numeric;
+  paid_now numeric;
+  dup boolean := false;
+BEGIN
+  IF (SELECT auth.uid()) IS NOT NULL AND NOT public.has_perm('can_collect_booking') THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED_COLLECT_BOOKING';
+  END IF;
+
+  SELECT * INTO b FROM public.bookings WHERE id = _booking_id FOR UPDATE;
+  IF b.id IS NULL THEN RAISE EXCEPTION 'BOOKING_NOT_FOUND'; END IF;
+  IF b.status = 'cancelled' THEN RAISE EXCEPTION 'BOOKING_CANCELLED'; END IF;
+
+  SELECT coalesce(sum(p.amount), 0) INTO paid_now
+    FROM public.booking_payments p
+   WHERE p.booking_id = b.id AND p.status = 'settled';
+  owed := round(coalesce(b.total, 0) - paid_now, 2);
+
+  IF _client_payment_id IS NOT NULL AND EXISTS (
+    SELECT 1 FROM public.booking_payments
+     WHERE booking_id = b.id AND client_payment_id = _client_payment_id
+  ) THEN
+    dup := true;
+  ELSIF coalesce(_amount, 0) > 0 THEN
+    IF round(_amount, 2) > owed + 0.005 THEN
+      RAISE EXCEPTION 'BOOKING_OVERPAYMENT: only % is outstanding', greatest(owed, 0);
+    END IF;
+    INSERT INTO public.booking_payments
+      (id, booking_id, amount, method, cashier, paid_at, status, reference, client_payment_id)
+    VALUES
+      (gen_random_uuid(), b.id, round(_amount, 2), coalesce(_method, 'cash'),
+       coalesce(_cashier, b.cashier), now(), 'settled', _reference, _client_payment_id);
+  END IF;
+
+  SELECT coalesce(sum(p.amount), 0) INTO paid_now
+    FROM public.booking_payments p
+   WHERE p.booking_id = b.id AND p.status = 'settled';
+  owed := round(coalesce(b.total, 0) - paid_now, 2);
+
+  PERFORM set_config('pos.booking_collect', 'on', true);
+  UPDATE public.bookings
+     SET paid = round(paid_now, 2),
+         status = CASE WHEN _complete AND owed <= 0.005 THEN 'collected' ELSE status END,
+         job_status = CASE
+           WHEN _complete AND owed <= 0.005 AND job_status IS NOT NULL THEN 'collected'
+           ELSE job_status END,
+         job_status_at = CASE
+           WHEN _complete AND owed <= 0.005 AND job_status IS NOT NULL THEN now()
+           ELSE job_status_at END,
+         job_status_by = CASE
+           WHEN _complete AND owed <= 0.005 AND job_status IS NOT NULL
+             THEN coalesce(_cashier, job_status_by) ELSE job_status_by END,
+         closed_at = CASE WHEN _complete AND owed <= 0.005 THEN now() ELSE closed_at END
+   WHERE id = b.id
+   RETURNING * INTO b;
+  PERFORM set_config('pos.booking_collect', 'off', true);
+
+  RETURN QUERY SELECT round(coalesce(b.total, 0), 2), round(paid_now, 2),
+                      round(greatest(owed, 0), 2), owed <= 0.005,
+                      b.status, b.job_status, dup;
+END $$;
+
+REVOKE ALL ON FUNCTION public.booking_collect(uuid, numeric, text, text, text, text, boolean) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.booking_collect(uuid, numeric, text, text, text, text, boolean) TO authenticated, service_role;
+
+-- 6. Cancel with a mandatory reason ---------------------------------------------
+CREATE OR REPLACE FUNCTION public.booking_cancel(
+  _booking_id uuid,
+  _reason text,
+  _cancelled_by text DEFAULT NULL,
+  _terminal text DEFAULT NULL
+)
+RETURNS public.bookings
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  b public.bookings%ROWTYPE;
+  clean text := btrim(coalesce(_reason, ''));
+BEGIN
+  IF (SELECT auth.uid()) IS NOT NULL AND NOT public.has_perm('can_cancel_booking') THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED_CANCEL_BOOKING';
+  END IF;
+  IF length(clean) < 3 THEN
+    RAISE EXCEPTION 'CANCEL_REASON_REQUIRED';
+  END IF;
+
+  SELECT * INTO b FROM public.bookings WHERE id = _booking_id FOR UPDATE;
+  IF b.id IS NULL THEN RAISE EXCEPTION 'BOOKING_NOT_FOUND'; END IF;
+  IF b.status = 'collected' THEN RAISE EXCEPTION 'BOOKING_ALREADY_COLLECTED'; END IF;
+
+  UPDATE public.bookings
+     SET status = 'cancelled',
+         closed_at = coalesce(closed_at, now()),
+         -- the first reason recorded is never overwritten
+         cancel_reason = coalesce(cancel_reason, clean),
+         cancelled_by = coalesce(cancelled_by, _cancelled_by),
+         cancelled_at = coalesce(cancelled_at, now()),
+         cancelled_terminal = coalesce(cancelled_terminal, _terminal)
+   WHERE id = b.id
+   RETURNING * INTO b;
+
+  RETURN b;
+END $$;
+
+REVOKE ALL ON FUNCTION public.booking_cancel(uuid, text, text, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.booking_cancel(uuid, text, text, text) TO authenticated, service_role;
+
+-- ------------------------------------------------------------------
+-- Booking payment routines - refunds and guards
+-- (source: 20260901111823_3090a950-3763-4b25-81c0-bcfcc1b972a4.sql)
+-- ------------------------------------------------------------------
+-- 1. Refund metadata on booking payments ---------------------------------------
+ALTER TABLE public.booking_payments
+  ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'payment',
+  ADD COLUMN IF NOT EXISTS refund_reason text,
+  ADD COLUMN IF NOT EXISTS refunds_payment_id uuid,
+  ADD COLUMN IF NOT EXISTS change_given numeric NOT NULL DEFAULT 0;
+
+DO $$ BEGIN
+  ALTER TABLE public.booking_payments
+    ADD CONSTRAINT booking_payments_kind_chk CHECK (kind IN ('payment','refund'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+ALTER TABLE public.bookings
+  ADD COLUMN IF NOT EXISTS cancel_money_action text;
+
+DO $$ BEGIN
+  ALTER TABLE public.bookings
+    ADD CONSTRAINT bookings_cancel_money_action_chk
+    CHECK (cancel_money_action IS NULL OR cancel_money_action IN ('refunded','retained','none'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- 2. Balance is net of refunds --------------------------------------------------
+CREATE OR REPLACE FUNCTION public.booking_net_paid(_booking_id uuid)
+RETURNS numeric
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT round(coalesce(sum(p.amount), 0), 2)
+    FROM public.booking_payments p
+   WHERE p.booking_id = _booking_id AND p.status = 'settled';
+$$;
+
+REVOKE ALL ON FUNCTION public.booking_net_paid(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.booking_net_paid(uuid) TO authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION public.booking_balance_state(_booking_id uuid)
+RETURNS TABLE (
+  booking_id uuid,
+  total numeric,
+  settled_paid numeric,
+  outstanding numeric,
+  fully_paid boolean,
+  status text,
+  job_status text
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT b.id,
+         round(coalesce(b.total, 0), 2),
+         public.booking_net_paid(b.id),
+         round(greatest(0, coalesce(b.total, 0) - public.booking_net_paid(b.id)), 2),
+         (coalesce(b.total, 0) - public.booking_net_paid(b.id)) <= 0.005,
+         b.status,
+         b.job_status
+  FROM public.bookings b
+  WHERE b.id = _booking_id;
+$$;
+
+REVOKE ALL ON FUNCTION public.booking_balance_state(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.booking_balance_state(uuid) TO authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION public.bookings_block_unpaid_collection()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  owed numeric;
+BEGIN
+  IF current_setting('pos.booking_collect', true) = 'on' THEN
+    RETURN NEW;
+  END IF;
+  IF NEW.status IS DISTINCT FROM 'collected'
+     AND coalesce(NEW.job_status, '') IS DISTINCT FROM 'collected' THEN
+    RETURN NEW;
+  END IF;
+  IF TG_OP = 'UPDATE'
+     AND OLD.status IS NOT DISTINCT FROM NEW.status
+     AND coalesce(OLD.job_status, '') IS NOT DISTINCT FROM coalesce(NEW.job_status, '') THEN
+    RETURN NEW;
+  END IF;
+
+  owed := round(coalesce(NEW.total, 0) - public.booking_net_paid(NEW.id), 2);
+
+  IF owed > 0.005 THEN
+    RAISE EXCEPTION 'BOOKING_BALANCE_DUE: % still outstanding on this booking', owed;
+  END IF;
+  RETURN NEW;
+END $$;
+
+-- 3. Collect: ambiguity fix, net balance, cash change ----------------------------
+DROP FUNCTION IF EXISTS public.booking_collect(uuid, numeric, text, text, text, text, boolean);
+
+CREATE OR REPLACE FUNCTION public.booking_collect(
+  _booking_id uuid,
+  _amount numeric,
+  _method text,
+  _cashier text DEFAULT NULL,
+  _reference text DEFAULT NULL,
+  _client_payment_id text DEFAULT NULL,
+  _complete boolean DEFAULT true
+)
+RETURNS TABLE (
+  total numeric,
+  settled_paid numeric,
+  outstanding numeric,
+  fully_paid boolean,
+  status text,
+  job_status text,
+  duplicate boolean,
+  change_due numeric
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  b public.bookings%ROWTYPE;
+  owed numeric;
+  paid_now numeric;
+  dup boolean := false;
+  taken numeric := 0;
+  change_out numeric := 0;
+  method_in text := lower(coalesce(_method, 'cash'));
+BEGIN
+  IF (SELECT auth.uid()) IS NOT NULL AND NOT public.has_perm('can_collect_booking') THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED_COLLECT_BOOKING';
+  END IF;
+
+  SELECT * INTO b FROM public.bookings bk WHERE bk.id = _booking_id FOR UPDATE;
+  IF b.id IS NULL THEN RAISE EXCEPTION 'BOOKING_NOT_FOUND'; END IF;
+  IF b.status = 'cancelled' THEN RAISE EXCEPTION 'BOOKING_CANCELLED'; END IF;
+
+  paid_now := public.booking_net_paid(b.id);
+  owed := round(coalesce(b.total, 0) - paid_now, 2);
+
+  IF _client_payment_id IS NOT NULL AND EXISTS (
+    SELECT 1 FROM public.booking_payments p
+     WHERE p.booking_id = b.id AND p.client_payment_id = _client_payment_id
+  ) THEN
+    dup := true;
+  ELSIF coalesce(_amount, 0) > 0 THEN
+    taken := round(_amount, 2);
+    IF taken > owed + 0.005 THEN
+      IF method_in = 'cash' THEN
+        -- cash over the counter: keep what is owed, hand the rest back
+        change_out := round(taken - greatest(owed, 0), 2);
+        taken := round(greatest(owed, 0), 2);
+      ELSE
+        RAISE EXCEPTION 'BOOKING_OVERPAYMENT: only % is outstanding', greatest(owed, 0);
+      END IF;
+    END IF;
+
+    IF taken > 0 THEN
+      INSERT INTO public.booking_payments
+        (id, booking_id, amount, method, cashier, paid_at, status, reference,
+         client_payment_id, kind, change_given)
+      VALUES
+        (gen_random_uuid(), b.id, taken, coalesce(_method, 'cash'),
+         coalesce(_cashier, b.cashier), now(), 'settled', _reference,
+         _client_payment_id, 'payment', change_out);
+    END IF;
+  END IF;
+
+  paid_now := public.booking_net_paid(b.id);
+  owed := round(coalesce(b.total, 0) - paid_now, 2);
+
+  PERFORM set_config('pos.booking_collect', 'on', true);
+  UPDATE public.bookings bk
+     SET paid = round(paid_now, 2),
+         status = CASE WHEN _complete AND owed <= 0.005 THEN 'collected' ELSE bk.status END,
+         job_status = CASE
+           WHEN _complete AND owed <= 0.005 AND bk.job_status IS NOT NULL THEN 'collected'
+           ELSE bk.job_status END,
+         job_status_at = CASE
+           WHEN _complete AND owed <= 0.005 AND bk.job_status IS NOT NULL THEN now()
+           ELSE bk.job_status_at END,
+         job_status_by = CASE
+           WHEN _complete AND owed <= 0.005 AND bk.job_status IS NOT NULL
+             THEN coalesce(_cashier, bk.job_status_by) ELSE bk.job_status_by END,
+         closed_at = CASE WHEN _complete AND owed <= 0.005 THEN now() ELSE bk.closed_at END
+   WHERE bk.id = b.id
+   RETURNING * INTO b;
+  PERFORM set_config('pos.booking_collect', 'off', true);
+
+  RETURN QUERY SELECT round(coalesce(b.total, 0), 2), round(paid_now, 2),
+                      round(greatest(owed, 0), 2), owed <= 0.005,
+                      b.status, b.job_status, dup, change_out;
+END $$;
+
+REVOKE ALL ON FUNCTION public.booking_collect(uuid, numeric, text, text, text, text, boolean) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.booking_collect(uuid, numeric, text, text, text, text, boolean) TO authenticated, service_role;
+
+-- 4. Refunds --------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.booking_refund(
+  _booking_id uuid,
+  _amount numeric,
+  _method text DEFAULT 'cash',
+  _reason text DEFAULT NULL,
+  _cashier text DEFAULT NULL,
+  _client_payment_id text DEFAULT NULL
+)
+RETURNS TABLE (
+  total numeric,
+  settled_paid numeric,
+  outstanding numeric,
+  fully_paid boolean,
+  status text,
+  job_status text,
+  duplicate boolean,
+  change_due numeric
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  b public.bookings%ROWTYPE;
+  paid_now numeric;
+  owed numeric;
+  dup boolean := false;
+  clean text := btrim(coalesce(_reason, ''));
+  give numeric;
+BEGIN
+  IF (SELECT auth.uid()) IS NOT NULL AND NOT public.has_perm('can_process_refund') THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED_REFUND_BOOKING';
+  END IF;
+  IF length(clean) < 3 THEN
+    RAISE EXCEPTION 'REFUND_REASON_REQUIRED';
+  END IF;
+
+  SELECT * INTO b FROM public.bookings bk WHERE bk.id = _booking_id FOR UPDATE;
+  IF b.id IS NULL THEN RAISE EXCEPTION 'BOOKING_NOT_FOUND'; END IF;
+
+  paid_now := public.booking_net_paid(b.id);
+
+  IF _client_payment_id IS NOT NULL AND EXISTS (
+    SELECT 1 FROM public.booking_payments p
+     WHERE p.booking_id = b.id AND p.client_payment_id = _client_payment_id
+  ) THEN
+    dup := true;
+  ELSE
+    give := round(coalesce(_amount, 0), 2);
+    IF give <= 0 THEN RAISE EXCEPTION 'REFUND_AMOUNT_INVALID'; END IF;
+    IF give > paid_now + 0.005 THEN
+      RAISE EXCEPTION 'REFUND_EXCEEDS_PAID: only % has been taken', greatest(paid_now, 0);
+    END IF;
+
+    INSERT INTO public.booking_payments
+      (id, booking_id, amount, method, cashier, paid_at, status, client_payment_id,
+       kind, refund_reason)
+    VALUES
+      (gen_random_uuid(), b.id, -give, coalesce(_method, 'cash'),
+       coalesce(_cashier, b.cashier), now(), 'settled', _client_payment_id,
+       'refund', clean);
+  END IF;
+
+  paid_now := public.booking_net_paid(b.id);
+  owed := round(coalesce(b.total, 0) - paid_now, 2);
+
+  PERFORM set_config('pos.booking_collect', 'on', true);
+  UPDATE public.bookings bk SET paid = round(paid_now, 2)
+   WHERE bk.id = b.id RETURNING * INTO b;
+  PERFORM set_config('pos.booking_collect', 'off', true);
+
+  RETURN QUERY SELECT round(coalesce(b.total, 0), 2), round(paid_now, 2),
+                      round(greatest(owed, 0), 2), owed <= 0.005,
+                      b.status, b.job_status, dup, 0::numeric;
+END $$;
+
+REVOKE ALL ON FUNCTION public.booking_refund(uuid, numeric, text, text, text, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.booking_refund(uuid, numeric, text, text, text, text) TO authenticated, service_role;
+
+-- 5. Cancel: record what happened to the money -----------------------------------
+DROP FUNCTION IF EXISTS public.booking_cancel(uuid, text, text, text);
+
+CREATE OR REPLACE FUNCTION public.booking_cancel(
+  _booking_id uuid,
+  _reason text,
+  _cancelled_by text DEFAULT NULL,
+  _terminal text DEFAULT NULL,
+  _money_action text DEFAULT NULL,
+  _client_payment_id text DEFAULT NULL
+)
+RETURNS public.bookings
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  b public.bookings%ROWTYPE;
+  clean text := btrim(coalesce(_reason, ''));
+  held numeric;
+  action text := lower(coalesce(_money_action, ''));
+BEGIN
+  IF (SELECT auth.uid()) IS NOT NULL AND NOT public.has_perm('can_cancel_booking') THEN
+    RAISE EXCEPTION 'PERMISSION_DENIED_CANCEL_BOOKING';
+  END IF;
+  IF length(clean) < 3 THEN
+    RAISE EXCEPTION 'CANCEL_REASON_REQUIRED';
+  END IF;
+
+  SELECT * INTO b FROM public.bookings bk WHERE bk.id = _booking_id FOR UPDATE;
+  IF b.id IS NULL THEN RAISE EXCEPTION 'BOOKING_NOT_FOUND'; END IF;
+  IF b.status = 'collected' THEN RAISE EXCEPTION 'BOOKING_ALREADY_COLLECTED'; END IF;
+
+  held := public.booking_net_paid(b.id);
+
+  IF held > 0.005 THEN
+    IF action NOT IN ('refunded', 'retained') THEN
+      RAISE EXCEPTION 'CANCEL_MONEY_DECISION_REQUIRED: % is held on this booking', held;
+    END IF;
+    IF action = 'refunded' THEN
+      PERFORM public.booking_refund(
+        b.id, held, 'cash', 'Refunded on cancellation: ' || clean,
+        _cancelled_by, _client_payment_id);
+    END IF;
+  ELSE
+    action := 'none';
+  END IF;
+
+  PERFORM set_config('pos.booking_collect', 'on', true);
+  UPDATE public.bookings bk
+     SET status = 'cancelled',
+         paid = public.booking_net_paid(bk.id),
+         closed_at = coalesce(bk.closed_at, now()),
+         cancel_reason = coalesce(bk.cancel_reason, clean),
+         cancelled_by = coalesce(bk.cancelled_by, _cancelled_by),
+         cancelled_at = coalesce(bk.cancelled_at, now()),
+         cancelled_terminal = coalesce(bk.cancelled_terminal, _terminal),
+         cancel_money_action = coalesce(bk.cancel_money_action, action)
+   WHERE bk.id = b.id
+   RETURNING * INTO b;
+  PERFORM set_config('pos.booking_collect', 'off', true);
+
+  RETURN b;
+END $$;
+
+REVOKE ALL ON FUNCTION public.booking_cancel(uuid, text, text, text, text, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.booking_cancel(uuid, text, text, text, text, text) TO authenticated, service_role;
+
+-- ------------------------------------------------------------------
+-- Entity status history
+-- (source: 20260901123217_97f713b1-1c00-4d8e-89bd-8d0b7e345e83.sql)
+-- ------------------------------------------------------------------
+-- 1. Immutable status-transition history -------------------------------
+
+CREATE TABLE IF NOT EXISTS public.entity_status_history (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  entity_type         TEXT NOT NULL,
+  entity_id           TEXT NOT NULL,
+  status_kind         TEXT NOT NULL DEFAULT 'status',
+  previous_status     TEXT,
+  new_status          TEXT NOT NULL,
+  reason              TEXT,
+  actor_id            TEXT,
+  actor_name          TEXT,
+  actor_role          TEXT,
+  store_id            TEXT,
+  branch_id           TEXT,
+  terminal_id         TEXT,
+  related_entity_type TEXT,
+  related_entity_id   TEXT,
+  metadata            JSONB NOT NULL DEFAULT '{}'::jsonb,
+  client_event_id     TEXT,
+  occurred_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  row_version         BIGINT NOT NULL DEFAULT 1
+);
+
+GRANT SELECT, INSERT ON public.entity_status_history TO authenticated;
+GRANT ALL ON public.entity_status_history TO service_role;
+
+ALTER TABLE public.entity_status_history ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Staff read status history for visible stores" ON public.entity_status_history;
+CREATE POLICY "Staff read status history for visible stores"
+  ON public.entity_status_history FOR SELECT TO authenticated
+  USING (store_id IS NULL OR public.store_visible(store_id));
+
+DROP POLICY IF EXISTS "Staff append status history" ON public.entity_status_history;
+CREATE POLICY "Staff append status history"
+  ON public.entity_status_history FOR INSERT TO authenticated
+  WITH CHECK (public.is_staff_now());
+
+-- Retries after a dropped connection must not duplicate a transition.
+CREATE UNIQUE INDEX IF NOT EXISTS entity_status_history_client_event_uidx
+  ON public.entity_status_history (client_event_id)
+  WHERE client_event_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS entity_status_history_entity_idx
+  ON public.entity_status_history (entity_type, entity_id, occurred_at DESC);
+
+CREATE INDEX IF NOT EXISTS entity_status_history_store_idx
+  ON public.entity_status_history (store_id, created_at DESC);
+
+-- History is written once and never rewritten.
+CREATE OR REPLACE FUNCTION public.entity_status_history_immutable()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RAISE EXCEPTION 'entity_status_history is append-only';
+END;
+$$;
+
+DROP TRIGGER IF EXISTS entity_status_history_no_update ON public.entity_status_history;
+CREATE TRIGGER entity_status_history_no_update
+  BEFORE UPDATE OR DELETE ON public.entity_status_history
+  FOR EACH ROW EXECUTE FUNCTION public.entity_status_history_immutable();
+
+-- 2. Make business events say what actually changed ---------------------
+
+ALTER TABLE public.activity_events
+  ADD COLUMN IF NOT EXISTS entity_type    TEXT,
+  ADD COLUMN IF NOT EXISTS entity_id      TEXT,
+  ADD COLUMN IF NOT EXISTS previous_state TEXT,
+  ADD COLUMN IF NOT EXISTS new_state      TEXT;
+
+CREATE INDEX IF NOT EXISTS activity_events_entity_idx
+  ON public.activity_events (entity_type, entity_id, created_at DESC);
+
+-- 3. Let a rebuilt terminal recover its own branch's audit trail --------
+
+ALTER TABLE public.audit_logs
+  ADD COLUMN IF NOT EXISTS store_id TEXT;
+
+CREATE INDEX IF NOT EXISTS audit_logs_store_idx
+  ON public.audit_logs (store_id, created_at DESC);
+
+-- ------------------------------------------------------------------
+-- Stock transfer approval
+-- (source: 20260901134453_1063c342-9d1d-4bee-b6cf-6c848cdb7590.sql)
+-- ------------------------------------------------------------------
+-- Approve: record the allowed quantity per line, then move the note on.
+CREATE OR REPLACE FUNCTION public.stock_transfer_approve(
+  p_transfer_id uuid,
+  p_approved_by text DEFAULT NULL,
+  p_lines jsonb DEFAULT NULL
+) RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  t public.stock_transfers;
+BEGIN
+  IF NOT public.is_staff(auth.uid()) THEN
+    RAISE EXCEPTION 'Only staff can approve a transfer';
+  END IF;
+
+  SELECT * INTO t FROM public.stock_transfers WHERE id = p_transfer_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'TRANSFER_NOT_FOUND'; END IF;
+  IF t.status <> 'awaiting_approval' THEN
+    RAISE EXCEPTION 'Transfer % is % and is not waiting for approval', t.ref, t.status;
+  END IF;
+
+  -- No list means "everything as asked for".
+  UPDATE public.stock_transfer_items i
+     SET quantity_approved = COALESCE(
+           (SELECT (l ->> 'qty')::int FROM jsonb_array_elements(COALESCE(p_lines, '[]'::jsonb)) l
+             WHERE l ->> 'product_id' = i.product_id::text LIMIT 1),
+           i.quantity)
+   WHERE i.transfer_id = t.id;
+
+  UPDATE public.stock_transfers
+     SET status = 'approved', approved_by = COALESCE(p_approved_by, approved_by), approved_at = now()
+   WHERE id = t.id;
+END $$;
+
+-- Dispatch: the stock physically leaves here, so this is where the sending
+-- branch's count drops and the request closes against reality.
+CREATE OR REPLACE FUNCTION public.stock_transfer_dispatch(
+  p_transfer_id uuid,
+  p_dispatched_by text DEFAULT NULL,
+  p_lines jsonb DEFAULT NULL
+) RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  t public.stock_transfers;
+  it record;
+  v_qty integer;
+BEGIN
+  IF NOT public.is_staff(auth.uid()) THEN
+    RAISE EXCEPTION 'Only staff can dispatch a transfer';
+  END IF;
+
+  SELECT * INTO t FROM public.stock_transfers WHERE id = p_transfer_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'TRANSFER_NOT_FOUND'; END IF;
+  IF t.status <> 'approved' THEN
+    RAISE EXCEPTION 'Transfer % is % and cannot be dispatched', t.ref, t.status;
+  END IF;
+
+  FOR it IN SELECT * FROM public.stock_transfer_items WHERE transfer_id = t.id LOOP
+    v_qty := COALESCE(
+      (SELECT (l ->> 'qty')::int FROM jsonb_array_elements(COALESCE(p_lines, '[]'::jsonb)) l
+        WHERE l ->> 'product_id' = it.product_id::text LIMIT 1),
+      it.quantity_approved, it.quantity);
+    v_qty := GREATEST(LEAST(v_qty, COALESCE(it.quantity_approved, it.quantity)), 0);
+
+    UPDATE public.stock_transfer_items SET quantity_dispatched = v_qty WHERE id = it.id;
+
+    CONTINUE WHEN v_qty <= 0;
+
+    UPDATE public.products
+       SET stock_by_store = jsonb_set(
+             COALESCE(stock_by_store, '{}'::jsonb), ARRAY[t.from_store_id],
+             to_jsonb(GREATEST(
+               COALESCE((stock_by_store ->> t.from_store_id)::int, 0) - v_qty, 0)), true),
+           stock_quantity = GREATEST(stock_quantity - v_qty, 0)
+     WHERE id = it.product_id;
+  END LOOP;
+
+  UPDATE public.stock_transfers
+     SET status = 'dispatched',
+         dispatched_by = COALESCE(p_dispatched_by, dispatched_by),
+         dispatched_at = now()
+   WHERE id = t.id;
+END $$;
+
+-- Receiving books in what was actually sent.
+CREATE OR REPLACE FUNCTION public.stock_transfer_receive(
+  p_transfer_id uuid,
+  p_received_by text DEFAULT NULL,
+  p_deduct_source boolean DEFAULT false,
+  p_lines jsonb DEFAULT NULL
+) RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  t public.stock_transfers;
+  it record;
+  v_target uuid;
+  v_qty integer;
+  v_src public.products;
+BEGIN
+  IF NOT public.is_staff(auth.uid()) THEN
+    RAISE EXCEPTION 'Only staff can receive a transfer';
+  END IF;
+
+  SELECT * INTO t FROM public.stock_transfers WHERE id = p_transfer_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'TRANSFER_NOT_FOUND'; END IF;
+  IF t.status = 'received' THEN RAISE EXCEPTION 'TRANSFER_ALREADY_RECEIVED'; END IF;
+  IF t.status IN ('rejected', 'cancelled', 'completed') THEN RAISE EXCEPTION 'TRANSFER_CLOSED'; END IF;
+  IF t.status <> 'dispatched' THEN
+    RAISE EXCEPTION 'Transfer % has not been dispatched yet', t.ref;
+  END IF;
+
+  FOR it IN SELECT * FROM public.stock_transfer_items WHERE transfer_id = t.id LOOP
+    v_qty := COALESCE(
+      (SELECT (l ->> 'qty')::int FROM jsonb_array_elements(COALESCE(p_lines, '[]'::jsonb)) l
+        WHERE l ->> 'product_id' = it.product_id::text LIMIT 1),
+      NULLIF(it.quantity_received, 0),
+      it.quantity_dispatched, it.quantity);
+    v_qty := GREATEST(LEAST(v_qty, COALESCE(it.quantity_dispatched, it.quantity)), 0);
+
+    UPDATE public.stock_transfer_items SET quantity_received = v_qty WHERE id = it.id;
+    CONTINUE WHEN v_qty <= 0;
+
+    SELECT * INTO v_src FROM public.products WHERE id = it.product_id;
+    IF NOT FOUND THEN CONTINUE; END IF;
+
+    v_target := it.product_id;
+
+    -- Across clusters the receiving group keeps its own catalogue entry.
+    IF t.transfer_scope = 'INTER_GROUP' AND COALESCE(v_src.barcode, '') <> '' THEN
+      SELECT p.id INTO v_target
+        FROM public.products p
+       WHERE p.barcode = v_src.barcode
+         AND COALESCE(p.stock_by_store ? t.to_store_id, false)
+       LIMIT 1;
+      IF v_target IS NULL THEN v_target := it.product_id; END IF;
+    END IF;
+
+    IF p_deduct_source THEN
+      UPDATE public.products
+         SET stock_by_store = jsonb_set(
+               COALESCE(stock_by_store, '{}'::jsonb), ARRAY[t.from_store_id],
+               to_jsonb(GREATEST(
+                 COALESCE((stock_by_store ->> t.from_store_id)::int, 0) - v_qty, 0)), true),
+             stock_quantity = GREATEST(stock_quantity - v_qty, 0)
+       WHERE id = it.product_id;
+    END IF;
+
+    UPDATE public.products
+       SET stock_by_store = jsonb_set(
+             COALESCE(stock_by_store, '{}'::jsonb), ARRAY[t.to_store_id],
+             to_jsonb(COALESCE((stock_by_store ->> t.to_store_id)::int, 0) + v_qty), true),
+           stock_quantity = stock_quantity + v_qty
+     WHERE id = v_target;
+  END LOOP;
+
+  UPDATE public.stock_transfers
+     SET status = 'received', received_at = now(),
+         received_by = COALESCE(p_received_by, received_by)
+   WHERE id = t.id;
+END $$;
+
+REVOKE ALL ON FUNCTION public.stock_transfer_approve(uuid, text, jsonb) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.stock_transfer_dispatch(uuid, text, jsonb) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.stock_transfer_receive(uuid, text, boolean, jsonb) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.stock_transfer_approve(uuid, text, jsonb) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.stock_transfer_dispatch(uuid, text, jsonb) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.stock_transfer_receive(uuid, text, boolean, jsonb) TO authenticated, service_role;
+
+-- ------------------------------------------------------------------
+-- Stock transfer dispatch
+-- (source: 20260901151601_c8fcb3e2-615c-4b35-be01-1a2fbc038ee0.sql)
+-- ------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.stock_transfer_dispatch(p_transfer_id uuid, p_dispatched_by text DEFAULT NULL::text, p_lines jsonb DEFAULT NULL::jsonb)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  t public.stock_transfers;
+  it record;
+  v_qty integer;
+  v_before integer;
+BEGIN
+  IF NOT public.is_staff(auth.uid()) THEN
+    RAISE EXCEPTION 'Only staff can dispatch a transfer';
+  END IF;
+
+  SELECT * INTO t FROM public.stock_transfers WHERE id = p_transfer_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'TRANSFER_NOT_FOUND'; END IF;
+  IF t.status <> 'approved' THEN
+    RAISE EXCEPTION 'Transfer % is % and cannot be dispatched', t.ref, t.status;
+  END IF;
+
+  FOR it IN SELECT * FROM public.stock_transfer_items WHERE transfer_id = t.id LOOP
+    v_qty := COALESCE(
+      (SELECT (l ->> 'qty')::int FROM jsonb_array_elements(COALESCE(p_lines, '[]'::jsonb)) l
+        WHERE l ->> 'product_id' = it.product_id::text LIMIT 1),
+      it.quantity_approved, it.quantity);
+    v_qty := GREATEST(LEAST(v_qty, COALESCE(it.quantity_approved, it.quantity)), 0);
+
+    UPDATE public.stock_transfer_items SET quantity_dispatched = v_qty WHERE id = it.id;
+
+    CONTINUE WHEN v_qty <= 0;
+
+    SELECT COALESCE((stock_by_store ->> t.from_store_id)::int, 0) INTO v_before
+      FROM public.products WHERE id = it.product_id;
+
+    UPDATE public.products
+       SET stock_by_store = jsonb_set(
+             COALESCE(stock_by_store, '{}'::jsonb), ARRAY[t.from_store_id],
+             to_jsonb(GREATEST(
+               COALESCE((stock_by_store ->> t.from_store_id)::int, 0) - v_qty, 0)), true),
+           stock_quantity = GREATEST(stock_quantity - v_qty, 0)
+     WHERE id = it.product_id;
+
+    INSERT INTO public.item_activity_logs
+      (product_id, product_name, store_id, activity_type, reference,
+       quantity_delta, stock_before, stock_after, unit_cost, staff_name, note)
+    SELECT it.product_id, p.name, t.from_store_id, 'transfer_out', t.ref,
+           -v_qty, COALESCE(v_before, 0), GREATEST(COALESCE(v_before, 0) - v_qty, 0),
+           COALESCE(p.cost_price, 0), COALESCE(p_dispatched_by, ''), ''
+      FROM public.products p WHERE p.id = it.product_id;
+  END LOOP;
+
+  UPDATE public.stock_transfers
+     SET status = 'dispatched',
+         dispatched_by = COALESCE(p_dispatched_by, dispatched_by),
+         dispatched_at = now()
+   WHERE id = t.id;
+END $function$;
+
+CREATE OR REPLACE FUNCTION public.stock_transfer_receive(p_transfer_id uuid, p_received_by text DEFAULT NULL::text, p_deduct_source boolean DEFAULT false, p_lines jsonb DEFAULT NULL::jsonb)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  t public.stock_transfers;
+  it record;
+  v_target uuid;
+  v_qty integer;
+  v_src public.products;
+  v_before integer;
+BEGIN
+  IF NOT public.is_staff(auth.uid()) THEN
+    RAISE EXCEPTION 'Only staff can receive a transfer';
+  END IF;
+
+  SELECT * INTO t FROM public.stock_transfers WHERE id = p_transfer_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'TRANSFER_NOT_FOUND'; END IF;
+  IF t.status = 'received' THEN RAISE EXCEPTION 'TRANSFER_ALREADY_RECEIVED'; END IF;
+  IF t.status IN ('rejected', 'cancelled', 'completed') THEN RAISE EXCEPTION 'TRANSFER_CLOSED'; END IF;
+  IF t.status <> 'dispatched' THEN
+    RAISE EXCEPTION 'Transfer % has not been dispatched yet', t.ref;
+  END IF;
+
+  FOR it IN SELECT * FROM public.stock_transfer_items WHERE transfer_id = t.id LOOP
+    v_qty := COALESCE(
+      (SELECT (l ->> 'qty')::int FROM jsonb_array_elements(COALESCE(p_lines, '[]'::jsonb)) l
+        WHERE l ->> 'product_id' = it.product_id::text LIMIT 1),
+      NULLIF(it.quantity_received, 0),
+      it.quantity_dispatched, it.quantity);
+    v_qty := GREATEST(LEAST(v_qty, COALESCE(it.quantity_dispatched, it.quantity)), 0);
+
+    UPDATE public.stock_transfer_items SET quantity_received = v_qty WHERE id = it.id;
+    CONTINUE WHEN v_qty <= 0;
+
+    SELECT * INTO v_src FROM public.products WHERE id = it.product_id;
+    IF NOT FOUND THEN CONTINUE; END IF;
+
+    v_target := it.product_id;
+
+    -- Across clusters the receiving group keeps its own catalogue entry.
+    IF t.transfer_scope = 'INTER_GROUP' AND COALESCE(v_src.barcode, '') <> '' THEN
+      SELECT p.id INTO v_target
+        FROM public.products p
+       WHERE p.barcode = v_src.barcode
+         AND COALESCE(p.stock_by_store ? t.to_store_id, false)
+       LIMIT 1;
+      IF v_target IS NULL THEN v_target := it.product_id; END IF;
+    END IF;
+
+    IF p_deduct_source THEN
+      SELECT COALESCE((stock_by_store ->> t.from_store_id)::int, 0) INTO v_before
+        FROM public.products WHERE id = it.product_id;
+
+      UPDATE public.products
+         SET stock_by_store = jsonb_set(
+               COALESCE(stock_by_store, '{}'::jsonb), ARRAY[t.from_store_id],
+               to_jsonb(GREATEST(
+                 COALESCE((stock_by_store ->> t.from_store_id)::int, 0) - v_qty, 0)), true),
+             stock_quantity = GREATEST(stock_quantity - v_qty, 0)
+       WHERE id = it.product_id;
+
+      INSERT INTO public.item_activity_logs
+        (product_id, product_name, store_id, activity_type, reference,
+         quantity_delta, stock_before, stock_after, unit_cost, staff_name, note)
+      VALUES (it.product_id, v_src.name, t.from_store_id, 'transfer_out', t.ref,
+              -v_qty, COALESCE(v_before, 0), GREATEST(COALESCE(v_before, 0) - v_qty, 0),
+              COALESCE(v_src.cost_price, 0), COALESCE(p_received_by, ''), '');
+    END IF;
+
+    SELECT COALESCE((stock_by_store ->> t.to_store_id)::int, 0) INTO v_before
+      FROM public.products WHERE id = v_target;
+
+    UPDATE public.products
+       SET stock_by_store = jsonb_set(
+             COALESCE(stock_by_store, '{}'::jsonb), ARRAY[t.to_store_id],
+             to_jsonb(COALESCE((stock_by_store ->> t.to_store_id)::int, 0) + v_qty), true),
+           stock_quantity = stock_quantity + v_qty
+     WHERE id = v_target;
+
+    INSERT INTO public.item_activity_logs
+      (product_id, product_name, store_id, activity_type, reference,
+       quantity_delta, stock_before, stock_after, unit_cost, staff_name, note)
+    SELECT v_target, p.name, t.to_store_id, 'transfer_in', t.ref,
+           v_qty, COALESCE(v_before, 0), COALESCE(v_before, 0) + v_qty,
+           COALESCE(p.cost_price, 0), COALESCE(p_received_by, ''), ''
+      FROM public.products p WHERE p.id = v_target;
+  END LOOP;
+
+  UPDATE public.stock_transfers
+     SET status = 'received', received_at = now(),
+         received_by = COALESCE(p_received_by, received_by)
+   WHERE id = t.id;
+END $function$;
+
+-- ------------------------------------------------------------------
+-- Stock transfer receive/verify
+-- (source: 20260902034155_62cac758-4a22-408d-b91d-dffb4086c6d4.sql)
+-- ------------------------------------------------------------------
+ALTER TABLE public.stock_transfers
+  ADD COLUMN IF NOT EXISTS verified_by text,
+  ADD COLUMN IF NOT EXISTS verified_at timestamptz,
+  ADD COLUMN IF NOT EXISTS posted_at timestamptz,
+  ADD COLUMN IF NOT EXISTS discrepancy_reason text;
+
+ALTER TABLE public.stock_transfer_items
+  ADD COLUMN IF NOT EXISTS quantity_verified integer;
+
+-- Line quantity ceilings: verified can never exceed what arrived.
+CREATE OR REPLACE FUNCTION public.stock_transfer_items_enforce_quantities()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+BEGIN
+  IF NEW.quantity < 0
+     OR COALESCE(NEW.quantity_approved, 0) < 0
+     OR COALESCE(NEW.quantity_dispatched, 0) < 0
+     OR COALESCE(NEW.quantity_received, 0) < 0
+     OR COALESCE(NEW.quantity_verified, 0) < 0 THEN
+    RAISE EXCEPTION 'Transfer quantities cannot be negative' USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF NEW.quantity_approved IS NOT NULL AND NEW.quantity_approved > NEW.quantity THEN
+    RAISE EXCEPTION 'Cannot approve % of % requested', NEW.quantity_approved, NEW.quantity
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF NEW.quantity_dispatched IS NOT NULL
+     AND NEW.quantity_dispatched > COALESCE(NEW.quantity_approved, NEW.quantity) THEN
+    RAISE EXCEPTION 'Cannot send % when only % were approved',
+      NEW.quantity_dispatched, COALESCE(NEW.quantity_approved, NEW.quantity)
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF COALESCE(NEW.quantity_received, 0) > COALESCE(NEW.quantity_dispatched, NEW.quantity) THEN
+    RAISE EXCEPTION 'Cannot receive % when only % were sent',
+      NEW.quantity_received, COALESCE(NEW.quantity_dispatched, NEW.quantity)
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF COALESCE(NEW.quantity_verified, 0) > COALESCE(NEW.quantity_dispatched, NEW.quantity) THEN
+    RAISE EXCEPTION 'Cannot verify % when only % were sent',
+      NEW.quantity_verified, COALESCE(NEW.quantity_dispatched, NEW.quantity)
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  RETURN NEW;
+END;
+$function$;
+
+-- Lifecycle: arrival and posting are now two different things.
+CREATE OR REPLACE FUNCTION public.stock_transfers_enforce_lifecycle()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_needs_approval boolean;
+  v_may_approve boolean := public.is_supervisor_now()
+    OR public.has_perm('can_approve_transfer')
+    OR public.has_perm('can_receive_transfer');
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    v_needs_approval := public.stock_transfer_approval_required(NEW.from_store_id);
+
+    IF v_needs_approval THEN
+      NEW.status := 'awaiting_approval';
+    ELSIF NEW.status IS NULL OR NEW.status NOT IN ('awaiting_approval', 'approved') THEN
+      NEW.status := 'approved';
+    END IF;
+
+    IF NEW.status = 'approved' AND NOT v_needs_approval THEN
+      NEW.approved_by := COALESCE(NEW.approved_by, NEW.created_by);
+      NEW.approved_at := COALESCE(NEW.approved_at, now());
+    ELSE
+      NEW.approved_by := NULL;
+      NEW.approved_at := NULL;
+    END IF;
+
+    NEW.dispatched_by := NULL;
+    NEW.dispatched_at := NULL;
+    NEW.received_by := NULL;
+    NEW.received_at := NULL;
+    NEW.verified_by := NULL;
+    NEW.verified_at := NULL;
+    NEW.posted_at := NULL;
+    NEW.closed_at := NULL;
+    NEW.fulfilment := NULL;
+    RETURN NEW;
+  END IF;
+
+  IF OLD.status = NEW.status THEN
+    RETURN NEW;
+  END IF;
+
+  IF OLD.status IN ('rejected', 'cancelled', 'completed', 'completed_with_discrepancy') THEN
+    RAISE EXCEPTION 'Transfer % is closed (%) and cannot change', OLD.ref, OLD.status
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF NOT (
+    (OLD.status = 'awaiting_approval' AND NEW.status IN ('approved', 'rejected', 'cancelled'))
+    OR (OLD.status = 'approved' AND NEW.status IN ('dispatched', 'rejected', 'cancelled'))
+    OR (OLD.status = 'dispatched' AND NEW.status = 'received')
+    OR (OLD.status = 'received' AND NEW.status IN ('verified', 'completed', 'completed_with_discrepancy'))
+    OR (OLD.status = 'verified' AND NEW.status IN ('completed', 'completed_with_discrepancy'))
+  ) THEN
+    RAISE EXCEPTION 'Transfer % cannot go from % to %', OLD.ref, OLD.status, NEW.status
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF NEW.status IN ('approved', 'rejected') AND NOT v_may_approve THEN
+    RAISE EXCEPTION 'You are not allowed to approve or reject transfers'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+
+  IF NEW.status = 'approved' THEN
+    NEW.approved_at := COALESCE(NEW.approved_at, now());
+  END IF;
+
+  IF NEW.status = 'rejected' AND COALESCE(btrim(NEW.rejected_reason), '') = '' THEN
+    RAISE EXCEPTION 'A rejection needs a reason' USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF NEW.status = 'cancelled' AND COALESCE(btrim(NEW.cancelled_reason), '') = '' THEN
+    RAISE EXCEPTION 'A cancellation needs a reason' USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF NEW.status = 'completed_with_discrepancy'
+     AND COALESCE(btrim(NEW.discrepancy_reason), '') = '' THEN
+    RAISE EXCEPTION 'A discrepancy needs a reason' USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF NEW.status = 'dispatched' THEN
+    NEW.dispatched_at := COALESCE(NEW.dispatched_at, now());
+    NEW.closed_at := COALESCE(NEW.closed_at, now());
+    NEW.fulfilment := (
+      SELECT CASE
+        WHEN COALESCE(SUM(COALESCE(i.quantity_dispatched, 0)), 0) = 0 THEN 'none'
+        WHEN COALESCE(SUM(COALESCE(i.quantity_dispatched, 0)), 0)
+             >= COALESCE(SUM(i.quantity), 0) THEN 'full'
+        ELSE 'partial'
+      END
+      FROM public.stock_transfer_items i WHERE i.transfer_id = NEW.id
+    );
+  END IF;
+
+  IF NEW.status = 'received' THEN
+    NEW.received_at := COALESCE(NEW.received_at, now());
+  END IF;
+
+  IF NEW.status IN ('verified', 'completed', 'completed_with_discrepancy') THEN
+    NEW.received_at := COALESCE(NEW.received_at, now());
+    NEW.verified_at := COALESCE(NEW.verified_at, now());
+  END IF;
+
+  RETURN NEW;
+END;
+$function$;
+
+-- Receiving now only records arrival; no stock moves here.
+CREATE OR REPLACE FUNCTION public.stock_transfer_receive(
+  p_transfer_id uuid,
+  p_received_by text DEFAULT NULL::text,
+  p_deduct_source boolean DEFAULT false,
+  p_lines jsonb DEFAULT NULL::jsonb)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  t public.stock_transfers;
+  it record;
+  v_qty integer;
+BEGIN
+  IF NOT public.is_staff(auth.uid()) THEN
+    RAISE EXCEPTION 'Only staff can receive a transfer';
+  END IF;
+
+  SELECT * INTO t FROM public.stock_transfers WHERE id = p_transfer_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'TRANSFER_NOT_FOUND'; END IF;
+  IF t.status = 'received' THEN RAISE EXCEPTION 'TRANSFER_ALREADY_RECEIVED'; END IF;
+  IF t.status IN ('rejected', 'cancelled', 'verified', 'completed', 'completed_with_discrepancy') THEN
+    RAISE EXCEPTION 'TRANSFER_CLOSED';
+  END IF;
+  IF t.status <> 'dispatched' THEN
+    RAISE EXCEPTION 'Transfer % has not been dispatched yet', t.ref;
+  END IF;
+
+  FOR it IN SELECT * FROM public.stock_transfer_items WHERE transfer_id = t.id LOOP
+    v_qty := COALESCE(
+      (SELECT (l ->> 'qty')::int FROM jsonb_array_elements(COALESCE(p_lines, '[]'::jsonb)) l
+        WHERE l ->> 'product_id' = it.product_id::text LIMIT 1),
+      it.quantity_dispatched, it.quantity);
+    v_qty := GREATEST(LEAST(v_qty, COALESCE(it.quantity_dispatched, it.quantity)), 0);
+    UPDATE public.stock_transfer_items SET quantity_received = v_qty WHERE id = it.id;
+  END LOOP;
+
+  UPDATE public.stock_transfers
+     SET status = 'received', received_at = now(),
+         received_by = COALESCE(p_received_by, received_by)
+   WHERE id = t.id;
+END $function$;
+
+-- Verification posts the physically counted quantity, exactly once.
+CREATE OR REPLACE FUNCTION public.stock_transfer_verify(
+  p_transfer_id uuid,
+  p_verified_by text DEFAULT NULL::text,
+  p_lines jsonb DEFAULT NULL::jsonb,
+  p_reason text DEFAULT NULL::text)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  t public.stock_transfers;
+  it record;
+  v_target uuid;
+  v_qty integer;
+  v_src public.products;
+  v_before integer;
+  v_short boolean := false;
+BEGIN
+  IF NOT public.is_staff(auth.uid()) THEN
+    RAISE EXCEPTION 'Only staff can verify a transfer';
+  END IF;
+
+  SELECT * INTO t FROM public.stock_transfers WHERE id = p_transfer_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'TRANSFER_NOT_FOUND'; END IF;
+  IF t.posted_at IS NOT NULL
+     OR t.status IN ('verified', 'completed', 'completed_with_discrepancy') THEN
+    RAISE EXCEPTION 'TRANSFER_ALREADY_POSTED';
+  END IF;
+  IF t.status IN ('rejected', 'cancelled') THEN RAISE EXCEPTION 'TRANSFER_CLOSED'; END IF;
+  IF t.status <> 'received' THEN
+    RAISE EXCEPTION 'Transfer % has not arrived yet', t.ref;
+  END IF;
+
+  FOR it IN SELECT * FROM public.stock_transfer_items WHERE transfer_id = t.id LOOP
+    v_qty := COALESCE(
+      (SELECT (l ->> 'qty')::int FROM jsonb_array_elements(COALESCE(p_lines, '[]'::jsonb)) l
+        WHERE l ->> 'product_id' = it.product_id::text LIMIT 1),
+      it.quantity_received, it.quantity_dispatched, it.quantity);
+    v_qty := GREATEST(LEAST(v_qty, COALESCE(it.quantity_dispatched, it.quantity)), 0);
+
+    IF v_qty < COALESCE(it.quantity_dispatched, it.quantity) THEN v_short := true; END IF;
+
+    UPDATE public.stock_transfer_items
+       SET quantity_verified = v_qty, quantity_received = v_qty
+     WHERE id = it.id;
+
+    CONTINUE WHEN v_qty <= 0;
+
+    SELECT * INTO v_src FROM public.products WHERE id = it.product_id;
+    IF NOT FOUND THEN CONTINUE; END IF;
+
+    v_target := it.product_id;
+
+    IF t.transfer_scope = 'INTER_GROUP' AND COALESCE(v_src.barcode, '') <> '' THEN
+      SELECT p.id INTO v_target
+        FROM public.products p
+       WHERE p.barcode = v_src.barcode
+         AND COALESCE(p.stock_by_store ? t.to_store_id, false)
+       LIMIT 1;
+      IF v_target IS NULL THEN v_target := it.product_id; END IF;
+    END IF;
+
+    SELECT COALESCE((stock_by_store ->> t.to_store_id)::int, 0) INTO v_before
+      FROM public.products WHERE id = v_target FOR UPDATE;
+
+    UPDATE public.products
+       SET stock_by_store = jsonb_set(
+             COALESCE(stock_by_store, '{}'::jsonb), ARRAY[t.to_store_id],
+             to_jsonb(COALESCE((stock_by_store ->> t.to_store_id)::int, 0) + v_qty), true),
+           stock_quantity = stock_quantity + v_qty
+     WHERE id = v_target;
+
+    INSERT INTO public.item_activity_logs
+      (product_id, product_name, store_id, activity_type, reference,
+       quantity_delta, stock_before, stock_after, unit_cost, staff_name, note)
+    SELECT v_target, p.name, t.to_store_id, 'transfer_in', t.ref,
+           v_qty, COALESCE(v_before, 0), COALESCE(v_before, 0) + v_qty,
+           COALESCE(p.cost_price, 0), COALESCE(p_verified_by, ''), ''
+      FROM public.products p WHERE p.id = v_target;
+  END LOOP;
+
+  IF v_short AND COALESCE(btrim(p_reason), '') = '' THEN
+    RAISE EXCEPTION 'A discrepancy needs a reason' USING ERRCODE = 'check_violation';
+  END IF;
+
+  UPDATE public.stock_transfers
+     SET status = CASE WHEN v_short THEN 'completed_with_discrepancy' ELSE 'completed' END,
+         verified_by = COALESCE(p_verified_by, verified_by),
+         verified_at = now(),
+         posted_at = now(),
+         discrepancy_reason = CASE WHEN v_short THEN p_reason ELSE discrepancy_reason END
+   WHERE id = t.id;
+END $function$;
+
+GRANT EXECUTE ON FUNCTION public.stock_transfer_verify(uuid, text, jsonb, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.stock_transfer_verify(uuid, text, jsonb, text) TO service_role;
+
+-- Dispatch refuses to move stock the sending branch does not have.
+CREATE OR REPLACE FUNCTION public.stock_transfer_dispatch(
+  p_transfer_id uuid,
+  p_dispatched_by text DEFAULT NULL::text,
+  p_lines jsonb DEFAULT NULL::jsonb)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  t public.stock_transfers;
+  it record;
+  v_qty integer;
+  v_before integer;
+BEGIN
+  IF NOT public.is_staff(auth.uid()) THEN
+    RAISE EXCEPTION 'Only staff can dispatch a transfer';
+  END IF;
+
+  SELECT * INTO t FROM public.stock_transfers WHERE id = p_transfer_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'TRANSFER_NOT_FOUND'; END IF;
+  IF t.status <> 'approved' THEN
+    RAISE EXCEPTION 'Transfer % is % and cannot be dispatched', t.ref, t.status;
+  END IF;
+
+  FOR it IN SELECT * FROM public.stock_transfer_items WHERE transfer_id = t.id LOOP
+    v_qty := COALESCE(
+      (SELECT (l ->> 'qty')::int FROM jsonb_array_elements(COALESCE(p_lines, '[]'::jsonb)) l
+        WHERE l ->> 'product_id' = it.product_id::text LIMIT 1),
+      it.quantity_approved, it.quantity);
+    v_qty := GREATEST(LEAST(v_qty, COALESCE(it.quantity_approved, it.quantity)), 0);
+
+    UPDATE public.stock_transfer_items SET quantity_dispatched = v_qty WHERE id = it.id;
+
+    CONTINUE WHEN v_qty <= 0;
+
+    SELECT COALESCE((stock_by_store ->> t.from_store_id)::int, 0) INTO v_before
+      FROM public.products WHERE id = it.product_id FOR UPDATE;
+
+    IF COALESCE(v_before, 0) < v_qty THEN
+      RAISE EXCEPTION 'Short by % of % at the sending branch',
+        v_qty - COALESCE(v_before, 0),
+        COALESCE((SELECT name FROM public.products WHERE id = it.product_id), 'item')
+        USING ERRCODE = 'check_violation';
+    END IF;
+
+    UPDATE public.products
+       SET stock_by_store = jsonb_set(
+             COALESCE(stock_by_store, '{}'::jsonb), ARRAY[t.from_store_id],
+             to_jsonb(COALESCE((stock_by_store ->> t.from_store_id)::int, 0) - v_qty), true),
+           stock_quantity = GREATEST(stock_quantity - v_qty, 0)
+     WHERE id = it.product_id;
+
+    INSERT INTO public.item_activity_logs
+      (product_id, product_name, store_id, activity_type, reference,
+       quantity_delta, stock_before, stock_after, unit_cost, staff_name, note)
+    SELECT it.product_id, p.name, t.from_store_id, 'transfer_out', t.ref,
+           -v_qty, COALESCE(v_before, 0), COALESCE(v_before, 0) - v_qty,
+           COALESCE(p.cost_price, 0), COALESCE(p_dispatched_by, ''), ''
+      FROM public.products p WHERE p.id = it.product_id;
+  END LOOP;
+
+  UPDATE public.stock_transfers
+     SET status = 'dispatched',
+         dispatched_by = COALESCE(p_dispatched_by, dispatched_by),
+         dispatched_at = now()
+   WHERE id = t.id;
+END $function$;
+
+-- Historical rows: already received means already posted.
+UPDATE public.stock_transfer_items i
+   SET quantity_verified = COALESCE(i.quantity_received, i.quantity_dispatched, i.quantity)
+  FROM public.stock_transfers t
+ WHERE t.id = i.transfer_id
+   AND t.status = 'received'
+   AND i.quantity_verified IS NULL;
+
+UPDATE public.stock_transfers
+   SET status = 'completed',
+       verified_by = COALESCE(verified_by, received_by),
+       verified_at = COALESCE(verified_at, received_at),
+       posted_at = COALESCE(posted_at, received_at, now())
+ WHERE status = 'received';
+
+-- ------------------------------------------------------------------
+-- Stock transfer verify - grant
+-- (source: 20260902034240_c0e1ac50-4e17-4215-85d7-7834619526a2.sql)
+-- ------------------------------------------------------------------
+REVOKE ALL ON FUNCTION public.stock_transfer_verify(uuid, text, jsonb, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.stock_transfer_verify(uuid, text, jsonb, text) FROM anon;
+GRANT EXECUTE ON FUNCTION public.stock_transfer_verify(uuid, text, jsonb, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.stock_transfer_verify(uuid, text, jsonb, text) TO service_role;
+
+-- ------------------------------------------------------------------
+-- Authorisation requests: amounts and bill snapshot
+-- (source: 20260904111958_84467a29-26bd-47b6-b5b0-412ec9798f34.sql)
+-- ------------------------------------------------------------------
+ALTER TABLE public.authorization_requests
+  ADD COLUMN IF NOT EXISTS requested_amount numeric,
+  ADD COLUMN IF NOT EXISTS approved_amount numeric,
+  ADD COLUMN IF NOT EXISTS approved_payload jsonb NOT NULL DEFAULT '{}'::jsonb,
+  ADD COLUMN IF NOT EXISTS bill_snapshot jsonb NOT NULL DEFAULT '{}'::jsonb,
+  ADD COLUMN IF NOT EXISTS snapshot_hash text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS held_order_id text,
+  ADD COLUMN IF NOT EXISTS notified_at timestamptz;
+
+CREATE INDEX IF NOT EXISTS authorization_requests_requester_idx
+  ON public.authorization_requests (requested_by, created_at DESC);
+
+ALTER TABLE public.held_orders
+  ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'held',
+  ADD COLUMN IF NOT EXISTS pending_request_id uuid;
+
+CREATE INDEX IF NOT EXISTS held_orders_status_idx ON public.held_orders (status);
+
+ALTER TABLE public.sales
+  ADD COLUMN IF NOT EXISTS authorization_request_id uuid,
+  ADD COLUMN IF NOT EXISTS authorized_by text,
+  ADD COLUMN IF NOT EXISTS authorized_at timestamptz;
+
+ALTER TABLE public.activity_events
+  ADD COLUMN IF NOT EXISTS cleared_by text[] NOT NULL DEFAULT '{}'::text[];
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime'
+      AND schemaname = 'public'
+      AND tablename = 'authorization_requests'
+  ) THEN
+    EXECUTE 'ALTER PUBLICATION supabase_realtime ADD TABLE public.authorization_requests';
+  END IF;
+END $$;
+
+-- ------------------------------------------------------------------
+-- Navigation pins
+-- (source: 20260904152046_c8d143c4-f160-46f0-92b9-9802677b7d38.sql)
+-- ------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.nav_pins (
+  id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  owner_id uuid NULL,
+  item_kind text NOT NULL CHECK (item_kind IN ('nav', 'settings')),
+  item_key text NOT NULL,
+  sort_order integer NOT NULL DEFAULT 0,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS nav_pins_owner_item_uk
+  ON public.nav_pins (COALESCE(owner_id, '00000000-0000-0000-0000-000000000000'::uuid), item_kind, item_key);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.nav_pins TO authenticated;
+GRANT ALL ON public.nav_pins TO service_role;
+
+ALTER TABLE public.nav_pins ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "nav_pins_read_own_and_company" ON public.nav_pins;
+CREATE POLICY "nav_pins_read_own_and_company" ON public.nav_pins
+  FOR SELECT TO authenticated
+  USING (owner_id = auth.uid() OR owner_id IS NULL);
+
+DROP POLICY IF EXISTS "nav_pins_insert_own" ON public.nav_pins;
+CREATE POLICY "nav_pins_insert_own" ON public.nav_pins
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    (owner_id = auth.uid())
+    OR (owner_id IS NULL AND public.has_role(auth.uid(), 'admin'))
+  );
+
+DROP POLICY IF EXISTS "nav_pins_update_own" ON public.nav_pins;
+CREATE POLICY "nav_pins_update_own" ON public.nav_pins
+  FOR UPDATE TO authenticated
+  USING (
+    (owner_id = auth.uid())
+    OR (owner_id IS NULL AND public.has_role(auth.uid(), 'admin'))
+  )
+  WITH CHECK (
+    (owner_id = auth.uid())
+    OR (owner_id IS NULL AND public.has_role(auth.uid(), 'admin'))
+  );
+
+DROP POLICY IF EXISTS "nav_pins_delete_own" ON public.nav_pins;
+CREATE POLICY "nav_pins_delete_own" ON public.nav_pins
+  FOR DELETE TO authenticated
+  USING (
+    (owner_id = auth.uid())
+    OR (owner_id IS NULL AND public.has_role(auth.uid(), 'admin'))
+  );
+
+DROP TRIGGER IF EXISTS nav_pins_set_updated_at ON public.nav_pins;
+CREATE TRIGGER nav_pins_set_updated_at
+  BEFORE UPDATE ON public.nav_pins
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+-- ===========================================================================
+-- Verification - lists anything still missing after this run.
+-- An empty result means the database matches this file.
+-- ===========================================================================
+DO $verify$
+DECLARE
+  missing text[] := ARRAY[]::text[];
+  t text;
+  f text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY[
+    'app_users','audit_logs','authorization_actions','authorization_log',
+    'authorization_requests','bookings','booking_payments','cashiers',
+    'coupon_campaigns','coupon_events','drawer_events','entity_status_history',
+    'held_orders','issued_vouchers','item_activity_logs','members',
+    'member_verifications','membership_tiers','nav_pins','payment_transactions',
+    'payment_types','pos_settings','pos_store_settings','product_barcodes',
+    'product_categories','products','promotions','public_flags',
+    'purchase_orders','purchase_order_items','record_edits','sale_items','sales',
+    'secure_settings','security_findings','settings_locks','settings_overrides',
+    'settings_scoped','shift_cash_counts','shift_close_events',
+    'shift_reconciliations','shift_sessions','shift_variance_alerts','shifts',
+    'sku_audit','staff_roles','stock_adjustments','stock_count_drafts',
+    'stock_delta_applied','stock_transfers','stock_transfer_items','stores',
+    'suppliers','sync_metadata','terminal_commands','terminal_tokens',
+    'uom_units','user_roles','whatsapp_queue'
+  ] LOOP
+    IF to_regclass('public.' || t) IS NULL THEN
+      missing := missing || ('table ' || t);
+    END IF;
+  END LOOP;
+
+  FOREACH f IN ARRAY ARRAY[
+    'booking_balance_state','booking_cancel','booking_collect','booking_refund',
+    'has_role','product_delete_guard','shift_state','stock_apply_deltas',
+    'stock_reconcile','stock_transfer_approve','stock_transfer_dispatch',
+    'stock_transfer_receive'
+  ] LOOP
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+       WHERE n.nspname = 'public' AND p.proname = f
+    ) THEN
+      missing := missing || ('function ' || f);
+    END IF;
+  END LOOP;
+
+  IF array_length(missing, 1) IS NULL THEN
+    RAISE NOTICE 'Schema check: everything present.';
+  ELSE
+    RAISE WARNING 'Schema check: still missing -> %', array_to_string(missing, ', ');
+  END IF;
+END
+$verify$;
