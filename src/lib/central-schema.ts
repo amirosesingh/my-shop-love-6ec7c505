@@ -151,6 +151,7 @@ export const CENTRAL_SCHEMA: CentralTableSchema[] = [
       { name: "barcode_variants", pgType: "jsonb" },
       { name: "row_version", pgType: "integer" },
       { name: "deleted_at", pgType: "timestamptz" },
+      { name: "owner_store_id", pgType: "text" },
     ],
   },
   {
