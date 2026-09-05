@@ -98,7 +98,7 @@ function AllShops() {
   }, [state.sales, state.products]);
 
   const rows = state.products.filter((p) => {
-    if (hidden.size > 0 && !stores.some((s2) => productVisibleAt(state.settings, p.id, s2.id))) return false;
+    if (hidden.size > 0 && !stores.some((s2) => productVisibleAt(state.settings, p, s2.id))) return false;
     if (category !== "all" && p.category !== category) return false;
     if (
       query &&

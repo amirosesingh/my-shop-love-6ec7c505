@@ -189,7 +189,7 @@ function Inventory() {
   const rows = state.products.filter(
     (p) =>
       // Items owned by a private-catalogue branch stay at that branch.
-      productVisibleAt(state.settings, p.id, state.currentStoreId) &&
+      productVisibleAt(state.settings, p, state.currentStoreId) &&
       (showArchived ? p.archived === true : p.archived !== true) &&
       (catFilter === "all" || p.category === catFilter) &&
       (groupFilter === "all" || (p.group ?? "") === groupFilter) &&
