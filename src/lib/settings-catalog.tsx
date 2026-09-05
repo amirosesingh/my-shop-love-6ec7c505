@@ -34,15 +34,15 @@ import {
 
 export type SettingsCategoryId =
   | "business"
+  | "people"
   | "products"
-  | "payments"
-  | "receipts"
-  | "bookings"
   | "terminal"
+  | "receipts"
+  | "sales"
+  | "payments"
   | "data"
   | "security"
-  | "health"
-  | "messaging";
+  | "health";
 
 /** Heading a category sits under on the settings home page. */
 export type SettingsGroupId = "business" | "sales" | "terminal" | "admin";
@@ -68,68 +68,79 @@ export type SettingsCategory = {
   label: string;
   blurb: string;
   group: SettingsGroupId;
+  icon: typeof MonitorCog;
 };
 
 export const SETTINGS_CATEGORIES: SettingsCategory[] = [
   {
     id: "business",
-    label: "Business",
-    blurb: "Who you are, what you charge and how documents are numbered.",
+    label: "Business & locations",
+    blurb: "Who you are, where you trade and how documents are numbered.",
     group: "business",
+    icon: Building2,
+  },
+  {
+    id: "people",
+    label: "People & permissions",
+    blurb: "Who may do what, and who is signed in right now.",
+    group: "business",
+    icon: Users,
   },
   {
     id: "products",
     label: "Products & inventory",
     blurb: "Categories, units and the codes products are given.",
     group: "business",
+    icon: ScanBarcode,
   },
   {
     id: "payments",
-    label: "Payments",
-    blurb: "What customers can pay with and where the money lands.",
+    label: "Payments & tax",
+    blurb: "What customers can pay with, where the money lands and what you charge.",
     group: "sales",
+    icon: Landmark,
   },
   {
     id: "receipts",
-    label: "Receipts & printing",
+    label: "Printing & receipts",
     blurb: "The printer and everything printed on a slip.",
     group: "sales",
+    icon: Printer,
   },
   {
-    id: "bookings",
-    label: "Bookings & services",
-    blurb: "Job cards, deposits, turnaround and the slip the customer signs.",
+    id: "sales",
+    label: "Sales & bookings",
+    blurb: "Job cards, deposits, turnaround and how bills reach the customer.",
     group: "sales",
-  },
-  {
-    id: "messaging",
-    label: "Messaging",
-    blurb: "How bills and alerts reach the customer.",
-    group: "sales",
+    icon: CalendarClock,
   },
   {
     id: "terminal",
-    label: "Terminal",
-    blurb: "This machine: screen, hardware, updates and its identity.",
+    label: "Terminals & devices",
+    blurb: "This machine and every till and phone paired to the company.",
     group: "terminal",
+    icon: MonitorSmartphone,
   },
   {
     id: "data",
-    label: "Data & connectivity",
+    label: "Sync & data",
     blurb: "Company connection, local database and keeping them in step.",
     group: "terminal",
+    icon: RefreshCw,
   },
   {
     id: "security",
-    label: "Staff & security",
-    blurb: "Who may do what, and what each role can see.",
+    label: "Security",
+    blurb: "Enforcement rules and the alerts raised against them.",
     group: "admin",
+    icon: ShieldCheck,
   },
   {
     id: "health",
     label: "System health",
     blurb: "Status checks, alerts and support tools.",
     group: "admin",
+    icon: Activity,
   },
 ];
 
