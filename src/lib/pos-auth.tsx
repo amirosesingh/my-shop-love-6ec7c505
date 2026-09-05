@@ -810,6 +810,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       /* ignore */
     }
+    try {
+      await window.sqlAdmin?.lockAdmin?.();
+    } catch {
+      /* web/Android, or a desktop bridge that is already closing */
+    }
     clearStoredCredentials();
   }, []);
 
@@ -845,7 +850,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const meta = account.user_metadata ?? {};
     const metaRole = (meta["role"] as MetaRole | undefined) ?? null;
     const isTrueAdmin =
-      metaRole === "admin" ||
       roles.includes("admin") ||
       appUser?.role === "admin" ||
       terminalUser?.role === "admin";
@@ -853,7 +857,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // store scope is their own assignment (null = all stores).
     const isElevated =
       isTrueAdmin ||
-      metaRole === "supervisor" ||
       roles.includes("manager") ||
       appUser?.role === "manager" ||
       terminalUser?.role === "manager";

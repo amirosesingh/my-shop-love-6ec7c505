@@ -1299,6 +1299,36 @@ function registerIpc() {
   );
   ipcMain.handle("admin:lock", () => adminSession.lock());
   ipcMain.handle("admin:status", () => adminSession.status());
+  ipcMain.handle("admin:adopt-session", async (_e, accessToken) => {
+    const token = String(accessToken ?? "").trim();
+    if (!token) return { ok: false, error: "Not signed in" };
+    const configured = String(configStore.get("backendUrl") ?? "").trim().replace(/\/+$/, "");
+    if (!configured) return { ok: false, error: "The backend address is not configured" };
+    let target;
+    try {
+      const base = new URL(configured);
+      if (base.protocol !== "https:" && !(DEBUG && ["localhost", "127.0.0.1"].includes(base.hostname))) {
+        return { ok: false, error: "The configured backend address must use HTTPS" };
+      }
+      target = new URL("/api/public/desktop-session", base).toString();
+    } catch {
+      return { ok: false, error: "The configured backend address is invalid" };
+    }
+    try {
+      const response = await session.defaultSession.fetch(target, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || body?.ok !== true) {
+        adminSession.lock();
+        return { ok: false, error: body?.error ?? "The signed-in account could not be verified" };
+      }
+      return adminSession.adoptVerified(body.level, body.name);
+    } catch {
+      return { ok: false, error: "The signed-in account could not be verified" };
+    }
+  });
 
   /**
    * Emergency Access: the window says it accepted the recovery code, and this
@@ -1308,10 +1338,11 @@ function registerIpc() {
   ipcMain.handle("admin:recovery-unlock", (_e, code) => adminSession.recoveryUnlock(code));
   ipcMain.handle("admin:recovery-lock", () => adminSession.recoveryLock());
 
-  const admin = (work) => adminSession.requireAdmin(work);
+  const admin = (work) => adminSession.requireLevel(work, "admin");
+  const supervisor = (work) => adminSession.requireLevel(work, "supervisor");
 
   ipcMain.handle("sqladmin:connect", (_e, credentials) =>
-    admin(() =>
+    supervisor(() =>
       bounded(
         45_000,
         "The SQL driver did not finish the authentication handshake in time.",
@@ -1321,24 +1352,24 @@ function registerIpc() {
     ),
   );
   ipcMain.handle("sqladmin:cancel", (_e, attemptId) =>
-    admin(() =>
+    supervisor(() =>
       bounded(5_000, "The cancel request did not finish in time.", () => sqlAdmin.cancel(attemptId)),
     ),
   );
   ipcMain.handle("sqladmin:probe-port", (_e, credentials) =>
-    admin(() =>
+    supervisor(() =>
       bounded(15_000, "The port probe did not finish in time.", () => sqlAdmin.probePort(credentials)),
     ),
   );
   ipcMain.handle("sqladmin:lock", (_e, credentials) =>
-    admin(() =>
+    supervisor(() =>
       bounded(45_000, "The database could not be opened in time.", () =>
         sqlAdmin.lockDatabase(credentials),
       ),
     ),
   );
   ipcMain.handle("sqladmin:databases", () =>
-    admin(() =>
+    supervisor(() =>
       bounded(15_000, "The database list did not arrive in time.", () => sqlAdmin.listDatabases()),
     ),
   );
@@ -1348,26 +1379,26 @@ function registerIpc() {
     bounded(20_000, "The write check did not finish in time.", () => pool.verifyWrite()),
   );
   ipcMain.handle("sqladmin:tables", (_e, dbName) =>
-    admin(() =>
+    supervisor(() =>
       bounded(15_000, "The table list did not arrive in time.", () => sqlAdmin.getTables(dbName)),
     ),
   );
   ipcMain.handle("sqladmin:columns", (_e, dbName, tableName, schemaName) =>
-    admin(() =>
+    supervisor(() =>
       bounded(15_000, "The column list did not arrive in time.", () =>
         sqlAdmin.getTableColumns(dbName, tableName, schemaName),
       ),
     ),
   );
   ipcMain.handle("sqladmin:query", (_e, dbName, queryText) =>
-    admin(() =>
+    supervisor(() =>
       bounded(30_000, "The query did not finish in time.", () =>
         sqlAdmin.executeQuery(dbName, queryText),
       ),
     ),
   );
   ipcMain.handle("sqladmin:disconnect", () =>
-    admin(() =>
+    supervisor(() =>
       bounded(10_000, "The disconnect did not finish in time.", () => sqlAdmin.disconnect()),
     ),
   );

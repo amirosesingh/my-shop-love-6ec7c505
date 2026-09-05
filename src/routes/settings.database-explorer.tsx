@@ -25,19 +25,19 @@ export const Route = createFileRoute("/settings/database-explorer")({
 });
 
 function DatabaseExplorerPage() {
-  const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const { isAdmin, isSupervisor } = useAuth();
+  const canBrowse = isAdmin || isSupervisor;
   return (
     <SettingsFrame
       wide
       title="Database explorer"
       description="Connect to the Microsoft SQL Server on this machine, browse its databases and tables, and run read-only checks. This connection is separate from the one the register uses, so browsing never interrupts a sale."
     >
-      {isAdmin ? (
+      {canBrowse ? (
         <DatabaseExplorer />
       ) : (
         <div className="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">
-          Only an administrator can open the database explorer.
+          Only a supervisor or administrator can open the database explorer.
         </div>
       )}
     </SettingsFrame>
