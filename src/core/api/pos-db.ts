@@ -282,6 +282,7 @@ export const rowToStore = (r: Row): Store => ({
   // Databases that predate the column report `undefined`; treat those as live.
   active: r.is_active === undefined || r.is_active === null ? true : !!r.is_active,
   archivedAt: r.archived_at ?? null,
+  privateCatalogue: r.private_catalogue === true,
 });
 
 export const storeToRow = (s: Store): Row => ({
