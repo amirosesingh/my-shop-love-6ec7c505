@@ -30,7 +30,7 @@ const row = (over: Partial<QueueView>): QueueView =>
   }) as unknown as QueueView;
 
 describe("sync summary", () => {
-  beforeEach(() => window.localStorage.clear());
+  beforeEach(() => store.clear());
 
   it("counts waiting and refused changes apart", () => {
     const s = summarise([
