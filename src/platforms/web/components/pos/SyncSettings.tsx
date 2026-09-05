@@ -133,46 +133,6 @@ export function SyncSettings() {
 
       <Housekeeping />
 
-      <PendingTransactions rows={queueView()} onChange={bump} />
-
-      {quarantined.length > 0 && (
-        <div className="space-y-2 rounded-md border border-destructive/40 bg-destructive/5 p-3">
-          <p className="text-sm font-medium text-destructive">
-            {quarantined.length} change(s) need attention
-          </p>
-          <ul className="space-y-1 text-xs text-muted-foreground">
-            {quarantined.slice(0, 6).map((q) => (
-              <li key={q.id}>
-                {q.context} · {q.op.table} — {q.lastError ?? "unknown error"}
-              </li>
-            ))}
-          </ul>
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                retryQuarantined();
-                bump();
-                void drainOutbox();
-              }}
-            >
-              Retry all
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                discardQuarantined();
-                bump();
-                toast.success("Failed changes discarded");
-              }}
-            >
-              Discard
-            </Button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
