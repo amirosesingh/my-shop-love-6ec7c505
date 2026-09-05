@@ -56,6 +56,9 @@ const STATUS_TONE: Record<string, string> = {
   expired: "bg-muted text-muted-foreground",
 };
 
+/** Money that never throws on a missing or malformed value. */
+const money = (n: unknown) => (typeof n === "number" && Number.isFinite(n) ? n.toFixed(2) : "0.00");
+
 const ago = (iso: string) => {
   const ms = Date.now() - Date.parse(iso || "");
   if (!Number.isFinite(ms)) return "";
@@ -191,7 +194,7 @@ function ApprovalsPage() {
           </p>
         ) : null}
 
-        {!loading && rows.length === 0 ? (
+        {!loading && !error && rows.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center gap-2 p-10 text-center">
               <Clock3 className="size-6 text-muted-foreground" />
@@ -263,8 +266,8 @@ function ApprovalsPage() {
                         className="h-9 w-36"
                         inputMode="decimal"
                         placeholder={
-                          row.requestedAmount !== null
-                            ? `Approve ${row.requestedAmount.toFixed(2)}`
+                          typeof row.requestedAmount === "number"
+                            ? `Approve ${money(row.requestedAmount)}`
                             : "Amount (optional)"
                         }
                         value={amount[row.id] ?? ""}
@@ -298,11 +301,11 @@ function ApprovalsPage() {
                       ? `${row.status} by ${row.decidedByName || row.decidedBy}`
                       : row.status}
                     {row.decisionNote ? ` — ${row.decisionNote}` : ""}
-                    {row.requestedAmount !== null
-                      ? ` · asked ${row.requestedAmount.toFixed(2)}`
+                    {typeof row.requestedAmount === "number"
+                      ? ` · asked ${money(row.requestedAmount)}`
                       : ""}
-                    {row.approvedAmount !== null
-                      ? ` · granted ${row.approvedAmount.toFixed(2)}`
+                    {typeof row.approvedAmount === "number"
+                      ? ` · granted ${money(row.approvedAmount)}`
                       : ""}
                     {row.consumedAt ? " · used" : ""}
                   </p>
@@ -323,7 +326,7 @@ function ApprovalsPage() {
 function TicketReview({ row }: { row: AuthorizationRequest }) {
   const t = row.snapshot;
   if (!t) return null;
-  const money = (n: number) => n.toFixed(2);
+  const lines = Array.isArray(t.lines) ? t.lines : [];
   return (
     <div className="rounded-md border border-border/60">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-3 py-2 text-xs">
@@ -351,7 +354,7 @@ function TicketReview({ row }: { row: AuthorizationRequest }) {
           </tr>
         </thead>
         <tbody>
-          {t.lines.map((l, i) => (
+          {lines.map((l, i) => (
             <tr key={`${l.sku}-${i}`} className="border-t border-border/40">
               <td className="px-3 py-1">
                 {l.name || l.sku}
@@ -370,17 +373,18 @@ function TicketReview({ row }: { row: AuthorizationRequest }) {
         <span className="text-muted-foreground">Discount {money(t.discount)}</span>
         <span className="text-muted-foreground">Tax {money(t.tax)}</span>
         <span className="font-medium">Total {money(t.total)}</span>
-        {t.expectedTotal !== undefined ? (
+        {typeof t.expectedTotal === "number" ? (
           <span className="font-medium text-primary">
             If approved {money(t.expectedTotal)}
           </span>
         ) : null}
       </div>
-      {row.requestedAmount !== null ? (
+      {typeof row.requestedAmount === "number" ? (
         <p className="border-t border-border/60 px-3 py-2 text-xs">
           Requested{t.requestedLabel ? ` ${t.requestedLabel}` : ""}:{" "}
           <span className="font-medium">{money(row.requestedAmount)}</span>
-          {row.approvedAmount !== null && row.approvedAmount !== row.requestedAmount ? (
+          {typeof row.approvedAmount === "number" &&
+          row.approvedAmount !== row.requestedAmount ? (
             <span className="text-primary"> · granted {money(row.approvedAmount)}</span>
           ) : null}
         </p>
