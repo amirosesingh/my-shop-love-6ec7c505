@@ -127,8 +127,8 @@ export function usePromotions(deps: PromotionsDeps) {
         appliedAt: at,
       });
     } else {
-      setCartDiscountType(rule.valueType ?? "amount");
-      setCartDiscount(rule.value ?? 0);
+      // A bill coupon is its own figure — it never occupies the cashier's
+      // bill-discount entry, so the two add up instead of replacing each other.
       const value = rule.valueType === "percent" ? r2((promoBase * (rule.value ?? 0)) / 100) : r2(rule.value ?? 0);
       setCoupon({
         code: rule.name,
@@ -221,8 +221,6 @@ export function usePromotions(deps: PromotionsDeps) {
           return;
         }
         const value = voucherValue(campaign, base);
-        setCartDiscountType("amount");
-        setCartDiscount(value);
         setCoupon({
           code: token,
           promoId: campaign.id,
@@ -280,8 +278,6 @@ export function usePromotions(deps: PromotionsDeps) {
       const i = lines.findIndex((l) => l.couponCode === coupon.code);
       // Only the coupon goes; the cashier's own discount on that line stays.
       if (i >= 0) patchLine(i, { couponCode: undefined, couponDiscount: undefined });
-    } else {
-      setCartDiscount(0);
     }
     logger.log("promotion", "Coupon removed", "register", {
       coupon: coupon.code,
