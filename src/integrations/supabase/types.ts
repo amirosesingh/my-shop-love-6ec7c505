@@ -1961,6 +1961,7 @@ export type Database = {
           created_at: string
           deleted_at: string | null
           id: string
+          is_active: boolean
           kind: string
           name: string
           parent_id: string | null
@@ -1972,6 +1973,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           id?: string
+          is_active?: boolean
           kind?: string
           name: string
           parent_id?: string | null
@@ -1983,6 +1985,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           id?: string
+          is_active?: boolean
           kind?: string
           name?: string
           parent_id?: string | null
@@ -4024,6 +4027,7 @@ export type Database = {
           created_at: string
           deleted_at: string | null
           id: string
+          is_active: boolean
           name: string
           row_version: number
           sort: number
@@ -4035,6 +4039,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           id?: string
+          is_active?: boolean
           name: string
           row_version?: number
           sort?: number
@@ -4046,6 +4051,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           id?: string
+          is_active?: boolean
           name?: string
           row_version?: number
           sort?: number
