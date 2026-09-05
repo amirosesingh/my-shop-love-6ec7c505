@@ -494,20 +494,6 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     panel: page(() => import("@/routes/settings.database")),
   },
   {
-    id: "data-sync",
-    label: "Data sync & audit",
-    blurb: "Every push and pull between this till and the company data.",
-    icon: RefreshCw,
-    category: "data",
-    scope: "terminal",
-    to: "/settings/system?tab=data-sync",
-    raw: true,
-    desktopOnly: true,
-    panel: lazy(async () => ({
-      default: (await import("@/platforms/web/components/pos/sync/SyncHub")).SyncHub,
-    })),
-  },
-  {
     id: "shift-alerts",
     label: "Shift alerts",
     blurb: "How the day-end summary reaches this device.",
