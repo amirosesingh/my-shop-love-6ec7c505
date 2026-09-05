@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { SettingsFrame } from "@/platforms/web/components/pos/settings/SettingsFrame";
 import { SyncPanel } from "@/platforms/web/components/pos/sync/SyncPanel";
+import { SyncHub } from "@/platforms/web/components/pos/sync/SyncHub";
 import { SyncSettings } from "@/platforms/web/components/pos/SyncSettings";
 
 export const Route = createFileRoute("/settings/sync")({
@@ -10,7 +11,7 @@ export const Route = createFileRoute("/settings/sync")({
       {
         name: "description",
         content:
-          "The one place sync runs from: live table-by-table status, the pending queue, sync history and backups.",
+          "The one place sync runs from: live table-by-table status, every change still waiting, why it is stuck, the audit ledger and backups.",
       },
       { property: "og:title", content: "Sync — Northwind POS" },
       { property: "og:description", content: "Trigger sync, watch progress and clear the queue." },
@@ -25,6 +26,7 @@ export const Route = createFileRoute("/settings/sync")({
       description="This till always sells against its own database. Sync pushes finished work to the central database whenever a connection is available — start it here, and only here."
     >
       <SyncPanel />
+      <SyncHub />
       <SyncSettings />
     </SettingsFrame>
   ),

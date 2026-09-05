@@ -12,18 +12,12 @@ import { describeError, showNotification } from "@/lib/notify";
 import { localDb } from "@/core/local-db/local-db";
 import { databaseModeLabel, effectiveDatabaseMode, subscribeDatabaseMode } from "@/core/local-db/db-mode";
 import {
-  discardQuarantined,
-  discardOp,
   isOnlineSyncEnabled,
   lastSyncedAt,
   listQueue,
-  queueView,
-  retryOp,
-  retryQuarantined,
   setOnlineSyncEnabled,
   subscribeOutbox,
 } from "@/lib/sync-outbox";
-import type { QueueView } from "@/lib/sync-outbox";
 import { isOnlineOnly } from "@/lib/live-mode";
 import { isCloudConnected } from "@/core/activation/registration-status";
 import { subscribeConnectivity } from "@/core/activation/connection-health";
@@ -45,7 +39,6 @@ export function SyncSettings() {
   }, []);
 
   const queue = listQueue();
-  const quarantined = queue.filter((q) => q.quarantined);
   const last = lastSyncedAt();
 
   // Web and Android have no local database engine behind them: there is
@@ -133,46 +126,6 @@ export function SyncSettings() {
 
       <Housekeeping />
 
-      <PendingTransactions rows={queueView()} onChange={bump} />
-
-      {quarantined.length > 0 && (
-        <div className="space-y-2 rounded-md border border-destructive/40 bg-destructive/5 p-3">
-          <p className="text-sm font-medium text-destructive">
-            {quarantined.length} change(s) need attention
-          </p>
-          <ul className="space-y-1 text-xs text-muted-foreground">
-            {quarantined.slice(0, 6).map((q) => (
-              <li key={q.id}>
-                {q.context} · {q.op.table} — {q.lastError ?? "unknown error"}
-              </li>
-            ))}
-          </ul>
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                retryQuarantined();
-                bump();
-                void drainOutbox();
-              }}
-            >
-              Retry all
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                discardQuarantined();
-                bump();
-                toast.success("Failed changes discarded");
-              }}
-            >
-              Discard
-            </Button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -244,107 +197,3 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-const when = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString() : "—");
-
-const stateLabel: Record<QueueView["state"], string> = {
-  waiting: "Waiting to send",
-  retrying: "Retrying",
-  refused: "Refused",
-};
-
-/**
- * Every change still held on this terminal, so staff can see exactly what has
- * not reached the central database yet and why.
- */
-function PendingTransactions({ rows, onChange }: { rows: QueueView[]; onChange: () => void }) {
-  if (!rows.length) {
-    return (
-      <p className="rounded-md border border-border px-3 py-2 text-xs text-muted-foreground">
-        Nothing is waiting — every change on this terminal has reached the central database.
-      </p>
-    );
-  }
-
-  return (
-    <div className="space-y-2 rounded-md border border-border p-3">
-      <p className="text-sm font-medium">Transactions held on this terminal</p>
-      <p className="text-xs text-muted-foreground">
-        These are already saved here and are safe. They are sent in the order they happened as soon
-        as the connection allows.
-      </p>
-      <div className="max-h-72 overflow-auto rounded-md border border-border">
-        <table className="w-full text-left text-xs">
-          <thead className="sticky top-0 bg-muted/60 text-muted-foreground">
-            <tr>
-              <th className="px-2 py-1.5 font-medium">Change</th>
-              <th className="px-2 py-1.5 font-medium">Happened</th>
-              <th className="px-2 py-1.5 font-medium">Branch / till</th>
-              <th className="px-2 py-1.5 font-medium">Status</th>
-              <th className="px-2 py-1.5 font-medium">Next try</th>
-              <th className="px-2 py-1.5" />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.id} className="border-t border-border align-top">
-                <td className="px-2 py-1.5">
-                  <span className="block">{row.context}</span>
-                  <span className="text-muted-foreground">{row.op.table}</span>
-                </td>
-                <td className="px-2 py-1.5 numeric">{when(row.occurredAt ?? row.createdAt)}</td>
-                <td className="px-2 py-1.5 text-muted-foreground">
-                  {row.branchId ?? "—"}
-                  {row.terminalId ? ` · ${row.terminalId}` : ""}
-                </td>
-                <td className="px-2 py-1.5">
-                  <span className={row.state === "refused" ? "text-destructive" : ""}>
-                    {stateLabel[row.state]}
-                  </span>
-                  {row.reason && (
-                    <span className="block text-muted-foreground">
-                      {describeError(row.reason, "Sending this change")}
-                    </span>
-                  )}
-                </td>
-                <td className="px-2 py-1.5 numeric text-muted-foreground">
-                  {row.state === "refused" ? "Paused" : when(row.nextAttemptAt)}
-                </td>
-                <td className="px-2 py-1.5 text-right whitespace-nowrap">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      retryOp(row.id);
-                      onChange();
-                      void drainOutbox();
-                    }}
-                  >
-                    Retry
-                  </Button>
-                  {row.state === "refused" && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-destructive"
-                      onClick={() => {
-                        const ok = window.confirm(
-                          `Discard "${row.context}"? This change will never reach the central database.`,
-                        );
-                        if (!ok) return;
-                        discardOp(row.id);
-                        onChange();
-                        showNotification("Change discarded", "success");
-                      }}
-                    >
-                      Discard
-                    </Button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}

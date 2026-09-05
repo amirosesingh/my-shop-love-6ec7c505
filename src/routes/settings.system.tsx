@@ -8,7 +8,6 @@ import { DatabaseHealthPanel } from "@/platforms/web/components/pos/settings/pan
 import { LogicHealthPanel } from "@/platforms/web/components/pos/settings/panels/LogicHealthPanel";
 import { SecurityAlertsPanel } from "@/platforms/web/components/pos/settings/panels/SecurityAlertsPanel";
 import { InheritancePanel } from "@/platforms/web/components/pos/settings/panels/InheritancePanel";
-import { SyncHub } from "@/platforms/web/components/pos/sync/SyncHub";
 import { DataComparison } from "@/platforms/web/components/pos/sync/DataComparison";
 import { SYSTEM_TAB_IDS, systemTab, type SystemTabId } from "@/lib/settings-groups";
 
@@ -62,7 +61,6 @@ function SystemSettingsPage() {
         {tab === "database-health" && <DatabaseHealthPanel />}
         {tab === "logic-health" && <LogicHealthPanel />}
         {tab === "security-alerts" && <SecurityAlertsPanel />}
-        {tab === "data-sync" && <SyncHub />}
         {tab === "data-comparison" && <DataComparison />}
         {tab === "inheritance" && <InheritancePanel />}
       </div>

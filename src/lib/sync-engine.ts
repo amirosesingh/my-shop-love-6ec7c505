@@ -1,5 +1,6 @@
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { logSync } from "./sync-log";
+import { noteSyncAck } from "./sync-summary";
 import { hasRequiredPlatformConfig } from "./platform-config-ready";
 import { hasSignedInIdentity } from "./session-presence";
 
@@ -530,6 +531,9 @@ export async function drainOutbox(): Promise<{ pushed: number; failed: number }>
     }
 
     if (pushed) markSynced();
+    // The central database accepted these changes: that is the acknowledgement
+    // the Sync page shows, separate from "a pass finished".
+    if (pushed) noteSyncAck();
     // A successful push proves the connection is back, so online mode resumes.
     if (pushed) noteConnectionRestored();
     // Tell the register this terminal synced, so the Terminals screen can show

@@ -174,7 +174,7 @@ export function SystemStatusBadge({
           </Button>
           <Button asChild size="sm" className="flex-1">
             <Link
-              to={status.credentialsInvalid ? "/settings/system" : "/settings/data-sync"}
+              to={status.credentialsInvalid ? "/settings/system" : "/settings/sync"}
               onClick={() => setOpen(false)}
             >
               Sync hub
