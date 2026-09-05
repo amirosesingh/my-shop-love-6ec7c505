@@ -3445,8 +3445,25 @@ function Register() {
           padTarget === "bill"
             ? cartDiscountType
             : typeof padTarget === "number"
-              ? (lines[padTarget]?.discountType ?? "amount")
-              : "amount"
+              ? (lines[padTarget]?.discountType ?? "percent")
+              : "percent"
+        }
+        /** What the discount can be taken off — nothing may go below zero. */
+        max={
+          padTarget === "bill"
+            ? Math.max(0, r2(totals.subtotal - totals.lineDiscount))
+            : typeof padTarget === "number" && lines[padTarget]
+              ? Math.max(
+                  0,
+                  r2(
+                    Math.abs(lines[padTarget]!.price * lines[padTarget]!.qty) -
+                      Math.min(
+                        Math.abs(lines[padTarget]!.price * lines[padTarget]!.qty),
+                        Math.abs(lines[padTarget]!.couponDiscount || 0),
+                      ),
+                  ),
+                )
+              : 0
         }
         onApply={(v, t) => {
           const target = padTarget;
@@ -3459,7 +3476,9 @@ function Register() {
               !rules.allow_discount_stacking && !!coupon && v > 0 && (target === "bill" || typeof target === "number");
 
             if (stacking) {
-              toast.error("Discount stacking is off — remove the coupon first");
+              toast.error(
+                `Discount stacking is switched off for this branch, so coupon “${coupon?.code}” and a manual discount cannot both apply. Remove the coupon first, then enter the discount.`,
+              );
               return;
             }
             if (overLimit) {
