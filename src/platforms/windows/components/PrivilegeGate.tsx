@@ -18,14 +18,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-
-type Refusal = { ok?: boolean; code?: string; error?: string };
-
-const isRefusal = (value: unknown): value is Refusal =>
-  Boolean(value) &&
-  typeof value === "object" &&
-  (value as Refusal).ok === false &&
-  (value as Refusal).code === "EPRIVILEGE";
+import { wrapBridge } from "@/platforms/windows/privilege-bridge";
+import { onRecoveryScreen } from "@/lib/recovery-route";
 
 type Ask = { message: string; resolve: (unlocked: boolean) => void };
 
@@ -40,6 +34,9 @@ export function PrivilegeGate({ children }: { children: React.ReactNode }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const asking = useRef<Promise<boolean> | null>(null);
+  // Emergency Access exists to repair a broken till; it must never be gated or
+  // blanked by this component.
+  const recovery = useRef(onRecoveryScreen()).current;
 
   /* One prompt at a time, however many calls are refused at once. */
   const requestUnlock = (message: string) => {
@@ -64,35 +61,47 @@ export function PrivilegeGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const win = window as unknown as Record<string, Record<string, unknown> | undefined>;
     const pos = win["pos"] as { onFatal?: (cb: (p: { message: string }) => void) => () => void } | undefined;
-    if (!pos) return; // web and Android have no desktop bridge
+    if (!pos || recovery) return; // web and Android have no desktop bridge
 
     const undo: Array<() => void> = [];
+    let off: (() => void) | undefined;
 
-    for (const name of BRIDGES) {
-      const bridge = win[name];
-      if (!bridge) continue;
-      for (const [key, fn] of Object.entries(bridge)) {
-        if (typeof fn !== "function" || key.startsWith("on") || key === "unlock") continue;
-        const original = fn as (...args: unknown[]) => unknown;
-        (bridge as Record<string, unknown>)[key] = async (...args: unknown[]) => {
-          const first = await original(...args);
-          if (!isRefusal(first)) return first;
-          const unlocked = await requestUnlock(first.error ?? "");
-          if (!unlocked) return first;
-          return original(...args);
-        };
-        undo.push(() => {
-          (bridge as Record<string, unknown>)[key] = original;
-        });
+    // The desktop shell hands these objects over read-only, so their functions
+    // can never be replaced in place. A stand-in in front of the whole bridge
+    // forwards every call untouched and only adds the administrator prompt
+    // when a call comes back refused. Anything that goes wrong here must leave
+    // the till running rather than blanking the screen.
+    try {
+      for (const name of BRIDGES) {
+        const bridge = win[name];
+        if (!bridge) continue;
+        const proxy = wrapBridge(bridge, requestUnlock);
+        try {
+          win[name] = proxy as unknown as Record<string, unknown>;
+          undo.push(() => {
+            win[name] = bridge;
+          });
+        } catch {
+          /* this shell will not let us stand in front of the bridge */
+        }
       }
+
+      off = pos.onFatal?.((payload) => setFatal(payload?.message ?? "This till has stopped."));
+    } catch {
+      /* never block the till from loading */
     }
 
-    const off = pos.onFatal?.((payload) => setFatal(payload?.message ?? "This till has stopped."));
     return () => {
-      for (const restore of undo) restore();
+      for (const restore of undo) {
+        try {
+          restore();
+        } catch {
+          /* ignore */
+        }
+      }
       off?.();
     };
-  }, []);
+  }, [recovery]);
 
   const submit = async () => {
     setBusy(true);
@@ -111,6 +120,8 @@ export function PrivilegeGate({ children }: { children: React.ReactNode }) {
     }
     ask?.resolve(true);
   };
+
+  if (recovery) return <>{children}</>;
 
   if (fatal) {
     return (

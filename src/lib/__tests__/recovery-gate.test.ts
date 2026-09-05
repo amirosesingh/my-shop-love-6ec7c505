@@ -61,7 +61,10 @@ describe("no fresh-install screen is a dead end", () => {
     expect(read("src/platforms/web/components/pos/TerminalActivation.tsx")).toMatch(
       /<EmergencyAccessLink/,
     );
-    expect(read("src/routes/__root.tsx")).toMatch(/<EmergencyAccessLink/);
+    // The failure screen must leave the broken app entirely rather than
+    // re-render the same crashing tree, so it navigates the window instead of
+    // using the in-app link.
+    expect(read("src/routes/__root.tsx")).toMatch(/window\.location\.assign\(RECOVERY_PATH\)/);
   });
 
   it("routes missing terminal configuration to connection setup before activation", () => {
