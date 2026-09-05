@@ -174,9 +174,15 @@ type AuthCtx = {
   addStaff: (member: Omit<StaffMember, "id">) => void;
   updateStaff: (member: StaffMember) => void;
   removeStaff: (id: string) => void;
-  login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
+  login: (
+    email: string,
+    password: string,
+  ) => Promise<{ ok: boolean; error?: string; code?: LoginFailure }>;
   /** Cashier tab: numeric User ID + PIN mapped onto a Supabase email account. */
-  cashierLogin: (userId: string, pin: string) => Promise<{ ok: boolean; error?: string }>;
+  cashierLogin: (
+    userId: string,
+    pin: string,
+  ) => Promise<{ ok: boolean; error?: string; code?: LoginFailure }>;
   logout: () => Promise<void>;
   /** Lock the till / switch user — clears the session without losing local data. */
   lock: () => Promise<void>;
