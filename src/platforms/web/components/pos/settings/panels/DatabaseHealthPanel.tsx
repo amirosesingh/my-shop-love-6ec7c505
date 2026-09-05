@@ -322,7 +322,7 @@ export function DatabaseHealthPanel() {
           <h2 className="text-sm font-semibold">Branch id coverage</h2>
           <p className="text-xs text-muted-foreground">
             Rows saved without a branch cannot be found by branch reports. Run{" "}
-            <code>supabase/sql/21_backfill_branch_ids.sql</code> on your database to repair
+            <code>supabase/schema.sql</code> on your database to repair
             older rows.
           </p>
           <div className="overflow-x-auto rounded-md border border-border">

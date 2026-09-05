@@ -5,8 +5,8 @@
 -- Works for BOTH cases:
 --   * fresh project  -> every table, view, function, trigger, grant and
 --                       row-level-security policy is created
---   * live database  -> nothing is dropped, truncated or recreated; missing
---                       tables/columns/indexes/policies are added in place
+--   * live database  -> no table or column is dropped; missing objects are
+--                       added and known compatible legacy types are repaired
 --
 -- Re-runnable: run it as many times as you like.
 -- Order: enums -> tables -> columns -> routines -> constraints -> indexes
@@ -2309,11 +2309,74 @@ ALTER TABLE public.stock_transfer_items ADD COLUMN IF NOT EXISTS quantity intege
 
 ALTER TABLE public.stock_transfer_items ADD COLUMN IF NOT EXISTS quantity_received integer DEFAULT 0 NOT NULL;
 
+ALTER TABLE public.stock_transfer_items ADD COLUMN IF NOT EXISTS quantity_approved integer;
+
+ALTER TABLE public.stock_transfer_items ADD COLUMN IF NOT EXISTS quantity_dispatched integer;
+
+ALTER TABLE public.stock_transfer_items ADD COLUMN IF NOT EXISTS quantity_verified integer;
+
 ALTER TABLE public.stock_transfer_items ADD COLUMN IF NOT EXISTS unit_cost numeric DEFAULT 0 NOT NULL;
 
 ALTER TABLE public.stock_transfer_items ADD COLUMN IF NOT EXISTS created_at timestamp with time zone DEFAULT now() NOT NULL;
 
 ALTER TABLE public.stock_transfer_items ADD COLUMN IF NOT EXISTS row_version integer DEFAULT 1 NOT NULL;
+
+-- Older hand-built databases sometimes created transfer quantities as text or
+-- numeric. ADD COLUMN IF NOT EXISTS cannot correct an existing column's type,
+-- and mixed types later fail with 42804 inside COALESCE. Convert only values
+-- that are exact integers; otherwise stop and name the offending column so no
+-- row is silently rounded, discarded or replaced.
+DO $quantity_types$
+DECLARE
+  target_column text;
+  type_name text;
+  invalid_count bigint;
+BEGIN
+  FOREACH target_column IN ARRAY ARRAY[
+    'quantity', 'quantity_received', 'quantity_approved',
+    'quantity_dispatched', 'quantity_verified'
+  ] LOOP
+    SELECT c.data_type
+      INTO type_name
+      FROM information_schema.columns c
+     WHERE c.table_schema = 'public'
+       AND c.table_name = 'stock_transfer_items'
+       AND c.column_name = target_column;
+
+    IF type_name = 'integer' THEN
+      CONTINUE;
+    ELSIF type_name IN ('smallint', 'bigint', 'numeric', 'decimal',
+                        'text', 'character varying', 'character') THEN
+      EXECUTE format(
+        'SELECT count(*) FROM public.stock_transfer_items WHERE %1$I IS NOT NULL AND (' ||
+        'btrim(%1$I::text) !~ ''^[+-]?[0-9]+([.]0+)?$'' OR ' ||
+        'CASE WHEN btrim(%1$I::text) ~ ''^[+-]?[0-9]+([.]0+)?$'' ' ||
+        'THEN (%1$I::text)::numeric NOT BETWEEN -2147483648 AND 2147483647 ELSE false END)',
+        target_column
+      ) INTO invalid_count;
+
+      IF invalid_count > 0 THEN
+        RAISE EXCEPTION
+          'Cannot safely convert public.stock_transfer_items.% to integer: % incompatible value(s). Correct those values and run this file again.',
+          target_column, invalid_count
+          USING ERRCODE = '42804';
+      END IF;
+
+      EXECUTE format(
+        'ALTER TABLE public.stock_transfer_items ALTER COLUMN %1$I TYPE integer ' ||
+        'USING CASE WHEN %1$I IS NULL OR btrim(%1$I::text) = '''' THEN NULL ' ||
+        'ELSE (%1$I::text)::numeric::integer END',
+        target_column
+      );
+    ELSIF type_name IS NOT NULL THEN
+      RAISE EXCEPTION
+        'Cannot automatically convert public.stock_transfer_items.% from % to integer. Correct this column type and run this file again.',
+        target_column, type_name
+        USING ERRCODE = '42804';
+    END IF;
+  END LOOP;
+END
+$quantity_types$;
 
 ALTER TABLE public.stock_transfers ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid() NOT NULL;
 
@@ -10372,6 +10435,57 @@ CREATE TRIGGER nav_pins_set_updated_at
   BEFORE UPDATE ON public.nav_pins
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
+-- Full read-only inventory used by Settings -> Database health.
+CREATE OR REPLACE FUNCTION public.schema_inventory_deep()
+RETURNS jsonb
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_catalog
+AS $$
+  SELECT COALESCE(
+    jsonb_object_agg(t.relname, jsonb_build_object(
+      'rls', t.relrowsecurity,
+      'columns', COALESCE((
+        SELECT jsonb_object_agg(a.attname, jsonb_build_object(
+          'type', format_type(a.atttypid, a.atttypmod),
+          'nullable', NOT a.attnotnull,
+          'default', pg_get_expr(d.adbin, d.adrelid)
+        ))
+        FROM pg_attribute a
+        LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+        WHERE a.attrelid = t.oid AND a.attnum > 0 AND NOT a.attisdropped
+      ), '{}'::jsonb),
+      'constraints', COALESCE((
+        SELECT jsonb_object_agg(c.conname, jsonb_build_object(
+          'kind', c.contype::text,
+          'definition', pg_get_constraintdef(c.oid)
+        ))
+        FROM pg_constraint c WHERE c.conrelid = t.oid
+      ), '{}'::jsonb),
+      'indexes', COALESCE((
+        SELECT jsonb_agg(i.indexname ORDER BY i.indexname)
+        FROM pg_indexes i WHERE i.schemaname = 'public' AND i.tablename = t.relname
+      ), '[]'::jsonb),
+      'triggers', COALESCE((
+        SELECT jsonb_agg(g.tgname ORDER BY g.tgname)
+        FROM pg_trigger g WHERE g.tgrelid = t.oid AND NOT g.tgisinternal
+      ), '[]'::jsonb),
+      'policies', COALESCE((
+        SELECT jsonb_agg(p.policyname ORDER BY p.policyname)
+        FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = t.relname
+      ), '[]'::jsonb)
+    )),
+    '{}'::jsonb
+  )
+  FROM pg_class t
+  JOIN pg_namespace n ON n.oid = t.relnamespace
+  WHERE n.nspname = 'public' AND t.relkind = 'r';
+$$;
+
+REVOKE ALL ON FUNCTION public.schema_inventory_deep() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schema_inventory_deep() TO service_role;
+
 -- ===========================================================================
 -- Verification - lists anything still missing after this run.
 -- An empty result means the database matches this file.
@@ -10407,8 +10521,8 @@ BEGIN
   FOREACH f IN ARRAY ARRAY[
     'booking_balance_state','booking_cancel','booking_collect','booking_refund',
     'has_role','product_delete_guard','shift_state','stock_apply_deltas',
-    'stock_reconcile','stock_transfer_approve','stock_transfer_dispatch',
-    'stock_transfer_receive'
+    'schema_inventory_deep','stock_reconcile','stock_transfer_approve',
+    'stock_transfer_dispatch','stock_transfer_receive','stock_transfer_verify'
   ] LOOP
     IF NOT EXISTS (
       SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace

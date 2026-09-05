@@ -215,7 +215,7 @@ export function ActivityBell({ compact }: { compact?: boolean }) {
                 The activity log is not set up on this database yet. Run
                 <span className="font-medium">
                   {" "}
-                  supabase/sql/35_activity_and_token_columns.sql
+                  supabase/schema.sql
                 </span>{" "}
                 to switch it on.
               </p>

@@ -108,11 +108,11 @@ export async function fetchBoard(from: string, to: string): Promise<BoardData> {
 
   const issues: BoardIssue[] = [];
   if (storeRes.error)
-    issues.push(classify("v_daily_store_sales", "supabase/sql/12_analytics_views.sql", storeRes.error.message));
+    issues.push(classify("v_daily_store_sales", "supabase/schema.sql", storeRes.error.message));
   if (itemRes.error)
-    issues.push(classify("v_daily_item_sales", "supabase/sql/12_analytics_views.sql", itemRes.error.message));
+    issues.push(classify("v_daily_item_sales", "supabase/schema.sql", itemRes.error.message));
   if (billRes.error)
-    issues.push(classify("sales", "supabase/sql/04_register_sales.sql", billRes.error.message));
+    issues.push(classify("sales", "supabase/schema.sql", billRes.error.message));
   if (issues.length) throw new BoardError(issues);
 
   return {

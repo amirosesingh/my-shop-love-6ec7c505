@@ -14,9 +14,9 @@ const asIssues = (error: unknown): BoardIssue[] =>
         {
           source: "reporting data",
           kind: "other",
-          sqlFile: "supabase/sql/99_run_all.sql",
+          sqlFile: "supabase/schema.sql",
           detail: error instanceof Error ? error.message : String(error),
-          advice: "Re-run supabase/sql/99_run_all.sql to rebuild the reporting objects.",
+          advice: "Re-run supabase/schema.sql to rebuild the reporting objects.",
         },
       ];
 

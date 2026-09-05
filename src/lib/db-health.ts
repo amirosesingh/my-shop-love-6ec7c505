@@ -172,7 +172,7 @@ export function explainError(error: { message: string; code?: string }): string 
     return `Table missing — the setup script has not been run on this database (${error.message})`;
   }
   if (/permission denied for function/i.test(error.message)) {
-    return `${error.message} — run supabase/sql/99_fix_grants_and_helpers.sql once`;
+    return `${error.message} — run supabase/schema.sql once`;
   }
   if (error.code === "42501" || /permission denied/i.test(error.message)) {
     return `No access rule allows this account here (${error.message})`;
