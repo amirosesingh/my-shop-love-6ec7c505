@@ -1,0 +1,94 @@
+/**
+ * Why a sign-in did not go through — in categories, not raw backend text.
+ *
+ * A till that has not been connected to a company yet, a company database that
+ * cannot be reached and a mistyped password are three completely different
+ * problems, and only one of them is about the password. Before this module the
+ * screen printed whatever the cloud replied, so every one of them read as
+ * "Invalid login credentials" and sent people looking for the wrong fix.
+ *
+ * Nothing here ever carries a key, a token, a password or a server detail: the
+ * category and a short sentence are all that leave this file.
+ */
+import type { ConfigReadiness } from "@/lib/platform-config-ready";
+
+export type LoginFailure =
+  | "configuration-required"
+  | "configuration-invalid"
+  | "cloud-unreachable"
+  | "cloud-schema-missing"
+  | "terminal-not-activated"
+  | "branch-not-configured"
+  | "invalid-credentials"
+  | "account-inactive"
+  | "permission-denied"
+  | "local-backend-unavailable"
+  | "unknown-error";
+
+const WORDING: Record<LoginFailure, string> = {
+  "configuration-required":
+    "This terminal has not been connected to a company yet. Open the connection screen and enter the company database address and key.",
+  "configuration-invalid":
+    "The saved connection details on this terminal are incomplete or not valid. Open the connection screen and check them.",
+  "cloud-unreachable":
+    "The company database did not answer. Check this device's internet connection, then try again.",
+  "cloud-schema-missing":
+    "The company database answered but the point-of-sale tables are missing, so accounts cannot be checked yet.",
+  "terminal-not-activated":
+    "This terminal has not been activated yet. Complete activation before signing in.",
+  "branch-not-configured":
+    "This terminal is not assigned to a branch yet. Assign a branch before signing in.",
+  "invalid-credentials": "That email or password is not correct.",
+  "account-inactive": "Account deactivated. Please contact an administrator.",
+  "permission-denied":
+    "Your account signed in, but its role and permissions could not be loaded, so access was refused.",
+  "local-backend-unavailable":
+    "This terminal's own service is not responding, so it cannot complete sign-in.",
+  "unknown-error": "Sign in could not be completed. Please try again.",
+};
+
+/** Plain wording for a category — safe to show anywhere. */
+export const loginFailureMessage = (code: LoginFailure): string => WORDING[code];
+
+/** True when the operator should be sent to the connection screen. */
+export const isConfigurationFailure = (code: LoginFailure): boolean =>
+  code === "configuration-required" ||
+  code === "configuration-invalid" ||
+  code === "cloud-unreachable" ||
+  code === "cloud-schema-missing";
+
+/**
+ * Turn the local readiness answer into a category. `undefined` means the
+ * device is ready as far as its saved configuration is concerned.
+ */
+export function failureFromReadiness(state: ConfigReadiness): LoginFailure | undefined {
+  if (state.ready) return undefined;
+  switch (state.state) {
+    case "missing":
+      return "configuration-required";
+    case "incomplete":
+    case "failed":
+      return "configuration-invalid";
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * Classify what the cloud replied to a password sign-in. Only a genuine
+ * credential refusal may be reported as a wrong email or password.
+ */
+export function failureFromAuthError(message: string | undefined): LoginFailure {
+  const msg = (message ?? "").toLowerCase();
+  if (!msg) return "unknown-error";
+  if (/invalid login credentials|invalid email or password|invalid grant/.test(msg))
+    return "invalid-credentials";
+  if (/email not confirmed|user is banned|disabled|deactivat/.test(msg)) return "account-inactive";
+  if (/failed to fetch|load failed|network|timeout|abort|dns|enotfound|econnrefused/.test(msg))
+    return "cloud-unreachable";
+  if (/invalid api ?key|no api key|jwt|unrecognized|project not found|not found/.test(msg))
+    return "configuration-invalid";
+  if (/relation .* does not exist|schema|undefined table/.test(msg)) return "cloud-schema-missing";
+  if (/too many requests|rate limit/.test(msg)) return "unknown-error";
+  return "unknown-error";
+}
