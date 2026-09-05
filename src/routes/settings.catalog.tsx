@@ -12,10 +12,13 @@ import { useAuth } from "@/lib/pos-auth";
 import {
   deleteCategory,
   deleteUnit,
+  isActive,
   listOf,
   reorderCategory,
   saveCategory,
   saveUnit,
+  setCategoryActive,
+  setUnitActive,
   useCategories,
   useUnits,
 } from "@/lib/catalog-meta";
@@ -112,8 +115,25 @@ onRemove,
       <div className="divide-y divide-border rounded-md border border-border">
         {items.map((item) => (
           <div key={item.id} className="flex items-center justify-between gap-2 px-3 py-2">
-            <span className="truncate text-sm">{item.name}</span>
-            <div className="flex items-center">
+            <span className="flex min-w-0 items-center gap-2 truncate text-sm">
+              <span className={isActive(item) ? "truncate" : "truncate text-muted-foreground line-through"}>
+                {item.name}
+              </span>
+              {!isActive(item) && (
+                <Badge variant="outline" className="shrink-0 text-[10px]">
+                  Inactive
+                </Badge>
+              )}
+            </span>
+            <div className="flex items-center gap-1">
+              <Switch
+                checked={isActive(item)}
+                disabled={!allowed}
+                aria-label={`${item.name} active`}
+                onCheckedChange={(next) => {
+                  void setCategoryActive(item.id, next);
+                }}
+              />
               <Button
                 size="icon"
                 variant="ghost"
@@ -230,7 +250,8 @@ function CatalogMetaSettings() {
           <h1 className="text-2xl font-semibold tracking-tight">Categories & Units</h1>
           <p className="text-sm text-muted-foreground">
             Keep three simple lists — categories, groups and sub-categories — and pick from them
-            when adding products.
+            when adding products. Switch an entry off to retire it without losing what old records
+            say.
           </p>
         </header>
 
@@ -276,7 +297,8 @@ function CatalogMetaSettings() {
         <section className="space-y-3 rounded-lg border border-border p-4">
           <h2 className="font-medium">Units of measure</h2>
           <p className="text-xs text-muted-foreground">
-            Decimal units allow fractional quantities at the till (0.25 kg, 3.5 m).
+            Decimal units allow fractional quantities at the till (0.25 kg, 3.5 m). Switch a unit
+            off to retire it: old products keep it, new ones can no longer choose it.
           </p>
           <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-1">
@@ -315,10 +337,23 @@ function CatalogMetaSettings() {
 
           <div className="flex flex-wrap gap-2">
             {units.map((u) => (
-              <Badge key={u.code} variant="outline" className="gap-2 py-1">
+              <Badge
+                key={u.code}
+                variant="outline"
+                className={isActive(u) ? "gap-2 py-1" : "gap-2 py-1 opacity-60"}
+              >
                 <span className="numeric font-medium">{u.code}</span>
                 <span className="text-muted-foreground">{u.name}</span>
                 {u.allowDecimal && <span className="text-[10px] text-accent">decimal</span>}
+                {!isActive(u) && <span className="text-[10px] text-muted-foreground">inactive</span>}
+                <Switch
+                  checked={isActive(u)}
+                  disabled={!allowed}
+                  aria-label={`Unit ${u.code} active`}
+                  onCheckedChange={(next) => {
+                    void setUnitActive(u.id, next);
+                  }}
+                />
                 <button
                   type="button"
                   className="text-destructive"
