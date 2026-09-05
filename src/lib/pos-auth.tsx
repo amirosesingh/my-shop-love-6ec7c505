@@ -485,6 +485,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // accepts the same range: short numeric PINs and longer passcodes alike.
     if (pin.length < 4 || pin.length > 32)
       return { ok: false, error: "Enter your PIN or passcode" };
+    // A till that was never connected has nowhere to check a PIN against.
+    // Saying "PIN not recognised" there sends people hunting for the wrong
+    // fix, so the configuration problem is named instead.
+    const readiness = await hasRequiredPlatformConfig();
+    const configFailure = failureFromReadiness(readiness);
+    if (configFailure)
+      return {
+        ok: false,
+        code: configFailure,
+        error: loginFailureMessage(configFailure),
+      };
+
     let offline = false;
     if (typeof navigator !== "undefined" && !navigator.onLine) offline = true;
 
