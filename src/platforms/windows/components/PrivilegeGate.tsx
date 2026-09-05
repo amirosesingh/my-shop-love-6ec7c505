@@ -19,6 +19,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { wrapBridge } from "@/platforms/windows/privilege-bridge";
+import { onRecoveryScreen } from "@/lib/recovery-route";
 
 type Ask = { message: string; resolve: (unlocked: boolean) => void };
 
@@ -33,6 +34,9 @@ export function PrivilegeGate({ children }: { children: React.ReactNode }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const asking = useRef<Promise<boolean> | null>(null);
+  // Emergency Access exists to repair a broken till; it must never be gated or
+  // blanked by this component.
+  const recovery = useRef(onRecoveryScreen()).current;
 
   /* One prompt at a time, however many calls are refused at once. */
   const requestUnlock = (message: string) => {
@@ -57,7 +61,7 @@ export function PrivilegeGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const win = window as unknown as Record<string, Record<string, unknown> | undefined>;
     const pos = win["pos"] as { onFatal?: (cb: (p: { message: string }) => void) => () => void } | undefined;
-    if (!pos) return; // web and Android have no desktop bridge
+    if (!pos || recovery) return; // web and Android have no desktop bridge
 
     const undo: Array<() => void> = [];
     let off: (() => void) | undefined;
@@ -97,7 +101,7 @@ export function PrivilegeGate({ children }: { children: React.ReactNode }) {
       }
       off?.();
     };
-  }, []);
+  }, [recovery]);
 
   const submit = async () => {
     setBusy(true);
@@ -116,6 +120,8 @@ export function PrivilegeGate({ children }: { children: React.ReactNode }) {
     }
     ask?.resolve(true);
   };
+
+  if (recovery) return <>{children}</>;
 
   if (fatal) {
     return (
