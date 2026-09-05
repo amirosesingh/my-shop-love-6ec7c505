@@ -153,6 +153,9 @@ function Locations() {
         branches: { ...(state.settings.integrations.branches ?? {}), [store.id]: next },
       },
     });
+    // The private catalogue switch also lives on the branch record, because
+    // that is what the central database checks before showing an item.
+    if (key === "privateCatalogue") upsertStore({ ...store, privateCatalogue: value });
     toast.success(
       `${BRANCH_POLICY_COPY[key].label} ${value ? "turned on" : "turned off"} for ${store.name}`,
     );
