@@ -278,7 +278,7 @@ export function TerminalActivation({
         </div>
       )}
 
-      {error && online && (
+      {error && (
         <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">
           <ShieldAlert className="mt-0.5 size-4 shrink-0" />
           <span>{error}</span>

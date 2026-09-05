@@ -30,7 +30,11 @@ import { recordSignIn } from "@/lib/shift-attendance";
 import { endShiftSessions } from "@/lib/shift-sessions";
 import { onSessionExpired } from "@/lib/session-expiry";
 import { awaitProfileHydrated } from "@/lib/connection-profile";
-import { hasRequiredPlatformConfig } from "@/lib/platform-config-ready";
+import {
+  hasRequiredPlatformConfig,
+  subscribeConfigReady,
+} from "@/lib/platform-config-ready";
+import { isTerminalApp } from "@/platform-config/platform";
 import {
   failureFromAuthError,
   failureFromReadiness,
@@ -230,6 +234,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [ready, setReady] = useState(false);
+  const [authEnabled, setAuthEnabled] = useState(() => !isTerminalApp());
   const [terminalUser, setTerminalUser] = useState<TerminalUser | null>(null);
   const [appUser, setAppUser] = useState<AppUserProfile | null>(null);
 
@@ -255,18 +260,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Supabase session: hydrate once, then follow auth state changes.
+  // A terminal's cloud client must not be touched until its OS vault/Keystore
+  // profile has been restored and found complete. Missing configuration is a
+  // normal first-install state; AppShell owns that setup screen. Web keeps its
+  // existing hosting-variable path and enables auth immediately.
   useEffect(() => {
+    if (!isTerminalApp()) return;
+    let cancelled = false;
+    const apply = (configured: boolean) => {
+      if (cancelled) return;
+      setAuthEnabled(configured);
+      if (!configured) {
+        setSession(null);
+        setRoles([]);
+        setAppUser(null);
+        setReady(true);
+      }
+    };
+    void awaitProfileHydrated()
+      .then(() => hasRequiredPlatformConfig())
+      .then((state) => apply(state.ready))
+      .catch(() => apply(false));
+    const unsubscribe = subscribeConfigReady((state) => apply(state.ready));
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, []);
+
+  // Cloud session: hydrate once configuration is ready, then follow auth
+  // state changes. No auth request is made before that point on a terminal.
+  useEffect(() => {
+    if (!authEnabled) return;
+    let active = true;
     const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+      if (!active) return;
       setSession(next);
       if (!next) setRoles([]);
     });
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session ?? null);
-      setReady(true);
-    });
-    return () => sub.subscription.unsubscribe();
-  }, []);
+    void supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (active) setSession(data.session ?? null);
+      })
+      .catch(() => {
+        if (active) setSession(null);
+      })
+      .finally(() => {
+        if (active) setReady(true);
+      });
+    return () => {
+      active = false;
+      sub.subscription.unsubscribe();
+    };
+  }, [authEnabled]);
 
   // Backend roles for the signed-in account.
   const userId = session?.user?.id ?? null;
