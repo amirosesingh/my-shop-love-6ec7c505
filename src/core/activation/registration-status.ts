@@ -135,6 +135,7 @@ export function useStartupGate(): StartupGate {
     cloudConfigured,
     record,
     loading: registration === null,
+    probing,
     offlineGrace: registration === "registered" && !cloudConnected && graceValid(record),
     refresh: () => setTick((v) => v + 1),
   };
