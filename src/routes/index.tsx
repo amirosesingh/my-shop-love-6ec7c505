@@ -488,8 +488,16 @@ function Register() {
     member,
   });
   // One conversion, one place: the calculator turns the cashier's entry into
-  // money and folds the automatic promotion in on the same base.
-  const totals = cartTotals(lines, cartDiscount, cartDiscountType, taxSettings, promo.promoDiscount);
+  // money and folds automatic promotions and a whole-bill coupon in on the
+  // same base, so none of them cancels another out.
+  const billCouponDiscount = coupon && coupon.scope === "bill" ? r2(coupon.discount || 0) : 0;
+  const totals = cartTotals(
+    lines,
+    cartDiscount,
+    cartDiscountType,
+    taxSettings,
+    r2(promo.promoDiscount + billCouponDiscount),
+  );
   const pointsEarned = member ? Math.max(0, Math.round(totals.total * promo.pointsRate)) : 0;
 
 
