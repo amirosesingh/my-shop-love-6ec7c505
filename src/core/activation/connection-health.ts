@@ -32,9 +32,21 @@ export type HealthReport = {
   at: number;
 };
 
-const CLOUD_TIMEOUT = 1000;
+// A phone on mobile data regularly needs more than a second for the first
+// call of a session (DNS + TLS on a cold connection). Calling that "offline"
+// is what sent a correctly configured terminal back to the setup screen, so
+// the first probe of a launch is given a realistic budget and later probes,
+// which reuse a warm connection, stay quick.
+const CLOUD_TIMEOUT_FIRST = 8000;
+const CLOUD_TIMEOUT = 2500;
 const LOCAL_TIMEOUT = 800;
 const CACHE_MS = 2000;
+
+/** False until the first probe of this launch has settled. */
+let probedOnce = false;
+
+/** True once the launch's first connection check has produced a verdict. */
+export const hasProbedCloud = (): boolean => probedOnce;
 
 const OFFLINE: HealthReport = { cloud: false, local: false, anyOnline: false, at: 0 };
 
