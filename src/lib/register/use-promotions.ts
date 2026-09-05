@@ -14,7 +14,7 @@ import { r2 } from "@/core/types/pos-types";
 import { loadMemberVouchers, loadVoucherByToken, voucherValue } from "@/lib/coupons";
 import type { Campaign, VoucherView } from "@/lib/coupons";
 import type { CartCoupon } from "@/lib/register/use-cart";
-import type { CartLine, DiscountType, Product, Promotion } from "@/core/types/pos-types";
+import type { CartLine, Product, Promotion } from "@/core/types/pos-types";
 
 type PromotionsDeps = {
   /** Catalogue, active promotions and known members. */
