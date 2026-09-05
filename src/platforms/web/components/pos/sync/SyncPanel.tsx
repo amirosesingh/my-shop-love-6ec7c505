@@ -25,6 +25,43 @@ import { useSystemStatus } from "@/lib/system-status";
 import { localDb, type RestoreRun } from "@/core/local-db/local-db";
 import { toast } from "sonner";
 import { RebuildCheck } from "./RebuildCheck";
+import { SyncQueueTable } from "./SyncQueueTable";
+import { agoWords, useSyncSummary } from "@/lib/sync-summary";
+
+/**
+ * The six figures that answer "is my data safe and up to date?" — read from
+ * one derived summary, so the header badge and this page can never disagree.
+ */
+function SyncSummaryStrip() {
+  const s = useSyncSummary();
+  const cells: { label: string; value: string; tone?: string }[] = [
+    {
+      label: "Connection",
+      value: s.connection === "online" ? "Online" : "Offline",
+      tone: s.connection === "online" ? "text-success" : "text-warning",
+    },
+    { label: "Last successful sync", value: agoWords(s.lastSyncAt) || "Never" },
+    { label: "Central database confirmed", value: agoWords(s.lastAckAt) || "Never" },
+    { label: "Waiting to send", value: String(s.pending) },
+    {
+      label: "Needs attention",
+      value: String(s.failed),
+      tone: s.failed ? "text-destructive" : undefined,
+    },
+    { label: "Oldest waiting change", value: agoWords(s.oldestPendingAt) || "—" },
+  ];
+
+  return (
+    <div className="grid gap-3 rounded-md border border-border px-3 py-2 sm:grid-cols-3 lg:grid-cols-6">
+      {cells.map((cell) => (
+        <div key={cell.label} className="min-w-0">
+          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{cell.label}</p>
+          <p className={cn("truncate text-sm font-medium", cell.tone)}>{cell.value}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 const ICON: Record<TableSyncStatus, typeof CheckCircle2> = {
   idle: CircleDashed,
