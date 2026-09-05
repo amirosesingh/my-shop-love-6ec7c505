@@ -79,6 +79,16 @@ export const cloudVerdict = (): CloudVerdict => verdict;
 
 async function probeCloudVerdict(): Promise<CloudVerdict> {
   await hydrateTerminalConfig();
+  // The device's own saved connection is the authority and is restored
+  // asynchronously. Probing before it lands tests either nothing at all or the
+  // pair carried by an older activation record — both of which come back as
+  // "not configured" or "refused" on a perfectly good terminal.
+  try {
+    const { awaitProfileHydrated } = await import("@/lib/connection-profile");
+    await awaitProfileHydrated();
+  } catch {
+    /* the restore is best-effort; the checks below still hold */
+  }
   if (!hasSupabaseConfig()) return "unconfigured";
   if (typeof navigator !== "undefined" && navigator.onLine === false) return "unreachable";
   try {
