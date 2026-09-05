@@ -99,3 +99,15 @@ Central repairs use a different SQL dialect. In the Schema Manager choose
 **Download central PostgreSQL repair script**, review it, and run it in the
 external central project's SQL editor. Never run the downloaded central script
 in SQL Server Management Studio, and never run `database/schema.sql` centrally.
+
+## Starting fresh — `99_reset_local_data.sql`
+
+`99_reset_local_data.sql` empties this branch database of every trading record
+so the till can start from zero, keeping staff, settings, the store and its
+registered terminals. It also empties the pending-sync queue and the "last
+synced" markers, so a cleared till neither pushes old rows up nor believes it is
+already up to date.
+
+Destructive, no undo — back the database up first, and clear the central
+database (`supabase/sql/99_reset_data.sql`) before running this. The desktop's
+own SQLite file has its own copy: `electron/db/99_reset_local_sqlite.sql`.
