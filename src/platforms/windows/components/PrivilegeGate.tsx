@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/dialog";
 import { wrapBridge } from "@/platforms/windows/privilege-bridge";
 import { onRecoveryScreen } from "@/lib/recovery-route";
+import { useAuth } from "@/lib/pos-auth";
+import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
 
 type Ask = { message: string; resolve: (unlocked: boolean) => void };
 
@@ -27,6 +29,7 @@ type Ask = { message: string; resolve: (unlocked: boolean) => void };
 const BRIDGES = ["pos", "electronAPI", "sqlAdmin"] as const;
 
 export function PrivilegeGate({ children }: { children: React.ReactNode }) {
+  const { ready, user, isAdmin, isSupervisor } = useAuth();
   const [ask, setAsk] = useState<Ask | null>(null);
   const [fatal, setFatal] = useState<string | null>(null);
   const [username, setUsername] = useState("");
@@ -37,6 +40,30 @@ export function PrivilegeGate({ children }: { children: React.ReactNode }) {
   // Emergency Access exists to repair a broken till; it must never be gated or
   // blanked by this component.
   const recovery = useRef(onRecoveryScreen()).current;
+
+  // Reuse the already validated online identity. The main process sends the
+  // token only to the configured backend and derives the privilege there; it
+  // never trusts a role claimed by this window.
+  useEffect(() => {
+    if (recovery || !ready) return;
+    const bridge = window.sqlAdmin;
+    if (!bridge?.adoptSession || !bridge.lockAdmin) return;
+    let active = true;
+    const sync = async () => {
+      if (!user || (!isAdmin && !isSupervisor)) {
+        await bridge.lockAdmin?.();
+        return;
+      }
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!active || !token) return;
+      await bridge.adoptSession?.(token);
+    };
+    void sync();
+    return () => {
+      active = false;
+    };
+  }, [ready, recovery, user?.staffId, isAdmin, isSupervisor]);
 
   /* One prompt at a time, however many calls are refused at once. */
   const requestUnlock = (message: string) => {

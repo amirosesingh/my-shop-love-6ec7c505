@@ -79,6 +79,8 @@ describe("desktop channel privilege", () => {
     level = "supervisor";
     expect(p.allowed("pos:housekeep")).toBe(true);
     expect(p.allowed("local:rollback")).toBe(true);
+    expect(p.allowed("sqladmin:query")).toBe(true);
+    expect(p.allowed("sqladmin:repair")).toBe(false);
     expect(p.allowed("backend:set")).toBe(false);
     level = "admin";
     expect(p.allowed("backend:set")).toBe(true);

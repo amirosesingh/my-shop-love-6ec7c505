@@ -28,6 +28,7 @@ const CHANNEL_LEVELS = {
   "admin:unlock": OPEN,
   "admin:lock": OPEN,
   "admin:status": OPEN,
+  "admin:adopt-session": OPEN,
 
   /* --- trading: the register cannot sell without these --- */
   "pos:write": OPEN,
@@ -133,16 +134,16 @@ const CHANNEL_LEVELS = {
   "health:rollback": ADMIN,
   "health:quit": ADMIN,
   "settings:set": ADMIN, // refined per key below
-  "sqladmin:connect": ADMIN,
-  "sqladmin:cancel": ADMIN,
-  "sqladmin:probe-port": ADMIN,
-  "sqladmin:lock": ADMIN,
-  "sqladmin:databases": ADMIN,
-  "sqladmin:tables": ADMIN,
-  "sqladmin:columns": ADMIN,
-  "sqladmin:query": ADMIN,
+  "sqladmin:connect": SUPERVISOR,
+  "sqladmin:cancel": SUPERVISOR,
+  "sqladmin:probe-port": SUPERVISOR,
+  "sqladmin:lock": SUPERVISOR,
+  "sqladmin:databases": SUPERVISOR,
+  "sqladmin:tables": SUPERVISOR,
+  "sqladmin:columns": SUPERVISOR,
+  "sqladmin:query": SUPERVISOR,
   "sqladmin:repair": ADMIN,
-  "sqladmin:disconnect": ADMIN,
+  "sqladmin:disconnect": SUPERVISOR,
 };
 
 /**

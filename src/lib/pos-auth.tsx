@@ -48,6 +48,7 @@ import {
   FULL_PERMISSIONS,
   NO_PERMISSIONS,
   WAREHOUSE_PERMISSIONS,
+  SUPERVISOR_PERMISSIONS,
   PERMISSION_GROUPS,
   PERMISSION_KEYS,
   PERMISSION_LABELS,
@@ -818,7 +819,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!account) {
       if (!terminalUser) return null;
       // Local bootstrap / offline terminal session.
-      const isLocalAdmin = terminalUser.role === "admin" || terminalUser.role === "manager";
+      const isLocalAdmin = terminalUser.role === "admin";
+      const isLocalSupervisor = terminalUser.role === "manager";
       return {
         staffId: terminalUser.userCode,
         name: terminalUser.name,
@@ -834,6 +836,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         storeId: terminalUser.role === "admin" ? null : terminalUser.storeId,
         permissions: isLocalAdmin
           ? FULL_PERMISSIONS
+          : isLocalSupervisor
+            ? SUPERVISOR_PERMISSIONS
           : normalizePermissions(terminalUser.permissions ?? {}, "cashier"),
       };
     }
@@ -853,7 +857,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       roles.includes("manager") ||
       appUser?.role === "manager" ||
       terminalUser?.role === "manager";
-    const isAdmin = isElevated;
     const found = email ? staff.find((s) => s.email && norm(s.email) === norm(email)) : undefined;
     const fallbackName =
       (meta["full_name"] as string | undefined) || email.split("@")[0] || "User";
@@ -866,7 +869,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email,
       name: appUser?.full_name ?? terminalUser?.name ?? found?.name ?? fallbackName,
       email,
-      role: isAdmin ? "admin" : "cashier",
+      role: isTrueAdmin ? "admin" : "cashier",
       metaRole,
       roles,
       storeId: isTrueAdmin
@@ -878,8 +881,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           terminalUser?.storeId ??
           found?.storeId ??
           null),
-      permissions: isAdmin
+      permissions: isTrueAdmin
         ? { ...FULL_PERMISSIONS }
+        : isElevated
+          ? normalizePermissions(appUser?.permissions ?? null, "supervisor")
         : // public.app_users is the source of truth when the account has a row.
           normalizePermissions(
             Object.keys({
@@ -1024,7 +1029,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ready,
       user,
       isAdmin: user?.role === "admin",
-      isSupervisor: user?.metaRole === "supervisor" || user?.role === "admin",
+      isSupervisor:
+        user?.metaRole === "supervisor" ||
+        user?.roles.includes("manager") === true ||
+        user?.role === "admin",
       terminalStoreId,
       terminalStoreName,
       // A registered till is pinned to its own branch for everyone, including
@@ -1032,7 +1040,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       canSwitchStores:
         !terminalStoreId && !!user && !user.storeId && (user.role === "admin" || isWarehouse),
       isCashier:
-        !isWarehouse && (user?.metaRole === "cashier" || (!!user && user.role !== "admin")),
+        !isWarehouse &&
+        !!user &&
+        user.role !== "admin" &&
+        user.metaRole !== "supervisor" &&
+        !user.roles.includes("manager"),
       isWarehouse,
       authUserId: userId,
       terminalUser,
