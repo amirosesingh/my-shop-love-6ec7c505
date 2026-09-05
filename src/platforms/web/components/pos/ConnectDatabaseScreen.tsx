@@ -8,11 +8,15 @@
  */
 import { useNavigate } from "@tanstack/react-router";
 import { CloudCog, LifeBuoy, Loader2, RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { CloudConnectionPanel } from "@/platforms/web/components/pos/settings/panels/CloudConnectionPanel";
 import { checkCloudConnected } from "@/core/activation/registration-status";
+import {
+  hasRequiredPlatformConfig,
+  subscribeConfigReady,
+} from "@/lib/platform-config-ready";
 
 export function ConnectDatabaseScreen({
   cloudConfigured,
@@ -24,6 +28,24 @@ export function ConnectDatabaseScreen({
 }) {
   const navigate = useNavigate();
   const [checking, setChecking] = useState(false);
+  const [hasSavedConfiguration, setHasSavedConfiguration] = useState(cloudConfigured);
+
+  useEffect(() => {
+    const apply = (state: Awaited<ReturnType<typeof hasRequiredPlatformConfig>>) =>
+      setHasSavedConfiguration(Object.values(state.have).some(Boolean));
+    void hasRequiredPlatformConfig().then(apply);
+    return subscribeConfigReady(apply);
+  }, []);
+
+  const continueStartup = async () => {
+    setChecking(true);
+    try {
+      await checkCloudConnected();
+    } finally {
+      setChecking(false);
+      onRetry();
+    }
+  };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#0f172a] p-6 text-slate-100">
@@ -45,22 +67,14 @@ export function ConnectDatabaseScreen({
         </p>
 
         <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-4">
-          <CloudConnectionPanel />
+          <CloudConnectionPanel onConnected={continueStartup} />
         </div>
 
         <div className="flex flex-wrap gap-2">
           <Button
             className="bg-sky-500 text-slate-950 hover:bg-sky-400"
             disabled={checking}
-            onClick={async () => {
-              setChecking(true);
-              try {
-                await checkCloudConnected();
-              } finally {
-                setChecking(false);
-                onRetry();
-              }
-            }}
+            onClick={() => void continueStartup()}
           >
             {checking ? (
               <Loader2 className="size-4 animate-spin" />
@@ -69,14 +83,16 @@ export function ConnectDatabaseScreen({
             )}
             Test and continue
           </Button>
-          <Button
-            variant="outline"
-            className="border-slate-700 bg-slate-800/60 text-slate-100 hover:bg-slate-800"
-            onClick={() => void navigate({ to: "/recovery" })}
-          >
-            <LifeBuoy className="size-4" />
-            Emergency access
-          </Button>
+          {hasSavedConfiguration && (
+            <Button
+              variant="outline"
+              className="border-slate-700 bg-slate-800/60 text-slate-100 hover:bg-slate-800"
+              onClick={() => void navigate({ to: "/recovery" })}
+            >
+              <LifeBuoy className="size-4" />
+              Emergency access
+            </Button>
+          )}
         </div>
       </div>
     </div>

@@ -23,9 +23,8 @@ import { PrivilegeGate } from "../platforms/windows/components/PrivilegeGate";
 import { ErrorNotifier } from "@/platforms/web/components/pos/ErrorNotifier";
 import { AuditTracker } from "@/platforms/web/components/pos/AuditTracker";
 import { TelemetryAgent } from "@/platforms/web/components/pos/TelemetryAgent";
-import { TerminalActivation } from "@/platforms/web/components/pos/TerminalActivation";
+import { ConnectDatabaseScreen } from "@/platforms/web/components/pos/ConnectDatabaseScreen";
 import { isTerminalApp } from "@/platform-config/platform";
-import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 import { FirstRunSetup } from "@/platforms/web/components/pos/FirstRunSetup";
 import { EmergencyAccessLink } from "@/components/shared/EmergencyAccessLink";
 import { ThemeProvider, themeBootScript } from "../lib/theme";
@@ -65,10 +64,19 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   }, [error]);
   const notConfigured = error.name === "SupabaseConfigError";
 
-  // A till that has never been paired has no connection details yet — that is
-  // the normal first-boot state, not a failure. Show the activation screen.
-  if (notConfigured && isTerminalApp() && !readTerminalConfig()) {
-    return <TerminalActivation onActivated={() => window.location.reload()} />;
+  // Missing device configuration is step one of terminal setup, never a cue
+  // to attempt activation. Reset the boundary after a successful save/probe
+  // so the shared startup decision can proceed to activation or sign-in.
+  if (notConfigured && isTerminalApp()) {
+    return (
+      <ConnectDatabaseScreen
+        cloudConfigured={false}
+        onRetry={() => {
+          router.invalidate();
+          reset();
+        }}
+      />
+    );
   }
 
   const clearAndRestart = () => {

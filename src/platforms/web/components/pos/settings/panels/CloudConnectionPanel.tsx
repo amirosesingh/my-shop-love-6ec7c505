@@ -49,7 +49,7 @@ import {
 } from "@/lib/secure-cloud-config";
 import { backendUrl, type BackendTestResult } from "@/lib/backend-config";
 
-export function CloudConnectionPanel() {
+export function CloudConnectionPanel({ onConnected }: { onConnected?: () => void | Promise<void> } = {}) {
   const auth = useAuthOptional();
   const [status, setStatus] = useState<CloudKeyStatus | null>(null);
   const [url, setUrl] = useState("");
@@ -158,6 +158,7 @@ export function CloudConnectionPanel() {
         setKey("");
         toast.success(`${res.detail} Saved ✓ Activated ✓ Connected ✓`);
         await refresh();
+        await onConnected?.();
       } else {
         toast.error(
           res.stage === "save"
