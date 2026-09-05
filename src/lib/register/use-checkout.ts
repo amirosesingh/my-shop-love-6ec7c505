@@ -97,6 +97,11 @@ export function useCheckout(deps: CheckoutDeps) {
    * reached the database instead of billing the customer twice.
    */
   const attemptId = useRef<string | null>(null);
+  /**
+   * Set the instant a payment starts. React state updates a moment later, so a
+   * fast second tap on Pay could otherwise start a second bill.
+   */
+  const inFlight = useRef(false);
 
   /** Sends the finished bill to the customer's WhatsApp. */
   async function sendSaleOnWhatsApp(sale: Sale, to: string) {
@@ -322,6 +327,16 @@ export function useCheckout(deps: CheckoutDeps) {
   }
 
   async function completeSale() {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    try {
+      await runCompleteSale();
+    } finally {
+      inFlight.current = false;
+    }
+  }
+
+  async function runCompleteSale() {
     const activeShift = deps.getActiveShift();
     const currentStore = deps.getCurrentStore();
     const activeCashier = deps.getActiveCashier();
