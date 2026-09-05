@@ -1707,14 +1707,18 @@ export function PosProvider({ children }: { children: ReactNode }) {
         ecomPrice: record.ecomPrice,
       },
     });
-    // Store it before anything on screen says it was saved.
-    const target = await db.commitProduct(record);
     // A branch that keeps a private catalogue owns whatever it creates, so
-    // the item never shows up at the other shops.
-    if (
+    // the item never shows up at the other shops. The owner travels with the
+    // record itself, which is what the central database enforces on.
+    const ownsNewItems =
       !prev &&
-      branchPolicy(stateRef.current.settings, stateRef.current.currentStoreId).privateCatalogue
-    ) {
+      branchPolicy(stateRef.current.settings, stateRef.current.currentStoreId).privateCatalogue;
+    const stored: Product = ownsNewItems
+      ? { ...record, ownerStoreId: stateRef.current.currentStoreId }
+      : record;
+    // Store it before anything on screen says it was saved.
+    const target = await db.commitProduct(stored);
+    if (ownsNewItems) {
       const owners = {
         ...(stateRef.current.settings.integrations.productOwners ?? {}),
         [record.id]: stateRef.current.currentStoreId,
@@ -1725,9 +1729,9 @@ export function PosProvider({ children }: { children: ReactNode }) {
     }
     setState((s) => ({
       ...s,
-      products: s.products.some((p) => p.id === record.id)
-        ? s.products.map((p) => (p.id === record.id ? record : p))
-        : [record, ...s.products],
+      products: s.products.some((p) => p.id === stored.id)
+        ? s.products.map((p) => (p.id === stored.id ? stored : p))
+        : [stored, ...s.products],
     }));
     return target;
   }, []);

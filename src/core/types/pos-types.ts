@@ -23,6 +23,8 @@ export type Store = {
   isCentral?: boolean;
   /** the sub-warehouse level stock is picked from first */
   isPrimarySub?: boolean;
+  /** this branch keeps its own catalogue; its items stay hidden elsewhere */
+  privateCatalogue?: boolean;
   /** building this location sits in, e.g. "Riverside Tower" */
   buildingName?: string;
   /** floor or room designation, e.g. "2nd Floor Vault" */
@@ -66,6 +68,12 @@ export type Product = {
   taxRate: number;
   /** bonus loyalty points awarded for this item (bulk import field) */
   customPoints?: number;
+  /**
+   * Branch that owns this item. Empty means every branch shares it. When the
+   * owning branch keeps a private catalogue, the central database itself hides
+   * the item from the other branches.
+   */
+  ownerStoreId?: string | null;
 };
 
 export type ProductPack = {

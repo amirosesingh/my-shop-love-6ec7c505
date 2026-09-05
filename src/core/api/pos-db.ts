@@ -133,6 +133,7 @@ export const rowToProduct = (r: Row): Product => ({
   reorderLevel: num(r.reorder_level),
   taxRate: num(r.tax_rate),
   customPoints: r.custom_points == null ? undefined : num(r.custom_points),
+  ownerStoreId: (r.owner_store_id as string | null | undefined) ?? null,
 });
 
 function jsonValue<T>(value: unknown, fallback: T): T {
@@ -212,6 +213,7 @@ export const productToRow = (p: Product): Row => {
     reorder_level: safeInt(p.reorderLevel),
     tax_rate: safeNum(p.taxRate),
     custom_points: safeNumOrNull(p.customPoints),
+    owner_store_id: p.ownerStoreId || null,
   };
 };
 
@@ -280,6 +282,7 @@ export const rowToStore = (r: Row): Store => ({
   // Databases that predate the column report `undefined`; treat those as live.
   active: r.is_active === undefined || r.is_active === null ? true : !!r.is_active,
   archivedAt: r.archived_at ?? null,
+  privateCatalogue: r.private_catalogue === true,
 });
 
 export const storeToRow = (s: Store): Row => ({
@@ -296,6 +299,7 @@ export const storeToRow = (s: Store): Row => ({
   building_name: s.buildingName?.trim() || null,
   floor_label: s.floorLabel?.trim() || null,
   is_active: s.active !== false,
+  private_catalogue: s.privateCatalogue === true,
 });
 
 const promotionToRow = (p: Promotion): Row => ({

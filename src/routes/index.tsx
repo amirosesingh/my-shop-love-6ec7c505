@@ -400,7 +400,7 @@ function Register() {
 
   const filtered = state.products.filter((p) => {
     if (p.archived) return false;
-    if (!productVisibleAt(state.settings, p.id, state.currentStoreId)) return false;
+    if (!productVisibleAt(state.settings, p, state.currentStoreId)) return false;
     const q = query.trim().toLowerCase();
     const match = !q || p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q) || p.barcode.includes(q);
     return match && (category === "All" || p.category === category);
@@ -2118,7 +2118,7 @@ function Register() {
           }}
           query={query}
           onQueryChange={setQuery}
-          products={state.products.filter((p) => productVisibleAt(state.settings, p.id, state.currentStoreId))}
+          products={state.products.filter((p) => productVisibleAt(state.settings, p, state.currentStoreId))}
           storeId={currentStore.id}
           unknownCode={unknownCode}
           onAdd={(id) => {
