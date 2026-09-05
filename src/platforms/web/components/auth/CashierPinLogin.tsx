@@ -5,16 +5,17 @@
  * tap your PIN on the keypad. Sign-in fires as soon as the last digit lands.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, Delete, Loader2, ShieldAlert, UserRound } from "lucide-react";
+import { ArrowLeft, Delete, Loader2, MapPin, ShieldAlert, UserRound } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/pos-auth";
-import { serverUnreachableOnDevice } from "@/lib/server-origin";
-import { activeBranchId } from "@/lib/active-branch";
-import { listTerminalStaff, type TerminalStaff } from "@/lib/staff-admin";
+
+import { activeBranchId, boundBranchName } from "@/lib/active-branch";
+import { isConfigurationFailure, type LoginFailure } from "@/lib/login-failure";
+import { listTerminalStaff, type RosterReason, type TerminalStaff } from "@/lib/staff-admin";
 import { usernameFromAddress } from "@/lib/internal-domains";
 import {
   attemptsLeft,
@@ -27,6 +28,18 @@ import { cn } from "@/lib/utils";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
+/** Plain wording for why the sign-in grid is empty. Never mentions a server. */
+const ROSTER_WORDING: Record<RosterReason, string> = {
+  ok: "",
+  "no-server": "This till has not been connected to your company yet, so the staff list cannot load and a PIN cannot be checked.",
+  unreachable:
+    "Your company system did not answer, so the staff list could not load. You can still type your username below and sign in from this till's own records.",
+  "not-authorised":
+    "This till is not registered yet, so it is not allowed to load the staff list. Complete terminal setup first.",
+  empty: "Nobody is assigned to this branch yet. Type your username below.",
+};
+
+
 export function CashierPinLogin({
   onAdminLogin,
   initialUsername = "",
@@ -36,6 +49,15 @@ export function CashierPinLogin({
 }) {
   const { cashierLogin } = useAuth();
   const [staff, setStaff] = useState<TerminalStaff[]>([]);
+  const [reason, setReason] = useState<RosterReason>("ok");
+  // Set when the till itself is not connected — that is a setup problem, not
+  // a wrong PIN, and it gets a way out of the screen instead of a lockout.
+  const [configFailure, setConfigFailure] = useState<LoginFailure | null>(null);
+  // Which branch this till belongs to. An unbound till says so plainly rather
+  // than showing an empty list with no explanation.
+  const [branchLabel] = useState(
+    () => boundBranchName() ?? (activeBranchId(null) ? "This branch" : "No branch set"),
+  );
   const [loading, setLoading] = useState(true);
   const [picked, setPicked] = useState<TerminalStaff | null>(null);
   // What is being typed, and what has actually been committed. Keeping them
@@ -63,10 +85,14 @@ export function CashierPinLogin({
     const branch = activeBranchId(null);
     void (async () => {
       let rows: TerminalStaff[] = [];
+      let why: RosterReason = "empty";
       try {
-        rows = await listTerminalStaff(branch);
+        const roster = await listTerminalStaff(branch);
+        rows = roster.staff;
+        why = roster.reason;
       } catch {
         rows = [];
+        why = "unreachable";
       }
       // No answer from the server: offer the roster mirrored into this till's
       // own database, so a cut-off branch still sees who can sign in.
@@ -80,18 +106,21 @@ export function CashierPinLogin({
             roleSlug: r.roleSlug,
             storeId: r.storeId,
           })) as unknown as TerminalStaff[];
+          if (rows.length) why = "ok";
         } catch {
           rows = [];
         }
       }
       if (!live) return;
       setStaff(Array.isArray(rows) ? rows : []);
+      setReason(why);
       setLoading(false);
     })();
     return () => {
       live = false;
     };
   }, []);
+
 
   // A whole internal address is accepted too — it is what the account list
   // shows — so it is reduced to the username before anything is sent.
@@ -130,7 +159,12 @@ export function CashierPinLogin({
         const message = res.error ?? "That PIN was not recognised";
         const deactivated = /deactivat|not active|blocked/i.test(message);
         setPin("");
-        if (deactivated) {
+        // A till that is not connected has not judged the PIN at all, so the
+        // attempt must not count towards the keypad lockout.
+        if (res.code && isConfigurationFailure(res.code)) {
+          setConfigFailure(res.code);
+          setError(message);
+        } else if (deactivated) {
           setError("Account deactivated. Please contact an administrator.");
         } else {
           const locked = notePinFailure();
@@ -145,6 +179,7 @@ export function CashierPinLogin({
       } else {
         clearPinFailures();
       }
+
       setBusy(false);
     },
     [cashierLogin, username],
@@ -194,11 +229,17 @@ export function CashierPinLogin({
     };
     return (
       <div className="space-y-4 pt-4">
-        <div>
-          <p className="text-sm font-medium">Who is signing in?</p>
-          <p className="text-[11px] text-muted-foreground">
-            Tap your name to continue to the keypad.
-          </p>
+        <div className="flex items-start gap-2">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">Who is signing in?</p>
+            <p className="text-[11px] text-muted-foreground">
+              Tap your name to continue to the keypad.
+            </p>
+          </div>
+          <Badge variant="outline" className="ml-auto shrink-0 gap-1 text-[10px]">
+            <MapPin className="size-3" />
+            {branchLabel}
+          </Badge>
         </div>
         {loading ? (
           <div className="flex justify-center py-8">
@@ -228,12 +269,25 @@ export function CashierPinLogin({
             ))}
           </div>
         ) : (
-          <p className="rounded-md border border-border bg-surface-2 p-3 text-xs text-muted-foreground">
-            {serverUnreachableOnDevice()
-              ? "This app build has no POS server address, so the staff list cannot load. Type your username below."
-              : "No staff are listed for this terminal's branch yet. Type your username below."}
-          </p>
+          <div className="space-y-2 rounded-md border border-border bg-surface-2 p-3">
+            <p className="text-xs text-muted-foreground">{ROSTER_WORDING[reason]}</p>
+            {(reason === "no-server" || reason === "not-authorised") && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => {
+                  window.location.href =
+                    reason === "no-server" ? "/settings/database" : "/settings/terminals";
+                }}
+              >
+                {reason === "no-server" ? "Open connection settings" : "Open terminal setup"}
+              </Button>
+            )}
+          </div>
         )}
+
         <form
           className="space-y-2"
           onSubmit={(e) => {
@@ -438,6 +492,18 @@ export function CashierPinLogin({
         </p>
       )}
       {error && <p className="text-center text-sm text-destructive">{error}</p>}
+      {configFailure && isConfigurationFailure(configFailure) && (
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          onClick={() => {
+            window.location.href = "/settings/database";
+          }}
+        >
+          Open connection settings
+        </Button>
+      )}
       {onAdminLogin && (
         <Button type="button" variant="ghost" className="w-full text-xs" onClick={onAdminLogin}>
           Administrator sign in with email and password

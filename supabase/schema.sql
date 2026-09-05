@@ -3427,6 +3427,19 @@ CREATE OR REPLACE FUNCTION public.schema_inventory() RETURNS jsonb
   );
 $$;
 
+-- Guard for routines only a supervisor (or the system itself) may run.
+CREATE OR REPLACE FUNCTION public.assert_supervisor_caller() RETURNS void
+ LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path TO 'public', 'pg_temp'
+AS $$
+BEGIN
+  IF coalesce(auth.role(), '') = 'service_role' THEN RETURN; END IF;
+  IF NOT public.is_app_supervisor() THEN
+    RAISE EXCEPTION 'NOT_AUTHORISED';
+  END IF;
+END $$;
+GRANT EXECUTE ON FUNCTION public.assert_supervisor_caller() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.assert_supervisor_caller() TO service_role;
+
 CREATE OR REPLACE FUNCTION public.security_report_findings(_source text, _deployment_ref text, _findings jsonb) RETURNS jsonb
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public', 'pg_temp'
@@ -3439,6 +3452,7 @@ DECLARE
   _inserted boolean;
   _resolved integer := 0;
 BEGIN
+  PERFORM public.assert_supervisor_caller();
   IF coalesce(_source, '') NOT IN ('ci', 'selfcheck') THEN
     RAISE EXCEPTION 'INVALID_SOURCE';
   END IF;
@@ -3754,6 +3768,7 @@ CREATE OR REPLACE FUNCTION public.staff_account_adopt_legacy(p_username text) RE
     AS $$
 DECLARE c public.cashiers%rowtype;
 BEGIN
+  PERFORM public.assert_supervisor_caller();
   SELECT * INTO c FROM public.cashiers WHERE lower(username) = lower(trim(p_username));
   IF NOT FOUND THEN RETURN; END IF;
   INSERT INTO public.app_users
@@ -3820,6 +3835,7 @@ CREATE OR REPLACE FUNCTION public.staff_account_set_pin(p_user_id text, p_pin te
     SET search_path TO 'public', 'extensions', 'pg_temp'
     AS $$
 BEGIN
+  PERFORM public.assert_supervisor_caller();
   IF coalesce(p_pin, '') = '' OR length(p_pin) < 4 OR length(p_pin) > 32 THEN
     RAISE EXCEPTION 'STAFF_PIN_INVALID';
   END IF;
@@ -8239,6 +8255,7 @@ CREATE OR REPLACE FUNCTION public.set_authorization_pin(
 RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER
 SET search_path TO 'public', 'pg_temp', 'extensions' AS $$
 BEGIN
+  PERFORM public.assert_supervisor_caller();
   IF p_pin !~ '^[0-9]{4,8}$' THEN
     RAISE EXCEPTION 'A PIN must be 4 to 8 digits';
   END IF;

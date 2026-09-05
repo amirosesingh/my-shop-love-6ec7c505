@@ -34,7 +34,9 @@ import { hasRequiredPlatformConfig } from "@/lib/platform-config-ready";
 import {
   failureFromAuthError,
   failureFromReadiness,
+  failureFromProbeError,
   loginFailureMessage,
+  type LoginFailure,
 } from "@/lib/login-failure";
 
 import {
@@ -174,9 +176,15 @@ type AuthCtx = {
   addStaff: (member: Omit<StaffMember, "id">) => void;
   updateStaff: (member: StaffMember) => void;
   removeStaff: (id: string) => void;
-  login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
+  login: (
+    email: string,
+    password: string,
+  ) => Promise<{ ok: boolean; error?: string; code?: LoginFailure }>;
   /** Cashier tab: numeric User ID + PIN mapped onto a Supabase email account. */
-  cashierLogin: (userId: string, pin: string) => Promise<{ ok: boolean; error?: string }>;
+  cashierLogin: (
+    userId: string,
+    pin: string,
+  ) => Promise<{ ok: boolean; error?: string; code?: LoginFailure }>;
   logout: () => Promise<void>;
   /** Lock the till / switch user — clears the session without losing local data. */
   lock: () => Promise<void>;
@@ -340,6 +348,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           code: configFailure,
           error: loginFailureMessage(configFailure),
         };
+      // Prove the saved connection actually points at a company database that
+      // holds the point-of-sale tables. Without this, a terminal aimed at the
+      // wrong project reports "invalid login credentials" and sends people
+      // hunting for a password that was never the problem.
+      const probe = await supabase.from("app_users").select("id").limit(1);
+      const probeFailure = failureFromProbeError(probe.error);
+      if (probeFailure)
+        return {
+          ok: false,
+          code: probeFailure,
+          error: loginFailureMessage(probeFailure),
+        };
       // One handler for both worlds: a plain username belongs to a terminal
       // account and is mapped onto its hidden internal address; anything with
       // an "@" is used exactly as typed.
@@ -485,6 +505,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // accepts the same range: short numeric PINs and longer passcodes alike.
     if (pin.length < 4 || pin.length > 32)
       return { ok: false, error: "Enter your PIN or passcode" };
+    // A till that was never connected has nowhere to check a PIN against.
+    // Saying "PIN not recognised" there sends people hunting for the wrong
+    // fix, so the configuration problem is named instead.
+    const readiness = await hasRequiredPlatformConfig();
+    const configFailure = failureFromReadiness(readiness);
+    if (configFailure)
+      return {
+        ok: false,
+        code: configFailure,
+        error: loginFailureMessage(configFailure),
+      };
+
     let offline = false;
     if (typeof navigator !== "undefined" && !navigator.onLine) offline = true;
 

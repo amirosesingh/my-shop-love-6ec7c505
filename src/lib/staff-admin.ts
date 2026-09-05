@@ -118,8 +118,22 @@ export type TerminalStaff = {
   pinLength: number;
 };
 
-/** Staff to show on a till's sign-in grid. */
-export async function listTerminalStaff(storeId: string | null): Promise<TerminalStaff[]> {
+/** Why the sign-in grid has no names on it. */
+export type RosterReason =
+  | "ok"
+  /** this build has no POS server address saved on the device */
+  | "no-server"
+  /** the address is saved but nothing answered */
+  | "unreachable"
+  /** the server answered but would not hand over the roster */
+  | "not-authorised"
+  /** the answer was fine, this branch simply has nobody assigned */
+  | "empty";
+
+export type TerminalRoster = { staff: TerminalStaff[]; reason: RosterReason };
+
+/** Staff to show on a till's sign-in grid, plus why the list is empty. */
+export async function listTerminalStaff(storeId: string | null): Promise<TerminalRoster> {
   const rows = (value: unknown): TerminalStaff[] => {
     const staff = (value as { staff?: unknown } | null)?.staff;
     return Array.isArray(staff) ? (staff as TerminalStaff[]) : [];
@@ -145,11 +159,16 @@ export async function listTerminalStaff(storeId: string | null): Promise<Termina
     }
     return staff;
   };
+  const done = (staff: TerminalStaff[], empty: RosterReason = "empty"): TerminalRoster => ({
+    staff,
+    reason: staff.length ? "ok" : empty,
+  });
   try {
     // Android talks to the hosted POS directly; a server function would be
     // answered by the phone's own static file server. The roster is staff
     // data, so the endpoint only answers a registered terminal.
-    const { serverOrigin, posFetch } = await import("./server-origin");
+    const { serverOrigin, serverUnreachableOnDevice, posFetch } = await import("./server-origin");
+    if (serverUnreachableOnDevice()) return { staff: [], reason: "no-server" };
     if (serverOrigin()) {
       const { readTerminalConfig } = await import("@/core/activation/terminal-tokens");
       const terminalToken = readTerminalConfig()?.tokenId ?? "";
@@ -158,15 +177,18 @@ export async function listTerminalStaff(storeId: string | null): Promise<Termina
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ storeId, terminalToken }),
       });
-      return mirror(rows(await res.json().catch(() => null)));
+      if (res.status === 401 || res.status === 403) return { staff: [], reason: "not-authorised" };
+      if (!res.ok) return { staff: [], reason: "unreachable" };
+      return done(await mirror(rows(await res.json().catch(() => null))));
     }
 
-    return mirror(rows(await listTerminalStaffAccounts({ data: { storeId } })));
+    return done(await mirror(rows(await listTerminalStaffAccounts({ data: { storeId } }))));
   } catch {
     // A till must still be able to sign in by typing a username.
-    return [];
+    return { staff: [], reason: "unreachable" };
   }
 }
+
 
 /** Ask the server to make sure this person's account matches the PIN typed in. */
 export async function preparePinAccount(
