@@ -172,7 +172,13 @@ export type SqlAdminBridge = {
   unlock?: (
     username: string,
     pin: string,
-  ) => Promise<{ ok: boolean; name?: string; expiresAt?: number; error?: string }>;
+  ) => Promise<{
+    ok: boolean;
+    name?: string;
+    level?: "admin" | "supervisor";
+    expiresAt?: number;
+    error?: string;
+  }>;
   /** Ask the desktop process to validate and adopt the current online session. */
   adoptSession?: (
     accessToken: string,

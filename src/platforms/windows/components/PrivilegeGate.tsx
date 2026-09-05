@@ -24,7 +24,11 @@ import { useAuth } from "@/lib/pos-auth";
 import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
 import { toast } from "sonner";
 
-type Ask = { message: string; resolve: (unlocked: boolean) => void };
+type Ask = {
+  message: string;
+  requiredLevel?: "admin" | "supervisor";
+  resolve: (unlocked: boolean) => void;
+};
 
 /** Bridges that carry privileged calls. */
 const BRIDGES = ["pos", "electronAPI", "sqlAdmin"] as const;
@@ -92,6 +96,7 @@ export function PrivilegeGate({ children }: { children: React.ReactNode }) {
       asking.current = new Promise<boolean>((resolve) => {
         setAsk({
           message,
+          requiredLevel,
           resolve: (ok) => {
             asking.current = null;
             setAsk(null);
@@ -164,6 +169,10 @@ export function PrivilegeGate({ children }: { children: React.ReactNode }) {
     setBusy(false);
     if (!result.ok) {
       setError(result.error ?? "That username or PIN was not accepted on this till.");
+      return;
+    }
+    if (ask?.requiredLevel === "admin" && result.level !== "admin") {
+      setError("This action requires an Administrator account.");
       return;
     }
     ask?.resolve(true);

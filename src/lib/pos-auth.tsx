@@ -1035,6 +1035,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isSupervisor:
         user?.metaRole === "supervisor" ||
         user?.roles.includes("manager") === true ||
+        appUser?.role === "manager" ||
         user?.role === "admin",
       terminalStoreId,
       terminalStoreName,
@@ -1047,6 +1048,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         !!user &&
         user.role !== "admin" &&
         user.metaRole !== "supervisor" &&
+        appUser?.role !== "manager" &&
         !user.roles.includes("manager"),
       isWarehouse,
       authUserId: userId,
