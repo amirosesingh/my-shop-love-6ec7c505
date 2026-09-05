@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/pos-auth";
 import { serverUnreachableOnDevice } from "@/lib/server-origin";
 import { activeBranchId } from "@/lib/active-branch";
-import { listTerminalStaff, type TerminalStaff } from "@/lib/staff-admin";
+import { listTerminalStaff, type RosterReason, type TerminalStaff } from "@/lib/staff-admin";
 import { usernameFromAddress } from "@/lib/internal-domains";
 import {
   attemptsLeft,
@@ -36,6 +36,7 @@ export function CashierPinLogin({
 }) {
   const { cashierLogin } = useAuth();
   const [staff, setStaff] = useState<TerminalStaff[]>([]);
+  const [reason, setReason] = useState<RosterReason>("ok");
   const [loading, setLoading] = useState(true);
   const [picked, setPicked] = useState<TerminalStaff | null>(null);
   // What is being typed, and what has actually been committed. Keeping them
