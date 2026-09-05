@@ -1,5 +1,6 @@
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { logSync } from "./sync-log";
+import { noteSyncAck } from "./sync-summary";
 import { hasRequiredPlatformConfig } from "./platform-config-ready";
 import { hasSignedInIdentity } from "./session-presence";
 
