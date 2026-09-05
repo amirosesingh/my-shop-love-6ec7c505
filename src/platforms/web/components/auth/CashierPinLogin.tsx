@@ -27,6 +27,18 @@ import { cn } from "@/lib/utils";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
+/** Plain wording for why the sign-in grid is empty. Never mentions a server. */
+const ROSTER_WORDING: Record<RosterReason, string> = {
+  ok: "",
+  "no-server": "This till has not been connected to your company yet, so the staff list cannot load and a PIN cannot be checked.",
+  unreachable:
+    "Your company system did not answer, so the staff list could not load. You can still type your username below and sign in from this till's own records.",
+  "not-authorised":
+    "This till is not registered yet, so it is not allowed to load the staff list. Complete terminal setup first.",
+  empty: "Nobody is assigned to this branch yet. Type your username below.",
+};
+
+
 export function CashierPinLogin({
   onAdminLogin,
   initialUsername = "",
@@ -37,6 +49,11 @@ export function CashierPinLogin({
   const { cashierLogin } = useAuth();
   const [staff, setStaff] = useState<TerminalStaff[]>([]);
   const [reason, setReason] = useState<RosterReason>("ok");
+  // Which branch this till belongs to. An unbound till says so plainly rather
+  // than showing an empty list with no explanation.
+  const [branchLabel] = useState(
+    () => boundBranchName() ?? (activeBranchId(null) ? "This branch" : "No branch set"),
+  );
   const [loading, setLoading] = useState(true);
   const [picked, setPicked] = useState<TerminalStaff | null>(null);
   // What is being typed, and what has actually been committed. Keeping them
