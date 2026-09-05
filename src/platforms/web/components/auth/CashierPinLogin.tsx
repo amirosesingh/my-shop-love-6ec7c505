@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/pos-auth";
 
 import { activeBranchId, boundBranchName } from "@/lib/active-branch";
+import { isConfigurationFailure, type LoginFailure } from "@/lib/login-failure";
 import { listTerminalStaff, type RosterReason, type TerminalStaff } from "@/lib/staff-admin";
 import { usernameFromAddress } from "@/lib/internal-domains";
 import {
@@ -49,6 +50,9 @@ export function CashierPinLogin({
   const { cashierLogin } = useAuth();
   const [staff, setStaff] = useState<TerminalStaff[]>([]);
   const [reason, setReason] = useState<RosterReason>("ok");
+  // Set when the till itself is not connected — that is a setup problem, not
+  // a wrong PIN, and it gets a way out of the screen instead of a lockout.
+  const [configFailure, setConfigFailure] = useState<LoginFailure | null>(null);
   // Which branch this till belongs to. An unbound till says so plainly rather
   // than showing an empty list with no explanation.
   const [branchLabel] = useState(
