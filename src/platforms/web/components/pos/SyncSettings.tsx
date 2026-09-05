@@ -39,7 +39,6 @@ export function SyncSettings() {
   }, []);
 
   const queue = listQueue();
-  const quarantined = queue.filter((q) => q.quarantined);
   const last = lastSyncedAt();
 
   // Web and Android have no local database engine behind them: there is
