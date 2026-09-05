@@ -3,6 +3,16 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { agoWords, lastSyncAck, noteSyncAck, queueFailureKind, summarise } from "@/lib/sync-summary";
 import type { QueueView } from "@/lib/sync-outbox";
 
+const store = new Map<string, string>();
+const storage = {
+  getItem: (k: string) => store.get(k) ?? null,
+  setItem: (k: string, v: string) => void store.set(k, v),
+  removeItem: (k: string) => void store.delete(k),
+  clear: () => store.clear(),
+};
+(globalThis as { window?: unknown }).window = { localStorage: storage };
+(globalThis as { localStorage?: unknown }).localStorage = storage;
+
 const row = (over: Partial<QueueView>): QueueView =>
   ({
     id: "1",
