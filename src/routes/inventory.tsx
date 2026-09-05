@@ -51,6 +51,8 @@ import { ThemedSelect } from "@/platforms/web/components/pos/ThemedSelect";
 import { exportProductsXlsx } from "@/lib/product-export";
 import {
   groupList,
+  isActive,
+  selectableUnits,
   subCategoryList,
   topCategories,
   useCategories,
@@ -151,24 +153,38 @@ function Inventory() {
   const categories = useCategories();
   const units = useUnits();
 
-  // Categories the catalogue actually uses, plus anything set up in settings.
+  /**
+   * Names on offer: everything set up in settings that is still active, plus
+   * anything products already carry. A retired entry drops out of the list but
+   * stays offered on the product that is still filed under it.
+   */
+  const retired = useMemo(
+    () => new Set(categories.filter((c) => !isActive(c)).map((c) => c.name)),
+    [categories],
+  );
+  const offer = (names: Set<string>, keep?: string | null) =>
+    [...names].filter((n) => !retired.has(n) || n === keep).sort();
+
   const categoryNames = useMemo(() => {
     const names = new Set<string>(topCategories(categories).map((c) => c.name));
     state.products.forEach((p) => p.category && names.add(p.category));
-    return [...names].sort();
-  }, [categories, state.products]);
+    return offer(names, draft.category);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categories, state.products, retired, draft.category]);
 
   const groupNames = useMemo(() => {
     const names = new Set<string>(groupList(categories).map((c) => c.name));
     state.products.forEach((p) => p.group && names.add(p.group));
-    return [...names].sort();
-  }, [categories, state.products]);
+    return offer(names, draft.group);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categories, state.products, retired, draft.group]);
 
   const subNames = useMemo(() => {
     const names = new Set<string>(subCategoryList(categories).map((c) => c.name));
     state.products.forEach((p) => p.subCategory && names.add(p.subCategory));
-    return [...names].sort();
-  }, [categories, state.products]);
+    return offer(names, draft.subCategory);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categories, state.products, retired, draft.subCategory]);
 
   const rows = state.products.filter(
     (p) =>
@@ -328,7 +344,7 @@ function Inventory() {
                         value={draft.unit ?? "pcs"}
                         onChange={(v) => setDraft({ ...draft, unit: v })}
                         ariaLabel="Unit of measure"
-                        options={units.map((u) => ({
+                        options={selectableUnits(units, draft.unit).map((u) => ({
                           value: u.code,
                           label: `${u.code} · ${u.name}${u.allowDecimal ? " (decimal)" : ""}`,
                         }))}
