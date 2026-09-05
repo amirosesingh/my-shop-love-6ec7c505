@@ -252,6 +252,8 @@ function Register() {
     requirePermission,
     getTotal: () => totals.total,
     getMemberName: () => member?.name ?? null,
+    // A discount unlock lasts for this ticket only.
+    onReset: () => setDiscountOverride(false),
   });
   /** Cashier-adjustable column widths, remembered on this device. */
 
@@ -487,10 +489,17 @@ function Register() {
     base: promoBase,
     member,
   });
-  const manualBillDiscount = r2(
-    cartDiscountType === "percent" ? (promoBase * (cartDiscount || 0)) / 100 : cartDiscount || 0,
+  // One conversion, one place: the calculator turns the cashier's entry into
+  // money and folds automatic promotions and a whole-bill coupon in on the
+  // same base, so none of them cancels another out.
+  const billCouponDiscount = coupon && coupon.scope === "bill" ? r2(coupon.discount || 0) : 0;
+  const totals = cartTotals(
+    lines,
+    cartDiscount,
+    cartDiscountType,
+    taxSettings,
+    r2(promo.promoDiscount + billCouponDiscount),
   );
-  const totals = cartTotals(lines, r2(manualBillDiscount + promo.promoDiscount), "amount", taxSettings);
   const pointsEarned = member ? Math.max(0, Math.round(totals.total * promo.pointsRate)) : 0;
 
 
@@ -548,8 +557,6 @@ function Register() {
     memberId,
     setMemberId,
     patchLine,
-    setCartDiscount,
-    setCartDiscountType,
     unlockDiscounts,
   });
 
@@ -3438,8 +3445,27 @@ function Register() {
           padTarget === "bill"
             ? cartDiscountType
             : typeof padTarget === "number"
-              ? (lines[padTarget]?.discountType ?? "amount")
-              : "amount"
+              ? (lines[padTarget]?.discountType ?? "percent")
+              : "percent"
+        }
+        /** What the discount can be taken off — nothing may go below zero.
+         *  A line amount is per unit, matching how it is entered. */
+        max={
+          padTarget === "bill"
+            ? Math.max(0, r2(totals.subtotal - totals.lineDiscount))
+            : typeof padTarget === "number" && lines[padTarget]
+              ? Math.max(
+                  0,
+                  r2(
+                    Math.abs(lines[padTarget]!.price) -
+                      Math.min(
+                        Math.abs(lines[padTarget]!.price),
+                        Math.abs(lines[padTarget]!.couponDiscount || 0) /
+                          Math.max(1, Math.abs(lines[padTarget]!.qty)),
+                      ),
+                  ),
+                )
+              : 0
         }
         onApply={(v, t) => {
           const target = padTarget;
@@ -3452,7 +3478,9 @@ function Register() {
               !rules.allow_discount_stacking && !!coupon && v > 0 && (target === "bill" || typeof target === "number");
 
             if (stacking) {
-              toast.error("Discount stacking is off — remove the coupon first");
+              toast.error(
+                `Discount stacking is switched off for this branch, so coupon “${coupon?.code}” and a manual discount cannot both apply. Remove the coupon first, then enter the discount.`,
+              );
               return;
             }
             if (overLimit) {

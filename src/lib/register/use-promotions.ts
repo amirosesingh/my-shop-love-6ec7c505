@@ -14,7 +14,7 @@ import { r2 } from "@/core/types/pos-types";
 import { loadMemberVouchers, loadVoucherByToken, voucherValue } from "@/lib/coupons";
 import type { Campaign, VoucherView } from "@/lib/coupons";
 import type { CartCoupon } from "@/lib/register/use-cart";
-import type { CartLine, DiscountType, Product, Promotion } from "@/core/types/pos-types";
+import type { CartLine, Product, Promotion } from "@/core/types/pos-types";
 
 type PromotionsDeps = {
   /** Catalogue, active promotions and known members. */
@@ -31,8 +31,6 @@ type PromotionsDeps = {
   memberId: string | null;
   setMemberId: (id: string | null) => void;
   patchLine: (index: number, patch: Partial<CartLine>) => void;
-  setCartDiscount: (v: number) => void;
-  setCartDiscountType: (t: DiscountType) => void;
   /** Manager gate for staff without the discount permission. */
   unlockDiscounts: () => Promise<boolean>;
 };
@@ -50,8 +48,6 @@ export function usePromotions(deps: PromotionsDeps) {
     memberId,
     setMemberId,
     patchLine,
-    setCartDiscount,
-    setCartDiscountType,
     unlockDiscounts,
   } = deps;
 
@@ -99,9 +95,9 @@ export function usePromotions(deps: PromotionsDeps) {
       const line = lines[targetIndex]!;
       const unit = rule.valueType === "percent" ? r2((line.price * (rule.value ?? 0)) / 100) : r2(rule.value ?? 0);
       const value = r2(unit * line.qty);
+      // The coupon lives in its own field so a cashier discount on the same
+      // line adds to it instead of replacing it.
       patchLine(targetIndex, {
-        discount: rule.value ?? 0,
-        discountType: rule.valueType ?? "amount",
         couponCode: rule.name,
         couponDiscount: value,
       });
@@ -127,8 +123,8 @@ export function usePromotions(deps: PromotionsDeps) {
         appliedAt: at,
       });
     } else {
-      setCartDiscountType(rule.valueType ?? "amount");
-      setCartDiscount(rule.value ?? 0);
+      // A bill coupon is its own figure — it never occupies the cashier's
+      // bill-discount entry, so the two add up instead of replacing each other.
       const value = rule.valueType === "percent" ? r2((promoBase * (rule.value ?? 0)) / 100) : r2(rule.value ?? 0);
       setCoupon({
         code: rule.name,
@@ -193,8 +189,6 @@ export function usePromotions(deps: PromotionsDeps) {
         const line = lines[index]!;
         const value = voucherValue(campaign, r2(line.price * line.qty));
         patchLine(index, {
-          discount: r2(value / Math.max(1, line.qty)),
-          discountType: "amount",
           couponCode: token,
           couponDiscount: value,
         });
@@ -223,8 +217,6 @@ export function usePromotions(deps: PromotionsDeps) {
           return;
         }
         const value = voucherValue(campaign, base);
-        setCartDiscountType("amount");
-        setCartDiscount(value);
         setCoupon({
           code: token,
           promoId: campaign.id,
@@ -280,9 +272,8 @@ export function usePromotions(deps: PromotionsDeps) {
     if (!coupon) return;
     if (coupon.scope === "item") {
       const i = lines.findIndex((l) => l.couponCode === coupon.code);
-      if (i >= 0) patchLine(i, { discount: 0, couponCode: undefined, couponDiscount: undefined });
-    } else {
-      setCartDiscount(0);
+      // Only the coupon goes; the cashier's own discount on that line stays.
+      if (i >= 0) patchLine(i, { couponCode: undefined, couponDiscount: undefined });
     }
     logger.log("promotion", "Coupon removed", "register", {
       coupon: coupon.code,

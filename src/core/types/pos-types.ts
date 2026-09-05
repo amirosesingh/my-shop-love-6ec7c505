@@ -168,9 +168,46 @@ export type DiscountType = "amount" | "percent";
 /** Round to cents without float drift. */
 export const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
-/** Resolve a cart line's per-unit discount in currency. */
-export const lineUnitDiscount = (l: Pick<CartLine, "price" | "discount" | "discountType">) =>
-  l.discountType === "percent" ? r2((l.price * (l.discount || 0)) / 100) : r2(l.discount || 0);
+/** The parts of a line that decide what money comes off it. */
+export type DiscountableLine = Pick<CartLine, "price" | "discount" | "discountType"> &
+  Partial<Pick<CartLine, "qty" | "couponDiscount">>;
+
+/** Promotion / coupon money already taken off one unit of the line. */
+const unitCouponDiscount = (l: DiscountableLine) => {
+  const qty = Math.max(1, Math.abs(l.qty ?? 1));
+  return Math.min(Math.abs(l.price), r2(Math.abs(l.couponDiscount || 0) / qty));
+};
+
+/**
+ * Per-unit discount in currency. A promotion or coupon comes off first, then
+ * the cashier's own discount applies to the already-reduced price, so a second
+ * discount never erases the first (100 → 20% promo → 80 → 10% more → 72).
+ */
+export const lineUnitDiscount = (l: DiscountableLine) => {
+  const coupon = unitCouponDiscount(l);
+  const after = r2(Math.abs(l.price) - coupon);
+  const own =
+    l.discountType === "percent"
+      ? r2((after * Math.min(100, Math.max(0, l.discount || 0))) / 100)
+      : Math.min(after, Math.max(0, r2(l.discount || 0)));
+  return r2(Math.min(Math.abs(l.price), coupon + own));
+};
+
+/**
+ * Whole-line discount, rounded once so a percentage does not drift a cent per
+ * unit on prices like 33.33 × 3. This is what the ticket totals use.
+ */
+export const lineDiscountTotal = (l: DiscountableLine) => {
+  const qty = Math.abs(l.qty ?? 1);
+  const gross = Math.abs(l.price) * qty;
+  const coupon = Math.min(gross, Math.abs(l.couponDiscount || 0));
+  const after = gross - coupon;
+  const own =
+    l.discountType === "percent"
+      ? (after * Math.min(100, Math.max(0, l.discount || 0))) / 100
+      : Math.min(after, Math.max(0, l.discount || 0) * qty);
+  return r2(Math.min(gross, coupon + own));
+};
 
 /**
  * A payment method is a code from the configurable payment-types list, so an
