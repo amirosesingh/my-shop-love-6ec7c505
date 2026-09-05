@@ -1713,9 +1713,11 @@ export function PosProvider({ children }: { children: ReactNode }) {
     const ownsNewItems =
       !prev &&
       branchPolicy(stateRef.current.settings, stateRef.current.currentStoreId).privateCatalogue;
-    if (ownsNewItems) record = { ...record, ownerStoreId: stateRef.current.currentStoreId };
+    const stored: Product = ownsNewItems
+      ? { ...record, ownerStoreId: stateRef.current.currentStoreId }
+      : record;
     // Store it before anything on screen says it was saved.
-    const target = await db.commitProduct(record);
+    const target = await db.commitProduct(stored);
     if (ownsNewItems) {
       const owners = {
         ...(stateRef.current.settings.integrations.productOwners ?? {}),
