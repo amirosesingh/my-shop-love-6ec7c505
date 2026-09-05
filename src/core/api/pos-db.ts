@@ -133,6 +133,7 @@ export const rowToProduct = (r: Row): Product => ({
   reorderLevel: num(r.reorder_level),
   taxRate: num(r.tax_rate),
   customPoints: r.custom_points == null ? undefined : num(r.custom_points),
+  ownerStoreId: (r.owner_store_id as string | null | undefined) ?? null,
 });
 
 function jsonValue<T>(value: unknown, fallback: T): T {
