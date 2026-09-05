@@ -11,9 +11,10 @@ import { MonitorSmartphone } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { APP_VERSION } from "@/version";
-import { isDesktop, isNative } from "@/lib/branding";
+import { isDesktop } from "@/lib/branding";
+import { isNative } from "@/platform-config/platform";
 import { readTerminalConfig, subscribeTerminalConfig } from "@/core/activation/terminal-tokens";
-import { syncState, subscribeSync } from "@/lib/sync-engine";
+import { subscribeSyncState, syncState } from "@/lib/sync-status";
 import { isCloudConnected } from "@/core/activation/registration-status";
 import { sinceWords } from "@/lib/terminal-status";
 import { UnpairTerminalCard } from "@/platforms/web/components/pos/UnpairTerminal";
@@ -34,7 +35,7 @@ export function CurrentTerminalPanel() {
   const [, setTick] = useState(0);
 
   useEffect(() => subscribeTerminalConfig(() => setConfig(readTerminalConfig())), []);
-  useEffect(() => subscribeSync(() => setSync(syncState())), []);
+  useEffect(() => subscribeSyncState(() => setSync(syncState())), []);
   useEffect(() => {
     const read = () => {
       setOnline(isCloudConnected());
