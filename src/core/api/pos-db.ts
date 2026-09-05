@@ -213,6 +213,7 @@ export const productToRow = (p: Product): Row => {
     reorder_level: safeInt(p.reorderLevel),
     tax_rate: safeNum(p.taxRate),
     custom_points: safeNumOrNull(p.customPoints),
+    owner_store_id: p.ownerStoreId || null,
   };
 };
 
