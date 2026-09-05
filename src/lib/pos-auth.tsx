@@ -30,6 +30,13 @@ import { recordSignIn } from "@/lib/shift-attendance";
 import { endShiftSessions } from "@/lib/shift-sessions";
 import { onSessionExpired } from "@/lib/session-expiry";
 import { awaitProfileHydrated } from "@/lib/connection-profile";
+import { hasRequiredPlatformConfig } from "@/lib/platform-config-ready";
+import {
+  failureFromAuthError,
+  failureFromReadiness,
+  loginFailureMessage,
+} from "@/lib/login-failure";
+
 import {
   CASHIER_PERMISSIONS,
   FULL_PERMISSIONS,
@@ -323,6 +330,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Never construct the lazy cloud client until the current saved profile
       // has replaced any older cloud pair carried by terminal activation.
       await awaitProfileHydrated();
+      // A missing or half-saved connection is a configuration problem, and
+      // must never be reported as a wrong password.
+      const readiness = await hasRequiredPlatformConfig();
+      const configFailure = failureFromReadiness(readiness);
+      if (configFailure)
+        return {
+          ok: false,
+          code: configFailure,
+          error: loginFailureMessage(configFailure),
+        };
       // One handler for both worlds: a plain username belongs to a terminal
       // account and is mapped onto its hidden internal address; anything with
       // an "@" is used exactly as typed.
@@ -331,20 +348,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: address,
         password,
       });
-      if (error) return { ok: false, error: error.message };
-      // A blocked account may still hold valid credentials — refuse it here.
+      if (error) {
+        const code = failureFromAuthError(error.message);
+        return { ok: false, code, error: loginFailureMessage(code) };
+      }
+      // The account must resolve to a profile with a role before it is let in.
       try {
-        const { data: profileRows } = await supabase.rpc("current_app_user");
+        const { data: profileRows, error: profileError } = await supabase.rpc("current_app_user");
         const profile = (Array.isArray(profileRows) ? profileRows[0] : null) as
           | Record<string, unknown>
           | null;
-        if (profile && profile["is_active"] === false) {
+        if (profileError || !profile) {
           await supabase.auth.signOut();
-          return { ok: false, error: "Account deactivated. Please contact an administrator." };
+          return {
+            ok: false,
+            code: "permission-denied" as const,
+            error: loginFailureMessage("permission-denied"),
+          };
+        }
+        if (profile["is_active"] === false) {
+          await supabase.auth.signOut();
+          return {
+            ok: false,
+            code: "account-inactive" as const,
+            error: loginFailureMessage("account-inactive"),
+          };
         }
       } catch {
-        /* the profile lookup is advisory — row rules still apply server-side */
+        await supabase.auth.signOut();
+        return {
+          ok: false,
+          code: "permission-denied" as const,
+          error: loginFailureMessage("permission-denied"),
+        };
       }
+
       // Whoever signs in on this device trades in the terminal's branch.
       bindTerminalBranch();
       // Register this device so it can be listed and reset remotely, and so

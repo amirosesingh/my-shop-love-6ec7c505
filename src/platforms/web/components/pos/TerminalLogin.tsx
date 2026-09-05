@@ -9,6 +9,7 @@ import { useBranding } from "@/lib/branding";
 import { isTerminalApp } from "@/platform-config/platform";
 import { CashierPinLogin } from "@/platforms/web/components/auth/CashierPinLogin";
 import { isExternalEmail, usernameFromAddress } from "@/lib/internal-domains";
+import { isConfigurationFailure, type LoginFailure } from "@/lib/login-failure";
 
 export function TerminalLogin() {
   const { login } = useAuth();
@@ -19,12 +20,16 @@ export function TerminalLogin() {
   const [terminal, setTerminal] = useState(false);
   useEffect(() => setTerminal(isTerminalApp()), []);
   const [error, setError] = useState("");
+  // Why the last attempt failed. A connection problem gets a way out of the
+  // screen; only a genuine refusal is presented as a wrong password.
+  const [failure, setFailure] = useState<LoginFailure | null>(null);
   const [busy, setBusy] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [tab, setTab] = useState("admin");
   const [pinIdentifier, setPinIdentifier] = useState("");
   const [routed, setRouted] = useState(false);
+
 
   useEffect(() => {
     setTab(terminal ? "cashier" : "admin");
@@ -95,9 +100,14 @@ export function TerminalLogin() {
                 }
                 setBusy(true);
                 setError("");
+                setFailure(null);
                 const res = await login(email, password);
-                if (!res.ok) setError(res.error ?? "Sign in failed");
+                if (!res.ok) {
+                  setError(res.error ?? "Sign in could not be completed.");
+                  setFailure((res as { code?: LoginFailure }).code ?? null);
+                }
                 setBusy(false);
+
               }}
             >
               <div className="space-y-1">
@@ -127,7 +137,24 @@ export function TerminalLogin() {
                   }}
                 />
               </div>
-              {error && <p className="text-sm text-destructive">{error}</p>}
+              {error && (
+                <div className="space-y-2">
+                  <p className="text-sm text-destructive">{error}</p>
+                  {failure && isConfigurationFailure(failure) && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => {
+                        window.location.href = "/settings/database";
+                      }}
+                    >
+                      Open connection settings
+                    </Button>
+                  )}
+                </div>
+              )}
+
               <Button type="submit" className="w-full" disabled={busy}>
                 {busy && <Loader2 className="size-4 animate-spin" />}
                 Sign in

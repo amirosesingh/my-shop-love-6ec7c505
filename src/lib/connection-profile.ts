@@ -46,6 +46,16 @@ export function hydrateConnectionProfile(): Promise<void> {
   if (inFlight) return inFlight;
   state = "hydrating";
   inFlight = (async () => {
+    // Terminal identity first. An older activation record also carries the
+    // cloud pair that was current when the till was registered, and applying
+    // it after the vault pair would silently point the till at the previous
+    // project. Restoring it first lets the device's own saved connection win.
+    try {
+      const { hydrateTerminalConfig } = await import("@/core/activation/terminal-tokens");
+      await hydrateTerminalConfig();
+    } catch {
+      /* no readable activation — the saved connection stands on its own */
+    }
     // Neither half may abort the other: a device with only one of the two
     // stored must still come up as "incomplete", not as "unreadable".
     await Promise.all([
@@ -53,6 +63,7 @@ export function hydrateConnectionProfile(): Promise<void> {
       hydrateBackendUrl().catch(() => ""),
     ]);
   })()
+
     .catch(() => {})
     .then(() => {
       state = "hydrated";
