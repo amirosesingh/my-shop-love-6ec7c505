@@ -1,11 +1,13 @@
 /**
- * Puts a transparent stand-in in front of a desktop bridge.
+ * Builds a stand-in copy of a desktop bridge.
  *
  * The desktop shell hands its bridges to the page read-only, so their functions
- * can never be replaced in place — attempting it throws
- * "Cannot assign to read only property ...". The stand-in forwards every call
- * untouched and only adds the administrator prompt when a call comes back
- * refused.
+ * can never be replaced in place — attempting it threw
+ * "Cannot assign to read only property 'write'" and blanked the whole till.
+ * (A Proxy cannot help either: a frozen target forces the get trap to return
+ * the original function.) So we build a fresh plain object whose functions
+ * forward every call to the real bridge and only add the administrator prompt
+ * when a call comes back refused.
  */
 
 export type Refusal = { ok?: boolean; code?: string; error?: string };
@@ -23,28 +25,37 @@ export function wrapBridge<T extends object>(
   bridge: T,
   requestUnlock: (message: string) => Promise<boolean>,
 ): T {
-  const cache = new Map<string, unknown>();
-  return new Proxy(bridge, {
-    get(target, prop, receiver) {
-      const value = Reflect.get(target, prop, receiver);
-      if (typeof prop !== "string" || typeof value !== "function") return value;
-      if (passthrough(prop)) return value;
-      const cached = cache.get(prop);
-      if (cached) return cached;
-      const original = (value as (...args: unknown[]) => unknown).bind(target);
-      const wrapped = async (...args: unknown[]) => {
-        const first = await original(...args);
-        if (!isRefusal(first)) return first;
-        const unlocked = await requestUnlock(first.error ?? "");
-        if (!unlocked) return first;
-        return original(...args);
-      };
-      cache.set(prop, wrapped);
-      return wrapped;
-    },
-    // The underlying bridge is read-only; swallow writes instead of throwing.
-    set() {
-      return true;
-    },
-  });
+  const copy: Record<string, unknown> = {};
+
+  const keys = new Set<string>();
+  for (const key of Object.getOwnPropertyNames(bridge)) keys.add(key);
+  const proto = Object.getPrototypeOf(bridge) as object | null;
+  if (proto && proto !== Object.prototype) {
+    for (const key of Object.getOwnPropertyNames(proto)) {
+      if (key !== "constructor") keys.add(key);
+    }
+  }
+
+  for (const key of keys) {
+    let value: unknown;
+    try {
+      value = (bridge as Record<string, unknown>)[key];
+    } catch {
+      continue;
+    }
+    if (typeof value !== "function" || passthrough(key)) {
+      copy[key] = value;
+      continue;
+    }
+    const original = (value as (...args: unknown[]) => unknown).bind(bridge);
+    copy[key] = async (...args: unknown[]) => {
+      const first = await original(...args);
+      if (!isRefusal(first)) return first;
+      const unlocked = await requestUnlock(first.error ?? "");
+      if (!unlocked) return first;
+      return original(...args);
+    };
+  }
+
+  return copy as T;
 }
