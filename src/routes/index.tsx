@@ -547,8 +547,6 @@ function Register() {
     memberId,
     setMemberId,
     patchLine,
-    setCartDiscount,
-    setCartDiscountType,
     unlockDiscounts,
   });
 

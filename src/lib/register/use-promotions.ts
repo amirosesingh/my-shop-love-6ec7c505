@@ -31,8 +31,6 @@ type PromotionsDeps = {
   memberId: string | null;
   setMemberId: (id: string | null) => void;
   patchLine: (index: number, patch: Partial<CartLine>) => void;
-  setCartDiscount: (v: number) => void;
-  setCartDiscountType: (t: DiscountType) => void;
   /** Manager gate for staff without the discount permission. */
   unlockDiscounts: () => Promise<boolean>;
 };
@@ -50,8 +48,6 @@ export function usePromotions(deps: PromotionsDeps) {
     memberId,
     setMemberId,
     patchLine,
-    setCartDiscount,
-    setCartDiscountType,
     unlockDiscounts,
   } = deps;
 
