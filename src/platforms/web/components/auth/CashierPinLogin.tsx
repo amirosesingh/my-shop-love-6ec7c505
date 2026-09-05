@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/pos-auth";
-import { serverUnreachableOnDevice } from "@/lib/server-origin";
+
 import { activeBranchId, boundBranchName } from "@/lib/active-branch";
 import { listTerminalStaff, type RosterReason, type TerminalStaff } from "@/lib/staff-admin";
 import { usernameFromAddress } from "@/lib/internal-domains";
