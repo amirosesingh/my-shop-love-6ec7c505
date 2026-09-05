@@ -492,6 +492,18 @@ export function CashierPinLogin({
         </p>
       )}
       {error && <p className="text-center text-sm text-destructive">{error}</p>}
+      {configFailure && isConfigurationFailure(configFailure) && (
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          onClick={() => {
+            window.location.href = "/settings/database";
+          }}
+        >
+          Open connection settings
+        </Button>
+      )}
       {onAdminLogin && (
         <Button type="button" variant="ghost" className="w-full text-xs" onClick={onAdminLogin}>
           Administrator sign in with email and password
