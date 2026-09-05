@@ -276,6 +276,7 @@ function refusal(level) {
   return {
     ok: false,
     code: "EPRIVILEGE",
+    requiredLevel: level,
     stage: "authorize",
     error:
       level === ADMIN

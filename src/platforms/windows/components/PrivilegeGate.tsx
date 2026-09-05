@@ -22,6 +22,7 @@ import { wrapBridge } from "@/platforms/windows/privilege-bridge";
 import { onRecoveryScreen } from "@/lib/recovery-route";
 import { useAuth } from "@/lib/pos-auth";
 import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
+import { toast } from "sonner";
 
 type Ask = { message: string; resolve: (unlocked: boolean) => void };
 
@@ -66,7 +67,27 @@ export function PrivilegeGate({ children }: { children: React.ReactNode }) {
   }, [ready, recovery, user?.staffId, isAdmin, isSupervisor]);
 
   /* One prompt at a time, however many calls are refused at once. */
-  const requestUnlock = (message: string) => {
+  const requestUnlock = async (
+    message: string,
+    requiredLevel?: "admin" | "supervisor",
+  ): Promise<boolean> => {
+    // A live online account gets one immediate server-verified refresh before
+    // any local override is requested. This also closes the small launch race
+    // between auth hydration and the first protected click.
+    if (user && (isAdmin || isSupervisor)) {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      const adopted = token ? await window.sqlAdmin?.adoptSession?.(token) : null;
+      if (adopted?.ok) {
+        if (requiredLevel === "admin" && adopted.level !== "admin") {
+          toast.error("Administrator access required", {
+            description: "Your Supervisor account can use read-only database tools, but cannot make this change.",
+          });
+          return false;
+        }
+        return true;
+      }
+    }
     if (!asking.current) {
       asking.current = new Promise<boolean>((resolve) => {
         setAsk({
@@ -128,7 +149,7 @@ export function PrivilegeGate({ children }: { children: React.ReactNode }) {
       }
       off?.();
     };
-  }, [recovery]);
+  }, [recovery, user?.staffId, isAdmin, isSupervisor]);
 
   const submit = async () => {
     setBusy(true);

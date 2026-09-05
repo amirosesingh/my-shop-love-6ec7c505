@@ -86,6 +86,11 @@ describe("desktop channel privilege", () => {
     expect(p.allowed("backend:set")).toBe(true);
   });
 
+  it("reports the exact level needed by a refused call", () => {
+    const p = load();
+    expect(p.refusal?.("admin")).toMatchObject({ code: "EPRIVILEGE", requiredLevel: "admin" });
+  });
+
   it("classifies settings by what the setting decides", () => {
     const p = load();
     expect(p.settingLevel("ui_density")).toBe("open");

@@ -10,7 +10,12 @@
  * when a call comes back refused.
  */
 
-export type Refusal = { ok?: boolean; code?: string; error?: string };
+export type Refusal = {
+  ok?: boolean;
+  code?: string;
+  error?: string;
+  requiredLevel?: "admin" | "supervisor";
+};
 
 export const isRefusal = (value: unknown): value is Refusal =>
   Boolean(value) &&
@@ -23,7 +28,7 @@ const passthrough = (key: string) => key.startsWith("on") || key === "unlock";
 
 export function wrapBridge<T extends object>(
   bridge: T,
-  requestUnlock: (message: string) => Promise<boolean>,
+  requestUnlock: (message: string, requiredLevel?: "admin" | "supervisor") => Promise<boolean>,
 ): T {
   const copy: Record<string, unknown> = {};
 
@@ -51,7 +56,7 @@ export function wrapBridge<T extends object>(
     copy[key] = async (...args: unknown[]) => {
       const first = await original(...args);
       if (!isRefusal(first)) return first;
-      const unlocked = await requestUnlock(first.error ?? "");
+      const unlocked = await requestUnlock(first.error ?? "", first.requiredLevel);
       if (!unlocked) return first;
       return original(...args);
     };
