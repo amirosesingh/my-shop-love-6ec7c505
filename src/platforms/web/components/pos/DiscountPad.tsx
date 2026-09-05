@@ -23,6 +23,7 @@ export function DiscountPad({
   title = "Apply discount",
   value,
   type,
+  max,
   onApply,
 }: {
   open: boolean;
@@ -30,6 +31,8 @@ export function DiscountPad({
   title?: string;
   value: number;
   type: DiscountType;
+  /** Most money this discount may take off, so a total never goes negative. */
+  max?: number;
   onApply: (value: number, type: DiscountType) => void;
 }) {
   const [entry, setEntry] = useState(value ? String(value) : "");
@@ -42,7 +45,18 @@ export function DiscountPad({
   }, [open, value, type]);
 
   const numeric = Number(entry || 0);
-  const invalid = mode === "percent" && numeric > 100;
+  const ceiling = typeof max === "number" && Number.isFinite(max) ? max : null;
+  const problem =
+    entry.trim() === ""
+      ? null
+      : !Number.isFinite(numeric) || numeric < 0
+        ? "Enter a number of zero or more."
+        : mode === "percent" && numeric > 100
+          ? "A percentage cannot go above 100."
+          : mode === "amount" && ceiling !== null && numeric > ceiling
+            ? `That is more than the ${ceiling.toFixed(2)} this discount can come off.`
+            : null;
+  const invalid = problem !== null;
 
   const push = (k: string) =>
     setEntry((e) => (k === "." && e.includes(".") ? e : (e + k).replace(/^0(?=\d)/, "")));
@@ -81,9 +95,7 @@ export function DiscountPad({
             {mode === "percent" ? "%" : ""}
           </span>
         </div>
-        {invalid && (
-          <p className="text-[11px] text-destructive">A percentage cannot go above 100.</p>
-        )}
+        {problem && <p className="text-[11px] text-destructive">{problem}</p>}
 
         {mode === "percent" && (
           <div className="grid grid-cols-5 gap-1.5">
