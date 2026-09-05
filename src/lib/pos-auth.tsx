@@ -347,6 +347,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           code: configFailure,
           error: loginFailureMessage(configFailure),
         };
+      // Prove the saved connection actually points at a company database that
+      // holds the point-of-sale tables. Without this, a terminal aimed at the
+      // wrong project reports "invalid login credentials" and sends people
+      // hunting for a password that was never the problem.
+      const probe = await supabase.from("app_users").select("id").limit(1);
+      const probeFailure = failureFromProbeError(probe.error);
+      if (probeFailure)
+        return {
+          ok: false,
+          code: probeFailure,
+          error: loginFailureMessage(probeFailure),
+        };
       // One handler for both worlds: a plain username belongs to a terminal
       // account and is mapped onto its hidden internal address; anything with
       // an "@" is used exactly as typed.
