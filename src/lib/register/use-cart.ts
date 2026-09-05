@@ -42,6 +42,8 @@ type CartDeps = {
   /** Read at the moment of clearing, for the audit line. */
   getTotal: () => number;
   getMemberName: () => string | null;
+  /** Fired when the ticket is emptied, so one-off unlocks do not linger. */
+  onReset?: () => void;
 };
 
 export function useCart(deps: CartDeps) {
@@ -135,7 +137,9 @@ export function useCart(deps: CartDeps) {
   function resetCart() {
     setLines([]);
     setCartDiscount(0);
+    setCartDiscountType("percent");
     setExchangeRef(null);
+    deps.onReset?.();
     setCoupon(null);
     setBillNo(null);
     clearCartDraft(deps.currentStore.id);
