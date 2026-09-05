@@ -98,6 +98,7 @@ export const CENTRAL_SCHEMA: CentralTableSchema[] = [
       { name: "is_active", pgType: "boolean" },
       { name: "archived_at", pgType: "timestamptz" },
       { name: "is_primary_sub", pgType: "boolean" },
+      { name: "private_catalogue", pgType: "boolean" },
       { name: "deleted_at", pgType: "timestamptz" },
     ],
   },
