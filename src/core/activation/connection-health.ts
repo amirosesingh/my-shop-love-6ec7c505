@@ -139,10 +139,16 @@ export function checkHealth(force = false): Promise<HealthReport> {
   if (!force && fresh(cached)) return Promise.resolve(cached);
   if (inflight) return inflight;
   inflight = (async () => {
-    const [cloud, local] = await Promise.all([
-      withTimeout(probeCloud(), CLOUD_TIMEOUT),
+    const budget = probedOnce ? CLOUD_TIMEOUT : CLOUD_TIMEOUT_FIRST;
+    const [firstCloud, local] = await Promise.all([
+      withTimeout(probeCloud(), budget),
       withTimeout(probeLocal(), LOCAL_TIMEOUT),
     ]);
+    // A single slow answer must not be recorded as "cannot be reached": that
+    // verdict sends a configured terminal back to the connection screen.
+    let cloud = firstCloud;
+    if (!cloud && verdict === "unreachable") cloud = await withTimeout(probeCloud(), budget);
+    probedOnce = true;
     settleVerdict(cloud);
     const report: HealthReport = { cloud, local, anyOnline: cloud || local, at: Date.now() };
     cached = report;
