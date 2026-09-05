@@ -61,7 +61,7 @@ export async function loadApprovalCentre(storeId?: string | null): Promise<Centr
       status: "all",
     },
   });
-  if (!res.ok) return empty;
+  if (!res.ok || !Array.isArray(res.requests)) return empty;
   const meId = res.me?.id ?? "";
   const view = splitRequests(res.requests as AuthorizationRequest[], meId);
   // A ticket parked for a decision becomes pickable again the moment one lands.

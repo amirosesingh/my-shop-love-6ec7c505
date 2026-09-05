@@ -378,7 +378,12 @@ export const listAuthorizationRequests = createServerFn({ method: "POST" })
         rules: Object.values(rules),
       };
     } catch (e) {
-      return { ok: false as const, error: (e as Error).message.slice(0, 300), requests: [] };
+      return {
+        ok: false as const,
+        error: (e as Error).message.slice(0, 300),
+        requests: [] as never[],
+        rules: [] as never[],
+      };
     }
   });
 
