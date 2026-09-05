@@ -91,7 +91,6 @@ const GROUP_SPECS: GroupSpec[] = [
       { card: "security-alerts", shared: true },
       { card: "database", shared: true },
       { card: "sync", shared: true },
-      { card: "data-sync", shared: true },
       { card: "data-comparison", shared: true },
       { card: "inheritance", shared: true },
     ],
@@ -104,7 +103,6 @@ export const SYSTEM_TAB_IDS = [
   "database-health",
   "logic-health",
   "security-alerts",
-  "data-sync",
   "data-comparison",
   "inheritance",
 ] as const;
