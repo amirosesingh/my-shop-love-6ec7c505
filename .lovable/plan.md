@@ -1,46 +1,67 @@
-# Why the setup steps don't appear in the preview — and how to see them
+# Fix the PC and Android setup/login loop
 
-## What is actually happening
+## Confirmed cause
 
-The three-step start-up (connection details → activate terminal → sign-in) is written and active,
-but it deliberately only runs on a real till: the Windows app or the Android app. What you are
-looking at right now is the ordinary browser preview, and the browser version is built to take its
-connection from the hosting service, never from a setup screen. That is why the browser goes
-straight past the setup steps — not because the steps are missing.
+The intended order exists inside `AppShell`, but an earlier layer can bypass it:
 
-Verified in the code: the setup branch is entered only when the app is running inside the desktop
-shell or the phone app; a plain browser skips it by design.
+1. `AuthProvider` starts the external authentication client while the application is mounting.
+2. On a fresh device with no saved connection, that client throws `SupabaseConfigError`.
+3. The root error handler catches it and currently renders `TerminalActivation` when no activation
+   record exists (`src/routes/__root.tsx:68-72`). This is the wrong fallback: it skips the API
+   configuration screen entirely.
+4. Activation then cannot work because it needs the database connection that was skipped. The user
+   is left on the generic “Try again / Emergency access” path or an activation control that cannot
+   complete.
+
+This accounts for the reported behaviour on both desktop and Android. The recent startup probe fix
+cannot correct it because this exception happens outside/before the `AppShell` decision tree.
 
 ## What will change
 
-1. **A preview switch for the setup flow.** A hidden, opt-in switch so the browser preview can be
-   made to behave like a fresh till: add `?terminal=1` to the preview address (it is remembered for
-   that browser until you turn it off with `?terminal=0`). With it on you see exactly what a new
-   device sees — connection details first, then Activate Terminal, then staff sign-in. It changes
-   nothing about how the app behaves for real customers on the web, and nothing on tills or phones.
+1. **Stop authentication from starting before device configuration is ready.** On Windows and
+   Android, authentication/session restoration will wait for the existing secure connection-profile
+   hydration and local readiness result. Missing configuration is treated as the normal fresh-install
+   state, not as a page crash. The web path stays unchanged.
 
-2. **Emergency Access hidden on a brand-new device.** On a device with nothing saved at all, the
-   "Emergency access" button is not shown on the first setup screen. Once details have been saved
-   once — including when they later stop working — it appears exactly as today. Emergency Access
-   itself is not modified in any way.
+2. **Correct the root fallback.** A terminal-side `SupabaseConfigError` will never render terminal
+   activation. It will render the existing database/API configuration screen first. The Cloudflare
+   instructions remain only for the web version.
 
-3. **Saving keeps its existing button.** After entering the details the operator presses
-   "Test and continue" as today, and the device then moves on to terminal activation.
+3. **Enforce one startup decision path after save/retry.** “Test and continue” will re-run readiness
+   and the connection probe, then return to the shared startup decision:
+   - no configuration → API configuration;
+   - valid configuration + no/invalid registration → terminal activation;
+   - valid configuration + valid registration → normal staff sign-in.
 
-## Deliberately not touched
+4. **Prevent the stale error screen from trapping the user.** After a successful configuration save
+   or connection retry, reset/invalidate the error state and refresh the startup gate so the next
+   screen appears without restarting the app.
 
-- Emergency Access behaviour, screen and code rules.
-- Terminal activation rules and records; no step is skipped or duplicated.
-- The web version's real configuration source, backend, database, sync, roles, navigation, the
-  cashier keypad and staff sign-in.
+5. **Fresh-install Emergency Access visibility only.** Hide its button only when absolutely no local
+   API/database configuration has ever been saved. Once details exist—even if currently unreachable—
+   Emergency Access remains available and behaves exactly as it does now. Its code, Recovery Hub,
+   permissions and repair tools are not redesigned or bypassed.
 
-## Technical notes
+## Verification
 
-- Add `isSimulatedTerminal()` to `src/platform-config/platform.ts`, backed by a `localStorage` flag
-  set from the `?terminal=` query parameter, and fold it into a single `isTerminalShell()` helper
-  used by the `AppShell` start-up branch only (not by `isTerminalApp()`, so secure-storage and
-  config resolution rules are unchanged).
-- `ConnectDatabaseScreen` gains `showEmergencyAccess` (default true); `AppShell` passes `false` when
-  the device has never been configured (`verdict === "unconfigured"` and `cloudConfigured === false`).
-- Tests: extend `startup-decision.test.ts` with the fresh-install order and add a render check for
-  the emergency button's absence/presence. Run `bunx vitest run`, then `node scripts/bump-version.cjs`.
+Cover and run these flows on the shared decision logic and mounted application shell:
+
+- fresh install: configuration screen first, no Emergency Access button, no auth request;
+- save + successful test: activation screen next;
+- configured but unregistered: activation, never login;
+- configured and registered: normal login;
+- missing configuration with stale activation data: configuration first;
+- invalid/revoked registration: re-activation;
+- failed login: meaningful login error without falling into the root crash screen;
+- existing configuration failure: Emergency Access still opens normally;
+- successful repair/retry exits the error state and resumes the correct step.
+
+Run the targeted tests and full test suite, then bump the application version.
+
+## Deliberately unchanged
+
+- Emergency Access implementation and security.
+- Backend/database architecture and terminal activation rules.
+- Secure Windows/Android storage and the no-web-fallback rule.
+- Cashier keypad, local staff authentication, POS screens, roles and navigation.
+- Web configuration and working web login.
