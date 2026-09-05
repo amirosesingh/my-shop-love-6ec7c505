@@ -29,6 +29,7 @@ import { cacheCredential, verifyCachedPin } from "@/lib/offline-credentials";
 import { recordSignIn } from "@/lib/shift-attendance";
 import { endShiftSessions } from "@/lib/shift-sessions";
 import { onSessionExpired } from "@/lib/session-expiry";
+import { awaitProfileHydrated } from "@/lib/connection-profile";
 import {
   CASHIER_PERMISSIONS,
   FULL_PERMISSIONS,
@@ -318,6 +319,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (email: string, password: string) => {
+      // Terminal credentials are restored asynchronously from DPAPI/Keystore.
+      // Never construct the lazy cloud client until the current saved profile
+      // has replaced any older cloud pair carried by terminal activation.
+      await awaitProfileHydrated();
       // One handler for both worlds: a plain username belongs to a terminal
       // account and is mapped onto its hidden internal address; anything with
       // an "@" is used exactly as typed.
