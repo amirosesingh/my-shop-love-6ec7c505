@@ -107,6 +107,7 @@ import { Route as TransfersIndexRouteImport } from './routes/transfers.index'
 import { Route as TransfersIdRouteImport } from './routes/transfers.$id'
 import { Route as TransfersNewRouteImport } from './routes/transfers.new'
 import { Route as ApiPublicCashierLoginRouteImport } from './routes/api/public/cashier-login'
+import { Route as ApiPublicDesktopSessionRouteImport } from './routes/api/public/desktop-session'
 import { Route as ApiPublicHealthMetadataRouteImport } from './routes/api/public/health-metadata'
 import { Route as ApiPublicSecurityAlertsRouteImport } from './routes/api/public/security-alerts'
 import { Route as ApiPublicSyncRouteImport } from './routes/api/public/sync'
@@ -607,6 +608,11 @@ const ApiPublicCashierLoginRoute = ApiPublicCashierLoginRouteImport.update({
   path: '/api/public/cashier-login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicDesktopSessionRoute = ApiPublicDesktopSessionRouteImport.update({
+  id: '/api/public/desktop-session',
+  path: '/api/public/desktop-session',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicHealthMetadataRoute = ApiPublicHealthMetadataRouteImport.update({
   id: '/api/public/health-metadata',
   path: '/api/public/health-metadata',
@@ -747,6 +753,7 @@ export interface FileRoutesByFullPath {
   '/settings/': typeof SettingsIndexRoute
   '/transfers/': typeof TransfersIndexRoute
   '/api/public/cashier-login': typeof ApiPublicCashierLoginRoute
+  '/api/public/desktop-session': typeof ApiPublicDesktopSessionRoute
   '/api/public/health-metadata': typeof ApiPublicHealthMetadataRoute
   '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
   '/api/public/sync': typeof ApiPublicSyncRoute
@@ -855,6 +862,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsIndexRoute
   '/transfers': typeof TransfersIndexRoute
   '/api/public/cashier-login': typeof ApiPublicCashierLoginRoute
+  '/api/public/desktop-session': typeof ApiPublicDesktopSessionRoute
   '/api/public/health-metadata': typeof ApiPublicHealthMetadataRoute
   '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
   '/api/public/sync': typeof ApiPublicSyncRoute
@@ -964,6 +972,7 @@ export interface FileRoutesById {
   '/settings/': typeof SettingsIndexRoute
   '/transfers/': typeof TransfersIndexRoute
   '/api/public/cashier-login': typeof ApiPublicCashierLoginRoute
+  '/api/public/desktop-session': typeof ApiPublicDesktopSessionRoute
   '/api/public/health-metadata': typeof ApiPublicHealthMetadataRoute
   '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
   '/api/public/sync': typeof ApiPublicSyncRoute
@@ -1074,6 +1083,7 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/transfers/'
     | '/api/public/cashier-login'
+    | '/api/public/desktop-session'
     | '/api/public/health-metadata'
     | '/api/public/security-alerts'
     | '/api/public/sync'
@@ -1182,6 +1192,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/transfers'
     | '/api/public/cashier-login'
+    | '/api/public/desktop-session'
     | '/api/public/health-metadata'
     | '/api/public/security-alerts'
     | '/api/public/sync'
@@ -1290,6 +1301,7 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/transfers/'
     | '/api/public/cashier-login'
+    | '/api/public/desktop-session'
     | '/api/public/health-metadata'
     | '/api/public/security-alerts'
     | '/api/public/sync'
@@ -1399,6 +1411,7 @@ export interface RootRouteChildren {
   SettingsIndexRoute: typeof SettingsIndexRoute
   TransfersIndexRoute: typeof TransfersIndexRoute
   ApiPublicCashierLoginRoute: typeof ApiPublicCashierLoginRoute
+  ApiPublicDesktopSessionRoute: typeof ApiPublicDesktopSessionRoute
   ApiPublicHealthMetadataRoute: typeof ApiPublicHealthMetadataRoute
   ApiPublicSecurityAlertsRoute: typeof ApiPublicSecurityAlertsRoute
   ApiPublicSyncRoute: typeof ApiPublicSyncRoute
@@ -2095,6 +2108,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCashierLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/desktop-session': {
+      id: '/api/public/desktop-session'
+      path: '/api/public/desktop-session'
+      fullPath: '/api/public/desktop-session'
+      preLoaderRoute: typeof ApiPublicDesktopSessionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/health-metadata': {
       id: '/api/public/health-metadata'
       path: '/api/public/health-metadata'
@@ -2267,6 +2287,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsIndexRoute: SettingsIndexRoute,
   TransfersIndexRoute: TransfersIndexRoute,
   ApiPublicCashierLoginRoute: ApiPublicCashierLoginRoute,
+  ApiPublicDesktopSessionRoute: ApiPublicDesktopSessionRoute,
   ApiPublicHealthMetadataRoute: ApiPublicHealthMetadataRoute,
   ApiPublicSecurityAlertsRoute: ApiPublicSecurityAlertsRoute,
   ApiPublicSyncRoute: ApiPublicSyncRoute,
