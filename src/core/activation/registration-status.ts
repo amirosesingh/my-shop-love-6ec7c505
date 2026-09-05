@@ -14,6 +14,7 @@ import {
   subscribeConnectivity,
   checkHealth,
   cloudVerdict,
+  hasProbedCloud,
   type CloudVerdict,
 } from "@/core/activation/connection-health";
 import { cloudKeyStatus, subscribeCloudKeys } from "@/lib/secure-cloud-config";
