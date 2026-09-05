@@ -3448,7 +3448,8 @@ function Register() {
               ? (lines[padTarget]?.discountType ?? "percent")
               : "percent"
         }
-        /** What the discount can be taken off — nothing may go below zero. */
+        /** What the discount can be taken off — nothing may go below zero.
+         *  A line amount is per unit, matching how it is entered. */
         max={
           padTarget === "bill"
             ? Math.max(0, r2(totals.subtotal - totals.lineDiscount))
@@ -3456,10 +3457,11 @@ function Register() {
               ? Math.max(
                   0,
                   r2(
-                    Math.abs(lines[padTarget]!.price * lines[padTarget]!.qty) -
+                    Math.abs(lines[padTarget]!.price) -
                       Math.min(
-                        Math.abs(lines[padTarget]!.price * lines[padTarget]!.qty),
-                        Math.abs(lines[padTarget]!.couponDiscount || 0),
+                        Math.abs(lines[padTarget]!.price),
+                        Math.abs(lines[padTarget]!.couponDiscount || 0) /
+                          Math.max(1, Math.abs(lines[padTarget]!.qty)),
                       ),
                   ),
                 )
