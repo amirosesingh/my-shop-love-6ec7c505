@@ -1,0 +1,70 @@
+/**
+ * The settings map has to stay honest: every page belongs to exactly one live
+ * category, every category to a heading, and the folded navigation has to
+ * remember what was left open.
+ */
+import { describe, expect, it, beforeEach } from "vitest";
+import {
+  SETTINGS_CARDS,
+  SETTINGS_CATEGORIES,
+  SETTINGS_GROUPS,
+  settingsCatalogDuplicates,
+} from "@/lib/catalog-nav-test-entry";
+import {
+  initialOpenCategories,
+  readOpenCategories,
+} from "@/platforms/web/components/pos/settings/SettingsNavTree";
+import { matchSettings } from "@/platforms/web/components/pos/settings/use-settings-nav";
+
+describe("settings categories", () => {
+  it("gives every page a live category", () => {
+    const live = new Set(SETTINGS_CATEGORIES.map((c) => c.id));
+    for (const card of SETTINGS_CARDS) {
+      expect(live.has(card.category), `${card.id} → ${card.category}`).toBe(true);
+    }
+  });
+
+  it("leaves no category empty and none under a missing heading", () => {
+    const headings = new Set(SETTINGS_GROUPS.map((g) => g.id));
+    for (const category of SETTINGS_CATEGORIES) {
+      expect(headings.has(category.group), category.id).toBe(true);
+      expect(
+        SETTINGS_CARDS.some((c) => c.category === category.id),
+        `${category.id} has no pages`,
+      ).toBe(true);
+    }
+  });
+
+  it("keeps every page reachable exactly once", () => {
+    expect(settingsCatalogDuplicates()).toEqual([]);
+    expect(new Set(SETTINGS_CARDS.map((c) => c.id)).size).toBe(SETTINGS_CARDS.length);
+  });
+
+  it("still finds every page by its own name", () => {
+    for (const card of SETTINGS_CARDS) {
+      const hits = matchSettings(SETTINGS_CARDS, card.label);
+      expect(hits.map((h) => h.id)).toContain(card.id);
+    }
+  });
+});
+
+describe("folded navigation", () => {
+  beforeEach(() => globalThis.localStorage?.clear());
+
+  it("opens the category holding the current page on a fresh device", () => {
+    expect(initialOpenCategories(null, "payments")).toEqual({ payments: true });
+  });
+
+  it("remembers what was left open and still opens the current one", () => {
+    const stored = { business: true, payments: false };
+    expect(initialOpenCategories(stored, "payments")).toEqual({
+      business: true,
+      payments: true,
+    });
+  });
+
+  it("survives a device with nothing stored", () => {
+    expect(readOpenCategories()).toBeNull();
+    expect(initialOpenCategories(readOpenCategories())).toEqual({});
+  });
+});
