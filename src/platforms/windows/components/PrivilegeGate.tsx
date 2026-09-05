@@ -160,7 +160,12 @@ export function PrivilegeGate({ children }: { children: React.ReactNode }) {
     setBusy(true);
     setError("");
     const bridge = (window as unknown as {
-      sqlAdmin?: { unlock?: (u: string, p: string) => Promise<{ ok: boolean; error?: string }> };
+      sqlAdmin?: {
+        unlock?: (
+          u: string,
+          p: string,
+        ) => Promise<{ ok: boolean; level?: "admin" | "supervisor"; error?: string }>;
+      };
     }).sqlAdmin;
     const result = (await bridge?.unlock?.(username, pin)) ?? {
       ok: false,
