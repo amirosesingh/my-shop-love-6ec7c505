@@ -83,26 +83,93 @@ export async function rpc<T>(name: string, body: unknown, accessToken?: string):
 /** Where an answer came from, so the UI can say when rules are not live. */
 export type RulesSource = "database" | "defaults";
 
-export type RulesResult = { rules: PosRules; source: RulesSource; error?: string };
+/**
+ * Why a read failed. Every case keeps the strict fallback; the difference is
+ * only what is recorded and shown, so a stale key is never reported as a
+ * network outage.
+ */
+export type RulesFailure =
+  | "none"
+  | "config"
+  | "network"
+  | "auth"
+  | "permission"
+  | "data"
+  | "unknown";
+
+export type RulesResult = {
+  rules: PosRules;
+  source: RulesSource;
+  error?: string;
+  failure: RulesFailure;
+  /** Content stamp of the rule set, so a till can tell one version from another. */
+  revision: string;
+  fetchedAt: number;
+};
+
+/** Classify a raw database/transport error without leaking credentials. */
+export function classifyRulesFailure(message: string): RulesFailure {
+  const m = message.toLowerCase();
+  if (m.includes("service key is not configured") || m.includes("not configured")) return "config";
+  if (m.includes("invalid api key") || m.includes("jwt") || m.includes("not signed in")) {
+    return "auth";
+  }
+  if (m.includes("permission denied") || m.includes("row-level security") || m.includes("42501")) {
+    return "permission";
+  }
+  if (m.includes("pgrst") || m.includes("schema cache") || m.includes("does not exist")) {
+    return "data";
+  }
+  if (
+    m.includes("fetch") ||
+    m.includes("network") ||
+    m.includes("timeout") ||
+    m.includes("econn") ||
+    m.includes("getaddrinfo")
+  ) {
+    return "network";
+  }
+  return "unknown";
+}
+
+/** Stable content stamp for a rule set (order-independent). */
+export function rulesRevision(rules: PosRules): string {
+  const body = JSON.stringify(
+    Object.fromEntries(Object.entries(rules).sort(([a], [b]) => a.localeCompare(b))),
+  );
+  return createHash("sha256").update(body).digest("hex").slice(0, 16);
+}
 
 /**
  * Effective rule set for a branch (store row layered over the global row).
  *
  * A failure still returns the strict built-in defaults so the till keeps
- * working, but it is reported rather than hidden.
+ * working, but it is reported — with its real category — rather than hidden.
  */
 export async function loadRulesResult(storeId: string): Promise<RulesResult> {
   try {
     const json = await rpc<unknown>("pos_rules_get", { _store_id: storeId || "" });
-    return { rules: normalizeRules(json), source: "database" };
+    const rules = normalizeRules(json);
+    return {
+      rules,
+      source: "database",
+      failure: "none",
+      revision: rulesRevision(rules),
+      fetchedAt: Date.now(),
+    };
   } catch (e) {
+    const message = (e as Error).message.slice(0, 300);
     return {
       rules: { ...DEFAULT_POS_RULES },
       source: "defaults",
-      error: (e as Error).message.slice(0, 300),
+      error: message,
+      failure: classifyRulesFailure(message),
+      revision: "",
+      fetchedAt: Date.now(),
     };
   }
 }
+
 
 export async function loadRules(storeId: string): Promise<PosRules> {
   return (await loadRulesResult(storeId)).rules;

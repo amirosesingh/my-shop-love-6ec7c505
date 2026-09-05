@@ -798,6 +798,30 @@ const LIVE_TABLES = [
   "pos_store_settings",
 ] as const;
 
+/**
+ * Listeners told when centrally controlled settings changed, so the running
+ * POS re-reads its rules instead of waiting for a screen to be reopened.
+ * This reuses the one live channel below — no second subscription.
+ */
+const settingsListeners = new Set<(reason: string) => void>();
+
+export function subscribeSettingsChange(fn: (reason: string) => void): () => void {
+  settingsListeners.add(fn);
+  return () => settingsListeners.delete(fn);
+}
+
+function announceSettingsChange(reason: string): void {
+  for (const fn of settingsListeners) {
+    try {
+      fn(reason);
+    } catch {
+      /* one bad listener must not stop the others */
+    }
+  }
+}
+
+
+
 /** Refresh the offline staff roster so a PIN sign-in works without the cloud. */
 async function refreshStaffMirror(): Promise<void> {
   const { data, error } = await supabaseExternal.rpc("list_app_users");
@@ -887,7 +911,13 @@ export function startSyncEngine() {
   // a catch-up pass at once instead of waiting for the next tick.
   const offConnectivity = subscribeConnectivity((state: Connectivity) => {
     if (state === "offline") sleep();
-    else if (state === "online") wake();
+    else if (state === "online") {
+      wake();
+      // A terminal that was offline while an administrator changed a rule
+      // must not wait for a live event it already missed: reconnecting
+      // re-reads the central configuration straight away.
+      announceSettingsChange("reconnect");
+    }
   });
 
   // Live listener: an account or settings change made anywhere lands in this
@@ -900,10 +930,18 @@ export function startSyncEngine() {
       liveTimer = window.setTimeout(() => {
         liveTimer = undefined;
         void syncNow(`live:${table}`);
+        if (table === "pos_settings" || table === "pos_store_settings") {
+          announceSettingsChange(`live:${table}`);
+        }
       }, 400);
     });
   }
-  live.subscribe();
+  live.subscribe((status) => {
+    // A resubscribe after a dropped socket may have missed events while it
+    // was down, so treat a fresh join as a reason to re-read the rules.
+    if (status === "SUBSCRIBED") announceSettingsChange("realtime:subscribed");
+  });
+
   tick();
   return () => {
     window.clearInterval(timer);

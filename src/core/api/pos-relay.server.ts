@@ -87,18 +87,42 @@ function conflictKey(table: string): string {
   return RELAY_CONFLICT_KEYS[table] ?? "id";
 }
 
-/** The one name the service key is bound under. */
-const SERVICE_KEY_NAME = "POS_SUPABASE_SERVICE_ROLE_KEY";
+/**
+ * Names the service key may be bound under, in order of preference.
+ *
+ * The POS-specific name wins so a shop's own project always takes priority.
+ * A hosting platform that provisions the same project under the canonical
+ * name is accepted as a second candidate: without it, a stale or rotated
+ * POS-specific secret leaves the whole deployment answering "Invalid API key"
+ * even though a working key for the very same database is present. Neither
+ * value ever leaves the server.
+ */
+const SERVICE_KEY_NAMES = ["POS_SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SERVICE_ROLE_KEY"] as const;
 
 const envValue = (name: string): string | undefined =>
   // Cloudflare hands secrets to the worker per request, so check what the
   // server entry captured before falling back to the process environment.
   runtimeEnvValue(name) ?? process.env[name];
 
+/** Keys the central database has already rejected as invalid this run. */
+const rejectedKeys = new Set<string>();
+
+/** Every configured candidate, in preference order, at call time. */
+function serviceKeyCandidates(): string[] {
+  const out: string[] = [];
+  for (const name of SERVICE_KEY_NAMES) {
+    const value = envValue(name)?.trim();
+    if (value && !out.includes(value)) out.push(value);
+  }
+  return out;
+}
+
 /** Read the key at call time: some runtimes inject env per request. */
 function readServiceKey(): string | undefined {
-  return envValue(SERVICE_KEY_NAME);
+  const candidates = serviceKeyCandidates();
+  return candidates.find((k) => !rejectedKeys.has(k)) ?? candidates[0];
 }
+
 
 export function serviceKey(): string {
   const key = readServiceKey();
@@ -230,8 +254,7 @@ export async function runRelayRead(read: RelayRead): Promise<{
   return { ok: true, row: rows[0] ?? null };
 }
 
-function serviceHeaders(): Record<string, string> {
-  const key = serviceKey();
+function serviceHeaders(key: string): Record<string, string> {
   const headers: Record<string, string> = {
     apikey: key,
     "Content-Type": "application/json",
@@ -241,15 +264,45 @@ function serviceHeaders(): Record<string, string> {
   return headers;
 }
 
-/** Raw PostgREST call with the service key. */
+/** A rejected-credential answer, as opposed to a permission or data problem. */
+async function isInvalidKey(res: Response): Promise<boolean> {
+  if (res.status !== 401) return false;
+  try {
+    return (await res.clone().text()).includes("Invalid API key");
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Raw PostgREST call with the service key.
+ *
+ * If the database rejects the key itself (a rotated or foreign secret), the
+ * call is retried once with the next configured candidate and the bad key is
+ * remembered so the rest of the run goes straight to the working one. The key
+ * value is never logged or returned.
+ */
 export async function serviceRest(
   path: string,
   init: RequestInit & { prefer?: string } = {},
 ): Promise<Response> {
-  const headers = { ...serviceHeaders(), ...((init.headers as Record<string, string>) ?? {}) };
-  if (init.prefer) headers["Prefer"] = init.prefer;
-  return fetch(`${supabaseConfig().url}/rest/v1/${path}`, { ...init, headers });
+  const url = `${supabaseConfig().url}/rest/v1/${path}`;
+  const extra = (init.headers as Record<string, string>) ?? {};
+  const candidates = serviceKeyCandidates().filter((k) => !rejectedKeys.has(k));
+  const keys = candidates.length ? candidates : [serviceKey()];
+
+  let last: Response | undefined;
+  for (const key of keys) {
+    const headers = { ...serviceHeaders(key), ...extra };
+    if (init.prefer) headers["Prefer"] = init.prefer;
+    const res = await fetch(url, { ...init, headers });
+    if (!(await isInvalidKey(res))) return res;
+    rejectedKeys.add(key);
+    last = res;
+  }
+  return last as Response;
 }
+
 
 const encodeValue = (value: unknown) =>
   value === null ? "is.null" : `eq.${encodeURIComponent(String(value))}`;
