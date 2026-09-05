@@ -798,6 +798,30 @@ const LIVE_TABLES = [
   "pos_store_settings",
 ] as const;
 
+/**
+ * Listeners told when centrally controlled settings changed, so the running
+ * POS re-reads its rules instead of waiting for a screen to be reopened.
+ * This reuses the one live channel below — no second subscription.
+ */
+const settingsListeners = new Set<(reason: string) => void>();
+
+export function subscribeSettingsChange(fn: (reason: string) => void): () => void {
+  settingsListeners.add(fn);
+  return () => settingsListeners.delete(fn);
+}
+
+function announceSettingsChange(reason: string): void {
+  for (const fn of settingsListeners) {
+    try {
+      fn(reason);
+    } catch {
+      /* one bad listener must not stop the others */
+    }
+  }
+}
+
+
+
 /** Refresh the offline staff roster so a PIN sign-in works without the cloud. */
 async function refreshStaffMirror(): Promise<void> {
   const { data, error } = await supabaseExternal.rpc("list_app_users");
