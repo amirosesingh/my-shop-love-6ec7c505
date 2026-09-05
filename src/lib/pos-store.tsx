@@ -1707,14 +1707,16 @@ export function PosProvider({ children }: { children: ReactNode }) {
         ecomPrice: record.ecomPrice,
       },
     });
+    // A branch that keeps a private catalogue owns whatever it creates, so
+    // the item never shows up at the other shops. The owner travels with the
+    // record itself, which is what the central database enforces on.
+    const ownsNewItems =
+      !prev &&
+      branchPolicy(stateRef.current.settings, stateRef.current.currentStoreId).privateCatalogue;
+    if (ownsNewItems) record = { ...record, ownerStoreId: stateRef.current.currentStoreId };
     // Store it before anything on screen says it was saved.
     const target = await db.commitProduct(record);
-    // A branch that keeps a private catalogue owns whatever it creates, so
-    // the item never shows up at the other shops.
-    if (
-      !prev &&
-      branchPolicy(stateRef.current.settings, stateRef.current.currentStoreId).privateCatalogue
-    ) {
+    if (ownsNewItems) {
       const owners = {
         ...(stateRef.current.settings.integrations.productOwners ?? {}),
         [record.id]: stateRef.current.currentStoreId,
