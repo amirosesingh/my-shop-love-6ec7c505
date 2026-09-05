@@ -147,6 +147,9 @@ let baseUrl = DEV_URL || null;
 /** Cleared as soon as the renderer reports that the till actually mounted. */
 let readyWatchdog = null;
 let safeMode = false;
+/** Set once the operator (or the shell) has genuinely asked the till to close. */
+let quitting = false;
+
 let reconnectTimer = null;
 let reconnectDelay = 5_000;
 let reconnectAttempt = 0;
@@ -2037,11 +2040,17 @@ app.whenReady().then(async () => {
 });
 
 app.on("before-quit", () => {
+  quitting = true;
   closeCustomerDisplay();
 });
 
 app.on("window-all-closed", async () => {
-  if (readyWatchdog) clearTimeout(readyWatchdog);
+  // In repair mode the till windows are closed on purpose and the repair
+  // window is the app. Quitting here is what made an unconfigured PC appear
+  // to shut itself down a minute after launch.
+  if (safeMode || recovery.isOpen()) return;
+  markStartupSettled();
+
   worker.stop();
   if (reconnectTimer) clearTimeout(reconnectTimer);
   updater.stop();
