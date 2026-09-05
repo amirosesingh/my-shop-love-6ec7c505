@@ -911,7 +911,13 @@ export function startSyncEngine() {
   // a catch-up pass at once instead of waiting for the next tick.
   const offConnectivity = subscribeConnectivity((state: Connectivity) => {
     if (state === "offline") sleep();
-    else if (state === "online") wake();
+    else if (state === "online") {
+      wake();
+      // A terminal that was offline while an administrator changed a rule
+      // must not wait for a live event it already missed: reconnecting
+      // re-reads the central configuration straight away.
+      announceSettingsChange("reconnect");
+    }
   });
 
   // Live listener: an account or settings change made anywhere lands in this
@@ -924,10 +930,18 @@ export function startSyncEngine() {
       liveTimer = window.setTimeout(() => {
         liveTimer = undefined;
         void syncNow(`live:${table}`);
+        if (table === "pos_settings" || table === "pos_store_settings") {
+          announceSettingsChange(`live:${table}`);
+        }
       }, 400);
     });
   }
-  live.subscribe();
+  live.subscribe((status) => {
+    // A resubscribe after a dropped socket may have missed events while it
+    // was down, so treat a fresh join as a reason to re-read the rules.
+    if (status === "SUBSCRIBED") announceSettingsChange("realtime:subscribed");
+  });
+
   tick();
   return () => {
     window.clearInterval(timer);
