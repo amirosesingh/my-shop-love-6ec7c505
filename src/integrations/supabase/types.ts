@@ -3943,6 +3943,7 @@ export type Database = {
       terminal_tokens: {
         Row: {
           activated_at: string | null
+          app_version: string | null
           claim_proof: string | null
           claimed_at: string | null
           claimed_by_device: string | null
@@ -3952,6 +3953,7 @@ export type Database = {
           expires_at: string | null
           id: string
           last_seen_at: string | null
+          last_sync_at: string | null
           location_id: string | null
           location_name: string | null
           platform: string
@@ -3963,6 +3965,7 @@ export type Database = {
         }
         Insert: {
           activated_at?: string | null
+          app_version?: string | null
           claim_proof?: string | null
           claimed_at?: string | null
           claimed_by_device?: string | null
@@ -3972,6 +3975,7 @@ export type Database = {
           expires_at?: string | null
           id?: string
           last_seen_at?: string | null
+          last_sync_at?: string | null
           location_id?: string | null
           location_name?: string | null
           platform?: string
@@ -3983,6 +3987,7 @@ export type Database = {
         }
         Update: {
           activated_at?: string | null
+          app_version?: string | null
           claim_proof?: string | null
           claimed_at?: string | null
           claimed_by_device?: string | null
@@ -3992,6 +3997,7 @@ export type Database = {
           expires_at?: string | null
           id?: string
           last_seen_at?: string | null
+          last_sync_at?: string | null
           location_id?: string | null
           location_name?: string | null
           platform?: string
@@ -4871,10 +4877,20 @@ export type Database = {
         }
         Returns: boolean
       }
-      terminal_token_heartbeat: {
-        Args: { p_activate?: boolean; p_token_id: string }
-        Returns: undefined
-      }
+      terminal_token_heartbeat:
+        | {
+            Args: { p_activate?: boolean; p_token_id: string }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              p_activate?: boolean
+              p_synced?: boolean
+              p_token_id: string
+              p_version?: string
+            }
+            Returns: undefined
+          }
       terminal_token_status: {
         Args: { p_token_id: string }
         Returns: {
