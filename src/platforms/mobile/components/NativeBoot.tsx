@@ -29,18 +29,16 @@ export function NativeBoot({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (ready) return;
     let cancelled = false;
-    // Preferences first: the mirrored device keys (including the backend
-    // address) must be back in storage before anything reads them. Only then
-    // is the connection profile restored and applied.
+    // Restore terminal identity first because older activation records also
+    // contain the cloud pair that was current when the till was registered.
+    // The separately saved connection profile is the current authority, so it
+    // must be applied last and win when an operator has since changed project.
     void hydrateNativeStorage()
       .catch(() => {})
+      .then(() => hydrateTerminalConfig())
       .then(() => hydrateConnectionProfile())
       // Keep only what a terminal needs: caches and leftover installers go.
       .then(() => runDeviceCleanup())
-
-      // The activation is sealed on the device; unseal it before anything can
-      // decide the terminal is not registered.
-      .then(() => hydrateTerminalConfig())
       .then(() => applyPendingWebBundle())
       .finally(() => {
         if (!cancelled) setReady(true);
