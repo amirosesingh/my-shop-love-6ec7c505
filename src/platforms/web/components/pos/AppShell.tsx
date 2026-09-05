@@ -45,6 +45,7 @@ import { setPrintStore, setPrintSettings, setServiceTerms } from "@/lib/pos-prin
 import { bookingRulesOf } from "@/core/types/pos-types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
   Select,
@@ -452,6 +453,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     );
 
   return (
+    <TooltipProvider delayDuration={0}>
     <div className="pos-scaled flex h-dvh min-h-dvh flex-col overflow-hidden bg-background text-foreground">
       <DbConnectionModal />
       <CloudSetupGate />
@@ -641,5 +643,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </ShiftGuard>
     </div>
+    </TooltipProvider>
   );
 }

@@ -13,7 +13,7 @@ import { navGroups, navItemKey, type NavItem } from "./nav-config";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/lib/pos-auth";
 import { useNavPins } from "@/lib/nav-pins";
 import { SETTINGS_CARDS } from "@/lib/settings-catalog";
@@ -187,6 +187,7 @@ export function SidebarNav({
   };
 
   return (
+    <TooltipProvider delayDuration={0}>
     <div className="flex h-full min-h-0 flex-col">
       {header}
 
@@ -255,5 +256,6 @@ export function SidebarNav({
         </div>
       )}
     </div>
+    </TooltipProvider>
   );
 }
