@@ -11,6 +11,7 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { reportAppReady } from "@/lib/app-health";
 import { PosProvider } from "@/lib/pos-store";
 import { usePosOptional } from "@/lib/pos-store";
 import { PosRulesProvider } from "@/lib/pos-rules.tsx";
@@ -61,8 +62,12 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
   useEffect(() => {
+    // Something on screen beats a blank window: the desktop shell must know the
+    // build started, or its 60-second watchdog tears the till down.
+    reportAppReady();
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
   }, [error]);
+
   const notConfigured = error.name === "SupabaseConfigError";
 
   // Missing device configuration is step one of terminal setup, never a cue
