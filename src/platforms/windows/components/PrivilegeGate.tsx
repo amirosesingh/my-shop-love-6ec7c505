@@ -18,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { wrapBridge } from "@/platforms/windows/privilege-bridge";
 
 type Ask = { message: string; resolve: (unlocked: boolean) => void };
 
