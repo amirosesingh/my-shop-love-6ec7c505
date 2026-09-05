@@ -334,10 +334,15 @@ function lockDownNavigation(win, route) {
 
 function instrument(win, route) {
   lockDownNavigation(win, route);
+  // A page that painted is proof the build works, whatever screen it landed on
+  // — setup, sign-in or the register. Only a window that never renders at all
+  // counts as a failed launch.
+  win.webContents.on("did-finish-load", () => markStartupSettled());
   win.webContents.on("did-fail-load", (_e, code, description, url) => {
     console.error(`[window] failed to load ${url || route}: ${description} (${code})`);
     diagnostics.logCrash("window.did-fail-load", { route, code, description });
   });
+
   diagnostics.watchWindow(win, route);
   if (DEBUG) win.webContents.openDevTools({ mode: "detach" });
 }

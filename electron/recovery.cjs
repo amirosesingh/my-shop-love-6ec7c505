@@ -49,4 +49,4 @@ function close() {
   win = null;
 }
 
-module.exports = { open, close, progress, isOpen };
+module.exports = { open, close, progress, isOpen, isOwn };
