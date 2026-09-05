@@ -66,6 +66,12 @@ export type Product = {
   taxRate: number;
   /** bonus loyalty points awarded for this item (bulk import field) */
   customPoints?: number;
+  /**
+   * Branch that owns this item. Empty means every branch shares it. When the
+   * owning branch keeps a private catalogue, the central database itself hides
+   * the item from the other branches.
+   */
+  ownerStoreId?: string | null;
 };
 
 export type ProductPack = {
