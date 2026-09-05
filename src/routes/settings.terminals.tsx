@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { SettingsFrame } from "@/platforms/web/components/pos/settings/SettingsFrame";
+import { CurrentTerminalPanel } from "@/platforms/web/components/pos/CurrentTerminalPanel";
 import { TerminalTokens } from "@/platforms/web/components/pos/TerminalTokens";
 
 export const Route = createFileRoute("/settings/terminals")({
@@ -26,7 +27,10 @@ export const Route = createFileRoute("/settings/terminals")({
       title="Terminal activation"
       description="Every Windows till registers once with a code issued here. Phones and tablets live on the Mobile terminals page. Revoke a token to cut a machine off from the company data."
     >
-      <TerminalTokens only="pc" />
+      <div className="space-y-5">
+        <CurrentTerminalPanel />
+        <TerminalTokens only="pc" />
+      </div>
     </SettingsFrame>
   ),
 });

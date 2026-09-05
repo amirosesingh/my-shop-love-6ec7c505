@@ -35,6 +35,7 @@ import { stockAt, usePos } from "@/lib/pos-store";
 import { availableAt, planDeduction, subWarehouses } from "@/lib/locations";
 import { branchPolicy } from "@/lib/branch-policy";
 import { groupOf, scopeBetween } from "@/lib/stock-transfers";
+import { groupName, useStoreGroups } from "@/lib/store-groups";
 import type { TransferItem, TransferKind } from "@/core/types/pos-types";
 
 export type ComposerResult = {
@@ -75,6 +76,7 @@ export function TransferComposer({
   const sourceStoreId = kind === "transfer" ? currentStore.id : otherStoreId;
   const sourceLevels = subWarehouses(allStores, currentStore.id);
   const crossGroup = Boolean(otherStoreId) && scopeBetween(currentStore, otherStore) === "INTER_GROUP";
+  const groups = useStoreGroups();
 
   function addItem(productId: string, amount = 1) {
     const add = Math.max(1, Math.round(amount) || 1);
@@ -264,8 +266,11 @@ export function TransferComposer({
             )}
             {crossGroup && (
               <p className="mt-3 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-                {groupOf(currentStore)} and {groupOf(otherStore)} sit in different clusters. On
-                arrival each line is matched into the receiving cluster's own catalogue by barcode.
+                {groupName(groups, groupOf(currentStore))} and{" "}
+                {groupName(groups, groupOf(otherStore))} are different groups, so this request
+                always waits for an authorised approver — someone other than you — before any
+                stock moves. On arrival each line is matched into the receiving group's own
+                catalogue by barcode.
               </p>
             )}
             <div className="mt-4 space-y-1">

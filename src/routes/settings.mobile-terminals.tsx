@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { SettingsFrame } from "@/platforms/web/components/pos/settings/SettingsFrame";
+import { CurrentTerminalPanel } from "@/platforms/web/components/pos/CurrentTerminalPanel";
 import { TerminalTokens } from "@/platforms/web/components/pos/TerminalTokens";
 
 export const Route = createFileRoute("/settings/mobile-terminals")({
@@ -25,7 +26,10 @@ export const Route = createFileRoute("/settings/mobile-terminals")({
       title="Mobile terminals"
       description="Phones and tablets get their own activation codes here. Windows counter tills are managed on the Terminal activation page."
     >
-      <TerminalTokens only="mobile" />
+      <div className="space-y-5">
+        <CurrentTerminalPanel />
+        <TerminalTokens only="mobile" />
+      </div>
     </SettingsFrame>
   ),
 });

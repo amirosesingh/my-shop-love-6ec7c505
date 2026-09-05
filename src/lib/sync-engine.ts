@@ -532,6 +532,21 @@ export async function drainOutbox(): Promise<{ pushed: number; failed: number }>
     if (pushed) markSynced();
     // A successful push proves the connection is back, so online mode resumes.
     if (pushed) noteConnectionRestored();
+    // Tell the register this terminal synced, so the Terminals screen can show
+    // a truthful "last sync" instead of guessing from the check-in time.
+    if (pushed && !failed) {
+      void (async () => {
+        try {
+          const { readTerminalConfig, stampHeartbeat } = await import(
+            "@/core/activation/terminal-tokens"
+          );
+          const tokenId = readTerminalConfig()?.tokenId;
+          if (tokenId) await stampHeartbeat(tokenId, { synced: true });
+        } catch {
+          /* reporting the sync time must never break the sync itself */
+        }
+      })();
+    }
   } finally {
     draining = false;
     setSyncState({

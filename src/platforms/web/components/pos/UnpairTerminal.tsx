@@ -18,7 +18,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { isTerminalApp } from "@/platform-config/platform";
-import { readTerminalConfig, unpairTerminal } from "@/core/activation/terminal-tokens";
+import {
+  readTerminalConfig,
+  revokeTerminalToken,
+  unpairTerminal,
+} from "@/core/activation/terminal-tokens";
 import { useManagerGate } from "@/lib/manager-gate";
 import { useAuthOptional } from "@/lib/pos-auth";
 
@@ -48,8 +52,18 @@ export function UnpairTerminalCard() {
   };
 
   const run = async () => {
+    // Retire the registration centrally first, so the credentials this machine
+    // held are refused even if someone restores an old copy of them. Trading
+    // history — sales, shifts, payments, transfers, audit — is never touched.
+    if (config?.tokenId) {
+      try {
+        await revokeTerminalToken(config.tokenId);
+      } catch {
+        toast.message("Cleared on this device; the register will catch up when it reconnects.");
+      }
+    }
     await unpairTerminal();
-    toast.success("Terminal unpaired — enter a new activation code");
+    toast.success("Terminal cleared — enter a new activation code");
     window.setTimeout(() => window.location.reload(), 600);
   };
 

@@ -3610,6 +3610,36 @@ export type Database = {
           },
         ]
       }
+      store_groups: {
+        Row: {
+          archived_at: string | null
+          code: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          code: string
+          created_at?: string
+          id: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       stores: {
         Row: {
           address: string | null
@@ -3675,6 +3705,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "stores_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "store_groups"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "stores_parent_id_fkey"
             columns: ["parent_id"]
@@ -3906,6 +3943,7 @@ export type Database = {
       terminal_tokens: {
         Row: {
           activated_at: string | null
+          app_version: string | null
           claim_proof: string | null
           claimed_at: string | null
           claimed_by_device: string | null
@@ -3915,6 +3953,7 @@ export type Database = {
           expires_at: string | null
           id: string
           last_seen_at: string | null
+          last_sync_at: string | null
           location_id: string | null
           location_name: string | null
           platform: string
@@ -3926,6 +3965,7 @@ export type Database = {
         }
         Insert: {
           activated_at?: string | null
+          app_version?: string | null
           claim_proof?: string | null
           claimed_at?: string | null
           claimed_by_device?: string | null
@@ -3935,6 +3975,7 @@ export type Database = {
           expires_at?: string | null
           id?: string
           last_seen_at?: string | null
+          last_sync_at?: string | null
           location_id?: string | null
           location_name?: string | null
           platform?: string
@@ -3946,6 +3987,7 @@ export type Database = {
         }
         Update: {
           activated_at?: string | null
+          app_version?: string | null
           claim_proof?: string | null
           claimed_at?: string | null
           claimed_by_device?: string | null
@@ -3955,6 +3997,7 @@ export type Database = {
           expires_at?: string | null
           id?: string
           last_seen_at?: string | null
+          last_sync_at?: string | null
           location_id?: string | null
           location_name?: string | null
           platform?: string
@@ -4365,6 +4408,10 @@ export type Database = {
       }
       held_orders_open_count: { Args: { _store_id?: string }; Returns: number }
       is_app_supervisor: { Args: never; Returns: boolean }
+      is_cross_group_transfer: {
+        Args: { _from: string; _to: string }
+        Returns: boolean
+      }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
       is_staff_now: { Args: never; Returns: boolean }
       is_supervisor_now: { Args: never; Returns: boolean }
@@ -4425,6 +4472,7 @@ export type Database = {
         }
         Returns: string
       }
+      may_approve_cross_group_transfer: { Args: never; Returns: boolean }
       member_join: {
         Args: { _email?: string; _full_name: string; _phone: string }
         Returns: string
@@ -4770,10 +4818,12 @@ export type Database = {
         Args: { _since?: string; _store_id: string }
         Returns: Json
       }
-      stock_transfer_approval_required: {
-        Args: { _store_id: string }
-        Returns: boolean
-      }
+      stock_transfer_approval_required:
+        | { Args: { _store_id: string }; Returns: boolean }
+        | {
+            Args: { _store_id: string; _to_store_id: string }
+            Returns: boolean
+          }
       stock_transfer_approve: {
         Args: { p_approved_by?: string; p_lines?: Json; p_transfer_id: string }
         Returns: undefined
@@ -4804,6 +4854,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      store_group_of: { Args: { _store_id: string }; Returns: string }
       store_visible: { Args: { _store_id: string }; Returns: boolean }
       terminal_staff_list: {
         Args: { p_store_id?: string }
@@ -4826,10 +4877,20 @@ export type Database = {
         }
         Returns: boolean
       }
-      terminal_token_heartbeat: {
-        Args: { p_activate?: boolean; p_token_id: string }
-        Returns: undefined
-      }
+      terminal_token_heartbeat:
+        | {
+            Args: { p_activate?: boolean; p_token_id: string }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              p_activate?: boolean
+              p_synced?: boolean
+              p_token_id: string
+              p_version?: string
+            }
+            Returns: undefined
+          }
       terminal_token_status: {
         Args: { p_token_id: string }
         Returns: {
