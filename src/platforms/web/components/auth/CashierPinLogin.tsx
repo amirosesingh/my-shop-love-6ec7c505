@@ -63,10 +63,14 @@ export function CashierPinLogin({
     const branch = activeBranchId(null);
     void (async () => {
       let rows: TerminalStaff[] = [];
+      let why: RosterReason = "empty";
       try {
-        rows = await listTerminalStaff(branch);
+        const roster = await listTerminalStaff(branch);
+        rows = roster.staff;
+        why = roster.reason;
       } catch {
         rows = [];
+        why = "unreachable";
       }
       // No answer from the server: offer the roster mirrored into this till's
       // own database, so a cut-off branch still sees who can sign in.
@@ -80,18 +84,21 @@ export function CashierPinLogin({
             roleSlug: r.roleSlug,
             storeId: r.storeId,
           })) as unknown as TerminalStaff[];
+          if (rows.length) why = "ok";
         } catch {
           rows = [];
         }
       }
       if (!live) return;
       setStaff(Array.isArray(rows) ? rows : []);
+      setReason(why);
       setLoading(false);
     })();
     return () => {
       live = false;
     };
   }, []);
+
 
   // A whole internal address is accepted too — it is what the account list
   // shows — so it is reduced to the username before anything is sent.
