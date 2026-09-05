@@ -2047,8 +2047,10 @@ app.on("before-quit", () => {
 app.on("window-all-closed", async () => {
   // In repair mode the till windows are closed on purpose and the repair
   // window is the app. Quitting here is what made an unconfigured PC appear
-  // to shut itself down a minute after launch.
-  if (safeMode || recovery.isOpen()) return;
+  // to shut itself down a minute after launch. Once the operator closes the
+  // repair window too, the normal shutdown below runs as before.
+  if (recovery.isOpen()) return;
+
   markStartupSettled();
 
   worker.stop();
