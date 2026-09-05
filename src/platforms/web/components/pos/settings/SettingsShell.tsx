@@ -47,7 +47,12 @@ export function SettingsShell({ children, home = false }: { children: ReactNode;
         </nav>
 
         <div className="min-w-0 flex-1">
-          <div className="sticky top-0 z-20 flex items-center gap-1.5 border-b border-border bg-background/95 px-3 py-2 text-xs backdrop-blur">
+          <div
+            className={
+              "sticky top-0 z-20 items-center gap-1.5 border-b border-border bg-background/95 px-3 py-2 text-xs backdrop-blur " +
+              (home ? "flex lg:hidden" : "flex")
+            }
+          >
             <Sheet open={drawer} onOpenChange={setDrawer}>
               <SheetTrigger
                 aria-label="Open settings navigation"
