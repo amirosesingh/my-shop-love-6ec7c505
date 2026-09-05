@@ -203,7 +203,7 @@ const describeError = (table: string, error: PostgrestError) => {
       return `Not signed in to the central database, so "${table}" could not be saved. Sign in again (or activate this till) and the queued changes will go through.`;
     }
     if (/permission denied for function/i.test(error.message)) {
-      return `The central database refused a permission check while saving "${table}" (${error.message}). An administrator needs to run supabase/sql/99_fix_grants_and_helpers.sql once.`;
+      return `The central database refused a permission check while saving "${table}" (${error.message}). An administrator needs to run supabase/schema.sql once.`;
     }
     return `The central database's access rules refused to save "${table}" for this account (${error.message}). Check the account's branch assignment and role.`;
   }

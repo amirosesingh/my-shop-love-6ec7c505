@@ -113,7 +113,7 @@ function NotificationsReport() {
         {missing && (
           <p className="rounded-md border border-border bg-surface-2 p-3 text-xs text-muted-foreground">
             The activity log is not set up on this database yet. Run{" "}
-            <span className="font-medium">supabase/sql/35_activity_and_token_columns.sql</span> once
+            <span className="font-medium">supabase/schema.sql</span> once
             against your database to start recording events.
           </p>
         )}

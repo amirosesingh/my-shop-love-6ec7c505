@@ -146,8 +146,8 @@ export function buildShiftSummary(
 type Row = Record<string, unknown>;
 
 /**
- * `shift_notifications` is created by supabase/sql/18_shift_notifications.sql,
- * so it is not in the generated types yet — reach it through a loose handle.
+ * `shift_notifications` may not be in generated types yet, so reach it through
+ * a loose handle. The canonical central installer is supabase/schema.sql.
  */
 type LooseTable = {
   insert: (values: Row) => Promise<{ error: { message: string } | null }>;
