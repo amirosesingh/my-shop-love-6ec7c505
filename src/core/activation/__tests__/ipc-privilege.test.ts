@@ -17,6 +17,7 @@ type Privilege = {
   allowed: (channel: string, args?: unknown[]) => boolean;
   levelFor: (channel: string, args?: unknown[]) => string;
   settingLevel: (key: string) => string;
+  refusal: (level: string) => { ok: false; code: string; requiredLevel: string };
   install: (ipcMain: unknown, deps: { isFirstRun: () => boolean }) => void;
 };
 
@@ -79,9 +80,16 @@ describe("desktop channel privilege", () => {
     level = "supervisor";
     expect(p.allowed("pos:housekeep")).toBe(true);
     expect(p.allowed("local:rollback")).toBe(true);
+    expect(p.allowed("sqladmin:query")).toBe(true);
+    expect(p.allowed("sqladmin:repair")).toBe(false);
     expect(p.allowed("backend:set")).toBe(false);
     level = "admin";
     expect(p.allowed("backend:set")).toBe(true);
+  });
+
+  it("reports the exact level needed by a refused call", () => {
+    const p = load();
+    expect(p.refusal?.("admin")).toMatchObject({ code: "EPRIVILEGE", requiredLevel: "admin" });
   });
 
   it("classifies settings by what the setting decides", () => {

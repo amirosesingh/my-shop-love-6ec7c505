@@ -28,6 +28,8 @@ function loadSession() {
     lock: () => void;
     unlocked: () => boolean;
     requireAdmin: (work: () => unknown) => Promise<{ ok: boolean; code?: string; error?: string }>;
+    requireLevel: (work: () => unknown, level: string) => Promise<{ ok: boolean; code?: string }>;
+    adoptVerified: (level: string, name: string) => { ok: boolean; level?: string };
   };
 }
 
@@ -72,6 +74,19 @@ describe("desktop database administration", () => {
     expect(res.ok).toBe(true);
     session.lock();
     expect(session.unlocked()).toBe(false);
+    expect((await session.requireAdmin(async () => ({ ok: true }))).ok).toBe(false);
+  });
+
+  it("adopts a backend-verified Admin without another PIN", async () => {
+    const session = loadSession();
+    expect(session.adoptVerified("admin", "Online Admin")).toMatchObject({ ok: true, level: "admin" });
+    expect(await session.requireAdmin(async () => ({ ok: true }))).toEqual({ ok: true });
+  });
+
+  it("limits an adopted Supervisor to supervisor-level work", async () => {
+    const session = loadSession();
+    session.adoptVerified("supervisor", "Floor Supervisor");
+    expect(await session.requireLevel(async () => ({ ok: true }), "supervisor")).toEqual({ ok: true });
     expect((await session.requireAdmin(async () => ({ ok: true }))).ok).toBe(false);
   });
 });

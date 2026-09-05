@@ -80,44 +80,10 @@ export function DatabaseExplorer() {
     elapsedMs: number;
   } | null>(null);
 
-  // The desktop process refuses every administration call until an
-  // administrator unlocks it here, so the screen asks for that first.
-  const [adminUnlocked, setAdminUnlocked] = useState<boolean | null>(null);
-  const [adminUser, setAdminUser] = useState("");
-  const [adminPin, setAdminPin] = useState("");
-  const [unlocking, setUnlocking] = useState(false);
-
+  /* Restore the live SQL connection when the page is re-opened mid-session. */
   useEffect(() => {
     const bridge = sqlAdmin();
     if (!bridge) return;
-    void bridge
-      .adminStatus?.()
-      .then((s) => setAdminUnlocked(Boolean(s?.unlocked)))
-      .catch(() => setAdminUnlocked(false));
-  }, []);
-
-  const unlockAdmin = async () => {
-    const bridge = sqlAdmin();
-    if (!bridge?.unlock) return;
-    setUnlocking(true);
-    try {
-      const res = await bridge.unlock(adminUser.trim(), adminPin);
-      setAdminPin("");
-      if (res.ok) {
-        setAdminUnlocked(true);
-        toast.success("Database administration unlocked");
-      } else {
-        toast.error(res.error ?? "That sign-in was not accepted");
-      }
-    } finally {
-      setUnlocking(false);
-    }
-  };
-
-  /* Restore the live session when the page is re-opened mid-session. */
-  useEffect(() => {
-    const bridge = sqlAdmin();
-    if (!bridge || adminUnlocked !== true) return;
     void bridge.status().then((s) => {
       if (!s.connected) return;
       setConnected(true);
@@ -128,7 +94,7 @@ export function DatabaseExplorer() {
         if (res.ok) setDatabases(res.databases);
       });
     });
-  }, [adminUnlocked]);
+  }, []);
 
   const scan = useCallback(async () => {
     const res = await scanLocalInstances();
@@ -255,47 +221,6 @@ export function DatabaseExplorer() {
           Browsing a local Microsoft SQL Server is only possible from the Windows desktop app. In a
           browser there is no local instance to reach.
         </p>
-      </div>
-    );
-  }
-
-  if (adminUnlocked !== true) {
-    return (
-      <div className="max-w-sm space-y-3 rounded-md border border-border p-4">
-        <p className="text-sm font-medium">Administrator sign-in required</p>
-        <p className="text-xs text-muted-foreground">
-          This terminal keeps its database tools locked until an administrator signs in here with
-          their own username and PIN. The sign-in lasts fifteen minutes and is forgotten when the
-          app closes.
-        </p>
-        <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Username</Label>
-          <Input
-            value={adminUser}
-            autoComplete="off"
-            onChange={(e) => setAdminUser(e.target.value)}
-          />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">PIN</Label>
-          <Input
-            type="password"
-            value={adminPin}
-            autoComplete="off"
-            onChange={(e) => setAdminPin(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") void unlockAdmin();
-            }}
-          />
-        </div>
-        <Button
-          type="button"
-          size="sm"
-          disabled={unlocking || !adminUser.trim() || !adminPin}
-          onClick={() => void unlockAdmin()}
-        >
-          Unlock
-        </Button>
       </div>
     );
   }

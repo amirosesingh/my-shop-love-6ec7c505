@@ -4,9 +4,8 @@
  * The window renders application code, so a screen that merely hides a button
  * proves nothing: anything running in the window can call the bridge directly.
  * The database administration channels therefore ask the desktop process
- * itself, and the desktop process only says yes while an administrator has
- * unlocked them with their own username and PIN, checked against this till's
- * local staff copy.
+ * itself. A validated online Admin/Supervisor session may be adopted by the
+ * main process; offline overrides still use a local username and PIN.
  *
  * The grant lives in memory only. It never survives a restart, it expires on
  * its own, and it is dropped the moment the window reloads.
@@ -68,6 +67,18 @@ function unlock(username, pin) {
   return { ok: true, name: grant.name, level: grant.level, expiresAt: grant.until };
 }
 
+/** Adopt a role that the configured backend has independently verified. */
+function adoptVerified(level, name) {
+  if (level !== "admin" && level !== "supervisor") return lock();
+  grant = {
+    username: "online-session",
+    name: String(name ?? "Signed-in user").slice(0, 160),
+    level,
+    until: Date.now() + TTL_MS,
+  };
+  return { ok: true, name: grant.name, level: grant.level, expiresAt: grant.until };
+}
+
 
 function lock() {
   grant = null;
@@ -106,19 +117,23 @@ function touch() {
  * Gate for a channel body: refuses without touching the database when the
  * caller has not unlocked administration on this machine.
  */
-async function requireAdmin(work) {
-  if (!hasLevel("admin"))
+async function requireLevel(work, level = "admin") {
+  if (!hasLevel(level))
     return {
       ok: false,
       code: "EADMINLOCK",
       stage: "authorize",
       error:
-        "Database administration is locked on this terminal. An administrator must unlock it with their username and PIN first.",
+        level === "admin"
+          ? "This database action requires an administrator."
+          : "Database tools require a supervisor or administrator.",
     };
   // Active use keeps the grant alive; an idle one still times out.
   touch();
   return work();
 }
+
+const requireAdmin = (work) => requireLevel(work, "admin");
 
 /* ------------------------- emergency recovery --------------------------- */
 
@@ -197,12 +212,14 @@ function recoveryTouch() {
 
 module.exports = {
   unlock,
+  adoptVerified,
   lock,
   unlocked,
   status,
   hasLevel,
   touch,
   requireAdmin,
+  requireLevel,
   isAdministrator,
   isSupervisor,
   TTL_MS,

@@ -195,6 +195,7 @@ contextBridge.exposeInMainWorld("sqlAdmin", {
   // Administration is refused by the desktop process until it is unlocked
   // here with an administrator's own username and PIN.
   unlock: (username, pin) => invoke("admin:unlock", username, pin),
+  adoptSession: (accessToken) => invoke("admin:adopt-session", accessToken),
   lockAdmin: () => invoke("admin:lock"),
   adminStatus: () => invoke("admin:status"),
   // Emergency Access: the desktop process re-checks the clock code itself.
