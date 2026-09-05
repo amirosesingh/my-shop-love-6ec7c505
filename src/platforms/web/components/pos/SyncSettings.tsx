@@ -12,18 +12,12 @@ import { describeError, showNotification } from "@/lib/notify";
 import { localDb } from "@/core/local-db/local-db";
 import { databaseModeLabel, effectiveDatabaseMode, subscribeDatabaseMode } from "@/core/local-db/db-mode";
 import {
-  discardQuarantined,
-  discardOp,
   isOnlineSyncEnabled,
   lastSyncedAt,
   listQueue,
-  queueView,
-  retryOp,
-  retryQuarantined,
   setOnlineSyncEnabled,
   subscribeOutbox,
 } from "@/lib/sync-outbox";
-import type { QueueView } from "@/lib/sync-outbox";
 import { isOnlineOnly } from "@/lib/live-mode";
 import { isCloudConnected } from "@/core/activation/registration-status";
 import { subscribeConnectivity } from "@/core/activation/connection-health";
