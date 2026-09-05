@@ -43,7 +43,9 @@ export const Route = createFileRoute("/settings/rules")({
 });
 
 function RulesSettings() {
-  const { rules, loading, usingDefaults, backendError, refresh } = usePosRules();
+  const { rules, loading, usingDefaults, degraded, failureText, backendError, lastSyncedAt, refresh } =
+    usePosRules();
+
   const { currentStore } = usePos();
   const { isAdmin, can } = useAuth();
   const mayEdit = isAdmin || can("can_access_pos_settings");
