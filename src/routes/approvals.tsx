@@ -92,9 +92,11 @@ function ApprovalsPage() {
         },
       });
       setError(res.ok ? "" : (res.error ?? ""));
-      setRows(res.requests as AuthorizationRequest[]);
+      // A refused reply may carry no list at all; never hand undefined on.
+      setRows(Array.isArray(res.requests) ? (res.requests as AuthorizationRequest[]) : []);
       setMe(res.ok ? (res.me ?? null) : null);
     } catch (e) {
+      setRows([]);
       setError((e as Error).message);
     }
     setLoading(false);
