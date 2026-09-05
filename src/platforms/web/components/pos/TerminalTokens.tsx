@@ -57,6 +57,13 @@ import {
 import { CameraScanner } from "@/platforms/web/components/pos/CameraScanner";
 import { fetchTokenStatus } from "@/core/activation/terminal-tokens";
 import { ACTIVATION_TTL_MS } from "@/lib/terminal-crypto";
+import {
+  TERMINAL_STATUS_HINT,
+  TERMINAL_STATUS_LABEL,
+  sinceWords,
+  terminalStatus,
+  type TerminalLiveStatus,
+} from "@/lib/terminal-status";
 
 const qrDataUrl = (value: string) => {
   const qr = qrcode(0, "M");
@@ -67,6 +74,24 @@ const qrDataUrl = (value: string) => {
 
 const formatDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "—";
+
+const STATUS_CLASS: Record<TerminalLiveStatus, string> = {
+  online: "border-success/40 bg-success/10 text-success",
+  stale: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  offline: "border-border bg-muted text-muted-foreground",
+  revoked: "border-destructive/40 bg-destructive/10 text-destructive",
+  "not-activated": "border-primary/40 bg-primary/10 text-primary",
+};
+
+/** One badge, one meaning of online / not responding / offline. */
+function TerminalStatusBadge({ token, now }: { token: TerminalToken; now: number }) {
+  const live = terminalStatus(token, now);
+  return (
+    <Badge variant="outline" className={STATUS_CLASS[live]} title={TERMINAL_STATUS_HINT[live]}>
+      {TERMINAL_STATUS_LABEL[live]}
+    </Badge>
+  );
+}
 
 export function TerminalTokens({
   only,
