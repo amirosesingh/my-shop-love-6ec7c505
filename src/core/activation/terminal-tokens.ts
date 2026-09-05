@@ -70,6 +70,10 @@ export type TerminalToken = {
   isClaimed: boolean;
   /** the 15 minute redemption deadline */
   expiresAt: string | null;
+  /** app version reported by the device on its last check-in */
+  appVersion: string | null;
+  /** last time the device finished a successful sync */
+  lastSyncAt: string | null;
 };
 
 /** The table is not in the generated types, so queries go through a loose view. */
@@ -237,6 +241,8 @@ const rowToToken = (r: Record<string, any>): TerminalToken => ({
   claimedAt: r.claimed_at ?? null,
   isClaimed: r.is_claimed === true || asStatus(r.status) === "used",
   expiresAt: r.expires_at ?? null,
+  appVersion: r.app_version ?? null,
+  lastSyncAt: r.last_sync_at ?? null,
 });
 
 /* ----------------------------- admin surface ---------------------------- */
@@ -539,8 +545,24 @@ export async function fetchTokenStatus(
   };
 }
 
-export async function stampHeartbeat(tokenId: string): Promise<void> {
-  await rpc("terminal_token_heartbeat", { p_token_id: tokenId, p_activate: false });
+export async function stampHeartbeat(
+  tokenId: string,
+  opts: { version?: string; synced?: boolean } = {},
+): Promise<void> {
+  try {
+    await rpc("terminal_token_heartbeat", {
+      p_token_id: tokenId,
+      p_activate: false,
+      p_version: opts.version ?? APP_VERSION,
+      p_synced: opts.synced === true,
+    });
+  } catch (e) {
+    // A database that predates the version/sync arguments still accepts the
+    // original two — never let a check-in fail over an optional detail.
+    const message = (e as { message?: string })?.message ?? "";
+    if (!/p_version|p_synced|PGRST202|could not choose/i.test(message)) throw e;
+    await rpc("terminal_token_heartbeat", { p_token_id: tokenId, p_activate: false });
+  }
 }
 
 export class ActivationError extends Error {}
