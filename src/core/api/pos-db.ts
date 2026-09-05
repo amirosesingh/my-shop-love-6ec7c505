@@ -299,6 +299,7 @@ export const storeToRow = (s: Store): Row => ({
   building_name: s.buildingName?.trim() || null,
   floor_label: s.floorLabel?.trim() || null,
   is_active: s.active !== false,
+  private_catalogue: s.privateCatalogue === true,
 });
 
 const promotionToRow = (p: Promotion): Row => ({
