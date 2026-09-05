@@ -452,6 +452,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     );
 
   return (
+    <TooltipProvider delayDuration={0}>
     <div className="pos-scaled flex h-dvh min-h-dvh flex-col overflow-hidden bg-background text-foreground">
       <DbConnectionModal />
       <CloudSetupGate />
