@@ -9,7 +9,7 @@ import {
   SETTINGS_CATEGORIES,
   SETTINGS_GROUPS,
   settingsCatalogDuplicates,
-} from "@/lib/catalog-nav-test-entry";
+} from "@/lib/settings-catalog";
 import {
   initialOpenCategories,
   readOpenCategories,
