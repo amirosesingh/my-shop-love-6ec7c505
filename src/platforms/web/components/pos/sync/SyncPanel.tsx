@@ -174,6 +174,8 @@ export function SyncPanel({ className }: { className?: string }) {
         </table>
       </div>
 
+      <SyncQueueTable />
+
       {(run.lastError || status.lastError) && (
         <p className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
           {run.lastError ?? status.lastError}
