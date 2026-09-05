@@ -172,12 +172,12 @@ function enterSafeMode(reason) {
   // whole app — the operator saw the till vanish instead of a repair screen.
   recovery.open();
   for (const win of BrowserWindow.getAllWindows()) {
-    if (!recovery.isOwn?.(win)) win.destroy();
+    if (!recovery.isOwn(win)) win.destroy();
   }
   mainWindow = null;
   displayWindow = null;
-  recovery.open();
 }
+
 
 
 /* ------------------------- local app server ------------------------- */
