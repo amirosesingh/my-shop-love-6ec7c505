@@ -99,9 +99,9 @@ export function usePromotions(deps: PromotionsDeps) {
       const line = lines[targetIndex]!;
       const unit = rule.valueType === "percent" ? r2((line.price * (rule.value ?? 0)) / 100) : r2(rule.value ?? 0);
       const value = r2(unit * line.qty);
+      // The coupon lives in its own field so a cashier discount on the same
+      // line adds to it instead of replacing it.
       patchLine(targetIndex, {
-        discount: rule.value ?? 0,
-        discountType: rule.valueType ?? "amount",
         couponCode: rule.name,
         couponDiscount: value,
       });
@@ -193,8 +193,6 @@ export function usePromotions(deps: PromotionsDeps) {
         const line = lines[index]!;
         const value = voucherValue(campaign, r2(line.price * line.qty));
         patchLine(index, {
-          discount: r2(value / Math.max(1, line.qty)),
-          discountType: "amount",
           couponCode: token,
           couponDiscount: value,
         });
