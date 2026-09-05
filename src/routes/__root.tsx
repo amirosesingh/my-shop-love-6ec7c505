@@ -135,7 +135,17 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
             Go home
           </a>
           {/* Connection repair must stay reachable from the failure screen. */}
-          {isTerminalApp() && <EmergencyAccessLink />}
+          {/* A full load, not in-app navigation: whatever broke the app would
+              otherwise break the repair screen on the way in too. */}
+          {isTerminalApp() && (
+            <button
+              onClick={() => window.location.assign(RECOVERY_PATH)}
+              className="inline-flex items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+            >
+              <LifeBuoy className="size-4" aria-hidden />
+              Emergency access
+            </button>
+          )}
         </div>
       </div>
     </div>
