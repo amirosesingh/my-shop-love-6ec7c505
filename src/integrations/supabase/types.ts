@@ -4158,6 +4158,7 @@ export type Database = {
       }
     }
     Functions: {
+      assert_supervisor_caller: { Args: never; Returns: undefined }
       authorization_verify_pin: {
         Args: {
           p_allowed_roles?: string[]
