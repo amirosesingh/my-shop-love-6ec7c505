@@ -34,6 +34,7 @@ import { hasRequiredPlatformConfig } from "@/lib/platform-config-ready";
 import {
   failureFromAuthError,
   failureFromReadiness,
+  failureFromProbeError,
   loginFailureMessage,
   type LoginFailure,
 } from "@/lib/login-failure";
