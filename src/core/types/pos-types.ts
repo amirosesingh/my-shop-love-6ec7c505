@@ -23,6 +23,8 @@ export type Store = {
   isCentral?: boolean;
   /** the sub-warehouse level stock is picked from first */
   isPrimarySub?: boolean;
+  /** this branch keeps its own catalogue; its items stay hidden elsewhere */
+  privateCatalogue?: boolean;
   /** building this location sits in, e.g. "Riverside Tower" */
   buildingName?: string;
   /** floor or room designation, e.g. "2nd Floor Vault" */
