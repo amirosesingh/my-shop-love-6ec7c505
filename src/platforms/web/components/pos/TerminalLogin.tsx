@@ -137,7 +137,24 @@ export function TerminalLogin() {
                   }}
                 />
               </div>
-              {error && <p className="text-sm text-destructive">{error}</p>}
+              {error && (
+                <div className="space-y-2">
+                  <p className="text-sm text-destructive">{error}</p>
+                  {failure && isConfigurationFailure(failure) && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => {
+                        window.location.href = "/settings/database";
+                      }}
+                    >
+                      Open connection settings
+                    </Button>
+                  )}
+                </div>
+              )}
+
               <Button type="submit" className="w-full" disabled={busy}>
                 {busy && <Loader2 className="size-4 animate-spin" />}
                 Sign in
