@@ -75,6 +75,10 @@ export const getPosRules = createServerFn({ method: "POST" })
         anonymous: true as const,
         backend: base.source,
         backendError: base.error ?? "",
+        failure: base.failure,
+        revision: base.revision,
+        fetchedAt: base.fetchedAt,
+        scope: "" as const,
         rules: base.rules,
       };
     }
@@ -86,6 +90,10 @@ export const getPosRules = createServerFn({ method: "POST" })
         anonymous: false as const,
         backend: loaded.source,
         backendError: loaded.error ?? "",
+        failure: loaded.failure,
+        revision: loaded.revision,
+        fetchedAt: loaded.fetchedAt,
+        scope: data.storeId ?? "",
         rules: loaded.rules,
       };
     } catch (e) {
@@ -98,10 +106,15 @@ export const getPosRules = createServerFn({ method: "POST" })
         error: (e as Error).message,
         backend: base.source,
         backendError: base.error ?? "",
+        failure: base.failure,
+        revision: base.revision,
+        fetchedAt: base.fetchedAt,
+        scope: "" as const,
         rules: base.rules,
       };
     }
   });
+
 
 /** Supervisor-only write; the database re-checks the role as well. */
 export const savePosRules = createServerFn({ method: "POST" })
