@@ -276,7 +276,11 @@ async function startAppServer() {
     console.error(`[app-server] exited with code ${code}`);
     diagnostics.logServer(`exited with code ${code}`);
     diagnostics.logCrash("app-server.exit", { code });
+    // The pages the till is showing now point at a dead address. Go to the
+    // repair screen instead of leaving a window that can never load again.
+    if (!quitting && !safeMode) enterSafeMode("The local app server stopped");
   });
+
 
   await waitForPort(port);
   return `http://127.0.0.1:${port}`;
@@ -932,8 +936,8 @@ function registerIpc() {
 
   // The healthy signal: the register mounted, so this build works.
   ipcMain.handle("app:ready", () => {
-    if (readyWatchdog) clearTimeout(readyWatchdog);
-    readyWatchdog = null;
+    markStartupSettled();
+
     const state = health.markHealthy();
     // This build reached the till, so a previous bad start may no longer keep
     // automatic updates switched off.
