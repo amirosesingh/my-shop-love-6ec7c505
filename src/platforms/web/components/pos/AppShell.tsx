@@ -291,7 +291,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   // The connection profile is part of that: showing setup while it is still
   // being read out of the vault is what used to send a working till back to
   // the connection screen after a restart.
-  if (terminal.hydrating || !profileHydrated)
+  // The first connection check of the launch is part of that same window: a
+  // decision taken before it has answered is a decision taken on a guess.
+  if (terminal.hydrating || !profileHydrated || ((isDesktop() || isNative()) && startup.probing))
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="size-6 animate-spin text-primary" />
