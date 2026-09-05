@@ -30,6 +30,13 @@ import { recordSignIn } from "@/lib/shift-attendance";
 import { endShiftSessions } from "@/lib/shift-sessions";
 import { onSessionExpired } from "@/lib/session-expiry";
 import { awaitProfileHydrated } from "@/lib/connection-profile";
+import { hasRequiredPlatformConfig } from "@/lib/platform-config-ready";
+import {
+  failureFromAuthError,
+  failureFromReadiness,
+  loginFailureMessage,
+} from "@/lib/login-failure";
+
 import {
   CASHIER_PERMISSIONS,
   FULL_PERMISSIONS,
