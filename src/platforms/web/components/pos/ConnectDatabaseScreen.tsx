@@ -30,6 +30,10 @@ export function ConnectDatabaseScreen({
   const [checking, setChecking] = useState(false);
   const [hasSavedConfiguration, setHasSavedConfiguration] = useState(cloudConfigured);
 
+  // Waiting for setup details is a normal first run, not a failed launch — tell
+  // the desktop shell the app is up so it does not swap in the repair screen.
+  useEffect(() => reportAppReady(), []);
+
   useEffect(() => {
     const apply = (state: Awaited<ReturnType<typeof hasRequiredPlatformConfig>>) =>
       setHasSavedConfiguration(Object.values(state.have).some(Boolean));
