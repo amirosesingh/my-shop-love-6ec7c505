@@ -530,6 +530,9 @@ export async function drainOutbox(): Promise<{ pushed: number; failed: number }>
     }
 
     if (pushed) markSynced();
+    // The central database accepted these changes: that is the acknowledgement
+    // the Sync page shows, separate from "a pass finished".
+    if (pushed) noteSyncAck();
     // A successful push proves the connection is back, so online mode resumes.
     if (pushed) noteConnectionRestored();
     // Tell the register this terminal synced, so the Terminals screen can show
