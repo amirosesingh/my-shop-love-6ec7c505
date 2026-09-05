@@ -252,6 +252,8 @@ function Register() {
     requirePermission,
     getTotal: () => totals.total,
     getMemberName: () => member?.name ?? null,
+    // A discount unlock lasts for this ticket only.
+    onReset: () => setDiscountOverride(false),
   });
   /** Cashier-adjustable column widths, remembered on this device. */
 
