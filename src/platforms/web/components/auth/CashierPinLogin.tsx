@@ -202,11 +202,17 @@ export function CashierPinLogin({
     };
     return (
       <div className="space-y-4 pt-4">
-        <div>
-          <p className="text-sm font-medium">Who is signing in?</p>
-          <p className="text-[11px] text-muted-foreground">
-            Tap your name to continue to the keypad.
-          </p>
+        <div className="flex items-start gap-2">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">Who is signing in?</p>
+            <p className="text-[11px] text-muted-foreground">
+              Tap your name to continue to the keypad.
+            </p>
+          </div>
+          <Badge variant="outline" className="ml-auto shrink-0 gap-1 text-[10px]">
+            <MapPin className="size-3" />
+            {branchLabel}
+          </Badge>
         </div>
         {loading ? (
           <div className="flex justify-center py-8">
@@ -236,12 +242,25 @@ export function CashierPinLogin({
             ))}
           </div>
         ) : (
-          <p className="rounded-md border border-border bg-surface-2 p-3 text-xs text-muted-foreground">
-            {serverUnreachableOnDevice()
-              ? "This app build has no POS server address, so the staff list cannot load. Type your username below."
-              : "No staff are listed for this terminal's branch yet. Type your username below."}
-          </p>
+          <div className="space-y-2 rounded-md border border-border bg-surface-2 p-3">
+            <p className="text-xs text-muted-foreground">{ROSTER_WORDING[reason]}</p>
+            {(reason === "no-server" || reason === "not-authorised") && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => {
+                  window.location.href =
+                    reason === "no-server" ? "/settings/database" : "/settings/terminals";
+                }}
+              >
+                {reason === "no-server" ? "Open connection settings" : "Open terminal setup"}
+              </Button>
+            )}
+          </div>
         )}
+
         <form
           className="space-y-2"
           onSubmit={(e) => {
