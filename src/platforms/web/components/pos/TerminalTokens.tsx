@@ -520,11 +520,12 @@ export function TerminalTokens({
               <TableRow>
                 <TableHead>Device name</TableHead>
                 <TableHead>Location / warehouse</TableHead>
+                <TableHead>Type</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Claimed by</TableHead>
-                <TableHead>Date created</TableHead>
+                <TableHead>Version</TableHead>
                 <TableHead>Last seen</TableHead>
-                <TableHead>Re-issued</TableHead>
+                <TableHead>Last sync</TableHead>
+                <TableHead>Activated</TableHead>
                 <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
@@ -534,33 +535,39 @@ export function TerminalTokens({
                 .filter((t) => (only ? t.platform === only : true))
                 .map((t) => (
                 <TableRow key={t.id} className="hover:bg-muted/40">
-                  <TableCell className="font-medium">{t.deviceName}</TableCell>
+                  <TableCell className="font-medium">
+                    {t.deviceName}
+                    {t.claimedByDevice && (
+                      <span className="block max-w-[14rem] truncate text-xs font-normal text-muted-foreground">
+                        {t.claimedByDevice}
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-muted-foreground">{t.locationName || "—"}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {t.platform === "mobile" ? "Phone / tablet" : "Windows till"}
+                  </TableCell>
                   <TableCell>
-                    <Badge
-                      variant="outline"
-                      className={
-                        t.status === "active"
-                          ? "border-success/40 bg-success/10 text-success"
-                          : t.status === "used"
-                            ? "border-primary/40 bg-primary/10 text-primary"
-                            : "border-destructive/40 bg-destructive/10 text-destructive"
-                      }
-                    >
-                      {t.status === "active" ? "Active" : t.status === "used" ? "In use" : "Revoked"}
-                    </Badge>
+                    <TerminalStatusBadge token={t} now={now} />
                   </TableCell>
-                  <TableCell className="max-w-[14rem] truncate text-xs text-muted-foreground">
-                    {t.claimedByDevice ? t.claimedByDevice : "—"}
+                  <TableCell className="text-xs text-muted-foreground tabular-nums">
+                    {t.appVersion ?? "—"}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
-                    {formatDate(t.createdAt)}
+                    {t.lastSeenAt ? (
+                      <>
+                        {sinceWords(t.lastSeenAt, now)}
+                        <span className="block">{formatDate(t.lastSeenAt)}</span>
+                      </>
+                    ) : (
+                      "Never"
+                    )}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
-                    {formatDate(t.lastSeenAt)}
+                    {t.lastSyncAt ? sinceWords(t.lastSyncAt, now) : "Never"}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
-                    {formatDate(t.reissuedAt)}
+                    {formatDate(t.activatedAt)}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
