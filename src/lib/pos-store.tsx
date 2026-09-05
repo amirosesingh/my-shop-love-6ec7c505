@@ -2718,17 +2718,34 @@ export const money = (n: number) =>
     Number.isFinite(n) ? n : 0,
   );
 
+/**
+ * The one place a ticket turns into money. Line discounts (promotion first,
+ * then the cashier's own), the bill discount and any automatic promotion are
+ * folded in here — the register passes the raw entries, never a pre-converted
+ * figure, so the percent → currency rule exists exactly once.
+ */
 export function cartTotals(
   lines: CartLine[],
   cartDiscount: number,
   cartDiscountType: DiscountType = "amount",
   tax?: TaxSettings,
+  promoDiscount = 0,
 ) {
   const subtotal = r2(lines.reduce((a, l) => a + l.price * l.qty, 0));
-  const lineDiscount = r2(lines.reduce((a, l) => a + lineUnitDiscount(l) * l.qty, 0));
+  const lineDiscount = r2(
+    lines.reduce((a, l) => a + lineDiscountTotal(l) * (l.qty < 0 ? -1 : 1), 0),
+  );
   const base = r2(subtotal - lineDiscount);
+  // Never let a discount push the ticket below zero.
   const billDiscount = r2(
-    cartDiscountType === "percent" ? (base * (cartDiscount || 0)) / 100 : cartDiscount || 0,
+    Math.min(
+      Math.max(0, base),
+      Math.max(
+        0,
+        r2(cartDiscountType === "percent" ? (base * (cartDiscount || 0)) / 100 : cartDiscount || 0) +
+          Math.max(0, r2(promoDiscount || 0)),
+      ),
+    ),
   );
   const discount = r2(lineDiscount + billDiscount);
   // Spread the bill-level discount proportionally so tax stays accurate.
@@ -2741,12 +2758,22 @@ export function cartTotals(
     ({ tax: taxAmount, total } = computeTax(net, tax));
   } else {
     taxAmount = r2(
-      lines.reduce((a, l) => a + (l.price - lineUnitDiscount(l)) * l.qty * l.taxRate * ratio, 0),
+      lines.reduce(
+        (a, l) =>
+          a +
+          (Math.abs(l.price * l.qty) - lineDiscountTotal(l)) *
+            (l.qty < 0 ? -1 : 1) *
+            l.taxRate *
+            ratio,
+        0,
+      ),
     );
     total = r2(net + taxAmount);
   }
   const credit = r2(
-    lines.filter((l) => l.credit).reduce((a, l) => a + (l.price - lineUnitDiscount(l)) * -l.qty, 0),
+    lines
+      .filter((l) => l.credit)
+      .reduce((a, l) => a + (Math.abs(l.price * l.qty) - lineDiscountTotal(l)), 0),
   );
   return { subtotal, discount, lineDiscount, billDiscount, tax: taxAmount, total, credit, net };
 }
