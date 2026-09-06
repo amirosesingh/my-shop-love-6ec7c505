@@ -2115,7 +2115,7 @@ function Register() {
           }}
           query={query}
           onQueryChange={setQuery}
-          products={state.products.filter((p) => productVisibleAt(state.settings, p, state.currentStoreId))}
+          products={visibleProducts}
           storeId={currentStore.id}
           unknownCode={unknownCode}
           onAdd={(id) => {
