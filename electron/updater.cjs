@@ -14,16 +14,35 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const { spawn } = require("node:child_process");
 const { app, BrowserWindow, net } = require("electron");
+const netHttp = require("./net.cjs");
 
 const SIX_HOURS = 6 * 60 * 60 * 1000;
 
 /** Update folder used when nothing else is configured or baked in. */
 const DEFAULT_FEED_URL = "https://updatecms.luckycharmsdnbhd.com/pos-app/";
 
+/** How many times a failed check or download is retried before giving up. */
+const ATTEMPTS = 3;
+
 let autoUpdater = null;
-let state = { status: "idle", version: app.getVersion(), percent: 0, error: null };
+let state = {
+  status: "idle",
+  version: app.getVersion(),
+  percent: 0,
+  error: null,
+  /** Where it went wrong: check | download | verify | install. */
+  stage: null,
+  /** Raw network/library message, kept for the "Copy details" button. */
+  detail: null,
+  code: null,
+  url: null,
+  /** Installer fetched by the fallback path, run directly on restart. */
+  installerFile: null,
+};
 let timer = null;
 let paused = false;
+let fallbackRunning = false;
+
 
 function broadcast() {
   for (const win of BrowserWindow.getAllWindows()) {
