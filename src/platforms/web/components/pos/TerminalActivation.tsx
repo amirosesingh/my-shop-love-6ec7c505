@@ -78,6 +78,8 @@ export function TerminalActivation({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [scanning, setScanning] = useState(false);
+  /** Set once this till is registered, so the operator can check the details. */
+  const [done, setDone] = useState<TerminalConfig | null>(null);
   const [showPairing, setShowPairing] = useState(false);
   // Minted after mount: the id is random, so generating it during SSR would
   // hydrate a different QR than the server drew and blow up the page.
@@ -98,7 +100,7 @@ export function TerminalActivation({
         const config = await activateTerminal(trimmed);
         clearRevocation();
         await writeActivationRecord({ tokenId: config.tokenId }).catch(() => {});
-        onActivated(config);
+        setDone(config);
       } catch (e) {
         setError(
           e instanceof ActivationError ? e.message : "Activation failed. Try again in a moment.",
@@ -113,7 +115,7 @@ export function TerminalActivation({
   // While the operator waits, keep asking whether an administrator approved
   // the pairing request from their phone. Approval activates the till itself.
   useEffect(() => {
-    if (!pairing || !online) return;
+    if (!pairing || !online || done) return;
     let stopped = false;
     const tick = async () => {
       try {
@@ -121,7 +123,7 @@ export function TerminalActivation({
         if (config && !stopped) {
           clearRevocation();
           await writeActivationRecord({ tokenId: config.tokenId }).catch(() => {});
-          onActivated(config);
+          setDone(config);
         }
       } catch (e) {
         if (!stopped && e instanceof ActivationError) setError(e.message);
@@ -133,7 +135,48 @@ export function TerminalActivation({
       stopped = true;
       window.clearInterval(timer);
     };
-  }, [pairing, onActivated, online]);
+  }, [pairing, online, done]);
+
+  if (done) {
+    return (
+      <Frame bare={embedded}>
+        <div className="flex items-center gap-3">
+          <div className="flex size-11 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-500 ring-1 ring-emerald-500/40">
+            <ShieldCheck className="size-6" />
+          </div>
+          <div>
+            <h1 className="text-lg font-semibold">This terminal is registered</h1>
+            <p className="text-xs text-muted-foreground">
+              Check the details below, then carry on to the sign-in screen.
+            </p>
+          </div>
+        </div>
+
+        <dl className="mt-4 space-y-2 rounded-lg border border-border bg-surface-2 p-4 text-sm">
+          <div className="flex justify-between gap-3">
+            <dt className="text-muted-foreground">Terminal</dt>
+            <dd className="truncate font-medium">{done.deviceName || "This terminal"}</dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-muted-foreground">Terminal ID</dt>
+            <dd className="truncate font-mono text-xs">{done.tokenId}</dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-muted-foreground">Branch</dt>
+            <dd className="truncate font-medium">{done.locationName || done.locationId || "—"}</dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-muted-foreground">Status</dt>
+            <dd className="font-medium text-emerald-600 dark:text-emerald-400">Active</dd>
+          </div>
+        </dl>
+
+        <Button className="mt-4 w-full" onClick={() => onActivated(done)}>
+          Continue
+        </Button>
+      </Frame>
+    );
+  }
 
   return (
     <Frame bare={embedded}>
