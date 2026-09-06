@@ -109,6 +109,7 @@ import { Route as TransfersNewRouteImport } from './routes/transfers.new'
 import { Route as ApiPublicCashierLoginRouteImport } from './routes/api/public/cashier-login'
 import { Route as ApiPublicDesktopSessionRouteImport } from './routes/api/public/desktop-session'
 import { Route as ApiPublicHealthMetadataRouteImport } from './routes/api/public/health-metadata'
+import { Route as ApiPublicPosRulesRouteImport } from './routes/api/public/pos-rules'
 import { Route as ApiPublicSecurityAlertsRouteImport } from './routes/api/public/security-alerts'
 import { Route as ApiPublicSyncRouteImport } from './routes/api/public/sync'
 import { Route as ApiPublicSyncHealthRouteImport } from './routes/api/public/sync-health'
@@ -618,6 +619,11 @@ const ApiPublicHealthMetadataRoute = ApiPublicHealthMetadataRouteImport.update({
   path: '/api/public/health-metadata',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicPosRulesRoute = ApiPublicPosRulesRouteImport.update({
+  id: '/api/public/pos-rules',
+  path: '/api/public/pos-rules',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicSecurityAlertsRoute = ApiPublicSecurityAlertsRouteImport.update({
   id: '/api/public/security-alerts',
   path: '/api/public/security-alerts',
@@ -755,6 +761,7 @@ export interface FileRoutesByFullPath {
   '/api/public/cashier-login': typeof ApiPublicCashierLoginRoute
   '/api/public/desktop-session': typeof ApiPublicDesktopSessionRoute
   '/api/public/health-metadata': typeof ApiPublicHealthMetadataRoute
+  '/api/public/pos-rules': typeof ApiPublicPosRulesRoute
   '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
   '/api/public/sync': typeof ApiPublicSyncRoute
   '/api/public/sync-health': typeof ApiPublicSyncHealthRoute
@@ -864,6 +871,7 @@ export interface FileRoutesByTo {
   '/api/public/cashier-login': typeof ApiPublicCashierLoginRoute
   '/api/public/desktop-session': typeof ApiPublicDesktopSessionRoute
   '/api/public/health-metadata': typeof ApiPublicHealthMetadataRoute
+  '/api/public/pos-rules': typeof ApiPublicPosRulesRoute
   '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
   '/api/public/sync': typeof ApiPublicSyncRoute
   '/api/public/sync-health': typeof ApiPublicSyncHealthRoute
@@ -974,6 +982,7 @@ export interface FileRoutesById {
   '/api/public/cashier-login': typeof ApiPublicCashierLoginRoute
   '/api/public/desktop-session': typeof ApiPublicDesktopSessionRoute
   '/api/public/health-metadata': typeof ApiPublicHealthMetadataRoute
+  '/api/public/pos-rules': typeof ApiPublicPosRulesRoute
   '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
   '/api/public/sync': typeof ApiPublicSyncRoute
   '/api/public/sync-health': typeof ApiPublicSyncHealthRoute
@@ -1085,6 +1094,7 @@ export interface FileRouteTypes {
     | '/api/public/cashier-login'
     | '/api/public/desktop-session'
     | '/api/public/health-metadata'
+    | '/api/public/pos-rules'
     | '/api/public/security-alerts'
     | '/api/public/sync'
     | '/api/public/sync-health'
@@ -1194,6 +1204,7 @@ export interface FileRouteTypes {
     | '/api/public/cashier-login'
     | '/api/public/desktop-session'
     | '/api/public/health-metadata'
+    | '/api/public/pos-rules'
     | '/api/public/security-alerts'
     | '/api/public/sync'
     | '/api/public/sync-health'
@@ -1303,6 +1314,7 @@ export interface FileRouteTypes {
     | '/api/public/cashier-login'
     | '/api/public/desktop-session'
     | '/api/public/health-metadata'
+    | '/api/public/pos-rules'
     | '/api/public/security-alerts'
     | '/api/public/sync'
     | '/api/public/sync-health'
@@ -1413,6 +1425,7 @@ export interface RootRouteChildren {
   ApiPublicCashierLoginRoute: typeof ApiPublicCashierLoginRoute
   ApiPublicDesktopSessionRoute: typeof ApiPublicDesktopSessionRoute
   ApiPublicHealthMetadataRoute: typeof ApiPublicHealthMetadataRoute
+  ApiPublicPosRulesRoute: typeof ApiPublicPosRulesRoute
   ApiPublicSecurityAlertsRoute: typeof ApiPublicSecurityAlertsRoute
   ApiPublicSyncRoute: typeof ApiPublicSyncRoute
   ApiPublicSyncHealthRoute: typeof ApiPublicSyncHealthRoute
@@ -2122,6 +2135,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHealthMetadataRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/pos-rules': {
+      id: '/api/public/pos-rules'
+      path: '/api/public/pos-rules'
+      fullPath: '/api/public/pos-rules'
+      preLoaderRoute: typeof ApiPublicPosRulesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/security-alerts': {
       id: '/api/public/security-alerts'
       path: '/api/public/security-alerts'
@@ -2289,6 +2309,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicCashierLoginRoute: ApiPublicCashierLoginRoute,
   ApiPublicDesktopSessionRoute: ApiPublicDesktopSessionRoute,
   ApiPublicHealthMetadataRoute: ApiPublicHealthMetadataRoute,
+  ApiPublicPosRulesRoute: ApiPublicPosRulesRoute,
   ApiPublicSecurityAlertsRoute: ApiPublicSecurityAlertsRoute,
   ApiPublicSyncRoute: ApiPublicSyncRoute,
   ApiPublicSyncHealthRoute: ApiPublicSyncHealthRoute,
