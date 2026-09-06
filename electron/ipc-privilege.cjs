@@ -81,6 +81,9 @@ const CHANNEL_LEVELS = {
   "health:collect-diagnostics": OPEN,
   "update:status": OPEN,
   "update:check": OPEN,
+  "update:diagnose": OPEN,
+  "update:download-page": OPEN,
+
   "net:get-json": OPEN,
   "net:head": OPEN,
   "net:get-binary": OPEN,
