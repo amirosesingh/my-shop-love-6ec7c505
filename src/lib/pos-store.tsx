@@ -409,6 +409,16 @@ function applyCloud(s: PosState, cloud: CloudSlice): PosState {
 export function PosProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<PosState>(emptyState);
   const [ready, setReady] = useState(false);
+  // Loading, ready, stalled or failed — never "the clock ran out, call it ready".
+  const [loadPhase, setLoadPhase] = useState<LoadPhase>("loading");
+  // Whether the location list has actually been answered for, so an empty list
+  // can be told apart from a list that has not arrived yet.
+  const [storesLoaded, setStoresLoaded] = useState(false);
+  const [reloadTick, setReloadTick] = useState(0);
+  const retryLoad = useCallback(() => {
+    setLoadPhase("loading");
+    setReloadTick((v) => v + 1);
+  }, []);
   const { authUserId, terminalUser, user, isAdmin, isSupervisor, ready: authReady } = useAuth();
   // Nothing is fetched from the cloud until a cashier or supervisor session
   // exists — visitors never receive catalogue, member or sales data.
