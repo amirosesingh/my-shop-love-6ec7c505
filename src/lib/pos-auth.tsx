@@ -29,6 +29,7 @@ import { cacheCredential, verifyCachedPin } from "@/lib/offline-credentials";
 import { recordSignIn } from "@/lib/shift-attendance";
 import { endShiftSessions } from "@/lib/shift-sessions";
 import { onSessionExpired } from "@/lib/session-expiry";
+import { bumpSessionEpoch, isCurrentEpoch, sessionEpoch } from "@/lib/session-epoch";
 import { awaitProfileHydrated } from "@/lib/connection-profile";
 import {
   hasRequiredPlatformConfig,
@@ -193,7 +194,12 @@ type AuthCtx = {
   logout: () => Promise<void>;
   /** Lock the till / switch user — clears the session without losing local data. */
   lock: () => Promise<void>;
+  /** Where this device stands right now. */
+  sessionState: SessionState;
 };
+
+/** The named states a device can be in. They never overlap. */
+export type SessionState = "active" | "locked" | "logged-out" | "expired" | "signed-out";
 
 /**
  * The auth context is stored on a global registry key rather than as a plain
@@ -238,6 +244,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authEnabled, setAuthEnabled] = useState(() => !isTerminalApp());
   const [terminalUser, setTerminalUser] = useState<TerminalUser | null>(null);
   const [appUser, setAppUser] = useState<AppUserProfile | null>(null);
+  const [sessionState, setSessionState] = useState<SessionState>("signed-out");
 
   useEffect(() => {
     try {
@@ -294,8 +301,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!authEnabled) return;
     let active = true;
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, next) => {
       if (!active) return;
+      // A refreshed token is the same sign-in continuing, not a new one: only
+      // a genuine sign-in starts a new generation.
+      if (next && event !== "TOKEN_REFRESHED") bumpSessionEpoch();
       setSession(next);
       if (!next) setRoles([]);
     });
@@ -509,6 +519,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: String(profile?.["email"] ?? ""),
         permissions,
       };
+      bumpSessionEpoch();
       setTerminalUser(next);
       try {
         window.sessionStorage.setItem(TERMINAL_KEY, JSON.stringify(next));
@@ -712,6 +723,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    bumpSessionEpoch();
     setTerminalUser(next);
     // The branch is in place before the register mounts, so nothing renders
     // against an unresolved branch.
@@ -791,32 +803,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { ok: true };
   }, [finishAccountPinSignIn]);
 
+  /**
+   * End the person's session. `startedAt` is the sign-in generation this
+   * teardown belongs to: if somebody has signed in since, the screen is left
+   * exactly as it is, so a slow sign-out can never cancel a fresh sign-in.
+   *
+   * The terminal's own registration and activation are untouched — only the
+   * person is signed out. `reason` names the state for the caller.
+   */
+  const endSession = useCallback(
+    async (reason: "logged-out" | "locked" | "expired", startedAt = sessionEpoch()) => {
+      if (!isCurrentEpoch(startedAt)) return;
+      // Stamp the sign-out time on this user's open shift sessions first.
+      endShiftSessions({});
+      // End the session record so the token stops working everywhere at once.
+      try {
+        const sessionToken = await loadSessionToken();
+        if (sessionToken) await endDeviceSession({ data: { sessionToken } });
+      } catch {
+        /* offline — the local purge below still applies */
+      }
+      if (!isCurrentEpoch(startedAt)) return;
+      await supabase.auth.signOut();
+      // Signing out fires an auth change; anything newer than this teardown
+      // wins and the rest is skipped.
+      if (!isCurrentEpoch(startedAt)) return;
+      setSessionState(reason === "locked" ? "locked" : reason);
+      setSession(null);
+      setRoles([]);
+      setTerminalUser(null);
+      try {
+        window.sessionStorage.removeItem(TERMINAL_KEY);
+      } catch {
+        /* ignore */
+      }
+      try {
+        await window.sqlAdmin?.lockAdmin?.();
+      } catch {
+        /* web/Android, or a desktop bridge that is already closing */
+      }
+      clearStoredCredentials();
+    },
+    [],
+  );
+
   const logout = useCallback(async () => {
-    // Stamp the sign-out time on this user's open shift sessions first.
-    endShiftSessions({});
-    // End the session record so the token stops working everywhere at once.
-    try {
-      const sessionToken = await loadSessionToken();
-      if (sessionToken) await endDeviceSession({ data: { sessionToken } });
-    } catch {
-      /* offline — the local purge below still applies */
-    }
-    await supabase.auth.signOut();
-    setSession(null);
-    setRoles([]);
-    setTerminalUser(null);
-    try {
-      window.sessionStorage.removeItem(TERMINAL_KEY);
-    } catch {
-      /* ignore */
-    }
-    try {
-      await window.sqlAdmin?.lockAdmin?.();
-    } catch {
-      /* web/Android, or a desktop bridge that is already closing */
-    }
-    clearStoredCredentials();
-  }, []);
+    await endSession("logged-out");
+  }, [endSession]);
+
+  /** Idle lock / switch user: the person goes, the till stays registered. */
+  const lock = useCallback(async () => {
+    await endSession("locked");
+  }, [endSession]);
 
   // Resolved fresh from the staff list so a duty change applies immediately.
   const user = useMemo<PosUser | null>(() => {
@@ -901,6 +939,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [session, roles, staff, terminalUser, appUser]);
 
+  // "Active" is simply the state of having somebody signed in; the other
+  // states are set by the teardown that produced them.
+  useEffect(() => {
+    if (user) setSessionState("active");
+  }, [user?.staffId]);
+
   // Local, per-terminal record of who signed in today. Lets a shift opened by
   // one cashier be continued by another while still showing every user.
   useEffect(() => {
@@ -917,8 +961,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Connectivity problems never reach this listener.
   useEffect(() => {
     return onSessionExpired(() => {
+      const startedAt = sessionEpoch();
       void (async () => {
-        await logout();
+        await endSession("expired", startedAt);
+        if (!isCurrentEpoch(startedAt)) return;
         void import("sonner").then(({ toast }) =>
           toast.error("Session ended", {
             id: "pos-session-expired",
@@ -928,7 +974,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         );
       })();
     });
-  }, [logout]);
+  }, [endSession]);
 
   // An account switched off by a manager must lose the till straight away, not
   // at the next sign-in. Re-checked on a timer and whenever the screen is
@@ -939,12 +985,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const check = async () => {
       if (document.visibilityState === "hidden") return;
       if (typeof navigator !== "undefined" && !navigator.onLine) return;
+      const startedAt = sessionEpoch();
       try {
         const { data, error } = await supabase.rpc("current_app_user");
         if (!alive || error) return;
         const profile = (Array.isArray(data) ? data[0] : null) as Record<string, unknown> | null;
         if (profile && profile["is_active"] === false) {
-          await logout();
+          await endSession("expired", startedAt);
+          if (!isCurrentEpoch(startedAt)) return;
           void import("sonner").then(({ toast }) =>
             toast.error("Account deactivated", {
               id: "pos-account-deactivated",
@@ -964,7 +1012,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", check);
     };
-  }, [user?.staffId, logout]);
+  }, [user?.staffId, endSession]);
 
   // Boot / resume check: before the dashboard trusts what it has, ask the
   // server whether this device's token is still live and its branch still
@@ -977,9 +1025,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const creds = await readCredentials();
         if (!creds.cashierToken && !creds.terminalToken && !creds.accessToken) return;
+        const startedAt = sessionEpoch();
         const { verifySession } = await import("@/lib/session-verify.functions");
         const res = await verifySession({ data: creds });
-        if (!alive || res.ok) return;
+        if (!alive || res.ok || !isCurrentEpoch(startedAt)) return;
         if (res.reason === "revoked" || res.reason === "branch_missing") {
           const { notifySessionExpired } = await import("@/lib/session-expiry");
           notifySessionExpired();
@@ -1062,7 +1111,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       cashierLogin,
       logout,
-      lock: logout,
+      lock,
+      sessionState,
     }),
     [
       ready,
@@ -1080,6 +1130,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       cashierLogin,
       logout,
+      lock,
+      sessionState,
     ],
   );
 

@@ -86,12 +86,18 @@ export const CORE_TABLES: { table: string; label: string; writable: boolean }[] 
 ];
 
 type Loose = {
-  select: (cols: string, opts: { count: "exact"; head: true }) => PromiseLike<{
+  select: (
+    cols: string,
+    opts: { count: "exact"; head: true },
+  ) => PromiseLike<{
     error: { message: string; code?: string } | null;
     count: number | null;
   }>;
   update: (values: unknown) => {
-    eq: (col: string, val: unknown) => PromiseLike<{ error: { message: string; code?: string } | null }>;
+    eq: (
+      col: string,
+      val: unknown,
+    ) => PromiseLike<{ error: { message: string; code?: string } | null }>;
   };
 };
 
@@ -155,12 +161,36 @@ export async function loadRecentRows(
 
 /** Operational tables shown in the data inspector. */
 export const INSPECTOR_TABLES: { table: string; label: string; columns: string }[] = [
-  { table: "sales", label: "Sales", columns: "bill_number, store_id, cashier_name, total_amount, payment_type, created_at" },
-  { table: "shifts", label: "Shifts", columns: "store_id, terminal_name, opened_by_name, status, opened_at, closed_at" },
-  { table: "shift_sessions", label: "Shift sign-ins", columns: "store_id, staff_name, role, signed_in_at, signed_out_at" },
-  { table: "drawer_events", label: "Drawer events", columns: "store_id, staff_name, reason, created_at" },
-  { table: "held_orders", label: "Held bills", columns: "id, store_id, label, total, held_by, held_at" },
-  { table: "audit_logs", label: "Activity log", columns: "user_name, action_category, action_name, target_module, created_at" },
+  {
+    table: "sales",
+    label: "Sales",
+    columns: "bill_number, store_id, cashier_name, total_amount, payment_type, created_at",
+  },
+  {
+    table: "shifts",
+    label: "Shifts",
+    columns: "store_id, terminal_name, opened_by_name, status, opened_at, closed_at",
+  },
+  {
+    table: "shift_sessions",
+    label: "Shift sign-ins",
+    columns: "store_id, staff_name, role, signed_in_at, signed_out_at",
+  },
+  {
+    table: "drawer_events",
+    label: "Drawer events",
+    columns: "store_id, staff_name, reason, created_at",
+  },
+  {
+    table: "held_orders",
+    label: "Held bills",
+    columns: "id, store_id, label, total, held_by, held_at",
+  },
+  {
+    table: "audit_logs",
+    label: "Activity log",
+    columns: "user_name, action_category, action_name, target_module, created_at",
+  },
 ];
 
 /** Turn a database error into something a shop owner can act on. */
@@ -236,6 +266,76 @@ async function probeTable(entry: {
   return probe;
 }
 
+/**
+ * The activation routines the till needs before it can be given a branch.
+ * Each is called with an id that belongs to no terminal, so nothing is
+ * claimed or changed — only the presence and shape of the routine is proven.
+ */
+const NO_TERMINAL = "00000000-0000-0000-0000-000000000000";
+
+async function activationChecks(): Promise<HeaderCheck[]> {
+  const rpc = supabaseExternal as unknown as {
+    rpc: (fn: string, args: Record<string, unknown>) => PromiseLike<{ error: unknown }>;
+  };
+  const probes: { label: string; fn: string; args: Record<string, unknown> }[] = [
+    { label: "Activation lookup", fn: "terminal_token_status", args: { p_token_id: NO_TERMINAL } },
+    {
+      label: "Activation claim",
+      fn: "terminal_token_claim",
+      args: {
+        p_token_id: NO_TERMINAL,
+        p_device: null,
+        p_proof_hash: null,
+        p_platform: null,
+        p_os: null,
+      },
+    },
+    {
+      label: "Terminal check-in",
+      fn: "terminal_token_heartbeat",
+      args: { p_token_id: NO_TERMINAL, p_activate: false, p_version: null, p_synced: false },
+    },
+  ];
+
+  const out: HeaderCheck[] = [];
+  for (const probe of probes) {
+    try {
+      const { error } = await rpc.rpc(probe.fn, probe.args);
+      const err = error as { code?: string; message?: string } | null;
+      if (!err) {
+        out.push({ label: probe.label, ok: true, detail: "Up to date" });
+        continue;
+      }
+      const code = err.code ?? "";
+      const message = err.message ?? "";
+      if (code === "PGRST203" || /could not choose the best candidate/i.test(message)) {
+        out.push({
+          label: probe.label,
+          ok: false,
+          detail:
+            "This database holds two versions of this routine. Run supabase/schema.sql on it.",
+        });
+      } else if (code === "PGRST202") {
+        out.push({
+          label: probe.label,
+          ok: false,
+          detail:
+            "This routine is out of date or missing. Run supabase/schema.sql on this database.",
+        });
+      } else {
+        out.push({
+          label: probe.label,
+          ok: false,
+          detail: explainError({ message: message || "Refused", code }),
+        });
+      }
+    } catch (e) {
+      out.push({ label: probe.label, ok: false, detail: (e as Error).message });
+    }
+  }
+  return out;
+}
+
 /** Run the whole check. Safe to run at any time — nothing is modified. */
 export async function runDbHealth(): Promise<DbHealthReport> {
   const session = (await supabaseExternal.auth.getSession()).data.session;
@@ -276,6 +376,15 @@ export async function runDbHealth(): Promise<DbHealthReport> {
     },
   ];
 
+  header.push(...(await activationChecks()));
+  header.push({
+    label: "Ready to trade",
+    ok: !!terminal?.locationId && !!(session || terminal?.tokenId),
+    detail: terminal?.locationId
+      ? "This device has a branch and an identity"
+      : "No branch yet — check the activation routines above before re-activating",
+  });
+
   const tables: TableProbe[] = [];
   for (const entry of await probeList()) tables.push(await probeTable(entry));
 
@@ -306,15 +415,13 @@ async function probeList(): Promise<{ table: string; label: string; writable: bo
       known.add(name);
       list.push({ table: name, label: prettyTable(name), writable: false });
     }
-
   } catch {
     // An older database without the inventory helper simply keeps the core list.
   }
   return list;
 }
 
-const prettyTable = (name: string) =>
-  name.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+const prettyTable = (name: string) => name.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 
 /** Plain-text version of the report, for pasting into a support message. */
 export function formatReport(report: DbHealthReport): string {

@@ -4937,20 +4937,15 @@ export type Database = {
         }
         Returns: boolean
       }
-      terminal_token_heartbeat:
-        | {
-            Args: { p_activate?: boolean; p_token_id: string }
-            Returns: undefined
-          }
-        | {
-            Args: {
-              p_activate?: boolean
-              p_synced?: boolean
-              p_token_id: string
-              p_version?: string
-            }
-            Returns: undefined
-          }
+      terminal_token_heartbeat: {
+        Args: {
+          p_activate?: boolean
+          p_synced?: boolean
+          p_token_id: string
+          p_version?: string
+        }
+        Returns: undefined
+      }
       terminal_token_status: {
         Args: { p_token_id: string }
         Returns: {

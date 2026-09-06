@@ -209,10 +209,7 @@ export function TerminalTokens({
       window.clearInterval(timer);
     };
   }, [codeTokenId, claimed, expired, refresh]);
-  const reissueQr = useMemo(
-    () => (reissued ? qrDataUrl(reissued.code) : ""),
-    [reissued],
-  );
+  const reissueQr = useMemo(() => (reissued ? qrDataUrl(reissued.code) : ""), [reissued]);
   const locationName = useMemo(() => {
     const s = stores.find((x) => x.id === locationId);
     return s ? `${s.name} — ${s.code}` : "";
@@ -382,7 +379,11 @@ export function TerminalTokens({
             disabled={issuing || !locationId || !deviceName.trim()}
             onClick={() => void generate()}
           >
-            {issuing ? <Loader2 className="size-4 animate-spin" /> : <KeyRound className="size-4" />}
+            {issuing ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <KeyRound className="size-4" />
+            )}
             Generate activation token
           </Button>
         </div>
@@ -569,103 +570,109 @@ export function TerminalTokens({
                 .filter((t) => t.id !== selfTokenId)
                 .filter((t) => (only ? t.platform === only : true))
                 .map((t) => (
-                <TableRow key={t.id} className="hover:bg-muted/40">
-                  <TableCell className="font-medium">
-                    {t.deviceName}
-                    {t.claimedByDevice && (
-                      <span className="block max-w-[14rem] truncate text-xs font-normal text-muted-foreground">
-                        {t.claimedByDevice}
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{t.locationName || "—"}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {t.platform === "mobile" ? "Phone / tablet" : "Windows till"}
-                  </TableCell>
-                  <TableCell>
-                    <TerminalStatusBadge token={t} now={now} />
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground tabular-nums">
-                    {t.appVersion ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {t.lastSeenAt ? (
-                      <>
-                        {sinceWords(t.lastSeenAt, now)}
-                        <span className="block">{formatDate(t.lastSeenAt)}</span>
-                      </>
-                    ) : (
-                      "Never"
-                    )}
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {t.lastSyncAt ? sinceWords(t.lastSyncAt, now) : "Never"}
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {formatDate(t.activatedAt)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 text-xs"
-                        disabled={reissuing === t.id || Boolean(t.replacedBy)}
-                        onClick={() => setPendingReissue(t)}
+                  <TableRow key={t.id} className="hover:bg-muted/40">
+                    <TableCell className="font-medium">
+                      {t.deviceName}
+                      <span
+                        title={t.id}
+                        className="block font-mono text-[11px] font-normal text-muted-foreground"
                       >
-                        {reissuing === t.id ? (
-                          <Loader2 className="size-3.5 animate-spin" />
-                        ) : (
-                          <RefreshCw className="size-3.5" />
-                        )}
-                        Re-issue code
-                      </Button>
-                      {t.status === "active" ? (
+                        ID {t.id.slice(0, 8)}
+                      </span>
+                      {t.claimedByDevice && (
+                        <span className="block max-w-[14rem] truncate text-xs font-normal text-muted-foreground">
+                          {t.claimedByDevice}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{t.locationName || "—"}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {t.platform === "mobile" ? "Phone / tablet" : "Windows till"}
+                    </TableCell>
+                    <TableCell>
+                      <TerminalStatusBadge token={t} now={now} />
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground tabular-nums">
+                      {t.appVersion ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {t.lastSeenAt ? (
+                        <>
+                          {sinceWords(t.lastSeenAt, now)}
+                          <span className="block">{formatDate(t.lastSeenAt)}</span>
+                        </>
+                      ) : (
+                        "Never"
+                      )}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {t.lastSyncAt ? sinceWords(t.lastSyncAt, now) : "Never"}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {formatDate(t.activatedAt)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
                         <Button
                           variant="outline"
                           size="sm"
-                          className="h-8 border-destructive/40 text-xs text-destructive hover:bg-destructive/10"
-                          onClick={() => setPendingRevoke(t)}
+                          className="h-8 text-xs"
+                          disabled={reissuing === t.id || Boolean(t.replacedBy)}
+                          onClick={() => setPendingReissue(t)}
                         >
-                          <ShieldX className="size-3.5" /> Revoke authenticity
-                        </Button>
-                      ) : (
-                        <>
-                          {t.status === "used" ? (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-8 border-destructive/40 text-xs text-destructive hover:bg-destructive/10"
-                              onClick={() => setPendingRevoke(t)}
-                            >
-                              <ShieldX className="size-3.5" /> Revoke authenticity
-                            </Button>
+                          {reissuing === t.id ? (
+                            <Loader2 className="size-3.5 animate-spin" />
                           ) : (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 text-xs"
-                              onClick={() => void restore(t)}
-                            >
-                              <RotateCcw className="size-3.5" /> Re-enable
-                            </Button>
+                            <RefreshCw className="size-3.5" />
                           )}
-                          {t.status === "revoked" && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 text-xs text-destructive hover:bg-destructive/10"
-                              onClick={() => setPendingDelete(t)}
-                            >
-                              <Trash2 className="size-3.5" /> Delete
-                            </Button>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                          Re-issue code
+                        </Button>
+                        {t.status === "active" ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 border-destructive/40 text-xs text-destructive hover:bg-destructive/10"
+                            onClick={() => setPendingRevoke(t)}
+                          >
+                            <ShieldX className="size-3.5" /> Revoke authenticity
+                          </Button>
+                        ) : (
+                          <>
+                            {t.status === "used" ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 border-destructive/40 text-xs text-destructive hover:bg-destructive/10"
+                                onClick={() => setPendingRevoke(t)}
+                              >
+                                <ShieldX className="size-3.5" /> Revoke authenticity
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 text-xs"
+                                onClick={() => void restore(t)}
+                              >
+                                <RotateCcw className="size-3.5" /> Re-enable
+                              </Button>
+                            )}
+                            {t.status === "revoked" && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 text-xs text-destructive hover:bg-destructive/10"
+                                onClick={() => setPendingDelete(t)}
+                              >
+                                <Trash2 className="size-3.5" /> Delete
+                              </Button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
             </TableBody>
           </Table>
         )}
@@ -701,9 +708,9 @@ export function TerminalTokens({
           <AlertDialogHeader>
             <AlertDialogTitle>Issue a replacement code for this terminal?</AlertDialogTitle>
             <AlertDialogDescription>
-              {pendingReissue?.deviceName} at {pendingReissue?.locationName || "this location"} keeps
-              its place in this list. The current code stops working immediately and the till must be
-              activated again with the new one.
+              {pendingReissue?.deviceName} at {pendingReissue?.locationName || "this location"}{" "}
+              keeps its place in this list. The current code stops working immediately and the till
+              must be activated again with the new one.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
