@@ -961,8 +961,17 @@ export async function loadCloudState(): Promise<CloudSlice> {
           const relayed = await relayStores();
           if (relayed.ok) return { data: (relayed.rows as Row[] | undefined) ?? [] };
         }
-        const direct = await supabase.from("stores").select("*").is("deleted_at", null).order("name");
-        if (!direct.error) return { data: (direct.data as Row[] | null) ?? [] };
+        const direct = await readAllPages<Row>((from, to) =>
+          supabase
+            .from("stores")
+            .select("*", { count: "exact" })
+            .is("deleted_at", null)
+            .order("name")
+            .order("id")
+            .range(from, to),
+        );
+        if (!direct.error) return { data: direct.data ?? [] };
+
         // Registered terminals and staff sessions can still recover through
         // the server relay when a direct RLS read is unavailable.
         if (canRelay()) {
