@@ -1,87 +1,109 @@
-# Make register settings reach every till reliably
+# Make register settings reach every till, reliably and per branch
 
-## What I found (traced, not assumed)
+## What the trace shows (read from the code and database, not assumed)
 
-**The central database is fine.** The rules routine builds the effective set correctly:
+**The central database is already correct.** The rules routine builds the effective set as
 built-in defaults, then the global saved row, then the branch row on top
-(`pos_rules_defaults` -> `pos_rules_row('')` -> `pos_rules_row(<branch>)`). Only nulls are
-skipped, so a branch with no override inherits the global value automatically, and a branch
-override stays inside that branch. Saving is supervisor-checked inside the database with a
-version guard. Today the database holds exactly one saved row: the global one — no branch has
-its own overrides yet.
+(`pos_rules_defaults` -> `pos_rules_row('')` -> `pos_rules_row(<branch>)`), skipping unset values,
+so a branch without an override inherits the global value and a branch override stays local.
+Saving is supervisor-checked inside the database with a version guard. Today only the global row
+exists. No database redesign is needed.
 
-**The real fault is how phones and tills ask for the rules.** The rules are fetched through an
-app-server call that uses a *relative* address. On the website that lands on a real server, so
-Windows/web works. Inside the Android app and the Windows till the app is served from a local
-address inside the device, so that same call never reaches the hosted server: it answers with the
-app shell or nothing. The reader then falls into its catch branch and hands back the strict
-built-in defaults, which is exactly the "hardcoded rules" behaviour reported.
+**Root cause of "the rules are not the saved ones" on phone and till.** The rules reader calls an
+app-server function with a relative address. On the website that reaches a real server. Inside the
+Android app and the Windows till the app is served from a local address inside the device, so that
+call never leaves the device; the read fails and the reader's catch branch quietly returns the
+built-in safety defaults, which look like configuration. Every other device-to-server call in this
+project already goes through the configured backend address (`serverOrigin` / `posFetch`); this one
+was never moved onto that path.
 
-Every other device-to-server call in this project already goes through the configured backend
-address (`serverOrigin` / `posFetch`). The rules reader is one of the calls that was never moved
-onto that path.
+**Three further faults confirmed while tracing:**
+- The rules request accepts whichever branch the caller names and returns it after only checking
+  that the caller is signed in — no check that this person or terminal belongs to that branch.
+- When no branch is known yet the code asks for branch `""` and shows the global answer as if it
+  were the branch's own configuration.
+- The last confirmed rules live only in memory, so restarting the phone or till drops back to the
+  safety defaults.
 
-**Two smaller faults follow from it:**
-- The last confirmed rules are kept only in memory, so an app restart on a phone or till drops
-  back to the built-in defaults.
-- When no branch is known yet, the code asks for scope `""` and presents the global answer as if
-  it were the branch configuration.
+Branch identity itself is not being changed: the persisted branch id already created with the
+branch stays the authoritative identity everywhere (rules, activation, sign-in, cache, sync,
+audit). I will confirm the existing creation and persistence code before touching anything, and a
+rename will not change the stored id.
 
 ## What I will change
 
-1. **One reachable way to read rules.** Add a small read endpoint under the public API path that
-   returns the effective rules for a branch, protected the same way the existing settings
-   endpoint is (staff bearer or cashier session, cross-origin allowance, no keys ever returned).
-   The rules reader calls it through the configured backend address on phone/till, and keeps the
-   existing same-origin path on the website. No second rules system: both routes call the one
-   existing loader, which calls the one database routine.
+1. **One reachable read path.** Add a single endpoint that returns the effective rules for a
+   branch, calling the one existing loader and the one existing database routine — no second rules
+   implementation. It reuses the existing sign-in mechanisms (staff bearer or cashier session,
+   terminal token where that is what the device holds) and the existing cross-origin allowance.
+   Phone and till reach it through their configured backend address; the website keeps its current
+   same-origin path.
 
-2. **Honest status instead of a silent swap.** The reader will report one of:
-   `LIVE`, `SYNCING`, `DEGRADED` (last confirmed rules in use, refresh failed),
-   `NOT_VERIFIED` (never synced — safety defaults), `IDENTITY_UNAVAILABLE` (no branch yet),
-   plus the existing failure categories (auth, network, permission, data). The built-in defaults
-   are only ever labelled safety defaults, never presented as saved configuration.
+2. **Branch authorisation on the server.** The request is answered for the branch the caller is
+   actually entitled to. A terminal or user from one branch cannot read another branch's rules by
+   naming it. Nothing secret is ever returned.
 
-3. **Last confirmed rules survive a restart.** Store them locally against terminal id, branch id,
-   revision and sync time, using the existing secure device storage. On start: identity first,
-   then the stored set, then a refresh from the centre. A stored set belonging to a different
-   branch is discarded, so a terminal moved to another branch never keeps the old policy. Nothing
-   secret is stored — only the rule values.
+3. **Identity before configuration.** Terminal identity, branch identity and session must be ready
+   before an authoritative read. Until then the state is `SYNCING` or `IDENTITY_UNAVAILABLE` —
+   never "global rules presented as this branch's settings".
 
-4. **Change on one device, applied on the others.** Keep the existing live settings channel,
-   reconnect refresh and periodic refresh. On an event a terminal refetches for *its own* branch,
-   compares the revision, and only rewrites its stored copy when the revision differs — replaced
-   in one step, never half old and half new.
+4. **Honest sources instead of a silent swap.** Every answer is labelled `DATABASE`,
+   `LAST_KNOWN_GOOD`, `DEFAULT_SAFETY` or `UNAVAILABLE`, with states `LIVE`, `SYNCING`,
+   `DEGRADED`, `NOT_VERIFIED`, `IDENTITY_UNAVAILABLE` and the existing failure categories (auth,
+   network, permission, data, config, unknown). The built-in defaults remain, keep their strict
+   values, and are never described as saved configuration. For unverified terminals the strict
+   safety policy applies to refunds, voids, discounts, price overrides, drawer opening, cash
+   variance, shift close, manager approval, negative stock, held bills and terminal reset —
+   documented and tested, never accidentally permissive.
 
-5. **One rules source for enforcement.** Confirm every rule-driven action (shift close, held
-   bills, drawer, discounts, price override, refunds, voids, negative stock, manager PIN, cash
-   variance, terminal reset) reads the same effective set, and that the server keeps the final
-   say where it already does. No relaxing of server checks.
+5. **Last confirmed rules survive a restart.** Store rules values, revision, sync time, terminal id
+   and branch id in the existing secure device storage — no PINs, tokens, signing keys or database
+   keys. A stored set belonging to a different branch is discarded, so a terminal moved between
+   branches never keeps the old policy.
 
-6. **A status panel for supervisors** showing branch, terminal, source, revision, last successful
-   sync and last failure category — no tokens, keys or PINs.
+6. **Change on one device, applied on the others.** Keep the existing settings-change channel,
+   reconnect refresh, foreground refresh and the existing periodic refresh — no extra polling. On
+   an event each terminal refetches for its own branch, compares the revision, and swaps the whole
+   rule set in one step only when the revision differs.
+
+7. **One rules source for enforcement.** Audit every rule-driven action so it reads the same
+   effective set as the Settings page, and confirm the server keeps the final say where it already
+   does. Hardcoded numbers found on the way are classified as real configuration, system constants
+   or safety defaults before anything is touched; no server check is relaxed.
+
+8. **A supervisor status panel and structured logs** showing branch, branch id, terminal, source,
+   revision, last successful sync and last failure category, plus log lines for sync start,
+   success, revision change, use of last-known-good and not-verified. Identifiers only — never
+   tokens, PINs, signing keys or database keys.
 
 ## Left untouched
 
-Emergency access, the manager PIN and signed-approval mechanism, terminal activation, offline
-operation, sales/stock/shift behaviour, and the cashier login screen. No configuration or keys
-baked into the phone or till builds; the device keeps using its own securely stored settings.
+Emergency access, manager PIN and signed approvals, terminal activation, offline operation, sales,
+stock, shifts, orders, payments and existing synchronisation. No configuration or keys baked into
+the phone or till builds; devices keep using their own securely stored settings.
 
 ## Technical notes
 
-- New route `src/routes/api/public/pos-rules.ts` (bearer or cashier token, `withCors`), calling
-  the existing `loadRulesResult`.
-- `src/lib/pos-rules.tsx`: status model, persisted last-known-good keyed by terminal+branch,
-  revision-gated atomic swap, transport chosen by `serverOrigin()`.
-- `src/lib/pos-rules.server.ts`: revision already hashes the effective set; keep as the sync
-  identity and return it on every read.
-- Structured failure logging (`POS_RULES_LOAD_FAILED category=… platform=… branch=…`) with
-  identifiers only.
-- Tests: global-only, branch override, two branches isolated, override removal falls back to
-  global, restart offline, fresh install, reconnect catch-up, same-revision no rewrite, missing
-  or changed branch identity, and a check that saved rules are not replaced by defaults.
+- New route `src/routes/api/public/pos-rules.ts` (existing caller verification via
+  `assertCaller`-equivalent server helpers, `withCors`), delegating to `loadRulesResult`.
+- Branch authorisation resolved server-side from the verified staff/cashier/terminal record; the
+  client-supplied branch is validated, never trusted.
+- `src/lib/pos-rules.tsx`: status/source model, persisted last-known-good keyed by terminal+branch,
+  revision-gated atomic swap, transport selected by `serverOrigin()`; the existing server function
+  remains the web path.
+- `rulesRevision()` kept as-is: it already hashes the normalised effective set and is returned with
+  every read alongside the branch id.
+- Tests: global-only, branch override, two branches isolated, inheritance, override removal,
+  revision change, persisted branch id reuse, rename keeps id, cross-branch read refused, missing
+  identity, Windows/Electron/Android reads, temporary failure, offline restart, fresh install,
+  reconnect catch-up, same-revision no rewrite, enforcement honours ON and OFF, safety policy under
+  NOT_VERIFIED, and unchanged manager PIN, approval, activation and emergency access.
 
-## Report at the end
+## Final report
 
-Root cause, files and database objects touched, per-platform explanation, branch/global
-behaviour, sync, offline and fresh-install behaviour, and test results.
+Root cause; why web worked and the two device platforms did not; files and database objects
+touched; branch identity confirmation and how it travels with each request; global vs branch
+behaviour; sync, offline, restart, fresh install, reconnect and unavailable-identity behaviour; how
+each platform obtains rules; enforcement source; NOT_VERIFIED policy; confirmation that defaults
+cannot masquerade as configuration, that cross-branch access is refused, that PIN/approval/
+emergency access are unchanged and no secrets are exposed; tests run and results.
