@@ -526,13 +526,16 @@ export function PosProvider({ children }: { children: ReactNode }) {
         if (cancelled) return;
         writeSnapshot(cloud);
         setState((s) => applyCloud(s, cloud));
+        // The locations question now has a real answer, empty or not.
+        setStoresLoaded(true);
+        setLoadPhase("ready");
         // No backfill here on purpose: an empty branch list means the operator
         // deleted them, and re-creating them would undo that.
-        // Bookings and racket job cards live in the cloud so every till and
-        // the phone see the same list.
-        try {
-          const cloudBookings = await loadBookings();
-          if (!cancelled && cloudBookings.length) {
+        // Bookings and racket job cards are secondary: the till is usable
+        // without them, so they arrive after the first screen is up.
+        void loadBookings()
+          .then((cloudBookings) => {
+            if (cancelled || !cloudBookings.length) return;
             setState((s: PosState) => {
               const seen = new Set(cloudBookings.map((b) => b.id));
               return {
@@ -540,12 +543,13 @@ export function PosProvider({ children }: { children: ReactNode }) {
                 bookings: [...cloudBookings, ...s.bookings.filter((b) => !seen.has(b.id))],
               };
             });
-          }
-        } catch {
-          /* offline or not permitted — the local list still works */
-        }
+          })
+          .catch(() => {
+            /* offline or not permitted — the local list still works */
+          });
       } catch (e) {
         dbError("Loading data", e);
+        if (!cancelled) setLoadPhase("failed");
       } finally {
         if (!cancelled) setReady(true);
       }
