@@ -126,7 +126,10 @@ export function useCheckout(deps: CheckoutDeps) {
         });
       },
       `Bill ${sale.receiptNo} sent on WhatsApp`,
-    );
+    ).catch(() => {
+      // The helper already reports every failure; this belt-and-braces catch
+      // keeps the fire-and-forget caller free of unhandled rejections.
+    });
   }
 
 
