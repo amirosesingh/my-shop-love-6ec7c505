@@ -6,13 +6,15 @@
  * navigation as a slide-over from the header, so no page is a dead end.
  */
 import { Link, useRouterState } from "@tanstack/react-router";
-import { ChevronLeft, Menu } from "lucide-react";
+import { ChevronLeft, Menu, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { AppShell } from "@/platforms/web/components/pos/AppShell";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
+  readNavCollapsed,
   SettingsLink,
   SettingsNavTree,
+  writeNavCollapsed,
 } from "@/platforms/web/components/pos/settings/SettingsNavTree";
 import {
   cardForLocation,
@@ -33,6 +35,15 @@ export function SettingsShell({ children, home = false }: { children: ReactNode;
   const active = home ? null : cardForLocation(cards, pathname, tab);
   const category = categories.find((g) => g.id === active?.category);
   const [drawer, setDrawer] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+
+  // Read on the client only, so the first paint matches what the server sent.
+  useEffect(() => setCollapsed(readNavCollapsed()), []);
+
+  const setRail = (next: boolean) => {
+    setCollapsed(next);
+    writeNavCollapsed(next);
+  };
 
   useEffect(() => setDrawer(false), [pathname, tab]);
 
@@ -41,9 +52,33 @@ export function SettingsShell({ children, home = false }: { children: ReactNode;
       <div className="flex min-h-full w-full">
         <nav
           aria-label="Settings navigation"
-          className="sticky top-0 hidden max-h-[calc(100dvh-3.5rem)] w-64 shrink-0 self-start overflow-hidden border-r border-border bg-sidebar/40 px-2 py-3 lg:block xl:w-72"
+          className={
+            "sticky top-0 hidden max-h-[calc(100dvh-3.5rem)] shrink-0 self-start overflow-hidden border-r border-border bg-sidebar/40 px-2 py-3 lg:block " +
+            (collapsed ? "w-14" : "w-64 xl:w-72")
+          }
         >
-          <SettingsNavTree activeId={active?.id} activeCategory={active?.category} />
+          <div className={"mb-1 flex " + (collapsed ? "justify-center" : "justify-end")}>
+            <button
+              type="button"
+              onClick={() => setRail(!collapsed)}
+              title={collapsed ? "Widen the settings list" : "Narrow the settings list"}
+              aria-label={collapsed ? "Widen the settings list" : "Narrow the settings list"}
+              aria-pressed={collapsed}
+              className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              {collapsed ? (
+                <PanelLeftOpen className="size-4" />
+              ) : (
+                <PanelLeftClose className="size-4" />
+              )}
+            </button>
+          </div>
+          <SettingsNavTree
+            activeId={active?.id}
+            activeCategory={active?.category}
+            collapsed={collapsed}
+            onExpand={() => setRail(false)}
+          />
         </nav>
 
         <div className="min-w-0 flex-1">
