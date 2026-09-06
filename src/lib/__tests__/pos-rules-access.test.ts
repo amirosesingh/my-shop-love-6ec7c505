@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 const verifyRelayCaller = vi.fn();
 vi.mock("@/core/api/pos-relay.server", () => ({ verifyRelayCaller }));
@@ -6,8 +6,6 @@ vi.mock("@/core/api/pos-relay.server", () => ({ verifyRelayCaller }));
 import { resolveRulesAccess } from "../pos-rules-access.server";
 
 describe("who may read which branch's rules", () => {
-  beforeEach(() => verifyRelayCaller.mockReset());
-
   it("answers for the branch the proof carries, whatever was asked for", async () => {
     verifyRelayCaller.mockResolvedValue({ kind: "terminal", label: "t", storeId: "bandar" });
     const res = await resolveRulesAccess({ terminalToken: "abc", storeId: "" });
@@ -32,7 +30,6 @@ describe("who may read which branch's rules", () => {
     });
 
     const res = await resolveRulesAccess({ storeId: "bandar" });
-    console.log("R", JSON.stringify(res));
     expect(res).toMatchObject({ ok: false, status: 401, code: "IDENTITY" });
   });
 });
