@@ -67,6 +67,7 @@ export const EVENT_CATALOG: { group: string; types: { type: string; label: strin
     types: [
       { type: "shift_open", label: "Shift opened" },
       { type: "shift_close", label: "Shift closed" },
+      { type: "shift_cash_variance", label: "Shift closed over or short" },
       { type: "xreport_print", label: "X-report printed" },
       { type: "drawer_open", label: "Cash drawer opened by hand" },
     ],
