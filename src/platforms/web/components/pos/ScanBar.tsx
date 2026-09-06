@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { CameraScanner } from "@/platforms/web/components/pos/CameraScanner";
 import { isNativeApp, scanOnceNative } from "@/platforms/mobile/camera";
 import { isNative } from "@/platform-config/platform";
+import { hasFeature } from "@/platform-config/features";
 
 /** True when the user is typing into a real field, so we must not steal keys. */
 function typingInField(target: EventTarget | null) {
@@ -35,10 +36,29 @@ export function ScanBar({
   const [webScan, setWebScan] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Camera scanning is an Android/iOS feature only — the Windows till and the
-  // web build use the USB/Bluetooth scanner through this field.
+  // Phones always have a camera; a Windows till only offers the button when a
+  // webcam is actually attached. Everything else keeps using the USB or
+  // Bluetooth scanner through this field.
   // Rendered after mount so the server and the browser agree on the markup.
-  useEffect(() => setHasCamera(isNativeApp() || isNative()), []);
+  useEffect(() => {
+    let alive = true;
+    if (isNativeApp() || isNative()) {
+      setHasCamera(true);
+      return;
+    }
+    if (!hasFeature("cameraScanner") || !navigator.mediaDevices?.enumerateDevices) return;
+    void navigator.mediaDevices
+      .enumerateDevices()
+      .then((devices) => {
+        if (alive) setHasCamera(devices.some((d) => d.kind === "videoinput"));
+      })
+      .catch(() => {
+        /* the browser refused to list devices — keep the field-only scanner */
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // Keyboard-wedge capture: a burst of characters ending with Enter is a scan.
   useEffect(() => {

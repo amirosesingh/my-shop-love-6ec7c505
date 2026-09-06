@@ -69,6 +69,10 @@ const CHANNEL_LEVELS = {
   "config:read": OPEN,
   "config:get": OPEN,
   "terminal:read": OPEN,
+  // A terminal whose registration was revoked or deleted erases its own saved
+  // activation. That is the machine cleaning up after itself, so it must work
+  // with a cashier signed in, or nobody at all.
+  "terminal:clear": OPEN,
   "backend:get": OPEN,
   "cloud:status": OPEN,
   "cloud:bootstrap": OPEN,

@@ -65,7 +65,9 @@ export const platformFeatures = {
     terminalActivation: true,
     emergencyRecovery: true,
     hardwarePrinting: true,
-    cameraScanner: false,
+    // Tills with a webcam scan the same way the phone does; machines without
+    // one simply never show the button (the check is made at runtime).
+    cameraScanner: true,
     appUpdates: true,
     windowChrome: true,
     sealedSecrets: true,

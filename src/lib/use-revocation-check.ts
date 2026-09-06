@@ -124,6 +124,12 @@ export type RevocationState = {
   lastCheckedAt: string | null;
   /** still unsealing the saved activation — do not ask for a new code yet */
   hydrating: boolean;
+  /**
+   * The registration has been asked about once since launch. Until then the
+   * shell waits, so a till switched off while its record was deleted locks on
+   * the next power-on instead of up to five minutes later.
+   */
+  verified: boolean;
 };
 
 export function useRevocationCheck(): RevocationState {
@@ -133,6 +139,7 @@ export function useRevocationCheck(): RevocationState {
   const [online, setOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
   const [lastCheckedAt, setLastCheckedAt] = useState<string | null>(null);
   const [hydrating, setHydrating] = useState(() => !isTerminalConfigHydrated());
+  const [verified, setVerified] = useState(false);
 
   useEffect(() => subscribeTerminalConfig(() => setConfig(readTerminalConfig())), []);
   useEffect(() => {
@@ -173,7 +180,9 @@ export function useRevocationCheck(): RevocationState {
 
     const check = async () => {
       const verdict = await terminalVerdict(config.tokenId);
-      if (cancelled || verdict.outcome === "unknown") return;
+      if (cancelled) return;
+      setVerified(true);
+      if (verdict.outcome === "unknown") return;
       setLastCheckedAt(new Date().toISOString());
       if (verdict.outcome === "revoked" || verdict.outcome === "missing") {
         setBlocked(true, verdict.outcome);
@@ -202,5 +211,10 @@ export function useRevocationCheck(): RevocationState {
     };
   }, [config]);
 
-  return { config, revoked, reason, online, lastCheckedAt, hydrating };
+  // With no saved activation there is nothing to verify.
+  useEffect(() => {
+    if (!config) setVerified(true);
+  }, [config]);
+
+  return { config, revoked, reason, online, lastCheckedAt, hydrating, verified };
 }

@@ -1595,6 +1595,19 @@ function registerIpc() {
     return result;
   });
 
+  /** Erase the activation after the central record was revoked or removed. */
+  ipcMain.handle("terminal:clear", async () => {
+    const result = terminalStore.write(null);
+    try {
+      await repo.setSetting("terminal_config", null);
+      await repo.setSetting("terminal_branch_id", null);
+      await repo.setSetting("activation_token_id", null);
+    } catch {
+      /* local database unavailable — the sealed copy is already gone */
+    }
+    return result;
+  });
+
   ipcMain.handle("settings:get", async (_e, key) => {
     try {
       return { ok: true, value: await repo.getSetting(String(key)) };

@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { SettingsFrame } from "@/platforms/web/components/pos/settings/SettingsFrame";
 import { AppUpdateSettings } from "@/platforms/web/components/pos/AppUpdateSettings";
 import { SystemHealthCard } from "@/platforms/web/components/pos/SystemHealthCard";
+import { TerminalStatusCard } from "@/platforms/web/components/pos/TerminalStatusCard";
 
 export const Route = createFileRoute("/settings/updates")({
   head: () => ({
@@ -31,7 +32,8 @@ export const Route = createFileRoute("/settings/updates")({
         <div className="min-w-0">
           <AppUpdateSettings />
         </div>
-        <aside className="min-w-0 xl:sticky xl:top-4 xl:self-start">
+        <aside className="min-w-0 space-y-6 xl:sticky xl:top-4 xl:self-start">
+          <TerminalStatusCard />
           <SystemHealthCard />
         </aside>
       </div>

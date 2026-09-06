@@ -463,7 +463,12 @@ export function clearTerminalConfig() {
   applyTenantOverride(null);
   clearDeviceSecret(SEALED_NAME);
   window.localStorage.removeItem(CONFIG_KEY);
-  void desktopBridge()?.writeTerminalConfig(null);
+  // Clearing goes through its own channel: saving an activation is an
+  // administrator action, but erasing a dead one is housekeeping the machine
+  // must be able to do with a cashier — or nobody — signed in.
+  const bridge = desktopBridge();
+  if (bridge?.clearTerminalConfig) void bridge.clearTerminalConfig();
+  else void bridge?.writeTerminalConfig(null);
   window.dispatchEvent(new CustomEvent(EVENT));
 }
 
@@ -472,6 +477,7 @@ export function clearTerminalConfig() {
 type TerminalBridge = {
   readTerminalConfig: () => Promise<{ ok: boolean; config?: TerminalConfig | null }>;
   writeTerminalConfig: (config: TerminalConfig | null) => Promise<{ ok: boolean }>;
+  clearTerminalConfig?: () => Promise<{ ok: boolean }>;
 };
 
 const desktopBridge = (): TerminalBridge | null => {

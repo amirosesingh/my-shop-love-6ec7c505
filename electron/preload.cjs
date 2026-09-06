@@ -102,6 +102,8 @@ contextBridge.exposeInMainWorld("pos", {
   /* activation mirror that survives updates */
   readTerminalConfig: () => invoke("terminal:read"),
   writeTerminalConfig: (config) => invoke("terminal:write", config),
+  /* housekeeping the machine does to itself when its registration is gone */
+  clearTerminalConfig: () => invoke("terminal:clear"),
   /* device settings held in the branch SQL database */
   getSetting: (key) => invoke("settings:get", key),
   setSetting: (key, value) => invoke("settings:set", key, value),
