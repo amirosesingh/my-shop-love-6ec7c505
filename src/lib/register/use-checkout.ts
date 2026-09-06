@@ -8,7 +8,7 @@
  */
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { notifyError } from "@/lib/notify";
+import { describeError, notifyError } from "@/lib/notify";
 import { openCashDrawer, printBookingSlip, printJobTag, printSaleReceipt } from "@/lib/pos-print";
 import { buildBookingMessage, buildSaleMessage, sendBillOnWhatsApp } from "@/lib/whatsapp";
 import { logger } from "@/lib/audit-log";
