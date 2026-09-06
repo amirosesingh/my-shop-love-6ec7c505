@@ -62,9 +62,7 @@ describe("activation contract in the canonical schema", () => {
   });
 
   it("lets an unregistered till read a code's status", () => {
-    expect(schema).toMatch(
-      /GRANT EXECUTE ON FUNCTION public\.terminal_token_status[^;]*anon[^;]*;/,
-    );
+    expect(schema).toMatch(/GRANT ALL ON FUNCTION public\.terminal_token_status[^;]*TO anon;/);
   });
 });
 
