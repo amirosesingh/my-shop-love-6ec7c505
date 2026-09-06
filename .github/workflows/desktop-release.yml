@@ -4,21 +4,6 @@ on:
   push:
     branches: [main]
     tags: ["v*"]
-    # Windows-only paths: a change confined to src/platforms/mobile must not
-    # rebuild the desktop installer. TODO: add code-signing once a Windows
-    # certificate is available; the build is currently unsigned.
-    paths:
-      - "src/core/**"
-      - "src/platform-config/**"
-      - "src/platforms/windows/**"
-      - "src/lib/**"
-      - "src/components/**"
-      - "src/routes/**"
-      - "electron/**"
-      - "scripts/desktop-release.cjs"
-      - "vite.config.ts"
-      - "package.json"
-      - ".github/workflows/desktop-release.yml"
   workflow_dispatch:
 
 concurrency:
@@ -46,6 +31,21 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Assign automatic build version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            base=$(node -p "require('./package.json').version")
+            major=${base%%.*}
+            rest=${base#*.}
+            minor=${rest%%.*}
+            patch=${base##*.}
+            version="$major.$minor.$((patch + GITHUB_RUN_NUMBER))"
+          fi
+          node scripts/bump-version.cjs --set "$version"
+          echo "Building desktop version $version"
 
       - name: Resolve release identity
         id: meta
@@ -120,11 +120,6 @@ jobs:
           aws s3 sync upload s3://updatelccms/pos-app/latest \
             --endpoint-url "$R2_ENDPOINT" --cache-control "no-cache" --delete \
             --exclude "android/*" --exclude "manifest.json"
-          # Tills already in the field read the top-level path, so the same
-          # allowlisted files are mirrored there (without --delete, which
-          # would wipe releases/ and latest/).
-          aws s3 sync upload s3://updatelccms/pos-app \
-            --endpoint-url "$R2_ENDPOINT" --cache-control "no-cache"
 
       - name: Remove build scratch left in the bucket by earlier releases
         shell: bash

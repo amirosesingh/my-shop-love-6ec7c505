@@ -7,14 +7,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const live = vi.fn();
-const localWrite = vi.fn();
+const localWriteBatch = vi.fn();
 
 vi.mock("@/lib/sync-engine", () => ({
   runOpLive: (...a: unknown[]) => live(...a),
   drainOutbox: async () => {},
 }));
 vi.mock("@/core/local-db/local-db", () => ({
-  localDb: () => ({ write: (...a: unknown[]) => localWrite(...a) }),
+  localDb: () => ({
+    write: vi.fn(),
+    writeBatch: (...a: unknown[]) => localWriteBatch(...a),
+  }),
   electronDb: () => ({}),
   readBranch: () => ({ branchId: null, branchName: null }),
 }));
@@ -48,8 +51,8 @@ describe("failure injection — checkout", () => {
     };
     (globalThis as unknown as { window: Record<string, unknown> }).window["pos"] = {};
     live.mockReset();
-    localWrite.mockReset();
-    localWrite.mockResolvedValue({ ok: true });
+    localWriteBatch.mockReset();
+    localWriteBatch.mockResolvedValue({ ok: true });
     setPreferredDatabaseMode("online");
   });
   afterEach(() => {
@@ -57,46 +60,38 @@ describe("failure injection — checkout", () => {
     delete (globalThis as unknown as { window: Record<string, unknown> }).window["pos"];
   });
 
-  it("stores nothing at all when the very first write is refused", async () => {
-    // Nothing landed centrally, so the sale is simply refused: the cashier
-    // sees the error, the cart is untouched, and no half bill is left behind.
+  it("stores nothing when the atomic local SQL batch is refused", async () => {
     const before = listQueue().length;
-    live.mockRejectedValue(new Error("null value in column"));
+    localWriteBatch.mockResolvedValue({ ok: false, error: "null value in column" });
     await expect(commitOps("Saving sale", basket())).rejects.toThrow();
     expect(queuedTables(before)).toEqual([]);
-    expect(live).toHaveBeenCalledTimes(1);
+    expect(live).not.toHaveBeenCalled();
   });
 
-  it("keeps only the tender when the last write is refused", async () => {
+  it("never exposes a half-stored basket when the local batch fails", async () => {
     const before = listQueue().length;
-    live
-      .mockResolvedValueOnce(undefined)
-      .mockResolvedValueOnce(undefined)
-      .mockRejectedValue(new Error("null value in column"));
+    localWriteBatch.mockResolvedValue({ ok: false, error: "payment row refused" });
     await expect(commitOps("Saving sale", basket())).rejects.toThrow();
-    expect(queuedTables(before)).toEqual(["payment_transactions"]);
+    expect(queuedTables(before)).toEqual([]);
   });
 
-  it("does not park anything when the line simply drops — the till writes locally", async () => {
+  it("does not park anything in browser storage because the till writes locally", async () => {
     const before = listQueue().length;
     live.mockRejectedValue(new Error("Failed to fetch"));
     await expect(commitOps("Saving sale", basket())).resolves.toBe("local");
     expect(queuedTables(before)).toEqual([]);
-    expect(localWrite).toHaveBeenCalled();
+    expect(localWriteBatch).toHaveBeenCalled();
+    expect(live).not.toHaveBeenCalled();
   });
 
-  it("charges once when the same tender is sent twice after a timeout", async () => {
-    // The retry carries the same client transaction id, so the central copy is
-    // merged rather than added; the ledger keeps one row.
-    const seen = new Set<string>();
-    live.mockImplementation(async (_c: string, op: { rows?: { id: string }[] }) => {
-      for (const row of op.rows ?? []) seen.add(row.id);
-    });
+  it("sends a repeated tender through the same idempotent local upsert", async () => {
     const tender = [
       { kind: "upsert", table: "payment_transactions", rows: [{ id: "t-9" }], onConflict: "id" },
     ] as never;
     await commitOps("Saving payment", tender);
     await commitOps("Saving payment", tender);
-    expect([...seen]).toEqual(["t-9"]);
+    expect(localWriteBatch).toHaveBeenCalledTimes(2);
+    expect(localWriteBatch.mock.calls.every((call) => call[1] === tender)).toBe(true);
+    expect(live).not.toHaveBeenCalled();
   });
 });

@@ -109,8 +109,10 @@ async function runQuery(
       if (options.in) q = q.in(options.in.column, options.in.values);
       if (options.orderBy)
         q = q.order(options.orderBy.column, { ascending: options.orderBy.ascending ?? true });
-      // A deterministic tie-break, or rows can shift between windows.
-      q = q.order("id", { ascending: true });
+      // Most business tables use `id`, but scoped/configuration tables often
+      // have a composite primary key and no id column. An explicit order is
+      // therefore also the caller's deterministic pagination key.
+      if (!options.orderBy) q = q.order("id", { ascending: true });
       return q.range(start, end) as PromiseLike<{
 
         data: Row[] | null;
@@ -166,4 +168,3 @@ export function routedQueryWithSource(
 export async function routedQuery(table: string, options: QueryOptions = {}): Promise<Row[]> {
   return (await routedQueryWithSource(table, options)).rows;
 }
-
