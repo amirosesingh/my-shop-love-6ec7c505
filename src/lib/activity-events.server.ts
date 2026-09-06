@@ -152,7 +152,13 @@ export async function writeActivityEvent(
     error = failures[0] ?? null;
   }
 
-  const res = await serviceRest("activity_events", {
+  // Events that carry a logical identity (for example one cash-variance alert
+  // per shift) are matched on it, so a retry or a replayed offline queue can
+  // never leave two copies in the feed.
+  const path = row.client_event_id
+    ? "activity_events?on_conflict=client_event_id"
+    : "activity_events";
+  const res = await serviceRest(path, {
     method: "POST",
     headers: { Prefer: "return=minimal,resolution=ignore-duplicates" },
     body: JSON.stringify([{ ...full, whatsapp_status: status, whatsapp_error: error }]),

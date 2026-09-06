@@ -89,6 +89,33 @@ export function varianceNeedsPin(rules: PosRules, variance: number): boolean {
   return Math.abs(variance) > limit;
 }
 
+export type VarianceOutcome = {
+  /** counted − expected, to the cent. Negative is short, positive is over. */
+  variance: number;
+  status: "NO_VARIANCE" | "OVER" | "SHORT";
+  /** The shift always finishes closing, whatever was counted. */
+  closes: true;
+  /** Any non-zero difference raises one admin notification. No threshold. */
+  notifies: boolean;
+};
+
+/**
+ * What happens when a drawer is counted. This mirrors the database routine
+ * `shift_reconcile_now`: the counted amount is final, the shift closes either
+ * way, and any difference at all is reported to the admins.
+ */
+export function varianceOutcome(expected: number, counted: number): VarianceOutcome {
+  const variance = Number((counted - expected).toFixed(2));
+  const status =
+    Math.abs(variance) <= 0.005 ? "NO_VARIANCE" : variance > 0 ? "OVER" : "SHORT";
+  return { variance, status, closes: true, notifies: status !== "NO_VARIANCE" };
+}
+
+/** The stable identity of a shift's cash-variance notification. */
+export function varianceEventId(shiftId: string): string {
+  return `shift:${shiftId}:cash_variance`;
+}
+
 /* ------------------------ blind reconciliation ------------------------ */
 
 /** Payment codes that roll up into each counted box on the closing screen. */
