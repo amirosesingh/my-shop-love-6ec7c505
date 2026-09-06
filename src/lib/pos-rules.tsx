@@ -1,21 +1,31 @@
 /**
  * Client access to the database-backed POS rules.
  *
- * Nothing here is written to localStorage or sessionStorage: rules are
- * security state, so a cold start always re-reads them from the server and
- * uses the strictest defaults until the answer lands. Within a running
- * session the last rule set the database actually served is kept in memory,
- * so a brief connection blip does not silently tighten every limit. The
- * frontend only hides / disables things — every privileged action is
- * re-validated on the server.
+ * One rule set, one database routine, several transports. The website asks the
+ * app server directly; the Android shell and the Windows till serve the app
+ * from a local address inside the device, so they ask the configured hosted
+ * backend over the same path every other till call uses.
+ *
+ * Nothing here decides policy on its own: the strict built-in defaults are a
+ * safety net and are always labelled as such, never presented as the saved
+ * configuration. The last rule set the database genuinely served is kept — in
+ * memory and in the encrypted device store, keyed to this terminal and branch
+ * — so a passing outage or a restart does not silently tighten every limit.
+ * The frontend only hides and disables; every privileged action is re-checked
+ * on the server.
  */
-import { createContext, useContext, useEffect, useMemo, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { getPosRules } from "./pos-rules.functions";
 import { getPosCallerAuth } from "./pos-caller-auth";
 import { subscribeSettingsChange } from "./sync-engine";
-import { DEFAULT_POS_RULES, type PosRules } from "./pos-rules";
+import { readCachedRules, writeCachedRules, type CachedRules } from "./pos-rules-cache";
+import { logRules } from "./pos-rules-log";
+import { terminalId } from "./activity-journal";
+import { serverOrigin, posFetch } from "./server-origin";
+import { isAndroid, isElectron } from "@/platform-config/platform";
+import { DEFAULT_POS_RULES, normalizeRules, type PosRules } from "./pos-rules";
 
 /** Why the live values are not in use, in words a supervisor can act on. */
 export type RulesFailureKind =
@@ -27,6 +37,17 @@ export type RulesFailureKind =
   | "data"
   | "unknown";
 
+/** Where the rules in use came from. */
+export type RulesSourceKind = "DATABASE" | "LAST_KNOWN_GOOD" | "DEFAULT_SAFETY" | "UNAVAILABLE";
+
+/** What the terminal is doing about them. */
+export type RulesStatus =
+  | "LIVE"
+  | "SYNCING"
+  | "DEGRADED"
+  | "NOT_VERIFIED"
+  | "IDENTITY_UNAVAILABLE";
+
 const FAILURE_TEXT: Record<RulesFailureKind, string> = {
   none: "",
   config: "This deployment has no central database connection configured.",
@@ -37,19 +58,36 @@ const FAILURE_TEXT: Record<RulesFailureKind, string> = {
   unknown: "The saved rules could not be read.",
 };
 
+const STATUS_TEXT: Record<RulesStatus, string> = {
+  LIVE: "Live from the central database.",
+  SYNCING: "Checking the central database…",
+  DEGRADED: "Using the last confirmed rules — the latest check did not get through.",
+  NOT_VERIFIED:
+    "This terminal has never received its branch rules, so the strict safety rules apply.",
+  IDENTITY_UNAVAILABLE: "This terminal does not know its branch yet.",
+};
+
 type Ctx = {
   rules: PosRules;
   loading: boolean;
-  /** True when the rules shown are the built-in defaults, not the saved ones. */
+  /** True when the rules shown are the built-in safety set, not the saved ones. */
   usingDefaults: boolean;
-  /** True when saved rules are in use but the last refresh failed. */
+  /** True when confirmed rules are in use but the last refresh failed. */
   degraded: boolean;
+  /** True when this terminal has never received verified branch rules. */
+  notVerified: boolean;
+  status: RulesStatus;
+  statusText: string;
+  source: RulesSourceKind;
   failure: RulesFailureKind;
   /** Plain-language reason, safe to show to a supervisor. */
   failureText: string;
   backendError: string;
   /** Content stamp of the rule set in use, for diagnostics. */
   revision: string;
+  branchId: string;
+  terminalId: string;
+  platform: string;
   lastSyncedAt: number | null;
   refresh: () => void;
 };
@@ -60,17 +98,61 @@ type Snapshot = {
   rules: PosRules;
   usingDefaults: boolean;
   degraded: boolean;
+  notVerified: boolean;
+  status: RulesStatus;
+  source: RulesSourceKind;
   failure: RulesFailureKind;
   backendError: string;
   revision: string;
+  branchId: string;
   lastSyncedAt: number | null;
 };
 
+type Answer = {
+  ok?: boolean;
+  identified?: boolean;
+  branchId?: string;
+  backend?: string;
+  backendError?: string;
+  failure?: string;
+  revision?: string;
+  fetchedAt?: number;
+  rules?: unknown;
+  error?: string;
+};
+
+export function platformName(): string {
+  if (isAndroid()) return "android";
+  if (isElectron()) return "electron";
+  return "web";
+}
+
 /**
- * Last rule set the database actually served, per branch, for this session
- * only. Never persisted: a restart falls back to the strict defaults.
+ * Last rule set the database actually served, per branch, for this session.
+ * The encrypted device copy behind it survives a restart.
  */
 const lastGood = new Map<string, { rules: PosRules; revision: string; at: number }>();
+
+/** Ask the server, over whichever transport this platform can actually reach. */
+async function fetchRules(auth: Record<string, string>, storeId: string): Promise<Answer> {
+  if (serverOrigin()) {
+    const res = await posFetch("/api/public/pos-rules", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...auth, storeId }),
+    });
+    const body = (await res.json().catch(() => ({}))) as Answer;
+    if (!res.ok)
+      return {
+        ok: false,
+        identified: false,
+        failure: res.status === 403 ? "permission" : res.status === 401 ? "auth" : "network",
+        error: body.error ?? `Rules request failed (${res.status})`,
+      };
+    return body;
+  }
+  return (await getPosRules({ data: { ...auth, storeId } })) as Answer;
+}
 
 export function PosRulesProvider({
   storeId,
@@ -80,88 +162,160 @@ export function PosRulesProvider({
   children: ReactNode;
 }) {
   const queryClient = useQueryClient();
-  const scope = storeId ?? "";
+  const scope = (storeId ?? "").trim();
   const key = ["pos-rules", scope] as const;
+  const device = useRef<string>("");
+  if (!device.current) device.current = typeof window === "undefined" ? "server" : terminalId();
 
   const query = useQuery<Snapshot>({
     queryKey: key,
     // Rules are security state: always re-check with the server on mount,
-    // on focus, on reconnect and on a timer, never read them back from
-    // storage.
+    // on focus, on reconnect and on a timer.
     staleTime: 30_000,
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     queryFn: async (): Promise<Snapshot> => {
       const auth = await getPosCallerAuth();
-      const cached = lastGood.get(scope);
-      // Works signed in or not: without credentials the server answers with
-      // the global defaults rather than an error.
+      const platform = platformName();
+      const me = device.current;
+
+      // The confirmed set for this branch: memory first, then the encrypted
+      // device copy left by an earlier run.
+      let cached = lastGood.get(scope) ?? null;
+      if (!cached && scope) {
+        const stored: CachedRules | null = await readCachedRules(me, scope).catch(() => null);
+        if (stored) {
+          cached = { rules: stored.rules, revision: stored.revision, at: stored.syncedAt };
+          lastGood.set(scope, cached);
+        }
+      }
+
+      const unverified = (
+        status: RulesStatus,
+        failure: RulesFailureKind,
+        backendError: string,
+      ): Snapshot => {
+        logRules(
+          status === "IDENTITY_UNAVAILABLE"
+            ? "POS_RULES_IDENTITY_UNAVAILABLE"
+            : "POS_RULES_NOT_VERIFIED",
+          { platform, terminal_id: me, branch_id: scope, category: failure },
+        );
+        return {
+          rules: { ...DEFAULT_POS_RULES },
+          usingDefaults: true,
+          degraded: false,
+          notVerified: true,
+          status,
+          source: status === "IDENTITY_UNAVAILABLE" ? "UNAVAILABLE" : "DEFAULT_SAFETY",
+          failure,
+          backendError,
+          revision: "",
+          branchId: scope,
+          lastSyncedAt: null,
+        };
+      };
+
+      const held = (failure: RulesFailureKind, backendError: string): Snapshot => {
+        const now = cached!;
+        logRules("POS_RULES_USING_LAST_KNOWN_GOOD", {
+          platform,
+          terminal_id: me,
+          branch_id: scope,
+          revision: now.revision,
+          category: failure,
+        });
+        return {
+          rules: now.rules,
+          usingDefaults: false,
+          degraded: true,
+          notVerified: false,
+          status: "DEGRADED",
+          source: "LAST_KNOWN_GOOD",
+          failure,
+          backendError,
+          revision: now.revision,
+          branchId: scope,
+          lastSyncedAt: now.at,
+        };
+      };
+
+      // A terminal with no branch identity yet must not be shown the global
+      // rules as if they were its branch's configuration.
+      if (!scope) return unverified("IDENTITY_UNAVAILABLE", "none", "");
+
+      logRules("POS_RULES_SYNC_STARTED", { platform, terminal_id: me, branch_id: scope });
       try {
-        const res = await getPosRules({ data: { ...auth, storeId: scope } });
+        const res = await fetchRules(auth as Record<string, string>, scope);
         const failure = (res.failure ?? "unknown") as RulesFailureKind;
-        if (res.backend === "database") {
+        if (res.ok && res.identified !== false && res.backend === "database") {
           const at = typeof res.fetchedAt === "number" ? res.fetchedAt : Date.now();
+          const revision = res.revision ?? "";
+          const rules = normalizeRules(res.rules);
           // A late answer must never put an older rule set back in place.
           if (!cached || at >= cached.at) {
-            lastGood.set(scope, { rules: res.rules as PosRules, revision: res.revision ?? "", at });
+            const changed = !cached || cached.revision !== revision;
+            lastGood.set(scope, { rules, revision, at });
+            if (changed) {
+              logRules("POS_RULES_REVISION_CHANGED", {
+                platform,
+                terminal_id: me,
+                branch_id: scope,
+                revision,
+              });
+              // Only a genuine change is written back; the whole set at once.
+              await writeCachedRules({
+                terminalId: me,
+                branchId: scope,
+                revision,
+                syncedAt: at,
+                rules,
+              });
+            }
           }
           const now = lastGood.get(scope)!;
+          logRules("POS_RULES_SYNC_SUCCESS", {
+            platform,
+            terminal_id: me,
+            branch_id: scope,
+            revision: now.revision,
+          });
           return {
             rules: now.rules,
             usingDefaults: false,
             degraded: false,
+            notVerified: false,
+            status: "LIVE",
+            source: "DATABASE",
             failure: "none",
             backendError: "",
             revision: now.revision,
+            branchId: scope,
             lastSyncedAt: now.at,
           };
         }
-        // The read failed. Keep the last configuration that was genuinely
-        // served rather than tightening every limit for a passing blip; the
-        // strict built-in fallback still applies when nothing trusted exists.
-        if (cached) {
-          return {
-            rules: cached.rules,
-            usingDefaults: false,
-            degraded: true,
-            failure,
-            backendError: res.backendError ?? "",
-            revision: cached.revision,
-            lastSyncedAt: cached.at,
-          };
-        }
-        return {
-          rules: res.rules as PosRules,
-          usingDefaults: true,
-          degraded: false,
-          failure,
-          backendError: res.backendError ?? "",
-          revision: "",
-          lastSyncedAt: null,
-        };
+
+        // The read did not produce verified branch rules.
+        const detail = res.error ?? res.backendError ?? "";
+        logRules("POS_RULES_LOAD_FAILED", {
+          platform,
+          terminal_id: me,
+          branch_id: scope,
+          category: failure,
+        });
+        if (cached) return held(failure, detail);
+        return unverified("NOT_VERIFIED", failure, detail);
       } catch (e) {
         const message = (e as Error).message;
-        if (cached) {
-          return {
-            rules: cached.rules,
-            usingDefaults: false,
-            degraded: true,
-            failure: "network",
-            backendError: message,
-            revision: cached.revision,
-            lastSyncedAt: cached.at,
-          };
-        }
-        return {
-          rules: DEFAULT_POS_RULES,
-          usingDefaults: true,
-          degraded: false,
-          failure: "network",
-          backendError: message,
-          revision: "",
-          lastSyncedAt: null,
-        };
+        logRules("POS_RULES_LOAD_FAILED", {
+          platform,
+          terminal_id: me,
+          branch_id: scope,
+          category: "network",
+        });
+        if (cached) return held("network", message);
+        return unverified("NOT_VERIFIED", "network", message);
       }
     },
   });
@@ -179,15 +333,23 @@ export function PosRulesProvider({
 
   const value = useMemo<Ctx>(() => {
     const failure = query.data?.failure ?? "none";
+    const status: RulesStatus = query.data?.status ?? (query.isPending ? "SYNCING" : "SYNCING");
     return {
       rules: query.data?.rules ?? DEFAULT_POS_RULES,
       loading: query.isPending,
       usingDefaults: query.data?.usingDefaults ?? false,
       degraded: query.data?.degraded ?? false,
+      notVerified: query.data?.notVerified ?? false,
+      status,
+      statusText: STATUS_TEXT[status] ?? "",
+      source: query.data?.source ?? "UNAVAILABLE",
       failure,
       failureText: FAILURE_TEXT[failure] ?? "",
       backendError: query.data?.backendError ?? "",
       revision: query.data?.revision ?? "",
+      branchId: query.data?.branchId ?? "",
+      terminalId: device.current,
+      platform: platformName(),
       lastSyncedAt: query.data?.lastSyncedAt ?? null,
       refresh: () => void queryClient.invalidateQueries({ queryKey: ["pos-rules"] }),
     };
@@ -203,10 +365,17 @@ export function usePosRules(): Ctx {
       loading: false,
       usingDefaults: false,
       degraded: false,
+      notVerified: false,
+      status: "SYNCING",
+      statusText: STATUS_TEXT.SYNCING,
+      source: "UNAVAILABLE",
       failure: "none",
       failureText: "",
       backendError: "",
       revision: "",
+      branchId: "",
+      terminalId: "",
+      platform: platformName(),
       lastSyncedAt: null,
       refresh: () => {},
     }
