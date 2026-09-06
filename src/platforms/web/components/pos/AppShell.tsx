@@ -305,7 +305,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   // the connection screen after a restart.
   // The first connection check of the launch is part of that same window: a
   // decision taken before it has answered is a decision taken on a guess.
-  if (terminal.hydrating || !profileHydrated || ((isDesktop() || isNative()) && startup.probing))
+  // A registered till also waits for the first answer about its own
+  // registration, so a deleted terminal never reaches the sales screen.
+  const awaitingVerdict =
+    (isDesktop() || isNative()) && Boolean(terminal.config) && !terminal.verified;
+  if (
+    terminal.hydrating ||
+    !profileHydrated ||
+    awaitingVerdict ||
+    ((isDesktop() || isNative()) && startup.probing)
+  )
     return (
       <div className="flex h-dvh items-center justify-center">
         <Loader2 className="size-6 animate-spin text-primary" />
