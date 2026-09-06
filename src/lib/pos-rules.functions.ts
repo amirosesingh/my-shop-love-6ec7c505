@@ -282,7 +282,7 @@ export const assertShiftClosable = createServerFn({ method: "POST" })
 
       const override = verifyOverrideGrant(data.grantToken, "shift_close");
       if (rules.block_shift_close_on_hold && !override) {
-        const heldRes = await heldOrderCountResult(data.storeId ?? "");
+        const heldRes = await heldOrderCountResult(access.branchId);
         // If the count itself could not be read, the shift stays open rather
         // than closing over bills nobody could see.
         if (!heldRes.ok) {
