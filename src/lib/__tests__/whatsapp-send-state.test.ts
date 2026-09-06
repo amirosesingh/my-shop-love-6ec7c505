@@ -8,7 +8,9 @@ import { describe, expect, it, vi } from "vitest";
 
 const success = vi.fn();
 const error = vi.fn();
-vi.mock("sonner", () => ({ toast: { success: (...a: unknown[]) => success(...a), error: (...a: unknown[]) => error(...a) } }));
+vi.mock("sonner", () => ({
+  toast: { success: (...a: unknown[]) => success(...a), error: (...a: unknown[]) => error(...a) },
+}));
 
 import { runWhatsAppSend } from "@/lib/register/wa-send";
 
@@ -22,9 +24,13 @@ describe("WhatsApp send state", () => {
     success.mockReset();
     error.mockReset();
     const f = flags();
-    await runWhatsAppSend(f.set, async () => {
-      throw new Error("Failed to fetch");
-    }, "Bill sent");
+    await runWhatsAppSend(
+      f.set,
+      async () => {
+        throw new Error("Failed to fetch");
+      },
+      "Bill sent",
+    );
     expect(f.seen).toEqual([true, false]);
     expect(error).toHaveBeenCalled();
     expect(success).not.toHaveBeenCalled();
