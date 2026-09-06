@@ -21,6 +21,8 @@ import { applyStockDeltaBatch } from "@/lib/stock-recovery";
 import { canRelay, relayStores } from "@/core/api/sync-relay";
 import { isOperationalTable } from "@/lib/pos-auth-route";
 import { keyset, nextCursor, PAGE_SIZE, type Cursor, type Page } from "@/lib/keyset";
+import { readAllPages } from "@/lib/paged-read";
+
 import { isLinkedRecordError, usageBlock, type ProductUsage } from "@/lib/product-delete";
 import type {
   AppSettings,
