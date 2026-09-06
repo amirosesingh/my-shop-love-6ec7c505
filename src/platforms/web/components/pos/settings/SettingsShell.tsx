@@ -49,11 +49,11 @@ export function SettingsShell({ children, home = false }: { children: ReactNode;
 
   return (
     <AppShell>
-      <div className="flex min-h-full w-full">
+      <div className="flex h-full min-h-0 w-full overflow-hidden">
         <nav
           aria-label="Settings navigation"
           className={
-            "sticky top-0 hidden max-h-[calc(100dvh-3.5rem)] shrink-0 self-start overflow-hidden border-r border-border bg-sidebar/40 px-2 py-3 lg:block " +
+            "hidden h-full min-h-0 shrink-0 flex-col border-r border-border bg-sidebar/40 px-2 py-3 lg:flex " +
             (collapsed ? "w-14" : "w-64 xl:w-72")
           }
         >
