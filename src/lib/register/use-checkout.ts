@@ -8,7 +8,8 @@
  */
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { describeError, notifyError } from "@/lib/notify";
+import { notifyError } from "@/lib/notify";
+import { runWhatsAppSend } from "@/lib/register/wa-send";
 import { openCashDrawer, printBookingSlip, printJobTag, printSaleReceipt } from "@/lib/pos-print";
 import { buildBookingMessage, buildSaleMessage, sendBillOnWhatsApp } from "@/lib/whatsapp";
 import { logger } from "@/lib/audit-log";
