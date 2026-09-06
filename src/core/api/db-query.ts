@@ -18,14 +18,20 @@ import type { Row } from "@/lib/sync-outbox";
 
 /** Table names are dynamic here, so the generated row types do not apply. */
 type LooseSelect = {
-  select: (columns: string) => LooseFilter;
+  select: (columns: string, opts?: { count?: "exact" }) => LooseFilter;
 };
-type LooseFilter = PromiseLike<{ data: unknown; error: { message: string } | null }> & {
+type LooseFilter = PromiseLike<{
+  data: unknown;
+  error: { message: string } | null;
+  count?: number | null;
+}> & {
   eq: (column: string, value: unknown) => LooseFilter;
   in: (column: string, values: unknown[]) => LooseFilter;
   order: (column: string, opts: { ascending: boolean }) => LooseFilter;
   limit: (n: number) => LooseFilter;
+  range: (from: number, to: number) => LooseFilter;
 };
+
 
 const from = (table: string) =>
   (supabaseExternal as unknown as { from: (t: string) => LooseSelect }).from(table);
