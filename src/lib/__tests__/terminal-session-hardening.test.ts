@@ -74,9 +74,8 @@ describe("settings rail", () => {
       getItem: (k: string) => store.get(k) ?? null,
       setItem: (k: string, v: string) => void store.set(k, v),
     };
-    const { readNavCollapsed, writeNavCollapsed } = await import(
-      "@/platforms/web/components/pos/settings/SettingsNavTree"
-    );
+    const { readNavCollapsed, writeNavCollapsed } =
+      await import("@/platforms/web/components/pos/settings/SettingsNavTree");
     expect(readNavCollapsed()).toBe(false);
     writeNavCollapsed(true);
     expect(readNavCollapsed()).toBe(true);

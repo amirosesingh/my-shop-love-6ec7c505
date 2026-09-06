@@ -123,7 +123,8 @@ export function SettingsNavTree({
   }, [activeCategory]);
 
   useEffect(() => {
-    if (activeCategory) setOpen((prev) => (prev[activeCategory] ? prev : { ...prev, [activeCategory]: true }));
+    if (activeCategory)
+      setOpen((prev) => (prev[activeCategory] ? prev : { ...prev, [activeCategory]: true }));
   }, [activeCategory]);
 
   const toggle = useCallback((id: string, next?: boolean) => {
@@ -147,8 +148,7 @@ export function SettingsNavTree({
   }, []);
 
   const byCategory = useMemo(
-    () =>
-      categories.map((g) => ({ group: g, items: cards.filter((c) => c.category === g.id) })),
+    () => categories.map((g) => ({ group: g, items: cards.filter((c) => c.category === g.id) })),
     [cards, categories],
   );
 

@@ -86,12 +86,18 @@ export const CORE_TABLES: { table: string; label: string; writable: boolean }[] 
 ];
 
 type Loose = {
-  select: (cols: string, opts: { count: "exact"; head: true }) => PromiseLike<{
+  select: (
+    cols: string,
+    opts: { count: "exact"; head: true },
+  ) => PromiseLike<{
     error: { message: string; code?: string } | null;
     count: number | null;
   }>;
   update: (values: unknown) => {
-    eq: (col: string, val: unknown) => PromiseLike<{ error: { message: string; code?: string } | null }>;
+    eq: (
+      col: string,
+      val: unknown,
+    ) => PromiseLike<{ error: { message: string; code?: string } | null }>;
   };
 };
 
@@ -155,12 +161,36 @@ export async function loadRecentRows(
 
 /** Operational tables shown in the data inspector. */
 export const INSPECTOR_TABLES: { table: string; label: string; columns: string }[] = [
-  { table: "sales", label: "Sales", columns: "bill_number, store_id, cashier_name, total_amount, payment_type, created_at" },
-  { table: "shifts", label: "Shifts", columns: "store_id, terminal_name, opened_by_name, status, opened_at, closed_at" },
-  { table: "shift_sessions", label: "Shift sign-ins", columns: "store_id, staff_name, role, signed_in_at, signed_out_at" },
-  { table: "drawer_events", label: "Drawer events", columns: "store_id, staff_name, reason, created_at" },
-  { table: "held_orders", label: "Held bills", columns: "id, store_id, label, total, held_by, held_at" },
-  { table: "audit_logs", label: "Activity log", columns: "user_name, action_category, action_name, target_module, created_at" },
+  {
+    table: "sales",
+    label: "Sales",
+    columns: "bill_number, store_id, cashier_name, total_amount, payment_type, created_at",
+  },
+  {
+    table: "shifts",
+    label: "Shifts",
+    columns: "store_id, terminal_name, opened_by_name, status, opened_at, closed_at",
+  },
+  {
+    table: "shift_sessions",
+    label: "Shift sign-ins",
+    columns: "store_id, staff_name, role, signed_in_at, signed_out_at",
+  },
+  {
+    table: "drawer_events",
+    label: "Drawer events",
+    columns: "store_id, staff_name, reason, created_at",
+  },
+  {
+    table: "held_orders",
+    label: "Held bills",
+    columns: "id, store_id, label, total, held_by, held_at",
+  },
+  {
+    table: "audit_logs",
+    label: "Activity log",
+    columns: "user_name, action_category, action_name, target_module, created_at",
+  },
 ];
 
 /** Turn a database error into something a shop owner can act on. */
@@ -282,13 +312,15 @@ async function activationChecks(): Promise<HeaderCheck[]> {
         out.push({
           label: probe.label,
           ok: false,
-          detail: "This database holds two versions of this routine. Run supabase/schema.sql on it.",
+          detail:
+            "This database holds two versions of this routine. Run supabase/schema.sql on it.",
         });
       } else if (code === "PGRST202") {
         out.push({
           label: probe.label,
           ok: false,
-          detail: "This routine is out of date or missing. Run supabase/schema.sql on this database.",
+          detail:
+            "This routine is out of date or missing. Run supabase/schema.sql on this database.",
         });
       } else {
         out.push({
@@ -383,15 +415,13 @@ async function probeList(): Promise<{ table: string; label: string; writable: bo
       known.add(name);
       list.push({ table: name, label: prettyTable(name), writable: false });
     }
-
   } catch {
     // An older database without the inventory helper simply keeps the core list.
   }
   return list;
 }
 
-const prettyTable = (name: string) =>
-  name.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+const prettyTable = (name: string) => name.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 
 /** Plain-text version of the report, for pasting into a support message. */
 export function formatReport(report: DbHealthReport): string {
