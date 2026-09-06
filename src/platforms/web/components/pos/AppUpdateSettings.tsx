@@ -1,4 +1,14 @@
-import { CheckCircle2, DownloadCloud, Loader2, RefreshCw, Smartphone, Monitor, Globe } from "lucide-react";
+import {
+  CheckCircle2,
+  ClipboardCopy,
+  DownloadCloud,
+  Globe,
+  Loader2,
+  Monitor,
+  PlugZap,
+  RefreshCw,
+  Smartphone,
+} from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -80,6 +90,14 @@ export function AppUpdateSettings() {
   return <DesktopUpdateCard />;
 }
 
+/** Plain words for the point where an update gave up. */
+const STAGE_LABELS: Record<string, string> = {
+  check: "Could not reach the update folder",
+  download: "The download did not finish",
+  verify: "The downloaded file failed its safety check",
+  install: "The installer could not start",
+};
+
 function DesktopUpdateCard() {
   const {
     state,
@@ -92,7 +110,12 @@ function DesktopUpdateCard() {
     manifestNewer,
     releaseNotes,
     downloadUrl,
+    diagnose,
+    diagnosing,
+    diagnosis,
+    failureReport,
   } = useAppUpdates();
+  const [copied, setCopied] = useState(false);
 
   const version = state.version || APP_VERSION;
   const busy = manifestChecking || state.status === "checking" || state.status === "downloading";
@@ -156,7 +179,38 @@ function DesktopUpdateCard() {
           <TileRow label="Release notes" hint={releaseNotes} />
         )}
         {state.error && (
-          <TileRow label="Last error" hint={<span className="text-destructive">{state.error}</span>} />
+          <>
+            <TileRow
+              label={STAGE_LABELS[state.stage ?? ""] ?? "Last error"}
+              hint={<span className="text-destructive">{state.error}</span>}
+            />
+            {(state.url || state.code || state.detail) && (
+              <TileRow
+                label="Details"
+                hint={
+                  <span className="break-all">
+                    {[state.url, state.code, state.detail].filter(Boolean).join(" · ")}
+                  </span>
+                }
+              />
+            )}
+          </>
+        )}
+        {diagnosis && (
+          <TileRow
+            label={diagnosis.ok ? "Connection test passed" : "Connection test failed"}
+            hint={
+              <span className="space-y-1">
+                {diagnosis.checks.map((c) => (
+                  <span key={c.url} className="block break-all">
+                    {c.ok ? "OK" : "Failed"} · {c.url}
+                    {c.status ? ` · HTTP ${c.status}` : ""}
+                    {c.error ? ` · ${c.error}` : ""}
+                  </span>
+                ))}
+              </span>
+            }
+          />
         )}
       </TileGroup>
 
@@ -175,14 +229,44 @@ function DesktopUpdateCard() {
             Restart and install
           </Button>
         )}
-        {!supported && downloadUrl && (
-          <Button asChild className="touch-target">
-            <a href={downloadUrl} rel="noreferrer">
-              Download v{manifestVersion}
+        {supported && (
+          <Button
+            variant="outline"
+            className="touch-target"
+            disabled={diagnosing}
+            onClick={() => void diagnose()}
+          >
+            {diagnosing ? <Loader2 className="size-4 animate-spin" /> : <PlugZap className="size-4" />}
+            Test connection
+          </Button>
+        )}
+        {failureReport && (
+          <Button
+            variant="outline"
+            className="touch-target"
+            onClick={() => {
+              void navigator.clipboard?.writeText(failureReport);
+              setCopied(true);
+              window.setTimeout(() => setCopied(false), 2000);
+            }}
+          >
+            <ClipboardCopy className="size-4" />
+            {copied ? "Copied" : "Copy details"}
+          </Button>
+        )}
+        {downloadUrl && (
+          <Button
+            variant={supported ? "outline" : "default"}
+            asChild
+            className="touch-target"
+          >
+            <a href={downloadUrl} target="_blank" rel="noreferrer">
+              {supported ? "Download in browser" : `Download v${manifestVersion}`}
             </a>
           </Button>
         )}
       </div>
+
 
       <p className="px-1 text-xs text-muted-foreground">
         {supported

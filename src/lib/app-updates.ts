@@ -23,12 +23,36 @@ export type UpdateStatus =
   | "error"
   | "unavailable";
 
+export type UpdateStage = "check" | "download" | "verify" | "install";
+
 export type UpdateState = {
   status: UpdateStatus;
   version: string;
   available?: string | null;
   percent: number;
   error: string | null;
+  /** Where it went wrong, so the card can say more than "it failed". */
+  stage?: UpdateStage | null;
+  /** Raw message from the network layer, for the "Copy details" button. */
+  detail?: string | null;
+  code?: string | null;
+  url?: string | null;
+};
+
+export type UpdateProbe = {
+  ok: boolean;
+  url: string;
+  status?: number;
+  ms?: number;
+  code?: string | null;
+  error?: string;
+};
+
+export type UpdateDiagnosis = {
+  ok: boolean;
+  version: string;
+  feed: string | null;
+  checks: UpdateProbe[];
 };
 
 type UpdateBridge = {
@@ -36,6 +60,8 @@ type UpdateBridge = {
   updateStatus: () => Promise<UpdateState>;
   checkForUpdates: () => Promise<UpdateState>;
   installUpdate: () => Promise<{ ok: boolean; error?: string }>;
+  diagnoseUpdates?: () => Promise<UpdateDiagnosis>;
+  updateDownloadPage?: () => Promise<string | null>;
   onUpdateStatus: (cb: (s: UpdateState) => void) => () => void;
 };
 
@@ -44,6 +70,7 @@ export const updateBridge = (): UpdateBridge | null => {
   const api = (window as unknown as { pos?: Partial<UpdateBridge> }).pos;
   return api && typeof api.updateStatus === "function" ? (api as UpdateBridge) : null;
 };
+
 
 const INITIAL: UpdateState = { status: "idle", version: "", percent: 0, error: null };
 
@@ -89,16 +116,55 @@ export function useAppUpdates() {
     await updateBridge()?.installUpdate();
   }, []);
 
+  const [diagnosis, setDiagnosis] = useState<UpdateDiagnosis | null>(null);
+  const [diagnosing, setDiagnosing] = useState(false);
+
+  /** One-tap connection test against the update folder. */
+  const diagnose = useCallback(async () => {
+    const bridge = updateBridge();
+    if (!bridge?.diagnoseUpdates) return null;
+    setDiagnosing(true);
+    try {
+      const result = await bridge.diagnoseUpdates();
+      setDiagnosis(result ?? null);
+      return result ?? null;
+    } catch {
+      setDiagnosis(null);
+      return null;
+    } finally {
+      setDiagnosing(false);
+    }
+  }, []);
+
   const version = state.version || APP_VERSION;
   const manifestVersion = manifest?.version ?? null;
   const manifestNewer = Boolean(manifestVersion && isNewerVersion(manifestVersion, version));
   const downloadUrl = manifest && manifestNewer ? resolvePlatformTarget(manifest)?.url ?? null : null;
+
+  /** Everything a counter would need to paste into a message to head office. */
+  const failureReport = state.error
+    ? [
+        `Version ${version}`,
+        manifestVersion ? `Published ${manifestVersion}` : null,
+        state.stage ? `Stage: ${state.stage}` : null,
+        state.percent ? `Progress: ${state.percent}%` : null,
+        state.url ? `Address: ${state.url}` : null,
+        state.code ? `Code: ${state.code}` : null,
+        `Message: ${state.detail ?? state.error}`,
+      ]
+        .filter(Boolean)
+        .join("\n")
+    : null;
 
   return {
     state,
     supported,
     check,
     install,
+    diagnose,
+    diagnosing,
+    diagnosis,
+    failureReport,
     lastChecked,
     manifest,
     manifestChecking,
@@ -106,5 +172,6 @@ export function useAppUpdates() {
     manifestNewer,
     releaseNotes: manifest?.releaseNotes ?? null,
     downloadUrl,
+
   };
 }

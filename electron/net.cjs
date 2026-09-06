@@ -215,4 +215,137 @@ async function getBinary(url) {
   }
 }
 
-module.exports = { getJson, head, getBinary, checkUrl };
+/**
+ * Turn a raw Chromium network failure into something a counter can act on.
+ * The original text is kept alongside so a report still carries the detail.
+ */
+function explainNetworkError(message) {
+  const text = String(message || "");
+  const code = /net::([A-Z0-9_]+)/.exec(text)?.[1] ?? null;
+  const map = {
+    ERR_SSL_PROTOCOL_ERROR:
+      "The update server refused a secure connection. This is usually security software inspecting traffic, or the server's certificate settings.",
+    ERR_CERT_AUTHORITY_INVALID:
+      "The update server's security certificate is not trusted by this computer.",
+    ERR_CERT_DATE_INVALID:
+      "The update server's certificate looks expired — check this computer's date and time.",
+    ERR_CERT_COMMON_NAME_INVALID:
+      "The update server's certificate does not match its address.",
+    ERR_CONNECTION_RESET: "The connection to the update server was cut off part-way.",
+    ERR_CONNECTION_CLOSED: "The update server closed the connection before finishing.",
+    ERR_CONNECTION_TIMED_OUT: "The update server did not answer in time.",
+    ERR_NAME_NOT_RESOLVED: "The update server's address could not be found on this network.",
+    ERR_INTERNET_DISCONNECTED: "This computer is not connected to the internet.",
+    ERR_PROXY_CONNECTION_FAILED: "This computer's proxy blocked the connection to the update server.",
+    ERR_NETWORK_CHANGED: "The network changed while downloading.",
+  };
+  return { code, friendly: (code && map[code]) || text || "The download could not be completed." };
+}
+
+/**
+ * Download to a file, streaming, with resume support so an interrupted
+ * transfer continues instead of starting again. Never follows a redirect off
+ * the allowed update hosts.
+ */
+function downloadTo(url, destination, { onProgress, timeoutMs = 900000, resume = false } = {}) {
+  return new Promise((resolve, reject) => {
+    const allowed = checkUrl(url);
+    if (!allowed.ok) {
+      reject(new Error(allowed.error));
+      return;
+    }
+    let already = 0;
+    if (resume) {
+      try {
+        already = fs.statSync(destination).size;
+      } catch {
+        already = 0;
+      }
+    }
+
+    let settled = false;
+    const done = (fn, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      fn(value);
+    };
+    const timer = setTimeout(
+      () => done(reject, new Error("The update server stopped responding during the download.")),
+      timeoutMs,
+    );
+
+    let req;
+    try {
+      req = net.request({ method: "GET", url: allowed.url, redirect: "manual" });
+    } catch (error) {
+      done(reject, error instanceof Error ? error : new Error(String(error)));
+      return;
+    }
+    if (already > 0) req.setHeader("Range", `bytes=${already}-`);
+
+    let hops = 0;
+    req.on("redirect", (_status, _method, redirectUrl) => {
+      if (++hops > 5) {
+        req.abort();
+        done(reject, new Error("The update server redirected too many times."));
+        return;
+      }
+      const next = checkUrl(redirectUrl);
+      if (!next.ok) {
+        req.abort();
+        done(reject, new Error(next.error));
+        return;
+      }
+      req.followRedirect();
+    });
+
+    req.on("response", (res) => {
+      const status = res.statusCode;
+      const partial = status === 206 && already > 0;
+      if (status !== 200 && !partial) {
+        res.resume?.();
+        done(reject, new Error(`The update server answered HTTP ${status}.`));
+        return;
+      }
+      const start = partial ? already : 0;
+      const total = Number(res.headers["content-length"] || 0) + start;
+      let received = start;
+      const out = fs.createWriteStream(destination, partial ? { flags: "a" } : { flags: "w" });
+      out.on("error", (error) => done(reject, error));
+      res.on("data", (chunk) => {
+        received += chunk.length;
+        out.write(chunk);
+        if (total && onProgress) onProgress(Math.min(99, Math.round((received / total) * 100)));
+      });
+      res.on("end", () => out.end(() => done(resolve, { file: destination, bytes: received })));
+      res.on("error", (error) => done(reject, error));
+    });
+    req.on("error", (error) => done(reject, error));
+    req.end();
+  });
+}
+
+/**
+ * One-tap connection test: does this machine reach the address at all, and
+ * does the secure handshake succeed? Reports the plain reason when it fails.
+ */
+async function probe(url) {
+  const started = Date.now();
+  try {
+    const res = await request(url, { method: "GET", headers: { Range: "bytes=0-0" }, timeoutMs: 20000 });
+    return {
+      ok: res.status >= 200 && res.status < 400,
+      status: res.status,
+      ms: Date.now() - started,
+      url: String(url),
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const { code, friendly } = explainNetworkError(message);
+    return { ok: false, ms: Date.now() - started, url: String(url), code, error: friendly, raw: message };
+  }
+}
+
+module.exports = { getJson, head, getBinary, checkUrl, downloadTo, probe, explainNetworkError };
+

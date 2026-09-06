@@ -33,6 +33,7 @@ import { ThemeProvider, themeBootScript } from "../lib/theme";
 import { publicConfigScript } from "../lib/public-config-script";
 import { NativeBoot } from "@/platforms/mobile/components/NativeBoot";
 import { OfflineGate } from "@/platforms/mobile/components/OfflineGate";
+import { DesktopUpdateBanner } from "@/platforms/windows/components/DesktopUpdateBanner";
 import { AndroidUpdateBanner } from "@/platforms/mobile/components/AndroidUpdateBanner";
 import { usePublicHostLanding } from "../lib/coupon-hosts";
 
@@ -243,6 +244,7 @@ function RootComponent() {
           </FirstRunSetup>
 
           <AndroidUpdateBanner />
+          <DesktopUpdateBanner />
           <Toaster position="top-center" />
           <ErrorNotifier />
           </RulesBridge>

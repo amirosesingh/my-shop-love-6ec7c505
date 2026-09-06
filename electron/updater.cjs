@@ -14,16 +14,35 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const { spawn } = require("node:child_process");
 const { app, BrowserWindow, net } = require("electron");
+const netHttp = require("./net.cjs");
 
 const SIX_HOURS = 6 * 60 * 60 * 1000;
 
 /** Update folder used when nothing else is configured or baked in. */
 const DEFAULT_FEED_URL = "https://updatecms.luckycharmsdnbhd.com/pos-app/";
 
+/** How many times a failed check or download is retried before giving up. */
+const ATTEMPTS = 3;
+
 let autoUpdater = null;
-let state = { status: "idle", version: app.getVersion(), percent: 0, error: null };
+let state = {
+  status: "idle",
+  version: app.getVersion(),
+  percent: 0,
+  error: null,
+  /** Where it went wrong: check | download | verify | install. */
+  stage: null,
+  /** Raw network/library message, kept for the "Copy details" button. */
+  detail: null,
+  code: null,
+  url: null,
+  /** Installer fetched by the fallback path, run directly on restart. */
+  installerFile: null,
+};
 let timer = null;
 let paused = false;
+let fallbackRunning = false;
+
 
 function broadcast() {
   for (const win of BrowserWindow.getAllWindows()) {
@@ -86,19 +105,35 @@ function load() {
   }
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
+  // Partial ("delta") downloads make many small ranged requests and are the
+  // most fragile link in the chain on tills behind security software. One
+  // plain file download is slower but far more likely to complete.
+  autoUpdater.disableDifferentialDownload = true;
   autoUpdater.setFeedURL(target);
-  autoUpdater.on("checking-for-update", () => set({ status: "checking", error: null }));
-  autoUpdater.on("update-not-available", () => set({ status: "current", percent: 0 }));
+  autoUpdater.on("checking-for-update", () =>
+    set({ status: "checking", error: null, stage: null, detail: null, code: null }),
+  );
+  autoUpdater.on("update-not-available", () => set({ status: "current", percent: 0, error: null }));
   autoUpdater.on("update-available", (info) =>
     set({ status: "downloading", percent: 0, available: info?.version ?? null }),
   );
   autoUpdater.on("download-progress", (p) => set({ status: "downloading", percent: Math.round(p.percent || 0) }));
   autoUpdater.on("update-downloaded", (info) =>
-    set({ status: "ready", percent: 100, available: info?.version ?? null }),
+    set({ status: "ready", percent: 100, available: info?.version ?? null, error: null, stage: null }),
   );
-  autoUpdater.on("error", (err) => set({ status: "error", error: String(err?.message || err) }));
+  autoUpdater.on("error", (err) => {
+    const raw = String(err?.message || err);
+    const { code, friendly } = netHttp.explainNetworkError(raw);
+    const stage = state.status === "downloading" ? "download" : "check";
+    set({ status: "error", stage, code, detail: raw, error: friendly });
+    // A download that failed part-way is retried through our own network
+    // layer, which is the path the manifest already uses successfully.
+    if (stage === "download") void fallbackDownload();
+  });
   return autoUpdater;
 }
+
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function check() {
   const updater = load();
@@ -108,19 +143,139 @@ async function check() {
     set({ status: "unavailable", error: "Updates only run in the installed app." });
     return state;
   }
-  try {
-    await updater.checkForUpdates();
-  } catch (err) {
-    set({ status: "error", error: String(err?.message || err) });
+  for (let attempt = 1; attempt <= ATTEMPTS; attempt += 1) {
+    try {
+      await updater.checkForUpdates();
+      return state;
+    } catch (err) {
+      const raw = String(err?.message || err);
+      const { code, friendly } = netHttp.explainNetworkError(raw);
+      set({
+        status: "error",
+        stage: "check",
+        code,
+        detail: `${raw} (attempt ${attempt} of ${ATTEMPTS})`,
+        error: friendly,
+        url: manifestish(),
+      });
+      if (attempt < ATTEMPTS) await wait(attempt * 2000);
+    }
   }
   return state;
 }
 
+/** The address the check reads, used in error reports and the test button. */
+function manifestish() {
+  const target = feed();
+  if (!target) return null;
+  if (target.provider === "github")
+    return `https://github.com/${target.owner}/${target.repo}/releases/latest`;
+  return `${target.url.replace(/\/+$/, "")}/latest.yml`;
+}
+
+/** Direct installer address for a version on the configured feed. */
+function installerUrl(version) {
+  return version ? rollbackUrl(version) : null;
+}
+
+/**
+ * When the bundled downloader cannot finish, fetch the installer ourselves
+ * with resume and retries, prove it came from us, and keep it for restart.
+ */
+async function fallbackDownload() {
+  if (fallbackRunning) return state;
+  const version = state.available;
+  const url = installerUrl(version);
+  if (!version || !url) return state;
+  fallbackRunning = true;
+  const file = path.join(os.tmpdir(), `pos-update-${version}.exe`);
+  try {
+    for (let attempt = 1; attempt <= ATTEMPTS; attempt += 1) {
+      set({
+        status: "downloading",
+        percent: 0,
+        error: null,
+        stage: "download",
+        detail: `Retrying the download (${attempt} of ${ATTEMPTS})`,
+        url,
+      });
+      try {
+        await netHttp.downloadTo(url, file, {
+          resume: attempt > 1,
+          onProgress: (percent) => set({ status: "downloading", percent }),
+        });
+        const verified = await verifyInstaller(file, version);
+        if (!verified.ok) {
+          fs.rm(file, { force: true }, () => {});
+          set({ status: "error", stage: "verify", error: verified.error, detail: verified.error, url });
+          return state;
+        }
+        set({
+          status: "ready",
+          percent: 100,
+          error: null,
+          stage: null,
+          detail: null,
+          code: null,
+          installerFile: file,
+          available: version,
+        });
+        return state;
+      } catch (err) {
+        const raw = err instanceof Error ? err.message : String(err);
+        const { code, friendly } = netHttp.explainNetworkError(raw);
+        set({ status: "error", stage: "download", code, detail: raw, error: friendly, url });
+        if (attempt < ATTEMPTS) await wait(attempt * 3000);
+      }
+    }
+    return state;
+  } finally {
+    fallbackRunning = false;
+  }
+}
+
+/** Contact the update folder and report exactly what the server answered. */
+async function diagnose() {
+  const target = feed();
+  const base = target?.provider === "generic" ? target.url.replace(/\/+$/, "") : null;
+  const checks = [];
+  const addresses = [
+    manifestish(),
+    base ? `${base}/manifest.json` : null,
+    installerUrl(state.available),
+  ].filter(Boolean);
+  for (const url of addresses) checks.push(await netHttp.probe(url));
+  return {
+    ok: checks.some((c) => c.ok),
+    version: app.getVersion(),
+    feed: base ?? (target ? `${target.owner}/${target.repo}` : null),
+    checks,
+  };
+}
+
 function install() {
-  if (state.status !== "ready" || !autoUpdater) return { ok: false, error: "No update is ready." };
+  if (state.status !== "ready") return { ok: false, error: "No update is ready." };
+  // Installer fetched by the fallback path: run it directly. NSIS reinstalls
+  // in place, so activation, settings and the local database stay put.
+  if (state.installerFile && fs.existsSync(state.installerFile)) {
+    try {
+      spawn(state.installerFile, ["/S"], { detached: true, stdio: "ignore", windowsHide: true }).unref();
+    } catch (err) {
+      const raw = String(err?.message || err);
+      set({ status: "error", stage: "install", detail: raw, error: "The installer could not be started." });
+      return { ok: false, error: "The installer could not be started." };
+    }
+    setTimeout(() => app.quit(), 1500);
+    return { ok: true };
+  }
+  if (!autoUpdater) return { ok: false, error: "No update is ready." };
   setImmediate(() => autoUpdater.quitAndInstall(false, true));
   return { ok: true };
 }
+
+/** Address a counter can open in a browser when everything else failed. */
+const downloadPage = () => installerUrl(state.available);
+
 
 function start() {
   if (paused) return;
@@ -373,5 +528,7 @@ module.exports = {
   check,
   install,
   rollback,
+  diagnose,
+  downloadPage,
   status: () => state,
 };
