@@ -528,5 +528,7 @@ module.exports = {
   check,
   install,
   rollback,
+  diagnose,
+  downloadPage,
   status: () => state,
 };

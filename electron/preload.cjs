@@ -92,6 +92,8 @@ contextBridge.exposeInMainWorld("pos", {
   updateStatus: () => invoke("update:status"),
   checkForUpdates: () => invoke("update:check"),
   installUpdate: () => invoke("update:install"),
+  diagnoseUpdates: () => invoke("update:diagnose"),
+  updateDownloadPage: () => invoke("update:download-page"),
   onUpdateStatus: (cb) => {
     const handler = (_e, payload) => cb(payload);
     ipcRenderer.on("update:status", handler);

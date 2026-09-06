@@ -1519,6 +1519,8 @@ function registerIpc() {
   ipcMain.handle("update:status", () => updater.status());
   ipcMain.handle("update:check", () => updater.check());
   ipcMain.handle("update:install", () => updater.install());
+  ipcMain.handle("update:diagnose", () => updater.diagnose());
+  ipcMain.handle("update:download-page", () => updater.downloadPage());
   ipcMain.handle("app:version", () => app.getVersion());
 
   /**
