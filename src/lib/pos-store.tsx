@@ -559,7 +559,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       cancelled = true;
       window.clearTimeout(watchdog);
     };
-  }, [signedIn, authReady]);
+  }, [signedIn, authReady, reloadTick]);
 
   useEffect(() => {
     if (!ready) return;
