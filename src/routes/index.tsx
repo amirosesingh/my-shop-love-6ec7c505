@@ -397,18 +397,6 @@ function Register() {
   const [noSaleReason, setNoSaleReason] = useState("");
   const [noSaleNote, setNoSaleNote] = useState("");
 
-  const categories = useMemo(
-    () => ["All", ...Array.from(new Set(state.products.map((p) => p.category)))],
-    [state.products],
-  );
-
-  const filtered = state.products.filter((p) => {
-    if (p.archived) return false;
-    if (!productVisibleAt(state.settings, p, state.currentStoreId)) return false;
-    const q = query.trim().toLowerCase();
-    const match = !q || p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q) || p.barcode.includes(q);
-    return match && (category === "All" || p.category === category);
-  });
 
   const member = state.members.find((m) => m.id === memberId) ?? null;
 

@@ -1,5 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { useDebounced } from "@/hooks/use-debounced";
+
 import {
   ArrowLeftRight,
   Combine,
@@ -186,25 +188,45 @@ function Inventory() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categories, state.products, retired, draft?.subCategory]);
 
-  const rows = state.products.filter(
-    (p) =>
-      // Items owned by a private-catalogue branch stay at that branch.
-      productVisibleAt(state.settings, p, state.currentStoreId) &&
-      (showArchived ? p.archived === true : p.archived !== true) &&
-      (catFilter === "all" || p.category === catFilter) &&
-      (groupFilter === "all" || (p.group ?? "") === groupFilter) &&
-      (subFilter === "all" || (p.subCategory ?? "") === subFilter) &&
-      `${p.name} ${p.sku} ${p.barcode} ${(p.barcodes ?? []).join(" ")} ${(p.variants ?? [])
-        .map((v) => `${v.code} ${v.label ?? ""}`)
-        .join(" ")} ${p.category} ${p.group ?? ""} ${p.subCategory ?? ""}`
-        .toLowerCase()
-        .includes(query.toLowerCase()),
+  // A big catalogue must not be re-scanned on every keystroke or re-render:
+  // the search text settles first, then one pass produces the visible rows.
+  const settledQuery = useDebounced(query, 200);
+  const rows = useMemo(() => {
+    const needle = settledQuery.trim().toLowerCase();
+    return state.products.filter((p) => {
+      if (!productVisibleAt(state.settings, p, state.currentStoreId)) return false;
+      if (showArchived ? p.archived !== true : p.archived === true) return false;
+      if (catFilter !== "all" && p.category !== catFilter) return false;
+      if (groupFilter !== "all" && (p.group ?? "") !== groupFilter) return false;
+      if (subFilter !== "all" && (p.subCategory ?? "") !== subFilter) return false;
+      if (!needle) return true;
+      // Cheapest fields first — most searches stop on the name.
+      return (
+        `${p.name} ${p.sku} ${p.barcode} ${(p.barcodes ?? []).join(" ")} ${(p.variants ?? [])
+          .map((v) => `${v.code} ${v.label ?? ""}`)
+          .join(" ")} ${p.category} ${p.group ?? ""} ${p.subCategory ?? ""}`
+          .toLowerCase()
+          .includes(needle)
+      );
+    });
+  }, [
+    state.products,
+    state.settings,
+    state.currentStoreId,
+    showArchived,
+    catFilter,
+    groupFilter,
+    subFilter,
+    settledQuery,
+  ]);
+  const selectedSet = useMemo(() => new Set(selected), [selected]);
+  const selectedProducts = useMemo(
+    () => state.products.filter((p) => selectedSet.has(p.id)),
+    [state.products, selectedSet],
   );
-  const selectedProducts = state.products.filter((p) => selected.includes(p.id));
   const pager = usePagination(rows, 25);
   const pageRows = pager.pageItems;
-  const allShownSelected =
-    pageRows.length > 0 && pageRows.every((p) => selected.includes(p.id));
+  const allShownSelected = pageRows.length > 0 && pageRows.every((p) => selectedSet.has(p.id));
 
   function toggle(id: string, on: boolean) {
     setSelected((prev) => (on ? [...new Set([...prev, id])] : prev.filter((x) => x !== id)));
@@ -218,13 +240,17 @@ function Inventory() {
     navigate({ to: "/transfers", search: { items: selected.join(","), kind } });
   }
 
-  const lowStock = state.products.filter(
-    (p) => stockAt(p, currentStore.id) <= p.reorderLevel,
-  );
-  const stockValue = state.products.reduce(
-    (a, p) => a + p.cost * stockAt(p, currentStore.id),
-    0,
-  );
+  const { lowStock, stockValue } = useMemo(() => {
+    let value = 0;
+    const low: Product[] = [];
+    for (const p of state.products) {
+      const qty = stockAt(p, currentStore.id);
+      value += p.cost * qty;
+      if (qty <= p.reorderLevel) low.push(p);
+    }
+    return { lowStock: low, stockValue: value };
+  }, [state.products, currentStore.id]);
+
 
   return (
     <AppShell>
