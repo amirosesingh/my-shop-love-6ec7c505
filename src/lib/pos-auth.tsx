@@ -723,6 +723,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    bumpSessionEpoch();
     setTerminalUser(next);
     // The branch is in place before the register mounts, so nothing renders
     // against an unresolved branch.
@@ -937,6 +938,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           ),
     };
   }, [session, roles, staff, terminalUser, appUser]);
+
+  // "Active" is simply the state of having somebody signed in; the other
+  // states are set by the teardown that produced them.
+  useEffect(() => {
+    if (user) setSessionState("active");
+  }, [user?.staffId]);
 
   // Local, per-terminal record of who signed in today. Lets a shift opened by
   // one cashier be continued by another while still showing every user.
