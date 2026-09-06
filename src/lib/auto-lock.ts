@@ -29,6 +29,16 @@ export function setAutoLockSeconds(seconds: number) {
   for (const l of listeners) l();
 }
 
+/**
+ * The idle delay actually applied: the branch's register setting when it is
+ * confirmed, otherwise the per-machine fallback.
+ */
+export function effectiveLockSeconds(ruleSeconds?: number): number {
+  if (typeof ruleSeconds === "number" && Number.isFinite(ruleSeconds) && ruleSeconds >= 0)
+    return Math.min(Math.round(ruleSeconds), 86_400);
+  return autoLockSeconds();
+}
+
 export function subscribeAutoLock(cb: () => void) {
   listeners.add(cb);
   return () => listeners.delete(cb);
@@ -53,10 +63,7 @@ export function useAutoLock(active: boolean, onLock: () => void, ruleSeconds?: n
       window.clearTimeout(timer);
       // The register settings decide when they are the confirmed source; the
       // per-machine value is only a fallback while they have not arrived.
-      const seconds =
-        typeof ruleSeconds === "number" && Number.isFinite(ruleSeconds) && ruleSeconds >= 0
-          ? Math.min(Math.round(ruleSeconds), 86_400)
-          : autoLockSeconds();
+      const seconds = effectiveLockSeconds(ruleSeconds);
       if (!seconds || stopped) return;
       timer = window.setTimeout(() => {
         stopped = true;

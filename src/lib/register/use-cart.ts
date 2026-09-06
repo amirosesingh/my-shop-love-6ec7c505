@@ -11,6 +11,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { availableAt, stockAt } from "@/lib/pos-store";
 import { clearCartDraft } from "@/lib/cart-draft";
+import { blocksOutOfStockSale } from "@/lib/register/stock-guard";
 import { logger } from "@/lib/audit-log";
 import { TICKET_ACTIONS, logTicketEvent } from "@/lib/ticket-audit";
 import type { Booking, CartLine, DiscountType, Product, Store } from "@/core/types/pos-types";
@@ -76,7 +77,7 @@ export function useCart(deps: CartDeps) {
       const message = reserved
         ? `${product.name} is fully reserved by open bookings at ${deps.currentStore.name}`
         : `${product.name} is out of stock at ${deps.currentStore.name}`;
-      if (deps.preventNegativeStock) {
+      if (blocksOutOfStockSale(onHand, deps.preventNegativeStock)) {
         toast.error(message);
         return;
       }
