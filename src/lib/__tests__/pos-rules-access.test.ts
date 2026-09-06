@@ -27,7 +27,10 @@ describe("who may read which branch's rules", () => {
   });
 
   it("refuses a caller that cannot prove who it is", async () => {
-    verifyRelayCaller.mockRejectedValue(new Error("could not prove"));
+    verifyRelayCaller.mockImplementation(async () => {
+      throw new Error("could not prove");
+    });
+
     const res = await resolveRulesAccess({ storeId: "bandar" });
     expect(res).toMatchObject({ ok: false, status: 401, code: "IDENTITY" });
   });
