@@ -19,6 +19,7 @@ import { useStartupGate, startupDecision } from "@/core/activation/registration-
 import { hasFeature } from "@/platform-config/features";
 import { ConnectDatabaseScreen } from "@/platforms/web/components/pos/ConnectDatabaseScreen";
 import { useAutoLock } from "@/lib/auto-lock";
+import { usePosRules } from "@/lib/pos-rules.tsx";
 import { SidebarNav, useSidebarCollapsed } from "@/platforms/web/components/pos/SidebarNav";
 import {
   ConnectionStatusButton,
@@ -171,9 +172,20 @@ export function AppShell({ children }: { children: ReactNode }) {
   useUiScale();
 
   // Idle screens return to the sign-in keypad. The shift stays open.
-  useAutoLock(!!user, () => {
-    void lock();
-  });
+  // One source of truth: the branch's register settings hold the idle limit.
+  // The per-machine value is only used while those settings are unconfirmed.
+  const posRules = usePosRules();
+  const ruleLockSeconds =
+    posRules.source === "DATABASE" || posRules.source === "LAST_KNOWN_GOOD"
+      ? posRules.rules.auto_lock_timeout_seconds
+      : undefined;
+  useAutoLock(
+    !!user,
+    () => {
+      void lock();
+    },
+    ruleLockSeconds,
+  );
 
   // Background outbox drain: keeps offline sales flowing once the link returns.
   useEffect(() => startSyncEngine(), []);
