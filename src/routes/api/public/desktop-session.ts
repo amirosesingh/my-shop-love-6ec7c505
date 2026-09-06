@@ -8,6 +8,12 @@ export const Route = createFileRoute("/api/public/desktop-session")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const { callerVerifiedDownstream } = await import("@/lib/public-api-guard.server");
+        const denied = callerVerifiedDownstream(
+          "the caller's own bearer token is verified below before any answer is given",
+        );
+        if (denied) return denied;
+
         const token = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
         if (!token) return Response.json({ ok: false, error: "Not signed in" }, { status: 401 });
         try {

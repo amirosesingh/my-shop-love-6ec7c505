@@ -8,7 +8,8 @@ const schemaPath = resolve(root, "supabase/schema.sql");
 describe("canonical Supabase schema", () => {
   it("is the only hand-run central SQL installer", () => {
     const sqlDir = resolve(root, "supabase/sql");
-    expect(readdirSync(sqlDir).sort()).toEqual(["README.md"]);
+    // 99_reset_data.sql is a deliberate one-off data wipe, not a schema installer.
+    expect(readdirSync(sqlDir).sort()).toEqual(["99_reset_data.sql", "README.md"]);
     expect(existsSync(schemaPath)).toBe(true);
   });
 

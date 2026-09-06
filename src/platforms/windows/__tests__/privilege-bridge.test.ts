@@ -45,7 +45,7 @@ describe("wrapBridge", () => {
     const unlock = vi.fn(async () => true);
     const wrapped = wrapBridge(bridge, unlock) as { write: () => Promise<unknown> };
     await expect(wrapped.write()).resolves.toEqual({ ok: true });
-    expect(unlock).toHaveBeenCalledWith("Needs an admin");
+    expect(unlock).toHaveBeenCalledWith("Needs an admin", undefined);
     expect(calls).toBe(2);
   });
 
