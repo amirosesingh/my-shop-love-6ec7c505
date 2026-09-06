@@ -20,6 +20,24 @@ import {
 import type { SettingsCard, SettingsCategoryId } from "@/lib/settings-catalog";
 
 const OPEN_KEY = "pos.settings.nav.open";
+const COLLAPSED_KEY = "pos.settings.nav.collapsed";
+
+/** Whether the rail was left narrow on this device. */
+export function readNavCollapsed(): boolean {
+  try {
+    return globalThis.localStorage?.getItem(COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function writeNavCollapsed(collapsed: boolean): void {
+  try {
+    globalThis.localStorage?.setItem(COLLAPSED_KEY, collapsed ? "1" : "0");
+  } catch {
+    /* private mode — the rail simply forgets. */
+  }
+}
 
 /** A settings page link. Cards can carry a `?tab=`, so the search is passed on. */
 export function SettingsLink({
@@ -81,10 +99,16 @@ export function SettingsNavTree({
   activeId,
   activeCategory,
   onNavigate,
+  collapsed = false,
+  onExpand,
 }: {
   activeId?: string;
   activeCategory?: SettingsCategoryId;
   onNavigate?: () => void;
+  /** Narrow rail: category icons only. */
+  collapsed?: boolean;
+  /** Widen the rail again, opening the category that was clicked. */
+  onExpand?: () => void;
 }) {
   const { cards, categories } = useSettingsNav();
   const [query, setQuery] = useState("");
@@ -127,6 +151,44 @@ export function SettingsNavTree({
       categories.map((g) => ({ group: g, items: cards.filter((c) => c.category === g.id) })),
     [cards, categories],
   );
+
+  if (collapsed) {
+    return (
+      <div className="flex h-full min-h-0 flex-col items-center gap-1">
+        <Link
+          to="/"
+          onClick={onNavigate}
+          title="Back to register"
+          aria-label="Back to register"
+          className="mb-1 flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          <ChevronLeft className="size-4" />
+        </Link>
+        <div className="min-h-0 flex-1 space-y-1 overflow-y-auto pb-4">
+          {byCategory.map(({ group, items }) => (
+            <button
+              key={group.id}
+              type="button"
+              title={`${group.label} (${items.length})`}
+              aria-label={group.label}
+              onClick={() => {
+                toggle(group.id, true);
+                onExpand?.();
+              }}
+              className={cn(
+                "flex size-9 items-center justify-center rounded-md transition-colors",
+                group.id === activeCategory
+                  ? "bg-sidebar-accent text-primary"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+              )}
+            >
+              <group.icon className="size-4" />
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col">
