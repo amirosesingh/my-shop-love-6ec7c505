@@ -63,7 +63,7 @@ const headerKey = (h: string) => h.trim().toLowerCase().replace(/\s+/g, "_");
 export function readNumber(value: unknown): number | null {
   const raw = String(value ?? "").trim();
   if (!raw) return null;
-  const cleaned = raw.replace(/[^0-9.\-]/g, "");
+  const cleaned = raw.replace(/[^0-9.-]/g, "");
   if (!cleaned || !/\d/.test(cleaned)) return null;
   const n = Number(cleaned);
   return Number.isFinite(n) ? n : null;
