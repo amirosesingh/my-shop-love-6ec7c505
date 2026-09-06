@@ -34,22 +34,25 @@ function build() {
   ].join("\n");
 }
 
-const next = build();
-
-if (process.argv.includes("--check")) {
-  const current = read(OUT);
-  if (current !== next) {
-    console.error(
-      `${OUT} is out of date with database/schema.sql.\n` +
-        "Run: node scripts/build-offline-sql.cjs",
-    );
-    process.exit(1);
+function main() {
+  const next = build();
+  if (process.argv.includes("--check")) {
+    if (read(OUT) !== next) {
+      console.error(
+        `${OUT} is out of date with database/schema.sql.\n` +
+          "Run: node scripts/build-offline-sql.cjs",
+      );
+      process.exit(1);
+    }
+    console.log(`${OUT} is up to date.`);
+    return;
   }
-  console.log(`${OUT} is up to date.`);
-} else {
   writeFileSync(resolve(root, OUT), next);
   const tables = new Set([...next.matchAll(/CREATE TABLE dbo\.(\w+)/g)].map((m) => m[1]));
   console.log(`Wrote ${OUT} — ${tables.size} tables.`);
 }
 
+if (require.main === module) main();
+
 module.exports = { build };
+
