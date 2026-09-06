@@ -49,6 +49,7 @@ ALTER ROLE db_datawriter ADD MEMBER pos_local;
 GO
 
 /* ---- tables (identical to the shape the till syncs to the cloud) ---- */
+
 /*
   Local POS database for the Windows till.
 
@@ -216,6 +217,7 @@ IF OBJECT_ID('dbo.purchase_orders', 'U') IS NULL
 CREATE TABLE dbo.purchase_orders (
   id                UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
   po_number         NVARCHAR(60)     NOT NULL,
+  [reference]       NVARCHAR(60)     NULL,
   supplier_name     NVARCHAR(160)    NULL,
   operator_name     NVARCHAR(120)    NULL,
   total_cost        DECIMAL(18, 4)   NOT NULL DEFAULT 0,
@@ -282,6 +284,114 @@ CREATE TABLE dbo.shifts (
   updated_at    DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
 );
 GO
+
+/* ---- controlled shift closing: state, immutable counts and audit ---- */
+IF OBJECT_ID('dbo.shifts', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.shifts', 'state') IS NULL ALTER TABLE dbo.shifts ADD [state] NVARCHAR(40) DEFAULT N'ACTIVE';
+  IF COL_LENGTH('dbo.shifts', 'close_reason') IS NULL ALTER TABLE dbo.shifts ADD [close_reason] NVARCHAR(400);
+  IF COL_LENGTH('dbo.shifts', 'closing_started_at') IS NULL ALTER TABLE dbo.shifts ADD [closing_started_at] DATETIME2(3);
+  IF COL_LENGTH('dbo.shifts', 'closing_started_by') IS NULL ALTER TABLE dbo.shifts ADD [closing_started_by] NVARCHAR(200);
+  IF COL_LENGTH('dbo.shifts', 'final_counted_cash') IS NULL ALTER TABLE dbo.shifts ADD [final_counted_cash] DECIMAL(18,4);
+  IF COL_LENGTH('dbo.shifts', 'variance_status') IS NULL ALTER TABLE dbo.shifts ADD [variance_status] NVARCHAR(40);
+END
+GO
+
+IF OBJECT_ID('dbo.shift_cash_counts', 'U') IS NULL
+CREATE TABLE dbo.shift_cash_counts (
+  id                  UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+  shift_id            NVARCHAR(80)     NOT NULL,
+  store_id            NVARCHAR(60)     NULL,
+  terminal_id         NVARCHAR(120)    NULL,
+  kind                NVARCHAR(20)     NOT NULL DEFAULT N'ORIGINAL',
+  counted_cash        DECIMAL(18,4)    NOT NULL DEFAULT 0,
+  counted_card        DECIMAL(18,4)    NULL,
+  counted_digital     DECIMAL(18,4)    NULL,
+  reason              NVARCHAR(400)    NULL,
+  counted_by_name     NVARCHAR(200)    NULL,
+  counted_by_staff_id NVARCHAR(120)    NULL,
+  client_key          NVARCHAR(160)    NULL,
+  is_synced           BIT              NOT NULL DEFAULT 0,
+  sync_status         NVARCHAR(20)     NOT NULL DEFAULT N'pending',
+  created_at          DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at          DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+IF OBJECT_ID('dbo.shift_close_events', 'U') IS NULL
+CREATE TABLE dbo.shift_close_events (
+  id           UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+  shift_id     NVARCHAR(80)     NOT NULL,
+  store_id     NVARCHAR(60)     NULL,
+  terminal_id  NVARCHAR(120)    NULL,
+  event        NVARCHAR(60)     NOT NULL,
+  from_state   NVARCHAR(40)     NULL,
+  to_state     NVARCHAR(40)     NULL,
+  detail       NVARCHAR(MAX)    NULL,
+  actor_name   NVARCHAR(200)    NULL,
+  actor_staff_id NVARCHAR(120)  NULL,
+  is_synced    BIT              NOT NULL DEFAULT 0,
+  sync_status  NVARCHAR(20)     NOT NULL DEFAULT N'pending',
+  created_at   DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+/* Offline close: a count taken with no connection is kept here until the
+   central routine has recomputed the authoritative variance. */
+IF OBJECT_ID('dbo.shift_cash_counts', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.shift_cash_counts', 'reconcile_state') IS NULL
+    ALTER TABLE dbo.shift_cash_counts ADD [reconcile_state] NVARCHAR(20) NOT NULL DEFAULT N'pending';
+END
+GO
+
+IF OBJECT_ID('dbo.shift_reconciliations', 'U') IS NULL
+CREATE TABLE dbo.shift_reconciliations (
+  id                UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+  shift_id          NVARCHAR(80)     NOT NULL,
+  store_id          NVARCHAR(60)     NULL,
+  count_id          NVARCHAR(80)     NULL,
+  expected_cash     DECIMAL(18,4)    NOT NULL DEFAULT 0,
+  expected_card     DECIMAL(18,4)    NULL,
+  expected_digital  DECIMAL(18,4)    NULL,
+  counted_cash      DECIMAL(18,4)    NOT NULL DEFAULT 0,
+  counted_card      DECIMAL(18,4)    NULL,
+  counted_digital   DECIMAL(18,4)    NULL,
+  variance_cash     DECIMAL(18,4)    NOT NULL DEFAULT 0,
+  variance_card     DECIMAL(18,4)    NULL,
+  variance_digital  DECIMAL(18,4)    NULL,
+  variance_total    DECIMAL(18,4)    NOT NULL DEFAULT 0,
+  variance_status   NVARCHAR(40)     NULL,
+  is_synced         BIT              NOT NULL DEFAULT 0,
+  sync_status       NVARCHAR(20)     NOT NULL DEFAULT N'pending',
+  created_at        DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+IF OBJECT_ID('dbo.shift_variance_alerts', 'U') IS NULL
+CREATE TABLE dbo.shift_variance_alerts (
+  id                 UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+  shift_id           NVARCHAR(80)     NOT NULL,
+  store_id           NVARCHAR(60)     NULL,
+  reconciliation_id  NVARCHAR(80)     NULL,
+  variance_total     DECIMAL(18,4)    NOT NULL DEFAULT 0,
+  variance_status    NVARCHAR(40)     NULL,
+  severity           NVARCHAR(40)     NULL,
+  message            NVARCHAR(MAX)    NULL,
+  delivery_status    NVARCHAR(40)     NULL,
+  attempts           INT              NOT NULL DEFAULT 0,
+  last_error         NVARCHAR(MAX)    NULL,
+  last_attempt_at    DATETIME2(3)     NULL,
+  acknowledged_at    DATETIME2(3)     NULL,
+  acknowledged_by    NVARCHAR(200)    NULL,
+  is_synced          BIT              NOT NULL DEFAULT 0,
+  sync_status        NVARCHAR(20)     NOT NULL DEFAULT N'pending',
+  created_at         DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at         DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+
 
 IF OBJECT_ID('dbo.bookings', 'U') IS NULL
 CREATE TABLE dbo.bookings (
@@ -350,7 +460,12 @@ CREATE TABLE dbo.stock_transfers (
   to_store_id NVARCHAR(60) NOT NULL, to_store_name NVARCHAR(200) NULL, to_group_id NVARCHAR(80) NULL,
   status NVARCHAR(30) NOT NULL DEFAULT N'pending', note NVARCHAR(400) NOT NULL DEFAULT N'',
   created_by NVARCHAR(120) NULL, approved_by NVARCHAR(120) NULL, approved_at DATETIME2(3) NULL,
+  dispatched_by NVARCHAR(120) NULL, dispatched_at DATETIME2(3) NULL,
   received_by NVARCHAR(120) NULL, received_at DATETIME2(3) NULL, rejected_reason NVARCHAR(400) NULL,
+  verified_by NVARCHAR(120) NULL, verified_at DATETIME2(3) NULL, posted_at DATETIME2(3) NULL,
+  discrepancy_reason NVARCHAR(400) NULL,
+  rejected_by NVARCHAR(120) NULL, cancelled_reason NVARCHAR(400) NULL,
+  closed_at DATETIME2(3) NULL, fulfilment NVARCHAR(20) NULL,
   is_synced BIT NOT NULL DEFAULT 0, sync_status NVARCHAR(20) NOT NULL DEFAULT N'pending',
   created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(), updated_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME()
 );
@@ -360,7 +475,9 @@ IF OBJECT_ID('dbo.stock_transfer_items', 'U') IS NULL
 CREATE TABLE dbo.stock_transfer_items (
   id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(), transfer_id UNIQUEIDENTIFIER NOT NULL,
   product_id UNIQUEIDENTIFIER NULL, barcode NVARCHAR(80) NULL, sku NVARCHAR(80) NULL,
-  product_name NVARCHAR(200) NULL, quantity INT NOT NULL DEFAULT 0, quantity_received INT NOT NULL DEFAULT 0,
+  product_name NVARCHAR(200) NULL, quantity INT NOT NULL DEFAULT 0,
+  quantity_approved INT NULL, quantity_dispatched INT NULL, quantity_received INT NOT NULL DEFAULT 0,
+  quantity_verified INT NULL,
   unit_cost DECIMAL(18,4) NOT NULL DEFAULT 0, is_synced BIT NOT NULL DEFAULT 0,
   sync_status NVARCHAR(20) NOT NULL DEFAULT N'pending', created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
   updated_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME()
@@ -579,499 +696,6 @@ CREATE TABLE dbo.shift_notifications (
 );
 GO
 
-
-/* =====================================================================
-   Added in 1.3.x — tables the newer POS features write to offline.
-   Same column names and types as the central database, so a pending
-   row is pushed up with no field mapping.
-   ===================================================================== */
-
-/* ---- catalogue support: extra barcodes, categories, units ---- */
-IF OBJECT_ID('dbo.product_barcodes', 'U') IS NULL
-CREATE TABLE dbo.product_barcodes (
-  id          UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
-  product_id  UNIQUEIDENTIFIER NOT NULL,
-  barcode     NVARCHAR(120)    NOT NULL,
-  label       NVARCHAR(120)    NULL,
-  pack_size   DECIMAL(18, 4)   NOT NULL DEFAULT 1,
-  is_primary  BIT              NOT NULL DEFAULT 0,
-  is_synced   BIT              NOT NULL DEFAULT 0,
-  sync_status NVARCHAR(20)     NOT NULL DEFAULT N'pending',
-  row_version INT              NOT NULL DEFAULT 1,
-  created_at  DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
-  updated_at  DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
-);
-GO
-IF OBJECT_ID('dbo.product_barcodes', 'U') IS NOT NULL
-   AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'UX_product_barcodes_barcode')
-  CREATE UNIQUE INDEX UX_product_barcodes_barcode ON dbo.product_barcodes (barcode);
-GO
-
-IF OBJECT_ID('dbo.product_categories', 'U') IS NULL
-CREATE TABLE dbo.product_categories (
-  id          UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
-  name        NVARCHAR(200)    NOT NULL,
-  parent_id   UNIQUEIDENTIFIER NULL,
-  kind        NVARCHAR(40)     NOT NULL DEFAULT N'product',
-  sort        INT              NOT NULL DEFAULT 0,
-  is_synced   BIT              NOT NULL DEFAULT 0,
-  sync_status NVARCHAR(20)     NOT NULL DEFAULT N'pending',
-  row_version INT              NOT NULL DEFAULT 1,
-  created_at  DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
-  updated_at  DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
-);
-GO
-
-IF OBJECT_ID('dbo.uom_units', 'U') IS NULL
-CREATE TABLE dbo.uom_units (
-  id            UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
-  code          NVARCHAR(40)     NOT NULL,
-  name          NVARCHAR(120)    NOT NULL,
-  allow_decimal BIT              NOT NULL DEFAULT 0,
-  sort          INT              NOT NULL DEFAULT 0,
-  is_synced     BIT              NOT NULL DEFAULT 0,
-  sync_status   NVARCHAR(20)     NOT NULL DEFAULT N'pending',
-  row_version   INT              NOT NULL DEFAULT 1,
-  created_at    DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
-  updated_at    DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
-);
-GO
-
-/* ---- money: tender types and the split-tender ledger ---- */
-IF OBJECT_ID('dbo.payment_types', 'U') IS NULL
-CREATE TABLE dbo.payment_types (
-  id                 UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
-  name               NVARCHAR(120)    NOT NULL,
-  type_code          NVARCHAR(60)     NOT NULL,
-  requires_reference BIT              NOT NULL DEFAULT 0,
-  is_active          BIT              NOT NULL DEFAULT 1,
-  icon               NVARCHAR(60)     NULL,
-  sort_order         INT              NOT NULL DEFAULT 0,
-  is_system          BIT              NOT NULL DEFAULT 0,
-  is_synced          BIT              NOT NULL DEFAULT 0,
-  sync_status        NVARCHAR(20)     NOT NULL DEFAULT N'pending',
-  row_version        INT              NOT NULL DEFAULT 1,
-  created_at         DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
-  updated_at         DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
-);
-GO
-
-IF OBJECT_ID('dbo.payment_transactions', 'U') IS NULL
-CREATE TABLE dbo.payment_transactions (
-  id                    UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
-  source_type           NVARCHAR(20)     NOT NULL DEFAULT N'sale',
-  sale_id               UNIQUEIDENTIFIER NULL,
-  booking_id            UNIQUEIDENTIFIER NULL,
-  member_id             UNIQUEIDENTIFIER NULL,
-  store_id              NVARCHAR(80)     NULL,
-  shift_id              NVARCHAR(80)     NULL,
-  terminal_id           NVARCHAR(120)    NULL,
-  amount                DECIMAL(18, 4)   NOT NULL DEFAULT 0,
-  method                NVARCHAR(60)     NOT NULL DEFAULT N'cash',
-  kind                  NVARCHAR(40)     NOT NULL DEFAULT N'payment',
-  reference             NVARCHAR(200)    NULL,
-  cashier_id            NVARCHAR(120)    NULL,
-  cashier_name          NVARCHAR(200)    NULL,
-  note                  NVARCHAR(400)    NULL,
-  status                NVARCHAR(30)     NOT NULL DEFAULT N'completed',
-  metadata              NVARCHAR(MAX)    NOT NULL DEFAULT N'{}',
-  paid_at               DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
-  client_transaction_id NVARCHAR(120)    NULL,
-  is_synced             BIT              NOT NULL DEFAULT 0,
-  sync_status           NVARCHAR(20)     NOT NULL DEFAULT N'pending',
-  row_version           INT              NOT NULL DEFAULT 1,
-  created_at            DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
-  updated_at            DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
-);
-GO
-
-/* ---- one audit trail for every stock movement ---- */
-IF OBJECT_ID('dbo.item_activity_logs', 'U') IS NULL
-CREATE TABLE dbo.item_activity_logs (
-  id             UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
-  product_id     UNIQUEIDENTIFIER NULL,
-  product_name   NVARCHAR(300)    NULL,
-  sku            NVARCHAR(120)    NULL,
-  barcode        NVARCHAR(120)    NULL,
-  store_id       NVARCHAR(80)     NULL,
-  terminal_id    NVARCHAR(120)    NULL,
-  activity_type  NVARCHAR(40)     NOT NULL,
-  reference      NVARCHAR(200)    NULL,
-  quantity_delta INT              NOT NULL DEFAULT 0,
-  stock_before   INT              NULL,
-  stock_after    INT              NULL,
-  unit_cost      DECIMAL(18, 4)   NULL,
-  staff_id       NVARCHAR(120)    NULL,
-  staff_name     NVARCHAR(200)    NULL,
-  role           NVARCHAR(60)     NULL,
-  note           NVARCHAR(400)    NULL,
-  is_synced      BIT              NOT NULL DEFAULT 0,
-  sync_status    NVARCHAR(20)     NOT NULL DEFAULT N'pending',
-  row_version    INT              NOT NULL DEFAULT 1,
-  created_at     DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
-  updated_at     DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
-);
-GO
-
-/* ---- coupons: campaigns, issued vouchers and their trail ---- */
-IF OBJECT_ID('dbo.coupon_campaigns', 'U') IS NULL
-CREATE TABLE dbo.coupon_campaigns (
-  id             UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
-  name           NVARCHAR(200)    NOT NULL,
-  slug           NVARCHAR(120)    NOT NULL,
-  discount_type  NVARCHAR(20)     NOT NULL DEFAULT N'percent',
-  discount_value DECIMAL(18, 4)   NOT NULL DEFAULT 0,
-  scope          NVARCHAR(40)     NOT NULL DEFAULT N'all',
-  scope_value    NVARCHAR(200)    NULL,
-  max_claims     INT              NULL,
-  max_per_member INT              NULL,
-  claims_count   INT              NOT NULL DEFAULT 0,
-  starts_at      DATETIME2(3)     NULL,
-  expires_at     DATETIME2(3)     NULL,
-  is_active      BIT              NOT NULL DEFAULT 1,
-  is_welcome     BIT              NOT NULL DEFAULT 0,
-  is_synced      BIT              NOT NULL DEFAULT 0,
-  sync_status    NVARCHAR(20)     NOT NULL DEFAULT N'pending',
-  row_version    INT              NOT NULL DEFAULT 1,
-  created_at     DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
-  updated_at     DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
-);
-GO
-
-IF OBJECT_ID('dbo.issued_vouchers', 'U') IS NULL
-CREATE TABLE dbo.issued_vouchers (
-  id               UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
-  token_slug       NVARCHAR(120)    NOT NULL,
-  campaign_id      UNIQUEIDENTIFIER NULL,
-  member_id        UNIQUEIDENTIFIER NULL,
-  status           NVARCHAR(30)     NOT NULL DEFAULT N'issued',
-  issued_at        DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
-  expires_at       DATETIME2(3)     NULL,
-  issued_by        NVARCHAR(200)    NULL,
-  issued_source    NVARCHAR(60)     NULL,
-  redeemed_at      DATETIME2(3)     NULL,
-  redeemed_by      NVARCHAR(200)    NULL,
-  redeemed_sale_id NVARCHAR(120)    NULL,
-  disabled_at      DATETIME2(3)     NULL,
-  disabled_by      NVARCHAR(200)    NULL,
-  disable_reason   NVARCHAR(400)    NULL,
-  store_id         NVARCHAR(80)     NULL,
-  is_synced        BIT              NOT NULL DEFAULT 0,
-  sync_status      NVARCHAR(20)     NOT NULL DEFAULT N'pending',
-  row_version      INT              NOT NULL DEFAULT 1,
-  created_at       DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
-  updated_at       DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
-);
-GO
-
-IF OBJECT_ID('dbo.coupon_events', 'U') IS NULL
-CREATE TABLE dbo.coupon_events (
-  id            UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
-  event_type    NVARCHAR(40)     NOT NULL,
-  campaign_id   UNIQUEIDENTIFIER NULL,
-  campaign_name NVARCHAR(200)    NULL,
-  voucher_token NVARCHAR(120)    NULL,
-  member_id     UNIQUEIDENTIFIER NULL,
-  member_phone  NVARCHAR(40)     NULL,
-  store_id      NVARCHAR(80)     NULL,
-  terminal_id   NVARCHAR(120)    NULL,
-  staff_name    NVARCHAR(200)    NULL,
-  staff_role    NVARCHAR(60)     NULL,
-  sale_id       NVARCHAR(120)    NULL,
-  note          NVARCHAR(400)    NULL,
-  is_synced     BIT              NOT NULL DEFAULT 0,
-  sync_status   NVARCHAR(20)     NOT NULL DEFAULT N'pending',
-  created_at    DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
-  updated_at    DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
-);
-GO
-
-/* ---- cash drawer opens, including no-sale ---- */
-IF OBJECT_ID('dbo.drawer_events', 'U') IS NULL
-CREATE TABLE dbo.drawer_events (
-  id          UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
-  store_id    NVARCHAR(80)     NULL,
-  terminal_id NVARCHAR(120)    NULL,
-  shift_id    NVARCHAR(80)     NULL,
-  staff_id    NVARCHAR(120)    NULL,
-  staff_name  NVARCHAR(200)    NULL,
-  role        NVARCHAR(60)     NULL,
-  reason      NVARCHAR(120)    NULL,
-  note        NVARCHAR(400)    NULL,
-  approved_by NVARCHAR(200)    NULL,
-  is_synced   BIT              NOT NULL DEFAULT 0,
-  sync_status NVARCHAR(20)     NOT NULL DEFAULT N'pending',
-  created_at  DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
-  updated_at  DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
-);
-GO
-
-/* ---- who signed in during a shift ---- */
-IF OBJECT_ID('dbo.shift_sessions', 'U') IS NULL
-CREATE TABLE dbo.shift_sessions (
-  id            UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
-  shift_id      NVARCHAR(80)     NOT NULL,
-  store_id      NVARCHAR(80)     NULL,
-  terminal_id   NVARCHAR(120)    NULL,
-  terminal_name NVARCHAR(200)    NULL,
-  staff_id      NVARCHAR(120)    NULL,
-  staff_name    NVARCHAR(200)    NULL,
-  role          NVARCHAR(60)     NULL,
-  signed_in_at  DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
-  signed_out_at DATETIME2(3)     NULL,
-  is_synced     BIT              NOT NULL DEFAULT 0,
-  sync_status   NVARCHAR(20)     NOT NULL DEFAULT N'pending',
-  row_version   INT              NOT NULL DEFAULT 1,
-  created_at    DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
-  updated_at    DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
-);
-GO
-
-/* ---- staff accounts and roles, so PIN sign-in works with no network ---- */
-IF OBJECT_ID('dbo.staff_roles', 'U') IS NULL
-CREATE TABLE dbo.staff_roles (
-  slug        NVARCHAR(60)  NOT NULL PRIMARY KEY,
-  name        NVARCHAR(120) NOT NULL,
-  base_level  NVARCHAR(40)  NULL,
-  permissions NVARCHAR(MAX) NOT NULL DEFAULT N'{}',
-  is_core     BIT           NOT NULL DEFAULT 0,
-  created_at  DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME(),
-  updated_at  DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME()
-);
-GO
-
-IF OBJECT_ID('dbo.app_users', 'U') IS NULL
-CREATE TABLE dbo.app_users (
-  id            UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
-  user_id       NVARCHAR(120)    NOT NULL,
-  full_name     NVARCHAR(200)    NULL,
-  email         NVARCHAR(200)    NULL,
-  role          NVARCHAR(60)     NULL,
-  role_slug     NVARCHAR(60)     NULL,
-  store_id      NVARCHAR(80)     NULL,
-  is_active     BIT              NOT NULL DEFAULT 1,
-  permissions   NVARCHAR(MAX)    NOT NULL DEFAULT N'{}',
-  pin_hash      NVARCHAR(400)    NULL,
-  pin_length    SMALLINT         NULL,
-  last_login_at DATETIME2(3)     NULL,
-  is_synced     BIT              NOT NULL DEFAULT 1,
-  sync_status   NVARCHAR(20)     NOT NULL DEFAULT N'synced',
-  row_version   INT              NOT NULL DEFAULT 1,
-  created_at    DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
-  updated_at    DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
-);
-GO
-
-IF OBJECT_ID('dbo.cashiers', 'U') IS NULL
-CREATE TABLE dbo.cashiers (
-  id            UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
-  username      NVARCHAR(120)    NOT NULL,
-  full_name     NVARCHAR(200)    NULL,
-  pin_hash      NVARCHAR(400)    NULL,
-  store_id      NVARCHAR(80)     NULL,
-  role_slug     NVARCHAR(60)     NULL,
-  permissions   NVARCHAR(MAX)    NOT NULL DEFAULT N'{}',
-  is_active     BIT              NOT NULL DEFAULT 1,
-  last_login_at DATETIME2(3)     NULL,
-  is_synced     BIT              NOT NULL DEFAULT 1,
-  sync_status   NVARCHAR(20)     NOT NULL DEFAULT N'synced',
-  created_at    DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
-  updated_at    DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
-);
-GO
-
-/* ---- member OTP verification ---- */
-IF OBJECT_ID('dbo.member_verifications', 'U') IS NULL
-CREATE TABLE dbo.member_verifications (
-  id          UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
-  member_id   UNIQUEIDENTIFIER NULL,
-  phone       NVARCHAR(40)     NULL,
-  email       NVARCHAR(200)    NULL,
-  channel     NVARCHAR(30)     NOT NULL DEFAULT N'whatsapp',
-  otp_code    NVARCHAR(200)    NULL,
-  attempts    INT              NOT NULL DEFAULT 0,
-  status      NVARCHAR(30)     NOT NULL DEFAULT N'pending',
-  sent_by     NVARCHAR(200)    NULL,
-  store_id    NVARCHAR(80)     NULL,
-  expires_at  DATETIME2(3)     NULL,
-  verified_at DATETIME2(3)     NULL,
-  is_synced   BIT              NOT NULL DEFAULT 0,
-  sync_status NVARCHAR(20)     NOT NULL DEFAULT N'pending',
-  created_at  DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
-  updated_at  DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
-);
-GO
-
-/* ---- terminal health and remote commands ---- */
-IF OBJECT_ID('dbo.branch_telemetry', 'U') IS NULL
-CREATE TABLE dbo.branch_telemetry (
-  terminal_id         NVARCHAR(120) NOT NULL PRIMARY KEY,
-  store_id            NVARCHAR(80)  NULL,
-  branch_id           NVARCHAR(80)  NULL,
-  terminal_name       NVARCHAR(200) NULL,
-  staff_name          NVARCHAR(200) NULL,
-  staff_role          NVARCHAR(60)  NULL,
-  db_mode             NVARCHAR(40)  NULL,
-  connection_status   NVARCHAR(40)  NULL,
-  storage_engine      NVARCHAR(40)  NULL,
-  pending_count       INT           NOT NULL DEFAULT 0,
-  pending_queue_count INT           NOT NULL DEFAULT 0,
-  conflict_count      INT           NOT NULL DEFAULT 0,
-  status              NVARCHAR(40)  NULL,
-  app_version         NVARCHAR(40)  NULL,
-  platform            NVARCHAR(40)  NULL,
-  last_synced_at      DATETIME2(3)  NULL,
-  last_ping           DATETIME2(3)  NULL,
-  last_seen_at        DATETIME2(3)  NULL,
-  is_synced           BIT           NOT NULL DEFAULT 0,
-  sync_status         NVARCHAR(20)  NOT NULL DEFAULT N'pending',
-  created_at          DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME(),
-  updated_at          DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME()
-);
-GO
-
-IF OBJECT_ID('dbo.terminal_commands', 'U') IS NULL
-CREATE TABLE dbo.terminal_commands (
-  id           UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
-  terminal_id  NVARCHAR(120)    NOT NULL,
-  store_id     NVARCHAR(80)     NULL,
-  command      NVARCHAR(60)     NOT NULL,
-  status       NVARCHAR(30)     NOT NULL DEFAULT N'pending',
-  note         NVARCHAR(400)    NULL,
-  result       NVARCHAR(MAX)    NULL,
-  issued_by    NVARCHAR(200)    NULL,
-  issued_role  NVARCHAR(60)     NULL,
-  picked_up_at DATETIME2(3)     NULL,
-  finished_at  DATETIME2(3)     NULL,
-  is_synced    BIT              NOT NULL DEFAULT 0,
-  sync_status  NVARCHAR(20)     NOT NULL DEFAULT N'pending',
-  created_at   DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
-  updated_at   DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
-);
-GO
-
-/* ---- outbound WhatsApp messages waiting for a connection ---- */
-IF OBJECT_ID('dbo.whatsapp_queue', 'U') IS NULL
-CREATE TABLE dbo.whatsapp_queue (
-  id              UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
-  phone_number_id NVARCHAR(120)    NULL,
-  recipient       NVARCHAR(40)     NOT NULL,
-  body            NVARCHAR(MAX)    NOT NULL,
-  reference       NVARCHAR(200)    NULL,
-  store_id        NVARCHAR(80)     NULL,
-  status          NVARCHAR(30)     NOT NULL DEFAULT N'queued',
-  error           NVARCHAR(MAX)    NULL,
-  queued_at       DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
-  sent_at         DATETIME2(3)     NULL,
-  is_synced       BIT              NOT NULL DEFAULT 0,
-  sync_status     NVARCHAR(20)     NOT NULL DEFAULT N'pending',
-  created_at      DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
-  updated_at      DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
-);
-GO
-
-/* ---- readable trail of what staff did on this till ---- */
-IF OBJECT_ID('dbo.activity_events', 'U') IS NULL
-CREATE TABLE dbo.activity_events (
-  id              UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
-  event_type      NVARCHAR(60)     NOT NULL,
-  severity        NVARCHAR(20)     NOT NULL DEFAULT N'info',
-  title           NVARCHAR(200)    NULL,
-  message         NVARCHAR(MAX)    NULL,
-  actor_id        NVARCHAR(120)    NULL,
-  actor_name      NVARCHAR(200)    NULL,
-  actor_role      NVARCHAR(60)     NULL,
-  terminal_id     NVARCHAR(120)    NULL,
-  terminal_name   NVARCHAR(200)    NULL,
-  store_id        NVARCHAR(80)     NULL,
-  entity_type     NVARCHAR(60)     NULL,
-  entity_id       NVARCHAR(120)    NULL,
-  amount          DECIMAL(18, 4)   NULL,
-  meta            NVARCHAR(MAX)    NOT NULL DEFAULT N'{}',
-  whatsapp_status NVARCHAR(30)     NULL,
-  whatsapp_error  NVARCHAR(MAX)    NULL,
-  client_event_id NVARCHAR(120)    NULL,
-  is_synced       BIT              NOT NULL DEFAULT 0,
-  sync_status     NVARCHAR(20)     NOT NULL DEFAULT N'pending',
-  created_at      DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
-  updated_at      DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
-);
-GO
-
-/* ---- the queue the sync engine drains, and its bookkeeping ---- */
-IF OBJECT_ID('dbo.offline_sync_queue', 'U') IS NULL
-CREATE TABLE dbo.offline_sync_queue (
-  id                    UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
-  table_name            NVARCHAR(80)  NOT NULL,
-  record_id             NVARCHAR(120) NULL,
-  action_type           NVARCHAR(10)  NOT NULL DEFAULT N'INSERT'
-    CONSTRAINT CK_offline_sync_queue_action
-    CHECK (action_type IN (N'INSERT', N'UPDATE', N'DELETE')),
-  payload_json          NVARCHAR(MAX) NOT NULL,
-  status                NVARCHAR(20)  NOT NULL DEFAULT N'pending'
-    CONSTRAINT CK_offline_sync_queue_status
-    CHECK (status IN (N'pending', N'failed', N'dead_letter')),
-  error_message         NVARCHAR(MAX) NULL,
-  attempts              INT           NOT NULL DEFAULT 0,
-  last_attempt_at       DATETIME2(3)  NULL,
-  client_transaction_id NVARCHAR(120) NULL,
-  created_at            DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME()
-);
-GO
-IF OBJECT_ID('dbo.offline_sync_queue', 'U') IS NOT NULL
-   AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_offline_sync_queue_status')
-  CREATE INDEX IX_offline_sync_queue_status
-    ON dbo.offline_sync_queue (status, created_at);
-GO
-
-/* Stock movements already applied, so a retry can never deduct twice. */
-IF OBJECT_ID('dbo.stock_delta_applied', 'U') IS NULL
-CREATE TABLE dbo.stock_delta_applied (
-  movement_id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
-  product_id  UNIQUEIDENTIFIER NULL,
-  store_id    NVARCHAR(80)     NULL,
-  delta       INT              NOT NULL DEFAULT 0,
-  applied_at  DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
-);
-GO
-
-/* Per-table high-water marks, scoped so one PC can serve two branches. */
-IF OBJECT_ID('dbo.sync_metadata', 'U') IS NULL
-CREATE TABLE dbo.sync_metadata (
-  table_name     NVARCHAR(80)  NOT NULL,
-  store_id       NVARCHAR(80)  NOT NULL DEFAULT N'',
-  terminal_id    NVARCHAR(120) NOT NULL DEFAULT N'',
-  last_synced_at DATETIME2(3)  NULL,
-  last_pushed_at DATETIME2(3)  NULL,
-  rows_pushed    INT           NOT NULL DEFAULT 0,
-  last_error     NVARCHAR(MAX) NULL,
-  updated_at     DATETIME2(3)  NULL,
-  CONSTRAINT PK_sync_metadata PRIMARY KEY (table_name, store_id, terminal_id)
-);
-GO
-
-/* ---- lookup indexes the till hits on every scan and search ---- */
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_item_activity_logs_product')
-  CREATE INDEX IX_item_activity_logs_product
-    ON dbo.item_activity_logs (product_id, created_at DESC);
-GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_payment_transactions_sale')
-  CREATE INDEX IX_payment_transactions_sale ON dbo.payment_transactions (sale_id);
-GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_payment_transactions_booking')
-  CREATE INDEX IX_payment_transactions_booking ON dbo.payment_transactions (booking_id);
-GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_activity_events_created')
-  CREATE INDEX IX_activity_events_created ON dbo.activity_events (created_at DESC);
-GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_terminal_commands_terminal')
-  CREATE INDEX IX_terminal_commands_terminal
-    ON dbo.terminal_commands (terminal_id, status);
-GO
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_issued_vouchers_token')
-  CREATE INDEX IX_issued_vouchers_token ON dbo.issued_vouchers (token_slug);
-GO
-
 /* ------------------------------------------------------------------
    Confirmation stamp — when the central database accepted this row.
    Lets a supervisor see how far behind a till is, per record.
@@ -1152,19 +776,464 @@ CLOSE ixtbl;
 DEALLOCATE ixtbl;
 GO
 
-/* ---- verification ---- */
-SELECT name AS created_table FROM sys.tables ORDER BY name;
+/* Per-row failure reason so the sync table can explain a red badge. */
+DECLARE @et SYSNAME, @sqlEr NVARCHAR(MAX);
+DECLARE errtbl CURSOR FOR
+  SELECT t.name FROM sys.tables AS t
+   WHERE COL_LENGTH('dbo.' + t.name, 'sync_status') IS NOT NULL
+     AND COL_LENGTH('dbo.' + t.name, 'sync_error') IS NULL;
+OPEN errtbl;
+FETCH NEXT FROM errtbl INTO @et;
+WHILE @@FETCH_STATUS = 0
+BEGIN
+  SET @sqlEr = N'ALTER TABLE dbo.[' + @et + N'] ADD [sync_error] NVARCHAR(MAX) NULL;';
+  EXEC sp_executesql @sqlEr;
+  FETCH NEXT FROM errtbl INTO @et;
+END
+CLOSE errtbl;
+DEALLOCATE errtbl;
+GO
+
+SET NOCOUNT ON;
+
+IF OBJECT_ID('dbo.sync_metadata', 'U') IS NULL
+CREATE TABLE dbo.sync_metadata (
+  table_name     NVARCHAR(120) NOT NULL PRIMARY KEY,
+  last_synced_at DATETIME2(3)  NULL,
+  last_pushed_at DATETIME2(3)  NULL,
+  rows_pushed    INT           NOT NULL DEFAULT 0,
+  last_error     NVARCHAR(MAX) NULL,
+  updated_at     DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+/* Per-row retry bookkeeping that survives an app restart. */
+DECLARE @mt SYSNAME, @sqlMt NVARCHAR(MAX);
+DECLARE metatbl CURSOR FOR
+  SELECT name FROM sys.tables
+   WHERE COL_LENGTH('dbo.' + name, 'is_synced') IS NOT NULL;
+OPEN metatbl;
+FETCH NEXT FROM metatbl INTO @mt;
+WHILE @@FETCH_STATUS = 0
+BEGIN
+  IF COL_LENGTH('dbo.' + @mt, 'sync_attempts') IS NULL
+  BEGIN
+    SET @sqlMt = N'ALTER TABLE dbo.[' + @mt
+      + N'] ADD [sync_attempts] INT NOT NULL CONSTRAINT [DF_' + @mt
+      + N'_sync_attempts] DEFAULT 0;';
+    EXEC sp_executesql @sqlMt;
+  END
+  IF COL_LENGTH('dbo.' + @mt, 'last_error_at') IS NULL
+  BEGIN
+    SET @sqlMt = N'ALTER TABLE dbo.[' + @mt + N'] ADD [last_error_at] DATETIME2(3) NULL;';
+    EXEC sp_executesql @sqlMt;
+  END
+  IF COL_LENGTH('dbo.' + @mt, 'row_version') IS NULL
+  BEGIN
+    SET @sqlMt = N'ALTER TABLE dbo.[' + @mt
+      + N'] ADD [row_version] INT NOT NULL CONSTRAINT [DF_' + @mt
+      + N'_row_version] DEFAULT 0;';
+    EXEC sp_executesql @sqlMt;
+  END
+  FETCH NEXT FROM metatbl INTO @mt;
+END
+CLOSE metatbl;
+DEALLOCATE metatbl;
+GO
+
+/* =====================================================================
+   v1.3.5 alignment — mirrors the cloud shape so every entity the till
+   touches has a local home, an idempotency key and a branch-scoped
+   high-water mark. Idempotent: safe on every start.
+   ===================================================================== */
+
+IF OBJECT_ID('dbo.product_barcodes', 'U') IS NULL
+CREATE TABLE dbo.product_barcodes (
+  id          NVARCHAR(80)  NOT NULL PRIMARY KEY,
+  product_id  NVARCHAR(80)  NOT NULL,
+  barcode     NVARCHAR(120) NOT NULL,
+  label       NVARCHAR(120) NULL,
+  pack_size   DECIMAL(18,4) NOT NULL DEFAULT 1,
+  is_primary  BIT           NOT NULL DEFAULT 0,
+  is_synced   BIT           NOT NULL DEFAULT 0,
+  sync_status NVARCHAR(20)  NOT NULL DEFAULT N'pending',
+  created_at  DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at  DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+IF OBJECT_ID('dbo.product_categories', 'U') IS NULL
+CREATE TABLE dbo.product_categories (
+  id          NVARCHAR(80)  NOT NULL PRIMARY KEY,
+  name        NVARCHAR(200) NOT NULL,
+  kind        NVARCHAR(40)  NOT NULL DEFAULT N'category',
+  sort        INT           NOT NULL DEFAULT 0,
+  is_synced   BIT           NOT NULL DEFAULT 0,
+  sync_status NVARCHAR(20)  NOT NULL DEFAULT N'pending',
+  created_at  DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at  DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+IF OBJECT_ID('dbo.uom_units', 'U') IS NULL
+CREATE TABLE dbo.uom_units (
+  id            NVARCHAR(80)  NOT NULL PRIMARY KEY,
+  code          NVARCHAR(40)  NOT NULL,
+  name          NVARCHAR(120) NOT NULL,
+  allow_decimal BIT           NOT NULL DEFAULT 0,
+  sort          INT           NOT NULL DEFAULT 0,
+  is_synced     BIT           NOT NULL DEFAULT 0,
+  sync_status   NVARCHAR(20)  NOT NULL DEFAULT N'pending',
+  created_at    DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at    DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+IF OBJECT_ID('dbo.payment_transactions', 'U') IS NULL
+CREATE TABLE dbo.payment_transactions (
+  id           NVARCHAR(80)  NOT NULL PRIMARY KEY,
+  source_type  NVARCHAR(20)  NOT NULL DEFAULT N'sale',
+  sale_id      NVARCHAR(80)  NULL,
+  booking_id   NVARCHAR(80)  NULL,
+  member_id    NVARCHAR(80)  NULL,
+  store_id     NVARCHAR(60)  NULL,
+  shift_id     NVARCHAR(80)  NULL,
+  terminal_id  NVARCHAR(80)  NULL,
+  amount       DECIMAL(18,4) NOT NULL DEFAULT 0,
+  method       NVARCHAR(40)  NOT NULL DEFAULT N'cash',
+  kind         NVARCHAR(40)  NOT NULL DEFAULT N'payment',
+  reference    NVARCHAR(120) NULL,
+  cashier_name NVARCHAR(200) NULL,
+  note         NVARCHAR(400) NOT NULL DEFAULT N'',
+  paid_at      DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME(),
+  is_synced    BIT           NOT NULL DEFAULT 0,
+  sync_status  NVARCHAR(20)  NOT NULL DEFAULT N'pending',
+  created_at   DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at   DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+IF OBJECT_ID('dbo.item_activity_logs', 'U') IS NULL
+CREATE TABLE dbo.item_activity_logs (
+  id             NVARCHAR(80)  NOT NULL PRIMARY KEY,
+  product_id     NVARCHAR(80)  NULL,
+  product_name   NVARCHAR(300) NULL,
+  sku            NVARCHAR(120) NULL,
+  barcode        NVARCHAR(120) NULL,
+  store_id       NVARCHAR(60)  NULL,
+  terminal_id    NVARCHAR(80)  NULL,
+  activity_type  NVARCHAR(60)  NOT NULL,
+  reference      NVARCHAR(120) NULL,
+  quantity_delta INT           NOT NULL DEFAULT 0,
+  stock_before   INT           NULL,
+  stock_after    INT           NULL,
+  unit_cost      DECIMAL(18,4) NOT NULL DEFAULT 0,
+  staff_name     NVARCHAR(200) NULL,
+  note           NVARCHAR(400) NOT NULL DEFAULT N'',
+  is_synced      BIT           NOT NULL DEFAULT 0,
+  sync_status    NVARCHAR(20)  NOT NULL DEFAULT N'pending',
+  created_at     DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at     DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+/* Movements already applied to local stock — a replay cannot deduct twice. */
+IF OBJECT_ID('dbo.stock_delta_applied', 'U') IS NULL
+CREATE TABLE dbo.stock_delta_applied (
+  movement_id NVARCHAR(80) NOT NULL PRIMARY KEY,
+  product_id  NVARCHAR(80) NULL,
+  store_id    NVARCHAR(60) NULL,
+  delta       INT          NOT NULL DEFAULT 0,
+  applied_at  DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+
+/* Idempotency key on the transaction tables. */
+IF COL_LENGTH('dbo.sale_items', 'client_transaction_id') IS NULL
+  ALTER TABLE dbo.sale_items ADD client_transaction_id NVARCHAR(80) NULL;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UX_sale_items_client_txn')
+  CREATE UNIQUE INDEX UX_sale_items_client_txn ON dbo.sale_items (client_transaction_id)
+    WHERE client_transaction_id IS NOT NULL;
+GO
+
+/* Watermarks scoped to branch + till, so one machine can serve two branches. */
+IF COL_LENGTH('dbo.sync_metadata', 'store_id') IS NULL
+BEGIN
+  ALTER TABLE dbo.sync_metadata ADD store_id NVARCHAR(60) NOT NULL
+    CONSTRAINT DF_sync_metadata_store DEFAULT N'';
+  ALTER TABLE dbo.sync_metadata ADD terminal_id NVARCHAR(80) NOT NULL
+    CONSTRAINT DF_sync_metadata_terminal DEFAULT N'';
+END
+GO
+DECLARE @pk SYSNAME = (
+  SELECT name FROM sys.key_constraints
+   WHERE parent_object_id = OBJECT_ID('dbo.sync_metadata') AND type = 'PK'
+);
+IF @pk IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM sys.index_columns ic
+    JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
+   WHERE ic.object_id = OBJECT_ID('dbo.sync_metadata') AND c.name = 'terminal_id'
+)
+BEGIN
+  EXEC('ALTER TABLE dbo.sync_metadata DROP CONSTRAINT ' + @pk);
+  ALTER TABLE dbo.sync_metadata
+    ADD CONSTRAINT PK_sync_metadata PRIMARY KEY (table_name, store_id, terminal_id);
+END
+GO
+
+/* ------------------------------------------------------------------ *
+ * Multi-level locations (stores, warehouses, sub-warehouse levels).
+ * Additive only: existing rows keep every value they already hold.
+ * ------------------------------------------------------------------ */
+IF COL_LENGTH('dbo.stores', 'location_type') IS NULL
+  ALTER TABLE dbo.stores ADD location_type NVARCHAR(40) NOT NULL
+    CONSTRAINT DF_stores_location_type DEFAULT N'store';
+GO
+IF COL_LENGTH('dbo.stores', 'parent_id') IS NULL
+  ALTER TABLE dbo.stores ADD parent_id NVARCHAR(60) NULL;
+GO
+IF COL_LENGTH('dbo.stores', 'is_central') IS NULL
+  ALTER TABLE dbo.stores ADD is_central BIT NOT NULL
+    CONSTRAINT DF_stores_is_central DEFAULT 0;
+GO
+IF COL_LENGTH('dbo.stores', 'is_primary_sub') IS NULL
+  ALTER TABLE dbo.stores ADD is_primary_sub BIT NOT NULL
+    CONSTRAINT DF_stores_is_primary_sub DEFAULT 0;
+GO
+IF COL_LENGTH('dbo.stores', 'building_name') IS NULL
+  ALTER TABLE dbo.stores ADD building_name NVARCHAR(200) NULL;
+GO
+IF COL_LENGTH('dbo.stores', 'floor_label') IS NULL
+  ALTER TABLE dbo.stores ADD floor_label NVARCHAR(200) NULL;
+GO
+IF COL_LENGTH('dbo.stores', 'is_active') IS NULL
+  ALTER TABLE dbo.stores ADD is_active BIT NOT NULL
+    CONSTRAINT DF_stores_is_active DEFAULT 1;
+GO
+IF COL_LENGTH('dbo.stores', 'archived_at') IS NULL
+  ALTER TABLE dbo.stores ADD archived_at DATETIME2(3) NULL;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_stores_parent_id')
+  CREATE INDEX IX_stores_parent_id ON dbo.stores (parent_id);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_stores_location_type')
+  CREATE INDEX IX_stores_location_type ON dbo.stores (location_type);
 GO
 
 
 /* ========================================================================
-   Cloud-parity top-up for the local SQL Server branch database
+   Cloud-parity top-up (master offline schema)
    Generated from the live cloud schema. Additive and re-runnable:
    a table is only created when absent, a column only added when absent.
    No table is dropped, emptied or recreated - existing rows survive.
    ======================================================================== */
 
 SET NOCOUNT ON;
+GO
+
+/* ---- app_users ---- */
+IF OBJECT_ID('dbo.app_users', 'U') IS NULL
+CREATE TABLE dbo.app_users (
+  [id] UNIQUEIDENTIFIER DEFAULT NEWID() NOT NULL,
+  [user_id] NVARCHAR(400),
+  [full_name] NVARCHAR(400),
+  [email] NVARCHAR(MAX),
+  [role] NVARCHAR(40) DEFAULT N'staff' NOT NULL,
+  [store_id] NVARCHAR(400),
+  [is_active] BIT DEFAULT 1 NOT NULL,
+  [permissions] NVARCHAR(MAX) NOT NULL,
+  [pin_hash] NVARCHAR(MAX) DEFAULT N'' NOT NULL,
+  [auth_user_id] UNIQUEIDENTIFIER,
+  [last_login_at] DATETIME2(3),
+  [created_at] DATETIME2(3) DEFAULT SYSUTCDATETIME() NOT NULL,
+  [updated_at] DATETIME2(3) DEFAULT SYSUTCDATETIME() NOT NULL,
+  [role_slug] NVARCHAR(400),
+  [pin_length] SMALLINT DEFAULT 6 NOT NULL,
+  [row_version] INT DEFAULT 1 NOT NULL,
+  [is_synced] BIT DEFAULT 0,
+  [sync_status] NVARCHAR(40) DEFAULT N'pending',
+  [sync_attempts] INT DEFAULT 0,
+  [last_error_at] DATETIME2(3),
+  [client_transaction_id] NVARCHAR(120),
+  CONSTRAINT [PK_app_users] PRIMARY KEY ([id])
+);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_app_users_store_id')
+  CREATE INDEX [IX_app_users_store_id] ON dbo.app_users ([store_id]);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_app_users_created_at')
+  CREATE INDEX [IX_app_users_created_at] ON dbo.app_users ([created_at]);
+GO
+
+/* ---- branch_telemetry ---- */
+IF OBJECT_ID('dbo.branch_telemetry', 'U') IS NULL
+CREATE TABLE dbo.branch_telemetry (
+  [terminal_id] NVARCHAR(400) NOT NULL,
+  [store_id] NVARCHAR(400),
+  [terminal_name] NVARCHAR(400),
+  [staff_name] NVARCHAR(400),
+  [staff_role] NVARCHAR(MAX),
+  [db_mode] NVARCHAR(MAX) DEFAULT N'online' NOT NULL,
+  [connection_status] NVARCHAR(MAX) DEFAULT N'online' NOT NULL,
+  [storage_engine] NVARCHAR(MAX) DEFAULT N'cloud' NOT NULL,
+  [pending_count] INT DEFAULT 0 NOT NULL,
+  [conflict_count] INT DEFAULT 0 NOT NULL,
+  [last_synced_at] DATETIME2(3),
+  [app_version] NVARCHAR(MAX),
+  [platform] NVARCHAR(MAX),
+  [last_seen_at] DATETIME2(3) DEFAULT SYSUTCDATETIME() NOT NULL,
+  [created_at] DATETIME2(3) DEFAULT SYSUTCDATETIME() NOT NULL,
+  [updated_at] DATETIME2(3) DEFAULT SYSUTCDATETIME() NOT NULL,
+  [branch_id] NVARCHAR(400),
+  [pending_queue_count] INT,
+  [last_ping] DATETIME2(3),
+  [status] NVARCHAR(MAX),
+  [is_synced] BIT DEFAULT 0,
+  [sync_status] NVARCHAR(40) DEFAULT N'pending',
+  [row_version] INT DEFAULT 0,
+  [sync_attempts] INT DEFAULT 0,
+  [last_error_at] DATETIME2(3),
+  [client_transaction_id] NVARCHAR(120),
+  CONSTRAINT [PK_branch_telemetry] PRIMARY KEY ([terminal_id])
+);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_branch_telemetry_store_id')
+  CREATE INDEX [IX_branch_telemetry_store_id] ON dbo.branch_telemetry ([store_id]);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_branch_telemetry_created_at')
+  CREATE INDEX [IX_branch_telemetry_created_at] ON dbo.branch_telemetry ([created_at]);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_branch_telemetry_status')
+  CREATE INDEX [IX_branch_telemetry_status] ON dbo.branch_telemetry ([status]);
+GO
+
+/* ---- cashiers ---- */
+IF OBJECT_ID('dbo.cashiers', 'U') IS NULL
+CREATE TABLE dbo.cashiers (
+  [id] UNIQUEIDENTIFIER DEFAULT NEWID() NOT NULL,
+  [username] NVARCHAR(400),
+  [full_name] NVARCHAR(400) DEFAULT N'' NOT NULL,
+  [pin_hash] NVARCHAR(MAX),
+  [store_id] NVARCHAR(400),
+  [permissions] NVARCHAR(MAX) DEFAULT N'{}' NOT NULL,
+  [is_active] BIT DEFAULT 1 NOT NULL,
+  [last_login_at] DATETIME2(3),
+  [created_at] DATETIME2(3) DEFAULT SYSUTCDATETIME() NOT NULL,
+  [updated_at] DATETIME2(3) DEFAULT SYSUTCDATETIME() NOT NULL,
+  [role_slug] NVARCHAR(400),
+  [is_synced] BIT DEFAULT 0,
+  [sync_status] NVARCHAR(40) DEFAULT N'pending',
+  [row_version] INT DEFAULT 0,
+  [sync_attempts] INT DEFAULT 0,
+  [last_error_at] DATETIME2(3),
+  [client_transaction_id] NVARCHAR(120),
+  CONSTRAINT [PK_cashiers] PRIMARY KEY ([id])
+);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_cashiers_store_id')
+  CREATE INDEX [IX_cashiers_store_id] ON dbo.cashiers ([store_id]);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_cashiers_created_at')
+  CREATE INDEX [IX_cashiers_created_at] ON dbo.cashiers ([created_at]);
+GO
+
+/* ---- coupon_campaigns ---- */
+IF OBJECT_ID('dbo.coupon_campaigns', 'U') IS NULL
+CREATE TABLE dbo.coupon_campaigns (
+  [id] UNIQUEIDENTIFIER DEFAULT NEWID() NOT NULL,
+  [name] NVARCHAR(400),
+  [slug] NVARCHAR(400),
+  [discount_type] NVARCHAR(MAX) DEFAULT N'PERCENTAGE' NOT NULL,
+  [discount_value] DECIMAL(18,4) DEFAULT 0 NOT NULL,
+  [scope] NVARCHAR(MAX) DEFAULT N'BILL' NOT NULL,
+  [scope_value] NVARCHAR(MAX),
+  [max_claims] INT,
+  [max_per_member] INT DEFAULT 1,
+  [claims_count] INT DEFAULT 0 NOT NULL,
+  [starts_at] DATETIME2(3),
+  [expires_at] DATETIME2(3),
+  [is_active] BIT DEFAULT 1 NOT NULL,
+  [is_welcome] BIT DEFAULT 0 NOT NULL,
+  [created_at] DATETIME2(3) DEFAULT SYSUTCDATETIME() NOT NULL,
+  [updated_at] DATETIME2(3) DEFAULT SYSUTCDATETIME() NOT NULL,
+  [row_version] INT DEFAULT 1 NOT NULL,
+  [is_synced] BIT DEFAULT 0,
+  [sync_status] NVARCHAR(40) DEFAULT N'pending',
+  [sync_attempts] INT DEFAULT 0,
+  [last_error_at] DATETIME2(3),
+  [client_transaction_id] NVARCHAR(120),
+  CONSTRAINT [PK_coupon_campaigns] PRIMARY KEY ([id])
+);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_coupon_campaigns_created_at')
+  CREATE INDEX [IX_coupon_campaigns_created_at] ON dbo.coupon_campaigns ([created_at]);
+GO
+
+/* ---- coupon_events ---- */
+IF OBJECT_ID('dbo.coupon_events', 'U') IS NULL
+CREATE TABLE dbo.coupon_events (
+  [id] UNIQUEIDENTIFIER DEFAULT NEWID() NOT NULL,
+  [event_type] NVARCHAR(MAX),
+  [campaign_id] UNIQUEIDENTIFIER,
+  [campaign_name] NVARCHAR(400),
+  [voucher_token] NVARCHAR(400),
+  [member_id] UNIQUEIDENTIFIER,
+  [member_phone] NVARCHAR(400),
+  [store_id] NVARCHAR(400),
+  [terminal_id] NVARCHAR(400),
+  [staff_name] NVARCHAR(400),
+  [staff_role] NVARCHAR(MAX),
+  [sale_id] NVARCHAR(400),
+  [note] NVARCHAR(MAX),
+  [created_at] DATETIME2(3) DEFAULT SYSUTCDATETIME() NOT NULL,
+  [is_synced] BIT DEFAULT 0,
+  [sync_status] NVARCHAR(40) DEFAULT N'pending',
+  [row_version] INT DEFAULT 0,
+  [sync_attempts] INT DEFAULT 0,
+  [last_error_at] DATETIME2(3),
+  [client_transaction_id] NVARCHAR(120),
+  CONSTRAINT [PK_coupon_events] PRIMARY KEY ([id])
+);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_coupon_events_store_id')
+  CREATE INDEX [IX_coupon_events_store_id] ON dbo.coupon_events ([store_id]);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_coupon_events_sale_id')
+  CREATE INDEX [IX_coupon_events_sale_id] ON dbo.coupon_events ([sale_id]);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_coupon_events_created_at')
+  CREATE INDEX [IX_coupon_events_created_at] ON dbo.coupon_events ([created_at]);
+GO
+
+/* ---- drawer_events ---- */
+IF OBJECT_ID('dbo.drawer_events', 'U') IS NULL
+CREATE TABLE dbo.drawer_events (
+  [id] UNIQUEIDENTIFIER DEFAULT NEWID() NOT NULL,
+  [store_id] NVARCHAR(400),
+  [terminal_id] NVARCHAR(400),
+  [shift_id] NVARCHAR(400),
+  [staff_id] NVARCHAR(400),
+  [staff_name] NVARCHAR(400),
+  [role] NVARCHAR(MAX),
+  [reason] NVARCHAR(MAX),
+  [note] NVARCHAR(MAX),
+  [approved_by] NVARCHAR(MAX),
+  [created_at] DATETIME2(3) DEFAULT SYSUTCDATETIME() NOT NULL,
+  [is_synced] BIT DEFAULT 0,
+  [sync_status] NVARCHAR(40) DEFAULT N'pending',
+  [row_version] INT DEFAULT 0,
+  [sync_attempts] INT DEFAULT 0,
+  [last_error_at] DATETIME2(3),
+  [client_transaction_id] NVARCHAR(120),
+  CONSTRAINT [PK_drawer_events] PRIMARY KEY ([id])
+);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_drawer_events_store_id')
+  CREATE INDEX [IX_drawer_events_store_id] ON dbo.drawer_events ([store_id]);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_drawer_events_created_at')
+  CREATE INDEX [IX_drawer_events_created_at] ON dbo.drawer_events ([created_at]);
 GO
 
 /* ---- integration_settings ---- */
@@ -1190,6 +1259,79 @@ CREATE TABLE dbo.integration_settings (
 GO
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_integration_settings_created_at')
   CREATE INDEX [IX_integration_settings_created_at] ON dbo.integration_settings ([created_at]);
+GO
+
+/* ---- issued_vouchers ---- */
+IF OBJECT_ID('dbo.issued_vouchers', 'U') IS NULL
+CREATE TABLE dbo.issued_vouchers (
+  [id] UNIQUEIDENTIFIER DEFAULT NEWID() NOT NULL,
+  [token_slug] NVARCHAR(400),
+  [campaign_id] UNIQUEIDENTIFIER,
+  [member_id] UNIQUEIDENTIFIER,
+  [status] NVARCHAR(MAX) DEFAULT N'ISSUED' NOT NULL,
+  [issued_at] DATETIME2(3) DEFAULT SYSUTCDATETIME() NOT NULL,
+  [expires_at] DATETIME2(3),
+  [issued_by] NVARCHAR(MAX),
+  [issued_source] NVARCHAR(MAX) DEFAULT N'PUBLIC' NOT NULL,
+  [redeemed_at] DATETIME2(3),
+  [redeemed_by] NVARCHAR(MAX),
+  [redeemed_sale_id] NVARCHAR(400),
+  [disabled_at] DATETIME2(3),
+  [disabled_by] NVARCHAR(MAX),
+  [disable_reason] NVARCHAR(MAX),
+  [store_id] NVARCHAR(400),
+  [row_version] INT DEFAULT 1 NOT NULL,
+  [is_synced] BIT DEFAULT 0,
+  [sync_status] NVARCHAR(40) DEFAULT N'pending',
+  [sync_attempts] INT DEFAULT 0,
+  [last_error_at] DATETIME2(3),
+  [client_transaction_id] NVARCHAR(120),
+  CONSTRAINT [PK_issued_vouchers] PRIMARY KEY ([id])
+);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_issued_vouchers_status')
+  CREATE INDEX [IX_issued_vouchers_status] ON dbo.issued_vouchers ([status]);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_issued_vouchers_store_id')
+  CREATE INDEX [IX_issued_vouchers_store_id] ON dbo.issued_vouchers ([store_id]);
+GO
+
+/* ---- member_verifications ---- */
+IF OBJECT_ID('dbo.member_verifications', 'U') IS NULL
+CREATE TABLE dbo.member_verifications (
+  [id] UNIQUEIDENTIFIER DEFAULT NEWID() NOT NULL,
+  [member_id] UNIQUEIDENTIFIER,
+  [phone] NVARCHAR(400),
+  [email] NVARCHAR(MAX),
+  [channel] NVARCHAR(MAX) DEFAULT N'whatsapp' NOT NULL,
+  [otp_code] NVARCHAR(400),
+  [attempts] INT DEFAULT 0 NOT NULL,
+  [status] NVARCHAR(MAX) DEFAULT N'pending' NOT NULL,
+  [sent_by] NVARCHAR(MAX),
+  [store_id] NVARCHAR(400),
+  [expires_at] DATETIME2(3) DEFAULT SYSUTCDATETIME() NOT NULL,
+  [verified_at] DATETIME2(3),
+  [created_at] DATETIME2(3) DEFAULT SYSUTCDATETIME() NOT NULL,
+  [is_synced] BIT DEFAULT 0,
+  [sync_status] NVARCHAR(40) DEFAULT N'pending',
+  [row_version] INT DEFAULT 0,
+  [sync_attempts] INT DEFAULT 0,
+  [last_error_at] DATETIME2(3),
+  [client_transaction_id] NVARCHAR(120),
+  CONSTRAINT [PK_member_verifications] PRIMARY KEY ([id])
+);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_member_verifications_phone')
+  CREATE INDEX [IX_member_verifications_phone] ON dbo.member_verifications ([phone]);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_member_verifications_status')
+  CREATE INDEX [IX_member_verifications_status] ON dbo.member_verifications ([status]);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_member_verifications_store_id')
+  CREATE INDEX [IX_member_verifications_store_id] ON dbo.member_verifications ([store_id]);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_member_verifications_created_at')
+  CREATE INDEX [IX_member_verifications_created_at] ON dbo.member_verifications ([created_at]);
 GO
 
 /* ---- offline_sync_audit_log ---- */
@@ -1224,6 +1366,32 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_offline_sync_audit_lo
 GO
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_offline_sync_audit_log_created_at')
   CREATE INDEX [IX_offline_sync_audit_log_created_at] ON dbo.offline_sync_audit_log ([created_at]);
+GO
+
+/* ---- payment_types ---- */
+IF OBJECT_ID('dbo.payment_types', 'U') IS NULL
+CREATE TABLE dbo.payment_types (
+  [id] UNIQUEIDENTIFIER DEFAULT NEWID() NOT NULL,
+  [name] NVARCHAR(400),
+  [type_code] NVARCHAR(400),
+  [requires_reference] BIT DEFAULT 0 NOT NULL,
+  [is_active] BIT DEFAULT 1 NOT NULL,
+  [icon] NVARCHAR(MAX) DEFAULT N'Wallet' NOT NULL,
+  [sort_order] INT DEFAULT 0 NOT NULL,
+  [is_system] BIT DEFAULT 0 NOT NULL,
+  [created_at] DATETIME2(3) DEFAULT SYSUTCDATETIME() NOT NULL,
+  [updated_at] DATETIME2(3) DEFAULT SYSUTCDATETIME() NOT NULL,
+  [row_version] INT DEFAULT 1 NOT NULL,
+  [is_synced] BIT DEFAULT 0,
+  [sync_status] NVARCHAR(40) DEFAULT N'pending',
+  [sync_attempts] INT DEFAULT 0,
+  [last_error_at] DATETIME2(3),
+  [client_transaction_id] NVARCHAR(120),
+  CONSTRAINT [PK_payment_types] PRIMARY KEY ([id])
+);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_payment_types_created_at')
+  CREATE INDEX [IX_payment_types_created_at] ON dbo.payment_types ([created_at]);
 GO
 
 /* ---- pin_attempts ---- */
@@ -1364,6 +1532,37 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_settings_overrides_cr
   CREATE INDEX [IX_settings_overrides_created_at] ON dbo.settings_overrides ([created_at]);
 GO
 
+/* ---- shift_sessions ---- */
+IF OBJECT_ID('dbo.shift_sessions', 'U') IS NULL
+CREATE TABLE dbo.shift_sessions (
+  [id] UNIQUEIDENTIFIER DEFAULT NEWID() NOT NULL,
+  [shift_id] NVARCHAR(400),
+  [store_id] NVARCHAR(400),
+  [terminal_id] NVARCHAR(400),
+  [terminal_name] NVARCHAR(400),
+  [staff_id] NVARCHAR(400),
+  [staff_name] NVARCHAR(400),
+  [role] NVARCHAR(MAX),
+  [signed_in_at] DATETIME2(3) DEFAULT SYSUTCDATETIME() NOT NULL,
+  [signed_out_at] DATETIME2(3),
+  [created_at] DATETIME2(3) DEFAULT SYSUTCDATETIME() NOT NULL,
+  [updated_at] DATETIME2(3) DEFAULT SYSUTCDATETIME() NOT NULL,
+  [row_version] INT DEFAULT 1 NOT NULL,
+  [is_synced] BIT DEFAULT 0,
+  [sync_status] NVARCHAR(40) DEFAULT N'pending',
+  [sync_attempts] INT DEFAULT 0,
+  [last_error_at] DATETIME2(3),
+  [client_transaction_id] NVARCHAR(120),
+  CONSTRAINT [PK_shift_sessions] PRIMARY KEY ([id])
+);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_shift_sessions_store_id')
+  CREATE INDEX [IX_shift_sessions_store_id] ON dbo.shift_sessions ([store_id]);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_shift_sessions_created_at')
+  CREATE INDEX [IX_shift_sessions_created_at] ON dbo.shift_sessions ([created_at]);
+GO
+
 /* ---- sku_audit ---- */
 IF OBJECT_ID('dbo.sku_audit', 'U') IS NULL
 CREATE TABLE dbo.sku_audit (
@@ -1402,6 +1601,29 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_sku_audit_created_at'
   CREATE INDEX [IX_sku_audit_created_at] ON dbo.sku_audit ([created_at]);
 GO
 
+/* ---- staff_roles ---- */
+IF OBJECT_ID('dbo.staff_roles', 'U') IS NULL
+CREATE TABLE dbo.staff_roles (
+  [slug] NVARCHAR(400) NOT NULL,
+  [name] NVARCHAR(400),
+  [base_level] NVARCHAR(MAX) DEFAULT N'cashier' NOT NULL,
+  [permissions] NVARCHAR(MAX) DEFAULT N'{}' NOT NULL,
+  [is_core] BIT DEFAULT 0 NOT NULL,
+  [created_at] DATETIME2(3) DEFAULT SYSUTCDATETIME() NOT NULL,
+  [updated_at] DATETIME2(3) DEFAULT SYSUTCDATETIME() NOT NULL,
+  [is_synced] BIT DEFAULT 0,
+  [sync_status] NVARCHAR(40) DEFAULT N'pending',
+  [row_version] INT DEFAULT 0,
+  [sync_attempts] INT DEFAULT 0,
+  [last_error_at] DATETIME2(3),
+  [client_transaction_id] NVARCHAR(120),
+  CONSTRAINT [PK_staff_roles] PRIMARY KEY ([slug])
+);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_staff_roles_created_at')
+  CREATE INDEX [IX_staff_roles_created_at] ON dbo.staff_roles ([created_at]);
+GO
+
 /* ---- system_audit_logs ---- */
 IF OBJECT_ID('dbo.system_audit_logs', 'U') IS NULL
 CREATE TABLE dbo.system_audit_logs (
@@ -1435,6 +1657,41 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_system_audit_logs_cre
   CREATE INDEX [IX_system_audit_logs_created_at] ON dbo.system_audit_logs ([created_at]);
 GO
 
+/* ---- terminal_commands ---- */
+IF OBJECT_ID('dbo.terminal_commands', 'U') IS NULL
+CREATE TABLE dbo.terminal_commands (
+  [id] UNIQUEIDENTIFIER DEFAULT NEWID() NOT NULL,
+  [terminal_id] NVARCHAR(400),
+  [store_id] NVARCHAR(400),
+  [command] NVARCHAR(MAX),
+  [status] NVARCHAR(MAX) DEFAULT N'pending' NOT NULL,
+  [note] NVARCHAR(MAX),
+  [result] NVARCHAR(MAX),
+  [issued_by] NVARCHAR(MAX),
+  [issued_role] NVARCHAR(MAX),
+  [picked_up_at] DATETIME2(3),
+  [finished_at] DATETIME2(3),
+  [created_at] DATETIME2(3) DEFAULT SYSUTCDATETIME() NOT NULL,
+  [updated_at] DATETIME2(3) DEFAULT SYSUTCDATETIME() NOT NULL,
+  [is_synced] BIT DEFAULT 0,
+  [sync_status] NVARCHAR(40) DEFAULT N'pending',
+  [row_version] INT DEFAULT 0,
+  [sync_attempts] INT DEFAULT 0,
+  [last_error_at] DATETIME2(3),
+  [client_transaction_id] NVARCHAR(120),
+  CONSTRAINT [PK_terminal_commands] PRIMARY KEY ([id])
+);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_terminal_commands_store_id')
+  CREATE INDEX [IX_terminal_commands_store_id] ON dbo.terminal_commands ([store_id]);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_terminal_commands_status')
+  CREATE INDEX [IX_terminal_commands_status] ON dbo.terminal_commands ([status]);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_terminal_commands_created_at')
+  CREATE INDEX [IX_terminal_commands_created_at] ON dbo.terminal_commands ([created_at]);
+GO
+
 /* ---- terminal_tokens ---- */
 IF OBJECT_ID('dbo.terminal_tokens', 'U') IS NULL
 CREATE TABLE dbo.terminal_tokens (
@@ -1452,6 +1709,9 @@ CREATE TABLE dbo.terminal_tokens (
   [claimed_by_device] NVARCHAR(MAX),
   [claimed_at] DATETIME2(3),
   [platform] NVARCHAR(MAX) DEFAULT N'unknown' NOT NULL,
+  [expires_at] DATETIME2(3),
+  [claimed_os] NVARCHAR(200),
+  [claim_proof] NVARCHAR(400),
   [row_version] INT DEFAULT 1 NOT NULL,
   [is_synced] BIT DEFAULT 0,
   [sync_status] NVARCHAR(40) DEFAULT N'pending',
@@ -1486,6 +1746,40 @@ CREATE TABLE dbo.user_roles (
 GO
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_user_roles_created_at')
   CREATE INDEX [IX_user_roles_created_at] ON dbo.user_roles ([created_at]);
+GO
+
+/* ---- whatsapp_queue ---- */
+IF OBJECT_ID('dbo.whatsapp_queue', 'U') IS NULL
+CREATE TABLE dbo.whatsapp_queue (
+  [id] UNIQUEIDENTIFIER DEFAULT NEWID() NOT NULL,
+  [phone_number_id] NVARCHAR(400) DEFAULT N'' NOT NULL,
+  [recipient] NVARCHAR(MAX),
+  [body] NVARCHAR(MAX) DEFAULT N'' NOT NULL,
+  [reference] NVARCHAR(MAX),
+  [store_id] NVARCHAR(400),
+  [status] NVARCHAR(MAX) DEFAULT N'QUEUED' NOT NULL,
+  [error] NVARCHAR(MAX),
+  [queued_at] DATETIME2(3) DEFAULT SYSUTCDATETIME() NOT NULL,
+  [sent_at] DATETIME2(3),
+  [created_at] DATETIME2(3) DEFAULT SYSUTCDATETIME() NOT NULL,
+  [updated_at] DATETIME2(3) DEFAULT SYSUTCDATETIME() NOT NULL,
+  [is_synced] BIT DEFAULT 0,
+  [sync_status] NVARCHAR(40) DEFAULT N'pending',
+  [row_version] INT DEFAULT 0,
+  [sync_attempts] INT DEFAULT 0,
+  [last_error_at] DATETIME2(3),
+  [client_transaction_id] NVARCHAR(120),
+  CONSTRAINT [PK_whatsapp_queue] PRIMARY KEY ([id])
+);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_whatsapp_queue_store_id')
+  CREATE INDEX [IX_whatsapp_queue_store_id] ON dbo.whatsapp_queue ([store_id]);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_whatsapp_queue_status')
+  CREATE INDEX [IX_whatsapp_queue_status] ON dbo.whatsapp_queue ([status]);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_whatsapp_queue_created_at')
+  CREATE INDEX [IX_whatsapp_queue_created_at] ON dbo.whatsapp_queue ([created_at]);
 GO
 
 /* ---- column top-up for tables that already exist ---- */
@@ -1580,6 +1874,13 @@ BEGIN
   IF COL_LENGTH('dbo.booking_payments', 'sync_attempts') IS NULL ALTER TABLE dbo.booking_payments ADD [sync_attempts] INT DEFAULT 0;
   IF COL_LENGTH('dbo.booking_payments', 'last_error_at') IS NULL ALTER TABLE dbo.booking_payments ADD [last_error_at] DATETIME2(3);
   IF COL_LENGTH('dbo.booking_payments', 'client_transaction_id') IS NULL ALTER TABLE dbo.booking_payments ADD [client_transaction_id] NVARCHAR(120);
+  IF COL_LENGTH('dbo.booking_payments', 'status') IS NULL ALTER TABLE dbo.booking_payments ADD [status] NVARCHAR(20) DEFAULT N'settled';
+  IF COL_LENGTH('dbo.booking_payments', 'reference') IS NULL ALTER TABLE dbo.booking_payments ADD [reference] NVARCHAR(200);
+  IF COL_LENGTH('dbo.booking_payments', 'client_payment_id') IS NULL ALTER TABLE dbo.booking_payments ADD [client_payment_id] NVARCHAR(120);
+  IF COL_LENGTH('dbo.booking_payments', 'kind') IS NULL ALTER TABLE dbo.booking_payments ADD [kind] NVARCHAR(20) DEFAULT N'payment';
+  IF COL_LENGTH('dbo.booking_payments', 'refund_reason') IS NULL ALTER TABLE dbo.booking_payments ADD [refund_reason] NVARCHAR(400);
+  IF COL_LENGTH('dbo.booking_payments', 'refunds_payment_id') IS NULL ALTER TABLE dbo.booking_payments ADD [refunds_payment_id] UNIQUEIDENTIFIER;
+  IF COL_LENGTH('dbo.booking_payments', 'change_given') IS NULL ALTER TABLE dbo.booking_payments ADD [change_given] DECIMAL(18,4) DEFAULT 0;
 END
 GO
 IF OBJECT_ID('dbo.bookings', 'U') IS NOT NULL
@@ -1631,6 +1932,11 @@ BEGIN
   IF COL_LENGTH('dbo.bookings', 'technician') IS NULL ALTER TABLE dbo.bookings ADD [technician] NVARCHAR(MAX);
   IF COL_LENGTH('dbo.bookings', 'liability_accepted') IS NULL ALTER TABLE dbo.bookings ADD [liability_accepted] BIT DEFAULT 0;
   IF COL_LENGTH('dbo.bookings', 'incident_note') IS NULL ALTER TABLE dbo.bookings ADD [incident_note] NVARCHAR(MAX);
+  IF COL_LENGTH('dbo.bookings', 'cancel_reason') IS NULL ALTER TABLE dbo.bookings ADD [cancel_reason] NVARCHAR(400);
+  IF COL_LENGTH('dbo.bookings', 'cancelled_by') IS NULL ALTER TABLE dbo.bookings ADD [cancelled_by] NVARCHAR(200);
+  IF COL_LENGTH('dbo.bookings', 'cancelled_at') IS NULL ALTER TABLE dbo.bookings ADD [cancelled_at] DATETIME2(3);
+  IF COL_LENGTH('dbo.bookings', 'cancelled_terminal') IS NULL ALTER TABLE dbo.bookings ADD [cancelled_terminal] NVARCHAR(120);
+  IF COL_LENGTH('dbo.bookings', 'cancel_money_action') IS NULL ALTER TABLE dbo.bookings ADD [cancel_money_action] NVARCHAR(20);
   IF COL_LENGTH('dbo.bookings', 'row_version') IS NULL ALTER TABLE dbo.bookings ADD [row_version] INT DEFAULT 1;
   IF COL_LENGTH('dbo.bookings', 'is_synced') IS NULL ALTER TABLE dbo.bookings ADD [is_synced] BIT DEFAULT 0;
   IF COL_LENGTH('dbo.bookings', 'sync_status') IS NULL ALTER TABLE dbo.bookings ADD [sync_status] NVARCHAR(40) DEFAULT N'pending';
@@ -1787,6 +2093,9 @@ BEGIN
   IF COL_LENGTH('dbo.held_orders', 'sync_attempts') IS NULL ALTER TABLE dbo.held_orders ADD [sync_attempts] INT DEFAULT 0;
   IF COL_LENGTH('dbo.held_orders', 'last_error_at') IS NULL ALTER TABLE dbo.held_orders ADD [last_error_at] DATETIME2(3);
   IF COL_LENGTH('dbo.held_orders', 'client_transaction_id') IS NULL ALTER TABLE dbo.held_orders ADD [client_transaction_id] NVARCHAR(120);
+  IF COL_LENGTH('dbo.held_orders', 'status') IS NULL ALTER TABLE dbo.held_orders ADD [status] NVARCHAR(40) DEFAULT N'held';
+  IF COL_LENGTH('dbo.held_orders', 'pending_request_id') IS NULL ALTER TABLE dbo.held_orders ADD [pending_request_id] NVARCHAR(400);
+  IF COL_LENGTH('dbo.held_orders', 'decided_at') IS NULL ALTER TABLE dbo.held_orders ADD [decided_at] DATETIME2(3);
 END
 GO
 IF OBJECT_ID('dbo.integration_settings', 'U') IS NOT NULL
@@ -1978,6 +2287,22 @@ BEGIN
   IF COL_LENGTH('dbo.payment_transactions', 'client_transaction_id') IS NULL ALTER TABLE dbo.payment_transactions ADD [client_transaction_id] NVARCHAR(120);
 END
 GO
+IF OBJECT_ID('dbo.payment_transactions', 'U') IS NOT NULL
+AND COL_LENGTH('dbo.payment_transactions', 'client_transaction_id') IS NOT NULL
+AND NOT EXISTS (
+  SELECT 1 FROM sys.indexes
+   WHERE object_id = OBJECT_ID('dbo.payment_transactions')
+     AND name = N'UX_payment_transactions_client_txn'
+)
+AND NOT EXISTS (
+  SELECT client_transaction_id FROM dbo.payment_transactions
+   WHERE client_transaction_id IS NOT NULL
+   GROUP BY client_transaction_id HAVING COUNT(*) > 1
+)
+  CREATE UNIQUE INDEX UX_payment_transactions_client_txn
+    ON dbo.payment_transactions (client_transaction_id)
+    WHERE client_transaction_id IS NOT NULL;
+GO
 IF OBJECT_ID('dbo.payment_types', 'U') IS NOT NULL
 BEGIN
   IF COL_LENGTH('dbo.payment_types', 'id') IS NULL ALTER TABLE dbo.payment_types ADD [id] UNIQUEIDENTIFIER DEFAULT NEWID();
@@ -2109,6 +2434,7 @@ BEGIN
   IF COL_LENGTH('dbo.products', 'ecom_price') IS NULL ALTER TABLE dbo.products ADD [ecom_price] DECIMAL(18,4);
   IF COL_LENGTH('dbo.products', 'stock_quantity') IS NULL ALTER TABLE dbo.products ADD [stock_quantity] INT DEFAULT 0;
   IF COL_LENGTH('dbo.products', 'custom_points') IS NULL ALTER TABLE dbo.products ADD [custom_points] DECIMAL(18,4);
+  IF COL_LENGTH('dbo.products', 'owner_store_id') IS NULL ALTER TABLE dbo.products ADD [owner_store_id] NVARCHAR(200);
   IF COL_LENGTH('dbo.products', 'point_multiplier') IS NULL ALTER TABLE dbo.products ADD [point_multiplier] DECIMAL(18,4) DEFAULT 1.0;
   IF COL_LENGTH('dbo.products', 'created_at') IS NULL ALTER TABLE dbo.products ADD [created_at] DATETIME2(3) DEFAULT SYSUTCDATETIME();
   IF COL_LENGTH('dbo.products', 'sku') IS NULL ALTER TABLE dbo.products ADD [sku] NVARCHAR(400);
@@ -2198,6 +2524,7 @@ IF OBJECT_ID('dbo.purchase_orders', 'U') IS NOT NULL
 BEGIN
   IF COL_LENGTH('dbo.purchase_orders', 'id') IS NULL ALTER TABLE dbo.purchase_orders ADD [id] UNIQUEIDENTIFIER DEFAULT NEWID();
   IF COL_LENGTH('dbo.purchase_orders', 'po_number') IS NULL ALTER TABLE dbo.purchase_orders ADD [po_number] NVARCHAR(MAX);
+  IF COL_LENGTH('dbo.purchase_orders', 'reference') IS NULL ALTER TABLE dbo.purchase_orders ADD [reference] NVARCHAR(60) NULL;
   IF COL_LENGTH('dbo.purchase_orders', 'supplier_name') IS NULL ALTER TABLE dbo.purchase_orders ADD [supplier_name] NVARCHAR(400);
   IF COL_LENGTH('dbo.purchase_orders', 'operator_name') IS NULL ALTER TABLE dbo.purchase_orders ADD [operator_name] NVARCHAR(400);
   IF COL_LENGTH('dbo.purchase_orders', 'total_cost') IS NULL ALTER TABLE dbo.purchase_orders ADD [total_cost] DECIMAL(18,4) DEFAULT 0;
@@ -2215,6 +2542,8 @@ BEGIN
   IF COL_LENGTH('dbo.purchase_orders', 'sync_attempts') IS NULL ALTER TABLE dbo.purchase_orders ADD [sync_attempts] INT DEFAULT 0;
   IF COL_LENGTH('dbo.purchase_orders', 'last_error_at') IS NULL ALTER TABLE dbo.purchase_orders ADD [last_error_at] DATETIME2(3);
   IF COL_LENGTH('dbo.purchase_orders', 'client_transaction_id') IS NULL ALTER TABLE dbo.purchase_orders ADD [client_transaction_id] NVARCHAR(120);
+  -- Draft receiving orders: 'draft' until finalized, then 'posted' (or 'cancelled').
+  IF COL_LENGTH('dbo.purchase_orders', 'status') IS NULL ALTER TABLE dbo.purchase_orders ADD [status] NVARCHAR(20) NOT NULL DEFAULT N'posted';
 END
 GO
 IF OBJECT_ID('dbo.sale_items', 'U') IS NOT NULL
@@ -2270,6 +2599,9 @@ BEGIN
   IF COL_LENGTH('dbo.sales', 'coupon_promo_id') IS NULL ALTER TABLE dbo.sales ADD [coupon_promo_id] NVARCHAR(400);
   IF COL_LENGTH('dbo.sales', 'coupon_scope') IS NULL ALTER TABLE dbo.sales ADD [coupon_scope] NVARCHAR(MAX);
   IF COL_LENGTH('dbo.sales', 'coupon_discount') IS NULL ALTER TABLE dbo.sales ADD [coupon_discount] DECIMAL(18,4) DEFAULT 0;
+  IF COL_LENGTH('dbo.sales', 'authorization_request_id') IS NULL ALTER TABLE dbo.sales ADD [authorization_request_id] NVARCHAR(400);
+  IF COL_LENGTH('dbo.sales', 'authorized_by') IS NULL ALTER TABLE dbo.sales ADD [authorized_by] NVARCHAR(400);
+  IF COL_LENGTH('dbo.sales', 'authorized_at') IS NULL ALTER TABLE dbo.sales ADD [authorized_at] DATETIME2(3);
   IF COL_LENGTH('dbo.sales', 'payments') IS NULL ALTER TABLE dbo.sales ADD [payments] NVARCHAR(MAX) DEFAULT N'[]';
   IF COL_LENGTH('dbo.sales', 'rounding_adjustment') IS NULL ALTER TABLE dbo.sales ADD [rounding_adjustment] DECIMAL(18,4) DEFAULT 0;
   IF COL_LENGTH('dbo.sales', 'rounding_label') IS NULL ALTER TABLE dbo.sales ADD [rounding_label] NVARCHAR(120) NULL;
@@ -2512,7 +2844,10 @@ BEGIN
   IF COL_LENGTH('dbo.stock_transfer_items', 'sku') IS NULL ALTER TABLE dbo.stock_transfer_items ADD [sku] NVARCHAR(400);
   IF COL_LENGTH('dbo.stock_transfer_items', 'product_name') IS NULL ALTER TABLE dbo.stock_transfer_items ADD [product_name] NVARCHAR(400);
   IF COL_LENGTH('dbo.stock_transfer_items', 'quantity') IS NULL ALTER TABLE dbo.stock_transfer_items ADD [quantity] INT DEFAULT 0;
+  IF COL_LENGTH('dbo.stock_transfer_items', 'quantity_approved') IS NULL ALTER TABLE dbo.stock_transfer_items ADD [quantity_approved] INT;
+  IF COL_LENGTH('dbo.stock_transfer_items', 'quantity_dispatched') IS NULL ALTER TABLE dbo.stock_transfer_items ADD [quantity_dispatched] INT;
   IF COL_LENGTH('dbo.stock_transfer_items', 'quantity_received') IS NULL ALTER TABLE dbo.stock_transfer_items ADD [quantity_received] INT DEFAULT 0;
+  IF COL_LENGTH('dbo.stock_transfer_items', 'quantity_verified') IS NULL ALTER TABLE dbo.stock_transfer_items ADD [quantity_verified] INT;
   IF COL_LENGTH('dbo.stock_transfer_items', 'unit_cost') IS NULL ALTER TABLE dbo.stock_transfer_items ADD [unit_cost] DECIMAL(18,4) DEFAULT 0;
   IF COL_LENGTH('dbo.stock_transfer_items', 'created_at') IS NULL ALTER TABLE dbo.stock_transfer_items ADD [created_at] DATETIME2(3) DEFAULT SYSUTCDATETIME();
   IF COL_LENGTH('dbo.stock_transfer_items', 'row_version') IS NULL ALTER TABLE dbo.stock_transfer_items ADD [row_version] INT DEFAULT 1;
@@ -2543,6 +2878,16 @@ BEGIN
   IF COL_LENGTH('dbo.stock_transfers', 'received_by') IS NULL ALTER TABLE dbo.stock_transfers ADD [received_by] NVARCHAR(MAX);
   IF COL_LENGTH('dbo.stock_transfers', 'received_at') IS NULL ALTER TABLE dbo.stock_transfers ADD [received_at] DATETIME2(3);
   IF COL_LENGTH('dbo.stock_transfers', 'rejected_reason') IS NULL ALTER TABLE dbo.stock_transfers ADD [rejected_reason] NVARCHAR(MAX);
+  IF COL_LENGTH('dbo.stock_transfers', 'rejected_by') IS NULL ALTER TABLE dbo.stock_transfers ADD [rejected_by] NVARCHAR(MAX);
+  IF COL_LENGTH('dbo.stock_transfers', 'cancelled_reason') IS NULL ALTER TABLE dbo.stock_transfers ADD [cancelled_reason] NVARCHAR(MAX);
+  IF COL_LENGTH('dbo.stock_transfers', 'dispatched_by') IS NULL ALTER TABLE dbo.stock_transfers ADD [dispatched_by] NVARCHAR(MAX);
+  IF COL_LENGTH('dbo.stock_transfers', 'dispatched_at') IS NULL ALTER TABLE dbo.stock_transfers ADD [dispatched_at] DATETIME2(3);
+  IF COL_LENGTH('dbo.stock_transfers', 'verified_by') IS NULL ALTER TABLE dbo.stock_transfers ADD [verified_by] NVARCHAR(MAX);
+  IF COL_LENGTH('dbo.stock_transfers', 'verified_at') IS NULL ALTER TABLE dbo.stock_transfers ADD [verified_at] DATETIME2(3);
+  IF COL_LENGTH('dbo.stock_transfers', 'posted_at') IS NULL ALTER TABLE dbo.stock_transfers ADD [posted_at] DATETIME2(3);
+  IF COL_LENGTH('dbo.stock_transfers', 'discrepancy_reason') IS NULL ALTER TABLE dbo.stock_transfers ADD [discrepancy_reason] NVARCHAR(MAX);
+  IF COL_LENGTH('dbo.stock_transfers', 'closed_at') IS NULL ALTER TABLE dbo.stock_transfers ADD [closed_at] DATETIME2(3);
+  IF COL_LENGTH('dbo.stock_transfers', 'fulfilment') IS NULL ALTER TABLE dbo.stock_transfers ADD [fulfilment] NVARCHAR(40);
   IF COL_LENGTH('dbo.stock_transfers', 'created_at') IS NULL ALTER TABLE dbo.stock_transfers ADD [created_at] DATETIME2(3) DEFAULT SYSUTCDATETIME();
   IF COL_LENGTH('dbo.stock_transfers', 'updated_at') IS NULL ALTER TABLE dbo.stock_transfers ADD [updated_at] DATETIME2(3) DEFAULT SYSUTCDATETIME();
   IF COL_LENGTH('dbo.stock_transfers', 'row_version') IS NULL ALTER TABLE dbo.stock_transfers ADD [row_version] INT DEFAULT 1;
@@ -2572,6 +2917,7 @@ BEGIN
   IF COL_LENGTH('dbo.stores', 'is_active') IS NULL ALTER TABLE dbo.stores ADD [is_active] BIT DEFAULT 1;
   IF COL_LENGTH('dbo.stores', 'archived_at') IS NULL ALTER TABLE dbo.stores ADD [archived_at] DATETIME2(3);
   IF COL_LENGTH('dbo.stores', 'is_primary_sub') IS NULL ALTER TABLE dbo.stores ADD [is_primary_sub] BIT DEFAULT 0;
+  IF COL_LENGTH('dbo.stores', 'private_catalogue') IS NULL ALTER TABLE dbo.stores ADD [private_catalogue] BIT DEFAULT 0;
   IF COL_LENGTH('dbo.stores', 'is_synced') IS NULL ALTER TABLE dbo.stores ADD [is_synced] BIT DEFAULT 0;
   IF COL_LENGTH('dbo.stores', 'sync_status') IS NULL ALTER TABLE dbo.stores ADD [sync_status] NVARCHAR(40) DEFAULT N'pending';
   IF COL_LENGTH('dbo.stores', 'sync_attempts') IS NULL ALTER TABLE dbo.stores ADD [sync_attempts] INT DEFAULT 0;
@@ -2683,6 +3029,9 @@ BEGIN
   IF COL_LENGTH('dbo.terminal_tokens', 'claimed_by_device') IS NULL ALTER TABLE dbo.terminal_tokens ADD [claimed_by_device] NVARCHAR(MAX);
   IF COL_LENGTH('dbo.terminal_tokens', 'claimed_at') IS NULL ALTER TABLE dbo.terminal_tokens ADD [claimed_at] DATETIME2(3);
   IF COL_LENGTH('dbo.terminal_tokens', 'platform') IS NULL ALTER TABLE dbo.terminal_tokens ADD [platform] NVARCHAR(MAX) DEFAULT N'unknown';
+  IF COL_LENGTH('dbo.terminal_tokens', 'expires_at') IS NULL ALTER TABLE dbo.terminal_tokens ADD [expires_at] DATETIME2(3);
+  IF COL_LENGTH('dbo.terminal_tokens', 'claimed_os') IS NULL ALTER TABLE dbo.terminal_tokens ADD [claimed_os] NVARCHAR(200);
+  IF COL_LENGTH('dbo.terminal_tokens', 'claim_proof') IS NULL ALTER TABLE dbo.terminal_tokens ADD [claim_proof] NVARCHAR(400);
   IF COL_LENGTH('dbo.terminal_tokens', 'row_version') IS NULL ALTER TABLE dbo.terminal_tokens ADD [row_version] INT DEFAULT 1;
   IF COL_LENGTH('dbo.terminal_tokens', 'is_synced') IS NULL ALTER TABLE dbo.terminal_tokens ADD [is_synced] BIT DEFAULT 0;
   IF COL_LENGTH('dbo.terminal_tokens', 'sync_status') IS NULL ALTER TABLE dbo.terminal_tokens ADD [sync_status] NVARCHAR(40) DEFAULT N'pending';
@@ -2743,6 +3092,531 @@ BEGIN
   IF COL_LENGTH('dbo.whatsapp_queue', 'last_error_at') IS NULL ALTER TABLE dbo.whatsapp_queue ADD [last_error_at] DATETIME2(3);
   IF COL_LENGTH('dbo.whatsapp_queue', 'client_transaction_id') IS NULL ALTER TABLE dbo.whatsapp_queue ADD [client_transaction_id] NVARCHAR(120);
 END
+GO
+
+/* =========================================================================
+   0106 — Sync schema drift repair (additive, idempotent)
+   Columns the central database gained after tills shipped. Without them the
+   local write layer silently drops the data (idempotency keys, racket job
+   cards, X/Z report counts) and pushes of payment rows fail centrally.
+   Safe to re-run: every statement is guarded by COL_LENGTH.
+   ========================================================================= */
+IF OBJECT_ID('dbo.sales', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.sales', 'client_transaction_id') IS NULL ALTER TABLE dbo.sales ADD [client_transaction_id] NVARCHAR(120) NULL;
+  IF COL_LENGTH('dbo.sales', 'cashier_id') IS NULL ALTER TABLE dbo.sales ADD [cashier_id] NVARCHAR(60) NULL;
+  IF COL_LENGTH('dbo.sales', 'payments') IS NULL ALTER TABLE dbo.sales ADD [payments] NVARCHAR(MAX) NULL;
+  IF COL_LENGTH('dbo.sales', 'coupon_code') IS NULL ALTER TABLE dbo.sales ADD [coupon_code] NVARCHAR(60) NULL;
+  IF COL_LENGTH('dbo.sales', 'coupon_discount') IS NULL ALTER TABLE dbo.sales ADD [coupon_discount] DECIMAL(18, 4) NULL;
+  IF COL_LENGTH('dbo.sales', 'coupon_promo_id') IS NULL ALTER TABLE dbo.sales ADD [coupon_promo_id] NVARCHAR(60) NULL;
+  IF COL_LENGTH('dbo.sales', 'coupon_scope') IS NULL ALTER TABLE dbo.sales ADD [coupon_scope] NVARCHAR(40) NULL;
+  IF COL_LENGTH('dbo.sales', 'store_name_snapshot') IS NULL ALTER TABLE dbo.sales ADD [store_name_snapshot] NVARCHAR(200) NULL;
+  IF COL_LENGTH('dbo.sales', 'store_address_snapshot') IS NULL ALTER TABLE dbo.sales ADD [store_address_snapshot] NVARCHAR(400) NULL;
+  IF COL_LENGTH('dbo.sales', 'created_by') IS NULL ALTER TABLE dbo.sales ADD [created_by] NVARCHAR(120) NULL;
+  IF COL_LENGTH('dbo.sales', 'updated_by') IS NULL ALTER TABLE dbo.sales ADD [updated_by] NVARCHAR(120) NULL;
+END
+GO
+IF OBJECT_ID('dbo.sale_items', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.sale_items', 'coupon_code') IS NULL ALTER TABLE dbo.sale_items ADD [coupon_code] NVARCHAR(60) NULL;
+  IF COL_LENGTH('dbo.sale_items', 'coupon_discount') IS NULL ALTER TABLE dbo.sale_items ADD [coupon_discount] DECIMAL(18, 4) NULL;
+  IF COL_LENGTH('dbo.sale_items', 'unit_cost') IS NULL ALTER TABLE dbo.sale_items ADD [unit_cost] DECIMAL(18, 4) NULL;
+END
+GO
+IF OBJECT_ID('dbo.payment_transactions', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.payment_transactions', 'client_transaction_id') IS NULL ALTER TABLE dbo.payment_transactions ADD [client_transaction_id] NVARCHAR(120) NULL;
+  IF COL_LENGTH('dbo.payment_transactions', 'status') IS NULL ALTER TABLE dbo.payment_transactions ADD [status] NVARCHAR(30) NULL;
+  IF COL_LENGTH('dbo.payment_transactions', 'metadata') IS NULL ALTER TABLE dbo.payment_transactions ADD [metadata] NVARCHAR(MAX) NULL;
+  IF COL_LENGTH('dbo.payment_transactions', 'cashier_id') IS NULL ALTER TABLE dbo.payment_transactions ADD [cashier_id] NVARCHAR(60) NULL;
+END
+GO
+IF OBJECT_ID('dbo.bookings', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.bookings', 'ref') IS NULL ALTER TABLE dbo.bookings ADD [ref] NVARCHAR(40) NULL;
+  IF COL_LENGTH('dbo.bookings', 'cashier') IS NULL ALTER TABLE dbo.bookings ADD [cashier] NVARCHAR(120) NULL;
+  IF COL_LENGTH('dbo.bookings', 'service_type_id') IS NULL ALTER TABLE dbo.bookings ADD [service_type_id] NVARCHAR(60) NULL;
+  IF COL_LENGTH('dbo.bookings', 'service_name') IS NULL ALTER TABLE dbo.bookings ADD [service_name] NVARCHAR(160) NULL;
+  IF COL_LENGTH('dbo.bookings', 'service_fee') IS NULL ALTER TABLE dbo.bookings ADD [service_fee] DECIMAL(18, 4) NULL;
+  IF COL_LENGTH('dbo.bookings', 'payment_timing') IS NULL ALTER TABLE dbo.bookings ADD [payment_timing] NVARCHAR(30) NULL;
+  IF COL_LENGTH('dbo.bookings', 'sale_receipt_no') IS NULL ALTER TABLE dbo.bookings ADD [sale_receipt_no] NVARCHAR(60) NULL;
+  IF COL_LENGTH('dbo.bookings', 'closed_at') IS NULL ALTER TABLE dbo.bookings ADD [closed_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.bookings', 'racket_model') IS NULL ALTER TABLE dbo.bookings ADD [racket_model] NVARCHAR(160) NULL;
+  IF COL_LENGTH('dbo.bookings', 'string_type') IS NULL ALTER TABLE dbo.bookings ADD [string_type] NVARCHAR(160) NULL;
+  IF COL_LENGTH('dbo.bookings', 'tension_main') IS NULL ALTER TABLE dbo.bookings ADD [tension_main] DECIMAL(9, 2) NULL;
+  IF COL_LENGTH('dbo.bookings', 'tension_cross') IS NULL ALTER TABLE dbo.bookings ADD [tension_cross] DECIMAL(9, 2) NULL;
+  IF COL_LENGTH('dbo.bookings', 'tension_unit') IS NULL ALTER TABLE dbo.bookings ADD [tension_unit] NVARCHAR(10) NULL;
+  IF COL_LENGTH('dbo.bookings', 'grommet_notes') IS NULL ALTER TABLE dbo.bookings ADD [grommet_notes] NVARCHAR(MAX) NULL;
+  IF COL_LENGTH('dbo.bookings', 'job_notes') IS NULL ALTER TABLE dbo.bookings ADD [job_notes] NVARCHAR(MAX) NULL;
+  IF COL_LENGTH('dbo.bookings', 'dropped_off_at') IS NULL ALTER TABLE dbo.bookings ADD [dropped_off_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.bookings', 'promised_at') IS NULL ALTER TABLE dbo.bookings ADD [promised_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.bookings', 'job_status') IS NULL ALTER TABLE dbo.bookings ADD [job_status] NVARCHAR(40) NULL;
+  IF COL_LENGTH('dbo.bookings', 'job_status_by') IS NULL ALTER TABLE dbo.bookings ADD [job_status_by] NVARCHAR(120) NULL;
+  IF COL_LENGTH('dbo.bookings', 'job_status_at') IS NULL ALTER TABLE dbo.bookings ADD [job_status_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.bookings', 'notify_whatsapp') IS NULL ALTER TABLE dbo.bookings ADD [notify_whatsapp] BIT NULL;
+  IF COL_LENGTH('dbo.bookings', 'tag_id') IS NULL ALTER TABLE dbo.bookings ADD [tag_id] NVARCHAR(60) NULL;
+  IF COL_LENGTH('dbo.bookings', 'intake_note') IS NULL ALTER TABLE dbo.bookings ADD [intake_note] NVARCHAR(MAX) NULL;
+  IF COL_LENGTH('dbo.bookings', 'string_origin') IS NULL ALTER TABLE dbo.bookings ADD [string_origin] NVARCHAR(40) NULL;
+  IF COL_LENGTH('dbo.bookings', 'string_source_product_id') IS NULL ALTER TABLE dbo.bookings ADD [string_source_product_id] NVARCHAR(60) NULL;
+  IF COL_LENGTH('dbo.bookings', 'grip_product_id') IS NULL ALTER TABLE dbo.bookings ADD [grip_product_id] NVARCHAR(60) NULL;
+  IF COL_LENGTH('dbo.bookings', 'charges') IS NULL ALTER TABLE dbo.bookings ADD [charges] NVARCHAR(MAX) NULL;
+  IF COL_LENGTH('dbo.bookings', 'technician') IS NULL ALTER TABLE dbo.bookings ADD [technician] NVARCHAR(120) NULL;
+  IF COL_LENGTH('dbo.bookings', 'liability_accepted') IS NULL ALTER TABLE dbo.bookings ADD [liability_accepted] BIT NULL;
+  IF COL_LENGTH('dbo.bookings', 'incident_note') IS NULL ALTER TABLE dbo.bookings ADD [incident_note] NVARCHAR(MAX) NULL;
+END
+GO
+IF OBJECT_ID('dbo.shifts', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.shifts', 'status') IS NULL ALTER TABLE dbo.shifts ADD [status] NVARCHAR(20) NULL;
+  IF COL_LENGTH('dbo.shifts', 'terminal_id') IS NULL ALTER TABLE dbo.shifts ADD [terminal_id] NVARCHAR(60) NULL;
+  IF COL_LENGTH('dbo.shifts', 'terminal_name') IS NULL ALTER TABLE dbo.shifts ADD [terminal_name] NVARCHAR(120) NULL;
+  IF COL_LENGTH('dbo.shifts', 'user_id') IS NULL ALTER TABLE dbo.shifts ADD [user_id] NVARCHAR(60) NULL;
+  IF COL_LENGTH('dbo.shifts', 'opened_by_name') IS NULL ALTER TABLE dbo.shifts ADD [opened_by_name] NVARCHAR(120) NULL;
+  IF COL_LENGTH('dbo.shifts', 'opened_by_staff_id') IS NULL ALTER TABLE dbo.shifts ADD [opened_by_staff_id] NVARCHAR(60) NULL;
+  IF COL_LENGTH('dbo.shifts', 'opened_by_role') IS NULL ALTER TABLE dbo.shifts ADD [opened_by_role] NVARCHAR(40) NULL;
+  IF COL_LENGTH('dbo.shifts', 'closed_by_name') IS NULL ALTER TABLE dbo.shifts ADD [closed_by_name] NVARCHAR(120) NULL;
+  IF COL_LENGTH('dbo.shifts', 'closed_by_staff_id') IS NULL ALTER TABLE dbo.shifts ADD [closed_by_staff_id] NVARCHAR(60) NULL;
+  IF COL_LENGTH('dbo.shifts', 'closed_by_role') IS NULL ALTER TABLE dbo.shifts ADD [closed_by_role] NVARCHAR(40) NULL;
+  IF COL_LENGTH('dbo.shifts', 'closing_float') IS NULL ALTER TABLE dbo.shifts ADD [closing_float] DECIMAL(18, 4) NULL;
+  IF COL_LENGTH('dbo.shifts', 'expected_cash') IS NULL ALTER TABLE dbo.shifts ADD [expected_cash] DECIMAL(18, 4) NULL;
+  IF COL_LENGTH('dbo.shifts', 'expected_card') IS NULL ALTER TABLE dbo.shifts ADD [expected_card] DECIMAL(18, 4) NULL;
+  IF COL_LENGTH('dbo.shifts', 'counted_card') IS NULL ALTER TABLE dbo.shifts ADD [counted_card] DECIMAL(18, 4) NULL;
+  IF COL_LENGTH('dbo.shifts', 'expected_digital') IS NULL ALTER TABLE dbo.shifts ADD [expected_digital] DECIMAL(18, 4) NULL;
+  IF COL_LENGTH('dbo.shifts', 'counted_digital') IS NULL ALTER TABLE dbo.shifts ADD [counted_digital] DECIMAL(18, 4) NULL;
+  IF COL_LENGTH('dbo.shifts', 'variance_cash') IS NULL ALTER TABLE dbo.shifts ADD [variance_cash] DECIMAL(18, 4) NULL;
+  IF COL_LENGTH('dbo.shifts', 'variance_card') IS NULL ALTER TABLE dbo.shifts ADD [variance_card] DECIMAL(18, 4) NULL;
+  IF COL_LENGTH('dbo.shifts', 'variance_digital') IS NULL ALTER TABLE dbo.shifts ADD [variance_digital] DECIMAL(18, 4) NULL;
+  IF COL_LENGTH('dbo.shifts', 'variance_total') IS NULL ALTER TABLE dbo.shifts ADD [variance_total] DECIMAL(18, 4) NULL;
+  IF COL_LENGTH('dbo.shifts', 'overdue') IS NULL ALTER TABLE dbo.shifts ADD [overdue] BIT NULL;
+END
+GO
+IF OBJECT_ID('dbo.products', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.products', 'stock_quantity') IS NULL ALTER TABLE dbo.products ADD [stock_quantity] INT NULL;
+  IF COL_LENGTH('dbo.products', 'is_archived') IS NULL ALTER TABLE dbo.products ADD [is_archived] BIT NULL;
+  IF COL_LENGTH('dbo.products', 'archived_at') IS NULL ALTER TABLE dbo.products ADD [archived_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.products', 'brand') IS NULL ALTER TABLE dbo.products ADD [brand] NVARCHAR(120) NULL;
+  IF COL_LENGTH('dbo.products', 'product_group') IS NULL ALTER TABLE dbo.products ADD [product_group] NVARCHAR(120) NULL;
+  IF COL_LENGTH('dbo.products', 'barcode_variants') IS NULL ALTER TABLE dbo.products ADD [barcode_variants] NVARCHAR(MAX) NULL;
+  IF COL_LENGTH('dbo.products', 'landing_pct') IS NULL ALTER TABLE dbo.products ADD [landing_pct] DECIMAL(9, 4) NULL;
+  IF COL_LENGTH('dbo.products', 'sub_category') IS NULL ALTER TABLE dbo.products ADD [sub_category] NVARCHAR(120) NULL;
+  IF COL_LENGTH('dbo.products', 'unit') IS NULL ALTER TABLE dbo.products ADD [unit] NVARCHAR(40) NULL;
+  IF COL_LENGTH('dbo.products', 'packs') IS NULL ALTER TABLE dbo.products ADD [packs] NVARCHAR(MAX) NULL;
+  IF COL_LENGTH('dbo.products', 'barcode_aliases') IS NULL ALTER TABLE dbo.products ADD [barcode_aliases] NVARCHAR(MAX) NULL;
+END
+GO
+IF OBJECT_ID('dbo.members', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.members', 'is_verified') IS NULL ALTER TABLE dbo.members ADD [is_verified] BIT NULL;
+  IF COL_LENGTH('dbo.members', 'verified_at') IS NULL ALTER TABLE dbo.members ADD [verified_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.members', 'verified_channel') IS NULL ALTER TABLE dbo.members ADD [verified_channel] NVARCHAR(30) NULL;
+END
+GO
+
+/* Draft physical counts: saved automatically so a count survives a restart. */
+IF OBJECT_ID('dbo.stock_count_drafts', 'U') IS NULL
+CREATE TABLE dbo.stock_count_drafts (
+  id NVARCHAR(80) NOT NULL PRIMARY KEY,
+  reference NVARCHAR(60) NULL, store_code NVARCHAR(40) NULL,
+  store_id NVARCHAR(60) NULL, terminal_id NVARCHAR(80) NULL,
+  staff_id NVARCHAR(80) NULL, staff_name NVARCHAR(200) NULL,
+  status NVARCHAR(20) NOT NULL DEFAULT N'draft',
+  reason NVARCHAR(80) NULL, note NVARCHAR(400) NOT NULL DEFAULT N'',
+  lines NVARCHAR(MAX) NOT NULL DEFAULT N'[]',
+  line_count INT NOT NULL DEFAULT 0, total_impact DECIMAL(18,4) NOT NULL DEFAULT 0,
+  posted_at DATETIME2(3) NULL, posted_by NVARCHAR(200) NULL,
+  is_synced BIT NOT NULL DEFAULT 0, sync_status NVARCHAR(40) NOT NULL DEFAULT N'pending',
+  row_version INT NOT NULL DEFAULT 0, sync_attempts INT NOT NULL DEFAULT 0,
+  last_error_at DATETIME2(3) NULL, client_transaction_id NVARCHAR(120) NULL,
+  created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+IF OBJECT_ID('dbo.stock_count_drafts', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.stock_count_drafts', 'reference') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [reference] NVARCHAR(60) NULL;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'store_code') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [store_code] NVARCHAR(40) NULL;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'store_id') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [store_id] NVARCHAR(60) NULL;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'terminal_id') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [terminal_id] NVARCHAR(80) NULL;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'staff_id') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [staff_id] NVARCHAR(80) NULL;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'staff_name') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [staff_name] NVARCHAR(200) NULL;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'status') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [status] NVARCHAR(20) DEFAULT N'draft';
+  IF COL_LENGTH('dbo.stock_count_drafts', 'reason') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [reason] NVARCHAR(80) NULL;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'note') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [note] NVARCHAR(400) DEFAULT N'';
+  IF COL_LENGTH('dbo.stock_count_drafts', 'lines') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [lines] NVARCHAR(MAX) DEFAULT N'[]';
+  IF COL_LENGTH('dbo.stock_count_drafts', 'line_count') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [line_count] INT DEFAULT 0;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'total_impact') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [total_impact] DECIMAL(18,4) DEFAULT 0;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'posted_at') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [posted_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'posted_by') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [posted_by] NVARCHAR(200) NULL;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'is_synced') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [is_synced] BIT DEFAULT 0;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'sync_status') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [sync_status] NVARCHAR(40) DEFAULT N'pending';
+  IF COL_LENGTH('dbo.stock_count_drafts', 'row_version') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [row_version] INT DEFAULT 0;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'sync_attempts') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [sync_attempts] INT DEFAULT 0;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'last_error_at') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [last_error_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'client_transaction_id') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [client_transaction_id] NVARCHAR(120) NULL;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'created_at') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [created_at] DATETIME2(3) DEFAULT SYSUTCDATETIME();
+  IF COL_LENGTH('dbo.stock_count_drafts', 'updated_at') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [updated_at] DATETIME2(3) DEFAULT SYSUTCDATETIME();
+END
+GO
+IF OBJECT_ID('dbo.stock_adjustments', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.stock_adjustments', 'draft_id') IS NULL ALTER TABLE dbo.stock_adjustments ADD [draft_id] NVARCHAR(80) NULL;
+END
+GO
+
+
+-- =====================================================================
+-- Authorisation framework: rules, approval queue and the decision log.
+-- Guarded so the file stays safe to re-run against a live till.
+-- =====================================================================
+IF OBJECT_ID('dbo.authorization_actions', 'U') IS NULL
+CREATE TABLE dbo.authorization_actions (
+  id NVARCHAR(80) NOT NULL PRIMARY KEY,
+  action_key NVARCHAR(80) NOT NULL,
+  scope_type NVARCHAR(20) NOT NULL DEFAULT N'global',
+  scope_id NVARCHAR(60) NOT NULL DEFAULT N'',
+  mode NVARCHAR(20) NOT NULL DEFAULT N'none',
+  allowed_roles NVARCHAR(MAX) NOT NULL DEFAULT N'[]',
+  allowed_user_ids NVARCHAR(MAX) NOT NULL DEFAULT N'[]',
+  require_reason BIT NOT NULL DEFAULT 0,
+  threshold DECIMAL(18,4) NULL,
+  is_enabled BIT NOT NULL DEFAULT 1,
+  is_synced BIT NOT NULL DEFAULT 0, sync_status NVARCHAR(40) NOT NULL DEFAULT N'pending',
+  row_version INT NOT NULL DEFAULT 0, sync_attempts INT NOT NULL DEFAULT 0,
+  last_error_at DATETIME2(3) NULL, client_transaction_id NVARCHAR(120) NULL,
+  created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+IF OBJECT_ID('dbo.authorization_actions', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.authorization_actions', 'action_key') IS NULL ALTER TABLE dbo.authorization_actions ADD [action_key] NVARCHAR(80);
+  IF COL_LENGTH('dbo.authorization_actions', 'scope_type') IS NULL ALTER TABLE dbo.authorization_actions ADD [scope_type] NVARCHAR(20) DEFAULT N'global';
+  IF COL_LENGTH('dbo.authorization_actions', 'scope_id') IS NULL ALTER TABLE dbo.authorization_actions ADD [scope_id] NVARCHAR(60) DEFAULT N'';
+  IF COL_LENGTH('dbo.authorization_actions', 'mode') IS NULL ALTER TABLE dbo.authorization_actions ADD [mode] NVARCHAR(20) DEFAULT N'none';
+  IF COL_LENGTH('dbo.authorization_actions', 'allowed_roles') IS NULL ALTER TABLE dbo.authorization_actions ADD [allowed_roles] NVARCHAR(MAX) DEFAULT N'[]';
+  IF COL_LENGTH('dbo.authorization_actions', 'allowed_user_ids') IS NULL ALTER TABLE dbo.authorization_actions ADD [allowed_user_ids] NVARCHAR(MAX) DEFAULT N'[]';
+  IF COL_LENGTH('dbo.authorization_actions', 'require_reason') IS NULL ALTER TABLE dbo.authorization_actions ADD [require_reason] BIT DEFAULT 0;
+  IF COL_LENGTH('dbo.authorization_actions', 'threshold') IS NULL ALTER TABLE dbo.authorization_actions ADD [threshold] DECIMAL(18,4) NULL;
+  IF COL_LENGTH('dbo.authorization_actions', 'is_enabled') IS NULL ALTER TABLE dbo.authorization_actions ADD [is_enabled] BIT DEFAULT 1;
+  IF COL_LENGTH('dbo.authorization_actions', 'is_synced') IS NULL ALTER TABLE dbo.authorization_actions ADD [is_synced] BIT DEFAULT 0;
+  IF COL_LENGTH('dbo.authorization_actions', 'sync_status') IS NULL ALTER TABLE dbo.authorization_actions ADD [sync_status] NVARCHAR(40) DEFAULT N'pending';
+  IF COL_LENGTH('dbo.authorization_actions', 'row_version') IS NULL ALTER TABLE dbo.authorization_actions ADD [row_version] INT DEFAULT 0;
+  IF COL_LENGTH('dbo.authorization_actions', 'sync_attempts') IS NULL ALTER TABLE dbo.authorization_actions ADD [sync_attempts] INT DEFAULT 0;
+  IF COL_LENGTH('dbo.authorization_actions', 'last_error_at') IS NULL ALTER TABLE dbo.authorization_actions ADD [last_error_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.authorization_actions', 'client_transaction_id') IS NULL ALTER TABLE dbo.authorization_actions ADD [client_transaction_id] NVARCHAR(120) NULL;
+  IF COL_LENGTH('dbo.authorization_actions', 'created_at') IS NULL ALTER TABLE dbo.authorization_actions ADD [created_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.authorization_actions', 'updated_at') IS NULL ALTER TABLE dbo.authorization_actions ADD [updated_at] DATETIME2(3) NULL;
+END
+GO
+IF OBJECT_ID('dbo.authorization_requests', 'U') IS NULL
+CREATE TABLE dbo.authorization_requests (
+  id NVARCHAR(80) NOT NULL PRIMARY KEY,
+  action_key NVARCHAR(80) NOT NULL,
+  requested_by NVARCHAR(120) NOT NULL,
+  requested_by_name NVARCHAR(200) NULL,
+  store_id NVARCHAR(60) NOT NULL DEFAULT N'',
+  terminal_id NVARCHAR(80) NOT NULL DEFAULT N'',
+  reason NVARCHAR(400) NULL,
+  payload NVARCHAR(MAX) NOT NULL DEFAULT N'{}',
+  status NVARCHAR(20) NOT NULL DEFAULT N'pending',
+  decided_by NVARCHAR(120) NULL,
+  decided_by_name NVARCHAR(200) NULL,
+  decided_at DATETIME2(3) NULL,
+  decision_note NVARCHAR(400) NULL,
+  expires_at DATETIME2(3) NULL,
+  consumed_at DATETIME2(3) NULL,
+  is_synced BIT NOT NULL DEFAULT 0, sync_status NVARCHAR(40) NOT NULL DEFAULT N'pending',
+  row_version INT NOT NULL DEFAULT 0, sync_attempts INT NOT NULL DEFAULT 0,
+  last_error_at DATETIME2(3) NULL, client_transaction_id NVARCHAR(120) NULL,
+  created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+IF OBJECT_ID('dbo.authorization_requests', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.authorization_requests', 'action_key') IS NULL ALTER TABLE dbo.authorization_requests ADD [action_key] NVARCHAR(80);
+  IF COL_LENGTH('dbo.authorization_requests', 'requested_by') IS NULL ALTER TABLE dbo.authorization_requests ADD [requested_by] NVARCHAR(120);
+  IF COL_LENGTH('dbo.authorization_requests', 'requested_by_name') IS NULL ALTER TABLE dbo.authorization_requests ADD [requested_by_name] NVARCHAR(200) NULL;
+  IF COL_LENGTH('dbo.authorization_requests', 'store_id') IS NULL ALTER TABLE dbo.authorization_requests ADD [store_id] NVARCHAR(60) DEFAULT N'';
+  IF COL_LENGTH('dbo.authorization_requests', 'terminal_id') IS NULL ALTER TABLE dbo.authorization_requests ADD [terminal_id] NVARCHAR(80) DEFAULT N'';
+  IF COL_LENGTH('dbo.authorization_requests', 'reason') IS NULL ALTER TABLE dbo.authorization_requests ADD [reason] NVARCHAR(400) NULL;
+  IF COL_LENGTH('dbo.authorization_requests', 'payload') IS NULL ALTER TABLE dbo.authorization_requests ADD [payload] NVARCHAR(MAX) DEFAULT N'{}';
+  IF COL_LENGTH('dbo.authorization_requests', 'status') IS NULL ALTER TABLE dbo.authorization_requests ADD [status] NVARCHAR(20) DEFAULT N'pending';
+  IF COL_LENGTH('dbo.authorization_requests', 'decided_by') IS NULL ALTER TABLE dbo.authorization_requests ADD [decided_by] NVARCHAR(120) NULL;
+  IF COL_LENGTH('dbo.authorization_requests', 'decided_by_name') IS NULL ALTER TABLE dbo.authorization_requests ADD [decided_by_name] NVARCHAR(200) NULL;
+  IF COL_LENGTH('dbo.authorization_requests', 'decided_at') IS NULL ALTER TABLE dbo.authorization_requests ADD [decided_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.authorization_requests', 'decision_note') IS NULL ALTER TABLE dbo.authorization_requests ADD [decision_note] NVARCHAR(400) NULL;
+  IF COL_LENGTH('dbo.authorization_requests', 'expires_at') IS NULL ALTER TABLE dbo.authorization_requests ADD [expires_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.authorization_requests', 'consumed_at') IS NULL ALTER TABLE dbo.authorization_requests ADD [consumed_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.authorization_requests', 'is_synced') IS NULL ALTER TABLE dbo.authorization_requests ADD [is_synced] BIT DEFAULT 0;
+  IF COL_LENGTH('dbo.authorization_requests', 'sync_status') IS NULL ALTER TABLE dbo.authorization_requests ADD [sync_status] NVARCHAR(40) DEFAULT N'pending';
+  IF COL_LENGTH('dbo.authorization_requests', 'row_version') IS NULL ALTER TABLE dbo.authorization_requests ADD [row_version] INT DEFAULT 0;
+  IF COL_LENGTH('dbo.authorization_requests', 'sync_attempts') IS NULL ALTER TABLE dbo.authorization_requests ADD [sync_attempts] INT DEFAULT 0;
+  IF COL_LENGTH('dbo.authorization_requests', 'last_error_at') IS NULL ALTER TABLE dbo.authorization_requests ADD [last_error_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.authorization_requests', 'client_transaction_id') IS NULL ALTER TABLE dbo.authorization_requests ADD [client_transaction_id] NVARCHAR(120) NULL;
+  IF COL_LENGTH('dbo.authorization_requests', 'created_at') IS NULL ALTER TABLE dbo.authorization_requests ADD [created_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.authorization_requests', 'updated_at') IS NULL ALTER TABLE dbo.authorization_requests ADD [updated_at] DATETIME2(3) NULL;
+END
+GO
+IF OBJECT_ID('dbo.authorization_log', 'U') IS NULL
+CREATE TABLE dbo.authorization_log (
+  id NVARCHAR(80) NOT NULL PRIMARY KEY,
+  action_key NVARCHAR(80) NOT NULL,
+  mode_used NVARCHAR(20) NOT NULL,
+  request_id NVARCHAR(80) NULL,
+  requested_by NVARCHAR(120) NULL,
+  authorized_by NVARCHAR(120) NULL,
+  authorizer_role NVARCHAR(40) NULL,
+  store_id NVARCHAR(60) NOT NULL DEFAULT N'',
+  terminal_id NVARCHAR(80) NOT NULL DEFAULT N'',
+  outcome NVARCHAR(20) NOT NULL,
+  detail NVARCHAR(MAX) NOT NULL DEFAULT N'{}',
+  is_synced BIT NOT NULL DEFAULT 0, sync_status NVARCHAR(40) NOT NULL DEFAULT N'pending',
+  row_version INT NOT NULL DEFAULT 0, sync_attempts INT NOT NULL DEFAULT 0,
+  last_error_at DATETIME2(3) NULL, client_transaction_id NVARCHAR(120) NULL,
+  created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+IF OBJECT_ID('dbo.authorization_log', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.authorization_log', 'action_key') IS NULL ALTER TABLE dbo.authorization_log ADD [action_key] NVARCHAR(80);
+  IF COL_LENGTH('dbo.authorization_log', 'mode_used') IS NULL ALTER TABLE dbo.authorization_log ADD [mode_used] NVARCHAR(20);
+  IF COL_LENGTH('dbo.authorization_log', 'request_id') IS NULL ALTER TABLE dbo.authorization_log ADD [request_id] NVARCHAR(80) NULL;
+  IF COL_LENGTH('dbo.authorization_log', 'requested_by') IS NULL ALTER TABLE dbo.authorization_log ADD [requested_by] NVARCHAR(120) NULL;
+  IF COL_LENGTH('dbo.authorization_log', 'authorized_by') IS NULL ALTER TABLE dbo.authorization_log ADD [authorized_by] NVARCHAR(120) NULL;
+  IF COL_LENGTH('dbo.authorization_log', 'authorizer_role') IS NULL ALTER TABLE dbo.authorization_log ADD [authorizer_role] NVARCHAR(40) NULL;
+  IF COL_LENGTH('dbo.authorization_log', 'store_id') IS NULL ALTER TABLE dbo.authorization_log ADD [store_id] NVARCHAR(60) DEFAULT N'';
+  IF COL_LENGTH('dbo.authorization_log', 'terminal_id') IS NULL ALTER TABLE dbo.authorization_log ADD [terminal_id] NVARCHAR(80) DEFAULT N'';
+  IF COL_LENGTH('dbo.authorization_log', 'outcome') IS NULL ALTER TABLE dbo.authorization_log ADD [outcome] NVARCHAR(20);
+  IF COL_LENGTH('dbo.authorization_log', 'detail') IS NULL ALTER TABLE dbo.authorization_log ADD [detail] NVARCHAR(MAX) DEFAULT N'{}';
+  IF COL_LENGTH('dbo.authorization_log', 'is_synced') IS NULL ALTER TABLE dbo.authorization_log ADD [is_synced] BIT DEFAULT 0;
+  IF COL_LENGTH('dbo.authorization_log', 'sync_status') IS NULL ALTER TABLE dbo.authorization_log ADD [sync_status] NVARCHAR(40) DEFAULT N'pending';
+  IF COL_LENGTH('dbo.authorization_log', 'row_version') IS NULL ALTER TABLE dbo.authorization_log ADD [row_version] INT DEFAULT 0;
+  IF COL_LENGTH('dbo.authorization_log', 'sync_attempts') IS NULL ALTER TABLE dbo.authorization_log ADD [sync_attempts] INT DEFAULT 0;
+  IF COL_LENGTH('dbo.authorization_log', 'last_error_at') IS NULL ALTER TABLE dbo.authorization_log ADD [last_error_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.authorization_log', 'client_transaction_id') IS NULL ALTER TABLE dbo.authorization_log ADD [client_transaction_id] NVARCHAR(120) NULL;
+  IF COL_LENGTH('dbo.authorization_log', 'created_at') IS NULL ALTER TABLE dbo.authorization_log ADD [created_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.authorization_log', 'updated_at') IS NULL ALTER TABLE dbo.authorization_log ADD [updated_at] DATETIME2(3) NULL;
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_authorization_actions_scope')
+CREATE UNIQUE INDEX ux_authorization_actions_scope ON dbo.authorization_actions (action_key, scope_type, scope_id);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_authorization_requests_status')
+CREATE INDEX ix_authorization_requests_status ON dbo.authorization_requests (status, store_id, created_at);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_authorization_log_created')
+CREATE INDEX ix_authorization_log_created ON dbo.authorization_log (created_at);
+GO
+
+/* ------------------------------------------------------------------ */
+/* record_edits — before/after history of authorised edits to posted   */
+/* stock counts and receiving entries.                                 */
+/* ------------------------------------------------------------------ */
+IF OBJECT_ID('dbo.record_edits', 'U') IS NULL
+CREATE TABLE dbo.record_edits (
+  id NVARCHAR(80) NOT NULL PRIMARY KEY,
+  record_type NVARCHAR(40) NOT NULL,
+  record_id NVARCHAR(80) NOT NULL,
+  reference NVARCHAR(60) NULL,
+  store_id NVARCHAR(60) NULL,
+  terminal_id NVARCHAR(80) NULL,
+  action_key NVARCHAR(64) NOT NULL,
+  request_id NVARCHAR(80) NULL,
+  edited_by NVARCHAR(80) NULL,
+  edited_by_name NVARCHAR(200) NULL,
+  authorized_by NVARCHAR(80) NULL,
+  authorized_by_name NVARCHAR(200) NULL,
+  mode_used NVARCHAR(20) NULL,
+  before_value NVARCHAR(MAX) NOT NULL DEFAULT N'{}',
+  after_value NVARCHAR(MAX) NOT NULL DEFAULT N'{}',
+  stock_deltas NVARCHAR(MAX) NOT NULL DEFAULT N'{}',
+  note NVARCHAR(400) NULL,
+  is_synced BIT NOT NULL DEFAULT 0, sync_status NVARCHAR(40) NOT NULL DEFAULT N'pending',
+  row_version INT NOT NULL DEFAULT 0, sync_attempts INT NOT NULL DEFAULT 0,
+  last_error_at DATETIME2(3) NULL, client_transaction_id NVARCHAR(120) NULL,
+  created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+IF OBJECT_ID('dbo.record_edits', 'U') IS NOT NULL
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_record_edits_record' AND object_id = OBJECT_ID('dbo.record_edits'))
+    CREATE INDEX ix_record_edits_record ON dbo.record_edits (record_type, record_id, created_at DESC);
+  IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_record_edits_store' AND object_id = OBJECT_ID('dbo.record_edits'))
+    CREATE INDEX ix_record_edits_store ON dbo.record_edits (store_id, created_at DESC);
+END
+GO
+
+/* Pending-edit hold on already-posted records. */
+IF OBJECT_ID('dbo.stock_count_drafts', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.stock_count_drafts', 'pending_edit_request_id') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [pending_edit_request_id] NVARCHAR(80) NULL;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'pending_edit_by') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [pending_edit_by] NVARCHAR(80) NULL;
+  IF COL_LENGTH('dbo.stock_count_drafts', 'pending_edit_at') IS NULL ALTER TABLE dbo.stock_count_drafts ADD [pending_edit_at] DATETIME2(3) NULL;
+END
+GO
+IF OBJECT_ID('dbo.purchase_orders', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.purchase_orders', 'pending_edit_request_id') IS NULL ALTER TABLE dbo.purchase_orders ADD [pending_edit_request_id] NVARCHAR(80) NULL;
+  IF COL_LENGTH('dbo.purchase_orders', 'pending_edit_by') IS NULL ALTER TABLE dbo.purchase_orders ADD [pending_edit_by] NVARCHAR(80) NULL;
+  IF COL_LENGTH('dbo.purchase_orders', 'pending_edit_at') IS NULL ALTER TABLE dbo.purchase_orders ADD [pending_edit_at] DATETIME2(3) NULL;
+END
+GO
+
+/* ------------------------------------------------------------------ */
+/* Schema alignment — fields the central database already has that the */
+/* till was missing, so a pulled or restored row keeps its meaning.    */
+/* ------------------------------------------------------------------ */
+IF OBJECT_ID('dbo.booking_payments', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.booking_payments', 'reversed_at') IS NULL ALTER TABLE dbo.booking_payments ADD [reversed_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.booking_payments', 'reversed_by') IS NULL ALTER TABLE dbo.booking_payments ADD [reversed_by] NVARCHAR(120) NULL;
+END
+GO
+IF OBJECT_ID('dbo.shift_cash_counts', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.shift_cash_counts', 'counted_by_user_id') IS NULL ALTER TABLE dbo.shift_cash_counts ADD [counted_by_user_id] NVARCHAR(120) NULL;
+END
+GO
+IF OBJECT_ID('dbo.shift_close_events', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.shift_close_events', 'actor_user_id') IS NULL ALTER TABLE dbo.shift_close_events ADD [actor_user_id] NVARCHAR(120) NULL;
+END
+GO
+
+/* Governance trail written offline: an event raised, an edit recorded or an
+   approval decided with no connection is kept here and pushed on reconnect. */
+IF OBJECT_ID('dbo.activity_events', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.activity_events', 'branch_id') IS NULL ALTER TABLE dbo.activity_events ADD [branch_id] NVARCHAR(60) NULL;
+  IF COL_LENGTH('dbo.activity_events', 'is_synced') IS NULL ALTER TABLE dbo.activity_events ADD [is_synced] BIT NOT NULL DEFAULT 0;
+  IF COL_LENGTH('dbo.activity_events', 'sync_status') IS NULL ALTER TABLE dbo.activity_events ADD [sync_status] NVARCHAR(40) NOT NULL DEFAULT N'pending';
+  IF COL_LENGTH('dbo.activity_events', 'sync_attempts') IS NULL ALTER TABLE dbo.activity_events ADD [sync_attempts] INT NOT NULL DEFAULT 0;
+  IF COL_LENGTH('dbo.activity_events', 'last_error_at') IS NULL ALTER TABLE dbo.activity_events ADD [last_error_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.activity_events', 'client_transaction_id') IS NULL ALTER TABLE dbo.activity_events ADD [client_transaction_id] NVARCHAR(120) NULL;
+END
+GO
+IF OBJECT_ID('dbo.member_verifications', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.member_verifications', 'is_synced') IS NULL ALTER TABLE dbo.member_verifications ADD [is_synced] BIT NOT NULL DEFAULT 0;
+  IF COL_LENGTH('dbo.member_verifications', 'sync_status') IS NULL ALTER TABLE dbo.member_verifications ADD [sync_status] NVARCHAR(40) NOT NULL DEFAULT N'pending';
+  IF COL_LENGTH('dbo.member_verifications', 'sync_attempts') IS NULL ALTER TABLE dbo.member_verifications ADD [sync_attempts] INT NOT NULL DEFAULT 0;
+  IF COL_LENGTH('dbo.member_verifications', 'last_error_at') IS NULL ALTER TABLE dbo.member_verifications ADD [last_error_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.member_verifications', 'client_transaction_id') IS NULL ALTER TABLE dbo.member_verifications ADD [client_transaction_id] NVARCHAR(120) NULL;
+END
+GO
+
+/* ------------------------------------------------------------------ */
+/* Status history — every state change of every tracked record.        */
+/* Written on the till first so a change made with no connection is    */
+/* never lost, then pushed like any other trading record.              */
+/* ------------------------------------------------------------------ */
+IF OBJECT_ID('dbo.entity_status_history', 'U') IS NULL
+CREATE TABLE dbo.entity_status_history (
+  id                  UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+  entity_type         NVARCHAR(80)     NOT NULL,
+  entity_id           NVARCHAR(120)    NOT NULL,
+  status_kind         NVARCHAR(60)     NOT NULL DEFAULT N'status',
+  previous_status     NVARCHAR(80)     NULL,
+  new_status          NVARCHAR(80)     NOT NULL,
+  reason              NVARCHAR(600)    NULL,
+  actor_id            NVARCHAR(120)    NULL,
+  actor_name          NVARCHAR(200)    NULL,
+  actor_role          NVARCHAR(60)     NULL,
+  store_id            NVARCHAR(80)     NULL,
+  branch_id           NVARCHAR(60)     NULL,
+  terminal_id         NVARCHAR(120)    NULL,
+  related_entity_type NVARCHAR(80)     NULL,
+  related_entity_id   NVARCHAR(120)    NULL,
+  metadata            NVARCHAR(MAX)    NOT NULL DEFAULT N'{}',
+  client_event_id     NVARCHAR(120)    NULL,
+  occurred_at         DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  is_synced           BIT              NOT NULL DEFAULT 0,
+  sync_status         NVARCHAR(40)     NOT NULL DEFAULT N'pending',
+  sync_attempts       INT              NOT NULL DEFAULT 0,
+  last_error_at       DATETIME2(3)     NULL,
+  created_at          DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at          DATETIME2(3)     NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+IF OBJECT_ID('dbo.entity_status_history', 'U') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.indexes
+                   WHERE name = 'entity_status_history_entity_idx'
+                     AND object_id = OBJECT_ID('dbo.entity_status_history'))
+CREATE INDEX entity_status_history_entity_idx
+  ON dbo.entity_status_history (entity_type, entity_id, occurred_at DESC);
+GO
+
+/* Business events now say which record changed and how, not just a
+   sentence of text, so history can be queried instead of read. */
+IF OBJECT_ID('dbo.activity_events', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.activity_events', 'entity_type') IS NULL ALTER TABLE dbo.activity_events ADD [entity_type] NVARCHAR(80) NULL;
+  IF COL_LENGTH('dbo.activity_events', 'entity_id') IS NULL ALTER TABLE dbo.activity_events ADD [entity_id] NVARCHAR(120) NULL;
+  IF COL_LENGTH('dbo.activity_events', 'previous_state') IS NULL ALTER TABLE dbo.activity_events ADD [previous_state] NVARCHAR(80) NULL;
+  IF COL_LENGTH('dbo.activity_events', 'new_state') IS NULL ALTER TABLE dbo.activity_events ADD [new_state] NVARCHAR(80) NULL;
+END
+GO
+
+/* A branch column so a rebuilt till can recover its own audit trail. */
+IF OBJECT_ID('dbo.audit_logs', 'U') IS NOT NULL
+BEGIN
+  IF COL_LENGTH('dbo.audit_logs', 'store_id') IS NULL ALTER TABLE dbo.audit_logs ADD [store_id] NVARCHAR(80) NULL;
+END
+GO
+
+/* Tombstones.
+   A deletion has to travel like any other change, so head office never removes
+   a catalogue or member row outright — it stamps deleted_at. The till mirrors
+   the stamp, drops its own copy on the next pull, and every read filters the
+   stamped rows out in the meantime. */
+IF OBJECT_ID('dbo.products', 'U') IS NOT NULL AND COL_LENGTH('dbo.products', 'deleted_at') IS NULL ALTER TABLE dbo.products ADD [deleted_at] DATETIME2(3) NULL;
+GO
+IF OBJECT_ID('dbo.product_categories', 'U') IS NOT NULL AND COL_LENGTH('dbo.product_categories', 'deleted_at') IS NULL ALTER TABLE dbo.product_categories ADD [deleted_at] DATETIME2(3) NULL;
+GO
+IF OBJECT_ID('dbo.product_barcodes', 'U') IS NOT NULL AND COL_LENGTH('dbo.product_barcodes', 'deleted_at') IS NULL ALTER TABLE dbo.product_barcodes ADD [deleted_at] DATETIME2(3) NULL;
+GO
+IF OBJECT_ID('dbo.uom_units', 'U') IS NOT NULL AND COL_LENGTH('dbo.uom_units', 'deleted_at') IS NULL ALTER TABLE dbo.uom_units ADD [deleted_at] DATETIME2(3) NULL;
+GO
+IF OBJECT_ID('dbo.suppliers', 'U') IS NOT NULL AND COL_LENGTH('dbo.suppliers', 'deleted_at') IS NULL ALTER TABLE dbo.suppliers ADD [deleted_at] DATETIME2(3) NULL;
+GO
+IF OBJECT_ID('dbo.promotions', 'U') IS NOT NULL AND COL_LENGTH('dbo.promotions', 'deleted_at') IS NULL ALTER TABLE dbo.promotions ADD [deleted_at] DATETIME2(3) NULL;
+GO
+IF OBJECT_ID('dbo.membership_tiers', 'U') IS NOT NULL AND COL_LENGTH('dbo.membership_tiers', 'deleted_at') IS NULL ALTER TABLE dbo.membership_tiers ADD [deleted_at] DATETIME2(3) NULL;
+GO
+IF OBJECT_ID('dbo.stores', 'U') IS NOT NULL AND COL_LENGTH('dbo.stores', 'deleted_at') IS NULL ALTER TABLE dbo.stores ADD [deleted_at] DATETIME2(3) NULL;
+GO
+IF OBJECT_ID('dbo.members', 'U') IS NOT NULL AND COL_LENGTH('dbo.members', 'deleted_at') IS NULL ALTER TABLE dbo.members ADD [deleted_at] DATETIME2(3) NULL;
+GO
+
+/* ---- tables that live only on the till ---- */
+
+/* ---- the queue the sync engine drains, and its bookkeeping ---- */
+IF OBJECT_ID('dbo.offline_sync_queue', 'U') IS NULL
+CREATE TABLE dbo.offline_sync_queue (
+  id                    UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+  table_name            NVARCHAR(80)  NOT NULL,
+  record_id             NVARCHAR(120) NULL,
+  action_type           NVARCHAR(10)  NOT NULL DEFAULT N'INSERT'
+    CONSTRAINT CK_offline_sync_queue_action
+    CHECK (action_type IN (N'INSERT', N'UPDATE', N'DELETE')),
+  payload_json          NVARCHAR(MAX) NOT NULL,
+  status                NVARCHAR(20)  NOT NULL DEFAULT N'pending'
+    CONSTRAINT CK_offline_sync_queue_status
+    CHECK (status IN (N'pending', N'failed', N'dead_letter')),
+  error_message         NVARCHAR(MAX) NULL,
+  attempts              INT           NOT NULL DEFAULT 0,
+  last_attempt_at       DATETIME2(3)  NULL,
+  client_transaction_id NVARCHAR(120) NULL,
+  created_at            DATETIME2(3)  NOT NULL DEFAULT SYSUTCDATETIME()
+);
+GO
+IF OBJECT_ID('dbo.offline_sync_queue', 'U') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_offline_sync_queue_status')
+  CREATE INDEX IX_offline_sync_queue_status
+    ON dbo.offline_sync_queue (status, created_at);
 GO
 
 /* pos_store_settings — the branch trading rules (blank store_id = the
