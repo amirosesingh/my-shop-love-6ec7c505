@@ -44,6 +44,13 @@ type CartDeps = {
   getMemberName: () => string | null;
   /** Fired when the ticket is emptied, so one-off unlocks do not linger. */
   onReset?: () => void;
+  /**
+   * The register setting "Prevent negative stock sale". The till used to block
+   * an out-of-stock item outright, whatever the branch had chosen, so the
+   * setting could never be honoured. The register settings now decide, and
+   * they are the only thing that decides.
+   */
+  preventNegativeStock: boolean;
 };
 
 export function useCart(deps: CartDeps) {
