@@ -490,7 +490,10 @@ export function PosProvider({ children }: { children: ReactNode }) {
     void (async () => {
       // Anonymous visitors get nothing: no products, members or sales.
       if (!signedIn) {
-        if (authReady && !cancelled) setReady(true);
+        if (authReady && !cancelled) {
+          setReady(true);
+          setLoadPhase("ready");
+        }
         return;
       }
       // Offline-first boot: paint the last known good snapshot immediately so
