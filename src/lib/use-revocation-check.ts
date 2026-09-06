@@ -119,32 +119,23 @@ export function useRevocationCheck(): RevocationState {
     let cancelled = false;
 
     const check = async () => {
-      // No link, no verdict: the till keeps selling exactly as it was.
-      if (typeof navigator !== "undefined" && !navigator.onLine) return;
-      try {
-        const remote = await fetchTokenStatus(config.tokenId);
-        if (cancelled) return;
-        setLastCheckedAt(new Date().toISOString());
-        // An empty lookup is inconclusive (for example while the API schema is
-        // reloading). Only a positive revoked verdict may wipe activation.
-        if (!remote) return;
-        if (remote.status === "revoked") {
-          setBlocked(true);
-          clearTerminalConfig();
-          // A confirmed revocation also drops the local "registered" record.
-          clearActivationRecord();
-          return;
-        }
-        setBlocked(false);
-        void stampHeartbeat(config.tokenId);
-        // A verified status is the only thing that extends the offline grace.
-        void writeActivationRecord({
-          tokenId: config.tokenId,
-          stamp: (remote as { stamp?: string | null }).stamp ?? null,
-        }).catch(() => {});
-      } catch {
-        /* transient network error — try again on the next tick */
+      const verdict = await terminalVerdict(config.tokenId);
+      if (cancelled || verdict.outcome === "unknown") return;
+      setLastCheckedAt(new Date().toISOString());
+      if (verdict.outcome === "revoked" || verdict.outcome === "missing") {
+        setBlocked(true, verdict.outcome);
+        clearTerminalConfig();
+        // A confirmed revocation or deletion also drops the "registered" record.
+        clearActivationRecord();
+        return;
       }
+      setBlocked(false);
+      void stampHeartbeat(config.tokenId);
+      // A verified status is the only thing that extends the offline grace.
+      void writeActivationRecord({
+        tokenId: config.tokenId,
+        stamp: verdict.stamp ?? null,
+      }).catch(() => {});
     };
 
     void check();
