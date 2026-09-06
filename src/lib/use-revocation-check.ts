@@ -202,5 +202,5 @@ export function useRevocationCheck(): RevocationState {
     };
   }, [config]);
 
-  return { config, revoked, online, lastCheckedAt, hydrating };
+  return { config, revoked, reason, online, lastCheckedAt, hydrating };
 }
