@@ -534,6 +534,24 @@ async function pull() {
   if (!settingsError) {
     await repo.setWatermark("pos_settings", settingsStartedAt, { error: null }).catch(() => {});
   }
+  // Branch trading rules: this branch's row plus the business-wide row it
+  // inherits from, so the register enforces the same limits with no connection.
+  try {
+    const rulesSince = await markFor("pos_store_settings");
+    const rulesStartedAt = new Date().toISOString();
+    const wanted = scope.storeId ? ["", scope.storeId] : [""];
+    const { data: rules, error: rulesError } = await supabase
+      .from("pos_store_settings")
+      .select("*")
+      .in("store_id", wanted)
+      .gt("updated_at", rulesSince);
+    if (rulesError) throw new Error(rulesError.message ?? String(rulesError));
+    if (rules?.length) merged += await repo.mergeFromCloud("pos_store_settings", rules);
+    await repo.setWatermark("pos_store_settings", rulesStartedAt, { error: null }).catch(() => {});
+  } catch (err) {
+    await repo.setWatermark("pos_store_settings", null, { error: String(err) }).catch(() => {});
+  }
+
   await repo.setState("last_pull_at", new Date().toISOString());
   setPhase("idle");
   return { ok: true, merged };
@@ -671,6 +689,27 @@ async function restore({ days = 90 } = {}) {
     } catch (err) {
       restoreState.tables.push({
         table: "pos_settings",
+        restored: 0,
+        skipped: 0,
+        error: String(err?.message ?? err),
+      });
+    }
+    // The branch's own trading rules come back with everything else.
+    restoreState.table = "pos_store_settings";
+    notify();
+    try {
+      const wanted = scope.storeId ? ["", scope.storeId] : [""];
+      const { data: rules, error: rulesError } = await supabase
+        .from("pos_store_settings")
+        .select("*")
+        .in("store_id", wanted);
+      if (rulesError) throw new Error(rulesError.message ?? String(rulesError));
+      const count = rules?.length ? await repo.mergeFromCloud("pos_store_settings", rules) : 0;
+      restoreState.restored += count;
+      restoreState.tables.push({ table: "pos_store_settings", restored: count, skipped: 0 });
+    } catch (err) {
+      restoreState.tables.push({
+        table: "pos_store_settings",
         restored: 0,
         skipped: 0,
         error: String(err?.message ?? err),
