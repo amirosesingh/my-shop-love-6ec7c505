@@ -451,10 +451,11 @@ export function PosProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
-    // A read that never answers must not keep the till on the loader: after
-    // this the app opens on whatever data it already has.
+    // A read that is taking too long is reported as exactly that. It is never
+    // turned into "the data arrived", which would show an empty, healthy-looking
+    // shop built out of nothing.
     const watchdog = window.setTimeout(() => {
-      if (!cancelled) setReady(true);
+      if (!cancelled) setLoadPhase((p) => (p === "loading" ? "stalled" : p));
     }, 15000);
     // Local-only slices (stores, shifts, transfers, counters) stay on the
     // terminal; catalogue, members, bills, promos and settings come from cloud.
