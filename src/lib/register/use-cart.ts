@@ -73,12 +73,14 @@ export function useCart(deps: CartDeps) {
     const onHand = availableAt(product, deps.currentStore.id, deps.bookings);
     if (onHand <= 0) {
       const reserved = stockAt(product, deps.currentStore.id) > 0;
-      toast.error(
-        reserved
-          ? `${product.name} is fully reserved by open bookings at ${deps.currentStore.name}`
-          : `${product.name} is out of stock at ${deps.currentStore.name}`,
-      );
-      return;
+      const message = reserved
+        ? `${product.name} is fully reserved by open bookings at ${deps.currentStore.name}`
+        : `${product.name} is out of stock at ${deps.currentStore.name}`;
+      if (deps.preventNegativeStock) {
+        toast.error(message);
+        return;
+      }
+      toast.warning(`${message} — sold anyway`);
     }
     setLines((ls) => {
       const found = ls.find((l) => l.productId === productId && !l.credit);
