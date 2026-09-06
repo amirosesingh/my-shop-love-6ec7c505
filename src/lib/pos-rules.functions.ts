@@ -4,8 +4,11 @@ import { z } from "zod";
 const callerInput = z.object({
   accessToken: z.string().min(10).optional(),
   terminalToken: z.string().min(10).optional(),
+  cashierToken: z.string().min(10).optional(),
+  sessionToken: z.string().min(10).optional(),
   storeId: z.string().max(64).optional(),
 });
+
 
 const ruleValue = z.union([z.boolean(), z.number()]);
 
@@ -61,59 +64,73 @@ async function assertCaller(data: { accessToken?: string; terminalToken?: string
   throw new Error("Not signed in");
 }
 
-/** Effective, database-backed rule set for the caller's branch. */
+/**
+ * Effective, database-backed rule set for the caller's own branch.
+ *
+ * The branch comes from the caller's proof, not from what the caller asks
+ * for, so a till registered to one branch cannot read another branch's rules.
+ */
 export const getPosRules = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => callerInput.parse(data))
   .handler(async ({ data }) => {
     const { loadRulesResult } = await import("./pos-rules.server");
-    // Reading rules must never fail before sign-in: an unauthenticated caller
-    // gets the global defaults chain (global row, then built-in defaults).
-    if (!data.accessToken && !data.terminalToken) {
+    const anySignIn =
+      data.accessToken || data.terminalToken || data.cashierToken || data.sessionToken;
+    // Before sign-in there is no branch identity, so the answer is explicitly
+    // the global chain — the caller marks it as unverified, never as this
+    // branch's saved configuration.
+    if (!anySignIn) {
       const base = await loadRulesResult("");
       return {
         ok: true as const,
         anonymous: true as const,
+        identified: false as const,
+        branchId: "",
         backend: base.source,
         backendError: base.error ?? "",
         failure: base.failure,
         revision: base.revision,
         fetchedAt: base.fetchedAt,
-        scope: "" as const,
+        scope: "",
         rules: base.rules,
       };
     }
-    try {
-      await assertCaller(data);
-      const loaded = await loadRulesResult(data.storeId ?? "");
-      return {
-        ok: true as const,
-        anonymous: false as const,
-        backend: loaded.source,
-        backendError: loaded.error ?? "",
-        failure: loaded.failure,
-        revision: loaded.revision,
-        fetchedAt: loaded.fetchedAt,
-        scope: data.storeId ?? "",
-        rules: loaded.rules,
-      };
-    } catch (e) {
-      // A partially initialised session falls back to the branch/global chain
-      // instead of raising into the UI.
+    const { resolveRulesAccess } = await import("./pos-rules-access.server");
+    const access = await resolveRulesAccess(data);
+    if (!access.ok) {
       const base = await loadRulesResult("");
       return {
         ok: false as const,
         anonymous: true as const,
-        error: (e as Error).message,
+        identified: false as const,
+        branchId: "",
+        error: access.error,
+        code: access.code,
         backend: base.source,
         backendError: base.error ?? "",
-        failure: base.failure,
+        failure: access.code === "FORBIDDEN" ? ("permission" as const) : base.failure,
         revision: base.revision,
         fetchedAt: base.fetchedAt,
-        scope: "" as const,
+        scope: "",
         rules: base.rules,
       };
     }
+    const loaded = await loadRulesResult(access.branchId);
+    return {
+      ok: true as const,
+      anonymous: false as const,
+      identified: true as const,
+      branchId: access.branchId,
+      backend: loaded.source,
+      backendError: loaded.error ?? "",
+      failure: loaded.failure,
+      revision: loaded.revision,
+      fetchedAt: loaded.fetchedAt,
+      scope: access.branchId,
+      rules: loaded.rules,
+    };
   });
+
 
 
 /** Supervisor-only write; the database re-checks the role as well. */
