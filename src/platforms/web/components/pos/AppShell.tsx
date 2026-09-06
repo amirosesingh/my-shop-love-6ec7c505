@@ -314,7 +314,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   // Desktop tills and Android terminals both have to register before use.
   if (isDesktop() || isNative()) {
-    if (terminal.revoked) return <TerminalRevokedScreen onReactivate={clearRevocation} />;
+    if (terminal.revoked)
+      return <TerminalRevokedScreen onReactivate={clearRevocation} reason={terminal.reason} />;
     // A stored activation is not a licence to sign in: the connection has to
     // be proven every launch, unless this platform may trade offline.
     const decision = startupDecision({

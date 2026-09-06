@@ -353,7 +353,14 @@ export function TerminalActivation({
 }
 
 /** Shown the moment the heartbeat confirms the token was revoked. */
-export function TerminalRevokedScreen({ onReactivate }: { onReactivate: () => void }) {
+export function TerminalRevokedScreen({
+  onReactivate,
+  reason = "revoked",
+}: {
+  onReactivate: () => void;
+  reason?: "revoked" | "missing";
+}) {
+  const missing = reason === "missing";
   return (
     <Frame>
       <div className="text-center">
@@ -361,11 +368,14 @@ export function TerminalRevokedScreen({ onReactivate }: { onReactivate: () => vo
           <ShieldAlert className="size-7" />
         </div>
         <h1 className="mt-4 text-lg font-semibold text-red-300">
-          This device&apos;s authorization has been revoked by the master administrator.
+          {missing
+            ? "This terminal is no longer registered on the database."
+            : "This device's authorization has been revoked by the master administrator."}
         </h1>
         <p className="mt-2 text-sm text-slate-400">
-          Cloud sync is blocked and the register is locked. Contact head office for a new activation
-          code.
+          {missing
+            ? "Its registration record was removed, so the register is locked and cloud sync is blocked. Ask an administrator for a new activation code."
+            : "Cloud sync is blocked and the register is locked. Contact head office for a new activation code."}
         </p>
         <Button
           variant="outline"
