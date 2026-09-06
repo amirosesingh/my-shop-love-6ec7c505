@@ -507,9 +507,15 @@ export function PosProvider({ children }: { children: ReactNode }) {
           clearSnapshot();
         }
         setReady(true);
+        // The snapshot carries the locations this terminal last saw, so the
+        // launch screen has a real answer while the fresh read is in flight.
+        setStoresLoaded(true);
       }
       if (typeof navigator !== "undefined" && !navigator.onLine) {
-        if (!cancelled) setReady(true);
+        if (!cancelled) {
+          setReady(true);
+          setLoadPhase("ready");
+        }
         return;
       }
       try {
