@@ -77,19 +77,29 @@ A till with no SQL Server installed uses the app's own local database
 holds the same tables with the same column names, so a branch can move between
 the two engines without changing anything in the POS.
 
-## Cloud-parity top-up (v1.3.9)
+## How this file is produced
 
-The bottom of `pos-offline-sqlserver.sql` now carries a generated block that
-mirrors every table in the cloud database — 52 in total. Tables added in this
-revision: `integration_settings`, `offline_sync_audit_log`, `pin_attempts`,
-`public_flags`, `secure_settings`, `security_findings`, `settings_locks`,
-`settings_overrides`, `sku_audit`, `system_audit_logs`, `terminal_tokens` and
-`user_roles`.
+`pos-offline-sqlserver.sql` is **generated**, never edited by hand:
 
-The same block also contains an `IF COL_LENGTH(...) IS NULL ALTER TABLE ... ADD`
-line for every column of every table, so a branch database installed months ago
-gains the newer columns in place. Nothing is dropped, emptied or recreated, and
-the file can be run again at any time.
+```
+npm run offline:sql          # rebuild the file
+npm run offline:sql:check    # fail if it has fallen behind
+```
+
+It is stitched together from `db/offline/parts/00-bootstrap.sql` (create the
+database, login and user), `database/schema.sql` (the master table set the app
+itself applies — 66 tables) and `db/offline/parts/90-local-only.sql` (the two
+tables that exist only on a till: `offline_sync_queue` and
+`pos_store_settings`). 68 tables in total, so the till can hold everything the
+central database holds.
+
+Every table is guarded with `IF OBJECT_ID(...) IS NULL` and every column with
+`IF COL_LENGTH(...) IS NULL ALTER TABLE ... ADD`, so a branch database installed
+months ago gains the newer tables and columns in place. Nothing is dropped,
+emptied or recreated, and the file can be run again at any time.
+
+A test (`src/lib/__tests__/offline-sqlserver-file.test.ts`) fails the build if a
+new table lands in `database/schema.sql` without this file being rebuilt.
 
 The cloud counterpart is `supabase/schema.sql`: one file that installs the whole
 Postgres schema on an empty project and tops up a live one, including grants,
