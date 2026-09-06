@@ -134,7 +134,7 @@ export function SettingsShell({ children, home = false }: { children: ReactNode;
             {home && <span className="font-medium text-muted-foreground lg:hidden">Settings</span>}
           </div>
 
-          {children}
+          <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
         </div>
       </div>
     </AppShell>
