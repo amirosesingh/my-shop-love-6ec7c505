@@ -2714,7 +2714,7 @@ BEGIN
     ('terminal_staff_list', $sig$TABLE(user_id text, full_name text, role_slug text, store_id text, kind text, pin_length smallint)$sig$),
     ('terminal_token_claim', $sig$boolean$sig$),
     ('terminal_token_heartbeat', $sig$void$sig$),
-    ('terminal_token_status', $sig$TABLE(status text, location_name text, location_id text)$sig$),
+    ('terminal_token_status', $sig$TABLE(status text, location_name text, location_id text, is_claimed boolean, expires_at timestamp with time zone)$sig$),
     ('touch_updated_at', $sig$trigger$sig$),
     ('update_updated_at_column', $sig$trigger$sig$),
     ('upsert_cashier', $sig$uuid$sig$),
@@ -6678,17 +6678,17 @@ GRANT ALL ON FUNCTION public.system_audit_immutable() TO service_role;
 
 GRANT ALL ON FUNCTION public.terminal_staff_list(p_store_id text) TO service_role;
 
-GRANT ALL ON FUNCTION public.terminal_token_claim(p_token_id uuid, p_device text) TO service_role;
+GRANT ALL ON FUNCTION public.terminal_token_claim(p_token_id uuid, p_device text, p_proof_hash text, p_platform text, p_os text) TO service_role;
 
-GRANT ALL ON FUNCTION public.terminal_token_claim(p_token_id uuid, p_device text) TO anon;
+GRANT ALL ON FUNCTION public.terminal_token_claim(p_token_id uuid, p_device text, p_proof_hash text, p_platform text, p_os text) TO anon;
 
-GRANT ALL ON FUNCTION public.terminal_token_claim(p_token_id uuid, p_device text) TO authenticated;
+GRANT ALL ON FUNCTION public.terminal_token_claim(p_token_id uuid, p_device text, p_proof_hash text, p_platform text, p_os text) TO authenticated;
 
-GRANT ALL ON FUNCTION public.terminal_token_heartbeat(p_token_id uuid, p_activate boolean) TO service_role;
+GRANT ALL ON FUNCTION public.terminal_token_heartbeat(p_token_id uuid, p_activate boolean, p_version text, p_synced boolean) TO service_role;
 
-GRANT ALL ON FUNCTION public.terminal_token_heartbeat(p_token_id uuid, p_activate boolean) TO anon;
+GRANT ALL ON FUNCTION public.terminal_token_heartbeat(p_token_id uuid, p_activate boolean, p_version text, p_synced boolean) TO anon;
 
-GRANT ALL ON FUNCTION public.terminal_token_heartbeat(p_token_id uuid, p_activate boolean) TO authenticated;
+GRANT ALL ON FUNCTION public.terminal_token_heartbeat(p_token_id uuid, p_activate boolean, p_version text, p_synced boolean) TO authenticated;
 
 GRANT ALL ON FUNCTION public.terminal_token_status(p_token_id uuid) TO service_role;
 
