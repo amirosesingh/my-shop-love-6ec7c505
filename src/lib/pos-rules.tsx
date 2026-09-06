@@ -254,6 +254,31 @@ export function PosRulesProvider({
         };
       };
 
+      // A change saved on this terminal that head office has not confirmed
+      // yet. It is in force here — that is the point of saving it offline.
+      const pendingHeld = (backendError: string): Snapshot => {
+        const now = cached!;
+        logRules("POS_RULES_PENDING_IN_FORCE", {
+          platform,
+          terminal_id: me,
+          branch_id: scope,
+          revision: now.revision,
+        });
+        return {
+          rules: now.rules,
+          usingDefaults: false,
+          degraded: false,
+          notVerified: false,
+          status: "PENDING_UPLOAD",
+          source: "LOCAL_PENDING",
+          failure: "none",
+          backendError,
+          revision: now.revision,
+          branchId: scope,
+          lastSyncedAt: now.at,
+        };
+      };
+
       // A terminal with no branch identity yet must not be shown the global
       // rules as if they were its branch's configuration.
       if (!scope) return unverified("IDENTITY_UNAVAILABLE", "none", "");
@@ -266,6 +291,39 @@ export function PosRulesProvider({
           const at = typeof res.fetchedAt === "number" ? res.fetchedAt : Date.now();
           const revision = res.revision ?? "";
           const rules = normalizeRules(res.rules);
+          if (cached?.pending) {
+            if (rulesEqual(rules, cached.rules)) {
+              // Head office now has the change: it stops being pending.
+              logRules("POS_RULES_SAVE_CONFIRMED", {
+                platform,
+                terminal_id: me,
+                branch_id: scope,
+                revision,
+              });
+              cached = { rules, revision, at, pending: false };
+              lastGood.set(scope, cached);
+              await writeCachedRules({
+                terminalId: me,
+                branchId: scope,
+                revision,
+                syncedAt: at,
+                rules,
+                pending: false,
+              });
+            } else if (pendingExpired(cached.at)) {
+              // Too old to keep holding the branch to it.
+              logRules("POS_RULES_PENDING_ABANDONED", {
+                platform,
+                terminal_id: me,
+                branch_id: scope,
+              });
+              cached = null;
+              lastGood.delete(scope);
+            } else {
+              lastGood.set(scope, cached);
+              return pendingHeld("");
+            }
+          }
           // A late answer must never put an older rule set back in place.
           if (!cached || at >= cached.at) {
             const changed = !cached || cached.revision !== revision;
@@ -317,6 +375,7 @@ export function PosRulesProvider({
           branch_id: scope,
           category: failure,
         });
+        if (cached?.pending) return pendingHeld(detail);
         if (cached) return held(failure, detail);
         return unverified("NOT_VERIFIED", failure, detail);
       } catch (e) {
@@ -327,6 +386,7 @@ export function PosRulesProvider({
           branch_id: scope,
           category: "network",
         });
+        if (cached?.pending) return pendingHeld(message);
         if (cached) return held("network", message);
         return unverified("NOT_VERIFIED", "network", message);
       }
