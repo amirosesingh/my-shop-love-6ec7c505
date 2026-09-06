@@ -48,3 +48,9 @@ export function hasConnection(): boolean {
 /** Standard message for the handful of features that genuinely need a signal. */
 export const NEEDS_CONNECTION =
   "This needs an internet connection. The rest of the till keeps working offline.";
+/** Short label for this shell, for logs and supervisor panels. */
+export function platformName(): "android" | "electron" | "web" {
+  if (isAndroid()) return "android";
+  if (isElectron()) return "electron";
+  return "web";
+}
