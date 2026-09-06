@@ -899,8 +899,28 @@ export async function loadCloudState(): Promise<CloudSlice> {
   }
 
   const [products, members, sales, promotions, settings, stores, shifts] = await Promise.all([
-    supabase.from("products").select("*").is("deleted_at", null).order("name"),
-    supabase.from("members").select("*").is("deleted_at", null).order("created_at"),
+    // Whole-catalogue reads are paged: a single request is capped at 1,000
+    // rows by the database, which used to hide every item past the first
+    // thousand without reporting anything.
+    readAllPages<Row>((from, to) =>
+      supabase
+        .from("products")
+        .select("*", { count: "exact" })
+        .is("deleted_at", null)
+        .order("name")
+        .order("id")
+        .range(from, to),
+    ),
+    readAllPages<Row>((from, to) =>
+      supabase
+        .from("members")
+        .select("*", { count: "exact" })
+        .is("deleted_at", null)
+        .order("created_at")
+        .order("id")
+        .range(from, to),
+    ),
+
     (async () => {
       const read = () =>
         supabase
