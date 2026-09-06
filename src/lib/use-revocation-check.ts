@@ -23,19 +23,30 @@ import {
 import { clearActivationRecord, writeActivationRecord } from "@/core/activation/activation-record";
 
 const CHECK_MS = 5 * 60 * 1000;
+/** Gap before a single empty lookup is confirmed as a deleted record. */
+export const MISSING_CONFIRM_MS = 8 * 1000;
 const BLOCK_KEY = "pos.terminal.revoked";
 
-let blocked = typeof window !== "undefined" && window.localStorage.getItem(BLOCK_KEY) === "1";
+/** Why the terminal is locked: management revoked it, or the record is gone. */
+export type BlockReason = "revoked" | "missing";
+
+const savedBlock = typeof window !== "undefined" ? window.localStorage.getItem(BLOCK_KEY) : null;
+let blocked = savedBlock === "1" || savedBlock === "missing";
+let blockReason: BlockReason = savedBlock === "missing" ? "missing" : "revoked";
 const listeners = new Set<() => void>();
 
-/** True once a revocation has been confirmed by the server. */
+/** True once a revocation (or deletion) has been confirmed by the server. */
 export const isTerminalRevoked = () => blocked;
 
-function setBlocked(next: boolean) {
-  if (blocked === next) return;
+/** Which of the two lock causes applies. Meaningless while not blocked. */
+export const terminalBlockReason = (): BlockReason => blockReason;
+
+function setBlocked(next: boolean, reason: BlockReason = "revoked") {
+  if (blocked === next && blockReason === reason) return;
   blocked = next;
+  blockReason = reason;
   if (typeof window !== "undefined") {
-    if (next) window.localStorage.setItem(BLOCK_KEY, "1");
+    if (next) window.localStorage.setItem(BLOCK_KEY, reason === "missing" ? "missing" : "1");
     else window.localStorage.removeItem(BLOCK_KEY);
   }
   for (const l of listeners) l();
