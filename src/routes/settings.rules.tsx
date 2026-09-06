@@ -43,8 +43,23 @@ export const Route = createFileRoute("/settings/rules")({
 });
 
 function RulesSettings() {
-  const { rules, loading, usingDefaults, degraded, failureText, backendError, lastSyncedAt, refresh } =
-    usePosRules();
+  const {
+    rules,
+    loading,
+    usingDefaults,
+    degraded,
+    failureText,
+    backendError,
+    lastSyncedAt,
+    refresh,
+    status,
+    statusText,
+    source,
+    revision,
+    branchId,
+    terminalId: terminal,
+  } = usePosRules();
+
 
   const { currentStore } = usePos();
   const { isAdmin, can } = useAuth();
@@ -165,6 +180,50 @@ function RulesSettings() {
             {backendError ? <span className="mt-1 block text-xs opacity-80">{backendError}</span> : null}
           </p>
         )}
+
+        <section className="rounded-lg border border-border bg-card p-4 text-sm">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <h2 className="font-medium">Rules status</h2>
+            <Button type="button" variant="outline" size="sm" onClick={refresh}>
+              Check now
+            </Button>
+          </div>
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-muted-foreground sm:grid-cols-3">
+            <div>
+              <dt className="text-xs uppercase tracking-wide">Branch</dt>
+              <dd className="text-foreground">{currentStore.name}</dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wide">Branch ID</dt>
+              <dd className="text-foreground">{branchId || currentStore.id || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wide">Terminal</dt>
+              <dd className="text-foreground">{terminal || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wide">Source</dt>
+              <dd className="text-foreground">{source}</dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wide">Revision</dt>
+              <dd className="text-foreground">{revision || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wide">Status</dt>
+              <dd className="text-foreground">{status}</dd>
+            </div>
+            <div className="col-span-2 sm:col-span-3">
+              <dt className="text-xs uppercase tracking-wide">Last successful sync</dt>
+              <dd className="text-foreground">
+                {lastSyncedAt ? new Date(lastSyncedAt).toLocaleString() : "never on this terminal"}
+              </dd>
+            </div>
+          </dl>
+          <p className="mt-2 text-xs text-muted-foreground">{statusText}</p>
+        </section>
+
+
 
 
         <section className="rounded-lg border border-border bg-card px-5">
