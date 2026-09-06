@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-09-06T05:31:51.440Z",
+  "generatedAt": "2026-09-06T05:33:12.814Z",
   "filesScanned": 601,
   "counts": {
-    "critical": 5,
+    "critical": 4,
     "warning": 2,
     "info": 275
   },
@@ -14,15 +14,6 @@
       "rule": "No failure handling",
       "severity": "critical",
       "detail": "queuedTables() awaits work without a try/catch.",
-      "hint": "A dropped connection here can lose money or stock movements."
-    },
-    {
-      "id": "src/lib/register/use-checkout.ts:114:No failure handling",
-      "file": "src/lib/register/use-checkout.ts",
-      "line": 114,
-      "rule": "No failure handling",
-      "severity": "critical",
-      "detail": "sendSaleOnWhatsApp() awaits work without a try/catch.",
       "hint": "A dropped connection here can lose money or stock movements."
     },
     {
