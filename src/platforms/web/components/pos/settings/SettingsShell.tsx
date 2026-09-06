@@ -73,18 +73,20 @@ export function SettingsShell({ children, home = false }: { children: ReactNode;
               )}
             </button>
           </div>
-          <SettingsNavTree
-            activeId={active?.id}
-            activeCategory={active?.category}
-            collapsed={collapsed}
-            onExpand={() => setRail(false)}
-          />
+          <div className="min-h-0 flex-1">
+            <SettingsNavTree
+              activeId={active?.id}
+              activeCategory={active?.category}
+              collapsed={collapsed}
+              onExpand={() => setRail(false)}
+            />
+          </div>
         </nav>
 
-        <div className="min-w-0 flex-1">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <div
             className={
-              "sticky top-0 z-20 items-center gap-1.5 border-b border-border bg-background/95 px-3 py-2 text-xs backdrop-blur " +
+              "z-20 shrink-0 items-center gap-1.5 border-b border-border bg-background/95 px-3 py-2 text-xs backdrop-blur " +
               (home ? "flex lg:hidden" : "flex")
             }
           >
