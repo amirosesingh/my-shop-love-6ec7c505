@@ -602,6 +602,28 @@ export function PosProvider({ children }: { children: ReactNode }) {
     setKnownBranches(state.stores.map((s) => s.id));
   }, [state.stores]);
 
+  // Take the branch identity from the central directory and mirror it locally,
+  // so a branch renamed centrally reaches this till on the next load. Nothing
+  // is written while the branch is unknown — an existing local copy stands.
+  useEffect(() => {
+    if (!state.stores.length) return;
+    const id = activeBranchId(state.currentStoreId);
+    if (!id) return;
+    const match = state.stores.find((s) => s.id === id);
+    if (!match) return;
+    bindTerminalBranch(match.id, match.name);
+    void import("@/core/local-db/local-db")
+      .then(({ readBranch, writeBranch }) => {
+        const local = readBranch();
+        if (local.branchId === match.id && local.branchName === match.name) return;
+        writeBranch({ branchId: match.id, branchName: match.name });
+      })
+      .catch(() => {
+        /* branch mirroring is best-effort */
+      });
+  }, [state.stores, state.currentStoreId]);
+
+
   // Publish the branch's sync switches to the outbox drainer and the region
   // clock to every formatter, so both follow the saved settings.
   useEffect(() => {
