@@ -209,6 +209,16 @@ const bumpItems = (
 
 type Ctx = {
   ready: boolean;
+  /**
+   * Honest launch state. `stalled` means the first read is taking longer than
+   * expected — it never means the data arrived. `failed` means the read
+   * genuinely came back with an error.
+   */
+  loadPhase: LoadPhase;
+  /** true only once the location list has actually been answered for */
+  storesLoaded: boolean;
+  /** run the first read again after a stall or failure */
+  retryLoad: () => void;
   state: PosState;
   stores: Store[];
   /** every location including archived ones — for the setup screen only */
