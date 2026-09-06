@@ -116,16 +116,55 @@ export function useAppUpdates() {
     await updateBridge()?.installUpdate();
   }, []);
 
+  const [diagnosis, setDiagnosis] = useState<UpdateDiagnosis | null>(null);
+  const [diagnosing, setDiagnosing] = useState(false);
+
+  /** One-tap connection test against the update folder. */
+  const diagnose = useCallback(async () => {
+    const bridge = updateBridge();
+    if (!bridge?.diagnoseUpdates) return null;
+    setDiagnosing(true);
+    try {
+      const result = await bridge.diagnoseUpdates();
+      setDiagnosis(result ?? null);
+      return result ?? null;
+    } catch {
+      setDiagnosis(null);
+      return null;
+    } finally {
+      setDiagnosing(false);
+    }
+  }, []);
+
   const version = state.version || APP_VERSION;
   const manifestVersion = manifest?.version ?? null;
   const manifestNewer = Boolean(manifestVersion && isNewerVersion(manifestVersion, version));
   const downloadUrl = manifest && manifestNewer ? resolvePlatformTarget(manifest)?.url ?? null : null;
+
+  /** Everything a counter would need to paste into a message to head office. */
+  const failureReport = state.error
+    ? [
+        `Version ${version}`,
+        manifestVersion ? `Published ${manifestVersion}` : null,
+        state.stage ? `Stage: ${state.stage}` : null,
+        state.percent ? `Progress: ${state.percent}%` : null,
+        state.url ? `Address: ${state.url}` : null,
+        state.code ? `Code: ${state.code}` : null,
+        `Message: ${state.detail ?? state.error}`,
+      ]
+        .filter(Boolean)
+        .join("\n")
+    : null;
 
   return {
     state,
     supported,
     check,
     install,
+    diagnose,
+    diagnosing,
+    diagnosis,
+    failureReport,
     lastChecked,
     manifest,
     manifestChecking,
@@ -133,5 +172,6 @@ export function useAppUpdates() {
     manifestNewer,
     releaseNotes: manifest?.releaseNotes ?? null,
     downloadUrl,
+
   };
 }
