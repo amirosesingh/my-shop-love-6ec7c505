@@ -56,6 +56,9 @@ const STORE_COLUMN: Record<string, string> = {
   whatsapp_queue: "store_id",
   payment_transactions: "store_id",
   item_activity_logs: "store_id",
+  // Branch trading rules. The branch column is the row's own key, so a till
+  // can only ever write its own branch's rules; supervisors reach any branch.
+  pos_store_settings: "store_id",
 };
 
 /** Child rows carry no branch of their own; their parent decides. */
@@ -150,6 +153,8 @@ const TABLE_PERMISSIONS: Record<string, { write?: string; remove?: string }> = {
   sales: { remove: "can_void_item" },
   sale_items: { remove: "can_void_item" },
   members: { write: "can_add_member" },
+  // Only an account allowed into POS settings may change trading rules.
+  pos_store_settings: { write: "can_access_pos_settings", remove: "can_access_pos_settings" },
 };
 
 export const RELAY_WRITABLE_TABLES = new Set([

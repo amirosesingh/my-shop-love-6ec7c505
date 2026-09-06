@@ -21,6 +21,7 @@ import { getPosRules } from "./pos-rules.functions";
 import { getPosCallerAuth } from "./pos-caller-auth";
 import { subscribeSettingsChange } from "./sync-engine";
 import { readCachedRules, writeCachedRules, type CachedRules } from "./pos-rules-cache";
+import { rulesEqual, pendingExpired } from "./pos-rules-pending";
 import { logRules } from "./pos-rules-log";
 import { terminalId } from "./activity-journal";
 import { serverOrigin, posFetch } from "./server-origin";
@@ -40,13 +41,19 @@ export type RulesFailureKind =
   | "unknown";
 
 /** Where the rules in use came from. */
-export type RulesSourceKind = "DATABASE" | "LAST_KNOWN_GOOD" | "DEFAULT_SAFETY" | "UNAVAILABLE";
+export type RulesSourceKind =
+  | "DATABASE"
+  | "LOCAL_PENDING"
+  | "LAST_KNOWN_GOOD"
+  | "DEFAULT_SAFETY"
+  | "UNAVAILABLE";
 
 /** What the terminal is doing about them. */
 export type RulesStatus =
   | "LIVE"
   | "SYNCING"
   | "DEGRADED"
+  | "PENDING_UPLOAD"
   | "NOT_VERIFIED"
   | "IDENTITY_UNAVAILABLE";
 
@@ -64,6 +71,8 @@ const STATUS_TEXT: Record<RulesStatus, string> = {
   LIVE: "Live from the central database.",
   SYNCING: "Checking the central database…",
   DEGRADED: "Using the last confirmed rules — the latest check did not get through.",
+  PENDING_UPLOAD:
+    "A change saved on this terminal is in force here and is waiting to reach the central system.",
   NOT_VERIFIED:
     "This terminal has never received its branch rules, so the strict safety rules apply.",
   IDENTITY_UNAVAILABLE: "This terminal does not know its branch yet.",
@@ -127,7 +136,10 @@ type Answer = {
  * Last rule set the database actually served, per branch, for this session.
  * The encrypted device copy behind it survives a restart.
  */
-const lastGood = new Map<string, { rules: PosRules; revision: string; at: number }>();
+const lastGood = new Map<
+  string,
+  { rules: PosRules; revision: string; at: number; pending?: boolean }
+>();
 
 /** Ask the server, over whichever transport this platform can actually reach. */
 async function fetchRules(auth: Record<string, string>, storeId: string): Promise<Answer> {
@@ -182,7 +194,12 @@ export function PosRulesProvider({
       if (!cached && scope) {
         const stored: CachedRules | null = await readCachedRules(me, scope).catch(() => null);
         if (stored) {
-          cached = { rules: stored.rules, revision: stored.revision, at: stored.syncedAt };
+          cached = {
+            rules: stored.rules,
+            revision: stored.revision,
+            at: stored.syncedAt,
+            pending: stored.pending === true,
+          };
           lastGood.set(scope, cached);
         }
       }
@@ -237,6 +254,31 @@ export function PosRulesProvider({
         };
       };
 
+      // A change saved on this terminal that head office has not confirmed
+      // yet. It is in force here — that is the point of saving it offline.
+      const pendingHeld = (backendError: string): Snapshot => {
+        const now = cached!;
+        logRules("POS_RULES_PENDING_IN_FORCE", {
+          platform,
+          terminal_id: me,
+          branch_id: scope,
+          revision: now.revision,
+        });
+        return {
+          rules: now.rules,
+          usingDefaults: false,
+          degraded: false,
+          notVerified: false,
+          status: "PENDING_UPLOAD",
+          source: "LOCAL_PENDING",
+          failure: "none",
+          backendError,
+          revision: now.revision,
+          branchId: scope,
+          lastSyncedAt: now.at,
+        };
+      };
+
       // A terminal with no branch identity yet must not be shown the global
       // rules as if they were its branch's configuration.
       if (!scope) return unverified("IDENTITY_UNAVAILABLE", "none", "");
@@ -249,6 +291,39 @@ export function PosRulesProvider({
           const at = typeof res.fetchedAt === "number" ? res.fetchedAt : Date.now();
           const revision = res.revision ?? "";
           const rules = normalizeRules(res.rules);
+          if (cached?.pending) {
+            if (rulesEqual(rules, cached.rules)) {
+              // Head office now has the change: it stops being pending.
+              logRules("POS_RULES_SAVE_CONFIRMED", {
+                platform,
+                terminal_id: me,
+                branch_id: scope,
+                revision,
+              });
+              cached = { rules, revision, at, pending: false };
+              lastGood.set(scope, cached);
+              await writeCachedRules({
+                terminalId: me,
+                branchId: scope,
+                revision,
+                syncedAt: at,
+                rules,
+                pending: false,
+              });
+            } else if (pendingExpired(cached.at)) {
+              // Too old to keep holding the branch to it.
+              logRules("POS_RULES_PENDING_ABANDONED", {
+                platform,
+                terminal_id: me,
+                branch_id: scope,
+              });
+              cached = null;
+              lastGood.delete(scope);
+            } else {
+              lastGood.set(scope, cached);
+              return pendingHeld("");
+            }
+          }
           // A late answer must never put an older rule set back in place.
           if (!cached || at >= cached.at) {
             const changed = !cached || cached.revision !== revision;
@@ -300,6 +375,7 @@ export function PosRulesProvider({
           branch_id: scope,
           category: failure,
         });
+        if (cached?.pending) return pendingHeld(detail);
         if (cached) return held(failure, detail);
         return unverified("NOT_VERIFIED", failure, detail);
       } catch (e) {
@@ -310,6 +386,7 @@ export function PosRulesProvider({
           branch_id: scope,
           category: "network",
         });
+        if (cached?.pending) return pendingHeld(message);
         if (cached) return held("network", message);
         return unverified("NOT_VERIFIED", "network", message);
       }

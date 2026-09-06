@@ -18,6 +18,7 @@ import { usePos } from "@/lib/pos-store";
 import { usePosRules } from "@/lib/pos-rules.tsx";
 import { RULE_GROUPS, type PosRules, type PosRuleKey } from "@/lib/pos-rules";
 import { savePosRules } from "@/lib/pos-rules.functions";
+import { queueRulesSave } from "@/lib/pos-rules-offline";
 import { getPosCallerAuth } from "@/lib/pos-caller-auth";
 import { getIdleTimeout, saveIdleTimeout } from "@/lib/idle-timeout.functions";
 
@@ -102,12 +103,31 @@ function RulesSettings() {
   const set = (key: PosRuleKey, value: boolean | number) =>
     setDraft((d) => ({ ...d, [key]: value }) as PosRules);
 
+  /**
+   * Keep the change on this terminal and let the sync worker deliver it.
+   * Used when the central system cannot be reached right now.
+   */
+  async function keepLocally(reason: string) {
+    await queueRulesSave({
+      terminalId: terminal,
+      branchId: branchId || currentStore.id,
+      rules: draft,
+      patch: draft as unknown as Record<string, boolean | number>,
+    });
+    refresh();
+    toast.success("Saved on this terminal", {
+      description: `${reason} These rules are in force here and will reach head office on the next connection.`,
+    });
+  }
+
   async function save() {
     setSaving(true);
     try {
       const auth = await getPosCallerAuth();
       if (!auth.accessToken) {
-        toast.error("Sign in with a supervisor account to change rules");
+        // Signed in at the till but with no central session — the change is
+        // still kept, and the server re-checks the account when it arrives.
+        await keepLocally("Head office could not be reached.");
         return;
       }
       const res = await savePosRules({
@@ -118,13 +138,18 @@ function RulesSettings() {
         },
       });
       if (!res.ok) {
+        // A refusal is a refusal; only an unreachable system is queued.
         toast.error(res.error ?? "Could not save rules");
         return;
       }
       refresh();
       toast.success("Rules saved");
     } catch (e) {
-      notifyError(e, "Could not save rules");
+      try {
+        await keepLocally("Head office could not be reached.");
+      } catch {
+        notifyError(e, "Could not save rules");
+      }
     } finally {
       setSaving(false);
     }

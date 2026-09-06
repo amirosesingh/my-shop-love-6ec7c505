@@ -25,7 +25,8 @@ import {
 } from "@/platforms/web/components/pos/AuthorizationDialog";
 import { useAuthOptional } from "@/lib/pos-auth";
 import { usePosRules } from "@/lib/pos-rules.tsx";
-import { GATE_RULE_KEY } from "@/lib/pos-rules";
+import { GATE_RULE_KEY, offlineApprovalMode, type GateAction } from "@/lib/pos-rules";
+import { isOnline } from "@/lib/sync-outbox";
 import { authorizeAsAdmin } from "@/lib/pos-rules.functions";
 import { getAuthorizationRules } from "@/lib/authorization.functions";
 import { getPosCallerAuth } from "@/lib/pos-caller-auth";
@@ -113,7 +114,28 @@ export function ManagerGateProvider({
       // 1 · this branch does not gate the action
       if (mode === "none") return { ok: true, grantToken: null };
 
-      // 2 · administrators are not prompted; the approval is logged server-side
+      // 2 · with no connection the branch rule decides what may still be
+      //     approved here, and how.
+      const offline = !isOnline();
+      let promptMode = mode;
+      const gateAction = (request.action in GATE_RULE_KEY ? request.action : null) as
+        | GateAction
+        | null;
+      if (offline && gateAction) {
+        const allowance = offlineApprovalMode(legacyRules, gateAction);
+        if (allowance === "refused") {
+          toast.error("This needs a connection", {
+            description: `${
+              AUTH_ACTION_LABEL[request.action] || "This action"
+            } can only be approved while the terminal is connected.`,
+          });
+          return { ok: false, grantToken: null };
+        }
+        // An approval request cannot travel now, so a PIN is the only route.
+        if (allowance === "manager_pin" || mode === "request") promptMode = "pin";
+      }
+
+      // 3 · administrators are not prompted; the approval is logged server-side
       if (isAdmin) {
         try {
           const caller = await getPosCallerAuth();
@@ -142,12 +164,12 @@ export function ManagerGateProvider({
         return { ok: true, grantToken: null };
       }
 
-      // 3 · everyone else: PIN, an approval request, or their choice of both
+      // 4 · everyone else: PIN, an approval request, or their choice of both
       const outcome = await new Promise<PromptOutcome>((resolve) => {
         resolver.current = resolve;
         setPending({
           actionKey: request.action,
-          mode,
+          mode: promptMode,
           title: request.title || AUTH_ACTION_LABEL[request.action] || "Authorisation",
           reason: request.reason,
           requireReason: rule?.requireReason ?? false,
@@ -168,7 +190,7 @@ export function ManagerGateProvider({
       }
       return { ok: false, grantToken: null };
     },
-    [rules, isAdmin],
+    [rules, isAdmin, legacyRules],
   );
 
   const value = useMemo<Ctx>(() => ({ authorize, rules }), [authorize, rules]);

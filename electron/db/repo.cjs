@@ -18,6 +18,9 @@ const TABLES = [
   "members",
   "promotions",
   "pos_settings",
+  // Branch trading rules. Kept locally so the register enforces the same
+  // limits with no connection, and a change made here is queued upward.
+  "pos_store_settings",
   "suppliers",
   "shifts",
   // Sign-in visibility and drawer openings are written by the till too; they
@@ -368,6 +371,12 @@ function bind(request, name, value) {
 
 /** pos_settings is one wide row in the cloud; locally it is stored as JSON. */
 function normaliseRow(table, row) {
+  // The branch rules have no id centrally; locally the branch is the key, and
+  // the business-wide row (blank branch) is filed under "global".
+  if (table === "pos_store_settings") {
+    const store = row.store_id === undefined || row.store_id === null ? "" : String(row.store_id);
+    return { ...row, store_id: store, id: store || "global" };
+  }
   if (table !== "pos_settings") return row;
   const { id: _id, ...payload } = row;
   return { id: SETTINGS_ID, payload };

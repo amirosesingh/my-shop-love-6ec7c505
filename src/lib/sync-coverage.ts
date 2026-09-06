@@ -45,7 +45,6 @@ export const CLOUD_ONLY: Record<string, string> = {
   settings_scoped: "Branch/cluster settings are resolved online.",
   settings_overrides: "Branch/cluster settings are resolved online.",
   settings_locks: "Branch/cluster settings are resolved online.",
-  pos_store_settings: "Branch trading rules are resolved online.",
   branch_telemetry: "Head office monitoring only.",
   terminal_tokens: "Activation is an online-only exchange.",
   terminal_commands: "Kill-switch commands are read online.",
