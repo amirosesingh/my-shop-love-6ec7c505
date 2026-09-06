@@ -8829,6 +8829,8 @@ BEGIN
     RAISE EXCEPTION 'You do not have permission to submit a cash count.';
   END IF;
   IF p_cash IS NULL OR p_cash < 0 THEN RAISE EXCEPTION 'Enter the cash counted in the drawer.'; END IF;
+  IF p_card IS NOT NULL AND p_card < 0 THEN RAISE EXCEPTION 'The card total counted cannot be negative.'; END IF;
+  IF p_digital IS NOT NULL AND p_digital < 0 THEN RAISE EXCEPTION 'The digital total counted cannot be negative.'; END IF;
 
   SELECT * INTO v FROM public.shifts WHERE id = p_shift FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'That shift no longer exists.'; END IF;
@@ -8876,9 +8878,12 @@ BEGIN
   END IF;
   IF v_reason = '' THEN RAISE EXCEPTION 'A reason for the recount is required.'; END IF;
   IF p_cash IS NULL OR p_cash < 0 THEN RAISE EXCEPTION 'Enter the recounted cash amount.'; END IF;
+  IF p_card IS NOT NULL AND p_card < 0 THEN RAISE EXCEPTION 'The card total counted cannot be negative.'; END IF;
+  IF p_digital IS NOT NULL AND p_digital < 0 THEN RAISE EXCEPTION 'The digital total counted cannot be negative.'; END IF;
 
   SELECT * INTO v FROM public.shifts WHERE id = p_shift FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'That shift no longer exists.'; END IF;
+  IF NOT public.store_visible(v.store_id) THEN RAISE EXCEPTION 'That shift belongs to another branch.'; END IF;
   IF v.state NOT IN ('VARIANCE_REVIEW_REQUIRED','RECONCILIATION','CLOSED') THEN
     RAISE EXCEPTION 'This shift has not been counted yet.';
   END IF;

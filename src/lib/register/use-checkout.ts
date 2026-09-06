@@ -9,6 +9,7 @@
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { notifyError } from "@/lib/notify";
+import { runWhatsAppSend } from "@/lib/register/wa-send";
 import { openCashDrawer, printBookingSlip, printJobTag, printSaleReceipt } from "@/lib/pos-print";
 import { buildBookingMessage, buildSaleMessage, sendBillOnWhatsApp } from "@/lib/whatsapp";
 import { logger } from "@/lib/audit-log";
@@ -103,22 +104,34 @@ export function useCheckout(deps: CheckoutDeps) {
    */
   const inFlight = useRef(false);
 
-  /** Sends the finished bill to the customer's WhatsApp. */
+  /**
+   * Sends the finished bill to the customer's WhatsApp.
+   *
+   * The shared helper clears the "sending" flag in every outcome and turns a
+   * thrown send into a toast, so the automatic fire-and-forget call cannot
+   * strand the register or raise an unhandled rejection.
+   */
   async function sendSaleOnWhatsApp(sale: Sale, to: string) {
-    deps.setWaSending(true);
-    const wa = state.settings.whatsapp;
-    const buyer = state.members.find((m) => m.id === sale.memberId) ?? null;
-    const res = await sendBillOnWhatsApp({
-      cfg: wa,
-      to,
-      body: buildSaleMessage(sale, deps.getDisplayBase().companyName, wa),
-      reference: sale.receiptNo,
-      member: buyer,
+    await runWhatsAppSend(
+      deps.setWaSending,
+      () => {
+        const wa = state.settings.whatsapp;
+        const buyer = state.members.find((m) => m.id === sale.memberId) ?? null;
+        return sendBillOnWhatsApp({
+          cfg: wa,
+          to,
+          body: buildSaleMessage(sale, deps.getDisplayBase().companyName, wa),
+          reference: sale.receiptNo,
+          member: buyer,
+        });
+      },
+      `Bill ${sale.receiptNo} sent on WhatsApp`,
+    ).catch(() => {
+      // The helper already reports every failure; this belt-and-braces catch
+      // keeps the fire-and-forget caller free of unhandled rejections.
     });
-    deps.setWaSending(false);
-    if (res.ok) toast.success(`Bill ${sale.receiptNo} sent on WhatsApp`);
-    else toast.error("WhatsApp send failed", { description: res.error });
   }
+
 
   async function bookAndPayLater() {
     const activeShift = deps.getActiveShift();
