@@ -32,6 +32,7 @@ describe("who may read which branch's rules", () => {
     });
 
     const res = await resolveRulesAccess({ storeId: "bandar" });
+    console.log("R", JSON.stringify(res));
     expect(res).toMatchObject({ ok: false, status: 401, code: "IDENTITY" });
   });
 });
