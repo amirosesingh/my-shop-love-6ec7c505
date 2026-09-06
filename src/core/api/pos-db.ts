@@ -935,7 +935,16 @@ export async function loadCloudState(): Promise<CloudSlice> {
       }
       return first;
     })(),
-    supabase.from("promotions").select("*").is("deleted_at", null).order("created_at"),
+    readAllPages<Row>((from, to) =>
+      supabase
+        .from("promotions")
+        .select("*", { count: "exact" })
+        .is("deleted_at", null)
+        .order("created_at")
+        .order("id")
+        .range(from, to),
+    ),
+
     supabase.from("pos_settings").select("*").eq("id", 1).maybeSingle(),
     // The stores table only exists once supabase/schema.sql has been applied; a
     // missing table must not stop the till from loading. Supabase query
