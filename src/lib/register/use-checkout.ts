@@ -103,22 +103,34 @@ export function useCheckout(deps: CheckoutDeps) {
    */
   const inFlight = useRef(false);
 
-  /** Sends the finished bill to the customer's WhatsApp. */
+  /**
+   * Sends the finished bill to the customer's WhatsApp.
+   *
+   * The "sending" flag is cleared in every outcome. A throw here used to leave
+   * the register showing "sending" for the rest of the session, and — because
+   * the automatic send is fire-and-forget — escaped as an unhandled rejection.
+   */
   async function sendSaleOnWhatsApp(sale: Sale, to: string) {
     deps.setWaSending(true);
-    const wa = state.settings.whatsapp;
-    const buyer = state.members.find((m) => m.id === sale.memberId) ?? null;
-    const res = await sendBillOnWhatsApp({
-      cfg: wa,
-      to,
-      body: buildSaleMessage(sale, deps.getDisplayBase().companyName, wa),
-      reference: sale.receiptNo,
-      member: buyer,
-    });
-    deps.setWaSending(false);
-    if (res.ok) toast.success(`Bill ${sale.receiptNo} sent on WhatsApp`);
-    else toast.error("WhatsApp send failed", { description: res.error });
+    try {
+      const wa = state.settings.whatsapp;
+      const buyer = state.members.find((m) => m.id === sale.memberId) ?? null;
+      const res = await sendBillOnWhatsApp({
+        cfg: wa,
+        to,
+        body: buildSaleMessage(sale, deps.getDisplayBase().companyName, wa),
+        reference: sale.receiptNo,
+        member: buyer,
+      });
+      if (res.ok) toast.success(`Bill ${sale.receiptNo} sent on WhatsApp`);
+      else toast.error("WhatsApp send failed", { description: res.error });
+    } catch (error) {
+      toast.error("WhatsApp send failed", { description: describeError(error, "The send") });
+    } finally {
+      deps.setWaSending(false);
+    }
   }
+
 
   async function bookAndPayLater() {
     const activeShift = deps.getActiveShift();
