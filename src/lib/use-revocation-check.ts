@@ -94,7 +94,10 @@ export function useRevocationCheck(): RevocationState {
     void restoreTerminalConfigFromDisk();
   }, []);
   useEffect(() => {
-    const off = subscribeRevocation(() => setRevoked(isTerminalRevoked()));
+    const off = subscribeRevocation(() => {
+      setRevoked(isTerminalRevoked());
+      setReason(terminalBlockReason());
+    });
     return () => {
       off();
     };
