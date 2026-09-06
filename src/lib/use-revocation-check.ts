@@ -61,6 +61,59 @@ export function clearRevocation() {
   setBlocked(false);
 }
 
+export type TerminalVerdict = {
+  /** "unknown" means no usable answer — never act on it */
+  outcome: "ok" | "revoked" | "missing" | "unknown";
+  stamp?: string | null;
+};
+
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Ask the database what it thinks of this terminal.
+ *
+ * A lookup that succeeds but finds nothing means the registration row was
+ * deleted — that ends the terminal just like a revocation. Because an empty
+ * answer can also appear for a moment while the database reloads its API, one
+ * empty result is retried before it counts.
+ */
+export async function terminalVerdict(
+  tokenId: string,
+  deps: {
+    lookup?: typeof fetchTokenStatus;
+    isOnline?: () => boolean;
+    confirmDelayMs?: number;
+  } = {},
+): Promise<TerminalVerdict> {
+  const lookup = deps.lookup ?? fetchTokenStatus;
+  const isOnline = deps.isOnline ?? (() => typeof navigator === "undefined" || navigator.onLine);
+  // No link, no verdict: the till keeps selling exactly as it was.
+  if (!isOnline()) return { outcome: "unknown" };
+
+  let remote: Awaited<ReturnType<typeof fetchTokenStatus>>;
+  try {
+    remote = await lookup(tokenId);
+  } catch {
+    return { outcome: "unknown" }; // transient error — try again on the next tick
+  }
+
+  if (!remote) {
+    // Second opinion before locking a working shop floor.
+    await wait(deps.confirmDelayMs ?? MISSING_CONFIRM_MS);
+    if (!isOnline()) return { outcome: "unknown" };
+    try {
+      const again = await lookup(tokenId);
+      if (!again) return { outcome: "missing" };
+      remote = again;
+    } catch {
+      return { outcome: "unknown" };
+    }
+  }
+
+  if (remote.status === "revoked") return { outcome: "revoked" };
+  return { outcome: "ok", stamp: (remote as { stamp?: string | null }).stamp ?? null };
+}
+
 export type RevocationState = {
   config: TerminalConfig | null;
   /** the token was confirmed revoked or deleted — lock the screen */
