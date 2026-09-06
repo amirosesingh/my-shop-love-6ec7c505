@@ -14,6 +14,8 @@ import { effectiveDatabaseMode, isConnectionError } from "@/core/local-db/db-mod
 import { readSnapshot } from "@/lib/offline-snapshot";
 import { lastHealth } from "@/core/activation/connection-health";
 import { noteVersions } from "@/lib/row-versions";
+import { readAllPages } from "@/lib/paged-read";
+
 import type { Row } from "@/lib/sync-outbox";
 
 /** Table names are dynamic here, so the generated row types do not apply. */
