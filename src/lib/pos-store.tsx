@@ -2680,6 +2680,9 @@ export function PosProvider({ children }: { children: ReactNode }) {
 
   const value: Ctx = {
     ready,
+    loadPhase,
+    storesLoaded,
+    retryLoad,
     state: effectiveState,
     settingsScope: scope,
     scopeIds,
