@@ -25,7 +25,7 @@ import {
 } from "@/platforms/web/components/pos/AuthorizationDialog";
 import { useAuthOptional } from "@/lib/pos-auth";
 import { usePosRules } from "@/lib/pos-rules.tsx";
-import { GATE_RULE_KEY, offlineApprovalMode } from "@/lib/pos-rules";
+import { GATE_RULE_KEY, offlineApprovalMode, type GateAction } from "@/lib/pos-rules";
 import { isOnline } from "@/lib/sync-outbox";
 import { authorizeAsAdmin } from "@/lib/pos-rules.functions";
 import { getAuthorizationRules } from "@/lib/authorization.functions";
@@ -118,8 +118,11 @@ export function ManagerGateProvider({
       //     approved here, and how.
       const offline = !isOnline();
       let promptMode = mode;
-      if (offline) {
-        const allowance = offlineApprovalMode(legacyRules, request.action);
+      const gateAction = (request.action in GATE_RULE_KEY ? request.action : null) as
+        | GateAction
+        | null;
+      if (offline && gateAction) {
+        const allowance = offlineApprovalMode(legacyRules, gateAction);
         if (allowance === "refused") {
           toast.error("This needs a connection", {
             description: `${
