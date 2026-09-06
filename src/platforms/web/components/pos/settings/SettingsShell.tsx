@@ -49,11 +49,11 @@ export function SettingsShell({ children, home = false }: { children: ReactNode;
 
   return (
     <AppShell>
-      <div className="flex min-h-full w-full">
+      <div className="flex h-full min-h-0 w-full overflow-hidden">
         <nav
           aria-label="Settings navigation"
           className={
-            "sticky top-0 hidden max-h-[calc(100dvh-3.5rem)] shrink-0 self-start overflow-hidden border-r border-border bg-sidebar/40 px-2 py-3 lg:block " +
+            "hidden h-full min-h-0 shrink-0 flex-col border-r border-border bg-sidebar/40 px-2 py-3 lg:flex " +
             (collapsed ? "w-14" : "w-64 xl:w-72")
           }
         >
@@ -73,18 +73,20 @@ export function SettingsShell({ children, home = false }: { children: ReactNode;
               )}
             </button>
           </div>
-          <SettingsNavTree
-            activeId={active?.id}
-            activeCategory={active?.category}
-            collapsed={collapsed}
-            onExpand={() => setRail(false)}
-          />
+          <div className="min-h-0 flex-1">
+            <SettingsNavTree
+              activeId={active?.id}
+              activeCategory={active?.category}
+              collapsed={collapsed}
+              onExpand={() => setRail(false)}
+            />
+          </div>
         </nav>
 
-        <div className="min-w-0 flex-1">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <div
             className={
-              "sticky top-0 z-20 items-center gap-1.5 border-b border-border bg-background/95 px-3 py-2 text-xs backdrop-blur " +
+              "z-20 shrink-0 items-center gap-1.5 border-b border-border bg-background/95 px-3 py-2 text-xs backdrop-blur " +
               (home ? "flex lg:hidden" : "flex")
             }
           >
@@ -132,7 +134,7 @@ export function SettingsShell({ children, home = false }: { children: ReactNode;
             {home && <span className="font-medium text-muted-foreground lg:hidden">Settings</span>}
           </div>
 
-          {children}
+          <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
         </div>
       </div>
     </AppShell>
