@@ -11,6 +11,8 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "logic:scan": "node scripts/logic-scan.cjs",
+    "offline:sql": "node scripts/build-offline-sql.cjs",
+    "offline:sql:check": "node scripts/build-offline-sql.cjs --check",
     "test": "vitest run",
     "format": "prettier --write .",
     "desktop:dev": "cross-env VITE_DEV_SERVER_URL=http://localhost:8080 electron .",
