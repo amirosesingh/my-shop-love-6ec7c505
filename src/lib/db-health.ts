@@ -291,7 +291,11 @@ async function activationChecks(): Promise<HeaderCheck[]> {
           detail: "This routine is out of date or missing. Run supabase/schema.sql on this database.",
         });
       } else {
-        out.push({ label: probe.label, ok: false, detail: explainError(err) });
+        out.push({
+          label: probe.label,
+          ok: false,
+          detail: explainError({ message: message || "Refused", code }),
+        });
       }
     } catch (e) {
       out.push({ label: probe.label, ok: false, detail: (e as Error).message });
