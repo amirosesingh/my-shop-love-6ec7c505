@@ -101,15 +101,16 @@ async function runQuery(
     if (rows) return { rows, source: "local" };
   }
   try {
-    const build = (from: number, to: number) => {
-      let q = from_(table).select(options.columns ?? "*", { count: "exact" });
+    const build = (start: number, end: number) => {
+      let q = from(table).select(options.columns ?? "*", { count: "exact" });
       for (const [k, v] of Object.entries(options.match ?? {})) q = q.eq(k, v);
       if (options.in) q = q.in(options.in.column, options.in.values);
       if (options.orderBy)
         q = q.order(options.orderBy.column, { ascending: options.orderBy.ascending ?? true });
       // A deterministic tie-break, or rows can shift between windows.
       q = q.order("id", { ascending: true });
-      return q.range(from, to) as PromiseLike<{
+      return q.range(start, end) as PromiseLike<{
+
         data: Row[] | null;
         error: { message: string } | null;
         count?: number | null;
