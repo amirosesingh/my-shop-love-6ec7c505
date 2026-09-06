@@ -23,12 +23,36 @@ export type UpdateStatus =
   | "error"
   | "unavailable";
 
+export type UpdateStage = "check" | "download" | "verify" | "install";
+
 export type UpdateState = {
   status: UpdateStatus;
   version: string;
   available?: string | null;
   percent: number;
   error: string | null;
+  /** Where it went wrong, so the card can say more than "it failed". */
+  stage?: UpdateStage | null;
+  /** Raw message from the network layer, for the "Copy details" button. */
+  detail?: string | null;
+  code?: string | null;
+  url?: string | null;
+};
+
+export type UpdateProbe = {
+  ok: boolean;
+  url: string;
+  status?: number;
+  ms?: number;
+  code?: string | null;
+  error?: string;
+};
+
+export type UpdateDiagnosis = {
+  ok: boolean;
+  version: string;
+  feed: string | null;
+  checks: UpdateProbe[];
 };
 
 type UpdateBridge = {
@@ -36,6 +60,8 @@ type UpdateBridge = {
   updateStatus: () => Promise<UpdateState>;
   checkForUpdates: () => Promise<UpdateState>;
   installUpdate: () => Promise<{ ok: boolean; error?: string }>;
+  diagnoseUpdates?: () => Promise<UpdateDiagnosis>;
+  updateDownloadPage?: () => Promise<string | null>;
   onUpdateStatus: (cb: (s: UpdateState) => void) => () => void;
 };
 
@@ -44,6 +70,7 @@ export const updateBridge = (): UpdateBridge | null => {
   const api = (window as unknown as { pos?: Partial<UpdateBridge> }).pos;
   return api && typeof api.updateStatus === "function" ? (api as UpdateBridge) : null;
 };
+
 
 const INITIAL: UpdateState = { status: "idle", version: "", percent: 0, error: null };
 
