@@ -397,8 +397,21 @@ function Register() {
   const [noSaleReason, setNoSaleReason] = useState("");
   const [noSaleNote, setNoSaleNote] = useState("");
 
+  // One pass over the catalogue instead of one per render — the search dialog
+  // gets the same array back until the catalogue or the branch actually change.
+  const visibleProducts = useMemo(
+    () =>
+      state.products.filter((p) =>
+        productVisibleAt(state.settings, p, state.currentStoreId),
+      ),
+    [state.products, state.settings, state.currentStoreId],
+  );
 
-  const member = state.members.find((m) => m.id === memberId) ?? null;
+  const member = useMemo(
+    () => state.members.find((m) => m.id === memberId) ?? null,
+    [state.members, memberId],
+  );
+
 
   /* ── Sticky ticket ──────────────────────────────────────────────────────
      The open ticket is stored per store so a refresh, a trip to another page
