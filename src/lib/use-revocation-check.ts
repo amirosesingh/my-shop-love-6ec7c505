@@ -63,8 +63,10 @@ export function clearRevocation() {
 
 export type RevocationState = {
   config: TerminalConfig | null;
-  /** the token was confirmed revoked — lock the screen */
+  /** the token was confirmed revoked or deleted — lock the screen */
   revoked: boolean;
+  /** which of the two causes locked the terminal */
+  reason: BlockReason;
   online: boolean;
   lastCheckedAt: string | null;
   /** still unsealing the saved activation — do not ask for a new code yet */
@@ -74,6 +76,7 @@ export type RevocationState = {
 export function useRevocationCheck(): RevocationState {
   const [config, setConfig] = useState<TerminalConfig | null>(() => readTerminalConfig());
   const [revoked, setRevoked] = useState(isTerminalRevoked);
+  const [reason, setReason] = useState<BlockReason>(terminalBlockReason);
   const [online, setOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
   const [lastCheckedAt, setLastCheckedAt] = useState<string | null>(null);
   const [hydrating, setHydrating] = useState(() => !isTerminalConfigHydrated());
