@@ -21,6 +21,11 @@ export type CachedRules = {
   revision: string;
   syncedAt: number;
   rules: PosRules;
+  /**
+   * A change made on this till that the central database has not confirmed
+   * yet. It stays in force locally until the confirmation comes back.
+   */
+  pending?: boolean;
 };
 
 type Stored = Omit<CachedRules, "rules"> & { rules: unknown };
@@ -40,6 +45,7 @@ export async function readCachedRules(
     revision: stored.revision ?? "",
     syncedAt: Number(stored.syncedAt) || 0,
     rules: normalizeRules(stored.rules),
+    pending: stored.pending === true,
   };
 }
 
