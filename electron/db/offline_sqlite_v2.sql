@@ -1245,7 +1245,9 @@ CREATE INDEX IF NOT EXISTS ix_record_edits_store ON record_edits (store_id, crea
 -- Branch trading rules mirrored locally: the register enforces the same rules
 -- offline, and a change made on the till is queued for the central system.
 CREATE TABLE IF NOT EXISTS pos_store_settings (
-  store_id TEXT PRIMARY KEY,
+  -- local key: the branch id, or 'global' for the business-wide row
+  id TEXT PRIMARY KEY,
+  store_id TEXT,
   block_shift_close_on_hold INTEGER,
   require_daily_sales_for_shift_close INTEGER,
   require_counted_cash_on_close INTEGER,

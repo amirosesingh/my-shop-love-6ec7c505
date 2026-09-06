@@ -2750,7 +2750,9 @@ GO
    same rules with no connection, and a change made here is queued upward. */
 IF OBJECT_ID('dbo.pos_store_settings', 'U') IS NULL
 CREATE TABLE dbo.pos_store_settings (
-  [store_id] NVARCHAR(MAX) NOT NULL PRIMARY KEY,
+  /* local key: the branch id, or 'global' for the business-wide row */
+  [id] NVARCHAR(120) NOT NULL PRIMARY KEY,
+  [store_id] NVARCHAR(400),
   [block_shift_close_on_hold] BIT,
   [require_daily_sales_for_shift_close] BIT,
   [require_counted_cash_on_close] BIT,
@@ -2809,6 +2811,8 @@ GO
 
 IF OBJECT_ID('dbo.pos_store_settings', 'U') IS NOT NULL
 BEGIN
+  IF COL_LENGTH('dbo.pos_store_settings', 'id') IS NULL ALTER TABLE dbo.pos_store_settings ADD [id] NVARCHAR(120);
+  IF COL_LENGTH('dbo.pos_store_settings', 'store_id') IS NULL ALTER TABLE dbo.pos_store_settings ADD [store_id] NVARCHAR(400);
   IF COL_LENGTH('dbo.pos_store_settings', 'block_shift_close_on_hold') IS NULL ALTER TABLE dbo.pos_store_settings ADD [block_shift_close_on_hold] BIT;
   IF COL_LENGTH('dbo.pos_store_settings', 'require_daily_sales_for_shift_close') IS NULL ALTER TABLE dbo.pos_store_settings ADD [require_daily_sales_for_shift_close] BIT;
   IF COL_LENGTH('dbo.pos_store_settings', 'require_counted_cash_on_close') IS NULL ALTER TABLE dbo.pos_store_settings ADD [require_counted_cash_on_close] BIT;
