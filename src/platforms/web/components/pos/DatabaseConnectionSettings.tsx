@@ -11,15 +11,11 @@ import { Switch } from "@/components/ui/switch";
 import { CloudConnectionPanel } from "@/platforms/web/components/pos/settings/panels/CloudConnectionPanel";
 import { LocalDatabaseSettings } from "@/platforms/web/components/pos/LocalDatabaseSettings";
 import { ConnectionCheck } from "@/platforms/web/components/pos/ConnectionCheck";
-import { heartbeat } from "@/core/activation/connection-health";
 import { isOnlineOnly } from "@/lib/live-mode";
 import { useSystemStatus } from "@/lib/system-status";
 import {
   databaseModeLabel,
-  databaseModeLocked,
   effectiveDatabaseMode,
-  preferredDatabaseMode,
-  setPreferredDatabaseMode,
   subscribeDatabaseMode,
 } from "@/core/local-db/db-mode";
 
@@ -38,8 +34,6 @@ export function DatabaseConnectionSettings() {
 
   useEffect(() => subscribeDatabaseMode(() => force((n) => n + 1)), []);
 
-  const locked = databaseModeLocked();
-  const localMode = preferredDatabaseMode() === "local";
   const liveOnly = isOnlineOnly();
 
   return (
@@ -60,22 +54,11 @@ export function DatabaseConnectionSettings() {
           <div>
             <p className="text-sm">Local database mode</p>
             <p className="text-xs text-muted-foreground">
-              {locked
-                ? "This device is a live client: everything is read from and written to the central database."
-                : "On: every sale, shift and stock change is stored on this machine first. Off: changes go straight to the central database, and this terminal switches to local automatically if the connection drops."}
+              Every sale, shift and stock change is committed to this terminal's SQL database first.
+              The background worker synchronizes pending changes to the central database.
             </p>
           </div>
-          <Switch
-            aria-label="Local database mode"
-            disabled={locked}
-            checked={locked ? false : localMode}
-            onCheckedChange={(v) => {
-              setPreferredDatabaseMode(v ? "local" : "online");
-              force((n) => n + 1);
-              // Only re-check the connection: the sync panel owns transfers.
-              void heartbeat();
-            }}
-          />
+          <Switch aria-label="Local database mode" disabled checked />
         </div>
       )}
 

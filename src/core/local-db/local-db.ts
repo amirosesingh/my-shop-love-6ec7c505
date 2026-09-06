@@ -3,8 +3,8 @@
  *
  * In the packaged Electron app the preload script exposes `window.pos`, and
  * every write becomes a parameterised T-SQL statement executed in the main
- * process. In a plain browser the bridge is absent and callers fall back to the
- * localStorage outbox, so the web build behaves exactly as before.
+ * process. The bridge is absent in web and Android builds; those clients write
+ * live to the central database and never queue business data locally.
  */
 import type { SyncOp } from "@/lib/sync-outbox";
 
