@@ -307,7 +307,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   // decision taken before it has answered is a decision taken on a guess.
   if (terminal.hydrating || !profileHydrated || ((isDesktop() || isNative()) && startup.probing))
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex h-dvh items-center justify-center">
         <Loader2 className="size-6 animate-spin text-primary" />
       </div>
     );
