@@ -539,7 +539,8 @@ async function pull() {
   try {
     const rulesSince = await markFor("pos_store_settings");
     const rulesStartedAt = new Date().toISOString();
-    const wanted = scope.storeId ? ["", scope.storeId] : [""];
+    const branch = credentials.branchId ? String(credentials.branchId) : "";
+    const wanted = branch ? ["", branch] : [""];
     const { data: rules, error: rulesError } = await supabase
       .from("pos_store_settings")
       .select("*")
@@ -698,7 +699,7 @@ async function restore({ days = 90 } = {}) {
     restoreState.table = "pos_store_settings";
     notify();
     try {
-      const wanted = scope.storeId ? ["", scope.storeId] : [""];
+      const wanted = storeId ? ["", storeId] : [""];
       const { data: rules, error: rulesError } = await supabase
         .from("pos_store_settings")
         .select("*")
