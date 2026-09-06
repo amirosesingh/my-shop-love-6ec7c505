@@ -21,6 +21,7 @@ import { getPosRules } from "./pos-rules.functions";
 import { getPosCallerAuth } from "./pos-caller-auth";
 import { subscribeSettingsChange } from "./sync-engine";
 import { readCachedRules, writeCachedRules, type CachedRules } from "./pos-rules-cache";
+import { rulesEqual, pendingExpired } from "./pos-rules-pending";
 import { logRules } from "./pos-rules-log";
 import { terminalId } from "./activity-journal";
 import { serverOrigin, posFetch } from "./server-origin";
@@ -40,13 +41,19 @@ export type RulesFailureKind =
   | "unknown";
 
 /** Where the rules in use came from. */
-export type RulesSourceKind = "DATABASE" | "LAST_KNOWN_GOOD" | "DEFAULT_SAFETY" | "UNAVAILABLE";
+export type RulesSourceKind =
+  | "DATABASE"
+  | "LOCAL_PENDING"
+  | "LAST_KNOWN_GOOD"
+  | "DEFAULT_SAFETY"
+  | "UNAVAILABLE";
 
 /** What the terminal is doing about them. */
 export type RulesStatus =
   | "LIVE"
   | "SYNCING"
   | "DEGRADED"
+  | "PENDING_UPLOAD"
   | "NOT_VERIFIED"
   | "IDENTITY_UNAVAILABLE";
 
@@ -64,6 +71,8 @@ const STATUS_TEXT: Record<RulesStatus, string> = {
   LIVE: "Live from the central database.",
   SYNCING: "Checking the central database…",
   DEGRADED: "Using the last confirmed rules — the latest check did not get through.",
+  PENDING_UPLOAD:
+    "A change saved on this terminal is in force here and is waiting to reach the central system.",
   NOT_VERIFIED:
     "This terminal has never received its branch rules, so the strict safety rules apply.",
   IDENTITY_UNAVAILABLE: "This terminal does not know its branch yet.",
@@ -127,7 +136,10 @@ type Answer = {
  * Last rule set the database actually served, per branch, for this session.
  * The encrypted device copy behind it survives a restart.
  */
-const lastGood = new Map<string, { rules: PosRules; revision: string; at: number }>();
+const lastGood = new Map<
+  string,
+  { rules: PosRules; revision: string; at: number; pending?: boolean }
+>();
 
 /** Ask the server, over whichever transport this platform can actually reach. */
 async function fetchRules(auth: Record<string, string>, storeId: string): Promise<Answer> {
@@ -182,7 +194,12 @@ export function PosRulesProvider({
       if (!cached && scope) {
         const stored: CachedRules | null = await readCachedRules(me, scope).catch(() => null);
         if (stored) {
-          cached = { rules: stored.rules, revision: stored.revision, at: stored.syncedAt };
+          cached = {
+            rules: stored.rules,
+            revision: stored.revision,
+            at: stored.syncedAt,
+            pending: stored.pending === true,
+          };
           lastGood.set(scope, cached);
         }
       }
