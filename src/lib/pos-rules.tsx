@@ -24,7 +24,9 @@ import { readCachedRules, writeCachedRules, type CachedRules } from "./pos-rules
 import { logRules } from "./pos-rules-log";
 import { terminalId } from "./activity-journal";
 import { serverOrigin, posFetch } from "./server-origin";
-import { isAndroid, isElectron } from "@/platform-config/platform";
+import { platformName } from "@/platform-config/platform";
+
+export { platformName };
 import { DEFAULT_POS_RULES, normalizeRules, type PosRules } from "./pos-rules";
 
 /** Why the live values are not in use, in words a supervisor can act on. */
@@ -120,12 +122,6 @@ type Answer = {
   rules?: unknown;
   error?: string;
 };
-
-export function platformName(): string {
-  if (isAndroid()) return "android";
-  if (isElectron()) return "electron";
-  return "web";
-}
 
 /**
  * Last rule set the database actually served, per branch, for this session.

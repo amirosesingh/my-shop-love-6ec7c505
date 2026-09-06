@@ -254,6 +254,8 @@ function Register() {
     getMemberName: () => member?.name ?? null,
     // A discount unlock lasts for this ticket only.
     onReset: () => setDiscountOverride(false),
+    // The register settings decide whether an out-of-stock item can be sold.
+    preventNegativeStock: rules.prevent_negative_stock_sale,
   });
   /** Cashier-adjustable column widths, remembered on this device. */
 

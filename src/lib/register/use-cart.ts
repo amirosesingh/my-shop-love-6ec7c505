@@ -11,6 +11,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { availableAt, stockAt } from "@/lib/pos-store";
 import { clearCartDraft } from "@/lib/cart-draft";
+import { blocksOutOfStockSale } from "@/lib/register/stock-guard";
 import { logger } from "@/lib/audit-log";
 import { TICKET_ACTIONS, logTicketEvent } from "@/lib/ticket-audit";
 import type { Booking, CartLine, DiscountType, Product, Store } from "@/core/types/pos-types";
@@ -44,6 +45,13 @@ type CartDeps = {
   getMemberName: () => string | null;
   /** Fired when the ticket is emptied, so one-off unlocks do not linger. */
   onReset?: () => void;
+  /**
+   * The register setting "Prevent negative stock sale". The till used to block
+   * an out-of-stock item outright, whatever the branch had chosen, so the
+   * setting could never be honoured. The register settings now decide, and
+   * they are the only thing that decides.
+   */
+  preventNegativeStock: boolean;
 };
 
 export function useCart(deps: CartDeps) {
@@ -66,12 +74,14 @@ export function useCart(deps: CartDeps) {
     const onHand = availableAt(product, deps.currentStore.id, deps.bookings);
     if (onHand <= 0) {
       const reserved = stockAt(product, deps.currentStore.id) > 0;
-      toast.error(
-        reserved
-          ? `${product.name} is fully reserved by open bookings at ${deps.currentStore.name}`
-          : `${product.name} is out of stock at ${deps.currentStore.name}`,
-      );
-      return;
+      const message = reserved
+        ? `${product.name} is fully reserved by open bookings at ${deps.currentStore.name}`
+        : `${product.name} is out of stock at ${deps.currentStore.name}`;
+      if (blocksOutOfStockSale(onHand, deps.preventNegativeStock)) {
+        toast.error(message);
+        return;
+      }
+      toast.warning(`${message} — sold anyway`);
     }
     setLines((ls) => {
       const found = ls.find((l) => l.productId === productId && !l.credit);

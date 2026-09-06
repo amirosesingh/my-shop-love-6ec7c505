@@ -29,6 +29,16 @@ export function setAutoLockSeconds(seconds: number) {
   for (const l of listeners) l();
 }
 
+/**
+ * The idle delay actually applied: the branch's register setting when it is
+ * confirmed, otherwise the per-machine fallback.
+ */
+export function effectiveLockSeconds(ruleSeconds?: number): number {
+  if (typeof ruleSeconds === "number" && Number.isFinite(ruleSeconds) && ruleSeconds >= 0)
+    return Math.min(Math.round(ruleSeconds), 86_400);
+  return autoLockSeconds();
+}
+
 export function subscribeAutoLock(cb: () => void) {
   listeners.add(cb);
   return () => listeners.delete(cb);
@@ -40,7 +50,7 @@ const EVENTS = ["pointerdown", "keydown", "wheel", "touchstart", "mousemove"] as
  * Lock `onLock` in when the screen has been left alone. Nothing happens while
  * nobody is signed in, or while the delay is switched off.
  */
-export function useAutoLock(active: boolean, onLock: () => void) {
+export function useAutoLock(active: boolean, onLock: () => void, ruleSeconds?: number) {
   const lockRef = useRef(onLock);
   lockRef.current = onLock;
 
@@ -51,7 +61,9 @@ export function useAutoLock(active: boolean, onLock: () => void) {
 
     const arm = () => {
       window.clearTimeout(timer);
-      const seconds = autoLockSeconds();
+      // The register settings decide when they are the confirmed source; the
+      // per-machine value is only a fallback while they have not arrived.
+      const seconds = effectiveLockSeconds(ruleSeconds);
       if (!seconds || stopped) return;
       timer = window.setTimeout(() => {
         stopped = true;
@@ -69,5 +81,5 @@ export function useAutoLock(active: boolean, onLock: () => void) {
       for (const e of EVENTS) window.removeEventListener(e, arm);
       offSetting();
     };
-  }, [active]);
+  }, [active, ruleSeconds]);
 }
