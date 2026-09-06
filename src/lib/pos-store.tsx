@@ -207,8 +207,21 @@ const bumpItems = (
     return item ? bump(p, storeId, sign * item.qty) : p;
   });
 
+/** Where the first read of the shop's data has got to. */
+export type LoadPhase = "loading" | "ready" | "stalled" | "failed";
+
 type Ctx = {
   ready: boolean;
+  /**
+   * Honest launch state. `stalled` means the first read is taking longer than
+   * expected — it never means the data arrived. `failed` means the read
+   * genuinely came back with an error.
+   */
+  loadPhase: LoadPhase;
+  /** true only once the location list has actually been answered for */
+  storesLoaded: boolean;
+  /** run the first read again after a stall or failure */
+  retryLoad: () => void;
   state: PosState;
   stores: Store[];
   /** every location including archived ones — for the setup screen only */
@@ -396,6 +409,16 @@ function applyCloud(s: PosState, cloud: CloudSlice): PosState {
 export function PosProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<PosState>(emptyState);
   const [ready, setReady] = useState(false);
+  // Loading, ready, stalled or failed — never "the clock ran out, call it ready".
+  const [loadPhase, setLoadPhase] = useState<LoadPhase>("loading");
+  // Whether the location list has actually been answered for, so an empty list
+  // can be told apart from a list that has not arrived yet.
+  const [storesLoaded, setStoresLoaded] = useState(false);
+  const [reloadTick, setReloadTick] = useState(0);
+  const retryLoad = useCallback(() => {
+    setLoadPhase("loading");
+    setReloadTick((v) => v + 1);
+  }, []);
   const { authUserId, terminalUser, user, isAdmin, isSupervisor, ready: authReady } = useAuth();
   // Nothing is fetched from the cloud until a cashier or supervisor session
   // exists — visitors never receive catalogue, member or sales data.
@@ -428,10 +451,11 @@ export function PosProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
-    // A read that never answers must not keep the till on the loader: after
-    // this the app opens on whatever data it already has.
+    // A read that is taking too long is reported as exactly that. It is never
+    // turned into "the data arrived", which would show an empty, healthy-looking
+    // shop built out of nothing.
     const watchdog = window.setTimeout(() => {
-      if (!cancelled) setReady(true);
+      if (!cancelled) setLoadPhase((p) => (p === "loading" ? "stalled" : p));
     }, 15000);
     // Local-only slices (stores, shifts, transfers, counters) stay on the
     // terminal; catalogue, members, bills, promos and settings come from cloud.
@@ -466,7 +490,10 @@ export function PosProvider({ children }: { children: ReactNode }) {
     void (async () => {
       // Anonymous visitors get nothing: no products, members or sales.
       if (!signedIn) {
-        if (authReady && !cancelled) setReady(true);
+        if (authReady && !cancelled) {
+          setReady(true);
+          setLoadPhase("ready");
+        }
         return;
       }
       // Offline-first boot: paint the last known good snapshot immediately so
@@ -480,9 +507,15 @@ export function PosProvider({ children }: { children: ReactNode }) {
           clearSnapshot();
         }
         setReady(true);
+        // The snapshot carries the locations this terminal last saw, so the
+        // launch screen has a real answer while the fresh read is in flight.
+        setStoresLoaded(true);
       }
       if (typeof navigator !== "undefined" && !navigator.onLine) {
-        if (!cancelled) setReady(true);
+        if (!cancelled) {
+          setReady(true);
+          setLoadPhase("ready");
+        }
         return;
       }
       try {
@@ -493,13 +526,16 @@ export function PosProvider({ children }: { children: ReactNode }) {
         if (cancelled) return;
         writeSnapshot(cloud);
         setState((s) => applyCloud(s, cloud));
+        // The locations question now has a real answer, empty or not.
+        setStoresLoaded(true);
+        setLoadPhase("ready");
         // No backfill here on purpose: an empty branch list means the operator
         // deleted them, and re-creating them would undo that.
-        // Bookings and racket job cards live in the cloud so every till and
-        // the phone see the same list.
-        try {
-          const cloudBookings = await loadBookings();
-          if (!cancelled && cloudBookings.length) {
+        // Bookings and racket job cards are secondary: the till is usable
+        // without them, so they arrive after the first screen is up.
+        void loadBookings()
+          .then((cloudBookings) => {
+            if (cancelled || !cloudBookings.length) return;
             setState((s: PosState) => {
               const seen = new Set(cloudBookings.map((b) => b.id));
               return {
@@ -507,12 +543,13 @@ export function PosProvider({ children }: { children: ReactNode }) {
                 bookings: [...cloudBookings, ...s.bookings.filter((b) => !seen.has(b.id))],
               };
             });
-          }
-        } catch {
-          /* offline or not permitted — the local list still works */
-        }
+          })
+          .catch(() => {
+            /* offline or not permitted — the local list still works */
+          });
       } catch (e) {
         dbError("Loading data", e);
+        if (!cancelled) setLoadPhase("failed");
       } finally {
         if (!cancelled) setReady(true);
       }
@@ -522,7 +559,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       cancelled = true;
       window.clearTimeout(watchdog);
     };
-  }, [signedIn, authReady]);
+  }, [signedIn, authReady, reloadTick]);
 
   useEffect(() => {
     if (!ready) return;
@@ -2643,6 +2680,9 @@ export function PosProvider({ children }: { children: ReactNode }) {
 
   const value: Ctx = {
     ready,
+    loadPhase,
+    storesLoaded,
+    retryLoad,
     state: effectiveState,
     settingsScope: scope,
     scopeIds,

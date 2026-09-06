@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import { Link, useLocation } from "@tanstack/react-router";
-import { MapPinOff } from "lucide-react";
+import { MapPinOff, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { TillLoader } from "@/components/shared/TillLoader";
 import { usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
 
@@ -9,13 +10,39 @@ import { useAuth } from "@/lib/pos-auth";
  * Launch check: a till with no active location has nowhere to book stock or
  * attribute a sale, so the app is held here until one exists. Location setup
  * itself stays reachable, otherwise the operator could never leave this state.
+ *
+ * "No locations yet" and "the location list has not arrived yet" look
+ * identical in the data — both are an empty list — so this screen never
+ * guesses. Until the database has actually answered it says it is loading.
  */
 export function LocationBootGuard({ children }: { children?: ReactNode }) {
-  const { stores } = usePos();
+  const { stores, storesLoaded, loadPhase, retryLoad } = usePos();
   const { isAdmin } = useAuth();
   const { pathname } = useLocation();
 
   if (stores.length > 0 || pathname.startsWith("/stores")) return <>{children}</>;
+
+  // Still waiting on the answer — say so rather than claiming there is nothing.
+  if (!storesLoaded && loadPhase !== "failed")
+    return <TillLoader message="Loading locations…" />;
+
+  if (!storesLoaded)
+    return (
+      <div className="flex min-h-screen items-center justify-center p-6">
+        <div className="w-full max-w-md space-y-4 rounded-lg border border-border bg-surface-1 p-6 text-center">
+          <div className="space-y-1">
+            <h1 className="text-lg font-semibold">Could not load locations</h1>
+            <p className="text-sm text-muted-foreground">
+              The location list did not come back. Nothing has been changed — try again once the
+              connection settles.
+            </p>
+          </div>
+          <Button className="w-full" onClick={retryLoad}>
+            <RefreshCw className="mr-1.5 size-4" /> Try again
+          </Button>
+        </div>
+      </div>
+    );
 
   return (
     <div className="flex min-h-screen items-center justify-center p-6">
