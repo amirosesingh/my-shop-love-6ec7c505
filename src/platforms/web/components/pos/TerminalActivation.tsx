@@ -109,7 +109,7 @@ export function TerminalActivation({
         setBusy(false);
       }
     },
-    [onActivated],
+    [],
   );
 
   // While the operator waits, keep asking whether an administrator approved
