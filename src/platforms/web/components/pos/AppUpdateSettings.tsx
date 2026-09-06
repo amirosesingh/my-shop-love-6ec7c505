@@ -1,4 +1,14 @@
-import { CheckCircle2, DownloadCloud, Loader2, RefreshCw, Smartphone, Monitor, Globe } from "lucide-react";
+import {
+  CheckCircle2,
+  ClipboardCopy,
+  DownloadCloud,
+  Globe,
+  Loader2,
+  Monitor,
+  PlugZap,
+  RefreshCw,
+  Smartphone,
+} from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -80,6 +90,14 @@ export function AppUpdateSettings() {
   return <DesktopUpdateCard />;
 }
 
+/** Plain words for the point where an update gave up. */
+const STAGE_LABELS: Record<string, string> = {
+  check: "Could not reach the update folder",
+  download: "The download did not finish",
+  verify: "The downloaded file failed its safety check",
+  install: "The installer could not start",
+};
+
 function DesktopUpdateCard() {
   const {
     state,
@@ -92,7 +110,12 @@ function DesktopUpdateCard() {
     manifestNewer,
     releaseNotes,
     downloadUrl,
+    diagnose,
+    diagnosing,
+    diagnosis,
+    failureReport,
   } = useAppUpdates();
+  const [copied, setCopied] = useState(false);
 
   const version = state.version || APP_VERSION;
   const busy = manifestChecking || state.status === "checking" || state.status === "downloading";
