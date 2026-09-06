@@ -265,8 +265,21 @@ export const assertShiftClosable = createServerFn({ method: "POST" })
     );
     try {
       await assertCaller(data);
-      const loaded = await loadRulesResult(data.storeId ?? "");
+      // The branch is taken from the caller's own proof where it carries one,
+      // so a till can never be closed against another branch's rules.
+      const { resolveRulesAccess } = await import("./pos-rules-access.server");
+      const access = await resolveRulesAccess({ ...data, storeId: data.storeId ?? "" });
+      if (!access.ok) {
+        return {
+          ok: false as const,
+          code: "ERROR" as const,
+          held: 0,
+          error: access.error,
+        };
+      }
+      const loaded = await loadRulesResult(access.branchId);
       const rules = loaded.rules;
+
       const override = verifyOverrideGrant(data.grantToken, "shift_close");
       if (rules.block_shift_close_on_hold && !override) {
         const heldRes = await heldOrderCountResult(data.storeId ?? "");
