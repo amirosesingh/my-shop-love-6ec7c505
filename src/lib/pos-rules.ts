@@ -109,6 +109,18 @@ export const DEFAULT_POS_RULES: PosRules = {
   require_pin_shift_close: false,
   require_pin_edit_tenders: false,
   require_pin_terminal_reset: true,
+  allow_offline_approvals: true,
+  offline_approval_requires_pin: true,
+  online_only_refund: false,
+  online_only_void_cart: false,
+  online_only_void_line: false,
+  online_only_reduce_qty: false,
+  online_only_manual_discount: false,
+  online_only_price_override: false,
+  online_only_stock_adjustment: false,
+  online_only_shift_close: false,
+  online_only_edit_tenders: false,
+  online_only_terminal_reset: false,
 };
 
 /** Coerce an untrusted payload (API row) into a complete rule set. */
@@ -224,6 +236,26 @@ export const RULE_GROUPS: RuleGroup[] = [
       { key: "require_pin_terminal_reset", kind: "switch", label: "Unpair / reset a terminal", blurb: "Sending this machine back to the activation screen." },
     ],
   },
+  {
+    id: "offline-approvals",
+    label: "Approvals while offline",
+    blurb:
+      "What a manager may authorise at the till when the central system cannot be reached. Every offline approval is recorded and uploaded with everything else.",
+    fields: [
+      { key: "allow_offline_approvals", kind: "switch", label: "Allow approvals while offline", blurb: "Off means no approval can be given until the connection is back." },
+      { key: "offline_approval_requires_pin", kind: "switch", label: "Offline approval needs a manager PIN", blurb: "Off lets a recent approval on this till stand in for a fresh PIN." },
+      { key: "online_only_refund", kind: "switch", label: "Refunds need the central system", blurb: "Refund approvals are refused while offline." },
+      { key: "online_only_void_cart", kind: "switch", label: "Void the whole cart needs the central system", blurb: "Refused while offline." },
+      { key: "online_only_void_line", kind: "switch", label: "Void a line needs the central system", blurb: "Refused while offline." },
+      { key: "online_only_reduce_qty", kind: "switch", label: "Reduce a quantity needs the central system", blurb: "Refused while offline." },
+      { key: "online_only_manual_discount", kind: "switch", label: "Manual discounts need the central system", blurb: "Refused while offline." },
+      { key: "online_only_price_override", kind: "switch", label: "Price override needs the central system", blurb: "Refused while offline." },
+      { key: "online_only_stock_adjustment", kind: "switch", label: "Stock adjustment needs the central system", blurb: "Refused while offline." },
+      { key: "online_only_shift_close", kind: "switch", label: "Shift close needs the central system", blurb: "Refused while offline." },
+      { key: "online_only_edit_tenders", kind: "switch", label: "Editing split payments needs the central system", blurb: "Refused while offline." },
+      { key: "online_only_terminal_reset", kind: "switch", label: "Terminal reset needs the central system", blurb: "Refused while offline." },
+    ],
+  },
 ];
 
 // --------------------------------------------------------------------------
@@ -258,6 +290,35 @@ export const GATE_RULE_KEY: Record<GateAction, PosRuleKey> = {
   edit_tenders: "require_pin_edit_tenders",
   terminal_unpair: "require_pin_terminal_reset",
 };
+
+/** Which rule says this action may only be approved with a live connection. */
+export const GATE_ONLINE_ONLY_KEY: Record<GateAction, PosRuleKey> = {
+  refund: "online_only_refund",
+  void_cart: "online_only_void_cart",
+  void_line: "online_only_void_line",
+  reduce_qty: "online_only_reduce_qty",
+  manual_discount: "online_only_manual_discount",
+  discount_over_limit: "online_only_manual_discount",
+  price_override: "online_only_price_override",
+  no_sale_drawer: "online_only_void_cart",
+  stock_adjustment: "online_only_stock_adjustment",
+  shift_close: "online_only_shift_close",
+  edit_tenders: "online_only_edit_tenders",
+  terminal_unpair: "online_only_terminal_reset",
+};
+
+/**
+ * What this till may do about an approval when the central system cannot be
+ * reached: refuse it, accept a manager PIN checked against the credentials
+ * already held on this device, or accept a recent approval on this till.
+ */
+export type OfflineApprovalMode = "refused" | "manager_pin" | "cached";
+
+export function offlineApprovalMode(rules: PosRules, action: GateAction): OfflineApprovalMode {
+  if (!rules.allow_offline_approvals) return "refused";
+  if (rules[GATE_ONLINE_ONLY_KEY[action]]) return "refused";
+  return rules.offline_approval_requires_pin ? "manager_pin" : "cached";
+}
 
 /** Does this action need a manager's PIN under the current branch rules? */
 export const requiresManagerPin = (rules: PosRules, action: GateAction): boolean =>
